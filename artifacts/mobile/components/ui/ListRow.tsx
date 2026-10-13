@@ -37,12 +37,14 @@ export interface ListRowProps {
   onPress?: () => void;
   disabled?: boolean;
   destructive?: boolean;
+  /** Announces the row as the chosen option (picker sheets). */
+  selected?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
 
 export function ListRow({
-  icon, iconColor, avatar, title, subtitle, subtitleNumberOfLines = 1, value, chevron, toggle, right, onPress, disabled, destructive, style, testID,
+  icon, iconColor, avatar, title, subtitle, subtitleNumberOfLines = 1, value, chevron, toggle, right, onPress, disabled, destructive, selected, style, testID,
 }: ListRowProps) {
   const palette = useColors();
   // Rows get a subtle background highlight instead of a scale — a whole row
@@ -81,7 +83,7 @@ export function ListRow({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
-      accessibilityState={{ disabled }}
+      accessibilityState={selected === undefined ? { disabled } : { disabled, selected }}
       disabled={disabled}
       onPress={() => { hapticLight(); onPress?.(); }}
       onPressIn={() => Animated.timing(highlight, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}

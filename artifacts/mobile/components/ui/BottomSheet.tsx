@@ -1,189 +1,318 @@
 /**
- * Brandthread Design System — BottomSheet (Phase 1 → Phase 2: shared sheet
- * transition primitive)
+ * Brandthread Design System — the shared sheet system.
  *
- * `useSheetTransition` is the ONE animation/dismissal engine every bottom
- * sheet in the app should use — Reanimated (UI-thread) only, a single close
- * timeline for the sheet transform + backdrop fade, a swipe-to-close pan
- * gesture (velocity-based dismissal) that also stays on the UI thread, and a
- * `finished`-gated close callback so the caller never unmounts/clears state
- * before the close animation has actually finished (the exact race that
- * produced the "stops a quarter of the way, then jumps the rest of the way"
- * Shop-the-Post close glitch: a legacy JS-thread `Animated.timing` sharing
- * the same thread as React re-renders can stall mid-flight and then jump to
- * catch up to its time-based target).
+ * `useSheetTransition` is the ONE motion/dismissal engine every bottom sheet
+ * in the app uses. Everything runs on the UI thread (Reanimated + Gesture
+ * Handler):
  *
- * `<BottomSheet>` below is the simple, generic sheet (grabber handle, dimmed
- * backdrop, keyboard-aware content) built on top of the hook, for anything
- * simpler than a bespoke sheet with its own header/chrome (ShopProductSheet,
- * VariantPickerSheet, SaveToCollectionSheet, …). Those sheets use
- * `useSheetTransition` directly so they keep their own layout while sharing
- * the exact same motion engine.
+ *  - Open: a fast, firm spring (SHEET_SPRING, ~260ms, overshoot-clamped so
+ *    it lands crisply with no wobble). Light haptic.
+ *  - Drag: the sheet follows the finger. Dragging up past rest rubber-bands
+ *    (iOS resistance curve). The backdrop's opacity is derived from the
+ *    sheet's own position, so it fades in lockstep while dragging too.
+ *  - Release: past ~25% of the sheet's height, or a downward flick, dismisses
+ *    on the same spring carrying the finger's velocity. Otherwise it springs
+ *    back to rest with a selection tick (the detent snap).
+ *  - Close: light haptic, then `onClosed` fires exactly once, only after the
+ *    close motion has finished. It never fires early, and never twice. (A
+ *    swipe-dismiss used to fire it a second time when the parent then
+ *    flipped `visible` false.)
  *
- * Layout/interaction reference only: UNIQLO "Added to cart" sheet.
+ * `<Sheet>` is the shared chrome built on the engine: a raised surface, a
+ * grabber, a left-aligned title row with a circular close (or "Done"), a
+ * scrollable body that never cuts content off, and an optional primary
+ * action pinned above the home indicator that rides up with the keyboard.
+ * `<BottomSheet>` is the same chrome without a title row, kept for existing
+ * call sites that draw their own header.
+ *
+ * Bespoke sheets with their own layout (ShopProductSheet, ReportSheet,
+ * SaveToCollectionSheet, …) keep calling `useSheetTransition` directly, so
+ * they share the exact same motion and haptics.
+ *
+ * Web: RN Web's Modal already traps focus and closes on Escape (it calls
+ * `onRequestClose`), so both come for free from the Modal wrapper.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import { a11yModalProps } from '@/lib/a11y/modal';
-import { Dimensions, Modal, Pressable, StyleSheet, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-  type AnimatedStyle,
-} from 'react-native-reanimated';
-import { useColors } from '@/hooks/useColors';
-import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
-import { RADII } from '@/constants/radii';
-import { SPACING } from '@/constants/spacing';
 import {
-  SHEET_CLOSE_MS, SHEET_EASING, SHEET_OFFSCREEN_Y, SHEET_OPEN_MS,
-} from '@/constants/motion';
+  ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, View,
+  type StyleProp, type ViewStyle,
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { useAnimatedScrollHandler, useAnimatedStyle } from 'react-native-reanimated';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useKeyboardHeight } from '@/components/KeyboardProviderCompat';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { radius } from '@/constants/radii';
+import { FONT } from '@/lib/theme';
+import { hapticLight, hapticMedium } from '@/lib/haptics';
+import { SHEET_BACKDROP_OPACITY } from '@/constants/motion';
+import { useSheetTransition } from '@/components/ui/useSheetTransition';
 import { useIsWebShell, WEB_SHELL_MAX_WIDTH } from '@/components/web/WebAppShell';
+import { sheetSurfaceColor } from '@/lib/sheetSurface';
 
-export interface SheetTransition {
-  /** Whether the sheet's Modal should currently be mounted/shown. Stays true
-   *  through the whole close animation and only flips false once it's done —
-   *  drive `<Modal visible={modalVisible} ...>` (or an equivalent) from it. */
-  modalVisible: boolean;
-  /** Animated style for the sheet's translateY — apply to the sheet's outer
-   *  `Animated.View`. */
-  sheetStyle: AnimatedStyle<{ transform?: { translateY: number }[] }>;
-  /** Animated style for the backdrop's opacity — apply to the backdrop's
-   *  `Animated.View`, on the exact same timeline as `sheetStyle`. */
-  backdropStyle: AnimatedStyle<{ opacity: number }>;
-  /** Pan gesture for swipe-to-close: attach via `<GestureDetector gesture={panGesture}>`
-   *  around the sheet's outer `Animated.View` (or a drag-handle region of it). */
-  panGesture: ReturnType<typeof Gesture.Pan>;
-  /** Attach to the sheet's outer `Animated.View`'s `onLayout` so the pan
-   *  gesture's dismiss threshold (25% of the sheet's actual rendered
-   *  height) is measured, not guessed — a fixed pixel threshold felt wrong
-   *  on a short sheet and too lenient on a tall one. */
-  onSheetLayout: (event: { nativeEvent: { layout: { height: number } } }) => void;
+// ─── Look ─────────────────────────────────────────────────────────────────────
+
+/** Top corner radius of every shared sheet (12–16pt per the sheet spec). */
+export const SHEET_RADIUS = 16;
+/** Horizontal padding for sheet content: title row, body and pinned action. */
+export const SHEET_GUTTER = 20;
+/** Height of the pinned primary action. */
+export const SHEET_ACTION_HEIGHT = 50;
+
+export { sheetSurfaceColor };
+
+export { useSheetTransition, type SheetTransition } from '@/components/ui/useSheetTransition';
+
+// ─── Chrome ───────────────────────────────────────────────────────────────────
+
+export interface SheetAction {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  /** `secondary` is a quiet filled button (e.g. "Cancel" under a primary). */
+  variant?: 'primary' | 'secondary' | 'destructive';
+  accessibilityLabel?: string;
+  testID?: string;
 }
 
-/**
- * Drives a sheet's open/close transform + backdrop opacity, and its
- * swipe-to-close gesture, all on the UI thread. `onClosed` fires exactly
- * once the close animation has finished — never before, and never if the
- * animation is interrupted by another `visible` flip.
- */
-export function useSheetTransition(
-  visible: boolean,
-  onClosed: () => void,
-  opts?: { closeDistance?: number; reduceMotion?: boolean | null },
-): SheetTransition {
-  // Falls back to the window's own height (never a measured sheet height —
-  // this must be independent of `onSheetLayout`/`sheetHeight` below, which
-  // only ever feeds the swipe-dismiss threshold) union'd with the fixed
-  // SHEET_OFFSCREEN_Y floor, so a very short window still gets comfortable
-  // offscreen clearance.
-  const closeDistance = opts?.closeDistance ?? Math.max(Dimensions.get('window').height, SHEET_OFFSCREEN_Y);
-  const reduceMotion = !!opts?.reduceMotion;
-  const translateY = useSharedValue(closeDistance);
-  const backdropOpacity = useSharedValue(0);
-  const [modalVisible, setModalVisible] = useState(visible);
-  const onClosedRef = useRef(onClosed);
-  onClosedRef.current = onClosed;
-
-  useEffect(() => {
-    if (visible) {
-      setModalVisible(true);
-      // Always animate via `withTiming` on the shared SHEET_TIMING curve —
-      // never a bare `.set()`/`.value =` jump straight to the target, even
-      // under reduceMotion. On web, a one-off synchronous value write with
-      // nothing else scheduling a frame after it can update the JS-side
-      // shared-value store without Reanimated ever pushing the matching DOM
-      // style patch, leaving the sheet permanently stuck at its *previous*
-      // transform (fully offscreen) even though the computed style is
-      // already correct — this was the "Shop the Post never opens" web
-      // regression. `withTiming` always goes through the same rAF-driven
-      // commit path a running animation uses, so the DOM reliably updates;
-      // 260ms is short enough that reduceMotion users aren't meaningfully
-      // affected by keeping it animated rather than instant.
-      backdropOpacity.set(withTiming(1, { duration: SHEET_OPEN_MS, easing: SHEET_EASING }));
-      translateY.set(withTiming(0, { duration: SHEET_OPEN_MS, easing: SHEET_EASING }));
-      return;
-    }
-    // Closing: keep the Modal mounted until the transform finishes — this is
-    // the single close timeline (sheet + backdrop share duration/easing), and
-    // nothing unmounts or clears caller state until `finished` is true.
-    // Same reasoning as the open branch above: always `withTiming`, never a
-    // bare assignment, even under reduceMotion.
-    backdropOpacity.set(withTiming(0, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING }));
-    translateY.set(
-      withTiming(closeDistance, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING }, finished => {
-        'worklet';
-        if (finished) {
-          runOnJS(setModalVisible)(false);
-          runOnJS(onClosedRef.current)();
-        }
-      }),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, reduceMotion]);
-
-  // Plain transform, always present — NOT `identityOrNone`: that helper drops
-  // the `transform` key entirely once the value is back at its identity (0),
-  // which is a real anti-blur win when a key that's already applied just
-  // stops changing. But the very first time the sheet reaches rest, the key
-  // goes from *present* (a real offscreen offset) to *absent* in one step,
-  // and Reanimated's web DOM patcher does not reliably clear a previously
-  // applied CSS `transform` when a later style update simply omits the key —
-  // the JS-computed style is correct (no transform) but the stale transform
-  // stays painted, leaving the sheet permanently stuck offscreen. That was
-  // this bug: "Shop the Post never opens" on web. A ever-present transform
-  // key (even an identity one) always gets diffed and applied.
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
-  const backdropStyle = useAnimatedStyle(() => ({ opacity: backdropOpacity.value }));
-
-  // Snap points/content height are never touched mid-gesture: the pan only
-  // ever writes to `translateY`, nothing about layout.
-  const dragStartY = useSharedValue(0);
-  // Measured via onSheetLayout below; falls back to closeDistance (a generous
-  // over-estimate) until the first layout so an extremely early drag still
-  // has a sane threshold rather than reading as `0 * 0.25 = 0` (always closes).
-  const sheetHeight = useSharedValue(closeDistance);
-  const onSheetLayout = useCallback((event: { nativeEvent: { layout: { height: number } } }) => {
-    const { height } = event.nativeEvent.layout;
-    if (height > 0) sheetHeight.set(height);
-  }, [sheetHeight]);
-
-  const panGesture = Gesture.Pan()
-    .onStart(() => {
-      dragStartY.set(translateY.value);
-    })
-    .onUpdate(e => {
-      const next = dragStartY.value + e.translationY;
-      translateY.set(Math.max(0, next));
-    })
-    .onEnd(e => {
-      // Past ~25% of the sheet's own height, or a fast flick, closes it —
-      // otherwise it returns to open. Both paths are `withTiming`, never a
-      // spring, so "returns" never overshoots past its resting position.
-      const shouldClose = e.translationY > sheetHeight.value * 0.25 || e.velocityY > 800;
-      if (shouldClose) {
-        backdropOpacity.set(withTiming(0, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING }));
-        translateY.set(
-          withTiming(closeDistance, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING }, finished => {
-            'worklet';
-            if (finished) {
-              runOnJS(setModalVisible)(false);
-              runOnJS(onClosedRef.current)();
-            }
-          }),
-        );
-      } else {
-        translateY.set(withTiming(0, { duration: SHEET_OPEN_MS, easing: SHEET_EASING }));
-      }
-    });
-
-  return {
-    modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout,
-  };
+export interface SheetProps {
+  visible: boolean;
+  /** Called on backdrop tap, close button, Escape (web), back (Android), and
+   *  after a swipe-dismiss finishes. Set your `visible` false here. */
+  onClose: () => void;
+  /** Left-aligned title. Omit for a chrome-free sheet (grabber only). */
+  title?: string;
+  /** What sits at the right of the title row. Defaults to a circular close
+   *  button when there's a title. `done` shows a "Done" text button. */
+  headerRight?: 'close' | 'done' | 'none' | React.ReactNode;
+  /** Optional left slot in the title row (e.g. a back chevron). */
+  headerLeft?: React.ReactNode;
+  /** "Done" press; defaults to `onClose`. */
+  onDone?: () => void;
+  /** Pinned under the body, above the home indicator / keyboard. */
+  primaryAction?: SheetAction;
+  secondaryAction?: SheetAction;
+  /** Custom pinned footer (rendered instead of the actions above). */
+  footer?: React.ReactNode;
+  children?: React.ReactNode;
+  /** Body scrolls when taller than the sheet's max height (default true). */
+  scrollable?: boolean;
+  /** Pads the body by SHEET_GUTTER horizontally (default true). */
+  padded?: boolean;
+  /** Tallest the sheet may get, as a fraction of the window (default 0.92). */
+  maxHeightRatio?: number;
+  /** Rise with the keyboard (default true). */
+  avoidKeyboard?: boolean;
+  testID?: string;
+  reduceMotion?: boolean | null;
+  accessibilityLabel?: string;
+  /** Extra style for the body content container. */
+  contentContainerStyle?: StyleProp<ViewStyle>;
 }
+
+export function SheetButton({ label, onPress, disabled, loading, variant = 'primary', accessibilityLabel, testID }: SheetAction) {
+  const { theme } = useAppTheme();
+  const filled = variant === 'primary';
+  const bg = filled ? theme.accent : `${theme.text}14`;
+  const fg = filled ? theme.onAccent : variant === 'destructive' ? theme.error : theme.text;
+  const inactive = !!disabled || !!loading;
+  return (
+    <PressableScale
+      onPress={() => {
+        if (inactive) return;
+        if (filled) hapticMedium(); else hapticLight();
+        onPress();
+      }}
+      disabled={inactive}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ disabled: !!disabled, busy: !!loading }}
+      testID={testID}
+      style={[styles.action, { backgroundColor: bg }, disabled && !loading && styles.actionDisabled]}
+    >
+      {loading
+        ? <ActivityIndicator color={fg} />
+        : <Text style={[styles.actionLabel, { color: fg }]} numberOfLines={1}>{label}</Text>}
+    </PressableScale>
+  );
+}
+
+export function SheetCloseButton({ onPress, label = 'Close' }: { onPress: () => void; label?: string }) {
+  const { theme } = useAppTheme();
+  return (
+    <PressableScale
+      onPress={() => { hapticLight(); onPress(); }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={{ top: 7, bottom: 7, left: 7, right: 7 }}
+      style={[styles.closeCircle, { backgroundColor: `${theme.text}1F` }]}
+      testID="sheet-close"
+    >
+      <Feather name="x" size={16} color={theme.text} />
+    </PressableScale>
+  );
+}
+
+export function SheetGrabber() {
+  const { theme } = useAppTheme();
+  return (
+    <View style={styles.grabberWrap} pointerEvents="none">
+      <View style={[styles.grabber, { backgroundColor: `${theme.text}66` }]} />
+    </View>
+  );
+}
+
+export function Sheet({
+  visible, onClose, title, headerRight, headerLeft, onDone, primaryAction, secondaryAction, footer,
+  children, scrollable = true, padded = true, maxHeightRatio = 0.92, avoidKeyboard = true,
+  testID, reduceMotion, accessibilityLabel, contentContainerStyle,
+}: SheetProps) {
+  const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
+  // Modal portals straight to <body> on web, outside WebAppShell's centred
+  // column, so the sheet itself is capped and centred there. The backdrop
+  // still dims the whole viewport.
+  const isWebShell = useIsWebShell();
+  const {
+    modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout, scrollOffset, bodyOverflows,
+  } = useSheetTransition(visible, onClose, { reduceMotion });
+
+  // Native: the whole sheet is draggable, coordinated with the body's own
+  // scroll (the sheet only moves while the body is at its top). Web: the
+  // grabber + title row is the drag handle, so touch-scrolling the body on a
+  // phone browser is never hijacked.
+  const isWeb = Platform.OS === 'web';
+  const nativeScroll = Gesture.Native();
+  if (!isWeb && scrollable) panGesture.simultaneousWithExternalGesture(nativeScroll);
+  const viewportH = useRef(0);
+  const contentH = useRef(0);
+  const syncOverflow = () => bodyOverflows.set(contentH.current > viewportH.current + 1);
+
+  const keyboard = useKeyboardHeight();
+  const restingBottom = Math.max(insets.bottom, 16);
+  // Pinned content sits on the keyboard (8pt gap) while it's up, and above
+  // the home indicator when it's down — tracked per frame, no jump.
+  const keyboardStyle = useAnimatedStyle(() => ({
+    paddingBottom: avoidKeyboard ? Math.max(restingBottom, -keyboard.value + 8) : restingBottom,
+  }));
+  const onScroll = useAnimatedScrollHandler(e => { scrollOffset.set(e.contentOffset.y); });
+
+  const right = headerRight ?? (title ? 'close' : 'none');
+  const rightNode = right === 'close'
+    ? <SheetCloseButton onPress={onClose} />
+    : right === 'done'
+      ? (
+        <PressableScale
+          onPress={() => { hapticLight(); (onDone ?? onClose)(); }}
+          accessibilityRole="button"
+          accessibilityLabel="Done"
+          testID="sheet-done"
+        >
+          <Text style={[styles.doneLabel, { color: theme.text }]}>Done</Text>
+        </PressableScale>
+      )
+      : right === 'none' ? null : right;
+  const wrapSheetDrag = (node: React.ReactElement) => (isWeb ? node : <GestureDetector gesture={panGesture}>{node}</GestureDetector>);
+  const wrapHandleDrag = (node: React.ReactElement) => (isWeb ? <GestureDetector gesture={panGesture}>{node}</GestureDetector> : node);
+  const hasHeader = !!title || !!headerLeft || !!rightNode;
+  const hasFooter = !!footer || !!primaryAction || !!secondaryAction;
+
+  const scroll = scrollable ? (
+    <Animated.ScrollView
+      onScroll={onScroll}
+      onLayout={e => { viewportH.current = e.nativeEvent.layout.height; syncOverflow(); }}
+      onContentSizeChange={(_w, h) => { contentH.current = h; syncOverflow(); }}
+      scrollEventThrottle={16}
+      bounces={false}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      style={styles.bodyScroll}
+      contentContainerStyle={[padded && styles.padded, !hasFooter && styles.bodyEnd, contentContainerStyle]}
+    >
+      {children}
+    </Animated.ScrollView>
+  ) : null;
+  const body = scroll ? (
+    isWeb ? scroll : <GestureDetector gesture={nativeScroll}>{scroll}</GestureDetector>
+  ) : (
+    <View style={[styles.bodyStatic, padded && styles.padded, !hasFooter && styles.bodyEnd, contentContainerStyle]}>
+      {children}
+    </View>
+  );
+
+  return (
+    <Modal
+      visible={modalVisible}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={onClose}
+      testID={testID}
+    >
+      <GestureHandlerRootView style={styles.root}>
+        <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            style={[StyleSheet.absoluteFill, styles.backdrop]}
+            onPress={onClose}
+          />
+        </Animated.View>
+        {wrapSheetDrag(
+          <Animated.View
+            {...a11yModalProps()}
+            accessibilityLabel={accessibilityLabel ?? title}
+            onLayout={onSheetLayout}
+            style={[
+              styles.sheet,
+              isWebShell && styles.sheetWebShell,
+              { backgroundColor: sheetSurfaceColor(theme), maxHeight: `${Math.round(maxHeightRatio * 100)}%` },
+              sheetStyle,
+            ]}
+          >
+            <Animated.View style={[styles.sheetInner, keyboardStyle]}>
+              {wrapHandleDrag(
+                <View>
+                  <SheetGrabber />
+                  {hasHeader ? (
+                    <View style={styles.header}>
+                      {headerLeft ? <View style={styles.headerLeft}>{headerLeft}</View> : null}
+                      <Text
+                        style={[styles.title, { color: theme.text }]}
+                        numberOfLines={1}
+                        accessibilityRole="header"
+                      >
+                        {title ?? ''}
+                      </Text>
+                      {rightNode ? <View style={styles.headerRight}>{rightNode}</View> : null}
+                    </View>
+                  ) : null}
+                </View>,
+              )}
+              {body}
+              {hasFooter ? (
+                <View style={styles.footer}>
+                  {footer ?? (
+                    <>
+                      {primaryAction ? <SheetButton {...primaryAction} /> : null}
+                      {secondaryAction ? <SheetButton variant="secondary" {...secondaryAction} /> : null}
+                    </>
+                  )}
+                </View>
+              ) : null}
+            </Animated.View>
+          </Animated.View>,
+        )}
+      </GestureHandlerRootView>
+    </Modal>
+  );
+}
+
+// ─── Back-compat chrome ───────────────────────────────────────────────────────
 
 export interface BottomSheetProps {
   visible: boolean;
@@ -193,72 +322,80 @@ export interface BottomSheetProps {
   reduceMotion?: boolean | null;
 }
 
+/**
+ * The shared sheet chrome without a title row — for existing call sites that
+ * draw their own header inside the body. New sheets use `<Sheet title=…>`.
+ */
 export function BottomSheet({ visible, onClose, children, testID, reduceMotion }: BottomSheetProps) {
-  const palette = useColors();
-  const insets = useSafeAreaInsets();
-  // Modal portals straight to <body> on web, outside WebAppShell's centered
-  // column, so an un-capped sheet would stretch edge-to-edge across a wide
-  // desktop window instead of reading as a card. The backdrop still dims the
-  // whole viewport (correct); only the sheet itself is capped and centered.
-  const isWebShell = useIsWebShell();
-  const {
-    modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout,
-  } = useSheetTransition(visible, onClose, { reduceMotion });
-
   return (
-    <Modal visible={modalVisible} transparent animationType="none" onRequestClose={onClose} testID={testID}>
-      <View style={styles.root}>
-        <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-            style={StyleSheet.absoluteFill}
-            onPress={onClose}
-          >
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
-          </Pressable>
-        </Animated.View>
-        <GestureDetector gesture={panGesture}>
-          <Animated.View
-            {...a11yModalProps()}
-            onLayout={onSheetLayout}
-            style={[
-              styles.sheet,
-              isWebShell && styles.sheetWebShell,
-              {
-                backgroundColor: palette.card,
-                borderColor: palette.border,
-                paddingBottom: Math.max(insets.bottom, SPACING.md),
-              },
-              sheetStyle,
-            ]}
-          >
-            <View style={styles.handleWrap}>
-              <View style={[styles.handle, { backgroundColor: palette.mutedForeground }]} />
-            </View>
-            <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" bottomOffset={24}>
-              {children}
-            </KeyboardAwareScrollViewCompat>
-          </Animated.View>
-        </GestureDetector>
-      </View>
-    </Modal>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      testID={testID}
+      reduceMotion={reduceMotion}
+      padded={false}
+      headerRight="none"
+      maxHeightRatio={0.88}
+    >
+      {children}
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { backgroundColor: `rgba(0,0,0,${SHEET_BACKDROP_OPACITY})` },
   sheet: {
-    borderTopLeftRadius: RADII.sheet,
-    borderTopRightRadius: RADII.sheet,
-    borderWidth: 1,
-    maxHeight: '88%',
-  },
-  sheetWebShell: {
+    borderTopLeftRadius: SHEET_RADIUS,
+    borderTopRightRadius: SHEET_RADIUS,
+    overflow: 'hidden',
     width: '100%',
+  },
+  sheetInner: { flexShrink: 1 },
+  sheetWebShell: {
     maxWidth: WEB_SHELL_MAX_WIDTH,
     alignSelf: 'center',
   },
-  handleWrap: { alignItems: 'center', paddingTop: SPACING.xs, paddingBottom: SPACING.xxs },
-  handle: { width: 36, height: 4, borderRadius: RADII.pill, opacity: 0.3 },
+  grabberWrap: { alignItems: 'center', paddingTop: 6, paddingBottom: 4 },
+  grabber: { width: 36, height: 5, borderRadius: 2.5 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 44,
+    paddingHorizontal: SHEET_GUTTER,
+    paddingTop: 4,
+    paddingBottom: 8,
+    gap: 12,
+  },
+  headerLeft: { marginLeft: -4 },
+  headerRight: { marginRight: -2 },
+  title: {
+    flex: 1,
+    fontFamily: FONT.semibold,
+    fontSize: 17,
+    lineHeight: 22,
+    letterSpacing: -0.2,
+  },
+  doneLabel: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 22 },
+  closeCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bodyScroll: { flexGrow: 0, flexShrink: 1 },
+  bodyStatic: { flexShrink: 1 },
+  padded: { paddingHorizontal: SHEET_GUTTER },
+  bodyEnd: { paddingBottom: 8 },
+  footer: { paddingHorizontal: SHEET_GUTTER, paddingTop: 12, gap: 8 },
+  action: {
+    height: SHEET_ACTION_HEIGHT,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  actionDisabled: { opacity: 0.4 },
+  actionLabel: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 22 },
 });
