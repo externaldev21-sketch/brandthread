@@ -67,6 +67,7 @@ import { POLICY_NOT_LISTED, readSellerPolicies, readSellerShipping } from '@/lib
 import { ProductQuestionsSection } from '@/components/ProductQuestionsSection';
 import { SizeRecommendationBadge, RecommendedTag, useSizeBadgeModel } from '@/components/SizeRecommendationBadge';
 import { BundleSaveSection } from '@/components/bundles/BundleSaveSection';
+import { useRememberedSize } from '@/hooks/useRememberedSize';
 import {
   messageSellerAboutProductHref, profileHref, profileVideosHref, resolveStoreVisitSource,
 } from '@/lib/profileNavigation';
@@ -658,6 +659,7 @@ export default function BuyerProductDetailScreen() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const [selections, setSelections] = useState<Record<string, string>>({});
+  useRememberedSize(product, selections, setSelections);
   const [qty, setQty] = useState(1);
   const [addingToCart, setAddingToCart] = useState(false);
   const [buyingNow, setBuyingNow] = useState(false);
