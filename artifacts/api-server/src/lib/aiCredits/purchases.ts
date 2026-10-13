@@ -64,6 +64,22 @@ export async function createPackCheckout(
   return { sessionId: session.id, url: session.url ?? null };
 }
 
+/**
+ * The catalogue price, or the price this session was opened at (recorded by
+ * createPackCheckout). The second case covers a checkout started before a
+ * pack's price changed and paid after: the buyer paid what we charged, so
+ * the pack is still credited.
+ */
+async function amountMatches(sessionId: string, userId: string, pack: CreditPack, amountTotal: number | null): Promise<boolean> {
+  if (amountTotal === pack.amountCents) return true;
+  if (amountTotal == null) return false;
+  const [row] = await db.select({ amountCents: aiCreditPurchases.amountCents, packId: aiCreditPurchases.packId })
+    .from(aiCreditPurchases)
+    .where(and(eq(aiCreditPurchases.stripeCheckoutSessionId, sessionId), eq(aiCreditPurchases.clerkUserId, userId)))
+    .limit(1);
+  return !!row && row.packId === pack.id && row.amountCents === amountTotal;
+}
+
 export type FulfilResult =
   | { ok: true; granted: boolean; credits: number }
   | { ok: false; code: "metadata_mismatch" | "amount_mismatch" | "unpaid" | "unknown_pack" };
@@ -83,7 +99,7 @@ export async function fulfilCreditCheckoutSession(
   }
   const pack = findPack(meta.packId ?? "");
   if (!pack) return { ok: false, code: "unknown_pack" };
-  if (session.amount_total !== pack.amountCents || session.currency !== "usd") {
+  if (session.currency !== "usd" || !(await amountMatches(session.id, userId, pack, session.amount_total))) {
     return { ok: false, code: "amount_mismatch" };
   }
   if (session.payment_status !== "paid") return { ok: false, code: "unpaid" };

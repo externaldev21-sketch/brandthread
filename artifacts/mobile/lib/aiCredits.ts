@@ -84,3 +84,21 @@ export function creditsNoteState(o: Pick<AiCreditsOverview, 'unlimited' | 'balan
 export function topUpRoute(o: Pick<AiCreditsOverview, 'packs'>): '/ai-credits' | '/plans' {
   return o.packs.length > 0 ? '/ai-credits' : '/plans';
 }
+
+/** The one-tap top-up: the cheapest pack the plan may buy ($4.99 for 500), or null. */
+export function topUpPack(o: Pick<AiCreditsOverview, 'packs'> | null | undefined): AiCreditPack | null {
+  if (!o || o.packs.length === 0) return null;
+  return o.packs.reduce((min, p) => (p.amountCents < min.amountCents ? p : min));
+}
+
+/** Route the 402 insufficient_credits refusal opens: the credits screen, flagged so it leads with the top-up. */
+export const OUT_OF_CREDITS_ROUTE = '/ai-credits?reason=insufficient';
+
+/**
+ * Whether the credits screen leads with the one-tap top-up: the seller was
+ * just refused for credits (`reason=insufficient`) or the balance is empty.
+ */
+export function leadsWithTopUp(o: Pick<AiCreditsOverview, 'unlimited' | 'balance' | 'packs'> | null | undefined, reason?: string): boolean {
+  if (!o || o.unlimited || !topUpPack(o)) return false;
+  return reason === 'insufficient' || (o.balance ?? 0) <= 0;
+}

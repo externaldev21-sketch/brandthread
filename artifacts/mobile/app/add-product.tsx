@@ -30,6 +30,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
+import { useProductLimitSheet } from '@/components/products/ProductLimitSheet';
 
 import { preOrderShipDateError, PREORDER_SHIP_DATE_REQUIRED_MESSAGE } from '@/lib/deliveryGuarantee';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
@@ -185,6 +186,7 @@ export default function AddProductScreen() {
   const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const productLimit = useProductLimitSheet();
 
   const [draftData, setDraftData] = useState<Partial<Product>>({
     name: '',
@@ -791,6 +793,7 @@ export default function AddProductScreen() {
         setPublishSuccess({ name, kind: 'created', productId: newProduct.id });
       }
     } catch (err: any) {
+      if (productLimit.showFor(err)) return;
       const needsShipDate = err?.code === 'PREORDER_SHIP_DATE_REQUIRED';
       showPublishError(
         needsShipDate ? 'Add a ship date' : 'Error',
@@ -2189,6 +2192,8 @@ export default function AddProductScreen() {
           </CollapsibleSection>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {productLimit.sheet}
 
       <SuccessSheet
         visible={!!publishSuccess}
