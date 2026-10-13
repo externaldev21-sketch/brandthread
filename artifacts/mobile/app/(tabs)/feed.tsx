@@ -144,6 +144,7 @@ import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
 
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 
+import { PollCard } from '@/components/social/PollCard';
 import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer-feed/ShopSideTab';
 
 import { LongPressMenu, type NotInterestedReason } from '@/components/buyer-feed/LongPressMenu';
@@ -2110,6 +2111,7 @@ function SpotlightPageImpl({
         onOpenCreator={() => onOpenCreator(item)}
         onPressInCreator={() => prefetchCreatorProfile(item)}
         onHeightChange={setCaptionBlockHeight}
+        belowCaptionSlot={<PollCard postId={feedPostId(item.id)} variant="overlay" />}
         soundActive={isActive}
         reduceMotion={reduceMotion}
         topSlot={!!item.productTags?.length && shopTagShown && (

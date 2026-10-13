@@ -80,6 +80,7 @@ import notificationPrefsRouter from "./notification-prefs";
 import smsPrefsRouter from "./notification-prefs-sms";
 import postsRouter from "./posts";
 import postCaptionsRouter from "./post-captions";
+import postPollsRouter from "./post-polls";
 import feedRouter from "./feed";
 import reportsRouter from "./reports";
 import accountStatusRouter from "./account-status";
@@ -434,6 +435,7 @@ router.use("/product-qa",                tc, productQaRouter);
 router.use("/posts",                     postCommentsRouter);
 router.use("/comment-media",             commentMediaRouter);
 router.use("/posts",                     postCaptionsRouter);
+router.use("/posts",                     postPollsRouter); // Thread polls: /posts/polls, /posts/:postId/poll[/vote]
 router.use("/posts",                     tc, postsRouter);
 router.use("/upload-sessions",           uploadSessionsRouter); // resumable chunked uploads; owned by the signed-in person, no tc
 router.use("/feed",                      feedRouter); // buyer-scoped (For You ranking + event ingestion); no tc

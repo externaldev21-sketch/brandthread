@@ -2,6 +2,7 @@ import type { PostAspect, PostMode } from '@/constants/postLimits';
 import type { SlideCrop } from '@/lib/createPost/crop';
 import type { Adjust } from '@/lib/createPost/adjust';
 import type { PostProductTag, PostVisibility } from '@/services/types';
+import type { PollDraft } from '@/lib/postPolls';
 
 /** One item from the device library (or, on web, a file the user chose). */
 export interface PickedAsset {
@@ -58,6 +59,8 @@ export interface PostDetails {
   productTags: PostProductTag[];
   visibility: PostVisibility;
   scheduledAt: string | null;
+  /** Thread poll (X-style), attached right after the Thread is created. */
+  poll?: PollDraft | null;
 }
 
 export interface PublishInput {

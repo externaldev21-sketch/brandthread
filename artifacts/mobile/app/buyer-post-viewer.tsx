@@ -64,6 +64,7 @@ import { Sheet } from '@/components/ui/BottomSheet';
 
 import { CaptionSpans } from '@/components/social/CaptionText';
 
+import { PollCard } from '@/components/social/PollCard';
 import { CaptionsOverlay, type CaptionSegment } from '@/components/social/CaptionsOverlay';
 
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -498,6 +499,9 @@ export default function BuyerPostViewer() {
         {caption ? (
           <TranslatableCaption text={caption} style={s.caption} linkStyle={s.translationLink} renderText={(value) => <CaptionSpans text={value} />} />
         ) : null}
+
+        {/* Thread poll (only present when the post has one — no layout change otherwise) */}
+        {post?.id ? <PollCard postId={post.id} style={{ paddingHorizontal: SP.md, paddingTop: SP.sm }} /> : null}
 
         {/* Quoted original (only present on quote reposts — no layout change otherwise) */}
         {post?.quotedPost ? (
