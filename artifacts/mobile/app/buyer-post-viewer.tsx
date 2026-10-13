@@ -46,6 +46,8 @@ import { CaptionsOverlay, type CaptionSegment } from '@/components/social/Captio
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useCaptionsPreference, useReadyCaptionTrack } from '@/lib/captions';
 import { LocationTag } from '@/components/social/LocationTag';
+import { emitSaveHeartEvent } from '@/lib/saved/saveHeartBus';
+import { savedPostToast } from '@/lib/saved/savedPostToast';
 
 function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () => void; captions?: CaptionSegment[] }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; p.timeUpdateEventInterval = 0.25; });
@@ -432,7 +434,16 @@ export default function BuyerPostViewer() {
                 setSaved(true);
                 await saveItem(
                   { type: 'post', targetId: params.postId, title: caption || 'Post', accentColor: mediaColor1 },
-                  { onRemoteSaved: () => { void requestContextualPushPermission(userId, api); } },
+                  {
+                    onRemoteSaved: () => {
+                      void requestContextualPushPermission(userId, api);
+                      // Instagram: "Saved · Save to collection" bar → "Save to…" sheet.
+                      emitSaveHeartEvent({ type: 'toast', toast: savedPostToast({
+                        id: params.postId, caption, creator: authorName, accentColor: mediaColor1,
+                        contentType: postType, mediaUris: post?.mediaUrls?.length ? post.mediaUrls : post?.mediaUrl ? [post.mediaUrl] : [],
+                      }) });
+                    },
+                  },
                 );
               }
             }}

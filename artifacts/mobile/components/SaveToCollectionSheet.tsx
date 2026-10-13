@@ -39,8 +39,8 @@ interface Props {
   visible: boolean;
   item: SaveToCollectionItem | null;
   onClose: () => void;
-  /** Fired after the item is filed — null means "saved to All" (no board). */
-  onSaved?: (collectionId: string | null) => void;
+  /** Fired after the item is filed — null means "saved to All" (no board). The board's name is passed when known. */
+  onSaved?: (collectionId: string | null, collectionName?: string) => void;
 }
 
 export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props) {
@@ -69,7 +69,7 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
     if (visible) { setCreating(false); setNewName(''); load(); }
   }, [visible, load]);
 
-  async function fileInto(collectionId: string | null) {
+  async function fileInto(collectionId: string | null, knownName?: string) {
     if (!item || busyId) return;
     setBusyId(collectionId ?? 'none');
     try {
@@ -84,7 +84,7 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
       });
       await moveSavedItemToCollection(item.targetId, collectionId);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onSaved?.(collectionId);
+      onSaved?.(collectionId, knownName ?? collections.find((c) => c.id === collectionId)?.name);
       onClose();
     } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -99,7 +99,7 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
     setBusyId('new');
     try {
       const collection = await createCollection(name);
-      await fileInto(collection.id);
+      await fileInto(collection.id, collection.name);
     } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setBusyId(null);
