@@ -87,6 +87,7 @@ const GROWTH_ITEMS: NavItem[] = [
 
 const MONEY_ITEMS: NavItem[] = [
   { icon: 'dollar-sign', label: 'Payouts', desc: 'Bank account and payout history', accent: 'success', route: '/payouts' },
+  { icon: 'smartphone', label: 'Pop-up mode', desc: 'Sell in person with Tap to Pay', accent: 'accent', route: '/popup-mode' },
   // ↑ De-duplicated: was also in OPERATIONS without a route — removed from there.
   { icon: 'star', label: 'Subscription', desc: 'Manage your Brandthread plan', accent: 'warning', badge: true, route: '/subscription' },
   { icon: 'percent', label: 'Taxes and Duties', desc: 'Tax rules and collection', accent: 'muted', route: '/taxes-duties' },
