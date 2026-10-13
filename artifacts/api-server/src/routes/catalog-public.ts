@@ -2,7 +2,8 @@
  * Public, no-auth buyer view of a product's stock counter.
  *   GET /api/catalog-public/products/:id/stock-info
  * Exposes only what a buyer may see: sold-out flag, the edition size of a
- * limited product and the remaining count when the seller chose to show it.
+ * limited product, the remaining count when the seller chose to show it, and
+ * the seller's "Only N left" threshold (counterThreshold) when they opted in.
  * Products that are not publicly visible (draft, hidden while sold out,
  * archived, deleted) return 404.
  */
@@ -10,7 +11,7 @@ import { Router } from "express";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db, products, productVariants, productStockRules } from "@workspace/db";
 import { setPublicCacheHeaders } from "../lib/httpCache";
-import { buildStockInfo } from "../lib/variantMatrix";
+import { buildStockInfo, publicCounterThreshold } from "../lib/variantMatrix";
 
 const router = Router();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -29,7 +30,10 @@ router.get("/products/:id/stock-info", async (req, res) => {
   const [rule] = await db.select().from(productStockRules).where(eq(productStockRules.productId, id)).limit(1);
 
   setPublicCacheHeaders(res, { maxAgeSeconds: 10, staleWhileRevalidateSeconds: 30 });
-  res.json(buildStockInfo({ totalStock: totals?.total ?? 0, variantCount: totals?.count ?? 0, rules: rule ?? null }));
+  res.json({
+    ...buildStockInfo({ totalStock: totals?.total ?? 0, variantCount: totals?.count ?? 0, rules: rule ?? null }),
+    counterThreshold: publicCounterThreshold(rule ?? null),
+  });
 });
 
 export default router;

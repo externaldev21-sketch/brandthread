@@ -290,6 +290,19 @@ export interface StockInfo {
   remaining: number | null;
 }
 
+/**
+ * The low-stock threshold the seller chose to show buyers ("Only N left" at
+ * or under it), or null when they have not opted into the counter. The
+ * product page uses it for the selected size's own stock line.
+ */
+export function publicCounterThreshold(
+  rules: Pick<StockRulesInput, "showRemainingCounter" | "counterThreshold"> | null,
+): number | null {
+  if (!rules?.showRemainingCounter) return null;
+  const t = rules.counterThreshold;
+  return typeof t === "number" && Number.isInteger(t) && t > 0 ? t : null;
+}
+
 /** What a buyer may see. `remaining` only when it is meant to be public. */
 export function buildStockInfo(input: {
   totalStock: number;
