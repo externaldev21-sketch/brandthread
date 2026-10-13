@@ -468,6 +468,12 @@ export const drops = pgTable('drops', {
   // Minutes before releaseAt that followers of this seller may buy/see the
   // drop unlock. 0 = no early access. Checked server-side in checkoutPlan.ts.
   earlyAccessMinutes: integer('early_access_minutes').notNull().default(0),
+  // When the "early access is open" push went to followers. Cleared when the
+  // seller moves releaseAt or changes the window, so a rescheduled drop notifies again.
+  earlyAccessNotifiedAt: timestamp('early_access_notified_at', { withTimezone: true }),
+  // Only buyers with a paid, uncancelled order from this seller can buy.
+  // Checked server-side in checkoutPlan.ts (lib/money/dropAudience.ts).
+  membersOnly: boolean('members_only').notNull().default(false),
   estimatedShipDate: timestamp('estimated_ship_date'),
   totalCollectedCents: integer('total_collected_cents').notNull().default(0),
   orderCount: integer('order_count').notNull().default(0),

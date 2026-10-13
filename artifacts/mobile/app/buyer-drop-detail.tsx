@@ -75,6 +75,9 @@ interface DropDetail {
   earlyAccessMinutes?: number;
   viewerHasEarlyAccess?: boolean;
   effectiveReleaseAt?: string | null;
+  membersOnly?: boolean;
+  /** False only when the drop is members-only and this viewer hasn't bought from the seller. */
+  viewerIsMember?: boolean;
   seller?: { displayName?: string; brandName?: string; verified?: boolean } | null;
   products?: DropProduct[];
 }
@@ -433,6 +436,11 @@ export default function BuyerDropDetail() {
       return;
     }
     if (product.soldOut) return;
+    if (drop?.membersOnly && drop.viewerIsMember === false) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      Alert.alert('Past buyers only', `This drop is only for people who've bought from ${sellerName}.`);
+      return;
+    }
 
     // postId is only used by ShopProductSheet/cartFlight for attribution and
     // flight-animation bookkeeping, never as a server-side post lookup — a
@@ -553,6 +561,17 @@ export default function BuyerDropDetail() {
                 earlyAccessMinutes={drop.earlyAccessMinutes}
                 viewerHasEarlyAccess={drop.viewerHasEarlyAccess}
               />
+            )}
+
+            {!showRecap && !!drop.membersOnly && (
+              <View style={styles.earlyAccessRow} testID="drop-members-only-row">
+                <Feather name={drop.viewerIsMember === false ? 'lock' : 'check'} size={12} color={theme.accent} />
+                <Text style={[styles.earlyAccessText, { color: theme.accent }]}>
+                  {drop.viewerIsMember === false
+                    ? `Only for past buyers of ${sellerName}`
+                    : "Past buyers only. You're in"}
+                </Text>
+              </View>
             )}
 
             {/* Demand signals — only shown when server supplies non-zero values */}

@@ -14,6 +14,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, drops, follows, products } from "@workspace/db";
 import { destinationApplicationFeeCents } from "./fees";
 import { isDropLive } from "./dropLaunch";
+import { isPastBuyer } from "./dropAudience";
 import type { DbExecutor } from "./ledger";
 import { payoutMode } from "../delivery/policy";
 import { unlaunchedProductIds } from "../productLaunch";
@@ -59,6 +60,7 @@ export async function resolveChargePlan(input: {
     releaseAt: drops.releaseAt,
     endsAt: drops.endsAt,
     earlyAccessMinutes: drops.earlyAccessMinutes,
+    membersOnly: drops.membersOnly,
   }).from(products)
     .leftJoin(drops, eq(drops.id, products.dropId))
     .where(inArray(products.id, ids));
@@ -78,6 +80,12 @@ export async function resolveChargePlan(input: {
     // The public drop list already hides ended drops; checkout must agree.
     if (drop.endsAt && drop.endsAt.valueOf() <= now.valueOf()) {
       throw new CheckoutPlanError("This drop has ended.", 409, "DROP_ENDED");
+    }
+    if (drop.membersOnly && !(await isPastBuyer(input.buyerId, drop.dropOwnerId!, executor))) {
+      throw new CheckoutPlanError(
+        "This drop is only for people who've bought from this brand before.",
+        403, "DROP_MEMBERS_ONLY",
+      );
     }
     if (!drop.releaseAt) continue;
     const earlyAccessMinutes = drop.earlyAccessMinutes ?? 0;

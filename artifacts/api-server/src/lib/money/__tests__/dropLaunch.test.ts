@@ -64,3 +64,27 @@ describe("isDropLive — server-clock launch gating", () => {
     }
   });
 });
+
+describe("early-access window bounds", () => {
+  it("accepts 0 to 24 hours of whole minutes", async () => {
+    const { isValidEarlyAccessMinutes, MAX_EARLY_ACCESS_MINUTES } = await import("../dropLaunch");
+    expect(isValidEarlyAccessMinutes(0)).toBe(true);
+    expect(isValidEarlyAccessMinutes(60)).toBe(true);
+    expect(isValidEarlyAccessMinutes(MAX_EARLY_ACCESS_MINUTES)).toBe(true);
+    expect(isValidEarlyAccessMinutes(MAX_EARLY_ACCESS_MINUTES + 1)).toBe(false);
+    expect(isValidEarlyAccessMinutes(-1)).toBe(false);
+    expect(isValidEarlyAccessMinutes(1.5)).toBe(false);
+    expect(isValidEarlyAccessMinutes("60")).toBe(false);
+  });
+
+  it("is open only between releaseAt − window and releaseAt", async () => {
+    const { isEarlyAccessWindowOpen } = await import("../dropLaunch");
+    const releaseAt = new Date("2026-01-01T18:00:00.000Z");
+    expect(isEarlyAccessWindowOpen(releaseAt, 60, new Date("2026-01-01T16:59:59.999Z"))).toBe(false);
+    expect(isEarlyAccessWindowOpen(releaseAt, 60, new Date("2026-01-01T17:00:00.000Z"))).toBe(true);
+    expect(isEarlyAccessWindowOpen(releaseAt, 60, new Date("2026-01-01T17:59:59.999Z"))).toBe(true);
+    expect(isEarlyAccessWindowOpen(releaseAt, 60, new Date("2026-01-01T18:00:00.000Z"))).toBe(false);
+    expect(isEarlyAccessWindowOpen(releaseAt, 0, new Date("2026-01-01T17:30:00.000Z"))).toBe(false);
+    expect(isEarlyAccessWindowOpen(null, 60)).toBe(false);
+  });
+});

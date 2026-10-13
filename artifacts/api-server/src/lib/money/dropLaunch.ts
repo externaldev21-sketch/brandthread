@@ -32,3 +32,24 @@ export function isDropLive(
   if (!releaseAt) return false;
   return effectiveDropLaunchAt(releaseAt, earlyAccessMinutes, hasEarlyAccess).getTime() <= now.getTime();
 }
+
+/** Upper bound on the head start a seller can set (one day). */
+export const MAX_EARLY_ACCESS_MINUTES = 24 * 60;
+
+export function isValidEarlyAccessMinutes(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= MAX_EARLY_ACCESS_MINUTES;
+}
+
+/**
+ * Whether the follower early-access window is open right now: past
+ * releaseAt − window, but before releaseAt (after that everyone is in).
+ */
+export function isEarlyAccessWindowOpen(
+  releaseAt: Date | null,
+  earlyAccessMinutes: number,
+  now: Date = new Date(),
+): boolean {
+  if (!releaseAt || earlyAccessMinutes <= 0) return false;
+  const t = now.getTime();
+  return effectiveDropLaunchAt(releaseAt, earlyAccessMinutes, true).getTime() <= t && t < releaseAt.getTime();
+}
