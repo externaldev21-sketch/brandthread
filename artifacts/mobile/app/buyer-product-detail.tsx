@@ -820,7 +820,7 @@ export default function BuyerProductDetailScreen() {
     try {
       await (api as any).waitlist.join(product.id, variant.id);
       setWaitlistJoined(true);
-      Alert.alert("You're on the waitlist", "We'll notify you the moment this drops back in stock.");
+      Alert.alert("You're on the waitlist", "We'll notify you the moment this restocks.");
     } catch { Alert.alert("Couldn't join waitlist", 'Try again.'); }
     finally { setWaitlistLoading(false); }
   }
