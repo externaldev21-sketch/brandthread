@@ -40,7 +40,7 @@ vi.mock("../../../middlewares/requireRole", async (importOriginal) => {
 });
 
 import {
-  db, affiliateCommissionEvents, affiliateCommissions, affiliateCreators, affiliatePayouts, discountCodes, orders, users,
+  db, affiliateCommissionEvents, affiliateCommissions, affiliateCreators, affiliatePayouts, affiliatePrograms, discountCodes, orders, users,
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { fake } from "../../money/__tests__/fakeStripe";
@@ -128,6 +128,66 @@ describe("program setup and the checkout code (reuses discount_codes)", () => {
   });
 });
 
+describe("seller-set commission range (5% to 10%)", () => {
+  const put = (seller: string, body: Record<string, unknown>) => call(app.base, "PUT", "/api/seller/affiliate/program", seller, body);
+
+  it("accepts 5%, 7.5% and 10% as the program default and rejects anything outside with a clear code", async () => {
+    const seller = await seedSeller("range");
+    for (const pct of [5, 7.5, 10]) {
+      const r = await put(seller, { commissionPercent: pct });
+      expect(r.status).toBe(200);
+      expect(r.body.program.commissionPercent).toBe(pct);
+    }
+    for (const pct of [0, 4.99, 10.01, 11, 15, 50, "abc", -5]) {
+      const r = await put(seller, { commissionPercent: pct });
+      expect(r.status).toBe(400);
+      expect(JSON.stringify(r.body)).toContain("COMMISSION_OUT_OF_RANGE");
+    }
+    const [p] = await db.select().from(affiliatePrograms).where(eq(affiliatePrograms.sellerId, seller));
+    expect(p.defaultCommissionBps).toBe(1000);
+  });
+
+  it("keeps a legacy out-of-range default untouched: unrelated saves (even re-sending it) work, a new out-of-range value does not", async () => {
+    const seller = await seedSeller("legacy");
+    await put(seller, { enabled: true });
+    await db.update(affiliatePrograms).set({ defaultCommissionBps: 1500 }).where(eq(affiliatePrograms.sellerId, seller));
+    expect((await put(seller, { autoApprove: true })).status).toBe(200);
+    expect((await put(seller, { commissionPercent: 15, windowDays: 14 })).status).toBe(200);
+    expect((await put(seller, { commissionPercent: 14 })).status).toBe(400);
+    const [p] = await db.select().from(affiliatePrograms).where(eq(affiliatePrograms.sellerId, seller));
+    expect(p).toMatchObject({ defaultCommissionBps: 1500, autoApprove: true, windowDays: 14 });
+    expect((await put(seller, { commissionPercent: 9 })).status).toBe(200);
+  });
+
+  it("enforces the range on per-creator overrides (invite and edit), allows clearing and re-sending a legacy override", async () => {
+    const seller = await seedSeller("override");
+    const creator = await seedCreator("override");
+    const aff = await setupProgram(seller, creator);
+    const patch = (body: Record<string, unknown>) => call(app.base, "PATCH", `/api/seller/affiliate/creators/${aff.id}`, seller, body);
+
+    const tooHigh = await patch({ commissionPercent: 12 });
+    expect(tooHigh.status).toBe(400);
+    expect(JSON.stringify(tooHigh.body)).toContain("COMMISSION_OUT_OF_RANGE");
+    expect((await patch({ commissionPercent: 4 })).status).toBe(400);
+    expect((await patch({ commissionPercent: 5 })).status).toBe(200);
+    expect((await db.select().from(affiliateCreators).where(eq(affiliateCreators.id, aff.id)))[0].commissionBpsOverride).toBe(500);
+
+    await db.update(affiliateCreators).set({ commissionBpsOverride: 2000 }).where(eq(affiliateCreators.id, aff.id));
+    expect((await patch({ commissionPercent: 20, status: "paused" })).status).toBe(200);
+    const [kept] = await db.select().from(affiliateCreators).where(eq(affiliateCreators.id, aff.id));
+    expect(kept).toMatchObject({ commissionBpsOverride: 2000, status: "paused" });
+    expect((await patch({ commissionPercent: 19 })).status).toBe(400);
+    expect((await patch({ commissionPercent: null })).status).toBe(200);
+    expect((await db.select().from(affiliateCreators).where(eq(affiliateCreators.id, aff.id)))[0].commissionBpsOverride).toBeNull();
+
+    const other = await seedCreator("override-2");
+    const invite = await call(app.base, "POST", "/api/seller/affiliate/creators/invite", seller, { username: other.username, commissionPercent: 25 });
+    expect(invite.status).toBe(400);
+    expect(JSON.stringify(invite.body)).toContain("COMMISSION_OUT_OF_RANGE");
+    expect((await call(app.base, "POST", "/api/seller/affiliate/creators/invite", seller, { username: other.username, commissionPercent: 6 })).status).toBe(201);
+  });
+});
+
 describe("attribution on a paid order", () => {
   it("records a pending commission via the click link, in integer cents excluding tax and shipping", async () => {
     const seller = await seedSeller("link");
@@ -165,7 +225,7 @@ describe("attribution on a paid order", () => {
     const buyer = await seedBuyer("code");
     const creator = await seedCreator("code");
     const aff = await setupProgram(seller, creator);
-    await call(app.base, "PATCH", `/api/seller/affiliate/creators/${aff.id}`, seller, { commissionPercent: 15 });
+    await call(app.base, "PATCH", `/api/seller/affiliate/creators/${aff.id}`, seller, { commissionPercent: 8 });
     const product = await seedProduct(seller, { priceCents: 10_000 });
     const { order } = await pay({ sellerId: seller, buyerId: buyer, chargeModel: "destination", items: [{ ...product, quantity: 1 }] });
     expect(await commissionFor(order.id)).toBeUndefined(); // no code, no link: untouched
@@ -174,7 +234,7 @@ describe("attribution on a paid order", () => {
       orderId: order.id, sellerId: seller, buyerId: buyer, subtotalCents: 10_000, sellerDiscountCents: 500,
       discountCodeId: aff.discountCodeId, paidAt: new Date(),
     }));
-    expect(made).toMatchObject({ source: "code", baseCents: 9_500, commissionBps: 1500, amountCents: 1425 });
+    expect(made).toMatchObject({ source: "code", baseCents: 9_500, commissionBps: 800, amountCents: 760 });
     // idempotent: a replay creates nothing new
     expect(await db.transaction((tx) => attributeOrder(tx, {
       orderId: order.id, sellerId: seller, buyerId: buyer, subtotalCents: 10_000, sellerDiscountCents: 500,

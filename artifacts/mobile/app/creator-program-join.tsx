@@ -37,7 +37,7 @@ export default function CreatorProgramJoinScreen() {
     if (previewOnly) {
       setInfo(isPreviewDemoMode() ? {
         sellerId: 'demo-brand-1', brandName: 'Northline Studio', username: ref, imageUrl: null,
-        program: { enabled: true, commissionPercent: 12, buyerDiscountPercent: 10, windowDays: 30, autoApprove: false },
+        program: { enabled: true, commissionPercent: 10, buyerDiscountPercent: 10, windowDays: 30, autoApprove: false },
         mine: null, isOwnBrand: false,
       } : null);
       setError(isPreviewDemoMode() ? null : 'Sign in to join a creator program');

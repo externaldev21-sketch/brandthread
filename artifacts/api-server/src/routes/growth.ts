@@ -24,6 +24,7 @@ import {
   BIO_SLUG_RE, MAX_BIO_LINKS, MAX_FEATURED, cleanText, normalizeAccent, normalizeBioLinkUrl, normalizeSocials, slugifyBio,
 } from "../lib/growth/bioValidation";
 import { validateMetaPixelId, validateTikTokPixelId } from "../lib/growth/pixels";
+import { getWebOrigin } from "../lib/webOrigin";
 
 const router = Router();
 router.use(requireAuth);
@@ -243,6 +244,56 @@ router.delete("/links/:id", requirePermission("marketing"), async (req, res) => 
     res.status(204).end();
   } catch (err) {
     req.log.error({ err }, "archive tracked link failed");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ───────────────────────── Pop-up QR sticker link ─────────────────────────
+
+export const QR_STICKER_UTM = { source: "popup", medium: "qr", campaign: "qr-sticker" } as const;
+
+/**
+ * The tracked store link printed on pop-up QR stickers. Find-or-create, so
+ * every sticker a seller prints scans to the same short code and its scans
+ * add up in Links. The QR encodes /api/l/:code because only /api/* reaches
+ * this server on brandthread.app.
+ */
+router.post("/qr-sticker-link", requirePermission("marketing"), async (req, res) => {
+  try {
+    const sellerId = sellerOf(req);
+    if (!(await resolveStoreHome(sellerId))) {
+      res.status(409).json({ error: "Set a username or publish your store first", code: "STORE_NOT_LIVE" });
+      return;
+    }
+    const row = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`qr-sticker:${sellerId}`}))`);
+      const [existing] = await tx.select().from(trackedLinks).where(and(
+        eq(trackedLinks.sellerId, sellerId), eq(trackedLinks.destinationType, "store"),
+        eq(trackedLinks.utmSource, QR_STICKER_UTM.source), eq(trackedLinks.utmMedium, QR_STICKER_UTM.medium),
+        eq(trackedLinks.utmCampaign, QR_STICKER_UTM.campaign), isNull(trackedLinks.archivedAt),
+      )).orderBy(asc(trackedLinks.createdAt)).limit(1);
+      if (existing) return existing;
+      const code = await generateUniqueLinkCode(async (c) => {
+        const [hit] = await tx.select({ id: trackedLinks.id }).from(trackedLinks).where(eq(trackedLinks.code, c)).limit(1);
+        return !!hit;
+      });
+      const [created] = await tx.insert(trackedLinks).values({
+        sellerId, code, label: "Pop-up QR sticker", destinationType: "store", destinationRef: null,
+        utmSource: QR_STICKER_UTM.source, utmMedium: QR_STICKER_UTM.medium, utmCampaign: QR_STICKER_UTM.campaign,
+      }).returning();
+      return created;
+    });
+    const [profile] = await db.select({ username: users.username, brandName: users.brandName, displayName: users.displayName, name: users.name })
+      .from(users).where(eq(users.clerkId, sellerId)).limit(1);
+    const link = serializeLink(row, await linkStats(sellerId, [row.id]));
+    res.json({
+      ...link,
+      qrUrl: `${getWebOrigin()}/api/l/${row.code}`,
+      username: profile?.username ?? null,
+      storeName: profile?.brandName || profile?.displayName || profile?.name || profile?.username || "",
+    });
+  } catch (err) {
+    req.log.error({ err }, "qr sticker link failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });

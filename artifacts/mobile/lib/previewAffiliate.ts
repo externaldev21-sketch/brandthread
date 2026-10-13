@@ -19,7 +19,7 @@ export function getPreviewCreatorOverview(): CreatorOverview {
     brands: [
       {
         id: 'demo-a1', sellerId: 'demo-brand-1', status: 'active', code: 'MAYA10', brandName: 'Northline Studio', brandUsername: 'northline',
-        brandImageUrl: null, programEnabled: true, commissionPercent: 12, buyerDiscountPercent: 10, windowDays: 30, holdDays: 30,
+        brandImageUrl: null, programEnabled: true, commissionPercent: 10, buyerDiscountPercent: 10, windowDays: 30, holdDays: 30,
         minPayoutCents: 2500, shareLink: 'https://brandthread.app/u/northline?aff=MAYA10',
         stats: { clicks: 482, orders: 19, revenueCents: 142_300, earnedCents: 17_076, pendingCents: 6_480, payableCents: 4_200, paidCents: 6_396 },
       },
@@ -62,12 +62,12 @@ export function getPreviewSellerOverview(): SellerAffiliateOverview {
   const s = (clicks: number, orders: number, rev: number, earned: number, pend: number, pay: number, paid: number) =>
     ({ clicks, orders, revenueCents: rev, earnedCents: earned, pendingCents: pend, payableCents: pay, paidCents: paid });
   return {
-    program: { enabled: true, commissionPercent: 12, buyerDiscountPercent: 10, windowDays: 30, holdDays: 30, minPayoutCents: 2500, autoApprove: false },
+    program: { enabled: true, commissionPercent: 10, buyerDiscountPercent: 10, windowDays: 30, holdDays: 30, minPayoutCents: 2500, autoApprove: false },
     creators: [
-      { id: 'c1', creatorId: 'u1', status: 'active', origin: 'invite', code: 'MAYA10', commissionPercent: 12, hasOverride: false, username: 'mayarivera', displayName: 'Maya Rivera', avatarUrl: null, stats: s(482, 19, 142_300, 17_076, 6_480, 4_200, 6_396) },
-      { id: 'c2', creatorId: 'u2', status: 'active', origin: 'apply', code: 'JONAH5', commissionPercent: 15, hasOverride: true, username: 'jonah.styles', displayName: 'Jonah Park', avatarUrl: null, stats: s(210, 8, 61_900, 9_285, 3_100, 0, 6_185) },
-      { id: 'c3', creatorId: 'u3', status: 'pending', origin: 'apply', code: 'AMARA2', commissionPercent: 12, hasOverride: false, username: 'amara', displayName: 'Amara Chen', avatarUrl: null, stats: s(0, 0, 0, 0, 0, 0, 0) },
-      { id: 'c4', creatorId: 'u4', status: 'paused', origin: 'invite', code: 'LEOK4', commissionPercent: 12, hasOverride: false, username: 'leok', displayName: 'Leo Kim', avatarUrl: null, stats: s(44, 1, 8_400, 1_008, 0, 0, 1_008) },
+      { id: 'c1', creatorId: 'u1', status: 'active', origin: 'invite', code: 'MAYA10', commissionPercent: 10, hasOverride: false, username: 'mayarivera', displayName: 'Maya Rivera', avatarUrl: null, stats: s(482, 19, 142_300, 17_076, 6_480, 4_200, 6_396) },
+      { id: 'c2', creatorId: 'u2', status: 'active', origin: 'apply', code: 'JONAH5', commissionPercent: 8, hasOverride: true, username: 'jonah.styles', displayName: 'Jonah Park', avatarUrl: null, stats: s(210, 8, 61_900, 9_285, 3_100, 0, 6_185) },
+      { id: 'c3', creatorId: 'u3', status: 'pending', origin: 'apply', code: 'AMARA2', commissionPercent: 10, hasOverride: false, username: 'amara', displayName: 'Amara Chen', avatarUrl: null, stats: s(0, 0, 0, 0, 0, 0, 0) },
+      { id: 'c4', creatorId: 'u4', status: 'paused', origin: 'invite', code: 'LEOK4', commissionPercent: 10, hasOverride: false, username: 'leok', displayName: 'Leo Kim', avatarUrl: null, stats: s(44, 1, 8_400, 1_008, 0, 0, 1_008) },
     ],
     totals: s(736, 28, 212_600, 27_369, 9_580, 4_200, 13_589),
     programLink: 'https://brandthread.app/creator-program/join?brand=northline',

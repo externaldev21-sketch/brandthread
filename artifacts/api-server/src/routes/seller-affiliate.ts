@@ -17,7 +17,8 @@ import { db, affiliateCreators, affiliatePrograms, users } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requirePermission } from "../middlewares/requireRole";
 import {
-  MAX_BUYER_DISCOUNT_BPS, MAX_COMMISSION_BPS, MAX_HOLD_DAYS, MAX_WINDOW_DAYS, isValidBps, percentToBps,
+  MAX_BUYER_DISCOUNT_BPS, MAX_COMMISSION_BPS, MAX_HOLD_DAYS, MAX_WINDOW_DAYS, commissionRangeError,
+  isAllowedSellerCommission, isValidBps, percentToBps,
 } from "../lib/affiliate/commission";
 import { generateUniqueCode, getProgram, syncAllDiscountCodes, syncDiscountCode } from "../lib/affiliate/service";
 import { sellerCreatorRows, sellerPayoutRows, sumStats } from "../lib/affiliate/queries";
@@ -79,8 +80,8 @@ router.put("/program", async (req, res) => {
     }
     if (b.commissionPercent !== undefined) {
       const bps = percentToBps(b.commissionPercent);
-      if (bps == null || !isValidBps(bps, MAX_COMMISSION_BPS)) {
-        res.status(400).json({ error: `Commission must be between 0 and ${MAX_COMMISSION_BPS / 100}%` });
+      if (bps == null || !isAllowedSellerCommission(bps, current.defaultCommissionBps)) {
+        res.status(400).json(commissionRangeError());
         return;
       }
       next.defaultCommissionBps = bps;
@@ -129,10 +130,15 @@ router.put("/program", async (req, res) => {
   }
 });
 
-function parseOverride(raw: unknown): { ok: true; bps: number | null } | { ok: false } {
+/**
+ * Parse a per-creator override. null clears it (back to the program default).
+ * A number must be in the seller range (5-10%), except the creator's currently
+ * stored override, which may be re-sent unchanged (`current`).
+ */
+function parseOverride(raw: unknown, current?: number | null): { ok: true; bps: number | null } | { ok: false } {
   if (raw === null) return { ok: true, bps: null };
   const bps = percentToBps(raw);
-  if (bps == null || !isValidBps(bps, MAX_COMMISSION_BPS)) return { ok: false };
+  if (bps == null || !isValidBps(bps, MAX_COMMISSION_BPS) || !isAllowedSellerCommission(bps, current)) return { ok: false };
   return { ok: true, bps };
 }
 
@@ -144,7 +150,7 @@ router.post("/creators/invite", async (req, res) => {
     let overrideBps: number | null = null;
     if (req.body?.commissionPercent !== undefined) {
       const parsed = parseOverride(req.body.commissionPercent);
-      if (!parsed.ok) { res.status(400).json({ error: "Invalid commission" }); return; }
+      if (!parsed.ok) { res.status(400).json(commissionRangeError()); return; }
       overrideBps = parsed.bps;
     }
     const program = await getProgram(sellerId);
@@ -191,7 +197,12 @@ router.post("/creators/invite", async (req, res) => {
   }
 });
 
-async function mutateCreator(req: any, res: any, change: (row: typeof affiliateCreators.$inferSelect) => Record<string, unknown> | { error: string }) {
+type BadRequest = ReturnType<typeof commissionRangeError>;
+
+async function mutateCreator(
+  req: any, res: any,
+  change: (row: typeof affiliateCreators.$inferSelect) => Record<string, unknown> | { error: string } | { badRequest: BadRequest },
+) {
   try {
     const sellerId = store(req);
     const program = await getProgram(sellerId);
@@ -201,6 +212,7 @@ async function mutateCreator(req: any, res: any, change: (row: typeof affiliateC
       )).for("update").limit(1);
       if (!row) return { notFound: true as const };
       const patch = change(row);
+      if ("badRequest" in patch) return { badRequest: patch.badRequest as BadRequest };
       if ("error" in patch) return { error: patch.error as string };
       const [updated] = await tx.update(affiliateCreators).set({ ...patch, updatedAt: new Date() })
         .where(eq(affiliateCreators.id, row.id)).returning();
@@ -208,6 +220,7 @@ async function mutateCreator(req: any, res: any, change: (row: typeof affiliateC
       return { updated };
     });
     if ("notFound" in out) { res.status(404).json({ error: "Creator not found" }); return; }
+    if ("badRequest" in out) { res.status(400).json(out.badRequest); return; }
     if ("error" in out) { res.status(409).json({ error: out.error }); return; }
     res.json({ id: out.updated.id, status: out.updated.status, commissionBpsOverride: out.updated.commissionBpsOverride });
   } catch (err) {
@@ -221,11 +234,12 @@ router.post("/creators/:id/approve", (req, res) => mutateCreator(req, res, (row)
 
 router.patch("/creators/:id", (req, res) => {
   const body = req.body ?? {};
-  let override: { set: boolean; bps: number | null } = { set: false, bps: null };
-  if (body.commissionPercent !== undefined) {
-    const parsed = parseOverride(body.commissionPercent);
-    if (!parsed.ok) { res.status(400).json({ error: "Invalid commission" }); return; }
-    override = { set: true, bps: parsed.bps };
+  const overrideSent = body.commissionPercent !== undefined;
+  // Shape check up front (a number or null); the 5-10% range is checked below
+  // against the row's stored override, which may be re-sent unchanged.
+  if (overrideSent && body.commissionPercent !== null) {
+    const bps = percentToBps(body.commissionPercent);
+    if (bps == null || !isValidBps(bps, MAX_COMMISSION_BPS)) { res.status(400).json(commissionRangeError()); return; }
   }
   if (body.status !== undefined && body.status !== "active" && body.status !== "paused") {
     res.status(400).json({ error: "status must be active or paused" });
@@ -236,6 +250,12 @@ router.patch("/creators/:id", (req, res) => {
       return { error: "This creator isn't active in your program" };
     }
     if (body.status === "active" && row.status === "pending") return { error: "Approve the application first" };
+    let override: { set: boolean; bps: number | null } = { set: false, bps: null };
+    if (overrideSent) {
+      const parsed = parseOverride(body.commissionPercent, row.commissionBpsOverride);
+      if (!parsed.ok) return { badRequest: commissionRangeError() };
+      override = { set: true, bps: parsed.bps };
+    }
     return {
       ...(body.status ? { status: body.status } : {}),
       ...(override.set ? { commissionBpsOverride: override.bps } : {}),

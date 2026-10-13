@@ -205,6 +205,8 @@ import affiliateCreatorRouter, { affiliateConnectRedirectRouter } from "./affili
 import sellerAffiliateRouter from "./seller-affiliate";
 import growthRouter from "./growth";
 import storeBlocksRouter from "./storeBlocks";
+import { publicProductFeedRouter, sellerProductFeedRouter } from "./product-feed";
+import { trackedLinkRedirect } from "./growthPublic";
 import sellerPushBroadcastsRouter from "./seller-push-broadcasts";
 import { sellerGiveawaysRouter, publicGiveawaysRouter } from "./giveaways";
 import geoPostalRouter from "./geo-postal";
@@ -235,6 +237,10 @@ router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (n
 router.use("/public",          publicWebAnnualPlansRouter); // GET /web-annual-plans (no auth; empty until a yearly web price is set)
 router.use("/public",          publicPayLaterRouter); // GET /sellers/:sellerId/pay-later (no auth, BNPL line on product page)
 router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
+router.use("/public/feeds",     publicProductFeedRouter); // secret-token Meta / TikTok catalog CSV feeds (public data only)
+// Tracked short links under /api too: on brandthread.app only /api/* reaches this
+// server, so printed QR stickers encode /api/l/:code (same handler as /l/:code).
+router.get("/l/:code",         trackedLinkRedirect);
 router.use("/public",          emailMarketingPublicRouter); // /stores/:slug/subscribe, /email/unsubscribe/:token
 router.use("/public",          sellerEmailsPublicRouter); // /seller-emails/unsubscribe/:token (store tips)
 router.use("/public/drop-waitlist", dropWaitlistPublicRouter); // brandthread.app/@handle/drop data + phone signup
@@ -534,6 +540,7 @@ router.use("/thread-cash",         threadCashRouter); // buyer-scoped; no tc
 router.use("/growth",              tc, growthRouter);
 // My Store: the product blocks on brandthread.app/@handle.
 router.use("/store-blocks",        tc, storeBlocksRouter);
+router.use("/seller/product-feed",  tc, sellerProductFeedRouter); // seller feed URL: view, create, regenerate
 router.use("/gift-cards",          giftCardsRouter); // buyer + seller (own auth/permission checks); no tc
 
 export default router;

@@ -13,6 +13,7 @@ import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { EMPTY_SELLER_OVERVIEW, getPreviewSellerOverview } from '@/lib/previewAffiliate';
 import { ActionButton } from '@/components/affiliate/AffiliateUI';
+import { CommissionStepper } from '@/components/affiliate/CommissionStepper';
 
 function Field({ label, value, onChange, suffix, help }: { label: string; value: string; onChange: (v: string) => void; suffix: string; help?: string }) {
   const { theme } = useAppTheme();
@@ -46,7 +47,10 @@ export default function SellerCreatorSettingsScreen() {
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [commission, setCommission] = useState('10');
+  const [commission, setCommission] = useState(10);
+  // The stored rate, so an unchanged commission isn't re-sent (a rate saved
+  // before the 5–10% range existed must not block saving other settings).
+  const [savedCommission, setSavedCommission] = useState(10);
   const [discount, setDiscount] = useState('0');
   const [windowDays, setWindowDays] = useState('30');
   const [holdDays, setHoldDays] = useState('30');
@@ -56,7 +60,8 @@ export default function SellerCreatorSettingsScreen() {
   const load = useCallback(async () => {
     try {
       const { program } = previewOnly ? (getPreviewSellerOverview() ?? EMPTY_SELLER_OVERVIEW) : await api.affiliate.seller.overview();
-      setCommission(String(program.commissionPercent));
+      setCommission(program.commissionPercent);
+      setSavedCommission(program.commissionPercent);
       setDiscount(String(program.buyerDiscountPercent));
       setWindowDays(String(program.windowDays));
       setHoldDays(String(program.holdDays));
@@ -70,7 +75,7 @@ export default function SellerCreatorSettingsScreen() {
 
   const save = async () => {
     const body = {
-      commissionPercent: Number(commission),
+      ...(commission !== savedCommission ? { commissionPercent: commission } : {}),
       buyerDiscountPercent: Number(discount),
       windowDays: Number(windowDays),
       holdDays: Number(holdDays),
@@ -94,7 +99,10 @@ export default function SellerCreatorSettingsScreen() {
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 32 }]} keyboardShouldPersistTaps="handled">
         {loading ? <ActivityIndicator color={theme.text} /> : error ? <RetryRow label="Couldn't load settings" onRetry={load} /> : (
           <>
-            <Field label="Default commission" value={commission} onChange={setCommission} suffix="%" help="Paid on the item subtotal after discounts. Tax and shipping are excluded. Fractions of a cent round down. It comes out of your payout for that order before the creator is paid." />
+            <View style={{ marginBottom: SP.md }}>
+              <CommissionStepper label="Default commission" value={commission} onChange={setCommission} testID="commission-stepper" />
+              <Text style={{ fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 4, lineHeight: 16 }}>Paid on the item subtotal after discounts. Tax and shipping are excluded. Fractions of a cent round down. It comes out of your payout for that order before the creator is paid.</Text>
+            </View>
             <Field label="Buyer discount on creator codes" value={discount} onChange={setDiscount} suffix="%" help="0 keeps the code for tracking only." />
             <Field label="Attribution window" value={windowDays} onChange={setWindowDays} suffix="days" help="How long a clicked link keeps crediting the creator." />
             <Field label="Hold period" value={holdDays} onChange={setHoldDays} suffix="days" help="Days after delivery before commission becomes payable." />
