@@ -5,7 +5,6 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'rea
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -85,7 +84,6 @@ export default function StoreSectionsScreen() {
   async function handleAdd(sectionType: string) {
     if (adding) return;
     setAdding(sectionType);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await createSection(sectionType as StoreSectionType);
       Alert.alert('Section added.', undefined, [{ text: 'OK', onPress: () => goBackOr(router) }]);
@@ -100,7 +98,7 @@ export default function StoreSectionsScreen() {
     <View style={styles.root}>
       <ScreenHeader
         title="Add Section"
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+        onBack={() => { goBackOr(router); }}
       />
 
       <Text style={styles.subtitle}>Choose a section to add to your homepage.</Text>

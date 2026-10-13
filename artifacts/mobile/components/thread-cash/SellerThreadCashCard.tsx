@@ -18,7 +18,6 @@ import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { RetryRow } from '@/components/ui/RetryRow';
-import { hapticLight } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
 
 export function SellerThreadCashCard({
@@ -52,7 +51,7 @@ export function SellerThreadCashCard({
           <Text style={[styles.title, { color: theme.text }]}>Thread Cash</Text>
         </View>
         <Pressable
-          onPress={() => { hapticLight(); router.push('/thread-cash-history' as never); }}
+          onPress={() => { router.push('/thread-cash-history' as never); }}
           style={[styles.historyBtn, { borderColor: theme.border }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
@@ -79,7 +78,7 @@ export function SellerThreadCashCard({
       )}
 
       <Pressable
-        onPress={() => { hapticLight(); onCashOutPress(); }}
+        onPress={() => { onCashOutPress(); }}
         disabled={loading || error || !balanceCents}
         style={[
           styles.cashOutBtn,

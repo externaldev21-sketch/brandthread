@@ -12,7 +12,6 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
@@ -92,7 +91,6 @@ export default function StripeConnectWarning({
 
   const handleFixStripeConnect = async () => {
     if (!isSignedIn || loading || isConnecting) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (onConnect) {
       await onConnect();
       return;

@@ -13,7 +13,6 @@ import { Alert, ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, Touc
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { PrimaryButton } from '@/components/BrandthreadUI';
 import { Header } from '@/components/layout';
@@ -81,7 +80,6 @@ export default function ProductPairingsScreen() {
   const move = (index: number, delta: -1 | 1) => {
     const target = index + delta;
     if (target < 0 || target >= paired.length) return;
-    Haptics.selectionAsync();
     const next = [...paired];
     [next[index], next[target]] = [next[target], next[index]];
     setPaired(next);

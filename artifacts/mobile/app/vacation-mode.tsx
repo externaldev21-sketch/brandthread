@@ -11,7 +11,6 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -52,7 +51,6 @@ export default function VacationModeScreen() {
   }, [api]));
 
   async function handleSave() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
     try {
       await (api as any).seller?.vacation?.update?.({
@@ -60,7 +58,6 @@ export default function VacationModeScreen() {
         vacationMessage: message.trim() || null,
         vacationUntil:   returnDate ? returnDate : null,
       });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
         vacationMode ? '🏖 Vacation Mode Active' : '✅ Store Reopened',
         vacationMode

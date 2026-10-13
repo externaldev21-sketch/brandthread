@@ -7,7 +7,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi, type AdminPromotionItem, type AdminPromotionQueue } from '@/lib/api';
@@ -92,7 +91,6 @@ export default function AdminPromotionsScreen() {
     try {
       if (action === 'approve') await api.adminPromotions.approve(item.kind, item.id);
       else await api.adminPromotions.reject(item.kind, item.id, reason.trim());
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setRejecting(null);
       setReason('');
       await load(true);

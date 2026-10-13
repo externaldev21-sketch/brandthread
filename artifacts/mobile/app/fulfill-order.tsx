@@ -14,7 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '@/lib/haptics';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -162,7 +162,6 @@ export default function FulfillOrderScreen() {
   const allChecked = order ? order.lineItems.length > 0 && order.lineItems.every(li => checked[li.id]) : false;
 
   function toggleItem(id: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setChecked(prev => ({ ...prev, [id]: !prev[id] }));
   }
 
@@ -267,11 +266,11 @@ export default function FulfillOrderScreen() {
 
   async function handleBuyLabel(rate: ShippingRate) {
     if (!orderId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
     setBuying(true);
     try {
       const lbl = await purchaseShippingLabel(orderId, rate, purchaseKey, isPartial ? partialItemIds : undefined);
       setLabel(lbl);
+      haptic('orderShipped');
     } catch (err: any) {
       Alert.alert(
         'Label not purchased',
@@ -285,7 +284,6 @@ export default function FulfillOrderScreen() {
 
   async function handleScanBarcode({ data }: { data: string }) {
     setShowScanner(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setManualTracking(data);
   }
 
@@ -528,7 +526,7 @@ export default function FulfillOrderScreen() {
                 return (
                   <TouchableOpacity
                     key={p.id}
-                    onPress={() => { Haptics.selectionAsync().catch(() => {}); setPackageChoice({ kind: 'preset', presetId: p.id }); }}
+                    onPress={() => { haptic('select'); setPackageChoice({ kind: 'preset', presetId: p.id }); }}
                     onLongPress={() => Alert.alert('Delete preset', `Remove "${p.name}"?`, [
                       { text: 'Cancel', style: 'cancel' },
                       { text: 'Delete', style: 'destructive', onPress: () => handleDeletePreset(p.id) },
@@ -541,7 +539,7 @@ export default function FulfillOrderScreen() {
                 );
               })}
               <TouchableOpacity
-                onPress={() => { Haptics.selectionAsync().catch(() => {}); setPackageChoice({ kind: 'custom', weight: suggestedWeightLb, length: '', width: '', height: '' }); }}
+                onPress={() => { haptic('select'); setPackageChoice({ kind: 'custom', weight: suggestedWeightLb, length: '', width: '', height: '' }); }}
                 style={[s.presetChip, packageChoice?.kind === 'custom' && { borderColor: ACCENT, backgroundColor: ACCENT_DIM }]}
               >
                 <Text style={[s.presetChipText, packageChoice?.kind === 'custom' && { color: FG, fontFamily: FONT.semibold }]}>Custom</Text>
@@ -669,7 +667,7 @@ export default function FulfillOrderScreen() {
                   {CARRIERS.map(c => (
                     <TouchableOpacity
                       key={c}
-                      onPress={() => { Haptics.selectionAsync().catch(() => {}); setManualCarrier(c); }}
+                      onPress={() => { haptic('select'); setManualCarrier(c); }}
                       style={[s.carrierChip, manualCarrier === c && { borderColor: ACCENT, backgroundColor: ACCENT_DIM }]}
                     >
                       <Text style={[s.presetChipText, manualCarrier === c && { color: FG, fontFamily: FONT.semibold }]}>{c}</Text>

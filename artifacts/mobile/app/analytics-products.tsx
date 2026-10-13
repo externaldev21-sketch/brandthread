@@ -11,7 +11,6 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProductAnalytics, getFilterState } from '@/services/analyticsService';
 import { formatCents } from '@/lib/money';
@@ -54,7 +53,7 @@ function ProductRow({ p, rank }: { p: ProductAnalyticsRow; rank: number }) {
   const color = statusColor(colors, p.inventoryStatus);
   return (
     <TouchableOpacity
-      onPress={() => { Haptics.selectionAsync(); router.push(`/product-detail?id=${p.productId}` as never); }}
+      onPress={() => { router.push(`/product-detail?id=${p.productId}` as never); }}
       style={s.prodRow}
       activeOpacity={0.8}
     >

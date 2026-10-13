@@ -30,7 +30,6 @@ import { ActivityRowView, SkeletonRows, makeStyles } from '@/app/activity-center
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
-import { hapticDestructiveConfirm } from '@/lib/haptics';
 import {
   ACTIVITY_PAGE_SIZE,
   ACTIVITY_UNDO_MS,
@@ -343,7 +342,6 @@ export default function SellerActivityScreen() {
         text: 'Block',
         style: 'destructive',
         onPress: () => {
-          hapticDestructiveConfirm();
           void blockUser({ userId: actor.id!, name: actor.name, handle: '', initials: actor.initials, color: actor.color ?? '#3F3F46' })
             .then(() => {
               setItems((prev) => prev.filter((item) => item.actorId !== actor.id));

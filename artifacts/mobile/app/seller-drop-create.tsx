@@ -26,7 +26,6 @@ import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useApi } from '@/lib/api';
@@ -342,7 +341,6 @@ export default function SellerDropCreate() {
         ]);
       }
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       if (effectiveDropId) {
         router.replace((`/seller-drop-preview?dropId=${encodeURIComponent(effectiveDropId)}`) as never);
       } else {

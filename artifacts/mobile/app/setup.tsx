@@ -14,7 +14,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 
 import {
@@ -55,7 +54,6 @@ function TaskCard({
   const scale = useRef(new Animated.Value(1)).current;
 
   function handleComplete() {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Animated.sequence([
       Animated.timing(scale, { toValue: 0.97, duration: 80, useNativeDriver: true }),
       Animated.timing(scale, { toValue: 1, duration: 150, useNativeDriver: true }),
@@ -66,7 +64,7 @@ function TaskCard({
     <Animated.View style={{ transform: [{ scale }] }}>
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(task); }}
+        onPress={() => { onPress(task); }}
         style={[
           ts.card,
           task.completed && ts.cardDone,
@@ -98,7 +96,7 @@ function TaskCard({
         {/* Right: action */}
         {!task.completed && (
           <TouchableOpacity
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSkip(task.id); }}
+            onPress={() => { onSkip(task.id); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Text style={ts.skip}>Skip</Text>
@@ -194,7 +192,7 @@ export default function SetupScreen() {
       <ScreenHeader
         title="Store setup"
         variant="modal"
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+        onBack={() => { goBackOr(router); }}
         rightElement={
           <View style={s.pctBadge}>
             <Text style={s.pctText}>{pct}%</Text>
@@ -271,7 +269,7 @@ export default function SetupScreen() {
         {/* Save and exit */}
         <SecondaryButton
           label="Save and exit"
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+          onPress={() => { goBackOr(router); }}
           style={{ marginTop: SP.lg }}
         />
       </ScrollView>

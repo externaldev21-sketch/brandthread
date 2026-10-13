@@ -8,7 +8,6 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useApi } from '@/lib/api';
-import * as Haptics from 'expo-haptics';
 import { formatCents } from '@/lib/money';
 import {
   getInitialDropBroadcastStates,
@@ -318,7 +317,6 @@ export default function PaymentsScreen() {
   const handleBroadcast = useCallback(async (dropId: string, dropName: string) => {
     const drop = drops.find((item) => item.id === dropId);
     setBroadcastStates((prev) => ({ ...prev, [dropId]: 'loading' }));
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       if (drop?.releaseAt && new Date(drop.releaseAt).getTime() > Date.now()) {
         await api.drops.scheduleBroadcast(dropId, drop.releaseAt);
