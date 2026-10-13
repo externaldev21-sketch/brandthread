@@ -19,6 +19,7 @@ import {
 } from '@/lib/accountSettings';
 import { OutboxAccountMismatchError, type OutboxEntry } from '@/lib/messageOutbox';
 import { setEngagementRetryFallback, setEngagementRetryOwnerResolver } from '@/lib/engagementRetryQueue';
+import { track } from '@/lib/analytics';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
   Friendship, FriendshipStatus, FriendRequest, FriendSuggestion,
@@ -2090,6 +2091,7 @@ export async function saveItem(
   const k = K();
   try {
     const saved = await serviceRequest<SavedItem>('/api/buyer/saved', { method: 'POST', body: JSON.stringify(params) });
+    track('item_saved', { item_type: params.type });
     options?.onRemoteSaved?.();
     notify();
     return saved;

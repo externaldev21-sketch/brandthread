@@ -7,6 +7,8 @@
  */
 export const ANALYTICS_EVENTS = {
   app_opened: ['platform'],
+  app_installed: ['platform'],
+  item_saved: ['item_type'],
   signup_started: ['method'],
   signup_completed: ['method'],
   onboarding_completed: ['account_type'],

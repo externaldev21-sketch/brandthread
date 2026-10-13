@@ -65,6 +65,8 @@ Every event name and property key is in an allow-list (`lib/analytics/events.ts`
 | Event | Fires when | Where | Properties |
 | --- | --- | --- | --- |
 | `app_opened` | Once per launch, as soon as sending is allowed | `AnalyticsBridge` | `platform` |
+| `app_installed` | First launch of an install (native only) | `hooks/useInstallReport` | `platform` |
+| `item_saved` | A post, product, collection or store is saved | `socialService.saveItem` | `item_type` |
 | `signup_started` | Email sign-up accepted, code sent | `app/onboarding.tsx` | `method` |
 | `signup_completed` | Email code verified; or a new Google/Apple account created | `app/onboarding.tsx`, `app/sign-in.tsx` | `method` |
 | `onboarding_completed` | The API confirms onboarding for a buyer or seller | `api.auth.completeOnboarding` | `account_type` |

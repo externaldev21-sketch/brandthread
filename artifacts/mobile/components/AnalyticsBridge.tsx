@@ -10,6 +10,7 @@ import { analyticsAllowed } from '@/lib/analytics/gate';
 import { identifyAnalyticsUser, isAnalyticsEnabled, setAnalyticsConsent, setAnalyticsPlatform, setAnalyticsSuppressed, track } from '@/lib/analytics';
 import { addMonitoringBreadcrumb, isMonitoringEnabled, setMonitoringRole, setMonitoringUser } from '@/lib/monitoring';
 import { routeBreadcrumbPath } from '@/lib/monitoringConfig';
+import { useInstallReport } from '@/hooks/useInstallReport';
 
 /**
  * Renders nothing. Keeps analytics in step with consent, the signed-in
@@ -22,7 +23,7 @@ import { routeBreadcrumbPath } from '@/lib/monitoringConfig';
  */
 export default function AnalyticsBridge() {
   const webConsent = useCanUseAnalytics();
-  const { isSignedIn, userId } = useAuth();
+  const { isSignedIn, userId, getToken } = useAuth();
   const { role } = useRole();
   const opened = useRef(false);
 
@@ -44,6 +45,9 @@ export default function AnalyticsBridge() {
       track('app_opened', { platform: Platform.OS });
     }
   }, [consent, suppressed, isSignedIn, userId]);
+
+  // After consent is applied above, so `app_installed` isn't dropped.
+  useInstallReport({ enabled: !suppressed, isSignedIn, getToken });
 
   useEffect(() => {
     setMonitoringRole(isSignedIn ? role : null);
