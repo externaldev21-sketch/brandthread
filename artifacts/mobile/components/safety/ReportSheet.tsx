@@ -26,7 +26,8 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { useSheetTransition } from '@/components/ui/BottomSheet';
+import { SHEET_RADIUS, SheetCloseButton, SheetGrabber, sheetSurfaceColor, useSheetTransition } from '@/components/ui/BottomSheet';
+import { SHEET_BACKDROP_OPACITY } from '@/constants/motion';
 import { PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
 import {
   REPORT_NOTE_LIMIT, REPORT_REASONS, TARGET_LABELS, normalizeReportTarget, reportHref,
@@ -48,7 +49,7 @@ export function ReportSheet({ visible, target, onClose }: ReportSheetProps) {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  const { modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout } = useSheetTransition(visible, () => {});
+  const { modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout } = useSheetTransition(visible, onClose);
 
   const targetType = normalizeReportTarget(target.targetType);
   const noun = TARGET_LABELS[targetType];
@@ -68,9 +69,9 @@ export function ReportSheet({ visible, target, onClose }: ReportSheetProps) {
           <ReanimatedAnimated.View
             testID="report-sheet"
             onLayout={onSheetLayout}
-            style={[s.sheet, { paddingBottom: insets.bottom + SP.md }, sheetStyle]}
+            style={[s.sheet, { backgroundColor: sheetSurfaceColor(theme), paddingBottom: insets.bottom + SP.md }, sheetStyle]}
           >
-            <View style={s.handle} />
+            <SheetGrabber />
             <View style={s.header}>
               {step === 'details' ? (
                 <PressableScale onPress={() => flow.setStep('reason')} style={s.headerSide} accessibilityLabel="Back">
@@ -78,9 +79,9 @@ export function ReportSheet({ visible, target, onClose }: ReportSheetProps) {
                 </PressableScale>
               ) : <View style={s.headerSide} />}
               <Text style={s.title}>Report</Text>
-              <PressableScale onPress={onClose} style={[s.headerSide, { alignItems: 'flex-end' }]} accessibilityLabel="Close">
-                <Feather name="x" size={20} color={theme.text} />
-              </PressableScale>
+              <View style={[s.headerSide, { alignItems: 'flex-end' }]}>
+                <SheetCloseButton onPress={onClose} />
+              </View>
             </View>
 
             {!target.targetId ? (
@@ -201,12 +202,10 @@ export function useReportSheet(): ReportSheetContextValue {
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+  backdrop: { flex: 1, backgroundColor: theme.shadowColor, opacity: SHEET_BACKDROP_OPACITY },
   sheet: {
-    backgroundColor: theme.background, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-    borderWidth: 1, borderColor: theme.border, paddingTop: SP.sm, maxHeight: '88%',
+    borderTopLeftRadius: SHEET_RADIUS, borderTopRightRadius: SHEET_RADIUS, maxHeight: '88%', overflow: 'hidden',
   },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginBottom: SP.sm },
   header: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingBottom: SP.sm,
     borderBottomWidth: 1, borderBottomColor: theme.borderSubtle,

@@ -17,9 +17,8 @@
  * feed player at that post.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
@@ -45,12 +44,13 @@ import {
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { getSellerShopPage, taggedItemHref, type ShopProduct } from '@/services/profileService';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
+import { MenuSheet } from '@/components/ui/MenuSheet';
 import { ProfileProductTile } from '@/components/profile/ProfileProductTile';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { BrandDropsCard } from '@/components/BrandDropsCard';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { confirmBlock, reportHref } from '@/lib/safety';
-import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { ListRow } from '@/components/ui/ListRow';
@@ -142,7 +142,6 @@ function toSellerView(profile: any, fallbackId: string): SellerView {
 export default function SellerProfileScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string; sellerId?: string; isOwner?: string; src?: string; asVisitor?: string }>();
@@ -757,19 +756,18 @@ export default function SellerProfileScreen() {
       />
 
       {/* ── Owner post actions (long-press a tile) ── */}
-      <Modal visible={!!selectedPost} transparent animationType="slide" onRequestClose={() => setSelectedPost(null)}>
-        <PressableScale style={styles.sheetBackdrop} activeOpacity={1} onPress={() => setSelectedPost(null)} accessibilityLabel="Close post actions" />
-        {selectedPost ? (
-          <View style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }]}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle} numberOfLines={1}>{selectedPost.caption || 'Post'}</Text>
-            <SheetRow icon="play" label="Play" onPress={() => { const post = selectedPost; setSelectedPost(null); openVideo(gridItemFromThreadPost(post)); }} />
-            <SheetRow icon="edit-2" label="Edit post" onPress={() => { const post = selectedPost; setSelectedPost(null); router.push(('/create-post?editId=' + post.id) as never); }} />
-            <SheetRow icon="bar-chart-2" label="View analytics" onPress={() => { const post = selectedPost; setSelectedPost(null); router.push(('/post-analytics?id=' + post.id) as never); }} />
-            <SheetRow icon="copy" label="Copy link" onPress={() => { const post = selectedPost; setSelectedPost(null); void handleCopyPostLink(post); }} />
-          </View>
-        ) : null}
-      </Modal>
+      <MenuSheet
+        visible={!!selectedPost}
+        onClose={() => setSelectedPost(null)}
+        accessibilityLabel="Post options"
+        testID="seller-post-menu"
+        sections={[[
+          { key: 'play', icon: 'play', label: 'Play', onPress: () => { const post = selectedPost; if (post) openVideo(gridItemFromThreadPost(post)); } },
+          { key: 'edit', icon: 'edit-2', label: 'Edit post', onPress: () => { const post = selectedPost; if (post) router.push(('/create-post?editId=' + post.id) as never); } },
+          { key: 'analytics', icon: 'bar-chart-2', label: 'View analytics', onPress: () => { const post = selectedPost; if (post) router.push(('/post-analytics?id=' + post.id) as never); } },
+          { key: 'copy-link', icon: 'link', label: 'Copy link', onPress: () => { const post = selectedPost; if (post) void handleCopyPostLink(post); } },
+        ]]}
+      />
 
       {isOwner ? (
         <>
@@ -803,22 +801,6 @@ export default function SellerProfileScreen() {
   );
 }
 
-function SheetRow({ icon, label, onPress }: { icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void }) {
-  const { theme } = useAppTheme();
-  return (
-    <PressableScale style={sheetRowStyles.row} onPress={() => { hapticMedium(); onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
-      <Feather name={icon} size={18} color={theme.text} />
-      <Text style={[sheetRowStyles.label, { color: theme.text }]}>{label}</Text>
-      <Feather name="chevron-right" size={16} color={theme.muted} />
-    </PressableScale>
-  );
-}
-
-const sheetRowStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: SP.md, minHeight: 52 },
-  label: { flex: 1, fontFamily: FONT.medium, fontSize: FS.base },
-});
-
 function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     flex: { flex: 1 },
@@ -842,13 +824,5 @@ function makeStyles(theme: AppThemePreset) {
     vacationText: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
     errorRoot: { flex: 1, backgroundColor: theme.background },
     errorBar: { paddingHorizontal: SP.md, alignItems: 'flex-start' },
-    sheetBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)' }, // theme-exempt: modal scrim
-    sheet: {
-      position: 'absolute', bottom: 0, left: 0, right: 0,
-      backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-      borderWidth: 1, borderBottomWidth: 0, borderColor: theme.border,
-    },
-    sheetHandle: { width: 36, height: 4, backgroundColor: theme.border, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: SP.sm },
-    sheetTitle: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
   });
 }

@@ -16,18 +16,17 @@
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Modal, Animated, Share, Linking, Alert, ScrollView, Pressable,
+  View, Text, StyleSheet, Animated, Share, Linking, Alert,
   useWindowDimensions, type LayoutChangeEvent, type FlatList,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { hapticLight, hapticMedium, hapticSelection, hapticDestructiveConfirm } from '@/lib/haptics';
-import { FONT, FS, SP, RADIUS, ICON, OVERLAY } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import {
   getMyProfile, getMyPosts, getSavedItems,
@@ -75,6 +74,7 @@ import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
+import { MenuSheet } from '@/components/ui/MenuSheet';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { taggedItemHref } from '@/services/profileService';
 import { radius } from '@/constants/radii';
@@ -103,90 +103,6 @@ function savedTypeIcon(type: string): keyof typeof Feather.glyphMap {
   if (type === 'product') return 'shopping-bag';
   if (type === 'collection') return 'folder';
   return 'home';
-}
-
-// ─── Bottom Sheet ─────────────────────────────────────────────────────────────
-function BottomSheet({
-  visible,
-  onClose,
-  children,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  const insets = useSafeAreaInsets();
-  const { theme } = useAppTheme();
-  const anim = useRef(new Animated.Value(0)).current;
-  const [mounted, setMounted] = useState(visible);
-
-  useEffect(() => {
-    if (visible) setMounted(true);
-    Animated.timing(anim, {
-      toValue: visible ? 1 : 0,
-      duration: 220,
-      useNativeDriver: true,
-    }).start(() => {
-      if (!visible) setMounted(false);
-    });
-  }, [visible, anim]);
-
-  if (!mounted) return null;
-
-  return (
-    <Modal transparent animationType="none" onRequestClose={onClose} visible={mounted}>
-      <View style={[sheetStyles.backdrop, { backgroundColor: OVERLAY }]}>
-        {/* Plain Pressable, not PressableScale: PressableScale only forwards
-            a plain-object `style` prop to its *inner* Animated.View, never
-            the outer Pressable that actually receives touches — so this
-            backdrop had no real hit area and tapping it did nothing (a
-            press-scale animation on a full-screen dismiss backdrop makes no
-            visual sense anyway, so there's no feature lost dropping it). */}
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close menu" />
-        <Animated.View
-          style={[
-            sheetStyles.sheet,
-            { backgroundColor: theme.card, borderColor: theme.border },
-            { paddingBottom: insets.bottom + SP.md },
-            { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [120, 0] }) }] },
-          ]}
-        >
-          <View style={[sheetStyles.sheetHandle, { backgroundColor: theme.border }]} />
-          <ScrollView style={sheetStyles.sheetScroll} showsVerticalScrollIndicator={false}>
-            {children}
-          </ScrollView>
-        </Animated.View>
-      </View>
-    </Modal>
-  );
-}
-
-function SheetRow({
-  icon, label, destructive, onPress, last,
-}: {
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  destructive?: boolean;
-  onPress: () => void;
-  /** Skips the divider under the last row in a group. */
-  last?: boolean;
-}) {
-  const { theme } = useAppTheme();
-  return (
-    // Plain `Pressable` (not `PressableScale`, whose forced style-forwarding
-    // to an inner wrapper — see the profile header's own fixes — was
-    // silently dropping this row's real height/divider here too).
-    <Pressable
-      style={({ pressed }) => [sheetStyles.sheetRow, !last && sheetStyles.sheetRowDivider, pressed && sheetStyles.sheetRowPressed]}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-    >
-      <Feather name={icon} size={22} color={destructive ? theme.error : theme.text} />
-      <Text style={[sheetStyles.sheetRowText, { color: destructive ? theme.error : theme.text }]}>{label}</Text>
-      {!destructive ? <Feather name="chevron-right" size={18} color={theme.subtle} style={sheetStyles.sheetRowChevron} /> : null}
-    </Pressable>
-  );
 }
 
 // ─── Top bar ──────────────────────────────────────────────────────────────────
@@ -1027,13 +943,19 @@ export default function ProfileScreen() {
       <AccountSwitcherSheet visible={accountSwitcherOpen} onClose={() => setAccountSwitcherOpen(false)} />
 
       {/* ── Post Long-Press Sheet ── */}
-      <BottomSheet visible={!!postSheet} onClose={() => setPostSheet(null)}>
-        <Text style={[sheetStyles.sheetTitle, { color: theme.muted }]} numberOfLines={1}>{postSheet?.caption || 'Post'}</Text>
-        <SheetRow icon="share-2" label="Share post" onPress={handleShareCurrentPost} />
-        <SheetRow icon="archive" label="Archive" last onPress={handleArchivePost} />
-        <View style={[sheetStyles.sheetDivider, { backgroundColor: theme.border }]} />
-        <SheetRow icon="trash-2" label="Delete post" destructive onPress={handleDeletePost} />
-      </BottomSheet>
+      <MenuSheet
+        visible={!!postSheet}
+        onClose={() => setPostSheet(null)}
+        accessibilityLabel="Post options"
+        testID="profile-post-menu"
+        sections={[
+          [
+            { key: 'share', icon: 'share-2', label: 'Share post', onPress: () => { void handleShareCurrentPost(); } },
+            { key: 'archive', icon: 'archive', label: 'Archive', onPress: () => { void handleArchivePost(); } },
+          ],
+          [{ key: 'delete', icon: 'trash-2', label: 'Delete post', destructive: true, onPress: handleDeletePost }],
+        ]}
+      />
     </View>
   );
 }
@@ -1085,18 +1007,4 @@ const cellStyles = StyleSheet.create({
   orderCardBody: { flex: 1, gap: 2 },
   orderCardSeller: { fontFamily: FONT.semibold, fontSize: FS.sm },
   orderCardMeta: { fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: 2 },
-});
-
-const sheetStyles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingTop: SP.sm, paddingHorizontal: SP.md, borderWidth: 1, borderBottomWidth: 0, maxHeight: '80%', overflow: 'hidden' },
-  sheetScroll: { maxHeight: '100%' },
-  sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
-  sheetTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, paddingVertical: SP.sm, paddingHorizontal: SP.xs, marginBottom: SP.xs },
-  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, height: 52, paddingHorizontal: SP.xs },
-  sheetRowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' /* theme-exempt: fixed 8% white divider per spec */ },
-  sheetRowPressed: { backgroundColor: 'rgba(255,255,255,0.04)' /* theme-exempt: fixed press wash */ },
-  sheetRowText: { fontFamily: FONT.medium, fontSize: FS.base, flex: 1 },
-  sheetRowChevron: { marginLeft: 'auto' },
-  sheetDivider: { height: 1, marginVertical: SP.xs },
 });

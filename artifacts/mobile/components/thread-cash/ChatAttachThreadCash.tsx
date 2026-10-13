@@ -18,13 +18,13 @@
  * is Cash-App-style (huge amount up top, plain 3-column numeric pad).
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Pressable, Alert, Animated, Easing } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Animated, Easing } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ThreadCashBill, ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from './ThreadCashBill';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/ui/Button';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { SuccessCheck } from '@/components/ui/SuccessCheck';
 import * as Haptics from 'expo-haptics';
 import { randomUUID } from 'expo-crypto';
@@ -62,7 +62,7 @@ const SEND_CONFIRM_HOLD_MS = 1150;
 const MAX_NOTE_LENGTH = 140;
 const NUMPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'];
 const PRESET_DOLLARS = [5, 10, 20] as const;
-const BADGE_SIZE = 56;
+const BADGE_SIZE = 44;
 
 function formatAmountDisplay(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
@@ -303,26 +303,38 @@ export function ThreadCashAttachButton({
           <ThreadCashBillMark size={18} color={theme.text} accent={theme.accent} disabled={disabled} />
         </TouchableOpacity>
       )}
-      <Modal transparent animationType="fade" visible={open} onRequestClose={() => { if (step !== 'sent') setOpen(false); }}>
-        {/* The transfer is already sent by the time this confirmation shows
-            — no backdrop-dismiss race that could skip posting the chat
-            bubble (see the 'sent' step effect above, which owns closing). */}
-        <Pressable
-          style={styles.backdrop}
-          onPress={() => { if (step !== 'sent') setOpen(false); }}
-          testID="thread-cash-backdrop"
-        />
-        <SheetRise style={[styles.sheet, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {/* Circular badge, half in / half out of the sheet's top edge */}
-          <View style={[styles.badge, { backgroundColor: theme.accent, borderColor: theme.card }]}>
-            <ThreadCashBillMark size={26} color={theme.onAccent} accent={theme.onAccent} />
-          </View>
-
-          {/* Cash App's confirmation screen drops the chrome around it (no
-              close affordance, no balance pill) — the checkmark + headline
-              are the whole screen for that one beat. */}
-          {step !== 'sent' && (
-            <View style={styles.sheetHeader}>
+      {/* The transfer is already sent by the time the confirmation shows —
+          no dismiss race that could skip posting the chat bubble (see the
+          'sent' step effect above, which owns closing). */}
+      <Sheet
+        visible={open}
+        onClose={() => { if (step !== 'sent') setOpen(false); }}
+        headerRight="none"
+        accessibilityLabel="Send Thread Cash"
+        testID="thread-cash-sheet"
+        footer={step !== 'sent' ? (
+          <Button
+            label={step === 'confirm'
+              ? `Confirm & Send · ${formatAmountDisplay(cents)}`
+              : step === 'keypad'
+                ? `Continue · ${formatAmountDisplay(cents)}`
+                : `Send · ${formatAmountDisplay(cents)}`}
+            variant="primary"
+            fullWidth
+            loading={sending || confirming}
+            disabled={!canProceedToConfirm || sending || confirming}
+            onPress={() => {
+              if (!canProceedToConfirm) return;
+              step === 'confirm' ? handleConfirmAndSend() : setStep('confirm');
+            }}
+            accessibilityLabel={step === 'confirm' ? 'Confirm and send' : 'Continue'}
+            testID={step === 'confirm' ? 'thread-cash-confirm-send' : 'thread-cash-continue'}
+          />
+        ) : undefined}
+      >
+        {step !== 'sent' && (
+          <View style={styles.sheetHeader}>
+            <View style={styles.headerSide}>
               <TouchableOpacity
                 onPress={() => setOpen(false)}
                 accessibilityRole="button"
@@ -332,6 +344,11 @@ export function ThreadCashAttachButton({
               >
                 <Feather name="chevron-down" size={22} color={theme.muted} />
               </TouchableOpacity>
+            </View>
+            <View style={[styles.badge, { backgroundColor: theme.accent }]}>
+              <ThreadCashBillMark size={22} color={theme.onAccent} accent={theme.onAccent} />
+            </View>
+            <View style={[styles.headerSide, styles.headerSideEnd]}>
               <View style={[styles.balancePill, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
                 <ThreadCashBillMark size={14} color={theme.text} accent={theme.accent} />
                 <Text style={[styles.balanceText, { color: theme.text }]} testID="thread-cash-balance">
@@ -341,148 +358,129 @@ export function ThreadCashAttachButton({
                 </Text>
               </View>
             </View>
-          )}
+          </View>
+        )}
 
-          {step === 'sent' && sentResult ? (
-            // The animated send confirmation — Cash App's "You sent $1 to
-            // {name}" structure (big checkmark, big amount headline,
-            // minimal chrome), adapted monochrome: SuccessCheck's `draw`
-            // variant (white ring + white stroke check on theme.text — no
-            // fill, no color, see components/ui/SuccessCheck.tsx) stands in
-            // for Cash App's green filled circle, reusing that component's
-            // existing timing/easing rather than a new animation.
-            <View style={styles.sentBlock} testID="thread-cash-sent-confirmation">
-              {/* haptic=false: the success haptic already fired the moment
-                  the transfer was confirmed (see handleSend above), not
-                  re-fired here on mount. */}
-              <SuccessCheck variant="draw" size={72} haptic={false} testID="thread-cash-sent-check" />
-              <Text style={[styles.sentAmount, { color: theme.text }]}>
-                You sent <Text style={{ color: THREAD_CASH_GREEN_MID }}>{formatAmountDisplay(sentResult.amountCents)}</Text>
+        {step === 'sent' && sentResult ? (
+          // The animated send confirmation — Cash App's "You sent $1 to
+          // {name}" structure (big checkmark, big amount headline,
+          // minimal chrome), adapted monochrome: SuccessCheck's `draw`
+          // variant (white ring + white stroke check on theme.text — no
+          // fill, no color, see components/ui/SuccessCheck.tsx) stands in
+          // for Cash App's green filled circle, reusing that component's
+          // existing timing/easing rather than a new animation.
+          <View style={styles.sentBlock} testID="thread-cash-sent-confirmation">
+            {/* haptic=false: the success haptic already fired the moment
+                the transfer was confirmed (see handleSend above), not
+                re-fired here on mount. */}
+            <SuccessCheck variant="draw" size={72} haptic={false} testID="thread-cash-sent-check" />
+            <Text style={[styles.sentAmount, { color: theme.text }]}>
+              You sent <Text style={{ color: THREAD_CASH_GREEN_MID }}>{formatAmountDisplay(sentResult.amountCents)}</Text>
+            </Text>
+            <Text style={[styles.subtitle, { color: theme.muted, marginBottom: 0 }]}>to {handle}</Text>
+          </View>
+        ) : step === 'keypad' ? (
+          <>
+            <Text
+              style={[styles.bigAmount, { color: insufficientBalance ? theme.error : cents > 0 ? THREAD_CASH_GREEN_MID : theme.subtle }]}
+              accessibilityLabel={`Amount ${formatAmountDisplay(cents)}`}
+              testID="thread-cash-amount"
+            >
+              {formatAmountDisplay(cents)}
+            </Text>
+            {insufficientBalance && (
+              <Text style={[styles.insufficientText, { color: theme.error }]} testID="thread-cash-insufficient">
+                Not enough Thread Cash — balance {balanceCents == null ? '···' : formatAmountDisplay(balanceCents)}
               </Text>
-              <Text style={[styles.subtitle, { color: theme.muted, marginBottom: 0 }]}>to {handle}</Text>
-            </View>
-          ) : step === 'keypad' ? (
-            <>
-              <Text
-                style={[styles.bigAmount, { color: insufficientBalance ? theme.error : cents > 0 ? THREAD_CASH_GREEN_MID : theme.subtle }]}
-                accessibilityLabel={`Amount ${formatAmountDisplay(cents)}`}
-                testID="thread-cash-amount"
-              >
-                {formatAmountDisplay(cents)}
-              </Text>
-              {insufficientBalance && (
-                <Text style={[styles.insufficientText, { color: theme.error }]} testID="thread-cash-insufficient">
-                  Not enough Thread Cash — balance {balanceCents == null ? '···' : formatAmountDisplay(balanceCents)}
-                </Text>
-              )}
-              <View style={styles.numpad}>
-                {NUMPAD_KEYS.map((key) => (
-                  <TouchableOpacity
-                    key={key}
-                    style={styles.numpadKey}
-                    onPress={() => pressKey(key)}
-                    accessibilityRole="button"
-                    accessibilityLabel={key === '⌫' ? 'Backspace' : `Digit ${key}`}
-                  >
-                    <Text style={[styles.numpadKeyText, { color: theme.text }]}>{key}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <TouchableOpacity onPress={() => setStep('amount')} style={styles.backToChips}>
-                <Text style={[styles.backToChipsText, { color: theme.muted }]}>Back to presets</Text>
-              </TouchableOpacity>
-            </>
-          ) : step === 'confirm' ? (
-            <View style={styles.confirmBlock}>
-              <Text style={[styles.title, { color: THREAD_CASH_GREEN_MID }]}>{formatAmountDisplay(cents)}</Text>
-              <Text style={[styles.subtitle, { color: theme.muted }]}>to {handle}</Text>
-              {note.trim() ? <Text style={[styles.confirmNote, { color: theme.muted }]} numberOfLines={2}>“{note.trim()}”</Text> : null}
-            </View>
-          ) : (
-            <>
-              <Text style={[styles.title, { color: theme.text }]}>Send Thread Cash</Text>
-              <Text style={[styles.subtitle, { color: theme.muted }]}>
-                To {handle} · they follow you back{'  '}
-                <Text
-                  style={[styles.learnMore, { color: theme.text }]}
-                  onPress={() => { setOpen(false); router.push('/thread-cash' as never); }}
-                  testID="thread-cash-learn-more"
-                >
-                  How it works
-                </Text>
-              </Text>
-
-              <TextInput
-                style={[styles.noteInput, { color: theme.text, backgroundColor: theme.cardElevated, borderColor: theme.border }]}
-                placeholder="Add a note"
-                placeholderTextColor={theme.subtle}
-                value={note}
-                onChangeText={(t) => setNote(t.slice(0, MAX_NOTE_LENGTH))}
-                maxLength={MAX_NOTE_LENGTH}
-                accessibilityLabel="Note"
-              />
-
-              <View style={styles.chipRow}>
-                {PRESET_DOLLARS.map((dollars) => {
-                  const isSelected = selectedChip === dollars;
-                  return (
-                    <TouchableOpacity
-                      key={dollars}
-                      onPress={() => pickChip(dollars)}
-                      style={[
-                        styles.chip,
-                        isSelected
-                          ? { backgroundColor: theme.accent, borderColor: theme.accent }
-                          : { backgroundColor: 'transparent', borderColor: theme.border },
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: isSelected }}
-                      accessibilityLabel={`$${dollars}`}
-                      testID={`thread-cash-chip-${dollars}`}
-                    >
-                      <Text style={[styles.chipText, { color: isSelected ? theme.onAccent : theme.text }]}>${dollars}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
+            )}
+            <View style={styles.numpad}>
+              {NUMPAD_KEYS.map((key) => (
                 <TouchableOpacity
-                  onPress={pickCustom}
-                  style={[
-                    styles.chip,
-                    selectedChip === 'custom'
-                      ? { backgroundColor: theme.accent, borderColor: theme.accent }
-                      : { backgroundColor: 'transparent', borderColor: theme.border },
-                  ]}
+                  key={key}
+                  style={styles.numpadKey}
+                  onPress={() => pressKey(key)}
                   accessibilityRole="button"
-                  accessibilityLabel="Custom amount"
-                  testID="thread-cash-chip-custom"
+                  accessibilityLabel={key === '⌫' ? 'Backspace' : `Digit ${key}`}
                 >
-                  <Text style={[styles.chipText, { color: selectedChip === 'custom' ? theme.onAccent : theme.text }]}>Custom</Text>
+                  <Text style={[styles.numpadKeyText, { color: theme.text }]}>{key}</Text>
                 </TouchableOpacity>
-              </View>
-            </>
-          )}
+              ))}
+            </View>
+            <TouchableOpacity onPress={() => setStep('amount')} style={styles.backToChips}>
+              <Text style={[styles.backToChipsText, { color: theme.muted }]}>Back to presets</Text>
+            </TouchableOpacity>
+          </>
+        ) : step === 'confirm' ? (
+          <View style={styles.confirmBlock}>
+            <Text style={[styles.title, { color: THREAD_CASH_GREEN_MID }]}>{formatAmountDisplay(cents)}</Text>
+            <Text style={[styles.subtitle, { color: theme.muted }]}>to {handle}</Text>
+            {note.trim() ? <Text style={[styles.confirmNote, { color: theme.muted }]} numberOfLines={2}>“{note.trim()}”</Text> : null}
+          </View>
+        ) : (
+          <>
+            <Text style={[styles.title, { color: theme.text }]}>Send Thread Cash</Text>
+            <Text style={[styles.subtitle, { color: theme.muted }]}>
+              To {handle} · they follow you back{'  '}
+              <Text
+                style={[styles.learnMore, { color: theme.text }]}
+                onPress={() => { setOpen(false); router.push('/thread-cash' as never); }}
+                testID="thread-cash-learn-more"
+              >
+                How it works
+              </Text>
+            </Text>
 
-          {step !== 'sent' && (
-            <Button
-              label={step === 'confirm'
-                ? `Confirm & Send · ${formatAmountDisplay(cents)}`
-                : step === 'keypad'
-                  ? `Continue · ${formatAmountDisplay(cents)}`
-                  : `Send · ${formatAmountDisplay(cents)}`}
-              variant="primary"
-              fullWidth
-              loading={sending || confirming}
-              disabled={!canProceedToConfirm || sending || confirming}
-              onPress={() => {
-                if (!canProceedToConfirm) return;
-                step === 'confirm' ? handleConfirmAndSend() : setStep('confirm');
-              }}
-              accessibilityLabel={step === 'confirm' ? 'Confirm and send' : 'Continue'}
-              testID={step === 'confirm' ? 'thread-cash-confirm-send' : 'thread-cash-continue'}
+            <TextInput
+              style={[styles.noteInput, { color: theme.text, backgroundColor: theme.cardElevated, borderColor: theme.border }]}
+              placeholder="Add a note"
+              placeholderTextColor={theme.subtle}
+              value={note}
+              onChangeText={(t) => setNote(t.slice(0, MAX_NOTE_LENGTH))}
+              maxLength={MAX_NOTE_LENGTH}
+              accessibilityLabel="Note"
             />
-          )}
-        </SheetRise>
-      </Modal>
+
+            <View style={styles.chipRow}>
+              {PRESET_DOLLARS.map((dollars) => {
+                const isSelected = selectedChip === dollars;
+                return (
+                  <TouchableOpacity
+                    key={dollars}
+                    onPress={() => pickChip(dollars)}
+                    style={[
+                      styles.chip,
+                      isSelected
+                        ? { backgroundColor: theme.accent, borderColor: theme.accent }
+                        : { backgroundColor: 'transparent', borderColor: theme.border },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                    accessibilityLabel={`$${dollars}`}
+                    testID={`thread-cash-chip-${dollars}`}
+                  >
+                    <Text style={[styles.chipText, { color: isSelected ? theme.onAccent : theme.text }]}>${dollars}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity
+                onPress={pickCustom}
+                style={[
+                  styles.chip,
+                  selectedChip === 'custom'
+                    ? { backgroundColor: theme.accent, borderColor: theme.accent }
+                    : { backgroundColor: 'transparent', borderColor: theme.border },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Custom amount"
+                testID="thread-cash-chip-custom"
+              >
+                <Text style={[styles.chipText, { color: selectedChip === 'custom' ? theme.onAccent : theme.text }]}>Custom</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+      </Sheet>
     </>
   );
 }
@@ -616,18 +614,13 @@ export function ThreadCashMessageCard({
 const styles = StyleSheet.create({
   attachButton: { width: 36, height: 36, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   attachButtonDisabled: { opacity: 0.45 },
-  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000000A0' },
-  sheet: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
-    borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-    borderWidth: 1, padding: SP.lg, paddingTop: SP.lg + BADGE_SIZE / 2,
-  },
   badge: {
-    position: 'absolute', top: -BADGE_SIZE / 2, alignSelf: 'center',
     width: BADGE_SIZE, height: BADGE_SIZE, borderRadius: BADGE_SIZE / 2,
-    borderWidth: 3, alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },
+  headerSide: { flex: 1, alignItems: 'flex-start' },
+  headerSideEnd: { alignItems: 'flex-end' },
   balancePill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 5,

@@ -89,8 +89,12 @@ vi.mock('@/components/ui/Button', () => ({
   Button: ({ label, onPress, testID, disabled }: { label: string; onPress: () => void; testID?: string; disabled?: boolean }) =>
     React.createElement('Button', { testID, onPress, disabled, label }, label),
 }));
-vi.mock('@/components/motion/SheetRise', () => ({
-  SheetRise: (props: Record<string, unknown>) => React.createElement('SheetRise', props, props.children as React.ReactNode),
+// The send flow renders on the shared <Sheet>: shown while `visible`, body
+// then the pinned footer (the Send / Confirm button).
+vi.mock('@/components/ui/BottomSheet', () => ({
+  Sheet: (props: Record<string, unknown>) => (props.visible
+    ? React.createElement('Sheet', { testID: props.testID }, props.children as React.ReactNode, props.footer as React.ReactNode)
+    : null),
 }));
 vi.mock('@/components/thread-cash/ThreadCashBill', () => ({
   ThreadCashBill: () => React.createElement('ThreadCashBill'),

@@ -8,13 +8,13 @@
  * followers.", a destructive "Remove" and a "Cancel":
  * https://mobbin.com/screens/11397cf3-a65b-41d1-9e13-9518ed5cc830
  */
-import React from 'react';
-import { Modal, Pressable, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useRef } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
-import { PressableScale, SheetHandle } from '@/components/BrandthreadUI';
+import { FONT, FS, SP } from '@/lib/theme';
+import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
+import { Sheet } from '@/components/ui/BottomSheet';
 
 export interface RemoveFollowerPerson {
   id: string;
@@ -31,91 +31,83 @@ export function RemoveFollowerSheet({ person, busy, onCancel, onConfirm }: {
   onConfirm: () => void;
 }) {
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
+  // Keep the last person on screen while the sheet slides away.
+  const lastPerson = useRef<RemoveFollowerPerson | null>(person);
+  if (person) lastPerson.current = person;
+  const shown = person ?? lastPerson.current;
+  const divider = { borderTopColor: theme.border };
   return (
-    <Modal visible={!!person} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.backdrop} onPress={busy ? undefined : onCancel} accessibilityLabel="Close">
-        <Pressable
-          style={[styles.sheet, { backgroundColor: theme.card, paddingBottom: insets.bottom + SP.lg }]}
-          onPress={() => {}}
-        >
-          <SheetHandle />
-          {person ? (
-            <View style={styles.content}>
-              {person.avatarUrl ? (
-                <CachedImage
-                  source={{ uri: person.avatarUrl }}
-                  style={styles.avatar}
-                  accessibilityIgnoresInvertColors
-                />
-              ) : (
-                <View style={[styles.avatar, { backgroundColor: person.color || theme.accent, alignItems: 'center', justifyContent: 'center' }]}>
-                  <Text style={{ color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.lg }}>{person.initials}</Text>
-                </View>
-              )}
-              <Text style={[styles.title, { color: theme.text }]}>Remove follower?</Text>
-              <Text style={[styles.body, { color: theme.muted }]}>
-                We won&apos;t tell {person.name} they were removed from your followers.
-              </Text>
-            </View>
-          ) : null}
-          {/* Text-row buttons (not filled pills) — matches the native iOS
-              action-sheet structure Instagram's own confirm sheet uses: a
-              hairline divider above each full-width row. */}
+    <Sheet
+      visible={!!person}
+      onClose={busy ? () => {} : onCancel}
+      headerRight="none"
+      accessibilityLabel="Remove follower?"
+      testID="remove-follower-sheet"
+      footer={(
+        // Text-row buttons (not filled buttons) — the native iOS action-sheet
+        // structure Instagram's own confirm sheet uses: a hairline divider
+        // above each full-width row.
+        <View>
           <PressableScale
-            style={styles.removeBtn}
+            style={[styles.rowBtn, divider]}
             onPress={onConfirm}
             disabled={busy}
             accessibilityRole="button"
             accessibilityLabel="Remove follower"
           >
             {busy ? <ActivityIndicator size="small" color={theme.error} /> : (
-              <Text style={[styles.removeText, { color: theme.error }]}>Remove</Text>
+              <Text style={[styles.rowText, { color: theme.error }]}>Remove</Text>
             )}
           </PressableScale>
           <PressableScale
-            style={styles.cancelBtn}
+            style={[styles.rowBtn, divider]}
             onPress={onCancel}
             disabled={busy}
             accessibilityRole="button"
             accessibilityLabel="Cancel"
           >
-            <Text style={[styles.cancelText, { color: theme.text }]}>Cancel</Text>
+            <Text style={[styles.rowText, { color: theme.text }]}>Cancel</Text>
           </PressableScale>
-        </Pressable>
-      </Pressable>
-    </Modal>
+        </View>
+      )}
+    >
+      {shown ? (
+        <View style={styles.content}>
+          {shown.avatarUrl ? (
+            <CachedImage
+              source={{ uri: shown.avatarUrl }}
+              style={styles.avatar}
+              accessibilityIgnoresInvertColors
+            />
+          ) : (
+            <View style={[styles.avatar, styles.initials, { backgroundColor: shown.color || theme.accent }]}>
+              <Text style={[styles.initialsText, { color: theme.onAccent }]}>{shown.initials}</Text>
+            </View>
+          )}
+          <Text style={[styles.title, { color: theme.text }]}>Remove follower?</Text>
+          <Text style={[styles.body, { color: theme.muted }]}>
+            We won&apos;t tell {shown.name} they were removed from your followers.
+          </Text>
+        </View>
+      ) : null}
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  sheet: {
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    paddingTop: SP.sm,
-    paddingHorizontal: SP.lg,
-  },
-  content: { alignItems: 'center', paddingVertical: SP.lg, gap: SP.sm },
+  content: { alignItems: 'center', paddingTop: SP.md, paddingBottom: SP.sm, gap: SP.sm },
   avatar: { width: 64, height: 64, borderRadius: 32 },
+  initials: { alignItems: 'center', justifyContent: 'center' },
+  initialsText: { fontFamily: FONT.bold, fontSize: FS.lg },
   title: { fontFamily: FONT.bold, fontSize: FS.lg },
   body: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', paddingHorizontal: SP.lg, lineHeight: 20 },
-  removeBtn: {
+  rowBtn: {
     height: 52,
     alignItems: 'center',
     justifyContent: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.2)',
   },
-  removeText: { fontFamily: FONT.semibold, fontSize: FS.md },
-  cancelBtn: {
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.2)',
-  },
-  cancelText: { fontFamily: FONT.semibold, fontSize: FS.md },
+  rowText: { fontFamily: FONT.semibold, fontSize: FS.md },
 });
 
 export default RemoveFollowerSheet;
