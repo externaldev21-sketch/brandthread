@@ -14,7 +14,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { classifyNetworkError } from './networkNotice';
-import { accountStorageKey, adoptLegacyKey, getAccountStorageScope } from './accountStorage';
+import { accountStorageKey, adoptLegacyKey, getAccountStorageScope, setAccountStorageScope } from './accountStorage';
 
 export type EngagementActionKind = 'like' | 'save' | 'repost' | 'follow' | 'not_interested' | 'save_product';
 
@@ -67,7 +67,11 @@ function load(): Promise<void> {
   if (!loadPromise) {
     loadPromise = adoptLegacyKey(LEGACY_STORAGE_KEY, 'drop')
       .then(() => AsyncStorage.getItem(accountStorageKey(LEGACY_STORAGE_KEY, scope)))
-      .then((raw) => { if (loadedScope === scope) queue = raw ? JSON.parse(raw) : []; })
+      .then((raw) => {
+        if (loadedScope !== scope) return;
+        const parsed = raw ? JSON.parse(raw) : [];
+        queue = Array.isArray(parsed) ? parsed : [];
+      })
       .catch(() => { if (loadedScope === scope) queue = []; })
       .finally(() => { if (loadedScope === scope) loaded = true; });
   }
@@ -84,6 +88,37 @@ async function persist(scope: string | null = loadedScope): Promise<void> {
     // for the rest of this session.
   }
   emit();
+}
+
+/**
+ * Call on sign-in/sign-out/account switch (app/_layout.tsx), before anything
+ * enqueues. Switches the queue to that account's own stored entries.
+ */
+export function initEngagementRetryQueue(userId: string | null): void {
+  setAccountStorageScope(userId);
+  const next = userId ?? 'anon';
+  if (next === loadedScope) return;
+  loadedScope = next;
+  queue = [];
+  loaded = false;
+  loadPromise = null;
+  emit();
+}
+
+/** Drop an account's queued actions (explicit sign-out). */
+export async function clearEngagementRetryQueue(userId: string): Promise<void> {
+  if (userId === loadedScope) {
+    queue = [];
+    loadedScope = null;
+    loaded = false;
+    loadPromise = null;
+    emit();
+  }
+  try {
+    await AsyncStorage.removeItem(accountStorageKey(LEGACY_STORAGE_KEY, userId));
+  } catch {
+    // Best-effort.
+  }
 }
 
 /** A screen registers how to actually replay each kind of queued action. */
@@ -215,4 +250,5 @@ export function __resetEngagementRetryQueueForTests(): void {
   fallbacks.clear();
   ownerResolver = null;
   globalPumpStarted = false;
+  setAccountStorageScope(null);
 }

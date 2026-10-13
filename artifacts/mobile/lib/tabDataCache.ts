@@ -16,8 +16,12 @@
  * under its own scope — so "switch back" doesn't refetch either.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { cacheStamp } from './cacheVersion';
 
-const STORAGE_PREFIX = 'bt_tab_data_cache_v1_';
+// Keys are `<prefix><cache stamp>:<userId>:<key>` so a payload written by an
+// older build is never read back (lib/cacheVersion.ts).
+export const TAB_DATA_CACHE_PREFIX = 'bt_tab_data_cache_v1_';
+const STORAGE_PREFIX = `${TAB_DATA_CACHE_PREFIX}${cacheStamp()}:`;
 
 let _scopeUserId = 'anon';
 
@@ -64,4 +68,17 @@ export function setCachedTabData<T>(key: string, data: T): void {
   const scoped = scopedKey(key);
   memoryCache.set(scoped, data);
   AsyncStorage.setItem(STORAGE_PREFIX + scoped, JSON.stringify(data)).catch(() => {});
+}
+
+/** Explicit sign-out: forget this account's cached tab snapshots (memory + disk). */
+export async function clearTabDataCacheForUser(userId: string): Promise<void> {
+  const prefix = `${userId}:`;
+  for (const key of [...memoryCache.keys()]) if (key.startsWith(prefix)) memoryCache.delete(key);
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const mine = keys.filter((k) => k.startsWith(STORAGE_PREFIX + prefix));
+    if (mine.length > 0) await AsyncStorage.multiRemove(mine);
+  } catch {
+    // Best-effort.
+  }
 }

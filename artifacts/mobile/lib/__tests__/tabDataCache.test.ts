@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = new Map<string, string>();
+vi.mock('expo-constants', () => ({ default: { expoConfig: { version: '1.0.0' } } }));
+
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
     getItem: vi.fn(async (key: string) => store.get(key) ?? null),
@@ -57,6 +59,6 @@ describe('tabDataCache: per-account scoping', () => {
     // hydrateTabData checks memory first, which still has it from setCachedTabData above —
     // clear the module's notion by re-scoping through another account and back isn't enough
     // to prove AsyncStorage persistence, so assert the storage key directly instead.
-    expect(store.has('bt_tab_data_cache_v1_user-a:inbox')).toBe(true);
+    expect(store.has('bt_tab_data_cache_v1_1@1.0.0:user-a:inbox')).toBe(true);
   });
 });

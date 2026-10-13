@@ -19,8 +19,12 @@
  * on another's feed after a switch.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { cacheStamp } from './cacheVersion';
 
-const STORAGE_PREFIX = 'bt_feed_posts_cache_v1_';
+// Keys are `<prefix><cache stamp>:<userId>:<key>` so a payload written by an
+// older build is never read back (lib/cacheVersion.ts).
+export const FEED_POSTS_CACHE_PREFIX = 'bt_feed_posts_cache_v1_';
+const STORAGE_PREFIX = `${FEED_POSTS_CACHE_PREFIX}${cacheStamp()}:`;
 // Only enough posts to paint the first screen or two instantly — this is a
 // warm-start cache, not a full offline store, so it stays small on disk.
 const MAX_CACHED_POSTS = 12;
@@ -113,4 +117,17 @@ export async function purgeAuthorFromFeedPostsCache(authorId: string): Promise<v
       // The memory copy is already clean; the next feed load rewrites the disk copy.
     }
   }));
+}
+
+/** Explicit sign-out: forget this account's warm-start feed pages (memory + disk). */
+export async function clearFeedPostsCacheForUser(userId: string): Promise<void> {
+  const prefix = `${userId}:`;
+  for (const key of [...memoryCache.keys()]) if (key.startsWith(prefix)) memoryCache.delete(key);
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const mine = keys.filter((k) => k.startsWith(STORAGE_PREFIX + prefix));
+    if (mine.length > 0) await AsyncStorage.multiRemove(mine);
+  } catch {
+    // Best-effort.
+  }
 }
