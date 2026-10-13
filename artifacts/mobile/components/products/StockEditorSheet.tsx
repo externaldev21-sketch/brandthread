@@ -15,9 +15,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import { haptics } from '@/lib/haptics';
+import { haptics, hapticLight, hapticSelection, hapticSuccess } from '@/lib/haptics';
 import { Product } from '@/services/productTypes';
 import { adjustInventory, adjustVariantStock, setVariantStock, getProduct } from '@/services/productService';
 
@@ -51,7 +51,6 @@ function rowsFor(product: Product): Row[] {
 export function StockEditorSheet({ product, visible, onClose, onChanged }: StockEditorSheetProps) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
   const { showUndo } = useUndoToast();
   const [rows, setRows] = useState<Row[]>([]);
 
@@ -108,6 +107,7 @@ export function StockEditorSheet({ product, visible, onClose, onChanged }: Stock
         : await adjustInventory(product!.id, undefined, nextQty - previousQty, 'Set exact quantity');
       if (!adj) throw new Error('not found');
       const latest = await getProduct(product!.id);
+      hapticSuccess();
       if (latest) onChanged(latest);
       showUndo({
         message: `${row.title} set to ${nextQty}`,
@@ -123,65 +123,61 @@ export function StockEditorSheet({ product, visible, onClose, onChanged }: Stock
     }
   }
 
+  // Copies the Shopify app's "Adjust inventory" sheet: product name under
+  // the title, one row per variant (title + "Available" caption) with a
+  // −/+ stepper around the quantity field. Every change saves on its own, so
+  // the sheet closes with "Done" rather than a Save button.
   return (
-    <Modal visible={visible} transparent animationType="fade" presentationStyle="overFullScreen" onRequestClose={onClose}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Close" style={s.overlay} onPress={onClose} />
-      <SheetRise style={[s.sheet, { paddingBottom: Math.max(insets.bottom, SP.xl) }]}>
-        <View style={s.handle} />
-        <Text style={s.title} numberOfLines={1}>Edit stock · {product.name}</Text>
-        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
-          {rows.map(row => (
-            <View key={row.key} style={s.row}>
-              <Text style={s.rowTitle} numberOfLines={1}>{row.title}</Text>
-              <View style={s.stepper}>
-                <PressableScale
-                  style={s.stepBtn}
-                  onPress={() => { haptics.selection(); void applyDelta(row, -1, `Decrease ${row.title}`); }}
-                  accessibilityLabel={`Decrease ${row.title} stock`}
-                  disabled={row.qty <= 0}
-                >
-                  <Icon name="minus" size={ICON.sm} color={row.qty <= 0 ? theme.subtle : theme.text} />
-                </PressableScale>
-                <TextInput
-                  value={row.draft}
-                  onChangeText={(text) => setRows(prev => prev.map(r => (r.key === row.key ? { ...r, draft: text.replace(/[^0-9]/g, '') } : r)))}
-                  onSubmitEditing={() => { void applyDirectEntry(row); }}
-                  onBlur={() => { void applyDirectEntry(row); }}
-                  keyboardType="number-pad"
-                  returnKeyType="done"
-                  style={[s.qtyInput, { color: theme.text, borderColor: theme.border }]}
-                  accessibilityLabel={`${row.title} quantity`}
-                />
-                <PressableScale
-                  style={s.stepBtn}
-                  onPress={() => { haptics.selection(); void applyDelta(row, 1, `Increase ${row.title}`); }}
-                  accessibilityLabel={`Increase ${row.title} stock`}
-                >
-                  <Icon name="plus" size={ICON.sm} color={theme.text} />
-                </PressableScale>
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-      </SheetRise>
-    </Modal>
+    <Sheet visible={visible} onClose={onClose} title="Adjust inventory" headerRight="done" testID="stock-editor-sheet">
+      <Text style={s.productName} numberOfLines={1}>{product.name}</Text>
+      {rows.map(row => (
+        <View key={row.key} style={s.row}>
+          <View style={s.rowText}>
+            <Text style={s.rowTitle} numberOfLines={1}>{row.title}</Text>
+            <Text style={s.rowCaption}>Available</Text>
+          </View>
+          <View style={s.stepper}>
+            <PressableScale
+              style={s.stepBtn}
+              onPress={() => { hapticLight(); void applyDelta(row, -1, `Decrease ${row.title}`); }}
+              accessibilityLabel={`Decrease ${row.title} stock`}
+              disabled={row.qty <= 0}
+            >
+              <Icon name="minus" size={ICON.sm} color={row.qty <= 0 ? theme.subtle : theme.text} />
+            </PressableScale>
+            <TextInput
+              value={row.draft}
+              onChangeText={(text) => setRows(prev => prev.map(r => (r.key === row.key ? { ...r, draft: text.replace(/[^0-9]/g, '') } : r)))}
+              onSubmitEditing={() => { hapticSelection(); void applyDirectEntry(row); }}
+              onBlur={() => { void applyDirectEntry(row); }}
+              keyboardType="number-pad"
+              returnKeyType="done"
+              style={[s.qtyInput, { color: theme.text, borderColor: theme.border }]}
+              accessibilityLabel={`${row.title} quantity`}
+            />
+            <PressableScale
+              style={s.stepBtn}
+              onPress={() => { hapticLight(); void applyDelta(row, 1, `Increase ${row.title}`); }}
+              accessibilityLabel={`Increase ${row.title} stock`}
+            >
+              <Icon name="plus" size={ICON.sm} color={theme.text} />
+            </PressableScale>
+          </View>
+        </View>
+      ))}
+    </Sheet>
   );
 }
 
 const createStyles = (theme: AppThemePreset) => StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.72)' },
-  sheet: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: theme.surface, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-    paddingTop: SP.sm, paddingHorizontal: SP.md,
-  },
-  handle: { width: 40, height: 4, borderRadius: RADIUS.pill, backgroundColor: theme.border, alignSelf: 'center', marginBottom: SP.md },
-  title: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text, marginBottom: SP.md, letterSpacing: -0.2 },
+  productName: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted, marginBottom: SP.sm },
   row: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: theme.border, gap: SP.sm,
   },
-  rowTitle: { flex: 1, fontSize: FS.base, fontFamily: FONT.medium, color: theme.text },
+  rowText: { flex: 1 },
+  rowTitle: { fontSize: FS.base, fontFamily: FONT.medium, color: theme.text },
+  rowCaption: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
   stepBtn: {
     width: 44, height: 44, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center',

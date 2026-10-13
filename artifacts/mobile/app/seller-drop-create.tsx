@@ -37,6 +37,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { LoadingSkeleton, HapticSwitch} from '@/components/BrandthreadUI';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { Sheet, SHEET_GUTTER } from '@/components/ui/BottomSheet';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
 import { radius } from '@/constants/radii';
@@ -680,35 +681,34 @@ export default function SellerDropCreate() {
         </ScrollView>
       </View>
 
-      <Modal visible={tzPickerOpen} animationType="slide" onRequestClose={() => setTzPickerOpen(false)}>
-        <View style={[styles.root, { backgroundColor: theme.background, paddingTop: topInset }]}>
-          <View style={styles.tzHeader}>
-            <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg }}>Choose timezone</Text>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setTzPickerOpen(false)}>
-              <Icon name="x" size={22} color={theme.text} />
-            </TouchableOpacity>
-          </View>
+      <Sheet
+        visible={tzPickerOpen}
+        onClose={() => setTzPickerOpen(false)}
+        title="Choose timezone"
+        padded={false}
+        testID="drop-timezone-sheet"
+      >
           <TextInput
-            style={[styles.input, { margin: SP.md, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }, WEB_INPUT_RESET]}
+            style={[styles.input, { marginHorizontal: SHEET_GUTTER, marginBottom: SP.sm, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }, WEB_INPUT_RESET]}
             value={tzFilter}
             onChangeText={setTzFilter}
             placeholder="Search timezones…"
             placeholderTextColor={theme.muted}
+            accessibilityLabel="Search timezones"
           />
-          <ScrollView>
             {filteredZones.map(z => (
               <TouchableOpacity
                 key={z}
                 style={[styles.tzRow, { borderColor: theme.border }]}
                 onPress={() => { setTimezone(z); setTzPickerOpen(false); setTzFilter(''); }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: z === timezone }}
               >
                 <Text style={{ color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm }}>{z}</Text>
                 {z === timezone && <Icon name="check" size={16} color={theme.accent} />}
               </TouchableOpacity>
             ))}
-          </ScrollView>
-        </View>
-      </Modal>
+      </Sheet>
     </KeyboardAvoidingView>
   );
 }

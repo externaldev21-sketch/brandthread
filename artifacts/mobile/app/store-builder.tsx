@@ -18,7 +18,7 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, TEXT_SECONDARY } from '@/lib/theme';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, FilterChip, StatusBadge, SectionHeader,
+  FilterChip, StatusBadge, SectionHeader,
   EmptyState, StatCard } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui';
 import {
@@ -32,7 +32,7 @@ import {
 } from '@/services/storeTypes';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { radius } from '@/constants/radii';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
@@ -485,16 +485,22 @@ export default function StoreBuilderScreen() {
         </View>
       </ScrollView>
 
-      <Modal visible={transferOpen} transparent animationType="fade" onRequestClose={() => setTransferOpen(false)}>
-        <KeyboardAvoidingView style={s.modalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <SheetRise style={[s.transferSheet, { paddingBottom: insets.bottom + SP.lg }]}>
+      <Sheet
+        visible={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        title="Transfer Shopify store"
+        testID="shopify-transfer-sheet"
+        contentContainerStyle={{ gap: SP.md }}
+        primaryAction={!importJob ? {
+          label: 'Start transfer',
+          onPress: () => { void submitShopifyImport(); },
+          loading: submittingImport,
+          disabled: submittingImport || !shopifyUrl.trim(),
+        } : undefined}
+      >
             <View style={s.transferHeader}>
               <View style={s.shopifyLogo}><Text style={s.shopifyLogoText}>S</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.transferTitle}>Transfer Shopify Store</Text>
-                <Text style={s.transferSubtitle}>Public catalog only. No Shopify login or credentials required.</Text>
-              </View>
-              <IconButton name="x" onPress={() => setTransferOpen(false)} />
+              <Text style={[s.transferSubtitle, { flex: 1 }]}>Public catalog only. No Shopify login or credentials required.</Text>
             </View>
 
             {!importJob ? (
@@ -514,7 +520,6 @@ export default function StoreBuilderScreen() {
                 />
                 <Text style={s.transferNote}>The first transfer imports up to 250 public products. If more remain, you can continue with the next batch.</Text>
                 {!!importError && <Text style={s.importError}>{importError}</Text>}
-                <PrimaryButton label={submittingImport ? 'Starting transfer…' : 'Start transfer'} onPress={submitShopifyImport} disabled={submittingImport || !shopifyUrl.trim()} />
               </>
             ) : (
               <View style={s.progressPanel}>
@@ -553,9 +558,7 @@ export default function StoreBuilderScreen() {
                 {!!importError && <Text style={s.importError}>{importError}</Text>}
               </View>
             )}
-          </SheetRise>
-        </KeyboardAvoidingView>
-      </Modal>
+      </Sheet>
     </View>
   );
 }
@@ -793,19 +796,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   shopifyEyebrow: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.bold },
   shopifyTitle: { color: FG, fontSize: FS.base, lineHeight: 21, fontFamily: FONT.bold },
   shopifyDesc: { color: MUTED, fontSize: FS.xs, lineHeight: 17, fontFamily: FONT.regular },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  transferSheet: {
-    backgroundColor: SURFACE,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: SP.lg,
-    gap: SP.md,
-  },
   transferHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
-  transferTitle: { color: FG, fontSize: FS.md, fontFamily: FONT.bold },
-  transferSubtitle: { color: MUTED, fontSize: FS.xs, lineHeight: 17, fontFamily: FONT.regular, marginTop: 3 },
+  transferSubtitle: { color: MUTED, fontSize: FS.xs, lineHeight: 17, fontFamily: FONT.regular },
   inputLabel: { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: SP.sm },
   urlInput: {
     minHeight: 50,

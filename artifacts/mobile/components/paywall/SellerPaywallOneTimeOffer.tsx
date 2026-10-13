@@ -5,17 +5,17 @@
  * component is currently unreachable in production. The discount is always
  * computed from the real plan price — never a separate hard-coded number.
  *
- * Same plain `Modal` + `Animated.timing` sheet pattern as
- * SellerPaywallExitDrawer (see that file's comment for why).
+ * Runs on the shared `<Sheet>`, like SellerPaywallExitDrawer: the offer is
+ * the body, the claim CTA is pinned in the footer.
  */
-import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import type { SellerPlanDefinition } from '@/lib/sellerPlans';
 import { SellerPaywallCTA } from './SellerPaywallCTA';
 import type { useAppTheme } from '@/contexts/AppThemeContext';
 import type { ButtonProps } from '@/components/ui/Button';
+import { Sheet } from '@/components/ui/BottomSheet';
 
 export interface SellerPaywallOneTimeOfferProps {
   visible: boolean;
@@ -28,84 +28,41 @@ export interface SellerPaywallOneTimeOfferProps {
   disabled?: boolean;
 }
 
-const OPEN_MS = 260;
-const CLOSE_MS = 200;
-const OFFSCREEN_Y = 700;
-
 export function SellerPaywallOneTimeOffer({
   visible, onClose, theme, plan, discountPercent, onAccept, loading, disabled,
 }: SellerPaywallOneTimeOfferProps) {
-  const insets = useSafeAreaInsets();
-  const [modalVisible, setModalVisible] = useState(visible);
-  const translateY = useRef(new Animated.Value(OFFSCREEN_Y)).current;
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const nativeDriver = Platform.OS !== 'web';
-
-  useEffect(() => {
-    if (visible) {
-      setModalVisible(true);
-      Animated.timing(backdropOpacity, { toValue: 1, duration: OPEN_MS, useNativeDriver: nativeDriver }).start();
-      Animated.timing(translateY, { toValue: 0, duration: OPEN_MS, useNativeDriver: nativeDriver }).start();
-      return;
-    }
-    Animated.timing(backdropOpacity, { toValue: 0, duration: CLOSE_MS, useNativeDriver: nativeDriver }).start();
-    Animated.timing(translateY, { toValue: OFFSCREEN_Y, duration: CLOSE_MS, useNativeDriver: nativeDriver }).start(({ finished }) => {
-      if (finished) setModalVisible(false);
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
-
   const discountedCents = Math.round(plan.priceCents * (1 - discountPercent / 100));
   const discountedLabel = `$${(discountedCents / 100).toFixed(2)}`;
 
   return (
-    <Modal visible={modalVisible} transparent animationType="none" onRequestClose={onClose} testID="seller-paywall-one-time-offer">
-      <View style={styles.root}>
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-            style={StyleSheet.absoluteFill}
-            onPress={onClose}
-          >
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
-          </Pressable>
-        </Animated.View>
-        <Animated.View
-          style={[
-            styles.sheet,
-            { backgroundColor: theme.card, borderColor: theme.border, paddingBottom: Math.max(insets.bottom, SP.md), transform: [{ translateY }] },
-          ]}
-        >
-          <View style={styles.handleWrap}>
-            <View style={[styles.handle, { backgroundColor: theme.muted }]} />
-          </View>
-
-          <View style={styles.wrap}>
-            <Text style={[styles.eyebrow, { color: theme.muted }]}>A ONE-TIME OFFER FOR NEW BRANDS</Text>
-            <Text style={[styles.title, { color: theme.text }]}>
-              {discountPercent}% off {plan.name} for your first month
-            </Text>
-            <Text style={[styles.priceRow, { color: theme.text }]}>
-              {discountedLabel}
-              <Text style={[styles.strike, { color: theme.muted }]}>  {plan.priceLabel}</Text>
-            </Text>
-
-            <View style={{ marginTop: SP.lg }}>
-              <SellerPaywallCTA
-                theme={theme}
-                label={`Claim ${discountPercent}% off`}
-                onPress={onAccept}
-                loading={loading}
-                disabled={disabled}
-                testID="seller-paywall-one-time-offer-cta"
-                subtext="One-time offer, applied to your first month only."
-              />
-            </View>
-          </View>
-        </Animated.View>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      testID="seller-paywall-one-time-offer"
+      accessibilityLabel="One-time offer"
+      footer={(
+        <SellerPaywallCTA
+          theme={theme}
+          label={`Claim ${discountPercent}% off`}
+          onPress={onAccept}
+          loading={loading}
+          disabled={disabled}
+          testID="seller-paywall-one-time-offer-cta"
+          subtext="One-time offer, applied to your first month only."
+        />
+      )}
+    >
+      <View style={styles.wrap}>
+        <Text style={[styles.eyebrow, { color: theme.muted }]}>A ONE-TIME OFFER FOR NEW BRANDS</Text>
+        <Text style={[styles.title, { color: theme.text }]}>
+          {discountPercent}% off {plan.name} for your first month
+        </Text>
+        <Text style={[styles.priceRow, { color: theme.text }]}>
+          {discountedLabel}
+          <Text style={[styles.strike, { color: theme.muted }]}>  {plan.priceLabel}</Text>
+        </Text>
       </View>
-    </Modal>
+    </Sheet>
   );
 }
 

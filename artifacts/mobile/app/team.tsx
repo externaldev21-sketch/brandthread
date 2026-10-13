@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { parseTeamInviteTarget } from '@/lib/teamInviteTarget';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator, Modal, Share, RefreshControl } from 'react-native';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { ListRow } from '@/components/ui/ListRow';
+import { hapticSuccess } from '@/lib/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -80,7 +83,6 @@ const ACTIVITY_PAGE = 10;
 
 export default function TeamScreen() {
   const colors  = useColors();
-  const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const api     = useApi();
   const { currentRole } = useTeamRole();
@@ -154,6 +156,7 @@ export default function TeamScreen() {
       const payload = { ...target.payload, role: inviteRole };
       const res = await api.team.invite(payload);
       setInviteResult({ inviteUrl: res.inviteUrl, emailSent: !!res.emailSent, email: res.member?.email ?? value });
+      hapticSuccess();
       await load();
     } catch (err: any) {
       const rejection = getEntitlementRejection(err);
@@ -442,106 +445,66 @@ export default function TeamScreen() {
 
     </ScrollView>
 
-    {/* Invite modal — email + shareable link options */}
-    <Modal visible={inviteVisible} transparent animationType="fade" onRequestClose={() => setInviteVisible(false)}>
-      <View style={styles.modalBackdrop}>
-        <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border, marginVertical: insets.top + insets.bottom }]}>
-          {!inviteResult ? (
-            <>
-              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Invite a team member</Text>
-              <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
-                They'll get access to your store based on the role you choose.
-              </Text>
-              <TextInput returnKeyType="done" autoComplete="email" textContentType="emailAddress"
-                value={inviteEmail}
-                onChangeText={setInviteEmail}
-                placeholder="Email address or @username"
-                placeholderTextColor={colors.mutedForeground}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoFocus
-                style={[styles.inviteInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+    {/* Invite sheet — copies Shopify's "Add staff": an email field, then the
+        role as a radio list, then one pinned action. The created invite
+        swaps in its shareable link. */}
+    <Sheet
+      visible={inviteVisible}
+      onClose={() => setInviteVisible(false)}
+      title={inviteResult ? 'Invite created' : 'Invite team member'}
+      headerRight={inviteResult ? 'done' : 'close'}
+      testID="team-invite-sheet"
+      primaryAction={inviteResult
+        ? { label: 'Copy link', onPress: () => copyLink(inviteResult.inviteUrl) }
+        : { label: 'Create invite', onPress: () => { void handleInvite(); }, loading: inviting, disabled: inviting || !inviteEmail.trim() }}
+      secondaryAction={inviteResult ? { label: 'Share link', onPress: () => shareLink(inviteResult.inviteUrl), variant: 'secondary' } : undefined}
+    >
+      {!inviteResult ? (
+        <>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Email or username</Text>
+          <TextInput
+            value={inviteEmail}
+            onChangeText={setInviteEmail}
+            placeholder="name@example.com or @username"
+            placeholderTextColor={colors.mutedForeground}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoFocus
+            accessibilityLabel="Email or username"
+            style={[styles.inviteInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+          />
+          <Text style={[styles.fieldLabel, styles.roleHeading, { color: colors.mutedForeground }]}>Role</Text>
+          {INVITE_ROLES.map((r, i) => (
+            <React.Fragment key={r.key}>
+              <ListRow
+                title={r.title}
+                subtitle={r.sub}
+                selected={inviteRole === r.key}
+                onPress={() => { haptics.light(); setInviteRole(r.key); }}
+                right={(
+                  <View style={[styles.radio, { borderColor: colors.foreground }]}>
+                    {inviteRole === r.key ? <View style={[styles.radioDot, { backgroundColor: colors.foreground }]} /> : null}
+                  </View>
+                )}
+                testID={`invite-role-${r.key}`}
               />
-              <View style={styles.roleGrid}>
-                {INVITE_ROLES.map(r => (
-                  <TouchableOpacity
-                    key={r.key}
-                    onPress={() => { haptics.selection(); setInviteRole(r.key); }}
-                    activeOpacity={0.8}
-                    style={[
-                      styles.rolePillWrap,
-                      { borderColor: inviteRole === r.key ? colors.primary : colors.border,
-                        backgroundColor: inviteRole === r.key ? colors.primary + '22' : 'transparent' },
-                    ]}
-                  >
-                    <Text style={[styles.rolePillTitle, { color: inviteRole === r.key ? colors.primary : colors.foreground }]}>
-                      {r.title}
-                    </Text>
-                    <Text style={[styles.rolePillSub, { color: colors.mutedForeground }]}>{r.sub}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <View style={styles.modalActions}>
-                <TouchableOpacity onPress={() => setInviteVisible(false)} activeOpacity={0.7} style={styles.modalCancel}>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 15, fontFamily: FONT.medium }}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleInvite}
-                  disabled={inviting || !inviteEmail.trim()}
-                  activeOpacity={0.8}
-                  style={[styles.addBtn, { backgroundColor: inviting || !inviteEmail.trim() ? FILL_ELEVATED : colors.primary }]}
-                >
-                  <Text style={[styles.addBtnText, { color: inviting || !inviteEmail.trim() ? TEXT_DISABLED : colors.primaryForeground }]}>
-                    {inviting ? 'Creating…' : 'Create Invite'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={[styles.successIcon, { backgroundColor: colors.success + '22' }]}>
-                <Icon name="check" size={22} color={colors.success} />
-              </View>
-              <Text style={[styles.modalTitle, { color: colors.foreground, textAlign: 'center' }]}>Invite created</Text>
-              <Text style={[styles.modalSub, { color: colors.mutedForeground, textAlign: 'center' }]}>
-                {inviteResult.emailSent
-                  ? `An email is on its way to ${inviteResult.email}. You can also share the link directly:`
-                  : `Share this link with ${inviteResult.email} so they can join your team:`}
-              </Text>
-              <View style={[styles.linkBox, { borderColor: colors.border, backgroundColor: colors.background }]}>
-                <Text style={{ color: colors.mutedForeground, fontSize: 12 }} numberOfLines={1}>{inviteResult.inviteUrl}</Text>
-              </View>
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  onPress={() => shareLink(inviteResult.inviteUrl)}
-                  activeOpacity={0.8}
-                  style={[styles.addBtn, { backgroundColor: colors.secondary }]}
-                >
-                  <Icon name="share-2" size={14} color={colors.foreground} />
-                  <Text style={[styles.addBtnText, { color: colors.foreground }]}>Share</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => copyLink(inviteResult.inviteUrl)}
-                  activeOpacity={0.8}
-                  style={[styles.addBtn, { backgroundColor: colors.secondary }]}
-                >
-                  <Icon name="copy" size={14} color={colors.foreground} />
-                  <Text style={[styles.addBtnText, { color: colors.foreground }]}>Copy link</Text>
-                </TouchableOpacity>
-                <View style={{ flex: 1 }} />
-                <TouchableOpacity
-                  onPress={() => setInviteVisible(false)}
-                  activeOpacity={0.8}
-                  style={[styles.addBtn, { backgroundColor: colors.primary }]}
-                >
-                  <Text style={[styles.addBtnText, { color: colors.primaryForeground }]}>Done</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-        </View>
-      </View>
-    </Modal>
+              {i < INVITE_ROLES.length - 1 && <View style={[styles.roleDivider, { backgroundColor: colors.border }]} />}
+            </React.Fragment>
+          ))}
+        </>
+      ) : (
+        <>
+          <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
+            {inviteResult.emailSent
+              ? `An email is on its way to ${inviteResult.email}. You can also share the link directly:`
+              : `Share this link with ${inviteResult.email} so they can join your team:`}
+          </Text>
+          <View style={[styles.linkBox, { borderColor: colors.border, backgroundColor: colors.background }]}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12 }} numberOfLines={1}>{inviteResult.inviteUrl}</Text>
+          </View>
+        </>
+      )}
+    </Sheet>
     </View>
   );
 }
@@ -581,6 +544,11 @@ const styles = StyleSheet.create({
   secLabel: { fontSize: 15, fontFamily: FONT.medium },
   secSub: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   inviteInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, fontFamily: FONT.regular, marginTop: 14 },
+  fieldLabel: { fontSize: 13, fontFamily: FONT.medium },
+  roleHeading: { marginTop: 20, marginBottom: 4 },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  radioDot: { width: 12, height: 12, borderRadius: 6 },
+  roleDivider: { height: StyleSheet.hairlineWidth },
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 },
   modalCard: { borderRadius: 16, borderWidth: 1, padding: 20 },

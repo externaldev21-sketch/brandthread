@@ -11,9 +11,11 @@ import { formatCents } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
-  ActivityIndicator, RefreshControl, Modal, TextInput, Platform,
+  ActivityIndicator, RefreshControl, TextInput, Platform,
 } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { hapticSuccess } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -136,6 +138,7 @@ export default function MetaAdsManageScreen() {
     try {
       const { campaign } = await api.metaAds.updateCampaign(id, { budgetCents: Math.round(dollars * 100) });
       setRows((prev) => prev?.map((r) => (r.id === id ? { ...r, ...campaign } : r)) ?? prev);
+      hapticSuccess();
       setEditingBudget(null);
     } catch {
       Alert.alert('Error', 'Could not update the budget. Please try again.');
@@ -211,10 +214,13 @@ export default function MetaAdsManageScreen() {
         ))}
       </ScrollView>
 
-      <Modal visible={!!editingBudget} transparent animationType="fade" onRequestClose={() => setEditingBudget(null)}>
-        <View style={s.modalOverlay}>
-          <View style={[s.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[s.modalTitle, { color: colors.foreground }]}>Edit budget</Text>
+      <Sheet
+        visible={!!editingBudget}
+        onClose={() => setEditingBudget(null)}
+        title="Edit budget"
+        testID="meta-budget-sheet"
+        primaryAction={{ label: 'Save budget', onPress: () => { void saveBudget(); }, loading: !!editingBudget && busyId === editingBudget.id }}
+      >
             <View style={[s.budgetInputRow, { borderColor: colors.border, backgroundColor: colors.elevated }]}>
               <Text style={[s.modalTitle, { color: colors.mutedForeground }]}>$</Text>
               <TextInput returnKeyType="done"
@@ -224,15 +230,10 @@ export default function MetaAdsManageScreen() {
                 style={[s.budgetInput, { color: colors.foreground }]}
                 placeholder="20"
                 placeholderTextColor={colors.subtle}
+                accessibilityLabel="Budget in dollars"
               />
             </View>
-            <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.md }}>
-              <Button label="Cancel" variant="secondary" style={s.modalBtn} onPress={() => setEditingBudget(null)} />
-              <Button label="Save" variant="primary" style={s.modalBtn} loading={busyId === editingBudget?.id} onPress={saveBudget} />
-            </View>
-          </View>
-        </View>
-      </Modal>
+      </Sheet>
     </BrandthreadScreen>
   );
 }
@@ -322,6 +323,7 @@ function ActionBtn({ label, icon, onPress, busy, colors, theme }: any) {
 }
 
 const s = StyleSheet.create({
+  modalTitle: { fontSize: FS.lg, fontFamily: FONT.bold },
   rowTitle:   { fontSize: FS.base, fontFamily: FONT.bold },
   rowSub:     { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   rejectBox:  { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', borderRadius: RADIUS.sm, borderWidth: 1, padding: SP.sm, marginTop: SP.sm },
@@ -332,10 +334,7 @@ const s = StyleSheet.create({
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginTop: SP.md },
   actionBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
   actionBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: SP.lg },
-  modalCard:  { width: '100%', maxWidth: 360, borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.lg },
-  modalTitle: { fontSize: FS.lg, fontFamily: FONT.bold },
-  budgetInputRow: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, marginTop: SP.md, minHeight: 48 },
+  currency: { fontSize: FS.lg, fontFamily: FONT.bold },
+  budgetInputRow: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, minHeight: 48 },
   budgetInput: { flex: 1, fontSize: FS.lg, fontFamily: FONT.bold, paddingVertical: SP.sm },
-  modalBtn:   { flex: 1 },
 });

@@ -9,13 +9,14 @@ import { radius as ControlRadius } from '@/constants/radii';
  */
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity } from 'react-native';
-import { Icon as Feather } from '@/components/ui/Icon';
+import { Icon as Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
-import { EmptyState, PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { EmptyState, SecondaryButton } from '@/components/BrandthreadUI';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { hapticSuccess } from '@/lib/haptics';
 import { Card, ProgressBar, SectionTitle } from '@/components/analytics/AnalyticsKit';
 import { InsightFrame, SegmentedPills } from '@/components/analytics/InsightFrame';
 import { useSellerInsight } from '@/hooks/useSellerInsight';
@@ -84,6 +85,7 @@ export default function GoalsReport() {
     try {
       const next = editing === 'new' || !editing ? await createGoal({ metric, period, target }) : await updateGoal(editing.id, { metric, period, target });
       setData(next);
+      hapticSuccess();
       setEditing(null);
     } catch { Alert.alert('Could not save', 'Check your connection and try again.'); }
     finally { setSaving(false); }
@@ -116,9 +118,16 @@ export default function GoalsReport() {
         </>
       )}
 
-      <BottomSheet visible={editing !== null} onClose={() => setEditing(null)} testID="goal-editor">
-        <View style={s.sheet}>
-          <Text style={s.sheetTitle}>{editing === 'new' ? 'New goal' : 'Edit goal'}</Text>
+      <Sheet
+        visible={editing !== null}
+        onClose={() => setEditing(null)}
+        title={editing === 'new' ? 'New goal' : 'Edit goal'}
+        testID="goal-editor"
+        primaryAction={{ label: editing === 'new' ? 'Add goal' : 'Save goal', onPress: () => { void onSave(); }, loading: saving, disabled: saving || !text }}
+        secondaryAction={editing !== null && editing !== 'new'
+          ? { label: 'Delete goal', onPress: () => { void onDelete(); }, disabled: saving, variant: 'destructive' }
+          : undefined}
+      >
           <Text style={s.fieldLabel}>Measure</Text>
           <View style={s.chips}>
             {GOAL_METRICS.map(m => {
@@ -146,15 +155,7 @@ export default function GoalsReport() {
               accessibilityLabel="Goal target"
             />
           </View>
-          <PrimaryButton label={editing === 'new' ? 'Add goal' : 'Save'} onPress={onSave} loading={saving} disabled={saving || !text} />
-          {editing !== null && editing !== 'new' && (
-            <TouchableOpacity onPress={onDelete} disabled={saving} style={s.deleteBtn} accessibilityRole="button" accessibilityLabel="Delete goal">
-              <Feather name="trash-2" size={14} color={colors.destructive} />
-              <Text style={s.deleteText}>Delete goal</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </BottomSheet>
+      </Sheet>
     </InsightFrame>
   );
 }
@@ -166,8 +167,6 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   statusText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: colors.foreground },
   big: { fontSize: 28, fontFamily: FONT.bold, color: colors.foreground, letterSpacing: -0.5 },
   meta: { fontSize: FS.meta, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
-  sheet: { paddingHorizontal: SP.md, paddingBottom: SP.lg, paddingTop: SP.sm },
-  sheetTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: colors.foreground, marginBottom: SP.md },
   fieldLabel: { fontSize: FS.meta, fontFamily: FONT.medium, color: colors.mutedForeground, marginBottom: SP.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginBottom: SP.md },
   chip: { minHeight: 36, paddingHorizontal: SP.sm + 4, borderRadius: ControlRadius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
@@ -177,6 +176,4 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   inputWrap: { flexDirection: 'row', alignItems: 'center', minHeight: 52, borderRadius: RADIUS.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, paddingHorizontal: SP.md, marginBottom: SP.md },
   inputPrefix: { fontSize: FS.md, fontFamily: FONT.semibold, color: colors.mutedForeground, marginRight: 4 },
   input: { flex: 1, minHeight: 50, fontSize: FS.md, fontFamily: FONT.regular, color: colors.foreground },
-  deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, marginTop: SP.sm },
-  deleteText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.destructive },
 });
