@@ -8,13 +8,13 @@
  *
  * Seller routes (all require auth):
  *   GET    /api/waitlist/seller            — demand per variant/product
- *   POST   /api/waitlist/seller/notify/:variantId — push-notify all waitlisted buyers
+ *   POST   /api/waitlist/seller/notify/:variantId — feed + push to waitlisted buyers (once each)
  */
 import { Router } from "express";
-import { db, waitlistEntries, products, productVariants, notificationsFeed, pushTokens } from "@workspace/db";
+import { db, waitlistEntries, products, productVariants } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { productThumbnail } from "../lib/activityEvents";
+import { notifyWaitlistRestock } from "../lib/stockNotifications";
 
 const router = Router();
 router.use(requireAuth);
@@ -145,9 +145,9 @@ router.post("/seller/notify/:variantId", async (req, res) => {
 
   // Verify the variant belongs to this seller
   const [v] = await db
-    .select({ productId: productVariants.productId, images: products.images })
+    .select({ productId: productVariants.productId, stock: productVariants.stock, productName: products.name })
     .from(productVariants)
-    .leftJoin(products, eq(products.id, productVariants.productId))
+    .innerJoin(products, eq(products.id, productVariants.productId))
     .where(
       and(
         eq(productVariants.id, variantId),
@@ -157,54 +157,27 @@ router.post("/seller/notify/:variantId", async (req, res) => {
     .limit(1);
   if (!v) { res.status(404).json({ error: "Variant not found or not yours" }); return; }
 
-  // Fetch all un-notified waitlist entries for this variant
-  const entries = await db
-    .select({
-      userId: waitlistEntries.userId,
-      productName: waitlistEntries.productName,
-      variantLabel: waitlistEntries.variantLabel,
-    })
-    .from(waitlistEntries)
-    .where(
-      and(
-        eq(waitlistEntries.variantId, variantId),
-        eq(waitlistEntries.sellerId, sellerId),
-        sql`${waitlistEntries.notifiedAt} is null`,
-      ),
-    );
-
-  if (entries.length === 0) {
-    res.json({ notified: 0, message: "No un-notified buyers on this waitlist" });
+  // "Back in stock" for a size that is still at zero would be wrong, and the
+  // shared restock path only claims entries for variants that have stock.
+  if ((v.stock ?? 0) <= 0) {
+    res.status(409).json({ error: "This size is out of stock. Restock it before notifying.", notified: 0 });
     return;
   }
 
-  // Insert in-app notifications for each buyer
-  const notifications = entries.map((e) => ({
-    userId:   e.userId,
-    category: "order",
-    type:     "waitlist_restock",
-    title:    "Back in stock!",
-    body:     `${e.productName}${e.variantLabel ? ` (${e.variantLabel})` : ""} is available again. Grab it before it sells out.`,
-    // Lets the Activity Center open the product and show its photo.
-    targetId:       v.productId,
-    targetType:     "product",
-    targetImageUrl: productThumbnail(v.images),
-  }));
+  // Same path as an automatic restock: an atomic claim (notified_at IS NULL
+  // ... RETURNING), so a buyer is never notified twice, then feed + push.
+  const notifiedUserIds = await notifyWaitlistRestock({
+    productId: v.productId,
+    ownerId: sellerId,
+    productName: v.productName,
+    variantId,
+  });
 
-  await db.insert(notificationsFeed).values(notifications);
-
-  // Mark all as notified
-  await db
-    .update(waitlistEntries)
-    .set({ notifiedAt: new Date() })
-    .where(
-      and(
-        eq(waitlistEntries.variantId, variantId),
-        eq(waitlistEntries.sellerId, sellerId),
-      ),
-    );
-
-  res.json({ notified: entries.length });
+  if (notifiedUserIds.length === 0) {
+    res.json({ notified: 0, message: "No un-notified buyers on this waitlist" });
+    return;
+  }
+  res.json({ notified: notifiedUserIds.length });
 });
 
 export default router;

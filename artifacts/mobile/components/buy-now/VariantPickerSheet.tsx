@@ -26,6 +26,11 @@ import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP, COMP } from '@/lib/theme';
 import { getBuyerProduct } from '@/services/cartService';
+import { Snackbar } from '@/components/ui/Snackbar';
+import { useSizeBadgeModel } from '@/components/SizeRecommendationBadge';
+import { useAutoSelectSize } from '@/hooks/useAutoSelectSize';
+import { useApi } from '@/hooks/useApi';
+import { useSignInGate } from '@/hooks/useSignInGate';
 import type { BuyerProduct, BuyerProductOption, BuyerProductVariant } from '@/services/cartTypes';
 
 function findVariant(product: BuyerProduct, selections: Record<string, string>): BuyerProductVariant | null {
@@ -72,6 +77,13 @@ export function VariantPickerSheet({
   const [quantity, setQuantity] = useState(1);
   const [confirming, setConfirming] = useState(false);
   const [touched, setTouched] = useState(false);
+  // Stock reminders (Zalando "Notify me" on a sold-out size), per variant id.
+  const api = useApi();
+  const { isSignedIn, goToSignIn } = useSignInGate();
+  const [reminders, setReminders] = useState<Record<string, boolean>>({});
+  const [reminderBusy, setReminderBusy] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const sizeBadgeModel = useSizeBadgeModel(product);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -97,6 +109,52 @@ export function VariantPickerSheet({
   }, [productId]);
 
   useEffect(() => { if (!initialProduct) load(); }, [initialProduct, load]);
+
+  // "Your size" preselected once (lib/autoSelectSize.ts), as on the product page.
+  useAutoSelectSize({
+    product,
+    selections,
+    badgeModel: sizeBadgeModel,
+    onSelect: (optionId, valueId) => setSelections(prev => (prev[optionId] ? prev : { ...prev, [optionId]: valueId })),
+  });
+
+  // Which sold-out variants already have a reminder (signed-in only).
+  useEffect(() => {
+    if (!product || !isSignedIn || product.isPreOrder) return;
+    let active = true;
+    for (const v of product.variants) {
+      if (v.isAvailable) continue;
+      api.waitlist.check(v.id)
+        .then(d => { if (active) setReminders(prev => ({ ...prev, [v.id]: !!d?.joined })); })
+        .catch(() => {});
+    }
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id, isSignedIn]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  async function toggleReminder(target: BuyerProductVariant) {
+    if (!product || reminderBusy) return;
+    if (!isSignedIn) { onClose(); goToSignIn(); return; }
+    const joined = !!reminders[target.id];
+    setReminderBusy(target.id);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    try {
+      if (joined) await api.waitlist.leave(product.id, target.id);
+      else await api.waitlist.join(product.id, target.id);
+      setReminders(prev => ({ ...prev, [target.id]: !joined }));
+      setToast(joined ? 'Reminder removed' : 'Reminder set');
+    } catch {
+      setToast("Couldn't update the reminder");
+    } finally {
+      setReminderBusy(null);
+    }
+  }
 
   const variant = product ? findVariant(product, selections) : null;
   const allSelected = !product || product.options.length === 0 || Object.keys(selections).length === product.options.length;
@@ -198,6 +256,33 @@ export function VariantPickerSheet({
                             </TouchableOpacity>
                           );
                         }
+                        // A sold-out size that resolves to one variant gets a
+                        // trailing "Notify me" (Zalando size picker); tapping it
+                        // sets a stock reminder, it never selects the size.
+                        const remindVariant = !available && !product.isPreOrder && option.name.toLowerCase() === 'size'
+                          ? findVariant(product, { ...selections, [option.id]: val.id })
+                          : null;
+                        if (remindVariant && !remindVariant.isAvailable) {
+                          const set = !!reminders[remindVariant.id];
+                          return (
+                            <Chip
+                              key={val.id}
+                              label={val.label}
+                              selected={false}
+                              disabled
+                              pressableWhenDisabled
+                              icon="slash"
+                              iconColor={theme.subtle}
+                              strikethrough
+                              trailingLabel={set ? 'Reminder set' : 'Notify me'}
+                              accessibilityRole="button"
+                              accessibilityLabel={`${option.name}, ${val.label}, sold out. ${set ? 'Reminder set' : 'Notify me'}`}
+                              accessibilityHint={set ? 'Removes the restock reminder' : 'Sets a restock reminder'}
+                              testID={`variant-chip-${val.id}`}
+                              onPress={() => { void toggleReminder(remindVariant); }}
+                            />
+                          );
+                        }
                         // The shared Chip — same size chip + sold-out treatment
                         // (disabled, slash, struck label) as the product page.
                         return (
@@ -252,6 +337,7 @@ export function VariantPickerSheet({
           </>
         ) : null}
       </View>
+      <Snackbar visible={!!toast} message={toast ?? ''} topOffset={insets.top + SP.md} />
     </Modal>
   );
 }
