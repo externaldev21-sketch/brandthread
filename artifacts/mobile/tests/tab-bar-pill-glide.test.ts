@@ -111,7 +111,9 @@ describe('tab bar pill glide', () => {
   it('starts the pill on touch-down on both bars, without a web press delay', () => {
     expect(parts).toContain("delayPressIn: 0");
     expect(sellerBar).toContain('onPressIn={() => pressIndicator(index)}');
-    expect(buyerBar).toContain('onPressIn={() => pressIndicator(index)}');
+    // The buyer bar wraps pressIndicator to also clear its Profile flag.
+    expect(buyerBar).toContain('onPressIn={() => pressSlot(index)}');
+    expect(buyerBar).toMatch(/const pressSlot = React\.useCallback\(\(index: number\) => \{\s*onProfile\.set\(false\);\s*pressIndicator\(index\);/);
   });
 
   it('runs both bars\' tab navigation through afterGlide', () => {

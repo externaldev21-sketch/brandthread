@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { useSegments, type Tabs } from 'expo-router';
 import Animated, {
   useAnimatedReaction,
@@ -23,6 +23,8 @@ import { TAB_BAR_SLIDE_EASING, TAB_BAR_SLIDE_MS } from '@/constants/motion';
 import { tabBarSlideTargetY } from '@/lib/tabBarSlide';
 import { useTabBarHiddenByScreen } from '@/lib/tabBarVisibility';
 import { radius } from '@/constants/radii';
+import { captureGlideStart, offsetAt, pillCorrection, scaleAt, type BarGeometry } from './barModePill';
+import { WEB_NAV_AFTER_PRESS_MS, currentStretch } from '@/components/tab-bar/pillGlide';
 
 // The compact <-> regular capsule resize rides the pill's own spring
 // (INDICATOR_SPRING: critically damped, no overshoot, ~90% there by ~115ms)
@@ -170,14 +172,32 @@ export function BuyerTabBar({
   // waiting for React to commit the real navigation state and competing with
   // that mount for the JS thread.
   const progress = useSharedValue(isCompact ? 1 : 0);
-  useAnimatedReaction(
-    () => indicatorTarget.value === 0,
-    (nowCompact, wasCompact) => {
-      if (nowCompact === wasCompact) return;
-      progress.set(reducedMotion ? (nowCompact ? 1 : 0) : withSpring(nowCompact ? 1 : 0, INDICATOR_SPRING));
-    },
-    [reducedMotion],
-  );
+  // The Profile circle hides the pill without moving its target, so from
+  // Home the target stays on Home — without this the capsule stayed compact
+  // on Profile when entered from Home (regular from any other tab). Set on
+  // the circle's / a slot's press-in so it flips on the same frame as every
+  // other trigger, and synced to the committed route as the fallback for
+  // back/deep-link focus changes.
+  const onProfile = useSharedValue(activeSlot === 'profile');
+  useEffect(() => {
+    onProfile.set(activeSlot === 'profile');
+  }, [activeSlot, onProfile]);
+  const pressSlot = React.useCallback((index: number) => {
+    onProfile.set(false);
+    pressIndicator(index);
+  }, [onProfile, pressIndicator]);
+  // When the Profile press also resizes the bar (from Home), it gets the same
+  // web hold-back as a pill glide (see useTabBarActiveIndex's afterGlide), so
+  // Profile's first render can't freeze the resize part-way on web.
+  const profileResizeAt = React.useRef(0);
+  const pressProfile = React.useCallback(() => {
+    profileResizeAt.current = activeSlot === 'index' ? Date.now() : 0;
+    onProfile.set(true);
+    hideIndicator();
+  }, [activeSlot, onProfile, hideIndicator]);
+  // Where the resize is heading (1 compact, 0 regular) — set in the
+  // reaction below on the same frame the resize starts.
+  const modeTarget = useSharedValue(isCompact ? 1 : 0);
 
   // Capsule/circle scale factors, in "regular -> compact" ratio form so the
   // capsule and circle can each be rendered at a FIXED (regular) layout size
@@ -198,6 +218,77 @@ export function BuyerTabBar({
   const circleShiftXTarget = (compactMetrics.capsuleWidth - regularMetrics.capsuleWidth) / 2
     + (compactMetrics.circleSize - regularMetrics.circleSize) / 2
     + (compactMetrics.gap - regularMetrics.gap);
+
+  // Mirror-image resize: the pill sits inside the scaling capsule, so on its
+  // own its on-screen glide ran ahead of the capsule when shrinking toward
+  // Home and in step when growing away from it (see barModePill.ts). This
+  // nudges it so its on-screen path is a straight interpolation on its own
+  // spring in both directions. Captured on the UI thread whenever the pill's
+  // target changes — the same press-in frame the resize itself starts on.
+  const pillGeometry = React.useMemo<BarGeometry>(() => ({
+    capsuleWidth: regularMetrics.capsuleWidth,
+    capsulePadding: regularMetrics.capsulePadding,
+    itemWidth: regularMetrics.itemWidth,
+    compactScaleX: capsuleScaleX,
+  }), [regularMetrics.capsuleWidth, regularMetrics.capsulePadding, regularMetrics.itemWidth, capsuleScaleX]);
+  const restingPill = Math.max(activeIndex, 0);
+  const glideFromX = useSharedValue(restingPill);
+  const glideFromScreen = useSharedValue(scaleAt(isCompact ? 1 : 0, pillGeometry) * offsetAt(restingPill, pillGeometry));
+  const glideFromScale = useSharedValue(scaleAt(isCompact ? 1 : 0, pillGeometry));
+  // How far (pre-scale px, signed) the indicator pushes the pill's centre
+  // ahead of its slot position for the liquid stretch — the same formula
+  // TabBarIndicator uses.
+  const stretchLead = (x: number, origin: number, target: number, peak: number) => {
+    'worklet';
+    const direction = target >= origin ? 1 : -1;
+    return (direction * currentStretch(x, origin, target, peak) * pillGeometry.itemWidth) / 2;
+  };
+  // One UI-thread reaction drives both the resize and the pill's glide
+  // capture, so they read the same previous/next state on the same frame:
+  // whatever triggers it (a slot's or the Profile circle's press-in, or the
+  // committed-route fallback) starts the capsule, circle, icons and pill
+  // together, in both directions.
+  useAnimatedReaction(
+    () => ({ target: indicatorTarget.value, compact: indicatorTarget.value === 0 && !onProfile.value }),
+    (next, previous) => {
+      if (previous === null) return;
+      const nextMode = next.compact ? 1 : 0;
+      if (next.target !== previous.target) {
+        const x = indicatorX.value;
+        const m = progress.value;
+        // The new glide starts exactly where the pill is on screen right now
+        // (including any correction still in flight), so a redirect is
+        // seamless. The new glide's stretch lead stands in for the old one:
+        // planGlide keeps the stretch continuous on a same-direction redirect.
+        const lead = stretchLead(x, indicatorOrigin.value, next.target, indicatorStretch.value);
+        const correction = pillCorrection(
+          x, previous.target, m, previous.compact ? 1 : 0,
+          { fromX: glideFromX.value, fromScreen: glideFromScreen.value, fromScale: glideFromScale.value },
+          pillGeometry, lead,
+        );
+        const displayed = scaleAt(m, pillGeometry) * (offsetAt(x, pillGeometry) + lead + correction);
+        const start = captureGlideStart(x, m, nextMode, displayed, lead, pillGeometry);
+        glideFromX.value = start.fromX;
+        glideFromScreen.value = start.fromScreen;
+        glideFromScale.value = start.fromScale;
+      }
+      if (next.compact !== previous.compact) {
+        modeTarget.value = nextMode;
+        progress.set(reducedMotion ? nextMode : withSpring(nextMode, INDICATOR_SPRING));
+      }
+    },
+    [pillGeometry, reducedMotion],
+  );
+  const pillCorrectionStyle = useAnimatedStyle(() => {
+    const x = indicatorX.value;
+    const target = indicatorTarget.value;
+    const correction = pillCorrection(
+      x, target, progress.value, modeTarget.value,
+      { fromX: glideFromX.value, fromScreen: glideFromScreen.value, fromScale: glideFromScale.value },
+      pillGeometry, stretchLead(x, indicatorOrigin.value, target, indicatorStretch.value),
+    );
+    return { transform: [{ translateX: correction }] };
+  });
 
   const capsuleAnimatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -267,13 +358,21 @@ export function BuyerTabBar({
       // The press-in already moved the pill ahead of this tab's own
       // navigation — a listener vetoing it means that never happens, so put
       // the pill (and, for Profile, its hidden state) back where it was.
-      if (activeIndex >= 0) pressIndicator(activeIndex);
-      else hideIndicator();
+      if (activeIndex >= 0) pressSlot(activeIndex);
+      else pressProfile();
       return;
     }
     hapticTabChange();
+    if (routeName === 'profile') {
+      const wait = Platform.OS === 'web' && !reducedMotion
+        ? WEB_NAV_AFTER_PRESS_MS - (Date.now() - profileResizeAt.current)
+        : 0;
+      if (wait > 0) setTimeout(() => navigation.navigate(routeName as never), wait);
+      else navigation.navigate(routeName as never);
+      return;
+    }
     afterGlide(() => navigation.navigate(routeName as never));
-  }, [activeRoute, activeIndex, navigation, state.routes, pressIndicator, hideIndicator, afterGlide]);
+  }, [activeRoute, activeIndex, navigation, state.routes, pressSlot, pressProfile, afterGlide, reducedMotion]);
 
   const onLongPress = React.useCallback((routeName: string) => {
     const route = state.routes.find(candidate => candidate.name === routeName);
@@ -330,6 +429,7 @@ export function BuyerTabBar({
       >
         <TabBarGlass theme={theme} radius={radius.bar} />
 
+        <Animated.View style={[StyleSheet.absoluteFill, styles.pillLayer, pillCorrectionStyle]}>
         <TabBarIndicator
           x={indicatorX}
           target={indicatorTarget}
@@ -339,6 +439,7 @@ export function BuyerTabBar({
           metrics={regularMetrics}
           theme={theme}
         />
+        </Animated.View>
 
         <View
           accessibilityRole="tablist"
@@ -360,7 +461,7 @@ export function BuyerTabBar({
                 theme={theme}
                 hitSlop={isCompact ? compactHitSlop : undefined}
                 onPress={() => openRoute(item.route)}
-                onPressIn={() => pressIndicator(index)}
+                onPressIn={() => pressSlot(index)}
                 onLongPress={() => onLongPress(item.route)}
                 testID={`buyer-tab-${item.route}`}
                 accessibilityLabel={label}
@@ -397,7 +498,7 @@ export function BuyerTabBar({
         accessibilityLabel="Profile tab"
         selected={profileFocused}
         onPress={() => openRoute('profile')}
-        onPressIn={hideIndicator}
+        onPressIn={pressProfile}
         onLongPress={() => onLongPress('profile')}
         testID="buyer-tab-profile"
       >
@@ -426,6 +527,7 @@ const styles = StyleSheet.create({
   },
   // Shadow lives on an unclipped wrapper; the glass inside clips to the radius.
   shadow: TAB_BAR_SHADOW,
+  pillLayer: { pointerEvents: 'none' },
   slotRow: {
     flexDirection: 'row',
     alignSelf: 'flex-start',
