@@ -74,6 +74,7 @@ import type { DmCallDto, DmCallRtcDto } from '@/lib/calls/dmCallClient';
 import { isPublicApiRequest, signedOutErrorBody } from '@/lib/signedOutApiPolicy';
 import type { LiveAnalytics, LiveAnalyticsListItem } from '@/lib/live/liveAnalytics';
 import type { OrderRefundsResponse, SellerRefundRequest, SellerRefundResponse } from '@/lib/sellerRefund';
+import type { StoreDetailRatings } from '@/lib/storeTrust';
 
 import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
@@ -2761,8 +2762,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         ),
       /** List reviews for a seller (public). Returns { reviews, avgRating, totalCount }. */
       forSeller: (sellerId: string) =>
-        get<{ reviews: any[]; avgRating: number; totalCount: number }>(
+        get<{ reviews: any[]; avgRating: number; totalCount: number; details?: StoreDetailRatings }>(
           `/api/reviews/seller/${encodeURIComponent(sellerId)}`
+        ),
+      /** Public store trust signals: "Ships in N days" and the detail ratings. */
+      storeTrust: (sellerId: string) =>
+        get<{ processingDays: number | null; details: StoreDetailRatings }>(
+          `/api/public/store-trust/${encodeURIComponent(sellerId)}`
         ),
       /** Create a review (buyer, authenticated). */
       create: (body: {
@@ -2774,6 +2780,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         /** Object paths returned by `uploadPhoto`. */
         photos?:    string[];
         fitNote?:   'Runs small' | 'True to size' | 'Runs large';
+        /** Optional 1–5 detail ratings. */
+        shipSpeedRating?: number;
+        accuracyRating?:  number;
       }) => post<any>('/api/reviews', body),
       /** Upload one review photo (buyer); send the returned objectPath in `photos`. */
       uploadPhoto: (image: { uri: string; mimeType?: string | null }) =>

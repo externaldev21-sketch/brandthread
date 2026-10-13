@@ -57,6 +57,7 @@ import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { confirmBlock, reportHref } from '@/lib/safety';
 import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { MissingItemState } from '@/components/states/MissingItemState';
+import { shipsInLabel } from '@/lib/storeTrust';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { ListRow } from '@/components/ui/ListRow';
@@ -306,6 +307,18 @@ export default function SellerProfileScreen() {
     });
     return () => { active = false; };
   }, [api, canonicalSellerId, isOwner, userId, reloadTick]);
+
+  // ── Ships in N days (feature 65): from the seller's own shipping zones ───────
+  const [processingDays, setProcessingDays] = useState<number | null>(null);
+  useEffect(() => {
+    if (!canonicalSellerId) return;
+    let active = true;
+    api.reviews.storeTrust(canonicalSellerId)
+      .then((data) => { if (active) setProcessingDays(data.processingDays ?? null); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [api, canonicalSellerId, reloadTick]);
+  const shipsIn = shipsInLabel(processingDays);
 
   // ── Rating ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -708,7 +721,27 @@ export default function SellerProfileScreen() {
       onOpenWebsite={(url) => { void Linking.openURL(url); }}
     >
       {seller.category ? <ProfileChip label={seller.category} icon="tag" /> : null}
-      {rating && rating.totalCount > 0 ? <ProfileChip label={`${rating.avgRating.toFixed(1)} · ${plural(rating.totalCount, 'review')}`} icon="star" /> : null}
+      {rating && rating.totalCount > 0 ? (
+        <Pressable
+          onPress={() => router.push({ pathname: '/store-reviews', params: { sellerId: canonicalSellerId ?? '' } } as never)}
+          accessibilityRole="button"
+          accessibilityLabel={`${rating.avgRating.toFixed(1)} stars, ${rating.totalCount} reviews. Open reviews`}
+          testID="seller-profile-rating-chip"
+        >
+          <ProfileChip label={`${rating.avgRating.toFixed(1)} · ${plural(rating.totalCount, 'review')}`} icon="star" />
+        </Pressable>
+      ) : null}
+      {shipsIn ? <ProfileChip label={shipsIn} icon="truck" /> : null}
+      {seller.verified ? (
+        <Pressable
+          onPress={() => router.push('/verified-brands' as never)}
+          accessibilityRole="button"
+          accessibilityLabel="Verified brand. What this means"
+          testID="seller-profile-verified-chip"
+        >
+          <ProfileChip label="Verified brand" icon="check-circle" />
+        </Pressable>
+      ) : null}
       {caps.showPlanChip && plan ? (
         <ProfileChip
           label={planChipLabel(plan)}

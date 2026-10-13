@@ -15,6 +15,7 @@ import { bodyObject, idParams, validateInput } from "../lib/commerceValidation";
 import { logger } from "../lib/logger";
 import { assertReviewOrderAuth } from "../lib/reviewOrderAuth";
 import { resolveToClerkId } from "./public";
+import { emptyDetailRatings, sellerDetailRatings } from "../lib/storeTrust";
 import { toPublicReview } from "../lib/publicProfile";
 import { notBlockedWith, optionalViewerId } from "../lib/safety";
 import { sellerRatingSummary } from "../lib/sellerRating";
@@ -22,7 +23,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { evaluateContent } from "../lib/contentModerator";
 import { publishNotification } from "./notifications-feed";
 import {
-  MAX_REVIEW_PHOTO_BYTES, REVIEW_REPLY_MAX, normalizeReviewBody, parseFitNote,
+  MAX_REVIEW_PHOTO_BYTES, REVIEW_REPLY_MAX, normalizeReviewBody, parseDetailRating, parseFitNote,
   reviewExtras, reviewPhotoPrefix, validateReviewPhotos,
 } from "../lib/reviewContent";
 import { acceptUploadSession } from "../lib/uploadSessions";
@@ -142,11 +143,11 @@ router.get("/product/:productId", async (req, res) => {
 // Accepts users.clerkId or users.id (UUID) — resolves to canonical clerkId.
 router.get("/seller/:sellerId", async (req, res) => {
   const { sellerId } = req.params;
-  if (!sellerId) return res.json({ reviews: [], avgRating: 0, totalCount: 0 });
+  if (!sellerId) return res.json({ reviews: [], avgRating: 0, totalCount: 0, details: emptyDetailRatings() });
 
   // Resolve UUID alias or direct clerkId to canonical clerkId.
   const canonicalClerkId = await resolveToClerkId(sellerId, "seller");
-  if (!canonicalClerkId) return res.json({ reviews: [], avgRating: 0, totalCount: 0 });
+  if (!canonicalClerkId) return res.json({ reviews: [], avgRating: 0, totalCount: 0, details: emptyDetailRatings() });
 
   const rows = await db
     .select()
@@ -159,8 +160,9 @@ router.get("/seller/:sellerId", async (req, res) => {
 
   return res.json({
     reviews:    await toPublicReviews(rows as any[], optionalViewerId(req)),
-    avgRating:  agg.avgRating,
-    totalCount: agg.totalCount,
+    avgRating:  Number(agg?.avgRating  ?? 0),
+    totalCount: Number(agg?.totalCount ?? 0),
+    details:    await sellerDetailRatings(canonicalClerkId),
   });
 });
 
@@ -238,7 +240,7 @@ async function notifyNewReview(input: { buyerId: string; sellerId: string; revie
 
 router.post("/", requireAuth, rateLimit("review"), validateInput({ body: createReviewBody }), async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
-  const { orderId, sellerId, productId, rating, body, photos, fitNote } = req.body as {
+  const { orderId, sellerId, productId, rating, body, photos, fitNote, shipSpeedRating, accuracyRating } = req.body as {
     orderId?:   string;
     sellerId:   string;
     productId?: string;
@@ -246,6 +248,8 @@ router.post("/", requireAuth, rateLimit("review"), validateInput({ body: createR
     body?:      string;
     photos?:    string[];
     fitNote?:   string;
+    shipSpeedRating?: number | null;
+    accuracyRating?:  number | null;
   };
 
   if (!sellerId || !rating || rating < 1 || rating > 5 || !Number.isInteger(rating)) {
@@ -263,6 +267,11 @@ router.post("/", requireAuth, rateLimit("review"), validateInput({ body: createR
   if (!photoCheck.ok) return res.status(400).json({ error: photoCheck.error });
   const fit = parseFitNote(fitNote);
   if (fit === null) return res.status(400).json({ error: "fitNote must be Runs small, True to size or Runs large" });
+  const shipSpeed = parseDetailRating(shipSpeedRating);
+  const accuracy = parseDetailRating(accuracyRating);
+  if (shipSpeed === null || accuracy === null) {
+    return res.status(400).json({ error: "shipSpeedRating and accuracyRating must be whole numbers from 1 to 5" });
+  }
   if (bodyCheck.body && evaluateContent(bodyCheck.body, "public").action === "reject") {
     return res.status(400).json({ error: "This review can't be posted. Edit it and try again." });
   }
@@ -295,6 +304,9 @@ router.post("/", requireAuth, rateLimit("review"), validateInput({ body: createR
     sizeBought,
     fitNote: fit?.fitNote ?? null,
     fitScale: fit?.fitScale ?? null,
+    // Editing a review without the detail ratings keeps the ones already given.
+    ...(shipSpeed !== undefined ? { shipSpeedRating: shipSpeed } : {}),
+    ...(accuracy !== undefined ? { accuracyRating: accuracy } : {}),
   };
 
   try {
