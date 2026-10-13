@@ -28,14 +28,14 @@ type TypeRole = Pick<TextStyle, 'fontSize' | 'lineHeight' | 'fontFamily' | 'font
  * fontSize / lineHeight, both in whole pixels, per the Phase 1 spec:
  * display 44/48, title1 28/34, title2 22/28, headline 17/22 (semibold),
  * body 15/20, callout 14/19, footnote 13/18, caption 11/13.
- * Large titles (display/title1) get letterSpacing: -0.3 — big Inter Bold
+ * Big titles are tracked tight (display -1, title1 -0.5, title2 -0.3) — big type
  * reads slightly loose otherwise; smaller roles are left at the font's
  * natural tracking.
  */
 export const TYPE_SCALE: Record<TypeRoleName, TypeRole> = {
-  display:  { fontSize: 44, lineHeight: 48, fontFamily: FONT.bold, letterSpacing: -0.3 },
-  title1:   { fontSize: 28, lineHeight: 34, fontFamily: FONT.bold, letterSpacing: -0.3 },
-  title2:   { fontSize: 22, lineHeight: 28, fontFamily: FONT.semibold },
+  display:  { fontSize: 44, lineHeight: 48, fontFamily: FONT.bold, letterSpacing: -1 },
+  title1:   { fontSize: 28, lineHeight: 34, fontFamily: FONT.bold, letterSpacing: -0.5 },
+  title2:   { fontSize: 22, lineHeight: 28, fontFamily: FONT.semibold, letterSpacing: -0.3 },
   headline: { fontSize: 17, lineHeight: 22, fontFamily: FONT.semibold },
   body:     { fontSize: 15, lineHeight: 20, fontFamily: FONT.regular },
   callout:  { fontSize: 14, lineHeight: 19, fontFamily: FONT.regular },

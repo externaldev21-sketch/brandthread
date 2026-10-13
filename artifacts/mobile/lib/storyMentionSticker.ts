@@ -10,6 +10,7 @@
  * viewer must keep a >=44pt tap target even when the sticker is invisible.
  */
 import type { StoryOverlay, StoryOverlayType } from '@/services/socialTypes';
+import { formatHandle } from '@/lib/handle';
 
 export type MentionStyle = NonNullable<StoryOverlay['mentionStyle']>;
 
@@ -115,8 +116,7 @@ export function taggedPeople(overlays: readonly StoryOverlay[] | undefined): Tag
 
 /** "@name" with exactly one leading @. */
 export function withAt(handle: string | null | undefined): string {
-  const h = (handle ?? '').trim().replace(/^@+/, '');
-  return h ? `@${h}` : '';
+  return formatHandle(handle);
 }
 
 /** Route for a tagged person's profile (same shape as lib/activity.ts's 'user' case). */
