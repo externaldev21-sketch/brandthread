@@ -40,8 +40,8 @@ export const SETS = {
     { name: '01-product-page', role: 'buyer', target: '/buyer-product-detail?productId=prod_nl_hoodie_ember', expect: /Heavyweight Hoodie/ },
     { name: '02-product-page-no-photo', role: 'buyer', target: '/buyer-product-detail?productId=prod_nl_hoodie_bone', expect: /Heavyweight Hoodie/ },
     { name: '03-bag', role: 'buyer', target: '/cart', expect: /^Cart \(\d+\)$/ },
-    { name: '04-discover', role: 'buyer', target: '/discover', after: scrollBy(700) },
-    { name: '05-seller-products', role: 'seller', target: '/products', expect: /Heavyweight Hoodie/ },
+    { name: '04-discover', role: 'buyer', target: '/discover', expect: /Just Dropped/, after: scrollBy(420) },
+    { name: '05-search-results', role: 'buyer', target: '/buyer-search?q=hoodie', expect: /^Products$/, after: tapText(/^Products$/) },
   ],
 };
 
