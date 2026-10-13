@@ -208,7 +208,7 @@ export default function BuyerFriendRequestsScreen() {
             <PressableScaleRow onPress={() => goToProfile({ userId: row.userId, name: row.name, handle: row.handle, initials: '', color: '' })}>
               <Avatar uri={row.avatarUrl} name={row.name} size={48} />
               <View style={s.rowCenter}>
-                <Text style={[TYPE_SCALE.body, s.rowName]} numberOfLines={1}>{row.name}</Text>
+                <Text style={[TYPE_SCALE.body, s.rowName]} numberOfLines={2}>{row.name}</Text>
                 <Text style={[TYPE_SCALE.footnote, s.rowHandle]} numberOfLines={1}>{row.handle}</Text>
               </View>
             </PressableScaleRow>
@@ -249,7 +249,7 @@ export default function BuyerFriendRequestsScreen() {
                 <Text style={[TYPE_SCALE.headline, s.avatar48Text]}>{row.initials}</Text>
               </View>
               <View style={s.rowCenter}>
-                <Text style={[TYPE_SCALE.body, s.rowName]} numberOfLines={1}>{row.name}</Text>
+                <Text style={[TYPE_SCALE.body, s.rowName]} numberOfLines={2}>{row.name}</Text>
                 <Text style={[TYPE_SCALE.footnote, s.rowHandle]} numberOfLines={1}>{row.handle}</Text>
                 <Text style={[TYPE_SCALE.caption, s.rowMutual]}>Follows you</Text>
               </View>
