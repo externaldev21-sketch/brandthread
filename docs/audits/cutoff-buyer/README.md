@@ -62,6 +62,29 @@ Top: every header sits below the simulated notch on every route.
   shrink-to-fit (`adjustsFontSizeToFit`), which react-native-web ignores,
   so the web preview still shows "…" there at the emulated largest size.
 
+## Before / after
+
+Web preview, 2× crops. Settings & account:
+
+![Settings, iPhone SE](img/settings-se.png)
+![Accounts Center, iPhone SE](img/account-center-se.png)
+![Notifications, iPhone SE](img/notifications-se.png)
+![Push notifications, iPhone SE](img/push-se.png)
+![Privacy, iPhone SE](img/privacy-se.png)
+![Edit profile, iPhone SE](img/edit-profile-se.png)
+![QR code link, 390pt](img/qr-iphone.png)
+
+Long names:
+
+![Threads feed caption, long brand name](img/feed-caption-longnames-se.png)
+![Followers tabs and Remove pill, long names](img/connections-longnames-se.png)
+![Friend requests, iPhone SE](img/friend-requests-se.png)
+![Friend requests, long names](img/friend-requests-longnames-se.png)
+
+Largest Dynamic Type (web emulation):
+
+![Retry row wraps instead of running off-screen](img/retry-row-dt-se.png)
+
 ## Screen inventory (154 routes)
 
 Static routes under `app/` that a buyer can reach, plus detail screens
