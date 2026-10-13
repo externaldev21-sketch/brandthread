@@ -40,9 +40,15 @@ router.get("/calculate", async (req, res) => {
   const processingDays = zone?.processingDays ?? null;
 
   if (!rate) {
-    res.json({ shippingCents: 0, isFree: true, rateName: "Free Shipping", processingDays });
+    res.json({ shippingCents: 0, isFree: true, rateName: "Free Shipping", processingDays, freeAboveCents: null });
     return;
   }
+
+  // The seller's own free-shipping threshold, so the buyer's bag can say how
+  // far a seller's items are from free shipping. Only reported when this flat
+  // rate is what checkout actually charges: a seller with shipping zones is
+  // priced per destination at checkout, so no single threshold applies.
+  const freeAboveCents = zones.length === 0 ? rate.freeAboveCents ?? null : null;
 
   if (rate.freeAboveCents != null && subtotal >= rate.freeAboveCents) {
     const threshold = (rate.freeAboveCents / 100).toFixed(0);
@@ -51,6 +57,7 @@ router.get("/calculate", async (req, res) => {
       isFree: true,
       rateName: `${rate.name} (Free above $${threshold})`,
       processingDays,
+      freeAboveCents,
     });
     return;
   }
@@ -60,6 +67,7 @@ router.get("/calculate", async (req, res) => {
     isFree: rate.flatRateCents === 0,
     rateName: rate.name,
     processingDays,
+    freeAboveCents,
   });
 });
 

@@ -42,9 +42,18 @@ export function previewShippingRate(sellerId: string, subtotalCents: number): { 
   return previewRateFor(sellerId, subtotalCents);
 }
 
+/** A preview seller's free-shipping threshold ($500). */
+export const PREVIEW_FREE_SHIPPING_CENTS = 50_000;
+
+/** A preview seller's free-shipping threshold, or null for every other seller. */
+export function previewFreeShippingThreshold(sellerId: string): number | null {
+  if (!isPreviewSellerId(sellerId) || !previewEnabled()) return null;
+  return PREVIEW_FREE_SHIPPING_CENTS;
+}
+
 /** Pure rate rule behind previewShippingRate (exported for tests). */
 export function previewRateFor(sellerId: string, subtotalCents: number): { id: string; name: string; amountCents: number } {
-  const free = subtotalCents >= 50_000;
+  const free = subtotalCents >= PREVIEW_FREE_SHIPPING_CENTS;
   return { id: `seller_rate_${sellerId}`, name: free ? 'Free shipping' : 'Standard shipping', amountCents: free ? 0 : 1_200 };
 }
 
