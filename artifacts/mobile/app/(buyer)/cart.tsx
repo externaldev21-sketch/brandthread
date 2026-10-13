@@ -7,7 +7,7 @@
  * - Inline unavailable/low-stock warnings backed by actual CartItem data
  * - Consistent monochrome Woven design-system tokens throughout
  */
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
@@ -24,12 +24,13 @@ import {
   getCartForScreen, updateCartItemQuantity, removeCartItem, removeCartItems, restoreCartSnapshot,
   saveForLater, moveToCart, removeSavedItem,
   groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart,
+  getSellerFreeShippingThreshold,
 } from '@/services/cartService';
+import { freeShippingLabel } from '@/lib/freeShipping';
 import {
   Cart, CartItem, SavedCartItem, CartSellerGroup, CheckoutLoyaltyRedemption, CheckoutThreadCashRedemption,
 } from '@/services/cartTypes';
 import { useScrollReset } from '@/hooks/useScrollReset';
-import { ThreadIllustration } from '@/components/illustrations/EmptyStateArt';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
 // Same flat-black language as the one-page checkout: sections on pure black,
@@ -62,13 +63,17 @@ import { BUYER_CART_STEPS } from '@/lib/firstRunTips/content';
 
 const fmtPrice = formatCents;
 
-// Sticky checkout bar's own fixed height (excluding the safe-area padding,
+// The pinned total block's big Checkout button (Nike Bag: full width, 56pt).
+const CHECKOUT_BUTTON_H = 56;
+// Its subtotal row: one 22pt line.
+const SUBTOTAL_ROW_H = 22;
+// Pinned total block's own fixed height (excluding the safe-area padding,
 // which is added separately wherever this is used) — StickyFooter's
-// paddingTop (SP.sm) plus the Checkout pill's height (COMP.buttonH), the
-// tallest thing in that row. Used to size the scroll content's own bottom
-// padding so the last line of content always clears the bar, instead of a
-// guessed magic number.
-const STICKY_BAR_CONTENT_HEIGHT = SP.sm + COMP.buttonH;
+// paddingTop (SP.sm), the subtotal row, the gap under it (SP.sm) and the
+// big Checkout button. Used to size the scroll content's own bottom padding
+// so the last line of content always clears the block, instead of a guessed
+// magic number.
+const STICKY_BAR_CONTENT_HEIGHT = SP.sm + SUBTOTAL_ROW_H + SP.sm + CHECKOUT_BUTTON_H;
 
 // ─── Row pending state tracker ────────────────────────────────────────────────
 // Tracks which action is in-flight per item ID so the row can show a localized
@@ -311,15 +316,16 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   // (the page color) so the actions never show through at rest (web).
   swipeBleed: { marginHorizontal: -SP.md },
   swipeFront: { paddingHorizontal: SP.md, backgroundColor: theme.background },
-  checkbox: { width: COMP.minTouchTarget, height: 72, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
+  checkbox: { width: COMP.minTouchTarget, height: 100, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
   checkboxBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   busyOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 10, alignItems: 'center', justifyContent: 'center',
   },
-  // 3:4 and `contain`: the whole product shows, never cropped.
+  // 80pt wide, 4:5 (Nike Bag), and `contain`: the whole product shows,
+  // never cropped.
   img: {
-    width: 84, height: 112, borderRadius: RADII.card,
+    width: 80, height: 100, borderRadius: RADII.card,
     backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
@@ -364,11 +370,13 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
 // ─── Seller Group ─────────────────────────────────────────────────────────────
 
 function SellerGroup({
-  group, first, pendingByItemId, selectedIds, checkingOut, checkoutDisabled, onCheckoutGroup, onToggleSelect, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
+  group, first, freeShippingThresholdCents, pendingByItemId, selectedIds, checkingOut, checkoutDisabled, onCheckoutGroup, onToggleSelect, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
 }: {
   group: CartSellerGroup;
   /** The first section has no hairline above it. */
   first: boolean;
+  /** This seller's real free-shipping threshold; null/undefined = none (no line shown). */
+  freeShippingThresholdCents?: number | null;
   pendingByItemId: Record<string, RowPendingAction>;
   selectedIds: Set<string>;
   /** This seller's own checkout is starting. */
@@ -392,6 +400,9 @@ function SellerGroup({
   );
   const checkoutThisSeller = useCallback(() => onCheckoutGroup(group.sellerId), [onCheckoutGroup, group.sellerId]);
   const hasAvailable = group.items.some(item => item.isAvailable);
+  // Nike Bag header line: "Free shipping" / "$24 away from free shipping",
+  // only from the seller's own threshold. No threshold → avatar + name only.
+  const shippingLine = freeShippingLabel(group.subtotalCents, freeShippingThresholdCents);
   return (
     <CheckoutSection first={first} testID={`cart-seller-${group.sellerId}`}>
       {/* Seller header — avatar, name, and a chevron to the store (the
@@ -415,9 +426,11 @@ function SellerGroup({
             <Text style={[sg.avatarText, { color: theme.accentLight }]}>{group.sellerInitial}</Text>
           )}
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={sg.sellerName}>{group.sellerName}</Text>
-          <Text style={sg.sellerHandle}>{group.sellerHandle}</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={sg.sellerName} numberOfLines={1}>{group.sellerName}</Text>
+          {shippingLine && (
+            <Text style={sg.shippingLine} numberOfLines={1} testID={`cart-seller-shipping-${group.sellerId}`}>{shippingLine}</Text>
+          )}
         </View>
         <Feather name="chevron-right" size={18} color={theme.muted} />
       </PressableScale>
@@ -518,7 +531,7 @@ const makeSellerGroupStyles = (theme: AppThemePreset) => StyleSheet.create({
   avatarImage: { width: '100%', height: '100%' },
   avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
   sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
-  sellerHandle: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted },
+  shippingLine: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 1 },
   // The checkout's hairline (theme.borderSubtle), between lines and above the footer.
   divider: { height: 1, backgroundColor: theme.borderSubtle, marginVertical: SP.xs },
   footer: { borderTopWidth: 1, borderTopColor: theme.borderSubtle, marginTop: SP.sm, paddingTop: SP.sm, gap: 4 },
@@ -741,6 +754,20 @@ export default function CartScreen() {
   }, [api, load, isSignedIn]));
 
   const groups = groupCartBySeller(cart.items);
+
+  // Each seller's real free-shipping threshold (null = none), for the
+  // section headers. Fetched once per seller, cached in cartService.
+  const [freeShippingBySeller, setFreeShippingBySeller] = useState<Record<string, number | null>>({});
+  const sellerIdsKey = groups.map(g => g.sellerId).join('|');
+  useEffect(() => {
+    if (!sellerIdsKey) return;
+    let active = true;
+    const ids = sellerIdsKey.split('|');
+    void Promise.all(ids.map(async id => [id, await getSellerFreeShippingThreshold(id)] as const))
+      .then(entries => { if (active) setFreeShippingBySeller(Object.fromEntries(entries)); });
+    return () => { active = false; };
+  }, [sellerIdsKey]);
+
   const hasPreOrder = cart.items.some(i => i.isPreOrder);
   const summary = calculateCartSummary(cart.items);
   const requestedPoints = Math.floor(Number(pointsInput));
@@ -758,7 +785,9 @@ export default function CartScreen() {
   const selectedItems = cart.items.filter(i => selectedIds.has(i.id));
   const allSelected = cart.items.length > 0 && selectedItems.length === cart.items.length;
   const selectedSummary = calculateCartSummary(selectedItems);
-  const selectedDisplayedTotal = allSelected ? displayedTotal : selectedSummary.totalCents;
+  // The pinned block shows the subtotal (Nike Bag); the full breakdown with
+  // rewards is in the Order summary above.
+  const selectedSubtotal = selectedSummary.subtotalCents;
 
   function toggleSelect(itemId: string) {
     setSelectedIds(prev => {
@@ -1040,21 +1069,19 @@ export default function CartScreen() {
       />
 
       {!hasItems && !hasSaved && !loadError ? (
-        // Monochrome empty state (Threads/Instagram-style plain icon-in-circle,
-        // not the shared BrandthreadUI EmptyState's colored gradient
-        // illustration) at the requested 120pt circle / 52pt CTA sizing.
-        <View style={[s.emptyWrap, { flex: 1 }]}>
-          <View style={[s.emptyIconCircle, { backgroundColor: theme.cardElevatedGlass, borderColor: theme.border }]}>
-            <ThreadIllustration motif="hanger" size={52} color={theme.muted} strokeWidth={4.5} />
+        // Nike Bag empty state: one big outline bag in an outline circle, a
+        // title, and one button back to Threads. No helper copy.
+        <View style={[s.emptyWrap, { flex: 1 }]} testID="cart-empty">
+          <View style={[s.emptyIconCircle, { borderColor: theme.border }]}>
+            <Feather name="shopping-bag" size={52} color={theme.text} />
           </View>
           <Text style={[s.emptyTitle, { color: theme.text }]}>Your cart is empty</Text>
-          <Text style={[s.emptyDescription, { color: theme.muted }]}>Tap Shop on a post you love to add it here.</Text>
           <Button
-            label="Continue shopping"
-            icon="compass"
-            onPress={() => router.navigate('/(buyer)/discover' as never)}
+            label="Shop Threads"
+            onPress={() => router.navigate('/(buyer)' as never)}
             style={s.emptyCta}
-            accessibilityHint="Opens Discover to browse products"
+            accessibilityHint="Opens Threads"
+            testID="cart-empty-shop-threads"
           />
         </View>
       ) : !hasItems && !hasSaved && loadError ? (
@@ -1124,6 +1151,7 @@ export default function CartScreen() {
                 key={group.sellerId}
                 group={group}
                 first={index === 0}
+                freeShippingThresholdCents={freeShippingBySeller[group.sellerId]}
                 pendingByItemId={pendingByItemId}
                 selectedIds={selectedIds}
                 checkingOut={checkingOutSellerId === group.sellerId}
@@ -1254,25 +1282,26 @@ export default function CartScreen() {
             <RecentlyViewedRow style={{ marginTop: SP.xl }} />
           </ScrollView>
 
-          {/* Sticky checkout bar — total on the left, a white "Checkout" pill
-              on the right, pinned above the home indicator. This is a pushed
-              screen with the floating tab bar hidden (see
+          {/* Pinned total block (Nike Bag): subtotal row, then one big
+              full-width Checkout button, above the home indicator. Same
+              action as before (handleCheckoutSelected → selected lines).
+              This is a pushed screen with the floating tab bar hidden (see
               BUYER_TAB_BAR_HIDDEN_ROUTES), so it pads by insets.bottom + 8,
               not the tab bar's occupied height. */}
           {hasItems && (
             <StickyFooter style={{ paddingBottom: insets.bottom + 8, backgroundColor: theme.background, borderTopColor: theme.borderSubtle }}>
-              <View style={s.checkoutBarRow}>
-                <View>
-                  <Text style={s.checkoutSummaryLabel}>
-                    {allSelected ? 'Total' : `${selectedItems.length} selected`}
+              <View testID="cart-total-block">
+                <View style={s.subtotalRow}>
+                  <Text style={s.subtotalLabel}>
+                    {allSelected ? 'Subtotal' : `Subtotal · ${selectedItems.length} selected`}
                   </Text>
-                  <Text style={s.checkoutSummaryAmount}>{fmtPrice(selectedDisplayedTotal)}</Text>
+                  <Text style={s.subtotalAmount}>{fmtPrice(selectedSubtotal)}</Text>
                 </View>
                 <TouchableOpacity
                   onPress={handleCheckoutSelected}
                   disabled={selectedItems.length === 0 || validating}
                   activeOpacity={0.85}
-                  style={[s.checkoutPill, (selectedItems.length === 0 || validating) && { opacity: 0.5 }]}
+                  style={[s.checkoutButton, (selectedItems.length === 0 || validating) && { opacity: 0.5 }]}
                   accessibilityRole="button"
                   accessibilityLabel="Checkout"
                   accessibilityHint="Reviews shipping and opens secure payment"
@@ -1280,7 +1309,7 @@ export default function CartScreen() {
                   {validating ? (
                     <ActivityIndicator size="small" color="#000000" />
                   ) : (
-                    <Text style={s.checkoutPillText}>Checkout</Text>
+                    <Text style={s.checkoutButtonText}>Checkout</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -1307,7 +1336,6 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm,
   },
   emptyTitle: { fontSize: FS.lg, fontFamily: FONT.bold, textAlign: 'center' },
-  emptyDescription: { fontSize: FS.base, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 21, maxWidth: 280 },
   emptyCta: { marginTop: SP.md },
   editBtn: { paddingRight: SP.sm },
   editText: { fontSize: FS.sm, fontFamily: FONT.semibold },
@@ -1342,17 +1370,19 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.success },
   appliedPointsSub: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
   savedHint: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.subtle, textAlign: 'center', marginBottom: SP.lg },
-  // Sticky checkout bar: total on the left, a white pill on the right —
-  // Nike Bag / TikTok Shop checkout-bar reference, forced white/black
-  // regardless of theme so it reads as the one fixed "pay" affordance.
-  checkoutBarRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  checkoutSummaryLabel: { ...TYPE_SCALE.footnote, color: theme.muted },
-  checkoutSummaryAmount: { ...TYPE_SCALE.headline, ...TABULAR_NUMS, color: theme.text },
-  checkoutPill: {
-    minWidth: 132, minHeight: COMP.buttonH,
+  // Pinned total block (Nike Bag): subtotal row over one big full-width
+  // Checkout button, forced white/black regardless of theme so it reads as
+  // the one fixed "pay" affordance.
+  subtotalRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    height: SUBTOTAL_ROW_H, marginBottom: SP.sm,
+  },
+  subtotalLabel: { ...TYPE_SCALE.body, color: theme.muted },
+  subtotalAmount: { ...TYPE_SCALE.headline, ...TABULAR_NUMS, color: theme.text },
+  checkoutButton: {
+    height: CHECKOUT_BUTTON_H, alignSelf: 'stretch',
     borderRadius: radius.md, backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: SP.lg,
   },
-  checkoutPillText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#000000' },
+  checkoutButtonText: { fontSize: FS.md, fontFamily: FONT.bold, color: '#000000' },
 });

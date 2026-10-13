@@ -1223,7 +1223,15 @@ export function respond({ method, path, query, role, options = {} }) {
       },
     ];
   }
-  if (p === '/shipping-rates/calculate') return { shippingCents: 1200, rateName: 'Express courier (2–3 days)', isFree: false };
+  if (p === '/shipping-rates/calculate') {
+    // Field Office has a free-shipping threshold ($200), so the bag can show
+    // "$35 away from free shipping"; every other seller has none (null).
+    const freeAboveCents = query.get('sellerId') === BRANDS.field.clerkId ? 20000 : null;
+    const free = freeAboveCents != null && Number(query.get('subtotalCents') ?? 0) >= freeAboveCents;
+    return free
+      ? { shippingCents: 0, rateName: 'Express courier (Free above $200)', isFree: true, freeAboveCents }
+      : { shippingCents: 1200, rateName: 'Express courier (2–3 days)', isFree: false, freeAboveCents };
+  }
   // app/meta-ads-connect.tsx, app/meta-ads-manage.tsx and app/meta-ads-setup.tsx
   // all call this before showing anything — unseeded, it 404s on every load
   // of every Meta Ads screen. Honestly disconnected (no fabricated Meta

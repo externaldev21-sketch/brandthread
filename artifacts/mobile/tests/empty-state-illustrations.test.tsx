@@ -50,7 +50,8 @@ describe('the old colored icon-in-a-square + two dots decoration is gone', () =>
 
 describe('each named screen wires its thread-motif illustration through the shared EmptyState', () => {
   const cases: [path: string, needle: string][] = [
-    ['../app/(buyer)/cart.tsx', "motif=\"hanger\""],
+    // The bag's empty state is Nike Bag's big outline bag (Dev item 36).
+    ['../app/(buyer)/cart.tsx', 'name="shopping-bag"'],
     ['../components/profile/profileEmptyStates.ts', "illustration: 'spool'"],
     ['../app/(buyer)/friends.tsx', 'illustration="friends"'],
     ['../app/buyer-search.tsx', 'illustration="search"'],
