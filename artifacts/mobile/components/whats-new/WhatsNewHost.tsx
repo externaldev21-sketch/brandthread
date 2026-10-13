@@ -4,7 +4,7 @@
  * home tab, and takes the first-run tips slot while open so a tip never
  * stacks on top of it.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSegments } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { WHATS_NEW } from '@/content/whatsNew';
@@ -20,6 +20,9 @@ export function WhatsNewHost() {
   const segments = useSegments();
   const tips = useFirstRunTipsController();
   const [visible, setVisible] = useState(false);
+  // The shared BottomSheet also calls onClose when its (hidden) close
+  // animation settles on mount, so only a sheet this host opened counts.
+  const openRef = useRef(false);
   const [checkedFor, setCheckedFor] = useState<string | null>(null);
   const onHomeTab = segments[0] === '(tabs)' || segments[0] === '(buyer)';
 
@@ -35,6 +38,7 @@ export function WhatsNewHost() {
         // A first-run tip holds the slot: wait for it to finish (this effect
         // re-runs when the tips controller changes).
         if (!tips.claim(SLOT_ID)) return;
+        openRef.current = true;
         setVisible(true);
       }
       setCheckedFor(userId);
@@ -46,6 +50,8 @@ export function WhatsNewHost() {
   }, [isSignedIn, userId, onHomeTab, checkedFor, tips]);
 
   const close = () => {
+    if (!openRef.current) return;
+    openRef.current = false;
     setVisible(false);
     if (userId) {
       markWhatsNewSeen(userId, WHATS_NEW.id);
