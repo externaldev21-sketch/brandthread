@@ -4,6 +4,11 @@
  *
  * GET  /status          get Stripe Tax enabled state + seller prefs
  * POST /enable          enable Stripe Tax on seller's Connect account
+ *                       (body.headOffice optional; else the saved head office
+ *                       or the account's business address is used)
+ * GET  /registrations   head office + where the seller collects tax
+ * POST /registrations   add a state/country registration (body.region)
+ * PUT  /head-office     set the head office address Stripe Tax needs
  * PATCH /config         update seller tax preferences
  * GET  /1099            1099-K form info via Stripe Connect tax reporting
  * POST /calculate       estimate tax/duties for a given cart (used at checkout preview)
@@ -18,6 +23,10 @@ import {
   federal1099KProgress,
   getSellerTaxYearTotals,
 } from "../lib/sellerTaxLedger";
+import {
+  TAX_REGIONS, findTaxRegion, fromStripeAddress, parseHeadOffice, regionOfRegistration,
+  registrationCreateParams, toStripeAddress, type HeadOfficeAddress,
+} from "../lib/taxRegions";
 
 const router = Router();
 router.use(requireAuth);
@@ -108,12 +117,36 @@ router.post("/enable", async (req, res) => {
       return;
     }
 
+    // Stripe Tax needs a head office before it can calculate. Use the one the
+    // seller just entered, else the one already saved on Stripe Tax, else the
+    // business address from their Stripe onboarding. With none, the app asks.
+    const supplied = req.body?.headOffice === undefined ? null : parseHeadOffice(req.body.headOffice);
+    if (req.body?.headOffice !== undefined && !supplied) {
+      res.status(400).json({ error: "Enter a complete head office address", code: "INVALID_HEAD_OFFICE" });
+      return;
+    }
+    let headOffice: HeadOfficeAddress | null = supplied;
+    if (!headOffice) {
+      const settings = await (stripe as any).tax.settings
+        .retrieve({}, { stripeAccount: user.stripeAccountId })
+        .catch(() => null);
+      if (!fromStripeAddress(settings?.head_office?.address)) {
+        const account = await (stripe as any).accounts.retrieve(user.stripeAccountId).catch(() => null);
+        headOffice = fromStripeAddress(account?.company?.address) ?? fromStripeAddress(account?.individual?.address);
+        if (!headOffice) {
+          res.status(409).json({ error: "Add your head office address to turn on automatic tax", code: "HEAD_OFFICE_REQUIRED" });
+          return;
+        }
+      }
+    }
+
     // Update Stripe Tax settings on the Connect account
     await (stripe as any).tax.settings.update(
       {
         defaults: {
           tax_behavior: "exclusive",
         },
+        ...(headOffice ? { head_office: { address: toStripeAddress(headOffice) } } : {}),
       },
       { stripeAccount: user.stripeAccountId },
     );
@@ -136,6 +169,151 @@ router.post("/enable", async (req, res) => {
   } catch (err) {
     req.log.error({ err, sellerId }, "Failed to enable Stripe Tax");
     res.status(500).json({ error: "Failed to enable Stripe Tax" });
+  }
+});
+
+// ─── Registrations + head office ──────────────────────────────────────────────
+// Where the seller is registered to collect tax, on their own connected
+// account (stripe.tax.registrations). Without Stripe or a connected account
+// the app shows its not-connected state; nothing here throws for that.
+
+async function sellerStripeAccount(sellerId: string): Promise<string | null> {
+  const [user] = await db
+    .select({ stripeAccountId: users.stripeAccountId })
+    .from(users)
+    .where(eq(users.clerkId, sellerId))
+    .limit(1);
+  return user?.stripeAccountId ?? null;
+}
+
+function registrationView(registration: any) {
+  const region = regionOfRegistration(registration);
+  return {
+    id: String(registration.id),
+    code: region.code,
+    name: region.name,
+    country: region.country,
+    state: region.state,
+    status: String(registration.status ?? "active"),
+    activeFrom: typeof registration.active_from === "number" ? new Date(registration.active_from * 1000).toISOString() : null,
+    expiresAt: typeof registration.expires_at === "number" ? new Date(registration.expires_at * 1000).toISOString() : null,
+  };
+}
+
+function stripeRejection(err: any): { status: number; message: string } | null {
+  const status = Number(err?.statusCode ?? err?.status);
+  if (Number.isInteger(status) && status >= 400 && status < 500) {
+    return { status, message: typeof err?.message === "string" ? err.message : "Stripe did not accept this change" };
+  }
+  return null;
+}
+
+router.get("/registrations", async (req, res) => {
+  const sellerId = getSellerId(req);
+  try {
+    const accountId = stripe ? await sellerStripeAccount(sellerId) : null;
+    if (!stripe || !accountId) {
+      res.json({ connected: false, providerConfigured: Boolean(stripe), headOffice: null, registrations: [], regions: TAX_REGIONS });
+      return;
+    }
+    const [settings, list] = await Promise.all([
+      (stripe as any).tax.settings.retrieve({}, { stripeAccount: accountId }).catch(() => null),
+      (stripe as any).tax.registrations.list({ status: "all", limit: 100 }, { stripeAccount: accountId }),
+    ]);
+    const registrations = (list?.data ?? []).map(registrationView)
+      .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name));
+    res.json({
+      connected: true,
+      providerConfigured: true,
+      headOffice: fromStripeAddress(settings?.head_office?.address),
+      registrations,
+      regions: TAX_REGIONS,
+    });
+  } catch (err) {
+    req.log.error({ err, sellerId }, "Failed to load tax registrations");
+    res.status(502).json({ error: "Failed to load tax registrations" });
+  }
+});
+
+router.post("/registrations", async (req, res) => {
+  const sellerId = getSellerId(req);
+  try {
+    const region = findTaxRegion(req.body?.region);
+    if (!region) {
+      res.status(400).json({ error: "Choose a region from the list", code: "INVALID_REGION" });
+      return;
+    }
+    if (!stripe) {
+      res.status(503).json({ error: "Stripe Tax is not configured", code: "STRIPE_UNAVAILABLE" });
+      return;
+    }
+    const accountId = await sellerStripeAccount(sellerId);
+    if (!accountId) {
+      res.status(409).json({ error: "Connect Stripe first", code: "NOT_CONNECTED" });
+      return;
+    }
+    const existing = await (stripe as any).tax.registrations.list({ status: "all", limit: 100 }, { stripeAccount: accountId });
+    const duplicate = (existing?.data ?? []).find((r: any) =>
+      regionOfRegistration(r).code === region.code && (r.status === "active" || r.status === "scheduled"));
+    if (duplicate) {
+      res.status(409).json({ error: `You already collect tax in ${region.name}`, code: "ALREADY_REGISTERED" });
+      return;
+    }
+    let created: any;
+    try {
+      created = await (stripe as any).tax.registrations.create(
+        registrationCreateParams(region),
+        { stripeAccount: accountId },
+      );
+    } catch (providerError: any) {
+      const rejection = stripeRejection(providerError);
+      if (rejection) {
+        res.status(409).json({ error: rejection.message, code: "REGISTRATION_REJECTED" });
+        return;
+      }
+      throw providerError;
+    }
+    res.status(201).json({ registration: registrationView(created) });
+  } catch (err) {
+    req.log.error({ err, sellerId }, "Failed to add tax registration");
+    res.status(502).json({ error: "Failed to add tax registration" });
+  }
+});
+
+router.put("/head-office", async (req, res) => {
+  const sellerId = getSellerId(req);
+  try {
+    const address = parseHeadOffice(req.body?.headOffice);
+    if (!address) {
+      res.status(400).json({ error: "Enter a complete head office address", code: "INVALID_HEAD_OFFICE" });
+      return;
+    }
+    if (!stripe) {
+      res.status(503).json({ error: "Stripe Tax is not configured", code: "STRIPE_UNAVAILABLE" });
+      return;
+    }
+    const accountId = await sellerStripeAccount(sellerId);
+    if (!accountId) {
+      res.status(409).json({ error: "Connect Stripe first", code: "NOT_CONNECTED" });
+      return;
+    }
+    try {
+      await (stripe as any).tax.settings.update(
+        { head_office: { address: toStripeAddress(address) } },
+        { stripeAccount: accountId },
+      );
+    } catch (providerError: any) {
+      const rejection = stripeRejection(providerError);
+      if (rejection) {
+        res.status(409).json({ error: rejection.message, code: "HEAD_OFFICE_REJECTED" });
+        return;
+      }
+      throw providerError;
+    }
+    res.json({ headOffice: address });
+  } catch (err) {
+    req.log.error({ err, sellerId }, "Failed to save head office");
+    res.status(502).json({ error: "Failed to save head office" });
   }
 });
 
