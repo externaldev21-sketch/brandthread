@@ -23,6 +23,15 @@ export function parseFitNote(raw: unknown): { fitNote: FitNote; fitScale: number
   return hit ? { fitNote: hit, fitScale: FIT_NOTES[hit] } : null;
 }
 
+/**
+ * Optional 1–5 detail rating (shipping speed, item as described). undefined =
+ * not given, null = invalid.
+ */
+export function parseDetailRating(raw: unknown): number | null | undefined {
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  return typeof raw === "number" && Number.isInteger(raw) && raw >= 1 && raw <= 5 ? raw : null;
+}
+
 export function reviewPhotoPrefix(buyerId: string): string {
   return `/objects/reviews/${buyerId.replace(/[^A-Za-z0-9_-]/g, "_")}/`;
 }
@@ -77,6 +86,8 @@ export function reviewExtras(r: Row, opts: { photos: string[]; helpfulCount: num
     sizeBought: r.sizeBought ?? r.size_bought ?? null,
     fitNote: r.fitNote ?? r.fit_note ?? null,
     fitScale: r.fitScale ?? r.fit_scale ?? null,
+    shipSpeedRating: r.shipSpeedRating ?? r.ship_speed_rating ?? null,
+    accuracyRating: r.accuracyRating ?? r.accuracy_rating ?? null,
     photos: opts.photos,
     helpfulCount: opts.helpfulCount,
     viewerHelpful: opts.viewerHelpful,

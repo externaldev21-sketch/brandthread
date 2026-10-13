@@ -231,7 +231,11 @@ function StarRating({ rating, size = 36, interactive = true, onRate }: {
   );
 }
 
-export interface ReviewExtras { photoUris: string[]; fitNote: FitOption | null }
+export interface ReviewExtras {
+  photoUris: string[]; fitNote: FitOption | null;
+  /** Optional detail ratings (0 = not rated). */
+  shipSpeedRating: number; accuracyRating: number;
+}
 
 // ─── Inline review rating sheet (Depop-pattern) ───────────────────────────────
 
@@ -249,10 +253,15 @@ function ReviewSheet({
   const [photos, setPhotos] = useState<string[]>([]);
   const [fit, setFit] = useState<FitOption | null>(null);
   const [photoNotice, setPhotoNotice] = useState<string | null>(null);
+  const [accuracyRating, setAccuracyRating] = useState(0);
+  const [shipSpeedRating, setShipSpeedRating] = useState(0);
 
   // Reset when sheet opens
   useEffect(() => {
-    if (visible) { setRating(0); setBody(''); setPhotos([]); setFit(null); setPhotoNotice(null); }
+    if (visible) {
+      setRating(0); setBody(''); setPhotos([]); setFit(null); setPhotoNotice(null);
+      setAccuracyRating(0); setShipSpeedRating(0);
+    }
   }, [visible]);
 
   async function pickPhotos() {
@@ -313,6 +322,22 @@ function ReviewSheet({
           <StarRating rating={rating} size={42} interactive onRate={setRating} />
           <Text style={[rvs.ratingLabel, { color: theme.muted }]}>{ratingLabel}</Text>
         </View>
+
+        {/* Rate the details (Etsy pattern): optional, shown once there's an overall rating */}
+        {rating > 0 && (
+          <View style={rvs.details} testID="review-detail-ratings">
+            <Text style={[rvs.detailsTitle, { color: theme.text }]}>Rate the details</Text>
+            {([
+              ['Item as described', accuracyRating, setAccuracyRating],
+              ['Shipping', shipSpeedRating, setShipSpeedRating],
+            ] as const).map(([label, value, set]) => (
+              <View key={label} style={rvs.detailRow} accessibilityLabel={label}>
+                <Text style={[rvs.detailLabel, { color: theme.text }]} numberOfLines={1}>{label}</Text>
+                <StarRating rating={value} size={24} interactive onRate={set} />
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Review text */}
         <TextInput
@@ -392,7 +417,7 @@ function ReviewSheet({
           </TouchableOpacity>
           <TouchableOpacity
             style={[rvs.submitBtn, { backgroundColor: theme.accent }, !canSubmit && rvs.submitBtnDisabled]}
-            onPress={canSubmit ? () => onSubmit(rating, body, { photoUris: photos, fitNote: fit }) : undefined}
+            onPress={canSubmit ? () => onSubmit(rating, body, { photoUris: photos, fitNote: fit, shipSpeedRating, accuracyRating }) : undefined}
             disabled={!canSubmit}
             activeOpacity={0.8}
             accessibilityRole="button"
@@ -424,6 +449,10 @@ const rvs = StyleSheet.create({
   title: { fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.3 },
   starsRow: { alignItems: 'center', marginBottom: SP.lg, gap: SP.sm },
   ratingLabel: { fontFamily: FONT.medium, fontSize: FS.sm, textAlign: 'center' },
+  details: { marginBottom: SP.md, gap: SP.xs },
+  detailsTitle: { fontFamily: FONT.semibold, fontSize: FS.base, marginBottom: SP.xs },
+  detailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, gap: SP.sm },
+  detailLabel: { flex: 1, fontFamily: FONT.regular, fontSize: FS.base },
   input: {
     minHeight: 88, borderRadius: RADIUS.md,
     borderWidth: 1, padding: SP.md,
@@ -810,6 +839,8 @@ export default function BuyerOrderDetailScreen() {
         body: body.trim() || undefined,
         ...(photos.length ? { photos } : {}),
         ...(extras.fitNote ? { fitNote: extras.fitNote } : {}),
+        ...(extras.shipSpeedRating > 0 ? { shipSpeedRating: extras.shipSpeedRating } : {}),
+        ...(extras.accuracyRating > 0 ? { accuracyRating: extras.accuracyRating } : {}),
       });
       setReviewSubmitted(true);
       setShowReviewSheet(false);
