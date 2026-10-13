@@ -12,7 +12,7 @@ the privacy answers below — do not let these two documents disagree).
 | App name (30 char max) | **Brandthread** | Matches `app.json` `expo.name`. |
 | Subtitle (30 char max, iOS only) | **Shop, sell & design streetwear** | Names all three sides of the app (buyer, seller, design studio) inside the limit. |
 | Promotional text (170 char max, iOS, editable without review) | "Brandthread is where independent labels drop new pieces, sellers run their whole shop, and buyers discover streetwear brands they'll actually wear." | Update per season/drop without a new build. |
-| Keywords (100 char max, comma-separated, iOS) | `streetwear,fashion marketplace,sell clothes,design studio,independent brand,drops,shop small` | No spaces after commas; every word counts toward the 100-char limit. |
+| Keywords (100 char max, comma-separated, iOS) | `clothing brand,drops,fashion,clothes,marketplace,indie,merch,hoodies,tees,live shopping,boutique` | No spaces after commas; every word counts toward the 100-char limit. Words already in the name or subtitle (Brandthread, shop, sell, design, streetwear) are indexed by Apple from there, so they're left out here (ASO, item 121). Mirrored in `artifacts/mobile/store.config.json`. |
 | Short description (80 char max, Google Play) | "Shop independent streetwear, sell your own label, and design in one app." | |
 
 ## Description (long form, both stores)

@@ -1,0 +1,34 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "copyright": "2026 Brandthread",
+    "categories": [
+      "SHOPPING",
+      "LIFESTYLE"
+    ],
+    "info": {
+      "en-US": {
+        "title": "Brandthread",
+        "subtitle": "Shop, sell & design streetwear",
+        "promoText": "Brandthread is where independent labels drop new pieces, sellers run their whole shop, and buyers discover streetwear brands they'll actually wear.",
+        "description": "Brandthread is the home for independent streetwear — as a shopper and as a seller.\n\nShop. Scroll a video-first feed of drops from independent labels, shop the post\nstraight from a video or photo, follow the sellers you like, and check out securely.\nSave pieces, track orders, and message sellers directly.\n\nSell. Set up your own storefront in minutes: list products, run inventory, go live,\nmessage customers, track orders and payouts, and grow with built-in analytics and\nmarketing tools.\n\nDesign. Brandthread's built-in Design Studio gives sellers AI-assisted mockups,\nbackground removal, and a canvas editor to turn an idea into a sellable product —\nwithout leaving the app.\n\nEvery account can switch between shopping and selling. Choose a look from twelve\nbuilt-in app themes. Your data is never sold, and account deletion is always one tap\naway in Settings.\n\nBrandthread is free to browse and buy. Selling plans and premium seller tools are\navailable as auto-renewing subscriptions, managed through your Apple/Google account.",
+        "keywords": [
+          "clothing brand",
+          "drops",
+          "fashion",
+          "clothes",
+          "marketplace",
+          "indie",
+          "merch",
+          "hoodies",
+          "tees",
+          "live shopping",
+          "boutique"
+        ],
+        "marketingUrl": "https://brandthread.app",
+        "supportUrl": "https://brandthread.app/help",
+        "privacyPolicyUrl": "https://brandthread.app/privacy"
+      }
+    }
+  }
+}
