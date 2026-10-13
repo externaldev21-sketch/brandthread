@@ -9,8 +9,10 @@ import {
   dropBroadcasts,
   products,
   productVariants,
+  orderItems,
 } from "@workspace/db";
-import { eq, desc, and, notExists, isNull, sql } from "drizzle-orm";
+import { eq, desc, and, notExists, isNull, isNotNull, notInArray, sql } from "drizzle-orm";
+import { attachPreOrderProgress } from "../lib/dropPreOrderProgress";
 import { finishListPage, parseListPage } from "../lib/pagination";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole } from "../middlewares/requireRole";
@@ -112,7 +114,30 @@ router.get("/", async (req, res) => {
     .orderBy(desc(drops.createdAt), desc(drops.id))
     .limit(page.limit + 1)
     .offset(page.offset);
-  res.json(finishListPage(res, page, fetched));
+  // "X pre-ordered of Y" (lib/dropPreOrderProgress.ts): paid units and units
+  // still in stock across each drop's products, one grouped query each.
+  const ownDropProducts = and(eq(products.ownerId, ownerId), isNotNull(products.dropId), isNull(products.deletedAt));
+  const [claimedRows, remainingRows] = await Promise.all([
+    db
+      .select({ dropId: products.dropId, units: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int` })
+      .from(orderItems)
+      .innerJoin(productVariants, eq(orderItems.variantId, productVariants.id))
+      .innerJoin(products, eq(productVariants.productId, products.id))
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(and(
+        ownDropProducts,
+        isNotNull(orders.paidAt),
+        notInArray(orders.status, ["cancelled", "refund_pending", "refunded"]),
+      ))
+      .groupBy(products.dropId),
+    db
+      .select({ dropId: products.dropId, units: sql<number>`coalesce(sum(${productVariants.stock}), 0)::int` })
+      .from(productVariants)
+      .innerJoin(products, eq(productVariants.productId, products.id))
+      .where(ownDropProducts)
+      .groupBy(products.dropId),
+  ]);
+  res.json(attachPreOrderProgress(finishListPage(res, page, fetched), claimedRows, remainingRows));
 });
 
 // POST /api/drops

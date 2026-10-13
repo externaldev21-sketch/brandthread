@@ -96,6 +96,7 @@ export const ProductCard = React.memo(function ProductCard({
   const { level: stockLevelKey, label: stockStatusText } = stockStatusLabel(stock, threshold);
   const stockLabel = stock === 0 ? 'Sold out' : stockStatusText;
   const flagColors = stockFlagColors(stockLevelKey === 'low_stock' ? 'low_stock' : 'out_of_stock', theme);
+  const soldOut = stock === 0 && product.status !== 'archived';
 
   const price = product.pricing.priceCents;
   const compare = product.pricing.compareAtPriceCents;
@@ -149,7 +150,7 @@ export const ProductCard = React.memo(function ProductCard({
               activeScale={0.98}
               accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatMoney(price)}`}
             >
-            <View style={{ height: imageHeight, width: '100%' }}>
+            <View style={{ height: imageHeight, width: '100%', opacity: soldOut ? 0.4 : 1 }}>
             {coverUri ? (
               <CachedImage source={{ uri: coverUri }} style={s.image} contentFit="cover" recyclingKey={product.id} fallbackLabel={product.name ?? ''} />
             ) : (
@@ -184,13 +185,14 @@ export const ProductCard = React.memo(function ProductCard({
               // clipped out of sight.
               <View style={s.chipBottomLeft} pointerEvents="box-none">
                 <PressableScale
-                  style={[s.chipBottomInner, { backgroundColor: flagColors.bg, borderColor: flagColors.border }]}
+                  style={[s.chipBottomInner, { backgroundColor: soldOut ? theme.text : flagColors.bg, borderColor: flagColors.border }]}
                   noMinHeight
                   onPress={() => onEditStock(product)}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  accessibilityLabel={`Edit stock for ${product.name}, ${stockLabel}`}
+                  accessibilityLabel={soldOut ? `Restock ${product.name}, sold out` : `Edit stock for ${product.name}, ${stockLabel}`}
+                  testID={soldOut ? 'product-card-restock' : undefined}
                 >
-                  <Text style={[s.chipBottomLabel, { color: flagColors.fg }]} numberOfLines={1}>{stockLabel}</Text>
+                  <Text style={[s.chipBottomLabel, { color: soldOut ? theme.background : flagColors.fg }]} numberOfLines={1}>{soldOut ? 'Sold out · Restock' : stockLabel}</Text>
                 </PressableScale>
               </View>
             )}

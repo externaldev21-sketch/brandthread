@@ -42,6 +42,7 @@ import { useReportBottomInset } from '@/components/analytics/InsightFrame';
 import { SellerDashboardRangePills } from '@/components/SellerDashboardRangePills';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { previousPeriodLabel } from '@/components/analytics/InsightCharts';
+import { analyticsSummary } from '@/lib/analyticsSummary';
 import { DEFAULT_INSIGHT_RANGE, INSIGHT_RANGES, type InsightRange } from '@/services/sellerInsightsService';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_ANALYTICS_SPOTLIGHT } from '@/lib/firstRunTips/content';
@@ -168,6 +169,12 @@ export default function AnalyticsScreen() {
   const chartPoints = bars.map(b => ({ label: b.label, value: b.cents }));
   const hasDelta = summary.visitsChangePct !== undefined || summary.revenueChangePct !== undefined;
   const comparedTo = hasDelta ? previousPeriodLabel(range) : null;
+  const summarySentence = analyticsSummary({
+    range,
+    revenueCents: summary.revenueCents,
+    revenueChangePct: summary.revenueChangePct,
+    visits: summary.visits,
+  });
 
   return (
     <View style={{ flex: 1 }}>
@@ -188,6 +195,13 @@ export default function AnalyticsScreen() {
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
           {/* ── Range (same pills as the Dashboard) ───────────────────────── */}
           <SellerDashboardRangePills range={range} onRangeChange={setRange} theme={theme} />
+
+          {/* ── One-sentence summary (S5 #125) ─────────────────────────────── */}
+          {summarySentence ? (
+            <Text style={[s.summarySentence, { color: colors.foreground }]} testID="analytics-summary-sentence">
+              {summarySentence}
+            </Text>
+          ) : null}
 
           {/* ── Summary stats ──────────────────────────────────────────────── */}
           {/* Each key metric opens its report (Shopify Analytics). */}
@@ -250,6 +264,7 @@ export default function AnalyticsScreen() {
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:  { flex: 1, backgroundColor: 'transparent' },
+  summarySentence: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 21, marginBottom: SP.md },
   content: { paddingTop: SP.md },
 
   statsRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md },
