@@ -59,29 +59,47 @@ export interface FirstRunTipsLocalState {
   skipAll: boolean;
 }
 
-/** Fast, offline-safe read used to paint the very first frame. */
+/**
+ * Fast, offline-safe read used to paint the very first frame. Tips seen while
+ * the account id was still loading (stored under 'anon') count for the
+ * account too, so a null → real userId switch can't show a tip twice.
+ */
 export async function readLocalFirstRunTipsState(userId: string | null | undefined): Promise<FirstRunTipsLocalState> {
   const [seenIds, skipAll] = await Promise.all([readLocalSeenSet(userId), readLocalSkipAll(userId)]);
+  if (userId) {
+    const [anonSeen, anonSkip] = await Promise.all([readLocalSeenSet(null), readLocalSkipAll(null)]);
+    anonSeen.forEach((id) => seenIds.add(id));
+    return { seenIds, skipAll: skipAll || anonSkip };
+  }
   return { seenIds, skipAll };
 }
 
 /**
- * Pulls the real server state (source of truth) and reconciles it into the
- * local cache, returning the merged result. Falls back silently to whatever
- * is already local on any network/API failure — a first-run tip must never
+ * Pulls the server state and merges it with the local cache. Seen-state only
+ * ever grows: the result is server ∪ local, so a server that missed a
+ * markSeen (offline, no auth in a preview, a race) can't bring a tip back.
+ * Whatever this device has that the server lacks is re-sent. Falls back
+ * silently to the local state on any failure; a first-run tip must never
  * hard-block a screen on a failed fetch.
  */
 export async function syncFirstRunTipsFromServer(
   userId: string | null | undefined,
   api: FirstRunTipsApi,
 ): Promise<FirstRunTipsLocalState> {
+  const local = await readLocalFirstRunTipsState(userId);
   try {
-    const { seenTipIds, skipAll } = await api.firstRunTips.get();
-    const seenIds = new Set(seenTipIds);
+    const server = await api.firstRunTips.get();
+    const serverSeen = new Set(server.seenTipIds);
+    const seenIds = new Set([...serverSeen, ...local.seenIds]);
+    const skipAll = server.skipAll || local.skipAll;
+    for (const id of local.seenIds) {
+      if (!serverSeen.has(id)) void api.firstRunTips.markSeen(id).catch(() => {});
+    }
+    if (local.skipAll && !server.skipAll) void api.firstRunTips.skipAll().catch(() => {});
     await Promise.all([writeLocalSeenSet(userId, seenIds), writeLocalSkipAll(userId, skipAll)]);
     return { seenIds, skipAll };
   } catch {
-    return readLocalFirstRunTipsState(userId);
+    return local;
   }
 }
 
@@ -119,7 +137,11 @@ export async function replayAllTips(
   userId: string | null | undefined,
   api?: FirstRunTipsApi,
 ): Promise<FirstRunTipsLocalState> {
-  await Promise.all([writeLocalSeenSet(userId, new Set()), writeLocalSkipAll(userId, false)]);
+  await Promise.all([
+    writeLocalSeenSet(userId, new Set()), writeLocalSkipAll(userId, false),
+    // The pre-sign-in record would otherwise keep counting as seen.
+    writeLocalSeenSet(null, new Set()), writeLocalSkipAll(null, false),
+  ]);
   if (api) {
     try { await api.firstRunTips.reset(); } catch { /* local reset still took effect */ }
   }

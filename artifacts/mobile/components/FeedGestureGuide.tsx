@@ -1,10 +1,11 @@
 import { radius as ControlRadius } from '@/constants/radii';
 /**
  * FeedGestureGuide — first-time buyer coach screen for the video feed.
- * Modeled on Instagram's "Watching stories" coach mark, but on an opaque
- * solid-black surface (no translucent overlay): a title and subtitle, four
- * animated gesture rows, and a "Keep watching" button. Any tap dismisses it; shown once per account
- * (see FEED_GESTURE_GUIDE_SEEN_KEY / dismissFeedGestureGuide below).
+ * Modeled on Instagram's "Watching stories" coach mark: a near-opaque black
+ * backdrop (nothing behind it reads through), a title and subtitle, four
+ * animated gesture rows, and a white "Keep watching" button. Any tap
+ * dismisses it. Shown once per account: the feed marks it seen the moment it
+ * appears (lib/feedGestureGuideStorage.ts).
  */
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -121,13 +122,10 @@ export function FeedGestureGuide({ visible, onDismiss }: { visible: boolean; onD
       accessibilityViewIsModal
       testID="feed-gesture-guide"
     >
-      {/* Opaque solid-black surface (no blur/dim over the feed — QA-0438/
-          1112/1113). Tapping anywhere still dismisses; the explicit
-          "Keep watching" button below is the visible dismiss affordance. */}
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.dim]} />
-      <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} accessibilityLabel="Tap to keep watching" />
+      {/* Tap anywhere dismisses; "Keep watching" is the visible button. */}
+      <Pressable style={[StyleSheet.absoluteFill, styles.backdrop]} onPress={onDismiss} accessibilityLabel="Tap to keep watching" />
       <View style={styles.content} pointerEvents="box-none">
-        <View pointerEvents="none" style={styles.inner}>
+        <View style={styles.inner} pointerEvents="none">
           <Text style={styles.title}>Watching Threads</Text>
           <Text style={styles.subtitle}>A few gestures to get you moving</Text>
 
@@ -165,7 +163,8 @@ export function FeedGestureGuide({ visible, onDismiss }: { visible: boolean; onD
 
 const styles = StyleSheet.create({
   root: { zIndex: 9999, elevation: 9999 },
-  dim: { backgroundColor: 'rgba(0,0,0,0.8)' },
+  // Near-opaque so the feed behind ("No posts yet", "Shop products") never reads through.
+  backdrop: { backgroundColor: 'rgba(0,0,0,0.94)' },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
   inner: { width: '100%', alignItems: 'center' },
   title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.xxl, textAlign: 'center' },
