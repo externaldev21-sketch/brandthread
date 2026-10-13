@@ -207,11 +207,32 @@ vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({
   useTabBarMetrics: () => ({ occupiedHeight: 90 }),
 }));
 
-vi.mock('@/components/motion/SheetRise', () => {
+// The product action, price, filter and sort sheets run on the shared sheet
+// system. Like the RN Modal mock above, these render their content
+// regardless of `visible`, so the rows stay reachable in the tree.
+vi.mock('@/components/ui/BottomSheet', () => {
   const React = require('react') as typeof import('react');
   return {
-    SheetRise: (props: Record<string, unknown>) =>
-      React.createElement('View', props, props.children as React.ReactNode),
+    Sheet: ({ title, testID, children }: { title?: string; testID?: string; children?: React.ReactNode }) =>
+      React.createElement('View', { testID }, title ? React.createElement('Text', null, title) : null, children),
+  };
+});
+
+vi.mock('@/components/ui/OptionSheet', () => {
+  const React = require('react') as typeof import('react');
+  return {
+    OptionSheet: ({ title, testID, options, onSelect }: {
+      title: string;
+      testID?: string;
+      options: { id: string; label: string }[];
+      onSelect: (id: string) => void;
+    }) =>
+      React.createElement(
+        'View',
+        { testID },
+        React.createElement('Text', null, title),
+        options.map(o => React.createElement('TouchableOpacity', { key: o.id, accessibilityLabel: o.label, onPress: () => onSelect(o.id) })),
+      ),
   };
 });
 

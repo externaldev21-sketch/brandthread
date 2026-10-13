@@ -19,7 +19,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  ActivityIndicator, Alert, Image, Modal, Platform,
+  ActivityIndicator, Alert, Image, Platform,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
@@ -28,7 +28,6 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -37,6 +36,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
 import { radius } from '@/constants/radii';
+import { Sheet, SHEET_GUTTER } from '@/components/ui/BottomSheet';
 
 interface SellerProductRow {
   id: string;
@@ -170,7 +170,6 @@ export default function SellerDropCreate() {
   const api = useApi();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const topInset = useHeaderTopInset();
   const { theme } = useAppTheme();
   const { dropId } = useLocalSearchParams<{ dropId?: string }>();
   const isEdit = !!dropId;
@@ -636,35 +635,34 @@ export default function SellerDropCreate() {
         </ScrollView>
       </View>
 
-      <Modal visible={tzPickerOpen} animationType="slide" onRequestClose={() => setTzPickerOpen(false)}>
-        <View style={[styles.root, { backgroundColor: theme.background, paddingTop: topInset }]}>
-          <View style={styles.tzHeader}>
-            <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg }}>Choose timezone</Text>
-            <TouchableOpacity onPress={() => setTzPickerOpen(false)}>
-              <Feather name="x" size={22} color={theme.text} />
-            </TouchableOpacity>
-          </View>
+      <Sheet
+        visible={tzPickerOpen}
+        onClose={() => setTzPickerOpen(false)}
+        title="Choose timezone"
+        padded={false}
+        testID="drop-timezone-sheet"
+      >
           <TextInput
-            style={[styles.input, { margin: SP.md, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }, WEB_INPUT_RESET]}
+            style={[styles.input, { marginHorizontal: SHEET_GUTTER, marginBottom: SP.sm, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }, WEB_INPUT_RESET]}
             value={tzFilter}
             onChangeText={setTzFilter}
             placeholder="Search timezones…"
             placeholderTextColor={theme.muted}
+            accessibilityLabel="Search timezones"
           />
-          <ScrollView>
             {filteredZones.map(z => (
               <TouchableOpacity
                 key={z}
                 style={[styles.tzRow, { borderColor: theme.border }]}
                 onPress={() => { setTimezone(z); setTzPickerOpen(false); setTzFilter(''); }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: z === timezone }}
               >
                 <Text style={{ color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm }}>{z}</Text>
                 {z === timezone && <Feather name="check" size={16} color={theme.accent} />}
               </TouchableOpacity>
             ))}
-          </ScrollView>
-        </View>
-      </Modal>
+      </Sheet>
     </KeyboardAvoidingView>
   );
 }
@@ -691,8 +689,7 @@ const styles = StyleSheet.create({
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   saveBtn: { minHeight: 52, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', marginTop: SP.sm },
   secondaryBtn: { flexDirection: 'row', minHeight: 46, borderWidth: 1, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  tzHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  tzRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: 14, borderBottomWidth: 1 },
+  tzRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SHEET_GUTTER, paddingVertical: 14, borderBottomWidth: 1 },
   chipRow: { flexDirection: 'row', gap: 8, paddingRight: SP.md },
   chip: { borderWidth: 1, borderRadius: radius.md, paddingHorizontal: 14, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
   chipText: { fontFamily: FONT.semibold, fontSize: FS.sm },

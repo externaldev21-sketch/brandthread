@@ -7,26 +7,22 @@
  * merged onboarding PR) — no duplicate task list or completion logic.
  */
 import React, { useCallback, useMemo } from 'react';
-import {
-  Modal, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Pressable,
-} from 'react-native';
-import Animated from 'react-native-reanimated';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { withOrigin } from '@/lib/navigation/flowOrigin';
-import { useSheetTransition } from '@/components/ui/BottomSheet';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import {
   SetupState, SetupTask, SetupTaskId,
   completionPercent, nextTask, completedRequiredTaskCount, requiredTaskCount,
   markSetupStarted, dismissWelcome, skipTask,
 } from '@/lib/setupStore';
 import SetupProgressRing from '@/components/SetupProgressRing';
-import { radius } from '@/constants/radii';
 
 export default function SetupWalkthroughSheet({
   visible,
@@ -43,22 +39,7 @@ export default function SetupWalkthroughSheet({
 }) {
   const { theme } = useAppTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const s = useMemo(() => createStyles(theme), [theme]);
-
-  // Backdrop opacity and sheet translateY animate on their own timeline
-  // (reanimated, UI thread) instead of both riding RN `Modal`'s single
-  // `animationType="slide"` transform: that transform slides the WHOLE
-  // modal subtree — backdrop included — as one block, so mid-close a
-  // shrinking sliver of the still-partially-onscreen, still-opaque backdrop
-  // sweeps across the very bottom of the viewport and paints straight over
-  // the floating tab bar (a separate, always-on-top layer the sliding
-  // Modal portal has no relationship to) for a frame or two — the "thin
-  // dark bar flashing over the tab bar" bug. `useSheetTransition` is the
-  // same shared engine `components/ui/BottomSheet.tsx` uses: the backdrop
-  // only ever fades in place, never moves, so nothing but the sheet card
-  // itself is ever in transit.
-  const { modalVisible, sheetStyle, backdropStyle } = useSheetTransition(visible, onClose);
 
   const pct = completionPercent(setupState);
   const active = nextTask(setupState);
@@ -83,7 +64,7 @@ export default function SetupWalkthroughSheet({
   }, [onClose, onSetupStateChange, router, userId]);
 
   const handleSkip = useCallback((task: SetupTask) => {
-    Alert.alert(
+    showActionSheet(
       `Skip "${task.label}"?`,
       'You can always come back to this later from the setup checklist.',
       [
@@ -101,130 +82,86 @@ export default function SetupWalkthroughSheet({
   }, [onSetupStateChange, userId]);
 
   return (
-    <Modal visible={modalVisible} animationType="none" transparent onRequestClose={handleClose}>
-      <View style={s.root}>
-        <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-            style={StyleSheet.absoluteFill}
-            onPress={handleClose}
-          >
-            <View style={[StyleSheet.absoluteFill, s.backdropFill]} />
-          </Pressable>
-        </Animated.View>
-        <Animated.View style={[s.sheet, { paddingBottom: insets.bottom + SP.lg }, sheetStyle]}>
-          <View style={s.grabber} />
+    <Sheet
+      visible={visible}
+      onClose={() => { void handleClose(); }}
+      title="Let's set up your store"
+      testID="setup-walkthrough-sheet"
+      primaryAction={{
+        label: active ? `Continue: ${active.label}` : 'Done',
+        onPress: () => { void (active ? openTask(active) : handleClose()); },
+      }}
+      secondaryAction={{ label: 'Continue setup later', onPress: () => { void handleClose(); }, variant: 'secondary' }}
+    >
+      <View style={s.header}>
+        <SetupProgressRing
+          percent={pct}
+          trackColor={theme.border}
+          fillColor={theme.accent}
+          textColor={theme.text}
+        />
+        <Text style={s.subtitle}>
+          {done} of {total} steps complete
+          {active ? ` · Next: ${active.label}` : ''}
+        </Text>
+      </View>
 
-          <View style={s.header}>
-            <SetupProgressRing
-              percent={pct}
-              trackColor={theme.border}
-              fillColor={theme.accent}
-              textColor={theme.text}
-            />
+      {setupState.tasks.map((task) => {
+        const isActive = active?.id === task.id;
+        const isSkipped = task.skipped && !task.completed;
+        return (
+          <TouchableOpacity
+            key={task.id}
+            activeOpacity={0.85}
+            onPress={() => openTask(task)}
+            style={[
+              s.row,
+              task.completed && s.rowDone,
+              isActive && s.rowActive,
+            ]}
+          >
+            <View style={[
+              s.iconWrap,
+              // Monochrome only: a completed step is told apart by the
+              // solid accent fill + checkmark glyph, never a green tint
+              // (this screen has none of the app's 3 allowed color
+              // accents — LIVE-red, end-call-red, Thread Cash green).
+              (task.completed || isActive) && { backgroundColor: theme.accent },
+            ]}>
+              <Feather
+                name={task.completed ? 'check' : (task.icon as keyof typeof Feather.glyphMap)}
+                size={ICON.sm}
+                color={task.completed || isActive ? theme.onAccent : theme.muted}
+              />
+            </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.title}>Let's set up your store</Text>
-              <Text style={s.subtitle}>
-                {done} of {total} steps complete
-                {active ? ` · Next: ${active.label}` : ''}
+              <Text style={[s.rowLabel, (task.completed || isSkipped) && s.rowLabelMuted]} numberOfLines={1}>
+                {task.label}{task.optional ? ' (optional)' : ''}
+              </Text>
+              <Text style={s.rowDesc} numberOfLines={1}>
+                {isSkipped ? 'Skipped' : task.description}
               </Text>
             </View>
-            <TouchableOpacity
-              onPress={handleClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityRole="button"
-              accessibilityLabel="Close setup walkthrough"
-            >
-              <Feather name="x" size={ICON.md} color={theme.muted} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            style={s.list}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: SP.sm }}
-          >
-            {setupState.tasks.map((task) => {
-              const isActive = active?.id === task.id;
-              const isSkipped = task.skipped && !task.completed;
-              return (
-                <TouchableOpacity
-                  key={task.id}
-                  activeOpacity={0.85}
-                  onPress={() => openTask(task)}
-                  style={[
-                    s.row,
-                    task.completed && s.rowDone,
-                    isActive && s.rowActive,
-                  ]}
-                >
-                  <View style={[
-                    s.iconWrap,
-                    // Monochrome only: a completed step is told apart by the
-                    // solid accent fill + checkmark glyph, never a green tint
-                    // (this screen has none of the app's 3 allowed color
-                    // accents — LIVE-red, end-call-red, Thread Cash green).
-                    (task.completed || isActive) && { backgroundColor: theme.accent },
-                  ]}>
-                    <Feather
-                      name={task.completed ? 'check' : (task.icon as keyof typeof Feather.glyphMap)}
-                      size={ICON.sm}
-                      color={task.completed || isActive ? theme.onAccent : theme.muted}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.rowLabel, (task.completed || isSkipped) && s.rowLabelMuted]} numberOfLines={1}>
-                      {task.label}{task.optional ? ' (optional)' : ''}
-                    </Text>
-                    <Text style={s.rowDesc} numberOfLines={1}>
-                      {isSkipped ? 'Skipped' : task.description}
-                    </Text>
-                  </View>
-                  {!task.completed && (
-                    <TouchableOpacity
-                      onPress={() => handleSkip(task)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Text style={s.skip}>Skip</Text>
-                    </TouchableOpacity>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          <TouchableOpacity style={s.primaryBtn} onPress={() => (active ? openTask(active) : handleClose())}>
-            <Text style={s.primaryBtnText}>
-              {active ? `Continue: ${active.label}` : 'Done'}
-            </Text>
+            {!task.completed && (
+              <TouchableOpacity
+                onPress={() => handleSkip(task)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Skip ${task.label}`}
+              >
+                <Text style={s.skip}>Skip</Text>
+              </TouchableOpacity>
+            )}
           </TouchableOpacity>
-          <TouchableOpacity style={s.secondaryBtn} onPress={handleClose}>
-            <Text style={s.secondaryBtnText}>Continue setup later</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
-    </Modal>
+        );
+      })}
+    </Sheet>
   );
 }
 
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  root: { flex: 1, justifyContent: 'flex-end' },
-  backdropFill: { backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-    borderWidth: 1, borderColor: theme.border, borderBottomWidth: 0,
-    paddingHorizontal: SP.lg, paddingTop: SP.sm, maxHeight: '86%',
-  },
-  grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, marginBottom: SP.md },
-  header: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginBottom: SP.lg },
-  title: { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.3 },
-  subtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
-  list: { flexGrow: 0 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginBottom: SP.md },
+  subtitle: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
     paddingVertical: SP.sm, paddingHorizontal: SP.sm, borderRadius: RADIUS.md,
@@ -240,11 +177,4 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   rowLabelMuted: { textDecorationLine: 'line-through', color: theme.muted },
   rowDesc: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
   skip: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.subtle },
-  primaryBtn: {
-    marginTop: SP.md, height: 50, borderRadius: radius.md, backgroundColor: theme.accent,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  primaryBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.onAccent },
-  secondaryBtn: { marginTop: SP.sm, height: 44, alignItems: 'center', justifyContent: 'center' },
-  secondaryBtnText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
 });

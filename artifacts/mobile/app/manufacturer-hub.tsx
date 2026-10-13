@@ -6,12 +6,12 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator, Image,
+  StyleSheet, Alert, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator, Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Sheet } from '@/components/ui/BottomSheet';
 import * as Haptics from 'expo-haptics';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
@@ -27,7 +27,7 @@ import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { ListSkeleton } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
+  BrandthreadCard, GradientCard,
   IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState,
   StatCard, HapticSwitch,} from '@/components/BrandthreadUI';
 import {
@@ -871,7 +871,7 @@ const makeCard = (theme: AppThemePreset) => StyleSheet.create({
   profileBtnText:{ fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.onAccent },
 });
 
-// ─── Filter Modal ─────────────────────────────────────────────────────────────
+// ─── Filter sheet ──────────────────────────────────────────────────────────────
 
 function FilterModal({ visible, filters, onApply, onClose }: {
   visible: boolean;
@@ -884,7 +884,6 @@ function FilterModal({ visible, filters, onApply, onClose }: {
   const [local, setLocal] = useState<Filters>(filters);
   const [facets, setFacets] = useState<DirectoryFacets | null>(null);
   const [facetError, setFacetError] = useState(false);
-  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!visible) return;
@@ -916,17 +915,14 @@ function FilterModal({ visible, filters, onApply, onClose }: {
     setLocal(prev => ({ ...prev, [key]: prev[key] === val ? (typeof val === 'number' ? undefined : '') : val }));
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[fm.root, { paddingBottom: insets.bottom + SP.md }]}>
-        <View style={fm.handle} />
-        <View style={fm.header}>
-          <Text style={fm.title}>Filter Manufacturers</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Feather name="x" size={ICON.md} color={theme.muted} />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={fm.scroll}>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Filter manufacturers"
+      testID="manufacturer-filter-sheet"
+      primaryAction={{ label: 'Apply filters', onPress: () => onApply(local) }}
+      secondaryAction={{ label: 'Reset', onPress: () => setLocal(DEFAULT_FILTERS), variant: 'secondary' }}
+    >
 
           <Text style={fm.sectionLabel}>Sort by</Text>
           <View style={fm.chipRow}>
@@ -956,21 +952,21 @@ function FilterModal({ visible, filters, onApply, onClose }: {
             ))}
           </View>
 
-          <Text style={fm.sectionLabel}>Min Order Qty (MOQ)</Text>
+          <Text style={fm.sectionLabel}>Minimum order quantity</Text>
           <View style={fm.chipRow}>
             {[{ label: '≤25', val: 25 }, { label: '≤50', val: 50 }, { label: '≤100', val: 100 }, { label: '≤200', val: 200 }, { label: 'Any', val: undefined }].map(({ label, val }) => (
               <FilterChip key={label} label={label} active={local.moqMax === val} onPress={() => set('moqMax', val)} />
             ))}
           </View>
 
-          <Text style={fm.sectionLabel}>Unit Price</Text>
+          <Text style={fm.sectionLabel}>Unit price</Text>
           <View style={fm.chipRow}>
             {[{ label: '≤$10', val: 10 }, { label: '≤$20', val: 20 }, { label: '≤$35', val: 35 }, { label: 'Any', val: undefined }].map(({ label, val }) => (
               <FilterChip key={label} label={label} active={local.unitPriceMaxCents === (val === undefined ? undefined : val * 100)} onPress={() => set('unitPriceMaxCents', val === undefined ? undefined : val * 100)} />
             ))}
           </View>
 
-          <Text style={fm.sectionLabel}>Lead Time</Text>
+          <Text style={fm.sectionLabel}>Lead time</Text>
           <View style={fm.chipRow}>
             {[{ label: '≤14 days', val: 14 }, { label: '≤30 days', val: 30 }, { label: '≤45 days', val: 45 }, { label: 'Any', val: undefined }].map(({ label, val }) => (
               <FilterChip key={label} label={label} active={local.leadTimeDaysMax === val} onPress={() => set('leadTimeDaysMax', val)} />
@@ -999,31 +995,16 @@ function FilterModal({ visible, filters, onApply, onClose }: {
             />
           </View>
 
-        </ScrollView>
-
-        <View style={[fm.footer, { paddingBottom: SP.md + insets.bottom }]}>
-          <SecondaryButton label="Reset" onPress={() => setLocal(DEFAULT_FILTERS)} style={fm.resetBtn} small />
-          <PrimaryButton label="Apply filters" onPress={() => onApply(local)} style={fm.applyBtn} />
-        </View>
-      </View>
-    </Modal>
+    </Sheet>
   );
 }
 
 const makeFm = (theme: AppThemePreset) => StyleSheet.create({
-  root:        { flex: 1, backgroundColor: theme.surfaceGlass },
-  handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginTop: SP.sm },
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.md },
-  title:       { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },
-  scroll:      { paddingHorizontal: SP.md, paddingBottom: SP.lg },
   sectionLabel:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, marginTop: SP.md, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
   chipRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   switchRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.lg, paddingVertical: SP.sm },
   switchLabel: { fontSize: FS.base, fontFamily: FONT.medium, color: theme.text },
   hint:        { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.subtle },
-  footer:      { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.md, borderTopWidth: 1, borderTopColor: theme.border },
-  resetBtn:    { flex: 1 },
-  applyBtn:    { flex: 2 },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
