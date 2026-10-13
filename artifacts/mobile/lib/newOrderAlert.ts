@@ -1,13 +1,54 @@
 /**
- * Seller: a new order arrives. In the foreground the in-app banner plays the
- * success haptic (lib/haptics.ts `newOrder`); the push itself carries the
- * order chime, or the standard sound when Settings › Sounds & haptics › New
- * order sound is off (stored server-side as `new_order_sound`, applied in
- * api-server lib/push.ts so background pushes respect it too).
+ * Foreground feedback for an incoming push (components/notifications/
+ * NotificationBanner). New orders get the bundled order sound once plus one
+ * success haptic, unless the seller turned "New order sound" off — the server
+ * then flags the push `silent` and the banner stays quiet.
  */
-export const NEW_ORDER_TYPE = 'new_order_received';
-export const NEW_ORDER_SOUND_PREF = 'new_order_sound';
+import { Platform } from 'react-native';
+import { hapticLight, hapticSuccess } from '@/lib/haptics';
 
-export function isNewOrderNotification(data: Record<string, unknown> | null | undefined): boolean {
-  return data?.type === NEW_ORDER_TYPE;
+export const NEW_ORDER_PUSH_TYPE = 'new_order_received';
+
+export type BannerFeedback = 'none' | 'tap' | 'newOrder';
+
+export function isNewOrderPush(data: Record<string, unknown> | null | undefined): boolean {
+  return data?.type === NEW_ORDER_PUSH_TYPE;
+}
+
+/** Which feedback a foreground banner gives for this push's data. */
+export function bannerFeedbackFor(data: Record<string, unknown> | null | undefined): BannerFeedback {
+  if (!isNewOrderPush(data)) return 'tap';
+  return data?.silent === true ? 'none' : 'newOrder';
+}
+
+async function playNewOrderSound(): Promise<void> {
+  const [{ createAudioPlayer }, { NEW_ORDER_SOUND }] = await Promise.all([
+    import('expo-audio'), import('@/lib/newOrderSoundSource'),
+  ]);
+  const player = createAudioPlayer(NEW_ORDER_SOUND);
+  const sub = player.addListener('playbackStatusUpdate', (status: { didJustFinish?: boolean }) => {
+    if (!status.didJustFinish) return;
+    sub.remove();
+    player.remove();
+  });
+  player.play();
+}
+
+/** Play the banner's feedback. Never throws. */
+export function playBannerFeedback(data: Record<string, unknown> | null | undefined): void {
+  if (Platform.OS === 'web') return;
+  const feedback = bannerFeedbackFor(data);
+  if (feedback === 'none') return;
+  if (feedback === 'tap') {
+    hapticLight();
+    return;
+  }
+  hapticSuccess();
+  // Lazy so the audio module only loads when a new order actually arrives.
+  void playNewOrderSound().catch(() => {});
+}
+
+export const NEW_ORDER_TYPE = NEW_ORDER_PUSH_TYPE;
+export const NEW_ORDER_SOUND_PREF = "new_order_sound";
+export function isNewOrderNotification(data: Record<string, unknown> | null | undefined): boolean { return isNewOrderPush(data);
 }

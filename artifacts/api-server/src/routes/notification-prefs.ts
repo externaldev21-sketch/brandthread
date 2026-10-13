@@ -56,6 +56,7 @@ const BUYER_DEFAULTS = {
 };
 const SELLER_DEFAULTS = {
   new_orders: true,
+  new_order_sound: true,
   production_milestones: true,
   payout_confirmations: true,
   customer_messages: true,

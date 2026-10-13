@@ -86,6 +86,7 @@ import { seedDetailOnInteraction, type DetailSeedSnapshot } from '@/lib/seedDeta
 
 import { groupByLocalDate } from '@/lib/groupByLocalDate';
 
+import { groupOrdersByRecency } from '@/lib/groupOrdersByRecency';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
@@ -177,9 +178,9 @@ function computeStats(orders: Order[]): OrderStats {
   };
 }
 
-/** Group a sorted order list into date-labelled sections. */
+/** Group a sorted order list into Today / This week / Earlier sections. */
 function groupByDate(orders: Order[]): OrderSection[] {
-  return groupByLocalDate(orders);
+  return groupOrdersByRecency(orders);
 }
 
 // ─── API → Order adapter ──────────────────────────────────────────────────────

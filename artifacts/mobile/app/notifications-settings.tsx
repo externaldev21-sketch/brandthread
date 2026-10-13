@@ -52,6 +52,17 @@ import { FONT } from '@/lib/theme';
 
 import { PAUSE_OPTIONS, pagesFor, pausedUntilLabel, type Role } from '@/lib/notificationSettingsModel';
 
+const SELLER_ROWS: NotifRow[] = [
+  { key: 'new_orders',             icon: 'shopping-bag',   label: 'New orders',             description: 'A customer places an order' },
+  { key: 'new_order_sound',        icon: 'volume-2',       label: 'New order sound',        description: 'Sound and vibration for each new order' },
+  { key: 'production_milestones',  icon: 'package',        label: 'Production milestones',  description: 'Sampling and production' },
+  { key: 'payout_confirmations',   icon: 'credit-card',    label: 'Payout confirmations',   description: 'Payout sent or delayed' },
+  { key: 'customer_messages',      icon: 'message-circle', label: 'Customer messages',      description: 'Messages from customers' },
+  { key: 'disputes',               icon: 'alert-triangle', label: 'Disputes',               description: 'Disputes and case updates' },
+  { key: 'inventory_alerts',       icon: 'archive',        label: 'Inventory alerts',       description: 'Low and out of stock' },
+  { key: 'seller_announcements', icon: 'bell', label: 'Brand announcements', description: 'Pushes that brands you follow send to their followers' },
+  { key: 'subscription_trial',     icon: 'clock',          label: 'Trial reminders',        description: 'Before your trial converts' },
+];
 
 
 export default function NotificationsSettingsScreen() {

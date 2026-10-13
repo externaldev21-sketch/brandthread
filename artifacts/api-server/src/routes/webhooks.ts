@@ -79,6 +79,7 @@ import { ORDER_SOUND_FILE, sendPushToUser, stableNotificationId } from "../lib/p
 import { nextOrderNumber } from "../lib/orderNumber";
 import { notifyStockLevelChanged } from "../lib/stockNotifications";
 import { profilesById } from "../lib/safety";
+import { NEW_ORDER_PUSH_SOUND } from "../lib/newOrderPushSound";
 import { connectReadiness } from "./manufacturer-connect";
 import { recordPaidPhysicalOrder } from "../lib/sellerTaxLedger";
 import { loyaltyAppliedCents as loyaltyShareCents, sellerFundedDiscountCents } from "../lib/money/loyaltyFunding";

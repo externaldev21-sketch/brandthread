@@ -357,6 +357,14 @@ export function isShipFromError(err: unknown): err is { code: 'SHIP_FROM_REQUIRE
   return code === 'SHIP_FROM_REQUIRED' || code === 'SHIP_FROM_IS_BUYER';
 }
 
+/** Newest active outbound label file for an order, or null when there is none. */
+export async function getPrintableLabelUrl(orderId: string): Promise<string | null> {
+  const result = await serviceRequest(`/api/shipping-labels/${encodeURIComponent(orderId)}/printable`) as {
+    label: { labelUrl: string | null } | null;
+  };
+  return result?.label?.labelUrl ?? null;
+}
+
 export async function getShippingRates(orderId: string, parcel: {
   itemIds?: string[];
   /** Omit to ship from the seller's primary location (Settings → Locations). */

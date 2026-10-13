@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync, existsSync } from "node:fs";
+import path from "node:path";
 import {
+  applyNewOrderSoundPreference,
   buildExpoPushMessages,
   isValidTimeZone,
+  NEW_ORDER_PUSH_SOUND,
+  SILENT_ORDERS_CHANNEL_ID,
   isWithinQuietHours,
   normalizePushEventCategory,
   preferenceKey,
@@ -52,12 +57,41 @@ describe("push notification delivery contract", () => {
     expect(buildExpoPushMessages([{ token: "ExponentPushToken[order]" }], {
       title: "New order! 🛍️",
       body: "Order ready to review",
-      sound: "order_received.wav",
+      sound: NEW_ORDER_PUSH_SOUND,
       channelId: "orders",
     })[0]).toMatchObject({
-      sound: "order_received.wav",
+      sound: NEW_ORDER_PUSH_SOUND,
       channelId: "orders",
     });
+  });
+
+  it("names a sound file that the mobile app actually bundles", () => {
+    const mobile = path.resolve(__dirname, "../../../mobile");
+    expect(NEW_ORDER_PUSH_SOUND).toBe("order_received.wav");
+    expect(existsSync(path.join(mobile, "assets/sounds", NEW_ORDER_PUSH_SOUND))).toBe(true);
+    expect(readFileSync(path.join(mobile, "app.json"), "utf8")).toContain(`./assets/sounds/${NEW_ORDER_PUSH_SOUND}`);
+  });
+
+  it("keeps the new-order sound when the seller has not turned it off", () => {
+    const payload = { title: "New order", body: "b", data: { type: "new_order_received" }, sound: NEW_ORDER_PUSH_SOUND, channelId: "orders" };
+    expect(applyNewOrderSoundPreference(payload, {})).toBe(payload);
+    expect(applyNewOrderSoundPreference(payload, { new_order_sound: true })).toBe(payload);
+    expect(buildExpoPushMessages([{ token: "t" }], applyNewOrderSoundPreference(payload, null))[0].sound).toBe("order_received.wav");
+  });
+
+  it("sends new-order pushes silently when the seller turned the sound off", () => {
+    const payload = { title: "New order", body: "b", data: { type: "new_order_received", targetId: "o1" }, sound: NEW_ORDER_PUSH_SOUND, channelId: "orders" };
+    const silenced = applyNewOrderSoundPreference(payload, { new_order_sound: false });
+    const [message] = buildExpoPushMessages([{ token: "t" }], silenced);
+    expect(message.sound).toBeNull();
+    expect(message.channelId).toBe(SILENT_ORDERS_CHANNEL_ID);
+    expect(message.data).toMatchObject({ type: "new_order_received", targetId: "o1", silent: true });
+  });
+
+  it("never silences other notification types", () => {
+    const payload = { title: "Message", body: "b", data: { type: "message" } };
+    expect(applyNewOrderSoundPreference(payload, { new_order_sound: false })).toBe(payload);
+    expect(buildExpoPushMessages([{ token: "t" }], payload)[0].sound).toBe("default");
   });
 
   it("maps new event categories to their buyer/seller preference keys", () => {

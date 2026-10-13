@@ -4,6 +4,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { haptic } from '@/lib/haptics';
 import { isNewOrderNotification } from '@/lib/newOrderAlert';
+import { playBannerFeedback } from '@/lib/newOrderAlert';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -55,8 +56,7 @@ export default function NotificationBanner() {
       if (dismissTimer.current) clearTimeout(dismissTimer.current);
       visibleRef.current = true;
       setPayload(next);
-      // Only a new order earns a haptic (success); other banners arrive silently.
-      if (isNewOrderNotification(next.data) && next.haptic !== 'none') haptic('newOrder');
+      if (next.haptic !== 'none') playBannerFeedback(next.data);
       translateY.setValue(-200);
       Animated.spring(translateY, {
         toValue: 0,

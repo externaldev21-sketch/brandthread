@@ -57,6 +57,7 @@ import {
 } from '@/lib/orderFulfillment';
 import { isLocalPreviewSellerOrderId, loadPreviewSellerOrder, savePreviewSellerOrder } from '@/lib/previewOrderEdits';
 import { refundReasonLabel, type OrderRefundsResponse, type SellerRefundRequest } from '@/lib/sellerRefund';
+import { PrintLabelButton } from "@/components/orders/PrintLabelButton";
 import { ApiError } from '@/lib/networkNotice';
 
 // ─── API → Order adapter ──────────────────────────────────────────────────────
