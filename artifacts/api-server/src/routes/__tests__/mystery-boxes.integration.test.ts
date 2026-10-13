@@ -75,11 +75,12 @@ async function makeProduct(ownerId: string, name: string, priceCents: number, st
   return { productId: p.id, variantId: v.id };
 }
 
+type JsonResponse = Omit<Response, "json"> & { json(): Promise<any> };
 const request = (path: string, method = "GET", body?: unknown) => fetch(`${base}${path}`, {
   method,
   headers: body === undefined ? undefined : { "content-type": "application/json" },
   body: body === undefined ? undefined : JSON.stringify(body),
-});
+}) as Promise<JsonResponse>;
 
 async function postWebhook(eventId: string) {
   const sig = `sig-${eventId}`;
