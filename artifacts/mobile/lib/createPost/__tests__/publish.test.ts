@@ -5,6 +5,8 @@ vi.mock('@/services/socialService', () => ({
   createSellerPost: vi.fn(async (v: any) => { created.push(v); return { id: 'p1', ...v }; }),
   updateSellerPost: vi.fn(),
 }));
+const syncPostExtras = vi.fn(async (..._args: unknown[]) => {});
+vi.mock('@/services/postExtrasService', () => ({ syncPostExtras: (...args: unknown[]) => syncPostExtras(...args) }));
 vi.mock('@/lib/mediaCrop', () => ({ applyCropRect: vi.fn(async (uri: string) => `${uri}#cropped`) }));
 
 import { publishCreatePost } from '../publish';
@@ -57,6 +59,8 @@ describe('publishCreatePost', () => {
     expect(post.slides[1]).toMatchObject({ path: '/objects/uploads/out1', thumbnailPath: '/objects/uploads/th1', duration: 5 });
     expect([...progress].sort((x, y) => x - y)).toEqual(progress);
     expect(progress[progress.length - 1]).toBe(1);
+    // Product mentions / BTS label are saved after the post, against its id.
+    expect(syncPostExtras).toHaveBeenCalledWith('p1', details, { editing: false });
   });
 
   it('a single video POST is a video post', async () => {

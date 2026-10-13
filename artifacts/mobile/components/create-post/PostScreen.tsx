@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT } from '@/lib/theme';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
-import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { getTaggableProducts } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import type { PostProductTag, PostVisibility } from '@/services/types';
@@ -179,7 +179,8 @@ function ProductMentionPage({ mentions, onPick, onRemove, onBack }: {
   const [query, setQuery] = useState('');
   const [note, setNote] = useState<string | null>(null);
   useEffect(() => {
-    if (isPreview()) { setProducts([]); return; }
+    // Signed-out preview has no catalog; the demo preview (?demo=1) uses its local demo products.
+    if (isPreview() && !isPreviewDemoMode()) { setProducts([]); return; }
     let live = true;
     getTaggableProducts().then((p) => { if (live) setProducts(p); }).catch(() => { if (live) setProducts([]); });
     return () => { live = false; };
