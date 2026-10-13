@@ -85,10 +85,29 @@ export async function captureShareCard(ref: React.RefObject<any>): Promise<strin
   return captureRef(ref, {
     format: 'png',
     quality: 1,
-    result: 'tmpfile',
+    result: Platform.OS === 'web' ? 'data-uri' : 'tmpfile',
     width: STORY_CARD_WIDTH,
     height: STORY_CARD_HEIGHT,
   });
+}
+
+/**
+ * Hands a captured story card PNG to the person: the system share sheet with
+ * the image on iOS/Android (expo-sharing, so Instagram/Snapchat "Add to
+ * story" targets appear), a file download on web.
+ */
+export async function shareStoryCardImage(imageUri: string, fileName: string): Promise<'shared' | 'downloaded'> {
+  if (Platform.OS === 'web') {
+    triggerWebImageDownload(imageUri, fileName);
+    return 'downloaded';
+  }
+  const Sharing = await import('expo-sharing');
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(imageUri, { mimeType: 'image/png', UTI: 'public.png', dialogTitle: 'Add to story' });
+    return 'shared';
+  }
+  await Share.share(Platform.OS === 'ios' ? { url: imageUri } : { message: imageUri });
+  return 'shared';
 }
 
 /**

@@ -21,7 +21,7 @@
  *     (lib/shareProfile.ts `buildCanonicalProfileUrl`, resolved by
  *     app/u/[username].tsx both in-app and on the web), with the Brandthread
  *     mark in the QR's center and "@handle" beneath it.
- *   - Three equal tiles below: Share profile, Copy link, Download — each
+ *   - Equal tiles below: Share profile, Copy link, Download, Add to story — each
  *     reusing the app's existing share/clipboard/capture utilities.
  *
  * Only the background and card content change between variants; the header
@@ -47,6 +47,10 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { hapticToggle, hapticLight, hapticSuccess } from '@/lib/haptics';
 import { buildCanonicalProfileUrl, normalizeUsername, shareLinkWithFallback } from '@/lib/shareProfile';
 import { captureCardAtNaturalSize, saveCardImageToLibrary, triggerWebImageDownload } from '@/lib/shareCard';
+import { captureShareCard, shareStoryCardImage } from '@/lib/shareCard';
+import { storyCardFileName } from '@/lib/storyCard';
+import { BuyerShareCard } from '@/components/share-cards/BuyerShareCard';
+import { SellerShareCard } from '@/components/share-cards/SellerShareCard';
 import { LOGO_SOURCE } from '@/constants/branding';
 import { ShareProfileQrScanner } from '@/components/ShareProfileQrScanner';
 import { radius } from '@/constants/radii';
@@ -95,10 +99,10 @@ interface OwnIdentity {
   accountType: 'buyer' | 'seller' | null;
 }
 
-type BusyAction = 'share' | 'copy' | 'download' | null;
+type BusyAction = 'share' | 'copy' | 'download' | 'story' | null;
 
 export function ShareProfileSheet({
-  visible, onClose, avatarUrl, profileUsername, profileDisplayName, profileBrandName,
+  visible, onClose, avatarUrl, profileUsername, profileDisplayName, profileBrandName, sellerExtra,
 }: ShareProfileSheetProps) {
   const { theme } = useAppTheme();
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
@@ -118,6 +122,7 @@ export function ShareProfileSheet({
   });
 
   const cardRef = useRef<View | null>(null);
+  const storyCardRef = useRef<View | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
@@ -250,6 +255,19 @@ export function ShareProfileSheet({
           ? 'Saving to Photos is unavailable in this app build.'
           : 'Enable Photos access to save this.', 'error');
       }
+    });
+  }, [busy, normalizedUsername, runAction, showToast]);
+
+  // "Add to story": the plain black story card (rendered off-screen below)
+  // captured at 1080x1920 and handed to the system share sheet.
+  const isSellerCard = !!sellerExtra || identity?.accountType === 'seller' || !!identity?.brandName;
+  const handleShareStory = useCallback(() => {
+    if (busy || !storyCardRef.current) return;
+    void runAction('story', async () => {
+      hapticLight();
+      const uri = await captureShareCard({ current: storyCardRef.current });
+      const result = await shareStoryCardImage(uri, storyCardFileName(normalizedUsername));
+      if (result === 'downloaded') showToast('Downloaded');
     });
   }, [busy, normalizedUsername, runAction, showToast]);
 
@@ -386,6 +404,26 @@ export function ShareProfileSheet({
                 onPress={handleDownload}
                 textColor={theme.text}
               />
+              <ShareTile
+                icon="plus-square"
+                label="Add to story"
+                busy={busy === 'story'}
+                onPress={handleShareStory}
+                textColor={theme.text}
+              />
+            </View>
+          )}
+          {!loading && !error && normalizedUsername && canonicalUrl && (
+            // Off-screen: only ever seen as the captured story image.
+            <View pointerEvents="none" style={styles.storyCardOffscreen} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              {isSellerCard ? (
+                <SellerShareCard
+                  ref={storyCardRef}
+                  data={{ brandName: shareName || handle, handle, logoUri: avatarUrl ?? null, products: sellerExtra?.products ?? [] }}
+                />
+              ) : (
+                <BuyerShareCard ref={storyCardRef} data={{ name: shareName || handle, handle, avatarUri: avatarUrl ?? null }} />
+              )}
             </View>
           )}
           {!loading && !error && isSignedIn && canonicalUrl && (
@@ -617,6 +655,7 @@ const styles = StyleSheet.create({
     marginTop: SP.lg,
   },
   tileFlex: { flex: 1 },
+  storyCardOffscreen: { position: 'absolute', left: -10000, top: 0 },
   tile: {
     alignItems: 'center',
     gap: SP.xs,

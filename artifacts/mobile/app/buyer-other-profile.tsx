@@ -52,6 +52,8 @@ import { isVisitorPreviewParam, resolveProfileMode } from '@/lib/profileAccess';
 import { taggedItemHref } from '@/services/profileService';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { buildCanonicalProfileUrl, shareLinkWithFallback } from '@/lib/shareProfile';
+import * as Clipboard from 'expo-clipboard';
+import { copyProfileLink } from '@/lib/copyProfileLink';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -312,6 +314,10 @@ export default function BuyerOtherProfileScreen() {
     })
       .then((result) => { if (result === 'copied') setSnackbar('Profile link copied'); })
       .catch(() => {});
+  };
+  const handleCopyLink = async () => {
+    setMoreSheetOpen(false);
+    if (await copyProfileLink(profile?.username, Clipboard.setStringAsync)) { hapticSuccess(); setSnackbar('Link copied'); }
   };
   const handleMute     = async () => { setMoreSheetOpen(false); await muteUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); };
   const handleRestrict = async () => { setMoreSheetOpen(false); await restrictUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); };
@@ -587,6 +593,12 @@ export default function BuyerOtherProfileScreen() {
               <Text style={styles.moreTitle}>{displayName}</Text>
               <MoreRow icon="share-2" label="Share profile" onPress={handleShare} />
               <View style={styles.moreDivider} />
+              {profile?.username ? (
+                <>
+                  <MoreRow icon="link" label="Copy profile link" onPress={handleCopyLink} />
+                  <View style={styles.moreDivider} />
+                </>
+              ) : null}
               <MoreRow icon="volume-x" label="Mute" onPress={handleMute} />
               <View style={styles.moreDivider} />
               <MoreRow icon="user-x" label="Restrict" onPress={handleRestrict} />
