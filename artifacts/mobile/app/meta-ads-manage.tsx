@@ -59,7 +59,7 @@ export default function MetaAdsManageScreen() {
       const { campaigns } = await api.metaAds.list();
       setRows(campaigns);
     } catch {
-      setError('Could not load your campaigns.');
+      setError('Tap Retry to try again.');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api]);
@@ -92,7 +92,7 @@ export default function MetaAdsManageScreen() {
       const { campaign } = row.status === 'active' ? await api.metaAds.pause(row.id) : await api.metaAds.resume(row.id);
       setRows((prev) => prev?.map((r) => (r.id === row.id ? { ...r, ...campaign } : r)) ?? prev);
     } catch {
-      Alert.alert('Error', `Could not ${row.status === 'active' ? 'pause' : 'resume'} this campaign. Please try again.`);
+      Alert.alert(`Couldn't ${row.status === 'active' ? 'pause' : 'resume'} campaign`, 'Try again.');
     } finally {
       setBusyId(null);
     }
@@ -104,7 +104,7 @@ export default function MetaAdsManageScreen() {
       const { campaign } = await api.metaAds.duplicate(row.id);
       setRows((prev) => (prev ? [campaign, ...prev] : prev));
     } catch {
-      Alert.alert('Error', 'Could not duplicate this campaign. Please try again.');
+      Alert.alert("Couldn't duplicate campaign", 'Try again.');
     } finally {
       setBusyId(null);
     }
@@ -116,7 +116,7 @@ export default function MetaAdsManageScreen() {
       const { insights } = await api.metaAds.refreshInsights(row.id);
       setRows((prev) => prev?.map((r) => (r.id === row.id ? { ...r, insights } : r)) ?? prev);
     } catch {
-      Alert.alert('Error', 'Could not refresh insights right now.');
+      Alert.alert("Couldn't refresh insights", 'Try again later.');
     } finally {
       setBusyId(null);
     }
@@ -142,7 +142,7 @@ export default function MetaAdsManageScreen() {
       hapticSuccess();
       setEditingBudget(null);
     } catch {
-      Alert.alert('Error', 'Could not update the budget. Please try again.');
+      Alert.alert("Couldn't update budget", 'Try again.');
     } finally {
       setBusyId(null);
     }
@@ -187,7 +187,7 @@ export default function MetaAdsManageScreen() {
         )}
 
         {!loading && error && (
-          <EmptyState icon="alert-circle" title="Something went wrong" description={error} action={{ label: 'Retry', onPress: loadCampaigns }} />
+          <EmptyState icon="alert-circle" title="Couldn't load campaigns" description={error} action={{ label: 'Retry', onPress: loadCampaigns }} />
         )}
 
         {!loading && !error && rows && rows.length === 0 && (

@@ -2962,7 +2962,7 @@ export default function FeedScreen({
         if (isRetryableFailure(error)) void enqueueEngagementRetry({ kind: 'not_interested', targetId: id, payload: { value: reason } });
       });
     }
-    showToast(reason === 'creator' ? 'You’ll see fewer videos from this seller.' : 'We’ll show you fewer posts like this.', 'info');
+    showToast('Post hidden', 'info');
   }, [api, showToast]);
 
   useEffect(() => {

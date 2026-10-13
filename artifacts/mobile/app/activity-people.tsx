@@ -196,7 +196,7 @@ export default function ActivityPeopleScreen() {
       await setSellerFollowing(actor.id, next);
     } catch {
       setFollowing(actor.id, !next);
-      Alert.alert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
+      Alert.alert(next ? 'Could not follow' : 'Could not unfollow', 'Try again in a moment.');
     } finally {
       setPending((prev) => {
         const copy = new Set(prev);

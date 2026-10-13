@@ -98,7 +98,7 @@ export default function SellerPushBroadcastScreen() {
       setReview(null); setTitle(''); setBody('');
       load();
     } catch (e: any) {
-      setError(e?.message || 'Could not send.');
+      setError(e?.message || "Couldn't send. Try again.");
       load();
     } finally { setBusy(false); }
   }

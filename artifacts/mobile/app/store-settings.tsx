@@ -102,7 +102,7 @@ export default function StoreSettingsScreen() {
       await updateSettings(form);
       Alert.alert('Saved', 'Store settings updated.');
     } catch {
-      Alert.alert('Error', 'Failed to save settings.');
+      Alert.alert("Couldn't save settings", 'Try again.');
     } finally {
       setSaving(false);
     }

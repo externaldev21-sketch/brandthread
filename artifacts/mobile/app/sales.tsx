@@ -210,9 +210,9 @@ export default function SalesScreen() {
 
   function handleDelete(x: Sale) {
     Alert.alert('Delete sale?', `Remove "${x.name}"? Prices go back to normal immediately.`, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Keep', style: 'cancel' },
       {
-        text: 'Delete', style: 'destructive',
+        text: 'Delete sale', style: 'destructive',
         onPress: async () => {
           setSales(prev => prev.filter(r => r.id !== x.id));
           try { await api.sales.delete(x.id); } catch { void load(); }

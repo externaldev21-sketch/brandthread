@@ -126,7 +126,7 @@ export default function RfqPostScreen() {
       router.replace(`/rfq-compare?rfqId=${rfq.id}` as never);
     } catch (e: any) {
       if (promptUpgradeOnPlanGate(e, router)) return;
-      Alert.alert('Could not post RFQ', e?.message ?? 'Please try again.');
+      Alert.alert("Couldn't post RFQ", e?.message ?? 'Try again.');
     } finally {
       setSubmitting(false);
     }

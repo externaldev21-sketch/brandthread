@@ -52,7 +52,7 @@ export default function ExportReport() {
     } catch (e) {
       // Export is part of Pro's full analytics (server plan config).
       if (promptUpgradeOnPlanGate(e, router)) return;
-      Alert.alert('Export failed', 'Could not generate the export. Check your connection and try again.');
+      Alert.alert('Export failed', 'Try again.');
     } finally { setBusy(false); }
   }
 

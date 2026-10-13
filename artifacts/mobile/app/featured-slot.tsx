@@ -93,7 +93,7 @@ export default function FeaturedSlotScreen() {
       setAvailability(a);
       setHistory(mine);
     } catch {
-      Alert.alert('Featured', 'Could not load availability. Please try again.');
+      Alert.alert("Couldn't load slots", 'Try again.');
     } finally {
       setLoading(false);
     }
@@ -112,8 +112,8 @@ export default function FeaturedSlotScreen() {
     } catch (e: any) {
       const msg = String(e?.message ?? '');
       Alert.alert(
-        msg.includes('402') || msg.includes('unpaid') ? 'Checkout cancelled' : 'Could not confirm payment',
-        msg.includes('402') || msg.includes('unpaid') ? 'Your payment was not completed. You can try again.' : 'Please check your slot status.',
+        msg.includes('402') || msg.includes('unpaid') ? 'Checkout cancelled' : "Couldn't confirm payment",
+        msg.includes('402') || msg.includes('unpaid') ? 'Your payment was not completed. You can try again.' : 'Check your slot status.',
       );
     } finally {
       setBusy(false);
@@ -160,7 +160,7 @@ export default function FeaturedSlotScreen() {
       const returnUrl = buildFeaturedReturnUrl(slot.id);
       const { url, paymentStatus } = await api.featuredSlots.pay(slot.id, returnUrl);
       if (paymentStatus === 'paid' || paymentStatus === 'no_payment_required') { await verify(slot.id); return; }
-      if (!url) { Alert.alert('Error', 'Could not start checkout. Please try again.'); return; }
+      if (!url) { Alert.alert("Couldn't start checkout", 'Try again.'); return; }
       const result = await WebBrowser.openAuthSessionAsync(url, returnUrl);
       if (result.type === 'success') { await verify(slot.id); return; }
       Alert.alert('Checkout cancelled', 'Your payment was not completed. Your spot is held for 30 minutes.');
@@ -169,7 +169,7 @@ export default function FeaturedSlotScreen() {
       const msg = String(e?.message ?? '');
       Alert.alert('Featured', msg.includes('already_booked') || msg.includes('409')
         ? 'You already have a Featured slot booked or in review.'
-        : 'Could not start checkout. Please try again.');
+        : "Couldn't start checkout. Try again.");
     } finally {
       setBusy(false);
       void load();
@@ -189,7 +189,7 @@ export default function FeaturedSlotScreen() {
         text: 'Cancel slot', style: 'destructive',
         onPress: async () => {
           setCancellingId(slot.id);
-          try { await api.featuredSlots.cancel(slot.id); } catch { Alert.alert('Featured', 'Could not cancel. Please try again.'); }
+          try { await api.featuredSlots.cancel(slot.id); } catch { Alert.alert("Couldn't cancel slot", 'Try again.'); }
           finally { setCancellingId(null); void load(); }
         },
       },

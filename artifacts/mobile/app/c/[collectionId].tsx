@@ -118,8 +118,8 @@ export default function PublicCollectionScreen() {
       <MissingItemState
         headerTitle="Collection"
         icon="alert-circle"
-        title="Something went wrong"
-        message="Please check your connection and try again."
+        title="Couldn't load collection"
+        message="Check your connection and try again."
         actionLabel="Retry"
         onAction={() => setReloadKey(k => k + 1)}
       />

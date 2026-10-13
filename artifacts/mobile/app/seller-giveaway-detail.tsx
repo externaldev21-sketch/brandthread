@@ -33,7 +33,7 @@ export default function SellerGiveawayDetail() {
 
   async function run(key: string, fn: () => Promise<any>) {
     setBusy(key); setError(null);
-    try { const r = await fn(); if (r && r.winners) setG(r); else await load(); } catch (e: any) { setError(e?.message || 'Something went wrong.'); await load(); } finally { setBusy(null); }
+    try { const r = await fn(); if (r && r.winners) setG(r); else await load(); } catch (e: any) { setError(e?.message || "Couldn't update the giveaway. Try again."); await load(); } finally { setBusy(null); }
   }
 
   if (failed) return <View style={{ flex: 1, backgroundColor: c.background }}><ScreenHeader title="Giveaway" /><Text style={[styles.note, { color: c.mutedForeground, padding: SP.md }]}>Couldn't load this giveaway.</Text></View>;

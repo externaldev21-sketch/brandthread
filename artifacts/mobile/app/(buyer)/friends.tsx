@@ -421,7 +421,7 @@ export default function FriendsScreen() {
       });
       router.push(`/buyer-conversation?id=${conv.id}` as never);
     } catch {
-      Alert.alert('Error', 'Could not open conversation.');
+      Alert.alert("Couldn't open conversation", 'Try again.');
     }
   }
 

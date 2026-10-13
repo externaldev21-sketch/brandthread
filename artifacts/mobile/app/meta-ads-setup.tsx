@@ -143,7 +143,7 @@ export default function MetaAdsSetupScreen() {
         const { campaign } = await api.metaAds.get(params.id!);
         applyCampaignToState(campaign);
       } catch {
-        Alert.alert('Could not load campaign', 'This campaign could not be found.');
+        Alert.alert('Campaign not found', 'Go back and pick another campaign.');
       } finally {
         setLoadingExisting(false);
       }
@@ -332,7 +332,7 @@ export default function MetaAdsSetupScreen() {
       await api.metaAds.launch(id);
       router.replace('/meta-ads-manage');
     } catch (e: any) {
-      const msg = String(e?.message ?? '').replace(/^\d+:\s*/, '') || 'Could not launch this campaign. Please try again.';
+      const msg = String(e?.message ?? '').replace(/^\d+:\s*/, '') || "Couldn't launch this campaign. Try again.";
       setLaunchError(msg);
       Alert.alert('Launch failed', msg);
     } finally {

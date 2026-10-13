@@ -95,7 +95,7 @@ export default function VacationModeScreen() {
         [{ text: 'Done', onPress: () => goBackOr(router) }],
       );
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Could not save. Please try again.');
+      Alert.alert("Couldn't save", e?.message ?? 'Try again.');
     } finally {
       setSaving(false);
     }

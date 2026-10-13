@@ -31,7 +31,7 @@ export function classifyAiCreditsError(status: number, body: string | undefined)
 
 export const AI_CREDITS_ALERT_COPY: Record<Exclude<AiCreditsErrorKind, 'insufficient_credits'>, { title: string; message: string }> = {
   user_daily_cap: { title: 'Daily AI limit reached', message: "You have reached today's AI limit. It resets tomorrow." },
-  global_daily_cap: { title: 'AI is at capacity', message: 'AI tools are at capacity right now. Please try again later.' },
+  global_daily_cap: { title: 'AI is at capacity', message: 'Try again later.' },
 };
 
 let lastSurfacedAt = 0;

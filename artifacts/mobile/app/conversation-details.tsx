@@ -166,7 +166,7 @@ export default function ConversationDetailsScreen() {
         setMutedUntil(until);
       }
     } catch (e) {
-      Alert.alert('Couldn’t update mute', apiErrorMessage(e, 'Please try again.'));
+      Alert.alert('Couldn’t update mute', apiErrorMessage(e, 'Try again.'));
     } finally {
       setBusy(false);
     }
@@ -191,7 +191,7 @@ export default function ConversationDetailsScreen() {
       setPreviewThemeId(null);
       setThemePickerVisible(false);
     } catch (e) {
-      Alert.alert('Couldn’t apply theme', apiErrorMessage(e, 'Please try again.'));
+      Alert.alert('Couldn’t apply theme', apiErrorMessage(e, 'Try again.'));
     } finally {
       setApplyingTheme(false);
     }
@@ -214,7 +214,7 @@ export default function ConversationDetailsScreen() {
       }
     } catch (e) {
       setDisappearing(!next);
-      Alert.alert('Couldn’t update disappearing messages', apiErrorMessage(e, 'Please try again.'));
+      Alert.alert('Couldn’t update disappearing messages', apiErrorMessage(e, 'Try again.'));
     }
   }
 

@@ -216,9 +216,9 @@ export default function LoginMethods() {
       `Remove ${providerLabel}?`,
       `You will no longer be able to sign in with this ${providerLabel} account.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep', style: 'cancel' },
         {
-          text: 'Remove',
+          text: `Remove ${providerLabel}`,
           style: 'destructive',
           onPress: async () => {
             setRemovingProvider(provider);
@@ -226,7 +226,7 @@ export default function LoginMethods() {
               await externalAccount.destroy();
               await user.reload();
             } catch (e: any) {
-              Alert.alert('Removal failed', `Couldn't remove ${providerLabel}. Try again.`);
+              Alert.alert(`Couldn't remove ${providerLabel}`, 'Try again.');
             } finally {
               setRemovingProvider(null);
             }

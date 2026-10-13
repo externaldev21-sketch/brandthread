@@ -183,7 +183,7 @@ export default function MoreScreen() {
       await AsyncStorage.removeItem('@brandthread/onboarding_complete');
       router.replace('/sign-in');
     } catch {
-      Alert.alert('Error', 'Failed to sign out. Please try again.');
+      Alert.alert("Couldn't sign out", 'Try again.');
     }
   };
 

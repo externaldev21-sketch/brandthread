@@ -453,7 +453,7 @@ export default function SampleDetailScreen() {
     } catch (error: any) {
       setPaymentError(error?.message?.includes('not succeeded')
         ? 'Payment is still being confirmed. Refresh in a moment and try again.'
-        : error?.message ?? 'Could not confirm payment. Please try again.');
+        : error?.message ?? "Couldn't confirm payment. Try again.");
       return false;
     } finally {
       setPaying(false);
@@ -474,7 +474,7 @@ export default function SampleDetailScreen() {
         // already settled. Confirm before treating it as unavailable.
         setPaying(false);
         const confirmed = await confirmHostedPayment();
-        if (!confirmed) setPaymentError('Secure checkout is unavailable and payment is not yet confirmed. Please try again.');
+        if (!confirmed) setPaymentError("Couldn't open checkout, and payment isn't confirmed yet. Try again.");
         return;
       }
       const result = await WebBrowser.openAuthSessionAsync(session.url, returnUrl);
@@ -487,13 +487,13 @@ export default function SampleDetailScreen() {
         setPaymentError('Checkout was cancelled. Your order is still awaiting payment.');
         return;
       }
-      setPaymentError('Secure checkout did not return a payment confirmation. Please try again.');
+      setPaymentError("Payment wasn't confirmed. Try again.");
     } catch (error: any) {
       const message = String(error?.message ?? '');
       setPaymentError(
         message.includes('Manufacturer cannot receive') || message.includes('payouts are not ready')
           ? 'The manufacturer needs to finish payout setup before you can pay. Message them, then refresh.'
-          : message || 'Could not open secure checkout. Please try again.',
+          : message || "Couldn't open checkout. Try again.",
       );
     } finally {
       setPaying(false);
@@ -536,7 +536,7 @@ export default function SampleDetailScreen() {
   const handleSubmitReview = async () => {
     if (!sample) return;
     if (ratings.overallRating === 0) {
-      Alert.alert('Rating Required', 'Please provide an overall rating.');
+      Alert.alert('Add a rating', 'Pick an overall rating first.');
       return;
     }
     setReviewSubmitting(true);
@@ -558,7 +558,7 @@ export default function SampleDetailScreen() {
         await load();
         Alert.alert('Sample changed', 'This sample changed since it was loaded. The latest version was reloaded; review it and try again.');
       } else {
-        Alert.alert('Could not submit review', error instanceof Error ? error.message : 'Please try again.');
+        Alert.alert("Couldn't submit review", error instanceof Error ? error.message : 'Try again.');
       }
     } finally {
       setReviewSubmitting(false);
@@ -568,7 +568,7 @@ export default function SampleDetailScreen() {
   const handleSubmitRevision = async () => {
     if (!sample) return;
     if (!revTitle.trim()) {
-      Alert.alert('Title Required', 'Please enter a revision title.');
+      Alert.alert('Add a title', 'Give this revision a title.');
       return;
     }
     setRevSubmitting(true);
@@ -593,7 +593,7 @@ export default function SampleDetailScreen() {
         await load();
         Alert.alert('Sample changed', 'This sample changed since it was loaded. The latest version was reloaded; review it and try again.');
       } else {
-        Alert.alert('Could not submit revision', error instanceof Error ? error.message : 'Please try again.');
+        Alert.alert("Couldn't submit revision", error instanceof Error ? error.message : 'Try again.');
       }
     } finally {
       setRevSubmitting(false);
@@ -606,8 +606,8 @@ export default function SampleDetailScreen() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert(
-        'Permission Required',
-        'Please allow access to your photo library to upload sample images.',
+        'Photo access needed',
+        'Allow photo library access in Settings to upload sample images.',
       );
       return;
     }
@@ -646,7 +646,7 @@ export default function SampleDetailScreen() {
         : current);
     } catch (err: any) {
       console.error('[SampleDetail] image upload error:', err);
-      Alert.alert('Upload Failed', err?.message ?? 'Could not upload image. Please try again.');
+      Alert.alert('Upload failed', err?.message ?? 'Try again.');
     } finally {
       setImageUploading(false);
     }

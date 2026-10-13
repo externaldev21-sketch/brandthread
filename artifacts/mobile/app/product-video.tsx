@@ -122,8 +122,8 @@ export default function ProductVideoScreen() {
     };
     if (Platform.OS === 'web') { void run(); return; }
     Alert.alert('Remove video?', 'Shoppers will no longer see it on this product.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => { void run(); } },
+      { text: 'Keep', style: 'cancel' },
+      { text: 'Remove video', style: 'destructive', onPress: () => { void run(); } },
     ]);
   }, [api, demo, productId]);
 

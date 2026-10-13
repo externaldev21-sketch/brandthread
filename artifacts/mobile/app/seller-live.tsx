@@ -359,7 +359,7 @@ function SellerLiveNativeScreen() {
       ...tag,
       highlighted: !alreadyPinned && tag.productId === productId,
     }));
-    await saveProductTags(updated, productTags, 'Could not feature product');
+    await saveProductTags(updated, productTags, "Couldn't feature product");
   }
 
   async function runCommentAction(action: CommentAction, c: CommentActionTarget) {
@@ -373,7 +373,7 @@ function SellerLiveNativeScreen() {
       if (action === 'ban' && c.user_id) setComments(prev => prev.filter(x => x.user_id !== c.user_id));
       if (action === 'remove') setComments(prev => prev.filter(x => x.id !== c.id));
     } catch {
-      Alert.alert('Couldn’t update', 'That action did not go through. Try again.');
+      Alert.alert('Couldn’t update the live', 'Try again.');
     }
   }
 

@@ -223,7 +223,7 @@ export default function FulfillOrderScreen() {
       setAddingPreset(false);
       setNewPreset({ name: '', weightOz: '', lengthIn: '', widthIn: '', heightIn: '' });
     } catch (err: unknown) {
-      Alert.alert('Could not save preset', errorMessageOr(err, 'Please try again.'));
+      Alert.alert("Couldn't save box", errorMessageOr(err, 'Try again.'));
     }
   }
 
@@ -233,7 +233,7 @@ export default function FulfillOrderScreen() {
       setPresets(prev => prev.filter(p => p.id !== id));
       setPackageChoice(prev => (prev?.kind === 'preset' && prev.presetId === id ? null : prev));
     } catch (err: unknown) {
-      Alert.alert('Could not delete preset', errorMessageOr(err, 'Please try again.'));
+      Alert.alert("Couldn't delete box", errorMessageOr(err, 'Try again.'));
     }
   }
 
@@ -293,7 +293,7 @@ export default function FulfillOrderScreen() {
     } catch (err: unknown) {
       Alert.alert(
         'Label not purchased',
-        errorMessageOr(err, 'Could not purchase this label. You can enter tracking manually instead.'),
+        errorMessageOr(err, 'Try again, or enter tracking manually.'),
       );
       setManualMode(true);
     } finally {
@@ -351,7 +351,7 @@ export default function FulfillOrderScreen() {
         router.replace('/(tabs)/orders');
       });
     } catch (err: unknown) {
-      Alert.alert('Could not mark shipped', errorMessageOr(err, 'Please try again.'));
+      Alert.alert("Couldn't mark shipped", errorMessageOr(err, 'Try again.'));
     } finally {
       setMarking(false);
     }
@@ -362,7 +362,7 @@ export default function FulfillOrderScreen() {
     try {
       await sharePackingSlip(order);
     } catch (err: unknown) {
-      Alert.alert('Could not create packing slip', errorMessageOr(err, 'Please try again.'));
+      Alert.alert("Couldn't create packing slip", errorMessageOr(err, 'Try again.'));
     }
   }
 
@@ -405,7 +405,7 @@ export default function FulfillOrderScreen() {
       'Void label',
       'Are you sure you want to void this label? This cannot be undone.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep label', style: 'cancel' },
         {
           text: 'Void label',
           style: 'destructive',
@@ -416,7 +416,7 @@ export default function FulfillOrderScreen() {
               setLabel(updated);
               if (updated.refundPending) Alert.alert('Void requested', 'The carrier is processing the label refund.');
             } catch (err: unknown) {
-              Alert.alert('Could not void label', errorMessageOr(err, 'Try again later.'));
+              Alert.alert("Couldn't void label", errorMessageOr(err, 'Try again later.'));
             }
           },
         },
@@ -566,9 +566,9 @@ export default function FulfillOrderScreen() {
                   <TouchableOpacity
                     key={p.id}
                     onPress={() => { haptics.selection(); setPackageChoice({ kind: 'preset', presetId: p.id }); }}
-                    onLongPress={() => Alert.alert('Delete preset', `Remove "${p.name}"?`, [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Delete', style: 'destructive', onPress: () => handleDeletePreset(p.id) },
+                    onLongPress={() => Alert.alert('Delete box?', `Remove "${p.name}"?`, [
+                      { text: 'Keep', style: 'cancel' },
+                      { text: 'Delete box', style: 'destructive', onPress: () => handleDeletePreset(p.id) },
                     ])}
                     style={[s.presetChip, active && { borderColor: ACCENT, backgroundColor: ACCENT_DIM }]}
                   >

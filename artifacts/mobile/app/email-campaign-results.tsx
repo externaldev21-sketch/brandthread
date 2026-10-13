@@ -29,7 +29,7 @@ export default function EmailCampaignResultsScreen() {
 
   const unschedule = async () => {
     try { await api.emailMarketing.unschedule(String(id)); router.replace(`/email-campaign-compose?id=${id}` as never); }
-    catch { Alert.alert('Not changed', "Couldn't cancel the schedule."); }
+    catch { Alert.alert("Couldn't cancel schedule", 'Try again.'); }
   };
 
   const s = camp?.stats;

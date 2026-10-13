@@ -84,9 +84,9 @@ export default function SetupWalkthroughSheet({
       `Skip "${task.label}"?`,
       'You can always come back to this later from the setup checklist.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep', style: 'cancel' },
         {
-          text: 'Skip',
+          text: 'Skip task',
           style: 'destructive',
           onPress: async () => {
             const next = await skipTask(task.id as SetupTaskId, userId);

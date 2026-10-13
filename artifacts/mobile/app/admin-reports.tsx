@@ -93,7 +93,7 @@ export default function ReviewQueueScreen() {
       });
       setQueue(data);
     } catch (err) {
-      setError(apiErrorMessage(err, 'We couldn’t load the review queue.'));
+      setError(apiErrorMessage(err, 'We couldn’t load the review queue. Try again.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -351,7 +351,7 @@ function ReviewSheet({
     try {
       await onReinstate(item.owner);
     } catch (err) {
-      setError(apiErrorMessage(err, 'Couldn’t reinstate this account.'));
+      setError(apiErrorMessage(err, 'Couldn’t reinstate this account. Try again.'));
       setBusy(null);
     }
   }

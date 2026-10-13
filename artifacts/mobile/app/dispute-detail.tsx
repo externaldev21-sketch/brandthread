@@ -275,7 +275,7 @@ export default function DisputeDetailScreen() {
   const handleSubmitEvidence = async () => {
     if (submittingEvidence) return;
     if (!evidenceDesc.trim()) {
-      Alert.alert('Required', 'Please enter a description for the evidence.');
+      Alert.alert('Add a description', 'Describe what this evidence shows.');
       return;
     }
     setSubmittingEvidence(true);
@@ -343,9 +343,9 @@ export default function DisputeDetailScreen() {
       'Submit all evidence?',
       'This sends everything above to the card network for review. You can’t add more after this.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep editing', style: 'cancel' },
         {
-          text: 'Submit',
+          text: 'Submit evidence',
           onPress: async () => {
             if (submittingAll) return;
             setSubmittingAll(true);

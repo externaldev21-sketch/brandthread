@@ -59,7 +59,7 @@ export default function StoreSEOScreen() {
       await updateSEO(seo);
       Alert.alert('Saved', 'SEO settings updated.');
     } catch {
-      Alert.alert('Error', 'Failed to save SEO settings.');
+      Alert.alert("Couldn't save SEO settings", 'Try again.');
     } finally {
       setSaving(false);
     }
@@ -126,7 +126,7 @@ export default function StoreSEOScreen() {
             disabled={socialImageUploading}
             onPress={async () => {
               const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-              if (!perm.granted) { Alert.alert('Permission required', 'Allow access to your photo library.'); return; }
+              if (!perm.granted) { Alert.alert('Photo access needed', 'Allow photo library access in Settings.'); return; }
               const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85, aspect: [1.91, 1], allowsEditing: true });
               if (result.canceled || !result.assets[0]) return;
               setSocialImageUploading(true);

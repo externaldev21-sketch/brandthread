@@ -15,9 +15,9 @@ export async function runRevenueCatSessionOperation<T>(
 ): Promise<T> {
   const generation = guard.current();
   const result = await operation();
-  if (!guard.isCurrent(generation)) throw new Error('Your account changed. Please try again.');
+  if (!guard.isCurrent(generation)) throw new Error('Your account changed. Try again.');
   await onCurrent(result, generation);
-  if (!guard.isCurrent(generation)) throw new Error('Your account changed. Please try again.');
+  if (!guard.isCurrent(generation)) throw new Error('Your account changed. Try again.');
   return result;
 }
 

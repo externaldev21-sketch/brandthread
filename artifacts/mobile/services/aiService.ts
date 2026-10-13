@@ -360,7 +360,7 @@ async function callAI(
       throw new Error('Rate limit reached — please wait a moment and try again.');
     }
     if (res.status === 503 || res.status === 502) {
-      throw new Error('AI service is temporarily unavailable. Please try again shortly.');
+      throw new Error('AI isn’t available right now. Try again soon.');
     }
     const body = await res.json().catch(() => ({})) as { error?: string };
     throw new Error(body.error ?? `AI request failed (${res.status}).`);
@@ -455,7 +455,7 @@ function callAIStream(
         } else if (xhr.status === 0) {
           reject(Object.assign(new Error('Request aborted'), { name: 'AbortError' }));
         } else if (xhr.status >= 500 || xhr.status === 502 || xhr.status === 503) {
-          reject(new Error('AI service is temporarily unavailable. Please try again shortly.'));
+          reject(new Error('AI isn’t available right now. Try again soon.'));
         } else if (xhr.status !== 200) {
           reject(new Error(`AI request failed (${xhr.status}).`));
         } else {

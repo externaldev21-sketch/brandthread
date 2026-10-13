@@ -239,7 +239,7 @@ export default function StoreFromMoodboardScreen() {
         setImageUris(prev => [...prev, ...newUris].slice(0, MAX_IMAGES));
         setImageBase64s(prev => [...prev, ...newB64s].slice(0, MAX_IMAGES));
       } catch {
-        Alert.alert('Could not prepare images', 'Please choose the images again and try once more.');
+        Alert.alert("Couldn't load images", 'Choose them again.');
       } finally {
         setPreparingImages(false);
       }
@@ -277,7 +277,7 @@ export default function StoreFromMoodboardScreen() {
       if (failure.kind === 'payload-too-large') {
         setAnalysisFailure(failure);
       } else {
-        Alert.alert('Analysis failed', 'Could not analyze mood board. Please try again.');
+        Alert.alert("Couldn't read mood board", 'Try again.');
       }
     } finally {
       setAnalyzing(false);

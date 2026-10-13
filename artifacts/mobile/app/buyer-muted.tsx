@@ -37,7 +37,7 @@ export default function MutedAccountsScreen() {
 
   const handleUnmute = (user: MuteRecord) => {
     Alert.alert('Unmute', `Unmute ${user.mutedUserName}?`, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Keep muted', style: 'cancel' },
       {
         text: 'Unmute',
         onPress: async () => {

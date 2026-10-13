@@ -234,9 +234,9 @@ export default function ContentScreen() {
           'Delete this post?',
           'It will be removed from your content library and will no longer appear to buyers.',
           [
-            { text: 'Cancel', style: 'cancel' },
+            { text: 'Keep', style: 'cancel' },
             {
-              text: 'Delete',
+              text: 'Delete post',
               style: 'destructive',
               onPress: async () => {
                 setDeletingPostId(post.id);

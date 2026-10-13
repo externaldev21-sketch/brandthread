@@ -70,12 +70,12 @@ export default function AiHelperScreen() {
   const [result, setResult] = useState<Result | null>(null);
   const [pick, setPick] = useState(0);
 
-  const explain = useCallback((e: unknown): { message: string } => {
+  const explain = useCallback((e: unknown, action = 'generate that'): { message: string } => {
     const err = e as { status?: number; code?: string; message?: string };
     if (err.status === 429) return { message: 'Too many requests. Try again in a minute.' };
-    if (err.status === 503) return { message: 'AI is not available right now.' };
-    if (err.status === 422 || err.status === 400 || err.status === 404) return { message: err.message || 'That could not be used.' };
-    return { message: 'Something went wrong. Try again.' };
+    if (err.status === 503) return { message: "AI isn't available right now. Try again later." };
+    if (err.status === 422 || err.status === 400 || err.status === 404) return { message: err.message || "Couldn't use that. Try something else." };
+    return { message: `Couldn't ${action}. Try again.` };
   }, []);
 
   async function generate() {
@@ -133,10 +133,10 @@ export default function AiHelperScreen() {
       if (err.status === 409 && err.code === 'would_overwrite') {
         const what = result.kind === 'caption' ? 'caption' : 'size chart';
         Alert.alert(`Replace the current ${what}?`, 'Your existing one will be overwritten.', [
-          { text: 'Cancel', style: 'cancel' },
+          { text: 'Keep', style: 'cancel' },
           { text: 'Replace', style: 'destructive', onPress: () => void save(true) },
         ]);
-      } else setError(explain(e));
+      } else setError(explain(e, 'save'));
     } finally { setSaving(false); }
   }
 

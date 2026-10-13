@@ -248,9 +248,9 @@ export default function AiSettingsScreen() {
       'Clear conversation history',
       'This will delete your entire AI conversation history. This cannot be undone.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep', style: 'cancel' },
         {
-          text: 'Clear',
+          text: 'Clear history',
           style: 'destructive',
           onPress: () => {
             clearSession().then(() => Alert.alert('History cleared'));
@@ -265,9 +265,9 @@ export default function AiSettingsScreen() {
       'Clear audit log',
       'This will delete all AI action history. This cannot be undone.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep', style: 'cancel' },
         {
-          text: 'Clear',
+          text: 'Clear log',
           style: 'destructive',
           onPress: () => {
             clearAuditLog().then(() => Alert.alert('Audit log cleared'));

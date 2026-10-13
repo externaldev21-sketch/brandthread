@@ -418,7 +418,7 @@ export default function CartScreen() {
       setPointsInput('');
       haptics.success();
     } catch (error: any) {
-      Alert.alert('Could not apply points', error?.message ?? 'Please try again.');
+      Alert.alert("Couldn't apply points", error?.message ?? 'Try again.');
     } finally {
       setRedeemingPoints(false);
     }
@@ -495,7 +495,7 @@ export default function CartScreen() {
       await createCheckoutSession(cart, true, items, loyaltyToApply);
       push(('/thread-checkout?source=cart') as never);
     } catch {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      Alert.alert("Couldn't start checkout", 'Try again.');
     }
     setBusy(false);
   }

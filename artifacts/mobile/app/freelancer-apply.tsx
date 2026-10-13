@@ -99,7 +99,7 @@ export default function FreelancerApplyScreen() {
                 const { url } = await api.freelancerConnect.onboard();
                 await WebBrowser.openBrowserAsync(url);
               } catch (e) {
-                Alert.alert('Could not start onboarding', apiErrorMessage(e));
+                Alert.alert("Couldn't open bank setup", apiErrorMessage(e));
               }
               router.replace(`/freelancer-profile?id=${freelancerId}` as any);
             },
@@ -131,7 +131,7 @@ export default function FreelancerApplyScreen() {
       }
     } catch (e) {
       haptics.error();
-      Alert.alert('Could not save profile', apiErrorMessage(e));
+      Alert.alert("Couldn't save profile", apiErrorMessage(e));
     } finally {
       setSubmitting(false);
     }

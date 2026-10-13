@@ -257,9 +257,9 @@ export default function BuyerHighlightsManager() {
       'Delete highlight?',
       `"${h.label}" will be removed from your profile. This can't be undone.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Delete highlight',
           style: 'destructive',
           onPress: async () => {
             await deleteHighlight(h.id);

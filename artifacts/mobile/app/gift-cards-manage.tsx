@@ -111,9 +111,9 @@ export default function GiftCardsManageScreen() {
 
   function confirmVoid(card: GiftCard) {
     Alert.alert('Void this gift card?', `${giftCardMask(card)} has ${formatCents(card.balanceCents)} left. Voiding removes it and can’t be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Keep card', style: 'cancel' },
       {
-        text: 'Void', style: 'destructive',
+        text: 'Void card', style: 'destructive',
         onPress: () => {
           if (preview) return;
           void api.giftCards.seller.void(card.id).then(load).catch(() => Alert.alert('Couldn’t void the card', 'Try again in a moment.'));

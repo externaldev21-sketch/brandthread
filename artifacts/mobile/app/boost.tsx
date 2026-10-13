@@ -687,7 +687,7 @@ export default function BoostScreen() {
       if (msg.includes('unpaid') || msg.includes('402')) {
         Alert.alert('Checkout cancelled', 'Your payment was not completed. You can try again.', [{ text: 'OK' }]);
       } else {
-        Alert.alert('Verification failed', 'Could not confirm payment. Please check your boost status.', [{ text: 'OK' }]);
+        Alert.alert("Couldn't confirm payment", 'Check your boost status.', [{ text: 'OK' }]);
       }
     } finally {
       setVerifying(false);
@@ -764,7 +764,7 @@ export default function BoostScreen() {
         }
         const msg = e?.message ?? '';
         const body = (() => { try { return JSON.parse(msg); } catch { return null; } })();
-        Alert.alert('Error', body?.error ?? 'Could not create boost. Please try again.');
+        Alert.alert("Couldn't create boost", body?.error ?? 'Try again.');
         return;
       } finally {
         setCreating(false);
@@ -782,7 +782,7 @@ export default function BoostScreen() {
         await verifyPayment(boostRecord.id, transactionId);
       } catch (e: any) {
         if (!isPurchaseCancelled(e)) {
-          Alert.alert('Payment failed', 'Could not complete the purchase. Please try again.', [{ text: 'OK' }]);
+          Alert.alert('Payment failed', 'Try again.', [{ text: 'OK' }]);
         }
       } finally {
         setPaying(false);
@@ -803,7 +803,7 @@ export default function BoostScreen() {
       }
 
       if (!url) {
-        Alert.alert('Error', 'Could not start checkout. Please try again.');
+        Alert.alert("Couldn't start checkout", 'Try again.');
         return;
       }
 
@@ -823,7 +823,7 @@ export default function BoostScreen() {
       }
       Alert.alert(
         'Checkout incomplete',
-        'Secure checkout did not return a payment confirmation. Please try again.',
+        "Payment wasn't confirmed. Try again.",
         [{ text: 'OK' }],
       );
     } catch (e: any) {
@@ -831,8 +831,8 @@ export default function BoostScreen() {
       Alert.alert(
         'Payment failed',
         msg.includes('422') || msg.includes('ineligible')
-          ? 'This post is no longer eligible for boosting. Please choose another post.'
-          : 'Could not start checkout. Please try again.',
+          ? "This post can't be boosted anymore. Choose another post."
+          : "Couldn't start checkout. Try again.",
         [{ text: 'OK' }],
       );
     } finally {
@@ -843,7 +843,7 @@ export default function BoostScreen() {
   async function handlePause(boost: Boost) {
     const isActive = boost.status === 'active';
     const newStatus = isActive ? 'paused' : 'cancelled';
-    const title     = isActive ? 'Pause Boost' : 'Cancel Boost';
+    const title     = isActive ? 'Pause boost' : 'Cancel boost';
     const message   = isActive
       ? 'Pause this boost? You can reactivate it later by contacting support.'
       : boost.status === 'in_review'
@@ -853,7 +853,7 @@ export default function BoostScreen() {
         : 'Are you sure you want to cancel this boost? This cannot be undone.';
 
     Alert.alert(title, message, [
-      { text: 'Keep Running', style: 'cancel' },
+      { text: 'Keep running', style: 'cancel' },
       {
         text: title,
         style: 'destructive',
@@ -866,7 +866,7 @@ export default function BoostScreen() {
               prev.map((b) => b.id === boost.id ? { ...b, status: newStatus } : b),
             );
           } catch {
-            Alert.alert('Error', 'Could not update the boost. Please try again.');
+            Alert.alert("Couldn't update boost", 'Try again.');
           } finally {
             setPausingId(null);
           }

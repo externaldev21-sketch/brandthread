@@ -153,7 +153,7 @@ export default function StoreDomainScreen() {
     } catch (err) {
       const message = subdomainErrorMessage(err);
       setAvailabilityError(message);
-      Alert.alert('Error', message);
+      Alert.alert("Couldn't update subdomain", message);
     } finally {
       setSaving(false);
     }
@@ -184,7 +184,7 @@ export default function StoreDomainScreen() {
       Alert.alert('Domain Added', instructions);
     } catch (e) {
       if (promptUpgradeOnPlanGate(e, router)) return;
-      Alert.alert('Error', 'Failed to connect domain. Check your internet connection and try again.');
+      Alert.alert("Couldn't connect domain", 'Check your connection and try again.');
     } finally {
       setConnectingDomain(false);
     }
@@ -216,10 +216,10 @@ export default function StoreDomainScreen() {
   };
 
   const handleRemoveDomain = async (domainId: string, domainName: string) => {
-    Alert.alert('Remove Domain?', `Remove ${domainName}?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert('Remove domain?', `Remove ${domainName}?`, [
+      { text: 'Keep', style: 'cancel' },
       {
-        text: 'Remove', style: 'destructive', onPress: async () => {
+        text: 'Remove domain', style: 'destructive', onPress: async () => {
           try {
             await (api as any).store.deleteDomain(domainId);
           } catch { /* best-effort */ }

@@ -173,17 +173,17 @@ export default function StoreCollectionsScreen() {
 
   function handleDelete(col: StoreCollection) {
     Alert.alert(
-      'Delete Collection',
+      'Delete collection?',
       `Delete "${col.name}"? This cannot be undone.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep', style: 'cancel' },
         {
-          text: 'Delete', style: 'destructive', onPress: async () => {
+          text: 'Delete collection', style: 'destructive', onPress: async () => {
             try {
               await deleteCollection(col.id);
               await loadCollections();
             } catch {
-              Alert.alert('Error', 'Failed to delete collection.');
+              Alert.alert("Couldn't delete collection", 'Try again.');
             }
           },
         },
@@ -193,7 +193,7 @@ export default function StoreCollectionsScreen() {
 
   async function handleSave() {
     if (!form.name.trim()) {
-      Alert.alert('Name required', 'Please enter a collection name.');
+      Alert.alert('Name required', 'Give the collection a name.');
       return;
     }
     setSaving(true);
@@ -219,7 +219,7 @@ export default function StoreCollectionsScreen() {
       await loadCollections();
       setMode('list');
     } catch {
-      Alert.alert('Error', 'Failed to save collection.');
+      Alert.alert("Couldn't save collection", 'Try again.');
     } finally {
       setSaving(false);
     }
@@ -395,7 +395,7 @@ export default function StoreCollectionsScreen() {
             disabled={coverUploading}
             onPress={async () => {
               const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-              if (!perm.granted) { Alert.alert('Permission required', 'Allow access to your photo library.'); return; }
+              if (!perm.granted) { Alert.alert('Photo access needed', 'Allow photo library access in Settings.'); return; }
               const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85, aspect: [16, 9], allowsEditing: true });
               if (result.canceled || !result.assets[0]) return;
               setCoverUploading(true);

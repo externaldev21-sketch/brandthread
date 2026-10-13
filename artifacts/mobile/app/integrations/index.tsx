@@ -74,7 +74,7 @@ export default function IntegrationsScreen() {
     try {
       const data = await api.seller.connect.onboard();
       if (!data || typeof data.url !== 'string' || !/^https:\/\//i.test(data.url)) {
-        Alert.alert('Onboarding unavailable', 'Stripe did not provide a valid onboarding link. Please try again.');
+        Alert.alert("Couldn't open Stripe", "Stripe didn't send a setup link. Try again.");
         return;
       }
       const canOpen = await Linking.canOpenURL(data.url);
@@ -83,7 +83,7 @@ export default function IntegrationsScreen() {
       // The seller finishes onboarding in an external browser tab/window;
       // useFocusEffect's load() re-checks real status on return.
     } catch {
-      Alert.alert('Error', 'Could not open Stripe onboarding. Please try again.');
+      Alert.alert("Couldn't open Stripe", 'Try again.');
     } finally {
       setToggling(null);
     }
@@ -99,15 +99,15 @@ export default function IntegrationsScreen() {
     const isConnected = connectedKeys.has(item.key);
     if (isConnected) {
       Alert.alert(`Disconnect ${item.label}?`, 'This will remove the integration from your store.', [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Stay connected', style: 'cancel' },
         {
-          text: 'Disconnect', style: 'destructive',
+          text: `Disconnect ${item.label}`, style: 'destructive',
           onPress: async () => {
             setToggling(item.key);
             try {
               await api.seller.disconnectIntegration(item.key) as any;
               setConnectedKeys(prev => { const next = new Set(prev); next.delete(item.key); return next; });
-            } catch { Alert.alert('Error', 'Could not disconnect. Try again.'); }
+            } catch { Alert.alert(`Couldn't disconnect ${item.label}`, 'Try again.'); }
             finally { setToggling(null); }
           },
         },
@@ -117,15 +117,15 @@ export default function IntegrationsScreen() {
         `Connect ${item.label}`,
         `Connect your ${item.label} account to sync data with Brandthread.`,
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: 'Not now', style: 'cancel' },
           {
-            text: 'Connect',
+            text: `Connect ${item.label}`,
             onPress: async () => {
               setToggling(item.key);
               try {
                 await api.seller.connectIntegration(item.key, {}) as any;
                 setConnectedKeys(prev => new Set([...prev, item.key]));
-              } catch { Alert.alert('Error', 'Could not connect. Try again.'); }
+              } catch { Alert.alert(`Couldn't connect ${item.label}`, 'Try again.'); }
               finally { setToggling(null); }
             },
           },

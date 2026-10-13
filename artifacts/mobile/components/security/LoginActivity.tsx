@@ -117,9 +117,9 @@ export default function LoginActivity() {
       'Sign out this device?',
       `${session.device}${session.location ? ` in ${session.location}` : ''} will be signed out right away.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep signed in', style: 'cancel' },
         {
-          text: 'Sign out',
+          text: 'Sign out device',
           style: 'destructive',
           onPress: async () => {
             setBusyId(session.id);
@@ -143,7 +143,7 @@ export default function LoginActivity() {
       'Sign out of all other devices?',
       `${others.length} other ${others.length === 1 ? 'device' : 'devices'} will be signed out. You’ll stay signed in here.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep signed in', style: 'cancel' },
         {
           text: 'Sign out others',
           style: 'destructive',
@@ -170,7 +170,7 @@ export default function LoginActivity() {
       'Sign out everywhere?',
       'Every device, including this one, will be signed out. You’ll need to sign in again.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Stay', style: 'cancel' },
         {
           text: 'Sign out everywhere',
           style: 'destructive',

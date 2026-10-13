@@ -91,9 +91,9 @@ export default function StoreAiImproveScreen() {
       'Apply this change?',
       sug.recommendation,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Not now', style: 'cancel' },
         {
-          text: 'Apply', onPress: async () => {
+          text: 'Apply change', onPress: async () => {
             await applyAISuggestion(sug.id);
             await load();
           },

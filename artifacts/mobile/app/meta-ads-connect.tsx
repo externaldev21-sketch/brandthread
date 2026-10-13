@@ -99,7 +99,7 @@ export default function MetaAdsConnectScreen() {
       setBusinesses(list);
       if (list.length === 1) void handleSelectBusiness(list[0].id);
     } catch {
-      setPickerError('Could not load your Meta businesses. Please try again.');
+      setPickerError("Couldn't load your Meta businesses. Try again.");
     } finally {
       setPickerLoading(false);
     }
@@ -121,7 +121,7 @@ export default function MetaAdsConnectScreen() {
       setAdAccounts(accountsRes.adAccounts);
       setPages(pagesRes.pages);
     } catch {
-      setPickerError('Could not load ad accounts and pages for this business. Please try again.');
+      setPickerError("Couldn't load ad accounts and pages for this business. Try again.");
     } finally {
       setPickerLoading(false);
     }
@@ -144,7 +144,7 @@ export default function MetaAdsConnectScreen() {
       } else if (result.type === 'cancel' || result.type === 'dismiss') {
         // Not an error — the seller simply backed out. Stay on this screen.
       } else {
-        setOauthError('Connection did not complete. Please try again.');
+        setOauthError("Connection didn't finish. Try again.");
         setStep('oauth_error');
       }
     } catch {
@@ -178,7 +178,7 @@ export default function MetaAdsConnectScreen() {
       setConnection(conn);
       setStep('connected');
     } catch {
-      Alert.alert('Could not connect', 'Something went wrong saving your selection. Please try again.');
+      Alert.alert("Couldn't save your selection", 'Try again.');
     } finally {
       setSubmitting(false);
     }
@@ -189,9 +189,9 @@ export default function MetaAdsConnectScreen() {
       'Disconnect Meta?',
       'Your running campaigns will keep serving on Meta, but Brandthread will no longer be able to manage them until you reconnect.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Stay connected', style: 'cancel' },
         {
-          text: 'Disconnect', style: 'destructive', onPress: async () => {
+          text: 'Disconnect Meta', style: 'destructive', onPress: async () => {
             setDisconnecting(true);
             try {
               await api.metaAds.disconnect();
@@ -200,7 +200,7 @@ export default function MetaAdsConnectScreen() {
               setBusinesses(null); setAdAccounts(null); setPages(null);
               setStep('not_connected');
             } catch {
-              Alert.alert('Error', 'Could not disconnect. Please try again.');
+              Alert.alert("Couldn't disconnect Meta", 'Try again.');
             } finally {
               setDisconnecting(false);
             }
@@ -259,7 +259,7 @@ export default function MetaAdsConnectScreen() {
             <Text style={[s.stepTitle, { color: colors.foreground }]}>Choose your Business</Text>
             {pickerLoading && !businesses && <ActivityIndicator color={theme.accentLight} style={{ marginVertical: SP.lg }} />}
             {pickerError && (
-              <EmptyState icon="alert-circle" title="Something went wrong" description={pickerError} action={{ label: 'Retry', onPress: loadBusinesses }} />
+              <EmptyState icon="alert-circle" title="Couldn't load Meta accounts" description={pickerError} action={{ label: 'Retry', onPress: loadBusinesses }} />
             )}
             {businesses && businesses.length === 0 && !pickerError && (
               <EmptyState icon="briefcase" title="No businesses found" description="Create a Meta Business Manager account first, then retry." action={{ label: 'Retry', onPress: loadBusinesses }} />

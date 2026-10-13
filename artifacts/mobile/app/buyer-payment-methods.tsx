@@ -87,7 +87,7 @@ export default function BuyerPaymentMethodsScreen() {
       await api.reviews.setDefaultPaymentMethod(pm.id);
       setPaymentMethods(prev => prev.map(p => ({ ...p, isDefault: p.id === pm.id })));
     } catch {
-      Alert.alert('Error', 'Could not make this card your default. Please try again.');
+      Alert.alert("Couldn't set default card", 'Try again.');
     } finally {
       setSettingDefault(null);
     }
@@ -98,9 +98,9 @@ export default function BuyerPaymentMethodsScreen() {
       'Remove card',
       `Remove your ${pm.brand.charAt(0).toUpperCase() + pm.brand.slice(1)} ending in ${pm.last4}?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep', style: 'cancel' },
         {
-          text: 'Remove', style: 'destructive',
+          text: 'Remove card', style: 'destructive',
           onPress: async () => {
             haptics.warning();
             setRemoving(pm.id);
@@ -108,7 +108,7 @@ export default function BuyerPaymentMethodsScreen() {
               await api.reviews.removePaymentMethod(pm.id) as any;
               setPaymentMethods(prev => prev.filter(p => p.id !== pm.id));
             } catch {
-              Alert.alert('Error', 'Could not remove this card. Please try again.');
+              Alert.alert("Couldn't remove card", 'Try again.');
             } finally {
               setRemoving(null);
             }

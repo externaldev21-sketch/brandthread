@@ -103,7 +103,7 @@ export default function MediaViewer({
       else if (result === 'denied') Alert.alert('Permission needed', 'Allow photo library access in Settings to save.');
       else Alert.alert('Unavailable', mediaLibraryUnavailableMessage());
     } catch {
-      Alert.alert('Save failed', 'Could not save the photo.');
+      Alert.alert("Couldn't save photo", 'Try again.');
     } finally {
       setIsSaving(false);
     }

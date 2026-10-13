@@ -149,7 +149,7 @@ export default function FreelancerJobsScreen() {
       await load();
     } catch (e) {
       haptics.error();
-      Alert.alert('Action failed', apiErrorMessage(e));
+      Alert.alert("Couldn't update job", apiErrorMessage(e));
     } finally {
       setBusyId(null);
     }
@@ -193,8 +193,8 @@ export default function FreelancerJobsScreen() {
       'Approve delivery?',
       `${formatPrice(job.freelancerPayoutCents)} is released to ${job.freelancerName ?? 'the freelancer'}. This can't be undone.`,
       [
-        { text: 'Approve', onPress: () => review(job, 'approve') },
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Approve work', onPress: () => review(job, 'approve') },
+        { text: 'Not yet', style: 'cancel' },
       ],
     );
   };

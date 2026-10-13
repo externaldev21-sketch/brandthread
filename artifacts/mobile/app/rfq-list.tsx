@@ -56,7 +56,7 @@ export default function RfqListScreen() {
   const handleCancel = (rfq: Rfq) => {
     Alert.alert('Withdraw RFQ', `Withdraw the request for ${rfq.garmentType}? Manufacturers will no longer be able to quote it.`, [
       { text: 'Keep it', style: 'cancel' },
-      { text: 'Withdraw', style: 'destructive', onPress: () => cancelRfq(rfq.id).then(load).catch(() => Alert.alert('Could not withdraw', 'Please try again.')) },
+      { text: 'Withdraw RFQ', style: 'destructive', onPress: () => cancelRfq(rfq.id).then(load).catch(() => Alert.alert("Couldn't withdraw RFQ", 'Try again.')) },
     ]);
   };
 

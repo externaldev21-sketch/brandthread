@@ -142,7 +142,7 @@ export default function PayoutScheduleScreen() {
       `Cash out ${formatCents(max)} instantly?`,
       `A ${formatCents(quote.fee)} fee is taken from your balance. The money reaches your debit card ···${info.instant.destination?.last4 ?? ''} in minutes.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Not now', style: 'cancel' },
         {
           text: 'Cash out',
           onPress: () => {
@@ -167,12 +167,12 @@ export default function PayoutScheduleScreen() {
                 }
                 haptics.error();
                 Alert.alert(
-                  'Could not cash out',
+                  "Couldn't cash out",
                   error instanceof ApiError && error.code === 'BALANCE_CHANGED'
                     ? 'Your balance changed. Review the new amount and try again.'
                     : error instanceof ApiError && error.code === 'INSTANT_PAYOUT_UNAVAILABLE'
                       ? 'Your card is not enabled for instant payouts.'
-                      : 'The cash-out could not be confirmed. Try again to safely retry the same request.',
+                      : "Cash-out wasn't confirmed. Try again. You won't be charged twice.",
                 );
               } finally {
                 setCashing(false);

@@ -132,10 +132,10 @@ export default function QuoteCompareScreen() {
   useEffect(() => { load(); }, [load]);
 
   async function handleAccept(quoteId: string) {
-    Alert.alert('Accept Quote', 'Accept this quote and proceed to production?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert('Accept quote?', 'Accept this quote and proceed to production?', [
+      { text: 'Not yet', style: 'cancel' },
       {
-        text: 'Accept', onPress: async () => {
+        text: 'Accept quote', onPress: async () => {
           await acceptQuote(quoteId);
           haptics.success();
           goBackOr(router);

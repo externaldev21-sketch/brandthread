@@ -152,7 +152,7 @@ export default function ProductSizeChartScreen() {
         { text: 'OK', onPress: () => goBackOr(router) },
       ]);
     } catch {
-      Alert.alert('Error', 'Could not save size chart. Please try again.');
+      Alert.alert("Couldn't save size chart", 'Try again.');
     } finally {
       setSaving(false);
     }
@@ -160,15 +160,15 @@ export default function ProductSizeChartScreen() {
 
   async function clearChart() {
     Alert.alert('Remove size chart?', 'This will remove the size chart from this product.', [
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Keep', style: 'cancel' },
       {
-        text: 'Remove', style: 'destructive',
+        text: 'Remove chart', style: 'destructive',
         onPress: async () => {
           setSaving(true);
           try {
             await (api as any).products.update(productId, { sizeChart: null });
             goBackOr(router);
-          } catch { Alert.alert('Error', 'Could not remove size chart.'); }
+          } catch { Alert.alert("Couldn't remove size chart", 'Try again.'); }
           finally { setSaving(false); }
         },
       },

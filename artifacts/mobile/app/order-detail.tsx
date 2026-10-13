@@ -850,7 +850,7 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
 
   function shareOrderInvoice() {
     if (!order) return;
-    shareInvoice(invoiceFromSellerOrder(order)).catch((err: any) => Alert.alert('Could not create invoice', err?.message ?? 'Please try again.'));
+    shareInvoice(invoiceFromSellerOrder(order)).catch((err: any) => Alert.alert("Couldn't create invoice", err?.message ?? 'Try again.'));
   }
 
   function printPackingSlip() {

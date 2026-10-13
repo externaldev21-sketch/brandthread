@@ -50,7 +50,7 @@ export default function OrderCardBubble({
         {
           text: 'Decline', style: 'destructive', onPress: async () => {
             setBusy('decline'); setError(null);
-            try { await declineOrderCard(order.id); onChanged(); } catch (e: any) { setError(e?.message ?? 'Could not decline. Try again.'); } finally { setBusy(null); }
+            try { await declineOrderCard(order.id); onChanged(); } catch (e: any) { setError(e?.message ?? "Couldn't decline. Try again."); } finally { setBusy(null); }
           },
         },
       ],
@@ -63,7 +63,7 @@ export default function OrderCardBubble({
       {
         text: 'It arrived', onPress: async () => {
           setBusy('confirm'); setError(null);
-          try { await confirmOrderDelivery(order.id); onChanged(); } catch (e: any) { setError(e?.message ?? 'Could not confirm delivery. Try again.'); } finally { setBusy(null); }
+          try { await confirmOrderDelivery(order.id); onChanged(); } catch (e: any) { setError(e?.message ?? "Couldn't confirm delivery. Try again."); } finally { setBusy(null); }
         },
       },
     ]);
