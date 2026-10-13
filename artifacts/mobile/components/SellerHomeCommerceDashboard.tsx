@@ -41,7 +41,9 @@ import SetupCelebration from '@/components/SetupCelebration';
 import LaunchChecklistCard from '@/components/LaunchChecklistCard';
 import DashboardTopCard, { pickTopCard, type DashboardTopCardCandidate } from '@/components/dashboard/DashboardTopCard';
 import MorningBriefCard from '@/components/dashboard/MorningBriefCard';
+import MilestoneCard from '@/components/dashboard/MilestoneCard';
 import { useMorningBrief } from '@/hooks/useMorningBrief';
+import { useMilestone } from '@/hooks/useMilestone';
 import { TOP_CARD_PRIORITY } from '@/lib/dashboardTopCard';
 import { primaryActionRoute } from '@/lib/morningBrief';
 import { hapticLight } from '@/lib/haptics';
@@ -282,6 +284,7 @@ export default function SellerHomeCommerceDashboard({
 
   const data = selectSellerHomeAnalytics(snapshot, analyticsUserId, range);
   const morningBrief = useMorningBrief(userId, storeContextTick);
+  const milestone = useMilestone(userId, storeContextTick);
 
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
   const [celebrationVisible, setCelebrationVisible] = useState(false);
@@ -660,6 +663,14 @@ export default function SellerHomeCommerceDashboard({
   // ── The one top-card slot (milestones, morning brief, …). While it shows a
   // card, the bottom setup prompts wait, so only one promo is on screen. ──
   const topCard = pickTopCard<DashboardTopCardCandidate>([
+    {
+      key: 'milestone',
+      priority: TOP_CARD_PRIORITY.milestone,
+      visible: milestone.milestone !== null,
+      render: () => milestone.milestone && (
+        <MilestoneCard milestone={milestone.milestone} theme={theme} onDone={milestone.markSeen} />
+      ),
+    },
     {
       key: 'morning-brief',
       priority: TOP_CARD_PRIORITY.morningBrief,

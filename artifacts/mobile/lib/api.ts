@@ -8,6 +8,7 @@ import { prepareImageForUpload } from '@/lib/imageUploadPrep';
 import { useAuth } from '@clerk/expo';
 import type { LaunchChecklistResponse } from '@/lib/launchChecklist';
 import type { MorningBrief } from '@/lib/morningBrief';
+import type { SellerMilestone } from '@/lib/milestones';
 import type {
   AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
   ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
@@ -2345,6 +2346,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Yesterday's sales, orders to ship and one suggestion, in the seller's own day. */
       morningBrief: (tz: string) =>
         get<MorningBrief>(`/api/seller/morning-brief?tz=${encodeURIComponent(tz)}`),
+      milestones: {
+        /** Records newly reached milestones; the highest unseen one, or null. */
+        next: () => get<SellerMilestone | null>('/api/seller/milestones/next'),
+        seen: (key: string) => post<void>(`/api/seller/milestones/${encodeURIComponent(key)}/seen`, {}),
+      },
       launchChecklist: {
         get: () => get<LaunchChecklistResponse>('/api/seller/launch-checklist'),
         previewSeen: () => post<void>('/api/seller/launch-checklist/preview-seen', {}),
