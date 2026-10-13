@@ -214,7 +214,7 @@ export default function CustomersScreen() {
                 if (s.key === 'top') setSortBy('spend');
               }}
               noMinHeight
-              style={[styles.segmentTab, active && { backgroundColor: colors.surface }]}
+              style={[styles.segmentTab, active && { backgroundColor: colors.border }]}
               accessibilityRole="tab"
               accessibilityLabel={s.label}
               accessibilityState={{ selected: active }}
