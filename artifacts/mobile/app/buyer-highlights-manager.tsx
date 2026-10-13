@@ -4,11 +4,10 @@
  * the create form; tapping a highlight → `?edit=<id>` opens that highlight)
  * and from the profile menu.
  */
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TextInput, Modal, Platform, Alert, Pressable,
+  View, Text, StyleSheet, FlatList, TextInput, Alert,
 } from 'react-native';
-import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -20,13 +19,12 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { hapticSelection, hapticSuccessAction, hapticDestructiveConfirm, hapticLight } from '@/lib/haptics';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { Button } from '@/components/ui';
 import {
   loadHighlights, createHighlight, updateHighlight, deleteHighlight,
   reorderHighlights, type Highlight,
 } from '@/lib/highlightsService';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { canSyncSocialServer } from '@/services/socialService';
@@ -37,7 +35,7 @@ const EMOJIS = ['✨', '🌟', '💜', '🎵', '🌿', '🔥', '💫', '🌙', '
 
 function HLFormModal({
   visible, title, label, setLabel, emoji, setEmoji, coverColor, setCoverColor, coverColors,
-  onSave, onSelectStories, onClose, s, insets, colors,
+  onSave, onSelectStories, onClose, s, colors,
 }: {
   visible: boolean; title: string;
   label: string; setLabel: (v: string) => void;
@@ -46,117 +44,94 @@ function HLFormModal({
   coverColors: string[];
   onSave: () => void; onSelectStories?: () => void; onClose: () => void;
   s: ReturnType<typeof makeStyles>;
-  insets: { bottom: number };
   colors: ReturnType<typeof useColors>;
 }) {
   // Emoji grid inlines into this same sheet instead of a modal-on-modal
   // (a second Modal on top of this one won't present on iOS).
   const [emojiGridOpen, setEmojiGridOpen] = useState(false);
 
+  useEffect(() => { if (visible) setEmojiGridOpen(false); }, [visible]);
+
+  // Instagram "New highlight" sheet on the shared chrome: title + close, the
+  // form in the body, Save pinned above the keyboard.
   return (
-    <Modal
+    <Sheet
       visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      onShow={() => setEmojiGridOpen(false)}
+      onClose={onClose}
+      title={title}
+      primaryAction={{ label: 'Save', onPress: onSave, disabled: !label.trim() }}
     >
-      <ModalSafeArea>
-        <View style={sheet.backdrop}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={onClose}
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-          />
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={sheet.kbWrap}
-          >
-            <View style={[sheet.sheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + SPACING.md }]}>
-              <View style={[sheet.handle, { backgroundColor: colors.border }]} />
-              <Text style={[sheet.sheetTitle, { color: colors.foreground }]}>{title}</Text>
+      {/* Emoji picker trigger */}
+      <PressableScale
+        style={s.emojiTrigger}
+        onPress={() => { hapticSelection(); setEmojiGridOpen(v => !v); }}
+        accessibilityRole="button"
+        accessibilityLabel="Change highlight emoji"
+      >
+        <Text style={{ fontSize: 36 }}>{emoji}</Text>
+        <Text style={[s.emojiHint, { color: colors.mutedForeground }]}>
+          {emojiGridOpen ? 'Choose below' : 'Tap to change'}
+        </Text>
+      </PressableScale>
 
-              {/* Emoji picker trigger */}
-              <PressableScale
-                style={s.emojiTrigger}
-                onPress={() => { hapticSelection(); setEmojiGridOpen(v => !v); }}
-                accessibilityRole="button"
-                accessibilityLabel="Change highlight emoji"
-              >
-                <Text style={{ fontSize: 36 }}>{emoji}</Text>
-                <Text style={[s.emojiHint, { color: colors.mutedForeground }]}>
-                  {emojiGridOpen ? 'Choose below' : 'Tap to change'}
-                </Text>
-              </PressableScale>
-
-              {emojiGridOpen && (
-                <View style={s.emojiGrid}>
-                  {EMOJIS.map(e => (
-                    <PressableScale
-                      key={e}
-                      style={s.emojiBtn}
-                      onPress={() => { hapticSelection(); setEmoji(e); setEmojiGridOpen(false); }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Use ${e} as the emoji`}
-                    >
-                      <Text style={{ fontSize: 28 }}>{e}</Text>
-                    </PressableScale>
-                  ))}
-                </View>
-              )}
-
-              {/* Label input */}
-              <TextInput
-                style={[s.labelInput, { borderColor: colors.primary, color: colors.foreground }]}
-                value={label}
-                onChangeText={setLabel}
-                placeholder="Highlight name"
-                placeholderTextColor={colors.mutedForeground}
-                maxLength={20}
-                autoFocus
-              />
-
-              {/* Cover colour */}
-              <Text style={[s.colorLabel, { color: colors.mutedForeground }]}>Cover color</Text>
-              <View style={s.colorRow}>
-                {coverColors.map(c => (
-                  <PressableScale
-                    key={c}
-                    noMinHeight
-                    style={[s.colorSwatch, { backgroundColor: c }, coverColor === c && [s.colorSwatchActive, { borderColor: colors.foreground }]]}
-                    onPress={() => { hapticSelection(); setCoverColor(c); }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Use this color as the cover`}
-                    accessibilityState={{ selected: coverColor === c }}
-                  />
-                ))}
-              </View>
-
-              {onSelectStories ? (
-                <PressableScale
-                  style={[s.selectStories, { borderColor: colors.border }]}
-                  onPress={() => { hapticSelection(); onSelectStories(); }}
-                  disabled={!label.trim()}
-                  accessibilityRole="button"
-                  accessibilityLabel="Select stories for this highlight"
-                  testID="highlight-select-stories"
-                >
-                  <Feather name="image" size={18} color={colors.foreground} />
-                  <Text style={[s.selectStoriesLabel, { color: colors.foreground }]}>Select stories</Text>
-                  <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
-                </PressableScale>
-              ) : null}
-
-              <View style={s.modalActions}>
-                <View style={{ flex: 1 }}><Button label="Cancel" variant="secondary" onPress={onClose} fullWidth /></View>
-                <View style={{ flex: 1 }}><Button label="Save" variant="primary" onPress={onSave} disabled={!label.trim()} fullWidth /></View>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
+      {emojiGridOpen && (
+        <View style={s.emojiGrid}>
+          {EMOJIS.map(e => (
+            <PressableScale
+              key={e}
+              style={s.emojiBtn}
+              onPress={() => { hapticSelection(); setEmoji(e); setEmojiGridOpen(false); }}
+              accessibilityRole="button"
+              accessibilityLabel={`Use ${e} as the emoji`}
+            >
+              <Text style={{ fontSize: 28 }}>{e}</Text>
+            </PressableScale>
+          ))}
         </View>
-      </ModalSafeArea>
-    </Modal>
+      )}
+
+      {/* Label input */}
+      <TextInput
+        style={[s.labelInput, { borderColor: colors.primary, color: colors.foreground }]}
+        value={label}
+        onChangeText={setLabel}
+        placeholder="Highlight name"
+        placeholderTextColor={colors.mutedForeground}
+        maxLength={20}
+        autoFocus
+      />
+
+      {/* Cover colour */}
+      <Text style={[s.colorLabel, { color: colors.mutedForeground }]}>Cover color</Text>
+      <View style={s.colorRow}>
+        {coverColors.map(c => (
+          <PressableScale
+            key={c}
+            noMinHeight
+            style={[s.colorSwatch, { backgroundColor: c }, coverColor === c && [s.colorSwatchActive, { borderColor: colors.foreground }]]}
+            onPress={() => { hapticSelection(); setCoverColor(c); }}
+            accessibilityRole="button"
+            accessibilityLabel={`Use this color as the cover`}
+            accessibilityState={{ selected: coverColor === c }}
+          />
+        ))}
+      </View>
+
+      {onSelectStories ? (
+        <PressableScale
+          style={[s.selectStories, { borderColor: colors.border }]}
+          onPress={() => { hapticSelection(); onSelectStories(); }}
+          disabled={!label.trim()}
+          accessibilityRole="button"
+          accessibilityLabel="Select stories for this highlight"
+          testID="highlight-select-stories"
+        >
+          <Feather name="image" size={18} color={colors.foreground} />
+          <Text style={[s.selectStoriesLabel, { color: colors.foreground }]}>Select stories</Text>
+          <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+        </PressableScale>
+      ) : null}
+    </Sheet>
   );
 }
 
@@ -381,7 +356,6 @@ export default function BuyerHighlightsManager() {
         onSelectStories={canSelectStories ? handleSelectStoriesCreate : undefined}
         onClose={() => setCreating(false)}
         s={s}
-        insets={insets}
         colors={colors}
       />
       <HLFormModal
@@ -398,7 +372,6 @@ export default function BuyerHighlightsManager() {
         onSelectStories={canSelectStories ? handleSelectStoriesEdit : undefined}
         onClose={() => setEditing(null)}
         s={s}
-        insets={insets}
         colors={colors}
       />
     </View>
@@ -425,13 +398,4 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   colorSwatchActive: { borderWidth: 3 },
   selectStories: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: RADII.input, paddingHorizontal: SPACING.md, height: 48, marginBottom: SPACING.md },
   selectStoriesLabel: { flex: 1, fontFamily: FONT.medium, ...TYPE_SCALE.body },
-  modalActions: { flexDirection: 'row', gap: SPACING.sm },
-});
-
-const sheet = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  kbWrap: { justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: RADII.sheet, borderTopRightRadius: RADII.sheet, padding: SPACING.lg },
-  handle: { width: 36, height: 4, borderRadius: RADII.pill, alignSelf: 'center', marginBottom: SPACING.md, opacity: 0.5 },
-  sheetTitle: { fontFamily: FONT.bold, ...TYPE_SCALE.title2, marginBottom: SPACING.md },
 });

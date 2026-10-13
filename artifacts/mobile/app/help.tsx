@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Linking, Alert, ActivityIndicator, Modal,
+  StyleSheet, Linking, Alert, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -9,10 +9,11 @@ import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
   BrandthreadCard, SearchBar, SectionHeader, FilterChip, FormInput,
-  PrimaryButton, EmptyState, SheetHandle, NavigationCard,
+  PrimaryButton, EmptyState, NavigationCard,
 } from '@/components/BrandthreadUI';
 
 type Category = 'General' | 'Billing' | 'Account' | 'Bug' | 'Feature';
@@ -55,6 +56,10 @@ export default function HelpScreen() {
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [article, setArticle] = useState<Faq | null>(null);
+  // Keep the last article on screen while the sheet animates closed.
+  const lastArticle = useRef<Faq | null>(null);
+  if (article) lastArticle.current = article;
+  const shownArticle = article ?? lastArticle.current;
 
   // Ticket form state
   const [subject, setSubject]       = useState('');
@@ -279,35 +284,26 @@ export default function HelpScreen() {
         </View>
       </ScrollView>
 
-      {/* Article sheet */}
-      <Modal
+      {/* Article sheet — Apple Support article sheet: category as the title,
+          the question and answer as the body, contact pinned at the bottom. */}
+      <Sheet
         visible={!!article}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setArticle(null)}
+        onClose={() => setArticle(null)}
+        title={shownArticle?.category ?? ''}
+        maxHeightRatio={0.8}
+        testID="help-article-sheet"
+        primaryAction={{
+          label: 'Contact support',
+          onPress: () => { setArticle(null); setTimeout(scrollToContact, 250); },
+        }}
       >
-        <View style={s.sheetBackdrop}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setArticle(null)} />
-          <View style={s.sheetCard}>
-            <SheetHandle />
-            {article && (
-              <ScrollView contentContainerStyle={{ padding: SP.md, paddingTop: SP.xs, gap: SP.sm, paddingBottom: SP.xl }} showsVerticalScrollIndicator={false}>
-                <View style={s.sheetCategoryPill}>
-                  <Text style={[s.sheetCategoryText, { color: theme.accent }]}>{article.category}</Text>
-                </View>
-                <Text style={s.sheetTitle}>{article.q}</Text>
-                <Text style={s.sheetBody}>{article.a}</Text>
-                <PrimaryButton
-                  label="Still need help? Contact support"
-                  onPress={() => { setArticle(null); setTimeout(scrollToContact, 250); }}
-                  icon="life-buoy"
-                  style={{ marginTop: SP.md }}
-                />
-              </ScrollView>
-            )}
+        {shownArticle && (
+          <View style={{ gap: SP.sm }}>
+            <Text style={s.sheetTitle}>{shownArticle.q}</Text>
+            <Text style={s.sheetBody}>{shownArticle.a}</Text>
           </View>
-        </View>
-      </Modal>
+        )}
+      </Sheet>
     </View>
   );
 }
@@ -335,10 +331,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   submittedText:   { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   sendAnotherText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, textDecorationLine: 'underline' },
 
-  sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheetCard:     { maxHeight: '80%', backgroundColor: theme.background, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, borderWidth: 1, borderColor: theme.border },
-  sheetCategoryPill: { alignSelf: 'flex-start', backgroundColor: theme.accentDim, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4 },
-  sheetCategoryText: { fontSize: FS.xs, fontFamily: FONT.bold, letterSpacing: 0.3, textTransform: 'uppercase' },
   sheetTitle:    { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.3 },
   sheetBody:     { fontSize: FS.base, fontFamily: FONT.regular, color: theme.muted, lineHeight: 23 },
 });

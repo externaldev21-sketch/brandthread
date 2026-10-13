@@ -1,18 +1,14 @@
 import React, { useState, useCallback } from 'react';
 import {
-  Modal,
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
-  Platform,
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { Button } from '@/components/ui/Button';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet, SheetButton, SHEET_GUTTER } from '@/components/ui/BottomSheet';
+import { OptionRadio } from '@/components/ui/OptionSheet';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -317,7 +313,6 @@ const calStyles = StyleSheet.create({
 
 export default function DateRangePicker({ visible, current, onApply, onClose }: Props) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const isDark = colors.background === '#121110' || colors.background.startsWith('#0');
 
   const PRESETS = buildPresets();
@@ -330,7 +325,6 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
   const [rangeStart, setRangeStart] = useState<Date | null>(current.start);
   const [rangeEnd, setRangeEnd] = useState<Date | null>(current.end);
 
-  const primary = colors.primary;
 
   function selectPreset(id: PresetId) {
     setSelectedId(id);
@@ -387,182 +381,109 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
       : `${fmtFull(rangeStart)} – select end`
     : 'Select a start date';
 
-  const bottomPad = Platform.OS === 'ios' ? insets.bottom : 16;
-
+  // Shopify "Date range" sheet: preset rows with a trailing radio, a month
+  // calendar for a custom range, and the selected range above Apply.
   return (
-    <Modal
+    <Sheet
       visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      {/* Backdrop */}
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-
-      {/* Sheet */}
-      <SheetRise style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {/* Handle */}
-        <View style={[styles.handle, { backgroundColor: colors.border }]} />
-
-        {/* Title */}
-        <View style={[styles.titleRow, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.title, { color: colors.foreground }]}>Select Period</Text>
-          <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
-            <Feather name="x" size={20} color={colors.mutedForeground} />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-          {/* Preset list */}
-          <View style={[styles.presetSection, { borderBottomColor: colors.border }]}>
-            {PRESETS.map((p) => {
-              const active = selectedId === p.id;
-              return (
-                <TouchableOpacity
-                  key={p.id}
-                  style={[
-                    styles.presetRow,
-                    active && { backgroundColor: `${primary}12` },
-                  ]}
-                  onPress={() => selectPreset(p.id)}
-                  activeOpacity={0.7}
-                >
-                  {/* Radio */}
-                  <View style={[styles.radio, { borderColor: active ? primary : colors.border }]}>
-                    {active && <View style={[styles.radioDot, { backgroundColor: primary }]} />}
-                  </View>
-                  <Text style={[styles.presetLabel, { color: colors.foreground }]}>{p.label}</Text>
-                  <Text style={[styles.presetHint, { color: colors.mutedForeground }]}>{p.hint}</Text>
-                  {active && (
-                    <Feather name="check" size={14} color={primary} style={{ marginLeft: 4 }} />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Calendar (custom range only) */}
-          {selectedId === 'custom' && (
-            <View style={[styles.calSection, { borderBottomColor: colors.border }]}>
-              {/* Month navigation */}
-              <View style={styles.monthNav}>
-                <TouchableOpacity onPress={prevMonth} activeOpacity={0.7} style={styles.navBtn}>
-                  <Feather name="chevron-left" size={18} color={colors.foreground} />
-                </TouchableOpacity>
-                <Text style={[styles.monthTitle, { color: colors.foreground }]}>
-                  {MONTH_NAMES[calMonth.getMonth()]} {calMonth.getFullYear()}
-                </Text>
-                <TouchableOpacity onPress={nextMonth} activeOpacity={0.7} style={styles.navBtn}>
-                  <Feather name="chevron-right" size={18} color={colors.foreground} />
-                </TouchableOpacity>
-              </View>
-
-              <Calendar
-                month={calMonth}
-                rangeStart={rangeStart}
-                rangeEnd={rangeEnd}
-                onDayPress={handleDayPress}
-                colors={colors}
-                isDark={isDark}
-              />
-
-              {/* Tap hint */}
-              <Text style={[styles.calHint, { color: colors.mutedForeground }]}>
-                {rangeStart && !rangeEnd ? 'Tap a second date to set the end' : 'Tap a date to start selection'}
-              </Text>
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Bottom bar */}
-        <View style={[styles.bottomBar, { borderTopColor: colors.border, paddingBottom: bottomPad }]}>
+      onClose={onClose}
+      title="Date range"
+      padded={false}
+      maxHeightRatio={0.88}
+      testID="date-range-sheet"
+      footer={(
+        <>
           <View style={styles.rangeLabel}>
             <Feather name="calendar" size={13} color={colors.mutedForeground} />
             <Text style={[styles.rangeLabelText, { color: colors.mutedForeground }]} numberOfLines={1}>
               {rangeLabel}
             </Text>
           </View>
-          <View style={styles.actions}>
-            <Button label="Cancel" variant="secondary" size="small" style={styles.flex1} onPress={onClose} />
-            <Button label="Apply" variant="primary" size="small" style={styles.flex1} onPress={handleApply} />
+          <SheetButton label="Apply" onPress={handleApply} disabled={!rangeStart} />
+        </>
+      )}
+    >
+      {/* Preset list */}
+      <View style={styles.presetSection}>
+        {PRESETS.map((p, i) => {
+          const active = selectedId === p.id;
+          return (
+            <React.Fragment key={p.id}>
+              <TouchableOpacity
+                style={styles.presetRow}
+                onPress={() => selectPreset(p.id)}
+                activeOpacity={0.7}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={p.label}
+              >
+                <Text style={[styles.presetLabel, { color: colors.foreground }]}>{p.label}</Text>
+                <Text style={[styles.presetHint, { color: colors.mutedForeground }]}>{p.hint}</Text>
+                <OptionRadio selected={active} color={colors.foreground} />
+              </TouchableOpacity>
+              {i < PRESETS.length - 1 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+            </React.Fragment>
+          );
+        })}
+      </View>
+
+      {/* Calendar (custom range only) */}
+      {selectedId === 'custom' && (
+        <View style={[styles.calSection, { borderTopColor: colors.border }]}>
+          {/* Month navigation */}
+          <View style={styles.monthNav}>
+            <TouchableOpacity onPress={prevMonth} activeOpacity={0.7} style={styles.navBtn} accessibilityRole="button" accessibilityLabel="Previous month">
+              <Feather name="chevron-left" size={18} color={colors.foreground} />
+            </TouchableOpacity>
+            <Text style={[styles.monthTitle, { color: colors.foreground }]}>
+              {MONTH_NAMES[calMonth.getMonth()]} {calMonth.getFullYear()}
+            </Text>
+            <TouchableOpacity onPress={nextMonth} activeOpacity={0.7} style={styles.navBtn} accessibilityRole="button" accessibilityLabel="Next month">
+              <Feather name="chevron-right" size={18} color={colors.foreground} />
+            </TouchableOpacity>
           </View>
+
+          <Calendar
+            month={calMonth}
+            rangeStart={rangeStart}
+            rangeEnd={rangeEnd}
+            onDayPress={handleDayPress}
+            colors={colors}
+            isDark={isDark}
+          />
+
+          {/* Tap hint */}
+          <Text style={[styles.calHint, { color: colors.mutedForeground }]}>
+            {rangeStart && !rangeEnd ? 'Tap a second date to set the end' : 'Tap a date to start selection'}
+          </Text>
         </View>
-      </SheetRise>
-    </Modal>
+      )}
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: '#00000055',
-  },
-  sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    maxHeight: '88%',
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-  },
-  title: { fontSize: 17, fontFamily: 'Inter_700Bold' },
-
   // Presets
-  presetSection: { borderBottomWidth: 1, paddingVertical: 6 },
+  presetSection: { paddingHorizontal: SHEET_GUTTER },
   presetRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 13,
+    minHeight: 52,
+    paddingVertical: 12,
     gap: 12,
   },
-  radio: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioDot: { width: 8, height: 8, borderRadius: 4 },
+  divider: { height: StyleSheet.hairlineWidth },
   presetLabel: { flex: 1, fontSize: 15, fontFamily: 'Inter_500Medium' },
   presetHint: { fontSize: 12, fontFamily: 'Inter_400Regular' },
 
   // Calendar
-  calSection: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1 },
+  calSection: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
   monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   navBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   monthTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   calHint: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 10 },
 
-  // Bottom
-  bottomBar: {
-    borderTopWidth: 1,
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    gap: 10,
-  },
+  // Footer
   rangeLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   rangeLabelText: { fontSize: 13, fontFamily: 'Inter_400Regular', flex: 1 },
-  actions: { flexDirection: 'row', gap: 10 },
-  flex1: { flex: 1 },
 });

@@ -14,8 +14,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { previewSellerBrandName } from '@/lib/previewIdentity';
 import { isSellerDevPreview } from '@/lib/devPreview';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
@@ -30,6 +29,9 @@ import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
 import { SELLER_SETTINGS_CATALOG, SettingsCatalogItem } from '@/services/settingsCatalog';
 import { ConfirmSheet } from '@/components/settings/SettingsKit';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { Sheet, SHEET_GUTTER } from '@/components/ui/BottomSheet';
+import { ListRow } from '@/components/ui/ListRow';
+import { OptionRadio } from '@/components/ui/OptionSheet';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
@@ -356,67 +358,46 @@ function AccountScopeSheet({
 }) {
   const colors = useColors();
   const s = useMemo(() => makeScopeStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
+  // Instagram picker sheet (same rows as OptionSheet: icon, label, subtitle,
+  // trailing radio), with a spinner on the row being saved.
+  const options = [
+    { value: 'global' as const, label: 'Global account', description: 'Make your account available worldwide.', icon: 'globe' as const },
+    { value: 'us' as const, label: 'United States only', description: 'Limit your account to the United States.', icon: 'map-pin' as const },
+  ];
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={s.backdrop}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close account reach options" />
-        <View style={[s.card, { paddingBottom: insets.bottom + 32 }]}>
-          <View style={s.headerRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.title}>Account reach</Text>
-              <Text style={s.subtitle}>Choose where your seller account is available.</Text>
-            </View>
-            <TouchableOpacity style={s.close} onPress={onClose} disabled={!!saving} accessibilityRole="button" accessibilityLabel="Close">
-              <Feather name="x" size={18} color={colors.foreground} />
-            </TouchableOpacity>
-          </View>
-          {loading ? (
-            <View style={{ minHeight: 150, alignItems: 'center', justifyContent: 'center' }}>
-              <ActivityIndicator color={colors.primary} />
-            </View>
-          ) : (
-            <View style={{ gap: 10 }}>
-              <View style={{ gap: 10 }} accessibilityRole="radiogroup">
-                {([
-                  { value: 'global' as const, label: 'Global account', description: 'Make your account available worldwide.', icon: 'globe' as const },
-                  { value: 'us' as const, label: 'United States only', description: 'Limit your account to the United States.', icon: 'map-pin' as const },
-                ]).map((option) => {
-                  const selected = value === option.value;
-                  const isSaving = saving === option.value;
-                  return (
-                    <TouchableOpacity
-                      key={option.value}
-                      testID={`account-reach-${option.value}`}
-                      activeOpacity={0.75}
-                      disabled={!!saving}
-                      accessibilityRole="radio"
-                      accessibilityState={{ selected, disabled: !!saving }}
-                      onPress={() => onChoose(option.value)}
-                      style={[s.option, { borderColor: selected ? colors.primary : colors.border }, selected && { backgroundColor: colors.secondary }]}
-                    >
-                      <View style={s.optionIcon}>
-                        <Feather name={option.icon} size={18} color={colors.foreground} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.optionTitle}>{option.label}</Text>
-                        <Text style={s.optionDescription}>{option.description}</Text>
-                      </View>
-                      {isSaving ? (
-                        <ActivityIndicator size="small" color={colors.primary} />
-                      ) : (
-                        <Feather name={selected ? 'check-circle' : 'circle'} size={20} color={selected ? colors.primary : colors.mutedForeground} />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              {saveError && <Text accessibilityRole="alert" style={s.saveNotice}>{saveError}</Text>}
-            </View>
-          )}
+    <Sheet visible={visible} onClose={onClose} title="Account reach" padded={false} testID="account-reach-sheet">
+      <Text style={s.subtitle}>Choose where your seller account is available.</Text>
+      {loading ? (
+        <View style={s.loading}>
+          <ActivityIndicator color={colors.primary} />
         </View>
-      </View>
-    </Modal>
+      ) : (
+        <View style={s.list} accessibilityRole="radiogroup">
+          {options.map((option, i) => {
+            const selected = value === option.value;
+            const isSaving = saving === option.value;
+            return (
+              <React.Fragment key={option.value}>
+                <ListRow
+                  icon={option.icon}
+                  title={option.label}
+                  subtitle={option.description}
+                  right={isSaving
+                    ? <ActivityIndicator size="small" color={colors.primary} />
+                    : <OptionRadio selected={selected} color={colors.foreground} />}
+                  selected={selected}
+                  disabled={!!saving}
+                  onPress={() => onChoose(option.value)}
+                  testID={`account-reach-${option.value}`}
+                />
+                {i < options.length - 1 && <View style={s.divider} />}
+              </React.Fragment>
+            );
+          })}
+          {saveError && <Text accessibilityRole="alert" style={s.saveNotice}>{saveError}</Text>}
+        </View>
+      )}
+    </Sheet>
   );
 }
 
@@ -463,16 +444,10 @@ function makeListStyles(colors: ReturnType<typeof useColors>) {
 
 function makeScopeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
-    backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: (colors as any).overlay ?? 'rgba(0,0,0,0.68)' },
-    card: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 20, paddingTop: 18 },
-    headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, marginBottom: 18 },
-    title: { fontSize: 20, fontFamily: FONT.bold, color: colors.foreground },
-    subtitle: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 4 },
-    saveNotice: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center' },
-    close: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-    option: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
-    optionIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.secondary },
-    optionTitle: { fontSize: 15, fontFamily: FONT.semibold, color: colors.foreground },
-    optionDescription: { fontSize: 12, lineHeight: 17, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
+    subtitle: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, paddingHorizontal: SHEET_GUTTER, paddingBottom: 8 },
+    loading: { minHeight: 150, alignItems: 'center', justifyContent: 'center' },
+    list: { paddingHorizontal: SHEET_GUTTER },
+    divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+    saveNotice: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', paddingTop: 10 },
   });
 }
