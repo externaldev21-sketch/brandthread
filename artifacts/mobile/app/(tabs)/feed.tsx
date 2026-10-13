@@ -112,7 +112,8 @@ import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGes
 import { getCachedFeedPosts, getFollowGraphVersion, hydrateFeedPostsCache, setCachedFeedPosts } from '@/lib/feedPostsCache';
 
 import { useCommentCountDelta } from '@/lib/commentCountBus';
-
+import { emitSaveHeartEvent } from '@/lib/saved/saveHeartBus';
+import { savedPostToast } from '@/lib/saved/savedPostToast';
 import type { BuyerProduct } from '@/services/cartTypes';
 import { getCart } from '@/services/cartService';
 
@@ -3034,6 +3035,7 @@ export default function FeedScreen({
           const item = itemsById.get(id);
           const title = item?.caption?.trim() || `${item?.creator ?? 'Post'}'s post`;
           await _api.buyer.saved.save({ type: 'post', targetId: postId, title, subtitle: item?.creator, accentColor: item?.accentColor });
+          emitSaveHeartEvent({ type: 'toast', toast: savedPostToast({ ...item, id: postId }) });
         } else {
           await _api.buyer.saved.remove(postId);
         }

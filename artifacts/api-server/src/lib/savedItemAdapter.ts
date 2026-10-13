@@ -6,6 +6,7 @@
 import type { savedItems } from "@workspace/db";
 import { fetchProductBadgeInfo, isBackInStockRecent } from "./savedProductBadges";
 import { deletedProductIds } from "./productVisibility";
+import { fetchSavedPostThumbnails } from "./savedPostThumbnails";
 
 /** Drop saved product rows whose product the seller deleted (target_id has no FK). */
 export async function withoutDeletedProducts<T extends { itemType: string; targetId: string }>(rows: T[]): Promise<T[]> {
@@ -16,7 +17,11 @@ export async function withoutDeletedProducts<T extends { itemType: string; targe
 export async function adaptSavedRows(allRows: (typeof savedItems.$inferSelect)[]) {
   const rows = await withoutDeletedProducts(allRows);
   const productIds = rows.filter((r) => r.itemType === "product").map((r) => r.targetId);
-  const badgeInfo = await fetchProductBadgeInfo(productIds);
+  const postIds = rows.filter((r) => r.itemType === "post").map((r) => r.targetId);
+  const [badgeInfo, postImages] = await Promise.all([
+    fetchProductBadgeInfo(productIds),
+    fetchSavedPostThumbnails(postIds),
+  ]);
 
   return rows.map((r) => {
     const badges = badgeInfo.get(r.targetId);
@@ -35,7 +40,7 @@ export async function adaptSavedRows(allRows: (typeof savedItems.$inferSelect)[]
       savedAt:       r.createdAt?.toISOString() ?? new Date().toISOString(),
       notifyOnPriceDrop: r.notifyOnPriceDrop,
       notifyOnBackInStock: r.notifyOnBackInStock,
-      image:         badges?.image ?? undefined,
+      image:         (r.itemType === "post" ? postImages.get(r.targetId) : badges?.image) ?? undefined,
       brand:         badges?.brand ?? undefined,
       sellerId:      badges?.sellerId ?? undefined,
       priceCents:    currentPriceCents ?? undefined,

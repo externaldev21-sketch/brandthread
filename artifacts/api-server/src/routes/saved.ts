@@ -45,8 +45,9 @@ const targetParams = idParams("targetId");
  * board lists its items by collectionId alone, so an unchecked id would let
  * anyone pin their own titled items onto someone else's shared board.
  */
-async function ownsCollection(userId: string, collectionId: string | null | undefined): Promise<boolean> {
-  if (!collectionId) return true;
+async function ownsCollection(userId: string, collectionId: unknown): Promise<boolean> {
+  if (collectionId === undefined || collectionId === null) return true;
+  if (typeof collectionId !== "string" || !UUID_RE.test(collectionId)) return false;
   const [row] = await db.select({ id: savedCollections.id }).from(savedCollections)
     .where(and(eq(savedCollections.id, collectionId), eq(savedCollections.userId, userId)))
     .limit(1);

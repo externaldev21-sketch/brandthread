@@ -219,6 +219,7 @@ export default function BuyerCollection() {
         </View>
         <View style={styles.tileInfo}>
           {item.brand ? <BrandLink sellerId={item.sellerId} name={item.brand} style={styles.tileBrand} /> : null}
+          {!item.brand && item.type === 'post' && item.subtitle ? <Text style={styles.tileBrand} numberOfLines={1}>{item.subtitle}</Text> : null}
           <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
           {item.priceCents != null ? (
             // Price drop on a wishlisted item (item 137), same as Saved: the
