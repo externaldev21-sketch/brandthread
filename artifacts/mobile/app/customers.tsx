@@ -25,6 +25,8 @@ import {
   type CustomerSort, type SellerCustomer,
 } from '@/lib/sellerCustomers';
 import { buildPreviewCustomers } from '@/lib/previewCustomers';
+import { AlphabetScrubber } from '@/components/AlphabetScrubber';
+import { firstRowByLetter, INDEX_MIN_ROWS, rowForLetter, type IndexLetter } from '@/lib/alphabetIndex';
 
 export default function CustomersScreen() {
   const colors = useColors();
@@ -79,15 +81,32 @@ export default function CustomersScreen() {
 
   const sortedCustomers = useMemo(() => sortCustomers(customers, sortBy), [customers, sortBy]);
 
+  // A–Z index (S5 #100): only for a long list sorted by name.
+  const showIndex = sortBy === 'name' && !loading && !error && sortedCustomers.length >= INDEX_MIN_ROWS;
+  const scrollRef = useRef<ScrollView>(null);
+  const listTopRef = useRef(0);
+  const rowTopsRef = useRef<number[]>([]);
+  const firstRows = useMemo(
+    () => firstRowByLetter(sortedCustomers.map((c) => c.name)),
+    [sortedCustomers],
+  );
+  const jumpToLetter = useCallback((letter: IndexLetter) => {
+    const row = rowForLetter(letter, firstRows, sortedCustomers.length);
+    if (row === null) return;
+    scrollRef.current?.scrollTo({ y: listTopRef.current + (rowTopsRef.current[row] ?? 0), animated: false });
+  }, [firstRows, sortedCustomers.length]);
+
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Customers"
         actions={[{ icon: 'bar-chart-2', onPress: () => router.navigate('/(tabs)/analytics' as never), accessibilityLabel: 'View customer analytics' }]}
       />
+      <View style={{ flex: 1 }}>
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 140, paddingHorizontal: 20 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 140, paddingHorizontal: 20, paddingRight: showIndex ? 32 : 20 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -156,6 +175,7 @@ export default function CustomersScreen() {
               <TouchableOpacity
                 key={c.id}
                 activeOpacity={0.7}
+                onLayout={(e) => { rowTopsRef.current[i] = e.nativeEvent.layout.y; }}
                 style={[styles.custRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
                 onPress={() => router.push(`/customer-orders?customerId=${encodeURIComponent(c.id)}` as never)}
                 accessibilityRole="button"
@@ -184,6 +204,8 @@ export default function CustomersScreen() {
           })
         )}
       </ScrollView>
+      {showIndex ? <View pointerEvents="box-none" style={styles.indexWrap}><AlphabetScrubber onLetter={jumpToLetter} /></View> : null}
+      </View>
       <OptionSheet
         visible={sortOpen}
         onClose={() => setSortOpen(false)}
@@ -200,6 +222,7 @@ export default function CustomersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  indexWrap: { position: 'absolute', top: 0, bottom: 0, right: 0, justifyContent: 'center' },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   searchWrap: { flex: 1, height: 44, flexDirection: 'row', alignItems: 'center', borderRadius: radius.md, paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1 },

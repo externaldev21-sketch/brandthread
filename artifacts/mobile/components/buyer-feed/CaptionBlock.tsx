@@ -54,6 +54,10 @@ export interface RepostFriend {
 // used to hardcode its own clearance and drifted out of sync with this
 // block, letting the drag-time bubble render behind the sound/mute pill.
 export const CAPTION_BLOCK_HEIGHT = 56;
+// Captions show in full up to 3 lines; only longer ones get "more" (S5 #93).
+// ~43 characters fill one line of this block on a 390pt phone.
+const CAPTION_LINES = 3;
+const CAPTION_MORE_CHARS = 43 * CAPTION_LINES;
 export const CAPTION_BLOCK_HEIGHT_WITH_REPOST = 92;
 
 export function CaptionBlock({
@@ -88,7 +92,7 @@ export function CaptionBlock({
   /** Press-in on the creator name: warm the profile it opens. */
   onPressInCreator?: () => void;
   /** Reports this block's real rendered height — bigger than the
-   *  `CAPTION_BLOCK_HEIGHT`/`_WITH_REPOST` *minimums* whenever a 2-line
+   *  `CAPTION_BLOCK_HEIGHT`/`_WITH_REPOST` *minimums* whenever a 3-line
    *  caption, a repost row, or just different font metrics push it taller.
    *  Callers that need to keep some other overlay clear of the whole stack
    *  (the feed's scrub-bubble; see ScrubProgressBar in feed.tsx) should use
@@ -196,15 +200,15 @@ export function CaptionBlock({
       <TouchableOpacity
         style={captionHit.boostStyle}
         onLayout={captionHit.onLayout}
-        onPress={() => caption.length > 86 && onToggleCaptionExpanded()}
-        activeOpacity={caption.length > 86 ? 0.7 : 1}
-        accessibilityRole={caption.length > 86 ? 'button' : 'text'}
-        accessibilityLabel={caption.length > 86 ? (captionExpanded ? 'Collapse caption' : 'Expand caption') : undefined}
+        onPress={() => caption.length > CAPTION_MORE_CHARS && onToggleCaptionExpanded()}
+        activeOpacity={caption.length > CAPTION_MORE_CHARS ? 0.7 : 1}
+        accessibilityRole={caption.length > CAPTION_MORE_CHARS ? 'button' : 'text'}
+        accessibilityLabel={caption.length > CAPTION_MORE_CHARS ? (captionExpanded ? 'Collapse caption' : 'Expand caption') : undefined}
         hitSlop={{ top: 4, bottom: 4 }}
       >
-        <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : 2}>
+        <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : CAPTION_LINES}>
           <CaptionSpans text={translation.text} />
-          {caption.length > 86 && (
+          {caption.length > CAPTION_MORE_CHARS && (
             <Text style={styles.moreText}>{captionExpanded ? '  less' : '  more'}</Text>
           )}
         </Text>
