@@ -1956,8 +1956,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   badgeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CYAN_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
   preOrderBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: CYAN, letterSpacing: 0.4 },
-  saleBadge: { backgroundColor: RED_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
-  saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: RED, letterSpacing: 0.4 },
+  // Item 145: LIVE is the only red; SALE is a white tag, the sale price white.
+  saleBadge: { backgroundColor: FG, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: BG, letterSpacing: 0.4 },
   productName: { ...TYPE.title, color: FG, marginBottom: SP.sm },
   brandLink: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, textDecorationLine: 'underline', alignSelf: 'flex-start', marginBottom: 2 },
   sellerCard: {
@@ -1992,9 +1993,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   vacationText: { color: FG, fontFamily: FONT.medium, fontSize: FS.meta, lineHeight: 18 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   price: { ...TYPE.heading, fontFamily: FONT.bold, color: FG },
-  priceSale: { color: SUCCESS },
+  priceSale: { color: FG },
   comparePrice: { fontSize: FS.base, fontFamily: FONT.regular, color: SUBTLE, textDecorationLine: 'line-through' },
-  savings: { fontSize: FS.sm, fontFamily: FONT.semibold, color: SUCCESS },
+  savings: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   preOrderCard: { backgroundColor: CYAN_DIM, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: `${CYAN}40`, marginBottom: SP.md, gap: 4 },
   preOrderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   preOrderTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: CYAN },
