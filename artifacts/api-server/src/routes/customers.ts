@@ -1,9 +1,18 @@
 import { Router } from "express";
-import { db, customers, orders } from "@workspace/db";
-import { eq, desc, ilike, or, and, sql } from "drizzle-orm";
+import { db, customers } from "@workspace/db";
+import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
+import { normalizeSearchTerm } from "../lib/search";
 import { logger } from "../lib/logger";
+import {
+  findSellerCustomer,
+  isUuid,
+  listSellerCustomers,
+  matchesCustomerSearch,
+  publicCustomer,
+  sellerCustomerOrders,
+  topCustomers,
+} from "../lib/sellerCustomers";
 
 // ─── Startup migration — add tags + notes columns ────────────────────────────
 (async () => {
@@ -18,22 +27,28 @@ import { logger } from "../lib/logger";
 const router = Router();
 router.use(requireAuth);
 
-// GET /api/customers
+// GET /api/customers[?search=][&top=20]
+// Customers derived from the seller's orders (lifetime spend net of refunds,
+// order count, last order), merged with the hand-entered rows that carry tags
+// and notes — see lib/sellerCustomers.ts. Newest order first; `top=N` returns
+// the N biggest lifetime spenders instead.
 router.get("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { search } = req.query;
-  let query = db.select().from(customers).where(eq(customers.ownerId, ownerId)).orderBy(desc(customers.createdAt)).$dynamic();
-  const term = normalizeSearchTerm(search);
-  if (term) {
-    const pattern = containsSearchPattern(term);
-    query = query.where(
-      and(
-        eq(customers.ownerId, ownerId),
-        or(ilike(customers.name, pattern), ilike(customers.email, pattern))
-      )
-    );
+  try {
+    const term = normalizeSearchTerm(req.query.search);
+    let list = await listSellerCustomers(ownerId);
+    if (term) list = list.filter((c) => matchesCustomerSearch(c, term));
+    const top = Number.parseInt(String(req.query.top ?? ""), 10);
+    if (Number.isFinite(top) && top > 0) {
+      list = topCustomers(list, Math.min(top, 100));
+    } else {
+      list.sort((a, b) => (b.lastOrderAt ?? b.createdAt).localeCompare(a.lastOrderAt ?? a.createdAt));
+    }
+    res.json(list.map(publicCustomer));
+  } catch (err) {
+    req.log.error({ err }, "Failed to list customers");
+    res.status(500).json({ error: "Failed to load customers" });
   }
-  res.json(await query);
 });
 
 // POST /api/customers
@@ -56,22 +71,24 @@ router.post("/", async (req, res) => {
 });
 
 // GET /api/customers/:id
+// :id is a list id (buyer_…, guest_… or a hand-entered row's uuid).
 router.get("/:id", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const [customer] = await db.select().from(customers)
-    .where(and(eq(customers.id, req.params.id), eq(customers.ownerId, ownerId)))
-    .limit(1);
-  if (!customer) { res.status(404).json({ error: "Not found" }); return; }
-  const recentOrders = await db.select().from(orders)
-    .where(and(eq(orders.customerId, customer.id), eq(orders.ownerId, ownerId)))
-    .orderBy(desc(orders.createdAt))
-    .limit(10);
-  res.json({ ...customer, recentOrders });
+  try {
+    const customer = await findSellerCustomer(ownerId, String(req.params.id));
+    if (!customer) { res.status(404).json({ error: "Not found" }); return; }
+    const recentOrders = (await sellerCustomerOrders(ownerId, customer)).slice(0, 10);
+    res.json({ ...publicCustomer(customer), recentOrders });
+  } catch (err) {
+    req.log.error({ err }, "Failed to load customer");
+    res.status(500).json({ error: "Failed to load customer" });
+  }
 });
 
 // PUT /api/customers/:id
 router.put("/:id", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
+  if (!isUuid(String(req.params.id))) { res.status(404).json({ error: "Not found" }); return; }
   const { name, phone, address, tags, notes } = req.body;
   const [updated] = await db.update(customers)
     .set({
@@ -91,18 +108,14 @@ router.put("/:id", async (req, res) => {
 // GET /api/customers/:id/orders
 router.get("/:id/orders", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const [customer] = await db
-    .select({ id: customers.id })
-    .from(customers)
-    .where(and(eq(customers.id, req.params.id), eq(customers.ownerId, ownerId)))
-    .limit(1);
-  if (!customer) { res.status(404).json({ error: "Not found" }); return; }
-  const customerOrders = await db
-    .select()
-    .from(orders)
-    .where(and(eq(orders.customerId, customer.id), eq(orders.ownerId, ownerId)))
-    .orderBy(desc(orders.createdAt));
-  res.json(customerOrders);
+  try {
+    const customer = await findSellerCustomer(ownerId, String(req.params.id));
+    if (!customer) { res.status(404).json({ error: "Not found" }); return; }
+    res.json(await sellerCustomerOrders(ownerId, customer));
+  } catch (err) {
+    req.log.error({ err }, "Failed to load customer orders");
+    res.status(500).json({ error: "Failed to load customer orders" });
+  }
 });
 
 export default router;

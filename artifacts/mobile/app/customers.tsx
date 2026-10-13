@@ -15,6 +15,8 @@ import { EmptyState } from '@/components/layout';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { radius } from '@/constants/radii';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { hapticSelection } from '@/lib/haptics';
 
 type ApiCustomer = {
   id: string;
@@ -27,8 +29,33 @@ type ApiCustomer = {
   notes?: string;
   orderCount?: number;
   totalSpentCents?: number;
+  /** Derived from orders (GET /api/customers). Null for hand-entered people with no orders. */
+  lastOrderAt?: string | null;
+  /** @username for signed-in buyers (their account email is never shared). */
+  handle?: string | null;
   createdAt: string;
 };
+
+// Shopify-style segment tabs: everyone, or the biggest lifetime spenders.
+type Segment = 'all' | 'top';
+const TOP_N = 20;
+const SEGMENTS: { key: Segment; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'top', label: `Top ${TOP_N}` },
+];
+
+/** "$174.93 • 2 orders • Oct 3" — the Shopify customer row's spend line. */
+function spendLine(c: ApiCustomer): string {
+  const n = c.orderCount ?? 0;
+  const parts = [formatCents(c.totalSpentCents ?? 0), `${n} ${n === 1 ? 'order' : 'orders'}`];
+  if (c.lastOrderAt) {
+    const d = new Date(c.lastOrderAt);
+    if (!Number.isNaN(d.getTime())) parts.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+  }
+  return parts.join(' • ');
+}
+
+const lastActivity = (c: ApiCustomer) => new Date(c.lastOrderAt ?? c.createdAt).getTime();
 
 
 type SortOption = 'recent' | 'spend' | 'name';
@@ -57,6 +84,7 @@ export default function CustomersScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('recent');
+  const [segment, setSegment] = useState<Segment>('all');
   const hasDataRef = useRef(false);
 
   const fetchCustomers = useCallback(async (searchText: string) => {
@@ -105,7 +133,12 @@ export default function CustomersScreen() {
     : 0;
 
   const sortedCustomers = useMemo(() => {
-    const list = [...customers];
+    const list = segment === 'top'
+      ? customers
+        .filter((c) => (c.orderCount ?? 0) > 0)
+        .sort((a, b) => (b.totalSpentCents ?? 0) - (a.totalSpentCents ?? 0) || lastActivity(b) - lastActivity(a))
+        .slice(0, TOP_N)
+      : [...customers];
     switch (sortBy) {
       case 'spend':
         return list.sort((a, b) => (b.totalSpentCents ?? 0) - (a.totalSpentCents ?? 0));
@@ -113,9 +146,9 @@ export default function CustomersScreen() {
         return list.sort((a, b) => a.name.localeCompare(b.name));
       case 'recent':
       default:
-        return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        return list.sort((a, b) => lastActivity(b) - lastActivity(a));
     }
-  }, [customers, sortBy]);
+  }, [customers, sortBy, segment]);
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
@@ -166,6 +199,32 @@ export default function CustomersScreen() {
         />
       </View>
 
+      {/* Segments (Shopify Customers / Orders tab row) */}
+      <View style={styles.segmentTabs} accessibilityRole="tablist">
+        {SEGMENTS.map((s) => {
+          const active = segment === s.key;
+          return (
+            <PressableScale
+              key={s.key}
+              onPress={() => {
+                if (active) return;
+                hapticSelection();
+                setSegment(s.key);
+                // Top 20 opens ranked by lifetime spend; the sort chips still re-order it.
+                if (s.key === 'top') setSortBy('spend');
+              }}
+              noMinHeight
+              style={[styles.segmentTab, active && { backgroundColor: colors.border }]}
+              accessibilityRole="tab"
+              accessibilityLabel={s.label}
+              accessibilityState={{ selected: active }}
+            >
+              <Text style={[styles.segmentTabText, { color: active ? colors.foreground : colors.mutedForeground }]}>{s.label}</Text>
+            </PressableScale>
+          );
+        })}
+      </View>
+
       {/* Sort */}
       <View style={styles.sortRow}>
         {SORT_OPTIONS.map((opt) => {
@@ -198,7 +257,7 @@ export default function CustomersScreen() {
       {!loading && !error && sortedCustomers.length === 0 ? (
         <EmptyState
           icon="users"
-          title={search.trim() ? 'No matching customers' : 'No customers yet'}
+          title={search.trim() ? 'No matching customers' : segment === 'top' && customers.length > 0 ? 'No orders yet' : 'No customers yet'}
           message={
             search.trim()
               ? 'Try a different name, email or tag.'
@@ -239,8 +298,11 @@ export default function CustomersScreen() {
                   <Text style={[styles.avatarText, { color }]}>{initials}</Text>
                 </View>
                 <View style={styles.custInfo}>
-                  <Text style={[styles.custName, { color: colors.foreground }]}>{c.name}</Text>
-                  <Text style={[styles.custEmail, { color: colors.mutedForeground }]}>{c.email}</Text>
+                  <Text style={[styles.custName, { color: colors.foreground }]} numberOfLines={1}>{c.name}</Text>
+                  {c.email || c.handle ? (
+                    <Text style={[styles.custEmail, { color: colors.mutedForeground }]} numberOfLines={1}>{c.email || c.handle}</Text>
+                  ) : null}
+                  <Text style={[styles.custSpend, { color: colors.foreground }]} numberOfLines={1}>{spendLine(c)}</Text>
                   {c.phone ? (
                     <Text style={[styles.custOrders, { color: colors.mutedForeground }]}>{c.phone}</Text>
                   ) : null}
@@ -303,6 +365,10 @@ const styles = StyleSheet.create({
   custName: { fontSize: FS.sm, fontFamily: 'Inter_600SemiBold' },
   custEmail: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   custOrders: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  custSpend: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  segmentTabs: { flexDirection: 'row', gap: 4, marginBottom: 12 },
+  segmentTab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.sm },
+  segmentTabText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   custRight: { alignItems: 'flex-end', justifyContent: 'center' },
   tagsRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
   tagChip:   { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, borderWidth: 1 },
