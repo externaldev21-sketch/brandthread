@@ -3086,6 +3086,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       skipAll: () => post<void>('/api/first-run-tips/skip-all', {}),
       reset: () => post<void>('/api/first-run-tips/reset', {}),
     },
+    /** "Add to this order": the post-purchase add-on offer (routes/order-add-on.ts). */
+    orderAddOn: {
+      get: (orderId: string) =>
+        get<import('./orderAddOn').AddOnOffer>(`/api/buyer/add-on/${encodeURIComponent(orderId)}`),
+      add: (orderId: string, body: { productId: string; variantId: string; clientKey: string }) =>
+        post<{ status: string; amountCents: number; paymentIntentId: string }>(`/api/buyer/add-on/${encodeURIComponent(orderId)}`, body),
+    },
     /** Public seller storefront — profile + products + posts */
     publicSellers: {
       get: (sellerId: string) =>
