@@ -40,6 +40,7 @@ import {
 import { matchesMutedWords } from "../lib/contentModerator";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
 import { parsePagination } from "../lib/pagination";
+import { pinnedAtByPostId, pinnedFirst } from "../lib/postPins";
 
 const router = Router();
 
@@ -304,13 +305,16 @@ router.get("/users/:userId/videos", async (req, res) => {
         .from(posts)
         .innerJoin(users, eq(users.clerkId, posts.userId))
         .where(where)
-        .orderBy(desc(posts.createdAt), asc(posts.id))
+        // Pinned posts first, newest pin first (Pin to your profile; lib/postPins.ts).
+        .orderBy(pinnedFirst(posts.id), desc(posts.createdAt), asc(posts.id))
         .limit(limit)
         .offset(offset),
     ]);
 
     const rows = isSelf ? pageRows : filterMuted(pageRows as VideoRow[], await mutedPhrasesFor(viewerId));
-    const videos = await hydrateVideoRows(rows as VideoRow[], viewerId, isSelf);
+    const pins = await pinnedAtByPostId(rows.map((row) => row.id));
+    const videos = (await hydrateVideoRows(rows as VideoRow[], viewerId, isSelf))
+      .map((video) => ({ ...video, pinnedAt: pins.get(video.id) ?? null }));
     const totalCount = Number(total);
     return res.json({
       user,
