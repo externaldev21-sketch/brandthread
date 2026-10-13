@@ -137,24 +137,26 @@ export function liveStreamIdFromItems(items: unknown): string | null {
  * only (never a surname, handle or amount paid). Safe to call for any order:
  * a no-op unless the order carries a source live stream.
  */
-export async function announceLivePurchase(orderId: string): Promise<void> {
+export async function announceLivePurchase(orderId: string, checkoutSessionId?: string): Promise<void> {
   try {
     const [row] = await db.execute(sql`
-      SELECT o.source_live_stream_id AS stream_id, o.owner_id, o.buyer_id, o.stripe_checkout_session_id AS checkout_session_id,
+      SELECT o.source_live_stream_id AS stream_id, o.owner_id, o.buyer_id, cs.id AS checkout_session_id,
              COALESCE(NULLIF(split_part(trim(COALESCE(NULLIF(u.display_name, ''), u.name, '')), ' ', 1), ''), 'Someone') AS first_name,
              (SELECT oi.product_name FROM order_items oi WHERE oi.order_id = o.id ORDER BY oi.price_cents * oi.quantity DESC LIMIT 1) AS product_name,
              (SELECT COALESCE(SUM(oi.quantity), 0)::int FROM order_items oi WHERE oi.order_id = o.id) AS units
       FROM orders o LEFT JOIN users u ON u.clerk_id = o.buyer_id
+      LEFT JOIN checkout_sessions cs ON cs.stripe_session_id = o.stripe_checkout_session_id
       WHERE o.id = ${orderId}::uuid AND o.source_live_stream_id IS NOT NULL
       LIMIT 1
     `).then((r) => r.rows as any[]);
     if (!row?.stream_id) return;
     // Preserve the authoritative attribution gate and one room broadcaster,
     // while using the new durable activity claim for polling and deduplication.
-    const [link] = row.checkout_session_id ? (await db.execute(sql`
-      SELECT id FROM live_stream_orders WHERE checkout_session_id = ${row.checkout_session_id}::uuid
+    const internalSessionId = checkoutSessionId ?? row.checkout_session_id;
+    const [link] = internalSessionId ? (await db.execute(sql`
+      SELECT id FROM live_stream_orders WHERE checkout_session_id = ${internalSessionId}::uuid
     `)).rows : [];
-    const activity = link ? await claimLivePurchase(String(row.checkout_session_id), orderId) : null;
+    const activity = link ? await claimLivePurchase(String(internalSessionId), orderId) : null;
     if (link && !activity) return;
     broadcastToRoom(String(row.stream_id), {
       type: "purchase",

@@ -73,7 +73,7 @@ function slipBody(order: Order, options: PackingSlipOptions): string {
   return `
     <div class="slip">
       <h1>${gift ? 'Gift receipt' : escapeHtml(order.sellerName ?? 'Packing Slip')}</h1>
-      <p class="muted">Order #${escapeHtml(order.orderNumber)}</p>
+      <p class="muted">${gift && order.sellerName ? `${escapeHtml(order.sellerName)} · ` : ''}Order #${escapeHtml(order.orderNumber)}</p>
       ${gift ? giftNoteHtml(gift) : ''}
 
       <div class="section">

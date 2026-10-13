@@ -97,6 +97,7 @@ beforeAll(async () => {
     ownerId: sellerId,
     orderNumber: `LBLP-${suffix}`,
     status: "processing",
+    paymentStatus: "paid",
     totalCents: 5000,
     subtotalCents: 5000,
     shippingAddress: { name: "Sam Lee", street: "1 Main St", city: "Austin", state: "TX", zip: "78701", country: "US" },

@@ -64,6 +64,13 @@ vi.mock("../../middlewares/requireAuth", () => ({
     next();
   },
 }));
+// These fixtures isolate duties; plan publication eligibility is covered
+// by the dedicated plan-gate suites, not an unconfigured fixture subscription.
+vi.mock("../../lib/planGate", () => ({
+  productsBeyondSellerPlan: async () => [],
+  SELLER_PLAN_LIMIT_CODE: "SELLER_PLAN_LIMIT",
+  SELLER_PLAN_LIMIT_MESSAGE: "Seller plan limit",
+}));
 
 let server: Server;
 let zonos: Server;

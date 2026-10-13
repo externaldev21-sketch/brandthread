@@ -45,7 +45,7 @@ async function grant(buyerId: string, amountCents: number): Promise<void> {
 async function reachReceiveCap(seller: string, stream: string, cap: number, sendCap: number, feeBps: number): Promise<void> {
   let left = cap;
   while (left > 0) {
-    const amount = Math.min(left, sendCap);
+    const amount = Math.min(left, sendCap, (await getThreadCashConfig()).dailySendCapCents);
     const giver = await makeUser();
     await grant(giver, amount);
     await sendLiveGift(giver, seller, stream, amount, crypto.randomUUID(), feeBps);
@@ -110,8 +110,8 @@ describe("sendLiveGift", () => {
 
     await sendLiveGift(buyer, seller, stream, 400, crypto.randomUUID());
     const [credit] = await db.select().from(threadCashEntries).where(eq(threadCashEntries.buyerId, seller));
-    expect(credit).toMatchObject({ source: "live_gift", funding: "promo", amountCents: 400 });
-    expect(await getBalanceCents(db, seller)).toBe(400);
+    expect(credit).toMatchObject({ source: "live_gift", funding: "promo", amountCents: 280 });
+    expect(await getBalanceCents(db, seller)).toBe(280);
     expect(await getCashableBalanceCents(db, seller)).toBe(0);
   });
 
@@ -124,7 +124,7 @@ describe("sendLiveGift", () => {
     });
 
     await sendLiveGift(buyer, seller, stream, 300, crypto.randomUUID());
-    expect(await getCashableBalanceCents(db, seller)).toBe(300);
+    expect(await getCashableBalanceCents(db, seller)).toBe(210);
   });
 
   it("rejects gifting yourself", async () => {

@@ -12,7 +12,7 @@ import crypto from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import {
   checkoutSessions, db, discountCodes, liveCohostProducts, liveCohosts, liveGiftPlatformFees, liveStreamOrders,
-  liveStreams, posts, productVariants, products, threadCashEntries, users,
+  liveStreams, orders, posts, productVariants, products, threadCashEntries, users,
 } from "@workspace/db";
 
 const auth = vi.hoisted(() => ({ userId: "" }));
@@ -185,19 +185,30 @@ describe("just-bought ticker", () => {
   });
 
   it("announces a paid order once, with first name + product only", async () => {
-    const { recordLiveCheckout, announceLivePurchase } = await import("../../lib/livePurchases");
+    const { recordLiveCheckout } = await import("../../lib/livePurchases");
+    const { announceLivePurchase } = await import("../../lib/liveAttribution");
     const cs = await checkout(host, "Linen Blazer");
     await recordLiveCheckout({ checkoutSessionId: cs, streamId, buyerId: buyer, sellerId: host });
     const orderId = crypto.randomUUID();
-    const first = await announceLivePurchase(cs, orderId);
-    expect(first).toMatchObject({ kind: "purchase", name: "Ana", text: "just bought Linen Blazer" });
-    expect(await announceLivePurchase(cs, orderId)).toBeNull();
-    const sent = broadcasts.filter((b) => b.payload.type === "purchase" && b.payload.purchase.id === first!.id);
-    expect(sent).toHaveLength(1);
-    expect(sent[0].streamId).toBe(streamId);
-    expect(JSON.stringify(sent[0].payload)).not.toContain("Lopez");
+    await db.insert(orders).values({
+      id: orderId, ownerId: host, buyerId: buyer, orderNumber: `live-${crypto.randomUUID()}`,
+      status: 'paid', totalCents: 1000, subtotalCents: 1000, sourceLiveStreamId: streamId,
+    } as any);
+    try {
+      await announceLivePurchase(orderId, cs);
+      await announceLivePurchase(orderId, cs);
+      const sent = broadcasts.filter((b) => b.payload.type === "purchase" && b.streamId === streamId);
+      expect(sent).toHaveLength(1);
+      expect(sent[0].payload.purchase).toMatchObject({ name: "Ana", text: "just bought Linen Blazer" });
+      expect(sent[0].streamId).toBe(streamId);
+      expect(JSON.stringify(sent[0].payload)).not.toContain("Lopez");
+    } finally {
+      await db.delete(orders).where(eq(orders.id, orderId));
+    }
     // A checkout that wasn't from a live announces nothing.
-    expect(await announceLivePurchase(await checkout(host, "Other"), crypto.randomUUID())).toBeNull();
+    const sentCount = broadcasts.length;
+    await announceLivePurchase(crypto.randomUUID(), await checkout(host, "Other"));
+    expect(broadcasts).toHaveLength(sentCount);
   });
 
   it("serves purchases and gifts to polling clients", async () => {

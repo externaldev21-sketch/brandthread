@@ -1570,7 +1570,7 @@ export async function handleCheckoutPaid(
       // Best effort, never blocks the order (lib/conversionTracking.ts).
       void sendPurchaseConversions(createdOrderId);
       // Bought from a live: the host (and the room) see it right away.
-      if (sourceLiveStreamId) await announceLivePurchase(createdOrderId);
+      if (sourceLiveStreamId) await announceLivePurchase(createdOrderId, csRecord.id);
 
       // This buyer now has a real paid order with this seller — if a
       // pending message request from this buyer is sitting in the seller's
