@@ -8,6 +8,11 @@
  * Shown as the ⋯ pull-down menu (lib/contextMenu.ts, UIMenu style) anchored
  * at `anchor`; the bottom sheet below is only the fallback when the menu
  * host isn't mounted. A real menu (not Alert.alert) so it also works on web.
+ *
+ * `appearance="list"` is Instagram's profile action sheet, 1:1 (Mobbin
+ * screen 5a8da308): grabber, centred title, full-width rows separated by
+ * hairlines, label on the left and its icon on the right. Used by the
+ * buyer's own ••• menu; every other caller keeps the default look.
  */
 import React, { useEffect, useMemo } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -24,10 +29,12 @@ export interface ProfileMenuItem {
   label: string;
   onPress: () => void;
   destructive?: boolean;
+  /** Starts a new group: a full-width separator above this row. */
+  separatorBefore?: boolean;
 }
 
 export function ProfileMenuSheet({
-  visible, title, items, onClose, anchor = null, testID = 'profile-menu-sheet',
+  visible, title, items, onClose, anchor = null, testID = 'profile-menu-sheet', appearance = 'default',
 }: {
   visible: boolean;
   title?: string;
@@ -36,8 +43,10 @@ export function ProfileMenuSheet({
   /** Where the ⋯ button was tapped (see `anchorFromEvent`). */
   anchor?: MenuAnchor | null;
   testID?: string;
+  appearance?: 'default' | 'list';
 }) {
-  const asPullDown = hasMenuHost();
+  const list = appearance === 'list';
+  const asPullDown = !list && hasMenuHost();
   useEffect(() => {
     if (!visible || !asPullDown) return;
     openPullDownMenuAt(anchor, items.map((item) => ({
@@ -55,20 +64,27 @@ export function ProfileMenuSheet({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close menu" />
         <View style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }]}>
           <View style={styles.handle} />
-          {title ? <Text style={styles.title} numberOfLines={1}>{title}</Text> : null}
-          {items.map((item) => (
-            <PressableScale
-              key={item.key}
-              style={styles.row}
-              onPress={() => { onClose(); item.onPress(); }}
-              accessibilityRole="button"
-              accessibilityLabel={item.label}
-              testID={`${testID}-${item.key}`}
-            >
-              <Icon name={item.icon} size={20} color={item.destructive ? theme.error : theme.text} />
-              <Text style={[styles.label, { color: item.destructive ? theme.error : theme.text }]}>{item.label}</Text>
-            </PressableScale>
-          ))}
+          {title ? <Text style={[styles.title, list && styles.listTitle]} numberOfLines={1}>{title}</Text> : null}
+          {items.map((item, index) => {
+            const color = item.destructive ? theme.error : theme.text;
+            return (
+              <React.Fragment key={item.key}>
+                {item.separatorBefore ? <View style={styles.separator} testID={`${testID}-separator-${item.key}`} /> : null}
+                {list && index > 0 && !item.separatorBefore ? <View style={styles.rowDivider} /> : null}
+                <PressableScale
+                  style={list ? styles.listRow : styles.row}
+                  onPress={() => { onClose(); item.onPress(); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.label}
+                  testID={`${testID}-${item.key}`}
+                >
+                  {list ? null : <Icon name={item.icon} size={20} color={color} />}
+                  <Text style={[list ? styles.listLabel : styles.label, { color }]}>{item.label}</Text>
+                  {list ? <Icon name={item.icon} size={22} color={color} /> : null}
+                </PressableScale>
+              </React.Fragment>
+            );
+          })}
         </View>
       </View>
     </Modal>
@@ -86,5 +102,11 @@ function makeStyles(theme: AppThemePreset) {
     title: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
     row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: SP.md, minHeight: 52 },
     label: { flex: 1, fontFamily: FONT.medium, fontSize: FS.base },
+    // appearance="list" (Instagram's profile action sheet)
+    listTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: 16, textAlign: 'center', paddingTop: SP.xs, paddingBottom: SP.md },
+    listRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, minHeight: 52 },
+    listLabel: { flex: 1, fontFamily: FONT.regular, fontSize: 16 },
+    rowDivider: { height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginLeft: SP.md },
+    separator: { height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginVertical: SP.sm },
   });
 }

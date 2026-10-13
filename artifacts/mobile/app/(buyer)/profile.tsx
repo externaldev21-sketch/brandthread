@@ -9,7 +9,8 @@ import { openContextMenu } from '@/lib/contextMenu';
  *    (`ProfileVideoHeader`); with no video the same layout sits on the plain
  *    background;
  *  - Posts · Followers · Following as number-over-label columns;
- *  - Edit profile · Share profile · discover-people (shared `Button`);
+ *  - Edit profile · Notifications · Share profile live in the ••• sheet
+ *    (Instagram's profile action sheet); no button row under the bio;
  *  - Story Highlights row (circles + "New");
  *  - the Thread Cash streak card;
  *  - icon-only tabs with an underline (Posts / Saved / Liked / Orders) over a
@@ -65,7 +66,6 @@ import { useProfileBanner } from '@/components/profile/ProfileBannerEditor';
 import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
 import { ProfileStoriesRow, type ProfileStoryItem } from '@/components/profile/ProfileStoriesRow';
 import { loadHighlights, type Highlight } from '@/lib/highlightsService';
-import { Button } from '@/components/ui/Button';
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { ProfileEmptyAreaContext } from '@/components/profile/ProfileEmptyAreaContext';
@@ -81,8 +81,9 @@ import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 import { getPreviewSocialCounts } from '@/lib/previewSocialCounts';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
-import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
+import { ProfileMenuSheet } from '@/components/profile/ProfileMenuSheet';
 import { anchorFromEvent, type MenuAnchor } from '@/lib/contextMenu';
+import { buyerOwnMenuItems } from '@/components/profile/buyerProfileMenu';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { taggedItemHref } from '@/services/profileService';
 import { radius } from '@/constants/radii';
@@ -930,11 +931,11 @@ export default function ProfileScreen() {
       onOpenWebsite={(url) => { void Linking.openURL(url); }}
     />
   ) : null;
-  // Banner layout (TikTok): the edit pencil leads the top bar.
+  // Banner layout: the @username ▾ account switcher leads the top bar (Edit
+  // profile lives only in the ••• menu).
   const bannerTopBar = (
     <>
       <View style={topBarStyles.bannerLeft}>
-        <ProfileTopBarIcon name="edit-2" onPress={() => router.push('/(buyer)/edit-profile')} accessibilityLabel="Edit profile" testID="profile-banner-edit" />
         <View style={topBarStyles.bannerSwitcher}>{accountSwitcherNode}</View>
       </View>
       {topBarIcons}
@@ -957,6 +958,8 @@ export default function ProfileScreen() {
         name={displayName}
         handle={displayHandle && displayHandle !== displayName ? displayHandle : null}
         stats={stats}
+        // Buyer's own profile: avatar on the left, name / @handle / stats to its right.
+        avatarSide="left"
         statsLoading={loading}
         coversTop={focused && bannerCoversTop}
         onAddBanner={bannerFlow.openSheet}
@@ -967,43 +970,6 @@ export default function ProfileScreen() {
         {profileMeta}
       </View>
 
-
-      {/* ── Edit profile · Share profile · discover people (shared Button) ── */}
-      <View style={styles.actionsRow}>
-        <View style={styles.actionFlex}>
-          <Button
-            label="Edit profile"
-            variant="secondary"
-            size="compact"
-            fullWidth
-            onPress={() => router.push('/(buyer)/edit-profile')}
-            style={[styles.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
-            testID="profile-edit-button"
-          />
-        </View>
-        <View style={styles.actionFlex}>
-          <Button
-            label="Share profile"
-            variant="secondary"
-            size="compact"
-            fullWidth
-            onPress={handleShareProfile}
-            accessibilityHint="Opens your shareable profile link and QR code"
-            style={[styles.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
-            testID="profile-share-button"
-          />
-        </View>
-        <Button
-          label=""
-          icon="user-plus"
-          variant="secondary"
-          size="compact"
-          accessibilityLabel="Discover people"
-          onPress={() => router.push('/(buyer)/friends' as any)}
-          style={[styles.actionButton, styles.actionSquare, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
-          testID="profile-discover-people"
-        />
-      </View>
 
       {/* ── Story Highlights: circles + "New" ── */}
       <View style={styles.highlightsWrap} testID="profile-highlights">
@@ -1082,20 +1048,25 @@ export default function ProfileScreen() {
       {/* "Add banner" on the placeholder: the same Edit banner sheet as Edit profile. */}
       {bannerFlow.sheet}
 
+      {/* ••• (Instagram's profile action sheet): Edit profile · Notifications ·
+          Share profile, then Find friends + the existing extras below a
+          separator. These replaced the Edit / Share / add-friend button row
+          under the bio. */}
       <ProfileMenuSheet
         visible={menuOpen}
         anchor={menuAnchor}
-        title={displayName}
+        title={displayHandle || displayName}
+        appearance="list"
         onClose={() => setMenuOpen(false)}
-        items={[
-          // Instagram's own-profile header keeps two icons; Notifications lives here (the tab bar bell is Activity).
-          { key: 'notifications', icon: 'bell', label: 'Notifications', onPress: () => router.push('/buyer-notifications' as any) },
-          caps.showShare && { key: 'share', icon: 'share-2', label: 'Share profile', onPress: handleShareProfile },
-          caps.showViewAsVisitor && user?.id && {
-            key: 'view-as-visitor', icon: 'eye', label: 'View as visitor',
-            onPress: () => router.push(viewAsVisitorHref('buyer', user.id) as never),
-          },
-        ].filter(Boolean) as ProfileMenuItem[]}
+        items={buyerOwnMenuItems({
+          onEditProfile: () => router.push('/(buyer)/edit-profile'),
+          onNotifications: () => router.push('/buyer-notifications' as any),
+          onShareProfile: caps.showShare ? handleShareProfile : null,
+          onFindFriends: () => router.push('/(buyer)/friends' as any),
+          onViewAsVisitor: caps.showViewAsVisitor && user?.id
+            ? () => router.push(viewAsVisitorHref('buyer', user.id) as never)
+            : null,
+        })}
       />
 
       <ShareProfileSheet
@@ -1131,13 +1102,7 @@ function makeStyles(theme: AppThemePreset) {
     errorRoot: { flex: 1, backgroundColor: theme.background, justifyContent: 'center' },
     gridRow: { gap: 1 },
 
-    // Stats row → buttons: 16pt. Instagram proportions: two equal buttons
-    // plus a square discover-people button, 6pt apart, 8pt corners.
-    actionsRow: { flexDirection: 'row', gap: 6, paddingHorizontal: SP.md, paddingTop: 16, alignItems: 'center' },
-    actionFlex: { flex: 1, minWidth: 0 },
-    actionButton: { borderRadius: 8, paddingHorizontal: SP.sm },
-    actionSquare: { width: 36, paddingHorizontal: 0 },
-    // Buttons → highlights: 16pt.
+    // Bio → highlights: 16pt.
     highlightsWrap: { paddingTop: 16 },
     // Highlights → streak card (or tabs, when Thread Cash is off): 16pt.
     streakWrap: { marginTop: 16 },

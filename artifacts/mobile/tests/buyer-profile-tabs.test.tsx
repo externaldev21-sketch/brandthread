@@ -765,7 +765,7 @@ describe('buyer profile — Instagram layout', () => {
     expect(renderer.root.findAll((node) => node.props.testID === 'profile-cover-affordance')).toHaveLength(0);
   });
 
-  it('with a profile banner (the cover video) shows the TikTok banner header; the pencil opens Edit profile', async () => {
+  it('with a profile banner (the cover video) shows the banner header, avatar on the left; no pencil — Edit profile is in the ••• menu', async () => {
     apiMock.social.profile.mockResolvedValue({
       followersCount: 7, followingCount: 3, coverVideoUrl: 'https://x/cover.mp4', coverPosterUrl: 'https://x/poster.jpg',
       profileBanner: { type: 'video', url: 'https://x/cover.mp4', posterUrl: 'https://x/poster.jpg', gifUrl: null },
@@ -775,8 +775,27 @@ describe('buyer profile — Instagram layout', () => {
     expect(renderer.root.findAll((node) => node.props.testID === 'profile-banner-video')).not.toHaveLength(0);
     // The Instagram video header is replaced, not stacked.
     expect(renderer.root.findAll((node) => node.props.testID === 'profile-identity-stack')).toHaveLength(0);
-    await act(async () => { renderer!.root.findByProps({ testID: 'profile-banner-edit' }).props.onPress(); });
+    // Mirrored: avatar (with its badge + note) left, name / @handle / stats right.
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-banner-identity-left')).not.toHaveLength(0);
+    // Edit profile lives in ONE place: the ••• menu (no top-bar pencil, no button row).
+    for (const gone of ['profile-banner-edit', 'profile-edit-button', 'profile-share-button', 'profile-discover-people']) {
+      expect(renderer.root.findAll((node) => node.props.testID === gone), gone).toHaveLength(0);
+    }
+    const editRow = renderer.root.findAll((node) => node.props.testID === 'profile-menu-sheet-edit-profile' && typeof node.props.onPress === 'function')[0];
+    await act(async () => { editRow.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/edit-profile');
+  });
+
+  it('••• menu: Edit profile · Notifications · Share profile, then Find friends + View as visitor below a separator', async () => {
+    renderer = await renderScreen();
+    const rows = renderer.root.findAll((node) => typeof node.props.testID === 'string'
+      && node.props.testID.startsWith('profile-menu-sheet-') && typeof node.props.onPress === 'function' && typeof node.type !== 'string');
+    const keys = [...new Set(rows.map((node) => node.props.testID.replace('profile-menu-sheet-', '')))];
+    expect(keys).toEqual(['edit-profile', 'notifications', 'share', 'find-friends', 'view-as-visitor']);
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-menu-sheet-separator-find-friends')).not.toHaveLength(0);
+    const notifications = rows.find((node) => node.props.testID === 'profile-menu-sheet-notifications')!;
+    await act(async () => { notifications.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/buyer-notifications');
   });
 
   it('with no banner, your own profile shows a dark "Add banner" placeholder that opens the banner sheet', async () => {

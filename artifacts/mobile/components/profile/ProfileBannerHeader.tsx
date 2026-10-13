@@ -173,6 +173,7 @@ export function ProfileBannerHeader({
   statsLoading,
   coversTop = false,
   onAddBanner,
+  avatarSide = 'right',
   testID = 'profile-banner-header',
 }: {
   /** null = owner's empty banner: a dark placeholder with "Add banner". */
@@ -205,6 +206,12 @@ export function ProfileBannerHeader({
   coversTop?: boolean;
   /** Empty banner (owner): what "Add banner" opens. */
   onAddBanner?: () => void;
+  /**
+   * Which side the avatar (with its "+" badge and note bubble) sits on.
+   * 'right' is TikTok's layout (default); 'left' mirrors it — avatar first,
+   * name / @handle / stats to its right (buyer's own profile).
+   */
+  avatarSide?: 'left' | 'right';
   testID?: string;
 }) {
   useSuppressStatusBarMask(coversTop);
@@ -238,14 +245,14 @@ export function ProfileBannerHeader({
 
       {topBar ? <View style={[styles.topBar, { paddingTop: topPad + 6 }]}>{topBar}</View> : null}
 
-      <View style={styles.bottom} pointerEvents="box-none">
-        <View style={styles.identity} pointerEvents="box-none">
+      <View style={[styles.bottom, avatarSide === 'left' && styles.bottomMirrored]} pointerEvents="box-none" testID={`profile-banner-identity-${avatarSide}`}>
+        <View style={[styles.identity, avatarSide === 'left' && styles.identityMirrored]} pointerEvents="box-none">
           <Text style={styles.name} numberOfLines={2} accessibilityRole="header">
             {name}
             {nameAccessory ? <Text>{' '}{nameAccessory}</Text> : null}
           </Text>
           {handle ? <Text style={styles.handle} numberOfLines={1}>{handle}</Text> : null}
-          <View style={styles.stats} testID="profile-banner-stats">
+          <View style={[styles.stats, avatarSide === 'left' && styles.statsMirrored]} testID="profile-banner-stats">
             {bannerStats(stats).map((stat) => {
               const label = stat.accessibilityLabel ?? `${stat.value} ${stat.label}`;
               const content = (
@@ -324,6 +331,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.md, paddingBottom: SP.md,
   },
   identity: { flex: 1, minWidth: 0, marginRight: SP.md },
+  // avatarSide="left": avatar first, identity to its right.
+  bottomMirrored: { flexDirection: 'row-reverse' },
+  identityMirrored: { marginRight: 0, marginLeft: SP.md },
+  statsMirrored: { gap: 16 },
   name: { fontFamily: FONT.bold, fontSize: 26, lineHeight: 31, letterSpacing: -0.4, color: ON_DARK, ...TEXT_SHADOW },
   handle: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 20, color: ON_DARK_MUTED, marginTop: 2, ...TEXT_SHADOW },
   stats: { flexDirection: 'row', alignItems: 'flex-end', gap: 20, marginTop: 12 },
