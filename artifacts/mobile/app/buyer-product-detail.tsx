@@ -1433,11 +1433,6 @@ export default function BuyerProductDetailScreen() {
             </View>
           )}
 
-          {/* "Size guide" text link — only when the seller uploaded a size
-              chart photo, right under the size chips (mobbin.com/screens/
-              0c16f080-0cb8-487a-8928-6a7631cb205c). No placeholder link
-              when absent. */}
-          {!!product.sizeChartImageUrl && (
           {/* Size guide remains available only when supplied by the seller. */}
           {hasSizeGuide && (
             <TouchableOpacity
@@ -2019,7 +2014,7 @@ function MoreFromBrand({ productId, sellerId, sellerName, dividerStyle, headerSt
         hitSlop={{ top: 6, bottom: 6 }}
       >
         <Text style={[headerStyle, { flexShrink: 1 }]} accessibilityRole="header" numberOfLines={1}>More from {sellerName}</Text>
-        <Feather name="chevron-right" size={16} color={MUTED} style={{ marginBottom: SP.sm }} />
+        <Icon name="chevron-right" size={16} color={MUTED} style={{ marginBottom: SP.sm }} />
       </TouchableOpacity>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -SP.md }} contentContainerStyle={{ paddingHorizontal: SP.md, gap: SP.md }}>
         {products.map((p) => (
@@ -2040,7 +2035,7 @@ function MoreFromBrand({ productId, sellerId, sellerName, dividerStyle, headerSt
                 <CachedImage source={{ uri: p.images[0] }} style={{ width: '100%', height: '100%' }} contentFit="cover" recyclingKey={p.images[0]} />
               ) : (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                  <Feather name="image" size={24} color={theme.muted} />
+                  <Icon name="image" size={24} color={theme.muted} />
                 </View>
               )}
             </View>

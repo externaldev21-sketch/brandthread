@@ -106,3 +106,4 @@
 - [Validation evidence](validation-evidence-persistence.md) — keep long-run logs in ignored workspace storage; restarts can erase temporary evidence and interrupt checks.
 - [Merge runtime validation](merge-runtime-validation.md) — TypeScript checks do not cover every runtime server; scan tracked sources and syntax-check changed JavaScript.
 - [Native font shim bootstrap](native-font-shim-bootstrap.md) — publish native exports before loading font helpers; web success cannot rule out an iOS import cycle.
+- [Haptics control boundary](haptics-control-boundary.md) — one shared Sounds & haptics control; off silences every haptic, while the new-order sound setting is audio only.

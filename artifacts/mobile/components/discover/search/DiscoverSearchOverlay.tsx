@@ -31,7 +31,7 @@ import { useSignInGate } from '@/hooks/useSignInGate';
 import { useRecentSearches } from '@/hooks/useRecentSearches';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import type { SearchPerson } from '@/components/search/PersonRow';
-import { hapticLight, hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
+import { hapticFollow, hapticLight, hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
 import { hashtagHref, normalizeTag } from '@/lib/hashtagText';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { FONT } from '@/lib/theme';
@@ -216,6 +216,7 @@ export function DiscoverSearchOverlay({
   const toggleFollow = useCallback(async (person: SearchPerson) => {
     if (followPending[person.userId]) return;
     const wasFollowing = person.isFollowing;
+    hapticFollow(!wasFollowing);
     setFollowPending((cur) => ({ ...cur, [person.userId]: true }));
     try {
       let requested = false;
@@ -223,7 +224,6 @@ export function DiscoverSearchOverlay({
       else requested = (await api.social.follow(person.userId))?.status === 'requested';
       // A private account only received a request — not following yet.
       live.setPeople((cur) => cur.map((x) => (x.userId === person.userId ? { ...x, isFollowing: !wasFollowing && !requested } : x)));
-      hapticPrimaryAction();
     } catch {
       // Keep the previous state.
     } finally {

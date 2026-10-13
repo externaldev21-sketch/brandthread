@@ -94,7 +94,7 @@ export function resetHapticsForTests() {
 
 function shouldPlay(kind: HapticKind, now: number) {
   if (!enabled) return false;
-  if (Platform?.OS === 'web') return false;
+  if (Platform?.OS === 'web' || process.env.EXPO_OS === 'web') return false;
   const gap = now - lastPlayedAt;
   const window = kind === 'selection' && lastKind === 'selection' ? SELECTION_TICK_MS : ACTION_WINDOW_MS;
   return gap >= window;
@@ -133,9 +133,17 @@ export function haptic(event: HapticEvent) {
 }
 
 /** `haptics.like()`, `haptics.purchaseSuccess()`, … — one function per event. */
-export const haptics = Object.fromEntries(
-  (Object.keys(HAPTIC_MAP) as HapticEvent[]).map((event) => [event, () => haptic(event)]),
-) as { [E in HapticEvent]: () => void };
+export const haptics = {
+  ...Object.fromEntries(
+    (Object.keys(HAPTIC_MAP) as HapticEvent[]).map((event) => [event, () => haptic(event)]),
+  ) as { [E in HapticEvent]: () => void },
+  // Existing screens use these names. They share the switch and action window.
+  selection: () => { void play('selection'); },
+  light: () => { void play('light'); },
+  success: () => { void play('success'); },
+  warning: () => { void play('warning'); },
+  rigid: () => { void play('rigid'); },
+};
 
 // ─── Raw expo-haptics calls (via shims/expo-haptics.ts) ──────────────────────
 

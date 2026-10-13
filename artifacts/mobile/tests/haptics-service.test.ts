@@ -74,7 +74,9 @@ describe('the map Dev approved', () => {
   });
 
   it('exposes one function per event', () => {
-    expect(Object.keys(haptics).sort()).toEqual(Object.keys(HAPTIC_MAP).sort());
+    expect(Object.keys(haptics).sort()).toEqual([
+      ...Object.keys(HAPTIC_MAP), 'selection', 'light', 'success', 'warning', 'rigid',
+    ].sort());
     haptics.purchaseSuccess();
     expect(played()).toEqual(['notification:success']);
   });
@@ -179,7 +181,7 @@ describe('metro routes raw expo-haptics imports through the gate', () => {
     const sentryPath = require.resolve('@sentry/react-native/metro');
     require.cache[sentryPath] = {
       id: sentryPath, filename: sentryPath, loaded: true,
-      exports: { getSentryExpoConfig: () => ({ resolver: {} }) },
+      exports: { getSentryExpoConfig: () => ({ resolver: {}, transformer: {} }) },
     } as never;
     const configPath = require.resolve('./metro.config.js');
     delete require.cache[configPath];

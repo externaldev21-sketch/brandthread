@@ -74,7 +74,7 @@ describe('gated expo-haptics', () => {
   });
 
   it('hydrates the saved preference', async () => {
-    stored.value = JSON.stringify({ disableHaptics: true });
+    stored.value = 'false'; // #872's single persisted Sounds & haptics switch.
     vi.resetModules();
     const pref = await import('../lib/hapticsPreference');
     await pref.hydrateHapticsPreference();

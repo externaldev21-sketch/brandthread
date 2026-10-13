@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const calls: string[] = [];
 vi.mock('expo-haptics', () => ({
@@ -15,15 +15,21 @@ async function load() {
 }
 
 describe('haptics map (Apple HIG "Playing haptics")', () => {
-  beforeEach(() => { calls.length = 0; process.env.EXPO_OS = 'ios'; });
+  beforeEach(() => { calls.length = 0; process.env.EXPO_OS = 'ios'; vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
 
   it('maps each meaning to exactly one native pattern', async () => {
     const { haptics } = await load();
     haptics.selection();
+    vi.advanceTimersByTime(250);
     haptics.light();
+    vi.advanceTimersByTime(250);
     haptics.success();
+    vi.advanceTimersByTime(250);
     haptics.warning();
+    vi.advanceTimersByTime(250);
     haptics.error();
+    vi.advanceTimersByTime(250);
     haptics.rigid();
     expect(calls).toEqual([
       'selection',
@@ -43,6 +49,16 @@ describe('haptics map (Apple HIG "Playing haptics")', () => {
     expect(calls).toEqual([]);
   });
 
+  it('silences every legacy method when the shared switch is off', async () => {
+    const { haptics, setHapticsEnabled } = await load();
+    setHapticsEnabled(false);
+    for (const name of ['selection', 'light', 'success', 'warning', 'error', 'rigid'] as const) {
+      haptics[name]();
+      vi.advanceTimersByTime(250);
+    }
+    expect(calls).toEqual([]);
+  });
+
   it('never throws or rejects when the native call fails', async () => {
     const mod = await import('expo-haptics');
     const spy = vi.spyOn(mod, 'impactAsync').mockImplementation(() => Promise.reject(new Error('no engine')));
@@ -54,6 +70,7 @@ describe('haptics map (Apple HIG "Playing haptics")', () => {
   it('keeps the tab-bar legacy names on their original feel', async () => {
     const { hapticTabChange, hapticLight } = await load();
     hapticTabChange();
+    vi.advanceTimersByTime(250);
     hapticLight();
     expect(calls).toEqual(['impact:medium', 'impact:light']);
   });

@@ -184,6 +184,7 @@ function styles(theme: ReturnType<typeof useAppTheme>['theme']) {
     },
     searchInput: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, paddingVertical: 0 },
     scrollContent: {},
+    version: { fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'center', marginTop: 4 },
     noResults: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', marginTop: SP.xl, paddingHorizontal: SIDE_INSET },
     section: { marginTop: SP.md },
     sectionHeader: {

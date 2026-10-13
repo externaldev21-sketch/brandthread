@@ -335,7 +335,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], TILE_SIZE: n
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   tileOldPrice: { color: theme.subtle, fontFamily: FONT.medium, fontSize: FS.xs, textDecorationLine: 'line-through' },
   dropTag: { position: 'absolute', left: 6, top: 6, paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.pill, backgroundColor: theme.text },
-  dropTagText: { color: theme.background, fontSize: 10, fontFamily: FONT.bold, letterSpacing: 0.2 },
+  dropTagText: { color: theme.background, fontSize: 11, fontFamily: FONT.bold, letterSpacing: 0.2 },
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: OVERLAY },
   centerModal: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg },
   renameCard: {
