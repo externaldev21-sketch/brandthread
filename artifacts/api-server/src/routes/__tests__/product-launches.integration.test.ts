@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { eq, inArray } from "drizzle-orm";
 import {
-  db, follows, productLaunchAlerts, productLaunches, productPreorderTerms, productVariants, products, waitlistEntries,
+  db, follows, productLaunchAlerts, productLaunches, productPreorderTerms, productVariants, products, users, waitlistEntries,
 } from "@workspace/db";
 
 const published = vi.hoisted(() => [] as Array<{ userId: string; type: string; targetId?: string }>);
@@ -54,7 +54,15 @@ async function makeProduct(values: Partial<typeof products.$inferInsert> = {}) {
   return p.id;
 }
 
+/** A product that passes the launch checklist's hard blockers (photo + price; payouts are on for `seller`). */
+async function makeReadyProduct() {
+  const id = await makeProduct({ images: ["https://example.test/a.jpg"] });
+  await db.insert(productVariants).values({ productId: id, size: "M", sku: `RDY-${id}`, priceCents: 4000, stock: 2 });
+  return id;
+}
+
 beforeAll(async () => {
+  await db.insert(users).values({ clerkId: seller, email: `${seller}@example.test`, name: "Launch Seller", stripeAccountStatus: "active" }).onConflictDoNothing();
   const launchRouter = (await import("../product-launches")).default;
   const termsRouter = (await import("../preorder-terms")).default;
   const app = express();
@@ -69,6 +77,7 @@ beforeEach(() => { published.length = 0; });
 
 afterAll(async () => {
   await db.delete(follows).where(eq(follows.followingId, seller));
+  await db.delete(users).where(eq(users.clerkId, seller));
   if (productIds.length) await db.delete(products).where(inArray(products.id, productIds));
   await new Promise<void>((r) => server.close(() => r()));
 });
@@ -120,7 +129,7 @@ describe("pre-order terms", () => {
 
 describe("product launches", () => {
   it("seller schedules, lists with notify-me counts, cancels", async () => {
-    const id = await makeProduct();
+    const id = await makeReadyProduct();
     expect((await api(`/api/product-launches/${id}`, seller, "PUT", { launchAt: future(-1).toISOString() })).status).toBe(400);
     expect((await api(`/api/product-launches/${id}`, otherSeller, "PUT", { launchAt: future(5).toISOString() })).status).toBe(404);
     const put = await api(`/api/product-launches/${id}`, seller, "PUT", { launchAt: future(5).toISOString(), notifyFollowers: true });
@@ -144,7 +153,7 @@ describe("product launches", () => {
   });
 
   it("public state never exposes subscribers and hides unpublished products", async () => {
-    const id = await makeProduct();
+    const id = await makeReadyProduct();
     await api(`/api/product-launches/${id}`, seller, "PUT", { launchAt: future(3).toISOString() });
     await api(`/api/product-launches/${id}/alert`, buyerA, "POST");
     const pub = await api(`/api/product-launches/${id}`);
