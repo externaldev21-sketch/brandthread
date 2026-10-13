@@ -37,3 +37,33 @@ describe('normalizeTag / hashtagHref', () => {
     expect(hashtagHref('東京')).toBe('/hashtag/%E6%9D%B1%E4%BA%AC');
   });
 });
+
+import { mentionHref, splitRichCaption } from './hashtagText';
+
+describe('splitRichCaption (item 143)', () => {
+  it('splits @mentions and #hashtags, leaving the rest as text', () => {
+    expect(splitRichCaption('Fit by @maya.okafor for #drop04.')).toEqual([
+      { kind: 'text', text: 'Fit by ' },
+      { kind: 'mention', text: '@maya.okafor', handle: 'maya.okafor' },
+      { kind: 'text', text: ' for ' },
+      { kind: 'tag', text: '#drop04', tag: 'drop04' },
+      { kind: 'text', text: '.' },
+    ]);
+  });
+
+  it('drops a trailing period from a handle and lowercases it', () => {
+    expect(splitRichCaption('thanks @Maya.')).toEqual([
+      { kind: 'text', text: 'thanks ' },
+      { kind: 'mention', text: '@Maya', handle: 'maya' },
+      { kind: 'text', text: '.' },
+    ]);
+  });
+
+  it('keeps emails and bare @ plain', () => {
+    expect(splitRichCaption('mail hi@brandthread.app or @ me')).toEqual([{ kind: 'text', text: 'mail hi@brandthread.app or @ me' }]);
+  });
+
+  it('builds the public profile route', () => {
+    expect(mentionHref('Maya.Okafor')).toBe('/u/maya.okafor');
+  });
+});
