@@ -28,11 +28,12 @@ describe('step sequencing', () => {
 
   it('buyer flow inserts Sizes after Style and Brands-to-follow before Loading', () => {
     expect(BUYER_STEP_INDEX.STYLE).toBe(4);
-    expect(BUYER_STEP_INDEX.SIZES).toBe(5);
-    expect(BUYER_STEP_INDEX.BRANDS).toBe(6);
-    expect(BUYER_STEP_INDEX.LOADING).toBe(7);
-    expect(BUYER_STEP_INDEX.NOTIFICATIONS).toBe(8);
-    expect(BUYER_STEP_INDEX.SUCCESS).toBe(9);
+    expect(BUYER_STEP_INDEX.TASTE).toBe(5);
+    expect(BUYER_STEP_INDEX.SIZES).toBe(6);
+    expect(BUYER_STEP_INDEX.BRANDS).toBe(7);
+    expect(BUYER_STEP_INDEX.LOADING).toBe(8);
+    expect(BUYER_STEP_INDEX.NOTIFICATIONS).toBe(9);
+    expect(BUYER_STEP_INDEX.SUCCESS).toBe(10);
   });
 
   it('seller flow keeps BrandName/BrandStage/Goals/Plan order after Name', () => {
@@ -64,6 +65,7 @@ describe('skip rules', () => {
 
   it('marks style picks, sizes and brand-follow as skippable', () => {
     expect(isStepSkippable('buyer', BUYER_STEP_INDEX.STYLE)).toBe(true);
+    expect(isStepSkippable('buyer', BUYER_STEP_INDEX.TASTE)).toBe(true);
     expect(isStepSkippable('buyer', BUYER_STEP_INDEX.SIZES)).toBe(true);
     expect(isStepSkippable('buyer', BUYER_STEP_INDEX.BRANDS)).toBe(true);
   });
@@ -106,6 +108,15 @@ describe('draft migration / resumption', () => {
   it('is a no-op for the current draft version', () => {
     expect(restoreDraftStep('buyer', BUYER_STEP_INDEX.STYLE, DRAFT_VERSION)).toBe(BUYER_STEP_INDEX.STYLE);
     expect(restoreDraftStep('seller', SELLER_STEP_INDEX.GOALS, DRAFT_VERSION)).toBe(SELLER_STEP_INDEX.GOALS);
+  });
+
+  it('migrates a v8 buyer draft: Style and earlier stay, Sizes and later shift past the Taste quiz', () => {
+    // v8: Style=4, Sizes=5, Brands=6, Loading=7, Notifications=8, Success=9
+    expect(restoreDraftStep('buyer', 4, 8)).toBe(BUYER_STEP_INDEX.STYLE);
+    expect(restoreDraftStep('buyer', 5, 8)).toBe(BUYER_STEP_INDEX.SIZES);
+    expect(restoreDraftStep('buyer', 6, 8)).toBe(BUYER_STEP_INDEX.BRANDS);
+    expect(restoreDraftStep('buyer', 9, 8)).toBe(BUYER_STEP_INDEX.SUCCESS);
+    expect(restoreDraftStep('seller', SELLER_STEP_INDEX.PLAN, 8)).toBe(SELLER_STEP_INDEX.PLAN);
   });
 
   it('migrates a v7 buyer draft: steps before Sizes stay, Brands and later shift by one', () => {

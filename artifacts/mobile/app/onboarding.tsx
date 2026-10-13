@@ -3,7 +3,7 @@
  *
  * STEP ORDER (v7) — see lib/onboardingFlow.ts for the single source of truth:
  * BOTH:   0=Welcome (cinematic opener)  1=AccountType  2=Auth  3=Name
- * BUYER:  4=Style  5=Brands (follow)  6=Loading  7=Notifications  8=Success
+ * BUYER:  4=Style  5=Taste (swipe quiz)  6=Sizes  7=Brands (follow)  8=Loading  9=Notifications  10=Success
  * SELLER: 4=BrandName  5=BrandStage  6=Goals  7=Plan  8=Loading  9=Notifications  10=Success
  *
  * Step ordering, skip rules and draft-version migration now live in
@@ -95,6 +95,8 @@ import {
 } from '@/lib/onboardingFlow';
 import { BrandsToFollowStep } from '@/components/onboarding/BrandsToFollowStep';
 import { SizesStep } from '@/components/onboarding/SizesStep';
+import { TasteQuizStep, type TasteQuizResult } from '@/components/onboarding/TasteQuizStep';
+import type { QuizSwipe } from '@/lib/tasteQuiz';
 import { EMPTY_SURVEY, hasSurveyAnswers, sanitizeDraftSurvey, saveBuyerSurvey, type OnboardingSurvey } from '@/lib/onboardingSurvey';
 import { WelcomeStep } from '@/components/onboarding/WelcomeStep';
 import { Glow, ThreadDraw, ThreadLogoStitch, ThreadProgress, ThreadWeave } from '@/components/onboarding/ThreadLine';
@@ -1966,6 +1968,13 @@ export default function OnboardingScreen() {
     prev.likedBrandIds.length === likedBrandIds.length && prev.likedBrandIds.every((id, i) => id === likedBrandIds[i])
       ? prev : { ...prev, likedBrandIds }
   )), []);
+  // Taste quiz swipes: held until finishBuyer, which sends them once the
+  // account exists server-side (they train the For You taste profile).
+  const tasteSwipesRef = useRef<QuizSwipe[]>([]);
+  const onTasteQuizDone = (result: TasteQuizResult) => {
+    tasteSwipesRef.current = result.swipes;
+    transitionTo(BUYER_STEP_INDEX.SIZES, 1);
+  };
 
   // Seller data
   const [brandName, setBrandName]         = useState('');
@@ -2327,6 +2336,11 @@ export default function OnboardingScreen() {
       // Optional survey (sizes + liked brands): best-effort, queued on failure,
       // never blocks completion (which is already committed server-side above).
       await saveBuyerSurvey(profile.clerkId, survey, styleInterests, api);
+      if (tasteSwipesRef.current.length > 0) {
+        await api.buyer.tasteQuiz.submit(tasteSwipesRef.current, styleInterests).catch((error) => {
+          logBuyerOnboardingFailure('taste-quiz', error, retryAttempt);
+        });
+      }
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
         [ONBOARDING_OWNER_KEY, profile.clerkId],
@@ -2480,6 +2494,7 @@ export default function OnboardingScreen() {
     if (flow === 'buyer') {
       if (step === BUYER_STEP_INDEX.NAME) return firstName.trim().length >= 2;
       if (step === BUYER_STEP_INDEX.STYLE) return true;
+      if (step === BUYER_STEP_INDEX.TASTE) return true;
       if (step === BUYER_STEP_INDEX.SIZES) return true;
       if (step === BUYER_STEP_INDEX.BRANDS) return true;
     }
@@ -2613,7 +2628,12 @@ export default function OnboardingScreen() {
         </ScrollView>
       );
 
-      // Step 5: Sizes (optional) — seeds My sizes and size recommendations
+      // Step 5: Taste quiz (optional) — swipe real products, ends on a style identity card
+      if (step === BUYER_STEP_INDEX.TASTE) return (
+        <TasteQuizStep onDone={onTasteQuizDone} />
+      );
+
+      // Step 6: Sizes (optional) — seeds My sizes and size recommendations
       if (step === BUYER_STEP_INDEX.SIZES) return (
         <SizesStep sizes={survey.sizes} onChange={setSurveySizes} />
       );
@@ -2832,6 +2852,7 @@ export default function OnboardingScreen() {
   const showFooter = !isFullScreen
     && !isAuthStep
     && !isAccountTypeStep
+    && !(flow === 'buyer' && step === BUYER_STEP_INDEX.TASTE)
     && !(flow === 'seller' && (step === SELLER_STEP_INDEX.GOALS || step === SELLER_STEP_INDEX.PLAN));
 
   function footerButtonLabel(): string {
