@@ -1,17 +1,16 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
+import {
   runOnJS,
   useAnimatedReaction,
-  useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import type { SellerHomeDashboardRange } from '@/lib/sellerDashboardHome';
-import { layoutSeriesPoints, smoothPath } from '@/lib/svgSmoothPath';
+import { layoutSeriesPoints, monotonePath } from '@/lib/svgSmoothPath';
 import { selectEvenlySpacedIndices } from '@/lib/sellerHomeChartLabels';
 import { BORDER_SUBTLE, FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { radius } from '@/constants/radii';
@@ -115,7 +114,9 @@ export function SellerDashboardChart({
     [series, width, chartHeight],
   );
   // One smooth line only — no area fill under it, no glow.
-  const linePath = useMemo(() => smoothPath(points), [points]);
+  // Monotone cubic: never overshoots the data, so a $0 bucket next to a
+  // spike can't dip below the baseline and a low can't dip past its value.
+  const linePath = useMemo(() => monotonePath(points), [points]);
 
   const scrubX = useSharedValue(0);
   const scrubActive = useSharedValue(0);
@@ -172,20 +173,12 @@ export function SellerDashboardChart({
     [handleIndexChange],
   );
 
-  const cursorStyle = useAnimatedStyle(() => ({
-    opacity: scrubActive.value,
-    transform: [{ translateX: scrubX.value - 0.5 }],
-  }));
-  const dotStyle = useAnimatedStyle(() => {
-    const point = points[Math.max(0, Math.min(points.length - 1, activeIndex.value))];
-    return {
-      opacity: scrubActive.value,
-      transform: [
-        { translateX: (point?.x ?? 0) - 4 },
-        { translateY: (point?.y ?? chartHeight / 2) - 4 },
-      ],
-    };
-  });
+  // The scrub cursor (line + dot) is placed from React state on the
+  // scrubbed bucket's own point and only mounted while scrubbing. It used to
+  // be an always-mounted animated view whose worklet captured a stale
+  // `points` array (no dependency list), which could leave a stray dot near
+  // x=0 after a range switch.
+  const scrubPoint = !isEmpty && tooltipIndex !== null ? points[tooltipIndex] ?? null : null;
 
   // The empty/fresh-seller state must still draw a real, VISIBLE flat line
   // at $0 (never blank space that reads as a broken/missing chart) — just
@@ -257,10 +250,14 @@ export function SellerDashboardChart({
               </View>
             </View>
           )}
-          {!isEmpty && (
+          {scrubPoint && (
             <>
-              <Animated.View pointerEvents="none" style={[styles.cursorLine, { backgroundColor: theme.border }, cursorStyle]} />
-              <Animated.View pointerEvents="none" style={[styles.cursorDot, { backgroundColor: theme.text, borderColor: theme.background }, dotStyle]} />
+              <View pointerEvents="none" testID="seller-dashboard-chart-cursor" style={[styles.cursorLine, { backgroundColor: theme.border, left: scrubPoint.x - 0.5 }]} />
+              <View
+                pointerEvents="none"
+                testID="seller-dashboard-chart-cursor-dot"
+                style={[styles.cursorDot, { backgroundColor: theme.text, borderColor: theme.background, left: scrubPoint.x - 4, top: scrubPoint.y - 4 }]}
+              />
             </>
           )}
           {/* "Now" marker for Today: a static dot at the current hour's point
@@ -269,7 +266,7 @@ export function SellerDashboardChart({
               stops at "now" rather than having simply run out of data.
               Hidden while actively scrubbing so it never fights the scrub
               cursor dot for the same spot. */}
-          {showNowMarker && !isEmpty && tooltipIndex === null && points.length > 0 && (
+          {showNowMarker && range === 'today' && !isEmpty && tooltipIndex === null && points.length > 0 && (
             <View
               pointerEvents="none"
               testID="seller-dashboard-chart-now-marker"

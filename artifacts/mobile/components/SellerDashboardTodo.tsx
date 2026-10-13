@@ -10,12 +10,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
-import { PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { hapticLight } from '@/lib/haptics';
 import { DASHBOARD_ACTION_ROWS } from '@/components/SellerDashboardActionNeeded';
 import { SellerDashboardSectionTitle } from '@/components/SellerDashboardSectionTitle';
 import { hasTodo } from '@/lib/sellerDashboardHome';
 import type { DashboardActionCounts } from '@/lib/sellerDashboardStats';
-import { FONT, SP } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
 /** Orders tab, pre-filtered to Unfulfilled (orders.tsx reads ?filter= on focus). */
 export const SHIP_NOW_ROUTE = '/(tabs)/orders?filter=unfulfilled';
@@ -30,7 +31,7 @@ export function SellerDashboardTodo({
   theme: AppThemePreset;
   /** Row taps (the caller fires the one light haptic). */
   onNavigate: (route: string) => void;
-  /** Ship now — PrimaryButton already fires its own haptic, so this must not add another. Opens SHIP_NOW_ROUTE. */
+  /** Ship now: opens SHIP_NOW_ROUTE. The button fires the one light haptic, so this must not add another. */
   onShipNow: () => void;
 }) {
   if (!counts || !hasTodo(counts)) return null;
@@ -47,7 +48,18 @@ export function SellerDashboardTodo({
               {counts.toShip === 1 ? 'Order to ship' : 'Orders to ship'}
             </Text>
           </View>
-          <PrimaryButton label="Ship now" small onPress={onShipNow} testID="seller-dashboard-ship-now" style={styles.shipButton} />
+          {/* Same solid button as the dashboard's Withdraw (accent fill,
+              plain onAccent text) — not PrimaryButton, whose label carries
+              a soft text shadow. */}
+          <PressableScale
+            onPress={() => { hapticLight(); onShipNow(); }}
+            style={[styles.shipButton, { backgroundColor: theme.accent }]}
+            accessibilityRole="button"
+            accessibilityLabel="Ship now"
+            testID="seller-dashboard-ship-now"
+          >
+            <Text style={[styles.shipButtonText, { color: theme.onAccent }]} numberOfLines={1}>Ship now</Text>
+          </PressableScale>
         </View>
       )}
       {rows.map((row, index) => {
@@ -76,7 +88,8 @@ const styles = StyleSheet.create({
   shipCopy: { flex: 1, minWidth: 0 },
   shipCount: { fontFamily: FONT.bold, fontSize: 34, lineHeight: 40, letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
   shipLabel: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 20 },
-  shipButton: { minWidth: 120 },
+  shipButton: { minHeight: 44, minWidth: 120, paddingHorizontal: SP.md, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  shipButtonText: { fontFamily: FONT.bold, fontSize: FS.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52 },
   rowTitle: { flex: 1, minWidth: 0, fontFamily: FONT.medium, fontSize: 15 },
 });

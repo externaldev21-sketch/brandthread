@@ -531,6 +531,22 @@ describe('SellerDashboardChart', () => {
     expect(renderer!.root.findAllByProps({ testID: 'seller-dashboard-range-pills' })).toHaveLength(0);
   });
 
+  it('mounts no scrub cursor dot while idle, and never a Now marker outside Today', async () => {
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart values={[10, 40, 25, 60]} labels={['A', 'B', 'C', 'D']} theme={theme} range="7d" onScrub={vi.fn()} isEmpty={false} showNowMarker />,
+      );
+    });
+    await layoutChart();
+    expect(renderer!.root.findAllByProps({ testID: 'seller-dashboard-chart-cursor-dot' })).toHaveLength(0);
+    expect(renderer!.root.findAllByProps({ testID: 'seller-dashboard-chart-now-marker' })).toHaveLength(0);
+  });
+
+  it('draws the line with the monotone (non-overshooting) curve', () => {
+    expect(chartSource).toContain('monotonePath(points)');
+    expect(chartSource).not.toContain('smoothPath(points)');
+  });
+
   it('never fires a haptic per scrub tick', () => {
     expect(chartSource).not.toContain('expo-haptics');
   });
