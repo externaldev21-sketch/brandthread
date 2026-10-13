@@ -9,13 +9,13 @@ import React from 'react';
 
 function makeChain(): Record<string, (...args: unknown[]) => unknown> {
   const chain: Record<string, (...args: unknown[]) => unknown> = {};
-  for (const m of ['onStart', 'onUpdate', 'onEnd', 'onBegin', 'onFinalize', 'enabled', 'activeOffsetY', 'failOffsetY']) {
+  for (const m of ['onStart', 'onUpdate', 'onEnd', 'onBegin', 'onFinalize', 'enabled', 'activeOffsetY', 'failOffsetY', 'failOffsetX', 'activeOffsetX', 'simultaneousWithExternalGesture']) {
     chain[m] = () => chain;
   }
   return chain;
 }
 
-export const Gesture = { Pan: makeChain, Tap: makeChain, Simultaneous: makeChain, Race: makeChain };
+export const Gesture = { Pan: makeChain, Tap: makeChain, Native: makeChain, Simultaneous: makeChain, Race: makeChain };
 
 export function GestureDetector({ children }: { children: React.ReactNode }) {
   return React.createElement(React.Fragment, null, children);

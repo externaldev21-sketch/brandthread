@@ -19,9 +19,14 @@ type KeyboardControllerModule = {
 let controller: KeyboardControllerModule | null | undefined;
 function getController(): KeyboardControllerModule | null {
   if (controller !== undefined) return controller;
-  const nativeModuleAvailable = Platform.OS === 'web'
-    || NativeModules.KeyboardController
-    || TurboModuleRegistry.get('KeyboardController');
+  let nativeModuleAvailable = false;
+  try {
+    nativeModuleAvailable = Platform.OS === 'web'
+      || !!NativeModules.KeyboardController
+      || !!TurboModuleRegistry.get('KeyboardController');
+  } catch {
+    // A partial react-native (test mocks, unusual hosts) — treat as absent.
+  }
   if (!nativeModuleAvailable) return (controller = null);
   try {
     // Matching Expo Go SDKs bundle this package; resolve it only when the
