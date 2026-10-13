@@ -81,7 +81,7 @@ async function setup(browser, images, origin, viewport, { empty = false } = {}) 
 async function openDrops(page, activity, origin) {
   for (let attempt = 0; ; attempt++) {
     await openScreen(page, activity, origin, 'buyer', '/(buyer)/discover');
-    try { await page.getByTestId('discover-filter-drops').first().waitFor({ timeout: 15_000 }); break; } catch (e) { if (attempt >= 3) throw e; }
+    try { await page.getByTestId('discover-filter-drops').first().waitFor({ timeout: 30_000 }); break; } catch (e) { await page.screenshot({ path: path.join(WORK_DIR, 'drop-calendar-fail.png') }); if (attempt >= 3) throw e; }
   }
   await waitForQuietNetwork(activity);
   await page.getByTestId('discover-filter-drops').first().click();
@@ -104,8 +104,9 @@ async function capture(label, buildDir) {
         if (label === 'after') {
           // Scroll to the later days.
           await page.mouse.move(d.viewport.width / 2, d.viewport.height / 2);
-          await page.mouse.wheel(0, 600);
-          await page.waitForTimeout(800);
+          // Twice: the FlatList renders its next window after the first scroll.
+          for (let i = 0; i < 3; i++) { await page.mouse.wheel(0, 600); await page.waitForTimeout(800); }
+          await waitForImages(page);
           await page.screenshot({ path: path.join(OUT, `${label}-drops-scrolled-${d.tag}.png`) });
           await page.mouse.wheel(0, -2000);
           await page.waitForTimeout(600);
