@@ -4,7 +4,7 @@
  * answers PIN_LIMIT; `pinPostWithReplacePrompt` then asks to replace the
  * oldest pin and retries with `replaceOldest`.
  */
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { serviceRequest } from '@/lib/serviceConfig';
 
 export const MAX_PINS = 3;
@@ -36,10 +36,19 @@ export function isPinLimitError(error: unknown): boolean {
 /** Resolves true when the user chose to replace the oldest pin. */
 export type ConfirmReplace = () => Promise<boolean>;
 
+const REPLACE_TITLE = 'Replace pinned post?';
+const REPLACE_BODY = `You can pin up to ${MAX_PINS} posts. Pinning this one unpins your oldest pinned post.`;
+
 export const confirmReplaceOldest: ConfirmReplace = () => new Promise((resolve) => {
+  if (Platform.OS === 'web') {
+    // react-native-web's Alert.alert is a no-op; same fallback as create-post's discard confirm.
+    // eslint-disable-next-line no-alert
+    resolve(typeof window !== 'undefined' && window.confirm(`${REPLACE_TITLE}\n\n${REPLACE_BODY}`));
+    return;
+  }
   Alert.alert(
-    'Replace pinned post?',
-    `You can pin up to ${MAX_PINS} posts. Pinning this one unpins your oldest pinned post.`,
+    REPLACE_TITLE,
+    REPLACE_BODY,
     [
       { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
       { text: 'Replace', onPress: () => resolve(true) },

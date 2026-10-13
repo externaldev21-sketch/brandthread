@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const serviceRequest = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/serviceConfig', () => ({ serviceRequest }));
-vi.mock('react-native', () => ({ Alert: { alert: vi.fn() } }));
+vi.mock('react-native', () => ({ Alert: { alert: vi.fn() }, Platform: { OS: 'ios' } }));
 
 import {
   getMyPins, isPinLimitError, pinPost, pinPostWithReplacePrompt, unpinPost, MAX_PINS,

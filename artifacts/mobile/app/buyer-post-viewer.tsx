@@ -233,6 +233,8 @@ export default function BuyerPostViewer() {
   // When post is null (not yet loaded or not found in my posts), assume non-owner
   // so report is visible and owner-only controls are hidden.
   const isOwner = post !== null && post.authorId === MY_USER_ID;
+  // Pinning is checked by the server (owner + published); real posts carry the Clerk id as authorId.
+  const canPin = post !== null && !post.isDraft && (isOwner || (!!userId && post.authorId === userId));
 
   const loadPost = useCallback(async () => {
     let found: BuyerPost | null = null;
@@ -527,7 +529,7 @@ export default function BuyerPostViewer() {
         ) : null}
 
         {/* Owner-only: Pin to your profile (Instagram) — published posts only */}
-        {isOwner && post && !post.isDraft ? (
+        {canPin && post ? (
           <View style={{ paddingHorizontal: SP.md, marginTop: SP.lg }}>
             <TouchableOpacity
               style={s.captionsBtn}
