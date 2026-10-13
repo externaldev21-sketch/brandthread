@@ -108,14 +108,41 @@ async function loadPost(postId: string, viewerId: string | null) {
 }
 
 // ─── GET /api/posts/:postId/comments ─────────────────────────────────────────
+/**
+ * "Top" ranking for a top-level comment: likes, plus replies (a conversation
+ * counts for more than a like), plus a bump when the post's creator liked it.
+ */
+function topCommentScore(creatorId: string) {
+  return sql<number>`(
+    (SELECT count(*) FROM post_comment_likes tl WHERE tl.comment_id = ${postComments.id})
+    + 2 * (SELECT count(*) FROM post_comments tr
+           WHERE tr.parent_id = ${postComments.id} AND tr.moderation_status = 'visible')
+    + CASE WHEN EXISTS (SELECT 1 FROM post_comment_likes cl
+                        WHERE cl.comment_id = ${postComments.id} AND cl.user_id = ${creatorId})
+           THEN 5 ELSE 0 END
+  )`;
+}
+
 router.get("/:postId/comments", async (req, res) => {
   const postId = String(req.params.postId);
   if (!UUID_RE.test(postId)) return res.status(404).json({ error: "Post not found" });
   const viewerId = optionalViewerId(req);
-  const before = typeof req.query.before === "string" ? new Date(req.query.before) : null;
+  // "top" (most liked/replied first) or "newest" (default, the original order).
+  const sort = req.query.sort === "top" ? "top" : "newest";
+  if (req.query.sort !== undefined && req.query.sort !== "top" && req.query.sort !== "newest") {
+    return res.status(400).json({ error: "sort must be top or newest" });
+  }
+  const rawBefore = typeof req.query.before === "string" ? req.query.before : null;
+  // Newest pages by timestamp; Top pages by offset (its order isn't by time).
+  const before = sort === "newest" && rawBefore ? new Date(rawBefore) : null;
   if (before && Number.isNaN(before.getTime())) {
     return res.status(400).json({ error: "before must be an ISO timestamp" });
   }
+  const topOffset = sort === "top" && rawBefore ? Number(rawBefore) : 0;
+  if (sort === "top" && rawBefore && !/^\d{1,6}$/.test(rawBefore)) {
+    return res.status(400).json({ error: "before must be a page offset for top comments" });
+  }
+  const firstPage = sort === "top" ? topOffset === 0 : !before;
 
   try {
     const post = await loadPost(postId, viewerId);
@@ -147,12 +174,15 @@ router.get("/:postId/comments", async (req, res) => {
         standing,
         before ? lt(postComments.createdAt, before) : undefined,
       ))
-      .orderBy(desc(postComments.createdAt))
+      .orderBy(...(sort === "top"
+        ? [desc(topCommentScore(post.userId)), desc(postComments.createdAt), desc(postComments.id)]
+        : [desc(postComments.createdAt)]))
+      .offset(topOffset)
       .limit(PAGE_SIZE + 1);
     const hasMore = topLevel.length > PAGE_SIZE;
     const rest = topLevel.slice(0, PAGE_SIZE);
     // The pinned comment always leads the first page, however old it is.
-    const pinnedRows = before ? [] : await db
+    const pinnedRows = !firstPage ? [] : await db
       .select()
       .from(postComments)
       .where(and(
@@ -281,7 +311,10 @@ router.get("/:postId/comments", async (req, res) => {
       commentsDisabled,
       canComment: !!viewerId && !commentsDisabled,
       isPostOwner: !!viewerId && viewerId === post.userId,
-      nextCursor: hasMore ? page[page.length - 1].createdAt.toISOString() : null,
+      nextCursor: !hasMore ? null
+        : sort === "top" ? String(topOffset + PAGE_SIZE)
+        : page[page.length - 1].createdAt.toISOString(),
+      sort,
     });
   } catch (err) {
     req.log.error({ err, postId }, "Failed to list comments");

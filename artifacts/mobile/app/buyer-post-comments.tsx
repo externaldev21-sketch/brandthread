@@ -93,6 +93,7 @@ import { getPreviewActivityForComment } from '@/lib/previewActivity';
 import { AppleEmoji, QUICK_REACTION_EMOJI } from '@/lib/appleEmoji';
 
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { COMMENT_SORTS, sortRoots, type CommentSort } from '@/lib/commentSort';
 
 import { TranslationLink, useCaptionTranslation } from '@/components/translation/CaptionTranslation';
 
@@ -150,6 +151,17 @@ function useFailOnNestedButtonWarning() {
 
 /** A flattened list row: roots followed by their replies. */
 type Row = ThreadComment & { isReply: boolean; parentAuthorName?: string; creatorLiked?: boolean };
+
+/** Re-orders a flattened thread (root, its replies, next root, …) by root. */
+function sortFlatRows(rows: Row[], sort: CommentSort): Row[] {
+  const groups: Row[][] = [];
+  for (const row of rows) {
+    if (!row.isReply || groups.length === 0) groups.push([row]);
+    else groups[groups.length - 1].push(row);
+  }
+  return sortRoots(groups.map((g) => ({ ...g[0], replies: g.slice(1), group: g })), sort)
+    .flatMap((root) => root.group);
+}
 
 function flatten(roots: ThreadComment[]): Row[] {
   return roots.flatMap((root) => [
@@ -738,6 +750,8 @@ export default function BuyerPostCommentsScreen() {
   const myAvatar = user?.hasImage ? user.imageUrl : null;
 
   const [comments, setComments] = useState<Row[]>([]);
+  /** Top / Newest chips under the header, YouTube's comments sheet (#142). */
+  const [sort, setSort] = useState<CommentSort>('top');
   /** Root comment ids whose reply thread is expanded (collapsed by default). */
   const [expandedRoots, setExpandedRoots] = useState<Set<string>>(new Set());
   const [meta, setMeta] = useState({ hiddenByMutedWords: 0, commentsDisabled: false, canComment: true, isPostOwner: false, nextCursor: null as string | null });
@@ -815,7 +829,7 @@ export default function BuyerPostCommentsScreen() {
     if (!hasLoadedOnce.current) setLoading(true);
     setFetchError(null);
     try {
-      const thread = await api.comments.list(postId);
+      const thread = await api.comments.list(postId, undefined, sort);
       setComments(flatten(thread.comments));
       setMeta({
         hiddenByMutedWords: thread.hiddenByMutedWords,
@@ -832,7 +846,7 @@ export default function BuyerPostCommentsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [api, postId, params.postAuthorName, targetCommentId, myName, user?.id, postAuthorId]);
+  }, [api, postId, params.postAuthorName, targetCommentId, myName, user?.id, postAuthorId, sort]);
 
   useEffect(() => { load(); }, [load]);
   const pull = usePullToRefresh(load);
@@ -841,7 +855,7 @@ export default function BuyerPostCommentsScreen() {
     if (!meta.nextCursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const thread = await api.comments.list(postId, meta.nextCursor);
+      const thread = await api.comments.list(postId, meta.nextCursor, sort);
       setComments((prev) => [...prev, ...flatten(thread.comments)]);
       setMeta((prev) => ({ ...prev, nextCursor: thread.nextCursor }));
     } catch {
@@ -849,7 +863,7 @@ export default function BuyerPostCommentsScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }, [api, loadingMore, meta.nextCursor, postId]);
+  }, [api, loadingMore, meta.nextCursor, postId, sort]);
 
   const postComment = useCallback(
     (text: string, parentId?: string | null) => api.comments.create(postId, text, parentId),
@@ -1054,7 +1068,10 @@ export default function BuyerPostCommentsScreen() {
    */
   const visibleRows = useMemo(() => {
     const out: (Row | ViewRepliesRow)[] = [];
-    const visibleComments = user?.id ? comments : guestMutedPhrases === null ? [] : comments.filter(
+    // Real posts come back sorted by the server; preview comments live on
+    // the device, so they get the same order here.
+    const ordered = isPreviewPost ? sortFlatRows(comments, sort) : comments;
+    const visibleComments = user?.id ? ordered : guestMutedPhrases === null ? [] : ordered.filter(
       (comment) => !matchesGuestMutedWords(comment.body, guestMutedPhrases),
     );
     let i = 0;
@@ -1076,7 +1093,7 @@ export default function BuyerPostCommentsScreen() {
       i = j;
     }
     return out;
-  }, [comments, expandedRoots, user?.id, guestMutedPhrases]);
+  }, [comments, expandedRoots, user?.id, guestMutedPhrases, isPreviewPost, sort]);
 
   const toggleReplies = useCallback((rootId: string) => {
     setExpandedRoots(prev => {
@@ -1263,6 +1280,30 @@ export default function BuyerPostCommentsScreen() {
               <Icon name="x" size={20} color={FG} />
             </PressableScale>
           </View>
+          {!meta.commentsDisabled ? (
+            <View style={s.sortRow} accessibilityRole="tablist">
+              {COMMENT_SORTS.map((option) => {
+                const selected = sort === option.id;
+                return (
+                  <PressableScale
+                    key={option.id}
+                    style={[s.sortChip, selected && s.sortChipOn]}
+                    onPress={() => {
+                      if (selected) return;
+                      hapticSelection();
+                      setSort(option.id);
+                      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+                    }}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected }}
+                    testID={`comments-sort-${option.id}`}
+                  >
+                    <Text style={[s.sortChipText, selected && s.sortChipTextOn]}>{option.label}</Text>
+                  </PressableScale>
+                );
+              })}
+            </View>
+          ) : null}
 
           <KeyboardGestureArea style={{ flex: 1 }} textInputNativeID={COMMENT_INPUT_NATIVE_ID}>
           <FlashList
@@ -1293,7 +1334,7 @@ export default function BuyerPostCommentsScreen() {
             <View style={s.listFooter}>
               {meta.nextCursor ? (
                 <PressableScale style={s.loadMore} onPress={() => loadMore()} disabled={loadingMore} accessibilityRole="button">
-                  {loadingMore ? <InlineSpinner style={{ paddingVertical: 0 }} /> : <Text style={s.loadMoreText}>View older comments</Text>}
+                  {loadingMore ? <InlineSpinner style={{ paddingVertical: 0 }} /> : <Text style={s.loadMoreText}>{sort === 'top' ? 'View more comments' : 'View older comments'}</Text>}
                 </PressableScale>
               ) : null}
               {meta.hiddenByMutedWords > 0 ? (
@@ -1491,6 +1532,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   headerSide: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontFamily: FONT.bold, fontSize: FS.sm, color: FG },
+  sortRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: 10, paddingBottom: 6 },
+  sortChip: {
+    height: 32, paddingHorizontal: 14, borderRadius: RADIUS.pill,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: SUBTLE_WASH,
+  },
+  sortChipOn: { backgroundColor: FG },
+  sortChipText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
+  sortChipTextOn: { color: CARD },
 
   listContent: { paddingTop: 4, paddingBottom: SP.md, flexGrow: 1 },
   emptyState: { flex: 1, minHeight: 180, alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: SP.lg },
