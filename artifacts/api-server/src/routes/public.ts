@@ -32,6 +32,7 @@ import {
 } from "../lib/pagination";
 import { setPublicCacheHeaders, setViewerScopedCacheHeaders } from "../lib/httpCache";
 import { applySalesToVariants } from "../lib/pricing/salesRuntime";
+import { goneProductBody } from "../lib/goneProduct";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -446,7 +447,21 @@ router.get("/products/:id", async (req, res) => {
       .limit(1);
 
     if (!product) {
-      res.status(404).json({ error: "Product not found" });
+      // Gone (archived/deleted/unpublished): name the brand so the app can
+      // link to it. Blocked pairs still get a plain 404.
+      const [gone] = await db
+        .select({ ownerId: products.ownerId })
+        .from(products)
+        .where(and(eq(products.id, req.params.id), notBlockedWith(viewerId, products.ownerId)))
+        .limit(1);
+      const [owner] = gone
+        ? await db
+          .select({ clerkId: users.clerkId, brandName: users.brandName, displayName: users.displayName, deletedAt: users.deletedAt })
+          .from(users)
+          .where(eq(users.clerkId, gone.ownerId))
+          .limit(1)
+        : [];
+      res.status(404).json(goneProductBody(owner));
       return;
     }
 
