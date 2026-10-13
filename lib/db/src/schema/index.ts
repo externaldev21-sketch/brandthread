@@ -598,6 +598,9 @@ export const orders = pgTable('orders', {
   // 'destination' = in-stock order paid straight to the seller;
   // 'held' = preorder-drop order whose funds Brandthread holds until ship.
   chargeModel: text('charge_model'),
+  // Sales channel. NULL = online checkout; 'popup' = in-person Tap to Pay
+  // sale from Pop-up mode (migration 274).
+  source: text('source'),
   // settled_direct | held | release_pending | released | refunded
   fundsState: text('funds_state'),
   stripeChargeId: text('stripe_charge_id'),
@@ -930,6 +933,9 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   // Bundle savings decided when this checkout was priced (migration 301).
   bundleDiscountCents: integer('bundle_discount_cents').notNull().default(0),
   bundleLines: jsonb('bundle_lines').$type<OrderBundleLine[]>().notNull().default([]),
+  // NULL = online checkout; 'popup' = a pending in-person Pop-up mode sale
+  // (no buyer identity; the seller rang it up). Migration 274.
+  source: text('source'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   paymentIntentIdx: index('checkout_sessions_payment_intent_idx').on(t.stripePaymentIntentId),
@@ -2912,6 +2918,7 @@ export * from './sellerPaymentSettings';
 export * from './sellerMessaging';
 export * from './aiCredits';
 export * from './liveModeration';
+export * from './popup';
 
 // ─── Automatic media screening results (migration 115) ───────────────────────
 // Held / rejected uploads only. No raw images are stored.

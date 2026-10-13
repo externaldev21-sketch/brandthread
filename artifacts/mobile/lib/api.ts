@@ -104,6 +104,7 @@ import type { LiveAnalytics, LiveAnalyticsListItem } from '@/lib/live/liveAnalyt
 import type { OrderRefundsResponse, SellerRefundRequest, SellerRefundResponse } from '@/lib/sellerRefund';
 import type { StoreDetailRatings } from '@/lib/storeTrust';
 import type { AccountStatus, MyReport } from '@/lib/accountStatus';
+import type { PopupPaymentStart, PopupPaymentStatus, PopupProduct, PopupStatus } from '@/lib/popupMode';
 
 import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
@@ -4147,6 +4148,19 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       sellerDemand:  () => get<any[]>('/api/waitlist/seller'),
       sellerNotify:  (variantId: string) =>
         post<{ notified: number }>(`/api/waitlist/seller/notify/${encodeURIComponent(variantId)}`, {}),
+    },
+    /** Pop-up mode: in-person Tap to Pay sales (/api/seller/terminal). */
+    popup: {
+      status:          () => freshGet<PopupStatus>('/api/seller/terminal/status'),
+      catalog:         () => freshGet<{ products: PopupProduct[] }>('/api/seller/terminal/catalog'),
+      location:        () => post<{ location: { id: string; displayName: string } }>('/api/seller/terminal/location', {}),
+      connectionToken: () => post<{ secret: string; locationId: string }>('/api/seller/terminal/connection-token', {}),
+      createPayment:   (body: { items: Array<{ productId: string; variantId: string; quantity: number }>; clientIdempotencyKey: string }) =>
+        post<PopupPaymentStart>('/api/seller/terminal/payment-intents', body),
+      getPayment:      (paymentIntentId: string) =>
+        freshGet<PopupPaymentStatus>(`/api/seller/terminal/payment-intents/${encodeURIComponent(paymentIntentId)}`),
+      cancelPayment:   (paymentIntentId: string) =>
+        post<{ ok: boolean }>(`/api/seller/terminal/payment-intents/${encodeURIComponent(paymentIntentId)}/cancel`, {}),
     },
     /** Scheduled product launches + "Notify me". */
     productLaunches: {

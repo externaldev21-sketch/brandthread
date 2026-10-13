@@ -165,6 +165,8 @@ router.get("/", async (req, res) => {
       // checkout order is stored as status "pending" (= new, not yet
       // processed), so the app needs this to show it as Paid — not Unpaid.
       paidAt: orders.paidAt,
+      // Sales channel: null = online, 'popup' = in-person Pop-up mode sale.
+      source: orders.source,
       // Delivery guarantee (docs/payments/delivery-guarantee.md): the seller's
       // deadline countdown and the auto-refunded / dispute-paused states.
       deliverBy: orders.deliverBy,

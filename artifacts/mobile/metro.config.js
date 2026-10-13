@@ -36,6 +36,20 @@ const webTextShims = {
   TextInput: path.resolve(__dirname, 'shims/react-native-web-text-input.js'),
 };
 const WEB_TEXT_MODULE = /react-native-web[\\/]dist[\\/](?:cjs[\\/])?exports[\\/](Text|TextInput)[\\/]index\.js$/;
+// Pop-up mode's Tap to Pay (lib/tapToPay.ts) lazily requires the optional
+// Stripe Terminal SDK. It is not a dependency until Tap to Pay is enabled
+// (Apple entitlement + EAS build), so resolve it to a null shim on web and
+// whenever the package isn't installed — Metro then bundles either way.
+const STRIPE_TERMINAL = '@stripe/stripe-terminal-react-native';
+const stripeTerminalShim = path.resolve(__dirname, 'shims/stripe-terminal-react-native.js');
+let stripeTerminalInstalled = false;
+try {
+  require.resolve(STRIPE_TERMINAL, { paths: [__dirname] });
+  stripeTerminalInstalled = true;
+} catch {
+  stripeTerminalInstalled = false;
+}
+
 const _orig = config.resolver.resolveRequest;
 const resolveDefault = (context, moduleName, platform) =>
   _orig ? _orig(context, moduleName, platform) : context.resolveRequest(context, moduleName, platform);
@@ -50,6 +64,9 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   }
   if (moduleName === 'react-native-agora' && platform === 'web') {
     return { filePath: agoraShim, type: 'sourceFile' };
+  }
+  if (moduleName === STRIPE_TERMINAL && (platform === "web" || !stripeTerminalInstalled)) {
+    return {filePath: stripeTerminalShim, type: "sourceFile"};
   }
   if (
     moduleName === 'react-native' &&
