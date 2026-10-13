@@ -27,6 +27,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { navigateOrShareStore } from '@/lib/shareStoreSheet';
+import { usePersistedChoice } from '@/hooks/usePersistedChoice';
 import {
   ActivityIndicator,
   Alert,
@@ -664,7 +665,7 @@ export default function ActivityCenterScreen() {
   const [suggested, setSuggested] = useState<SuggestedPerson[]>([]);
   const [suggestedFollowState, setSuggestedFollowState] = useState<Record<string, 'pending' | 'done'>>({});
   // Chip filter — component state only, not persisted across app restarts.
-  const [chip, setChip] = useState<ActivityChip>('all');
+  const [chip, setChip] = usePersistedChoice<ActivityChip>('activity.chip', 'all', ACTIVITY_CHIPS.map((c) => c.key));
 
   const requestId = useRef(0);
   const itemsRef = useRef<ActivityItem[]>([]);

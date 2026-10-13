@@ -1,6 +1,7 @@
 import { openContextMenu } from '@/lib/contextMenu';
 import { copyText } from '@/lib/shareActions';
 import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { usePersistedChoice } from '@/hooks/usePersistedChoice';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl,
@@ -339,7 +340,7 @@ export default function BuyerOrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<BuyerFilterKey>('all');
+  const [filter, setFilter] = usePersistedChoice<BuyerFilterKey>('buyer-orders.filter', 'all', FILTER_CHIPS.map((c) => c.key));
   // Track whether the very first load has completed so re-focuses and
   // polling intervals don't flash the full-screen spinner.
   const hasLoadedRef = useRef(false);

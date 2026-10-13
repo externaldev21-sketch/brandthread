@@ -22,6 +22,7 @@ import * as NavigationBar from 'expo-navigation-bar';
 import {
   DarkTheme, Stack, ThemeProvider as NavigationThemeProvider,
   useGlobalSearchParams, usePathname, useRootNavigationState, useRouter, useSegments,
+  router as globalRouter,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useSessionList, useUser } from '@clerk/expo';
@@ -117,11 +118,15 @@ import { consumeAnimationOverride } from '@/lib/navigationAnimationOverride';
 import { setRequestGuard } from '@workspace/api-client-react';
 import { emitThreadCashChanged, isThreadCashNotification } from '@/lib/threadCashEvents';
 import { hydrateHapticsPreference } from '@/lib/hapticsPreference';
+import { installPushGuard } from '@/lib/navigation/pushGuard';
 
 // Generated API hooks share this guard with the app-local API clients so
 // signed-out seller preview never reaches the backend through an alternate
 // generated fetch path.
 setRequestGuard(() => isSellerDevPreview());
+
+// A fast double tap must not push the same screen twice (polish #51).
+installPushGuard(globalRouter);
 
 // Presentation routes must remain transparent so the active runtime shell is
 // visible behind cards, sheets, and full-screen modal content.

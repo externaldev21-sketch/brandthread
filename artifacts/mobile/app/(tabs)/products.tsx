@@ -9,6 +9,7 @@ import { openPullDownMenu } from '@/lib/contextMenu';
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { usePersistedChoice } from '@/hooks/usePersistedChoice';
 import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, LayoutAnimation, UIManager, Platform } from 'react-native';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
@@ -379,6 +380,8 @@ function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
 // (the sheet drives the real getProducts query — nothing is re-sorted here).
 type SortKey = ProductSortKey;
 const SORT_OPTIONS = PRODUCT_SORT_OPTIONS;
+// Restored across launches when it's still one of these.
+const PRODUCT_FILTER_KEYS: ProductFilter[] = ['all', 'active', 'draft', 'scheduled', 'archived', 'pre-order', 'pre-made', 'low-stock', 'out-of-stock'];
 
 function SortModal({
   visible, current, onSelect, onClose,
@@ -448,7 +451,9 @@ export default function ProductsScreen() {
   const api = useApi();
   const [products, setProducts] = useState<Product[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [filter, setFilter] = useState<ProductFilter>(params.filter ?? 'all');
+  const [filter, setFilter] = usePersistedChoice<ProductFilter>(
+    'seller-products.filter', params.filter ?? 'all', PRODUCT_FILTER_KEYS, { restore: !params.filter },
+  );
   const [sort, setSort] = useState<SortKey>(DEFAULT_PRODUCT_SORT);
   const [searchQuery, setSearchQuery] = useState('');
   const [actionProduct, setActionProduct] = useState<Product | null>(null);

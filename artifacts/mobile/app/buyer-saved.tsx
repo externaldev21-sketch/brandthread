@@ -1,5 +1,6 @@
 import { haptics } from '@/lib/haptics';
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { usePersistedChoice } from '@/hooks/usePersistedChoice';
 import {
   View, Text, FlatList, Alert, StyleSheet, useWindowDimensions,
   Modal, TextInput, Animated, Pressable, Platform,
@@ -86,7 +87,7 @@ export default function BuyerSaved() {
 
   const [items, setItems] = useState<SavedItem[]>([]);
   const [collections, setCollections] = useState<SavedCollection[]>([]);
-  const [mainTab, setMainTab] = useState<MainTab>('all');
+  const [mainTab, setMainTab] = usePersistedChoice<MainTab>('buyer-saved.tab', 'all', MAIN_TABS.map((t) => t.id));
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 

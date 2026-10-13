@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { usePersistedChoice } from '@/hooks/usePersistedChoice';
 import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Platform, Share } from 'react-native';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { openPullDownMenu } from '@/lib/contextMenu';
@@ -289,6 +290,10 @@ const FILTERS: { key: OrderListFilter; label: string }[] = [
   { key: 'open',       label: 'Open' },
   { key: 'archived',   label: 'Archived' },
 ];
+
+// Every filter the list understands (chips + the filter sheet) — used to
+// restore the last pick across launches.
+const ORDER_LIST_FILTER_KEYS: OrderListFilter[] = ['all', 'new', 'unfulfilled', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'cancelled', 'unpaid', 'open', 'archived'];
 
 function filterOrderList(orders: Order[], filter: OrderListFilter): Order[] {
   if (filter === 'unpaid') {
@@ -766,7 +771,9 @@ export default function OrdersScreen() {
   const [updatesPaused, setUpdatesPaused] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<OrderListFilter>(initialFilter);
+  const [activeFilter, setActiveFilter] = usePersistedChoice<OrderListFilter>(
+    'seller-orders.filter', initialFilter, ORDER_LIST_FILTER_KEYS, { restore: !params.filter },
+  );
   const [sort, setSort] = useState<OrderSortKey>('newest');
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
