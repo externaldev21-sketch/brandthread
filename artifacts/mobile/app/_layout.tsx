@@ -1546,6 +1546,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="seller-agreement"        options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
         <Stack.Screen name="refund-policy"           options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
         <Stack.Screen name="buyer-saved"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="closet-outfit"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-collection"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-blocked"              options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-payment-methods"     options={{ headerShown: false, animation: 'ios_from_right' }} />
