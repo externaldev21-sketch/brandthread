@@ -290,31 +290,90 @@ export async function sendTeamInviteEmail(options: {
   return sendBrandthreadEmail({ to: options.to, subject, html, idempotencyKey: options.idempotencyKey });
 }
 
-export async function sendOrderConfirmationEmail(options: {
-  to: string;
+/** Universal link to one order; brandthread.app/buyer-order-detail* is claimed in routes/wellKnown.ts. */
+export function orderDeepLink(orderId: string): string {
+  return `https://brandthread.app/buyer-order-detail?id=${encodeURIComponent(orderId)}`;
+}
+
+export type OrderDeliveryFacts = {
+  isPreorder?: boolean | null;
+  promisedShipDate?: Date | null;
+  deliverBy?: Date | null;
+  estimatedDelivery?: string | null;
+};
+
+function shortDate(value: Date): string {
+  return value.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+/**
+ * The "Estimated delivery" line, worded like the app's order screen
+ * (mobile lib/deliveryGuarantee.ts deliveryHeadline, before shipping):
+ * "Seller ships by Oct 30" for a pre-order, else "Arrives by Oct 20" from the
+ * delivery guarantee, else the carrier estimate. null when nothing is known,
+ * so the email never invents a date.
+ */
+export function orderConfirmationDeliveryEstimate(facts: OrderDeliveryFacts | null | undefined): string | null {
+  if (!facts) return null;
+  const valid = (d: Date | null | undefined): d is Date => d instanceof Date && Number.isFinite(d.getTime());
+  if (facts.isPreorder && valid(facts.promisedShipDate)) return `Seller ships by ${shortDate(facts.promisedShipDate)}`;
+  if (valid(facts.deliverBy)) return `Arrives by ${shortDate(facts.deliverBy)}`;
+  const eta = facts.estimatedDelivery?.trim();
+  if (eta) {
+    const parsed = new Date(eta);
+    return valid(parsed) ? `Arriving ${shortDate(parsed)}` : null;
+  }
+  return null;
+}
+
+export function buildOrderConfirmationEmail(options: {
+  orderId?: string | null;
   orderNumber: string;
   items: EmailLineItem[];
   subtotalCents: number;
   shippingCents: number;
   totalCents: number;
-  idempotencyKey: string;
-}): Promise<boolean> {
+  delivery?: OrderDeliveryFacts | null;
+}): { subject: string; html: string } {
   const itemsHtml = options.items.map((item) => `
     <tr>
       <td style="padding:10px 0;border-bottom:1px solid #eeeeee;"><strong>${escapeHtml(item.productName)}</strong>${item.variantLabel ? `<br /><span style="color:#777777;font-size:13px;">${escapeHtml(item.variantLabel)}</span>` : ""}<br /><span style="color:#777777;font-size:13px;">Qty ${escapeHtml(item.quantity)}</span></td>
       <td align="right" style="padding:10px 0;border-bottom:1px solid #eeeeee;vertical-align:top;">${formatCents(item.priceCents * item.quantity)}</td>
     </tr>`).join("");
+  // Same order as the app's confirmation screen: estimated delivery first,
+  // then the items and totals, then the one "Track order" action.
+  const estimate = orderConfirmationDeliveryEstimate(options.delivery);
+  const estimateHtml = estimate
+    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-bottom:18px;"><tr><td style="padding:0 0 12px;color:#666666;border-bottom:1px solid #eeeeee;">Estimated delivery</td><td align="right" style="padding:0 0 12px;font-weight:700;border-bottom:1px solid #eeeeee;">${escapeHtml(estimate)}</td></tr></table>`
+    : "";
   const html = renderBrandthreadEmail({
     preheader: `Order ${options.orderNumber} is confirmed.`,
     eyebrow: "Order confirmed",
     title: "Thanks for your order",
     subtitle: `Order ${options.orderNumber} is confirmed and being prepared.`,
-    bodyHtml: `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">${itemsHtml}<tr><td style="padding:16px 0 4px;color:#666666;">Subtotal</td><td align="right" style="padding:16px 0 4px;">${formatCents(options.subtotalCents)}</td></tr><tr><td style="padding:4px 0;color:#666666;">Shipping</td><td align="right" style="padding:4px 0;">${options.shippingCents ? formatCents(options.shippingCents) : "Free"}</td></tr><tr><td style="padding:12px 0 0;font-size:17px;font-weight:700;">Total</td><td align="right" style="padding:12px 0 0;font-size:17px;font-weight:700;">${formatCents(options.totalCents)}</td></tr></table><p style="margin-bottom:0;color:#666666;">We’ll send another note when your order is on the way.</p>`,
-    cta: { label: "View your order", url: "https://brandthread.app/orders" },
+    bodyHtml: `${estimateHtml}<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">${itemsHtml}<tr><td style="padding:16px 0 4px;color:#666666;">Subtotal</td><td align="right" style="padding:16px 0 4px;">${formatCents(options.subtotalCents)}</td></tr><tr><td style="padding:4px 0;color:#666666;">Shipping</td><td align="right" style="padding:4px 0;">${options.shippingCents ? formatCents(options.shippingCents) : "Free"}</td></tr><tr><td style="padding:12px 0 0;font-size:17px;font-weight:700;">Total</td><td align="right" style="padding:12px 0 0;font-size:17px;font-weight:700;">${formatCents(options.totalCents)}</td></tr></table><p style="margin-bottom:0;color:#666666;">We’ll send another note when your order is on the way.</p>`,
+    cta: options.orderId
+      ? { label: "Track order", url: orderDeepLink(options.orderId) }
+      : { label: "View your order", url: "https://brandthread.app/orders" },
   });
+  return { subject: `Brandthread order ${options.orderNumber} confirmed`, html };
+}
+
+export async function sendOrderConfirmationEmail(options: {
+  to: string;
+  orderId?: string | null;
+  orderNumber: string;
+  items: EmailLineItem[];
+  subtotalCents: number;
+  shippingCents: number;
+  totalCents: number;
+  delivery?: OrderDeliveryFacts | null;
+  idempotencyKey: string;
+}): Promise<boolean> {
+  const { subject, html } = buildOrderConfirmationEmail(options);
   return sendBrandthreadEmail({
     to: options.to,
-    subject: `Brandthread order ${options.orderNumber} confirmed`,
+    subject,
     html,
     idempotencyKey: options.idempotencyKey,
   });

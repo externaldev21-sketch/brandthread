@@ -128,6 +128,10 @@ async function sendOrderConfirmationForOrder(orderId: string): Promise<boolean> 
       shippingCents: orders.shippingCents,
       totalCents: orders.totalCents,
       status: orders.status,
+      isPreorder: orders.isPreorder,
+      promisedShipDate: orders.promisedShipDate,
+      deliverBy: orders.deliverBy,
+      estimatedDelivery: orders.estimatedDelivery,
     })
     .from(orders)
     .leftJoin(users, eq(users.clerkId, orders.buyerId))
@@ -159,6 +163,15 @@ async function sendOrderConfirmationForOrder(orderId: string): Promise<boolean> 
 
   return sendOrderConfirmationEmail({
     to: recipient,
+    // Guest orders have no account to open the order in, so they keep the
+    // generic orders link.
+    orderId: order.buyerEmail ? order.id : null,
+    delivery: {
+      isPreorder: order.isPreorder,
+      promisedShipDate: order.promisedShipDate,
+      deliverBy: order.deliverBy,
+      estimatedDelivery: order.estimatedDelivery,
+    },
     orderNumber: order.orderNumber,
     items,
     subtotalCents: order.subtotalCents,
