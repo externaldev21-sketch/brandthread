@@ -16,6 +16,16 @@ const state = vi.hoisted(() => ({
   attempts: [] as any[],
   permissions: [] as string[],
   denyWrites: false,
+  feeCollections: [] as string[],
+  feeCollectionFails: false,
+}));
+
+vi.mock("../../lib/money/instantPayoutFee", () => ({
+  collectInstantPayoutPlatformFee: async (attemptId: string) => {
+    state.feeCollections.push(attemptId);
+    if (state.feeCollectionFails) throw new Error("Stripe unavailable");
+    return { status: "collected", feeCents: 0, collectedCents: 0, outstandingCents: 0 };
+  },
 }));
 
 vi.mock("../../middlewares/requireAuth", () => ({
@@ -169,6 +179,9 @@ beforeEach(() => {
   state.payoutCreates.length = 0;
   state.attempts.length = 0;
   state.denyWrites = false;
+  state.feeCollections.length = 0;
+  state.feeCollectionFails = false;
+  delete process.env.INSTANT_PAYOUT_PLATFORM_FEE_BPS;
 });
 
 describe("permissions wiring", () => {
@@ -238,8 +251,29 @@ describe("GET /payout-schedule", () => {
     const r = await call("GET", "/payout-schedule?amount=50000");
     expect(r.body.instant.eligible).toBe(true);
     expect(r.body.instant.destination).toMatchObject({ last4: "4242", funding: "debit" });
-    expect(r.body.instant.quote).toMatchObject({ amount: 50_000, fee: 500, total: 50_500, withinBalance: true });
+    // 1.5% in all: Stripe's 1% ($5.00) + Brandthread's 0.5% ($2.50).
+    expect(r.body.instant.quote).toMatchObject({
+      amount: 50_000, fee: 750, feeFormatted: "$7.50", stripeFee: 500, platformFee: 250, total: 50_750, withinBalance: true,
+    });
+    expect(r.body.instant).toMatchObject({ feeBps: 150, minFeeCents: 50 });
+    // 98,522 + 1,478 (1.5%) = 100,000 exactly.
+    expect(r.body.instant.maxAmount.amount).toBe(98_522);
+    expect(r.body.policy).toMatchObject({ instantFeeBps: 150, instantStripeFeeBps: 100, instantPlatformFeeBps: 50 });
+  });
+
+  it("uses INSTANT_PAYOUT_PLATFORM_FEE_BPS for Brandthread's part", async () => {
+    process.env.INSTANT_PAYOUT_PLATFORM_FEE_BPS = "0";
+    state.externalAccounts = [bank, debitCard];
+    const r = await call("GET", "/payout-schedule?amount=50000");
+    expect(r.body.instant.feeBps).toBe(100);
+    expect(r.body.instant.quote).toMatchObject({ fee: 500, platformFee: 0 });
     expect(r.body.instant.maxAmount.amount).toBe(99_010);
+  });
+
+  it("quotes the $0.50 minimum on a small amount", async () => {
+    state.externalAccounts = [bank, debitCard];
+    const r = await call("GET", "/payout-schedule?amount=2000");
+    expect(r.body.instant.quote).toMatchObject({ fee: 50, stripeFee: 50, platformFee: 0, total: 2_050 });
   });
 
   it("rejects a bad quote amount", async () => {
@@ -278,6 +312,15 @@ describe("GET /payouts/:id", () => {
     expect(r.body.breakdown.remainder.amount).toBe(100);
   });
 
+  it("the receipt's instant fee is Stripe's debit plus Brandthread's part", async () => {
+    state.payoutRecord = payout({
+      automatic: false, method: "instant", amount: 98_522, balance_transaction: { id: "txn_po", fee: 985 },
+    });
+    state.attempts.push({ id: "att_1", stripePayoutId: "po_abc123", platformFeeCents: 493 });
+    const r = await call("GET", "/payouts/po_abc123");
+    expect(r.body.payout.instantFee).toEqual({ amount: 1_478, formatted: "$14.78" });
+  });
+
   it("does not claim a breakdown for manual payouts", async () => {
     state.payoutRecord = payout({ automatic: false, method: "instant" });
     const r = await call("GET", "/payouts/po_abc123");
@@ -314,7 +357,7 @@ describe("POST /payout method", () => {
   });
 
   it("refuses instant without a Stripe-enabled debit card", async () => {
-    const r = await call("POST", "/payout", { amount: 99_010, currency: "usd", idempotencyKey: key, method: "instant" });
+    const r = await call("POST", "/payout", { amount: 98_522, currency: "usd", idempotencyKey: key, method: "instant" });
     expect(r.status).toBe(409);
     expect(r.body.code).toBe("INSTANT_PAYOUT_UNAVAILABLE");
     expect(state.payoutCreates).toHaveLength(0);
@@ -322,19 +365,60 @@ describe("POST /payout method", () => {
 
   it("instant binds the amount that fits with its fee and sends method instant to the card", async () => {
     state.externalAccounts = [bank, debitCard];
-    const wrong = await call("POST", "/payout", { amount: 100_000, currency: "usd", idempotencyKey: key, method: "instant" });
+    const wrong = await call("POST", "/payout", { amount: 99_010, currency: "usd", idempotencyKey: key, method: "instant" });
     expect(wrong.status).toBe(409);
-    expect(wrong.body).toMatchObject({ code: "BALANCE_CHANGED", availableAfterReservations: 99_010 });
-    const ok = await call("POST", "/payout", { amount: 99_010, currency: "usd", idempotencyKey: key, method: "instant" });
+    expect(wrong.body).toMatchObject({ code: "BALANCE_CHANGED", availableAfterReservations: 98_522 });
+    const ok = await call("POST", "/payout", { amount: 98_522, currency: "usd", idempotencyKey: key, method: "instant" });
     expect(ok.status).toBe(201);
-    expect(state.payoutCreates[0]).toMatchObject({ amount: 99_010, method: "instant", destination: "card_1" });
+    expect(state.payoutCreates[0]).toMatchObject({ amount: 98_522, method: "instant", destination: "card_1" });
     expect(state.attempts[0].method).toBe("instant");
+  });
+
+  it("fixes Brandthread's part on the attempt, collects it after the payout and shows it on the receipt", async () => {
+    state.externalAccounts = [bank, debitCard];
+    const ok = await call("POST", "/payout", { amount: 98_522, currency: "usd", idempotencyKey: key, method: "instant" });
+    expect(ok.status).toBe(201);
+    // Stripe 985 (1%) + Brandthread 493 = 1,478 (1.5%, half-up).
+    expect(state.attempts[0].platformFeeCents).toBe(493);
+    expect(state.feeCollections).toEqual(["att_1"]);
+    expect(ok.body.instantFee).toEqual({ amount: 1_478, formatted: "$14.78", stripeFee: 985, platformFee: 493 });
+  });
+
+  it("an env change after confirmation never changes the fee of a retry", async () => {
+    state.externalAccounts = [bank, debitCard];
+    await call("POST", "/payout", { amount: 98_522, currency: "usd", idempotencyKey: key, method: "instant" });
+    process.env.INSTANT_PAYOUT_PLATFORM_FEE_BPS = "200";
+    const retry = await call("POST", "/payout", { amount: 98_522, currency: "usd", idempotencyKey: key, method: "instant" });
+    expect(retry.status).toBe(200);
+    expect(retry.body.duplicate).toBe(true);
+    expect(retry.body.instantFee.platformFee).toBe(493);
+    expect(state.payoutCreates).toHaveLength(1);
+  });
+
+  it("a failed fee collection never fails or repeats the payout, and a retry tries the fee again", async () => {
+    state.externalAccounts = [bank, debitCard];
+    state.feeCollectionFails = true;
+    const first = await call("POST", "/payout", { amount: 98_522, currency: "usd", idempotencyKey: key, method: "instant" });
+    expect(first.status).toBe(201);
+    state.feeCollectionFails = false;
+    const retry = await call("POST", "/payout", { amount: 98_522, currency: "usd", idempotencyKey: key, method: "instant" });
+    expect(retry.status).toBe(200);
+    expect(state.payoutCreates).toHaveLength(1);
+    expect(state.feeCollections).toEqual(["att_1", "att_1"]);
+  });
+
+  it("standard payouts carry no instant fee and collect nothing", async () => {
+    const r = await call("POST", "/payout", { amount: 100_000, currency: "usd", idempotencyKey: key });
+    expect(r.status).toBe(201);
+    expect(state.attempts[0].platformFeeCents).toBe(0);
+    expect(r.body.instantFee).toBeUndefined();
+    expect(state.feeCollections).toHaveLength(0);
   });
 
   it("a retry cannot switch method under the same idempotency key", async () => {
     state.externalAccounts = [bank, debitCard];
-    await call("POST", "/payout", { amount: 99_010, currency: "usd", idempotencyKey: key, method: "instant" });
-    const r = await call("POST", "/payout", { amount: 99_010, currency: "usd", idempotencyKey: key });
+    await call("POST", "/payout", { amount: 98_522, currency: "usd", idempotencyKey: key, method: "instant" });
+    const r = await call("POST", "/payout", { amount: 98_522, currency: "usd", idempotencyKey: key });
     expect(r.status).toBe(409);
     expect(r.body.code).toBe("IDEMPOTENCY_CONFLICT");
     expect(state.payoutCreates).toHaveLength(1);

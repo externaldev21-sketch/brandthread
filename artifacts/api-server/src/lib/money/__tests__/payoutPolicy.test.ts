@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  DOMESTIC_PAYOUT_DELAY_DAYS, INSTANT_PAYOUT_FEE_BPS, INSTANT_PAYOUT_MIN_FEE_CENTS, INTERNATIONAL_HOLD_DAYS,
+  DEFAULT_INSTANT_PAYOUT_PLATFORM_FEE_BPS, DOMESTIC_PAYOUT_DELAY_DAYS, INSTANT_PAYOUT_MIN_FEE_CENTS,
+  INSTANT_PAYOUT_STRIPE_FEE_BPS, INTERNATIONAL_HOLD_DAYS,
   PAYOUT_PROTECTION_MODE, RESERVE_BPS, RESERVE_ROLLING_DAYS,
-  computeHeldFunds, estimateNextPayout, holdReleaseDate, instantPayoutFeeCents, maxInstantPayoutCents,
+  computeHeldFunds, estimateNextPayout, holdReleaseDate, instantPayoutFee, instantPayoutFeeCents,
+  instantPayoutPlatformFeeBps, instantPayoutTotalFeeBps, maxInstantPayoutCents,
 } from "../payoutPolicy";
 
 const DAY = 86_400_000;
@@ -94,16 +96,51 @@ describe("computeHeldFunds", () => {
 });
 
 describe("instant payout fee", () => {
-  it("is 1% in integer cents with a minimum", () => {
-    expect(INSTANT_PAYOUT_FEE_BPS).toBe(100);
-    expect(instantPayoutFeeCents(100_000)).toBe(1_000);
-    expect(instantPayoutFeeCents(10_050)).toBe(101); // 100.5 rounds half-up
-    expect(instantPayoutFeeCents(1_000)).toBe(INSTANT_PAYOUT_MIN_FEE_CENTS);
-    expect(instantPayoutFeeCents(0)).toBe(0);
+  it("is 1.5% in all: Stripe's 1% plus Brandthread's 0.5%, min $0.50", () => {
+    expect(INSTANT_PAYOUT_STRIPE_FEE_BPS).toBe(100);
+    expect(DEFAULT_INSTANT_PAYOUT_PLATFORM_FEE_BPS).toBe(50);
+    expect(instantPayoutTotalFeeBps(50)).toBe(150);
+    expect(instantPayoutFee(100_000, 50)).toEqual({ stripeFeeCents: 1_000, platformFeeCents: 500, totalFeeCents: 1_500 });
+    expect(instantPayoutFeeCents(100_000, 50)).toBe(1_500);
+    expect(instantPayoutFeeCents(0, 50)).toBe(0);
+    expect(instantPayoutFee(0, 50)).toEqual({ stripeFeeCents: 0, platformFeeCents: 0, totalFeeCents: 0 });
+  });
+
+  it("rounds each part half-up to the cent and the parts always add up", () => {
+    // 150.75 -> 151 total; Stripe 100.5 -> 101; Brandthread gets the rest.
+    expect(instantPayoutFee(10_050, 50)).toEqual({ stripeFeeCents: 101, platformFeeCents: 50, totalFeeCents: 151 });
+    // 50.505 -> 51 total over Stripe's $0.50 minimum.
+    expect(instantPayoutFee(3_367, 50)).toEqual({ stripeFeeCents: 50, platformFeeCents: 1, totalFeeCents: 51 });
+    for (const amount of [1, 49, 50, 999, 3_333, 3_334, 5_000, 5_001, 12_345, 99_999, 184_250, 1_000_001]) {
+      const fee = instantPayoutFee(amount, 50);
+      expect(fee.stripeFeeCents + fee.platformFeeCents).toBe(fee.totalFeeCents);
+      expect(fee.platformFeeCents).toBeGreaterThanOrEqual(0);
+      expect(fee.totalFeeCents).toBeGreaterThanOrEqual(INSTANT_PAYOUT_MIN_FEE_CENTS);
+    }
+  });
+
+  it("applies the $0.50 minimum to the total, so small payouts carry no Brandthread part", () => {
+    expect(instantPayoutFee(1_000, 50)).toEqual({ stripeFeeCents: 50, platformFeeCents: 0, totalFeeCents: 50 });
+    expect(instantPayoutFee(3_333, 50)).toEqual({ stripeFeeCents: 50, platformFeeCents: 0, totalFeeCents: 50 });
+    expect(instantPayoutFee(4_000, 50)).toEqual({ stripeFeeCents: 50, platformFeeCents: 10, totalFeeCents: 60 });
+    expect(instantPayoutFeeCents(1, 50)).toBe(INSTANT_PAYOUT_MIN_FEE_CENTS);
+  });
+
+  it("reads Brandthread's part from INSTANT_PAYOUT_PLATFORM_FEE_BPS, falling back to 50", () => {
+    expect(instantPayoutPlatformFeeBps({})).toBe(50);
+    expect(instantPayoutPlatformFeeBps({ INSTANT_PAYOUT_PLATFORM_FEE_BPS: "75" })).toBe(75);
+    expect(instantPayoutPlatformFeeBps({ INSTANT_PAYOUT_PLATFORM_FEE_BPS: " 0 " })).toBe(0);
+    expect(instantPayoutPlatformFeeBps({ INSTANT_PAYOUT_PLATFORM_FEE_BPS: "abc" })).toBe(50);
+    expect(instantPayoutPlatformFeeBps({ INSTANT_PAYOUT_PLATFORM_FEE_BPS: "1.5" })).toBe(50);
+    expect(instantPayoutPlatformFeeBps({ INSTANT_PAYOUT_PLATFORM_FEE_BPS: "-10" })).toBe(50);
+    expect(instantPayoutPlatformFeeBps({ INSTANT_PAYOUT_PLATFORM_FEE_BPS: "501" })).toBe(50);
+    expect(instantPayoutPlatformFeeBps({ INSTANT_PAYOUT_PLATFORM_FEE_BPS: "500" })).toBe(500);
+    // 0 bps: the seller pays Stripe's fee only.
+    expect(instantPayoutFee(100_000, 0)).toEqual({ stripeFeeCents: 1_000, platformFeeCents: 0, totalFeeCents: 1_000 });
   });
 
   it("never loses precision on very large amounts", () => {
-    expect(instantPayoutFeeCents(9_007_199_254_740_000)).toBe(90_071_992_547_400);
+    expect(instantPayoutFeeCents(9_007_199_254_740_000, 50)).toBe(135_107_988_821_100);
   });
 
   it("rejects non-integer or negative cents", () => {
@@ -111,17 +148,18 @@ describe("instant payout fee", () => {
     expect(() => instantPayoutFeeCents(-1)).toThrow();
   });
 
-  it("maxInstantPayoutCents is the exact largest amount that fits with its fee", () => {
+  it("maxInstantPayoutCents is the exact largest amount that fits with its full 1.5% fee", () => {
     for (const available of [0, 49, 50, 51, 99, 100, 5_000, 5_050, 12_345, 184_250, 1_000_000]) {
-      const max = maxInstantPayoutCents(available);
-      expect(max + (max > 0 ? instantPayoutFeeCents(max) : 0)).toBeLessThanOrEqual(available);
+      const max = maxInstantPayoutCents(available, 50);
+      expect(max + (max > 0 ? instantPayoutFeeCents(max, 50) : 0)).toBeLessThanOrEqual(available);
       if (available > 0) {
         const next = max + 1;
-        expect(next + instantPayoutFeeCents(next)).toBeGreaterThan(available);
+        expect(next + instantPayoutFeeCents(next, 50)).toBeGreaterThan(available);
       }
     }
-    expect(maxInstantPayoutCents(101_000)).toBe(100_000);
-    expect(maxInstantPayoutCents(40)).toBe(0);
+    expect(maxInstantPayoutCents(101_500, 50)).toBe(100_000);
+    expect(maxInstantPayoutCents(101_000, 0)).toBe(100_000);
+    expect(maxInstantPayoutCents(40, 50)).toBe(0);
   });
 });
 
