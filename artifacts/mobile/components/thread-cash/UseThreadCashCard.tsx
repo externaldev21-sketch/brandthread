@@ -120,7 +120,7 @@ export function UseThreadCashCard({
         : { backgroundColor: theme.cardGlass, borderColor: isDisabled ? theme.border : theme.accent },
       isDisabled && { opacity: 0.6 },
     ]}>
-      <View style={[styles.icon, { backgroundColor: theme.accentDim }]}>
+      <View style={styles.icon}>
         <ThreadCashBillIcon size={20} />
       </View>
       <View style={{ flex: 1 }}>

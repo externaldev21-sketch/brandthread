@@ -487,7 +487,7 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
         <View style={sn.hero}>
           <ThreadDraw height={120} color={theme.text} delay={120} duration={1100} style={sn.heroThread} />
           <Reveal>
-            <View style={[sn.bellBg, { backgroundColor: theme.background, borderColor: theme.border, shadowColor: theme.text }]}>
+            <View style={[sn.bellBg, { backgroundColor: theme.background, borderColor: theme.border }]}>
               <Feather name="bell" size={30} color={theme.text} />
             </View>
           </Reveal>
@@ -529,7 +529,7 @@ const createSn = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   body: { flex: 1, justifyContent: 'center', paddingBottom: SPACE.lg },
   hero: { height: 120, justifyContent: 'center', marginBottom: SPACE.lg },
   heroThread: { position: 'absolute', left: -SPACE.lg, right: -SPACE.lg, top: 0 },
-  bellBg:   { width: 72, height: 72, borderRadius: 36, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center', shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: 0 }, elevation: 8, marginLeft: SPACE.xl },
+  bellBg:   { width: 72, height: 72, borderRadius: 36, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center', marginLeft: SPACE.xl },
   examples: { gap: SPACE.sm, width: '100%', marginTop: SPACE.lg },
   exampleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
   exampleDot: { width: 5, height: 5, borderRadius: 3 },

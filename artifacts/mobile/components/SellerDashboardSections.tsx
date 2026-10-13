@@ -114,7 +114,7 @@ export function SellerDashboardListItem({
   const palette = theme as typeof theme & Record<string, string>;
   const content = (
     <View style={[styles.listItem, { backgroundColor: palette.card ?? palette.surface }]} testID={`seller-dashboard-row-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      <View style={[styles.listIconWrap, { backgroundColor: `${iconColor}1A` }]}>
+      <View style={styles.listIconWrap}>
         <Feather name={icon as React.ComponentProps<typeof Feather>['name']} size={16} color={iconColor} />
       </View>
       <View style={styles.listBody}>

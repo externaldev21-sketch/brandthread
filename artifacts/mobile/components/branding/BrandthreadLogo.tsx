@@ -18,7 +18,8 @@ interface BrandthreadLogoProps {
   tintColor?: string;
   /** Fade-in entrance animation. */
   animated?: boolean;
-  /** Soft theme glow halo behind the logo. */
+  /** Accepted for existing callers; draws nothing — the seller tab-bar swipe
+   *  glow is the app's only glow. */
   showGlow?: boolean;
   glowColor?: string;
   accessibilityLabel?: string;
@@ -53,8 +54,6 @@ export default function BrandthreadLogo({
     }).start();
   }, [animated, fadeAnim]);
 
-  const glowSize = Math.round(Math.max(w, h) * 2.2);
-
   return (
     <Animated.View
       testID={testID}
@@ -67,21 +66,6 @@ export default function BrandthreadLogo({
         style,
       ]}
     >
-      {showGlow && (
-        <View
-          style={[
-            styles.glow,
-            {
-              width: glowSize,
-              height: glowSize,
-              borderRadius: glowSize / 2,
-              backgroundColor: glowColor + '22',
-              top: -(glowSize - h) / 2,
-              left: -(glowSize - w) / 2,
-            },
-          ]}
-        />
-      )}
       <Image
         source={LOGO_SOURCE}
         style={{ width: w, height: h, opacity }}
