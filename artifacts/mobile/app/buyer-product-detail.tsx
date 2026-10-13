@@ -44,7 +44,7 @@ import {
 import { ResponsiveContainer, StickyFooter } from '@/components/layout';
 import { SaveHeart } from '@/components/SaveHeart';
 import { CachedImage } from '@/components/CachedImage';
-import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar, SuccessCheck } from '@/components/ui';
+import { Button, IconButton, Chip, QuantityStepper, Sheet, Avatar } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII, radius } from '@/constants/radii';
@@ -1372,42 +1372,36 @@ export default function BuyerProductDetailScreen() {
       })() : null}
 
       {/* Added-to-bag confirmation — a deliberate choice (UNIQLO-style), not
-          an auto-dismissing toast: the buyer picks View bag or Keep shopping. */}
-      <BottomSheet visible={showAddedSheet} onClose={() => setShowAddedSheet(false)}>
-        <View style={s.addedSheetContent}>
-          {/* Monochrome brand accent, not a green checkmark — the shared
-              success-moment primitive (components/ui/SuccessCheck.tsx). */}
-          <SuccessCheck size={56} iconSize={26} />
-          <Text style={s.addedSheetTitle}>Added to your bag</Text>
-          <View style={s.addedSheetProductRow}>
-            {product.imageUris[0] ? (
-              <CachedImage source={{ uri: product.imageUris[0] }} style={s.addedSheetImage} contentFit="cover" />
-            ) : (
-              <View style={[s.addedSheetImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED }]}>
-                <Feather name="image" size={18} color={SUBTLE} />
-              </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={s.addedSheetProductName} numberOfLines={1}>{product.name}</Text>
-              <Text style={s.addedSheetProductMeta}>
-                {formatCents(variantPrice)}{qty > 1 ? ` · Qty ${qty}` : ''}
-              </Text>
+          an auto-dismissing toast: the buyer picks View bag or Keep shopping.
+          Nike "Added to bag": check + title in the header row, the item, then
+          the two actions pinned at the bottom. */}
+      <Sheet
+        visible={showAddedSheet}
+        onClose={() => setShowAddedSheet(false)}
+        title="Added to your bag"
+        headerLeft={<Feather name="check-circle" size={20} color={theme.text} />}
+        primaryAction={{
+          label: 'View bag',
+          onPress: () => { setShowAddedSheet(false); router.push('/(buyer)/cart' as never); },
+        }}
+        secondaryAction={{ label: 'Keep shopping', onPress: () => setShowAddedSheet(false) }}
+      >
+        <View style={s.addedSheetProductRow}>
+          {product.imageUris[0] ? (
+            <CachedImage source={{ uri: product.imageUris[0] }} style={s.addedSheetImage} contentFit="cover" />
+          ) : (
+            <View style={[s.addedSheetImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED }]}>
+              <Feather name="image" size={18} color={SUBTLE} />
             </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={s.addedSheetProductName} numberOfLines={1}>{product.name}</Text>
+            <Text style={s.addedSheetProductMeta}>
+              {formatCents(variantPrice)}{qty > 1 ? ` · Qty ${qty}` : ''}
+            </Text>
           </View>
-          <Button
-            label="View bag"
-            onPress={() => { setShowAddedSheet(false); router.push('/(buyer)/cart' as never); }}
-            fullWidth
-          />
-          <Button
-            label="Keep shopping"
-            variant="secondary"
-            onPress={() => setShowAddedSheet(false)}
-            fullWidth
-            style={{ marginTop: SP.sm }}
-          />
         </View>
-      </BottomSheet>
+      </Sheet>
 
       <SizeGuideSheet
         visible={sizeGuideOpen}
@@ -1536,12 +1530,12 @@ function SizeChartViewer({ chart }: { chart: SizeChart }) {
 // 0c16f080-0cb8-487a-8928-6a7631cb205c) and Polarsteps' full-bleed,
 // pinch-zoomable photo viewer (mobbin.com/screens/
 // 7d855183-6163-4eb9-8776-7ac07592c47f) for the zoom behavior — adapted to
-// the app's own shared BottomSheet rather than a full-screen viewer, since
+// the app's own shared Sheet rather than a full-screen viewer, since
 // a translucent Glass blur over the chart photo itself would work against
 // the one thing this sheet exists to show clearly.
 
 function SizeGuideSheet({ visible, imageUri, onClose }: { visible: boolean; imageUri: string | null; onClose: () => void }) {
-  const { theme, FG, MUTED } = useThemeAliases();
+  const { theme, MUTED } = useThemeAliases();
   const scale = useRef(new Animated.Value(1)).current;
   const currentScale = useRef(1);
   const pinchStartDistance = useRef(0);
@@ -1584,11 +1578,14 @@ function SizeGuideSheet({ visible, imageUri, onClose }: { visible: boolean; imag
   if (!imageUri) return null;
 
   return (
-    <BottomSheet visible={visible} onClose={() => { resetZoom(); onClose(); }} testID="size-guide-sheet">
-      <View style={sgs.header}>
-        <Text style={[sgs.title, { color: FG }]}>Size guide</Text>
-        <IconButton name="x" size={20} variant="plain" onPress={() => { resetZoom(); onClose(); }} accessibilityLabel="Close size guide" />
-      </View>
+    <Sheet
+      visible={visible}
+      onClose={() => { resetZoom(); onClose(); }}
+      title="Size guide"
+      padded={false}
+      maxHeightRatio={0.88}
+      testID="size-guide-sheet"
+    >
       <View style={[sgs.imageWrap, { backgroundColor: theme.surface }]} {...responder.panHandlers}>
         <Animated.Image
           source={{ uri: imageUri }}
@@ -1598,13 +1595,11 @@ function SizeGuideSheet({ visible, imageUri, onClose }: { visible: boolean; imag
         />
       </View>
       <Text style={[sgs.hint, { color: MUTED }]}>Pinch to zoom</Text>
-    </BottomSheet>
+    </Sheet>
   );
 }
 
 const sgs = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, marginBottom: SP.sm },
-  title: { fontFamily: FONT.bold, fontSize: FS.lg },
   imageWrap: { width: '100%', aspectRatio: 4 / 3, overflow: 'hidden' },
   hint: { textAlign: 'center', fontFamily: FONT.regular, fontSize: FS.xs, marginTop: SP.sm, marginBottom: SP.xs },
 });
@@ -1888,11 +1883,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   saleBadge: { backgroundColor: RED_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
   saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: RED, letterSpacing: 0.4 },
   productName: { ...TYPE.title, color: FG, marginBottom: SP.sm },
-  addedSheetContent: { padding: SP.md, paddingTop: SP.xs, alignItems: 'center' },
-  addedSheetTitle: { ...TYPE.title, color: FG, marginTop: SP.sm, marginBottom: SP.md },
   addedSheetProductRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, width: '100%',
-    marginBottom: SP.lg, padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
+    marginTop: SP.xs, padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
   },
   addedSheetImage: { width: 52, height: 52, borderRadius: RADIUS.sm },
   addedSheetProductName: { ...TYPE.bodyMedium, color: FG },

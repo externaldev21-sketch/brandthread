@@ -1,16 +1,13 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, FlatList, Alert, StyleSheet, Dimensions,
-  Modal, TextInput, Animated, Pressable,
+  TextInput, Animated, Pressable,
 } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import {
-  OVERLAY,
-  FONT, ICON, SHADOW_SM,
-} from '@/lib/theme';
+import { FONT, ICON, SHADOW_SM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import {
@@ -21,18 +18,17 @@ import { SavedItem, SavedCollection } from '@/services/socialTypes';
 import { getBuyerProduct, addToCart, createBuyNowSession, getCart } from '@/services/cartService';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { CachedImage } from '@/components/CachedImage';
 import { GridSkeleton } from '@/components/layout/Skeleton';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { SaveToCollectionSheet, SaveToCollectionItem } from '@/components/SaveToCollectionSheet';
 import { formatCents } from '@/lib/money';
-import { Card, IconButton, Button, ListRow, SegmentedControl, BottomSheet, ThemedRefreshControl } from '@/components/ui';
+import { Card, IconButton, ListRow, SegmentedControl, Sheet, ThemedRefreshControl } from '@/components/ui';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
-import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
+import { hapticLight, hapticSuccess, hapticSuccessAction } from '@/lib/haptics';
 
 const { width: W } = Dimensions.get('window');
 const GAP = SPACING.xs;
@@ -85,6 +81,9 @@ export default function BuyerSaved() {
 
   const [actionsFor, setActionsFor] = useState<SavedItem | null>(null);
   const [actionsBusy, setActionsBusy] = useState(false);
+  // Keeps the quick-actions title on screen through the sheet's close motion.
+  const actionsTitle = useRef('');
+  if (actionsFor) actionsTitle.current = actionsFor.title;
   const [saveToSheetItem, setSaveToSheetItem] = useState<SaveToCollectionItem | null>(null);
   const [newCollectionModal, setNewCollectionModal] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
@@ -196,6 +195,7 @@ export default function BuyerSaved() {
     setCreatingCollection(true);
     try {
       await createCollection(name);
+      hapticSuccess();
       setNewCollectionModal(false);
       setNewCollectionName('');
       await load({ silent: true });
@@ -381,11 +381,12 @@ export default function BuyerSaved() {
       )}
 
       {/* ─ Quick actions ─ */}
-      <BottomSheet visible={!!actionsFor} onClose={() => setActionsFor(null)}>
-        <View style={styles.actionsContent}>
-          <Text style={styles.actionsTitle} numberOfLines={1}>{actionsFor?.title}</Text>
-          <ListRow icon="zap" title="Buy Now" onPress={() => actionsFor && handleBuyNow(actionsFor)} disabled={actionsBusy} />
-          <ListRow icon="shopping-cart" title="Add to Cart" onPress={() => actionsFor && handleAddToCart(actionsFor)} disabled={actionsBusy} />
+      {/* Instagram "More options": item name as the title, then the
+          actions as plain rows, the destructive one last. */}
+      <Sheet visible={!!actionsFor} onClose={() => setActionsFor(null)} title={actionsTitle.current}>
+        <View>
+          <ListRow icon="zap" title="Buy now" onPress={() => actionsFor && handleBuyNow(actionsFor)} disabled={actionsBusy} />
+          <ListRow icon="shopping-cart" title="Add to cart" onPress={() => actionsFor && handleAddToCart(actionsFor)} disabled={actionsBusy} />
           <ListRow
             icon="folder"
             title="Move to collection"
@@ -400,7 +401,7 @@ export default function BuyerSaved() {
           />
           <ListRow icon="trash-2" title="Remove" destructive onPress={() => { const it = actionsFor; setActionsFor(null); if (it) removeSaved(it); }} />
         </View>
-      </BottomSheet>
+      </Sheet>
 
       <SaveToCollectionSheet
         visible={!!saveToSheetItem}
@@ -410,37 +411,30 @@ export default function BuyerSaved() {
       />
 
       {/* ─ New collection ─ */}
-      <Modal transparent animationType="fade" visible={newCollectionModal} onRequestClose={() => setNewCollectionModal(false)}>
-        <ModalSafeArea>
-          <Pressable style={styles.backdrop} onPress={() => setNewCollectionModal(false)} accessibilityRole="button" accessibilityLabel="Close" />
-          <View style={styles.centerModal} pointerEvents="box-none">
-            <View style={styles.newCollectionCard}>
-              <Text style={styles.actionsTitle}>New collection</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Fall Fits"
-                placeholderTextColor={theme.subtle}
-                value={newCollectionName}
-                onChangeText={setNewCollectionName}
-                autoFocus
-                onSubmitEditing={handleCreateCollection}
-                returnKeyType="done"
-              />
-              <View style={styles.modalActions}>
-                <Button label="Cancel" variant="secondary" size="small" onPress={() => setNewCollectionModal(false)} />
-                <Button
-                  label="Create"
-                  variant="primary"
-                  size="small"
-                  onPress={handleCreateCollection}
-                  loading={creatingCollection}
-                  disabled={!newCollectionName.trim() || creatingCollection}
-                />
-              </View>
-            </View>
-          </View>
-        </ModalSafeArea>
-      </Modal>
+      {/* Pinterest "Create board": one name field, Create pinned above the keyboard. */}
+      <Sheet
+        visible={newCollectionModal}
+        onClose={() => setNewCollectionModal(false)}
+        title="New collection"
+        primaryAction={{
+          label: 'Create',
+          onPress: handleCreateCollection,
+          loading: creatingCollection,
+          disabled: !newCollectionName.trim() || creatingCollection,
+        }}
+      >
+        <TextInput
+          style={styles.input}
+          placeholder="e.g. Fall Fits"
+          placeholderTextColor={theme.subtle}
+          value={newCollectionName}
+          onChangeText={setNewCollectionName}
+          autoFocus
+          onSubmitEditing={handleCreateCollection}
+          returnKeyType="done"
+          accessibilityLabel="Collection name"
+        />
+      </Sheet>
     </View>
   );
 }
@@ -490,17 +484,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING.xxs, marginTop: 1 },
   tilePrice: { ...TYPE_SCALE.footnote, fontFamily: FONT.bold, color: theme.text },
   tileOldPrice: { ...TYPE_SCALE.caption, color: theme.subtle, textDecorationLine: 'line-through' },
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: OVERLAY },
-  actionsContent: { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs },
-  actionsTitle: { ...TYPE_SCALE.headline, fontFamily: FONT.bold, color: theme.text, marginBottom: SPACING.xs, textAlign: 'center' },
-  centerModal: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.lg },
-  newCollectionCard: {
-    width: '100%', backgroundColor: palette.card, borderRadius: RADII.sheet, borderWidth: 1, borderColor: palette.border,
-    padding: SPACING.lg, gap: SPACING.md,
-  },
   input: {
     height: 48, borderRadius: RADII.chip, borderWidth: 1, borderColor: palette.border,
     backgroundColor: palette.elevated, paddingHorizontal: SPACING.md, color: theme.text, fontSize: TYPE_SCALE.body.fontSize,
   },
-  modalActions: { flexDirection: 'row', gap: SPACING.sm, justifyContent: 'flex-end' },
 });

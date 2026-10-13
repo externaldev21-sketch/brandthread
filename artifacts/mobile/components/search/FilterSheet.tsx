@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { Sheet, SheetCloseButton } from '@/components/ui/BottomSheet';
 import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
-import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
+import { hapticSelection } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
@@ -14,7 +14,6 @@ import {
   countActiveFilters, hasValue, priceBucketsFor, toggleValue,
   type SearchFacets, type SearchFilters, type SearchSort,
 } from '@/lib/searchFilters';
-import { radius } from '@/constants/radii';
 
 export type { SearchFilters, SearchSort } from '@/lib/searchFilters';
 export { countActiveFilters } from '@/lib/searchFilters';
@@ -81,7 +80,7 @@ export function FilterSheet({
   }
 
   function handleApply() {
-    hapticPrimaryAction();
+    // The pinned SheetButton plays the primary-action haptic.
     onApply(draft);
     onClose();
   }
@@ -134,20 +133,36 @@ export function FilterSheet({
   );
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} testID="search-filter-sheet">
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>Filters</Text>
-        <PressableScale
-          onPress={handleClearAll}
-          accessibilityRole="button"
-          accessibilityLabel="Clear all filters"
-          noMinHeight
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          testID="search-filter-clear-all"
-        >
-          <Text style={[styles.clearAll, { color: draftCount > 0 ? theme.text : theme.muted }]}>Clear all</Text>
-        </PressableScale>
-      </View>
+    // Depop filter sheet: title with Reset/Clear all top-right, the groups
+    // stacked below, and "Show results" pinned at the bottom.
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Filters"
+      padded={false}
+      testID="search-filter-sheet"
+      headerRight={(
+        <View style={styles.headerRight}>
+          <PressableScale
+            onPress={handleClearAll}
+            accessibilityRole="button"
+            accessibilityLabel="Clear all filters"
+            noMinHeight
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            testID="search-filter-clear-all"
+          >
+            <Text style={[styles.clearAll, { color: draftCount > 0 ? theme.text : theme.muted }]}>Clear all</Text>
+          </PressableScale>
+          <SheetCloseButton onPress={onClose} />
+        </View>
+      )}
+      primaryAction={{
+        label: draftCount > 0 ? `Show results · ${draftCount}` : 'Show results',
+        accessibilityLabel: draftCount > 0 ? `Show results, ${draftCount} filters active` : 'Show results',
+        onPress: handleApply,
+        testID: 'search-filter-apply',
+      }}
+    >
 
       <Text style={[styles.sectionLabel, { color: theme.muted }]}>Sort by</Text>
       <View style={styles.listWrap}>
@@ -236,28 +251,12 @@ export function FilterSheet({
           </View>
         </>
       )}
-
-      <PressableScale
-        onPress={handleApply}
-        style={[styles.applyBtn, { backgroundColor: theme.accent }]}
-        accessibilityRole="button"
-        accessibilityLabel={draftCount > 0 ? `Show results, ${draftCount} filters active` : 'Show results'}
-        testID="search-filter-apply"
-      >
-        <Text style={[styles.applyText, { color: theme.onAccent }]}>
-          {draftCount > 0 ? `Show results · ${draftCount}` : 'Show results'}
-        </Text>
-      </PressableScale>
-    </BottomSheet>
+    </Sheet>
   );
 }
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SCREEN_GUTTER, paddingBottom: SPACING.sm,
-  },
-  title: { ...TYPE_SCALE.title2, fontFamily: FONT.bold },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
   clearAll: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold },
   sectionLabel: {
     ...TYPE_SCALE.footnote, fontFamily: FONT.semibold,
@@ -282,9 +281,4 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   swatchItem: { alignItems: 'center', gap: 4 },
   swatchRing: { width: 44, height: 44, borderRadius: RADII.pill, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   swatch: { width: 34, height: 34, borderRadius: RADII.pill, borderWidth: 1 },
-  applyBtn: {
-    marginTop: SPACING.lg, marginHorizontal: SCREEN_GUTTER,
-    height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center',
-  },
-  applyText: { ...TYPE_SCALE.body, fontFamily: FONT.bold },
 });
