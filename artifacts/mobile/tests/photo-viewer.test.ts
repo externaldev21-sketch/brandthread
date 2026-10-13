@@ -45,7 +45,7 @@ describe('every full-screen media viewer closes with a swipe down', () => {
   it('product page photos open the PhotoViewer on tap', () => {
     const pdp = read('app/buyer-product-detail.tsx');
     expect(pdp).toContain("import { PhotoViewer } from '@/components/media/PhotoViewer';");
-    expect(pdp).toContain('onOpen={() => setViewerIndex(index)}');
+    expect(pdp).toContain('onOpen={() => setViewerIndex(index)} />');
   });
   it('the shop sheet and review photos use the PhotoViewer', () => {
     expect(read('components/ShopProductSheet.tsx')).toContain('<PhotoViewer visible images={imageUris} initialIndex={startIndex} onClose={onClose} />');

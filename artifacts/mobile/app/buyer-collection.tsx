@@ -10,7 +10,6 @@ import {
   View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, Dimensions,
   Modal, TextInput, ActivityIndicator, Share,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
@@ -24,7 +23,6 @@ import { SavedItem, SavedCollection } from '@/services/socialTypes';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
-import { CachedImage } from '@/components/CachedImage';
 import { GridSkeleton } from '@/components/layout/Skeleton';
 import { EmptyState, HapticSwitch } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
@@ -32,6 +30,8 @@ import { formatCents } from '@/lib/money';
 import { buildCanonicalCollectionUrl } from '@/lib/shareCollection';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { PRODUCT_PHOTO_ASPECT } from '@/constants/media';
 
 const { width: W } = Dimensions.get('window');
 const GAP = SP.sm;
@@ -178,13 +178,7 @@ export default function BuyerCollection() {
         activeOpacity={0.85}
       >
         <View style={styles.tileImageWrap}>
-          {item.image ? (
-            <CachedImage source={{ uri: item.image }} style={styles.tileImage} />
-          ) : (
-            <View style={[styles.tileImage, styles.tilePlaceholder, { backgroundColor: item.accentColor || theme.accentDim }]}>
-              <Feather name="shopping-bag" size={22} color={theme.accent} />
-            </View>
-          )}
+          <ProductPhoto uri={item.image} brand={item.brand} name={item.title} style={styles.tileImage} />
         </View>
         <View style={styles.tileInfo}>
           {item.brand ? <Text style={styles.tileBrand} numberOfLines={1}>{item.brand}</Text> : null}
@@ -285,7 +279,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   publicDesc: { color: MUTED, fontSize: FS.xs, marginTop: 1 },
   gridContent: { paddingHorizontal: SP.md, paddingTop: SP.sm, gap: GAP, paddingBottom: SP.xxl },
   tile: { width: TILE_SIZE, marginBottom: GAP },
-  tileImageWrap: { width: TILE_SIZE, aspectRatio: 1, borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: BORDER },
+  tileImageWrap: { width: TILE_SIZE, aspectRatio: PRODUCT_PHOTO_ASPECT, borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: BORDER },
   tileImage: { width: '100%', height: '100%' },
   tilePlaceholder: { alignItems: 'center', justifyContent: 'center' },
   tileInfo: { paddingTop: SP.xs, gap: 1 },

@@ -9,6 +9,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
+import { productPhotoHeight } from '@/constants/media';
 import { SaveHeart } from '@/components/SaveHeart';
 import { SkeletonBlock } from '@/components/layout';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,9 +36,8 @@ export interface EditorialTileItem {
 }
 
 export const TILE_WIDTH = 152;
-// Consistent 3:4 (width:height) tile image, matching the Mobbin references
-// used elsewhere in this pass (TikTok/Instagram shop-grid tiles).
-export const TILE_IMAGE_HEIGHT = Math.round((TILE_WIDTH * 4) / 3);
+// The one product photo frame, 4:5 (constants/media.ts).
+export const TILE_IMAGE_HEIGHT = productPhotoHeight(TILE_WIDTH);
 
 export const EditorialTile = React.memo(function EditorialTile({ item, theme }: { item: EditorialTileItem; theme: AppThemePreset }) {
   const { push } = useThreadPull();
