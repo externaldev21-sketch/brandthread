@@ -1744,6 +1744,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="buyer-drop-detail"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-category"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-trending"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-drop-hype"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-push-broadcast" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-push-broadcast-results" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-giveaways" options={{ headerShown: false, animation: 'ios_from_right' }} />

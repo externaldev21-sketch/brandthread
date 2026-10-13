@@ -1,6 +1,8 @@
 /**
  * Seller-facing drops list — the seller's own drops (api.drops.list()),
- * with a "+ New drop" entry to seller-drop-create.tsx.
+ * with a "+ New drop" entry to seller-drop-create.tsx. Each upcoming drop
+ * also has a "Waitlist" row to seller-drop-hype.tsx (notify-me signups
+ * over time, seller-only).
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -28,6 +30,10 @@ import { SectionError } from '@/components/InlineFeedback';
 import { StatusBadge } from '@/components/BrandthreadUI';
 
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { isUpcomingDrop } from '@/lib/dropHype';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { previewSellerDrops } from '@/lib/previewSellerDrops';
+import { hapticLight } from '@/lib/haptics';
 
 type DropStatusVariant = 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple';
 
@@ -62,8 +68,16 @@ export default function SellerDrops() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  const sellerPreview = isSellerDevPreview();
+
   const load = useCallback(async () => {
     setError(null);
+    if (sellerPreview) {
+      // The signed-out seller preview never calls the API.
+      setRows(previewSellerDrops(isPreviewDemoMode() ? 'demo' : 'fresh'));
+      setLoading(false);
+      return;
+    }
     try {
       const data: any = await api.drops.list();
       setRows(Array.isArray(data) ? data : []);
@@ -72,7 +86,7 @@ export default function SellerDrops() {
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, sellerPreview]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -80,6 +94,11 @@ export default function SellerDrops() {
     setRefreshing(true);
     haptic('refresh');
     load().finally(() => setRefreshing(false));
+  }
+
+  function openWaitlist(id: string) {
+    hapticLight();
+    router.push((`/seller-drop-hype?dropId=${encodeURIComponent(id)}`) as never);
   }
 
   function openDrop(id: string) {
@@ -113,6 +132,7 @@ export default function SellerDrops() {
           </View>
         ) : (
           rows.map(row => (
+            <View key={row.id} style={styles.card}>
             <TouchableOpacity
               key={row.id}
               style={[styles.row, { borderColor: theme.border, backgroundColor: theme.card }]}
@@ -133,6 +153,15 @@ export default function SellerDrops() {
               <StatusBadge label={row.status.toUpperCase()} variant={statusVariant(row.status)} small />
               <Icon name="chevron-right" size={18} color={theme.muted} />
             </TouchableOpacity>
+            {isUpcomingDrop(row) && (
+              <TouchableOpacity style={[styles.row, styles.subRow]} onPress={() => openWaitlist(row.id)}
+                accessibilityRole="button" accessibilityLabel={`Waitlist for ${row.name}`} testID={`seller-drop-waitlist-${row.id}`}>
+                <Icon name="users" size={15} color={theme.muted} />
+                <Text style={{ flex: 1, color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm }}>Waitlist</Text>
+                <Icon name="chevron-right" size={18} color={theme.muted} />
+              </TouchableOpacity>
+            )}
+            </View>
           ))
         )}
       </ScrollView>
@@ -143,5 +172,7 @@ export default function SellerDrops() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: RADIUS.sm, padding: 13 },
+  card: { overflow: 'hidden' },
+  subRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 11 },
   emptyCta: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 12, borderRadius: RADIUS.md },
 });

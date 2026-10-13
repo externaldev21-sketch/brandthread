@@ -556,6 +556,8 @@ export const dropAlertSubscriptions = pgTable('drop_alert_subscriptions', {
   uniq:    unique().on(t.dropId, t.userId),
   userIdx: index('drop_alert_subscriptions_user_idx').on(t.userId),
   pendingIdx: index('drop_alert_subscriptions_pending_idx').on(t.dropId).where(sql`notified_at IS NULL`),
+  // Migration 296: drop hype series (GET /api/drops/:id/hype).
+  dropCreatedIdx: index('drop_alert_subscriptions_drop_created_idx').on(t.dropId, t.createdAt),
 }));
 
 // ─── Orders ───────────────────────────────────────────────────────────────────

@@ -12,6 +12,7 @@ import type { FriendsSaved } from '@/lib/friendsSaved';
 import type { PriceHistory } from '@/lib/priceHistory';
 import type { MorningBrief } from '@/lib/morningBrief';
 import type { SellerMilestone } from '@/lib/milestones';
+import type { DropHype } from '@/lib/dropHype';
 import type {
   AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
   ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
@@ -1930,6 +1931,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       get:     (id: string)             => get(`/api/drops/${id}`),
       create:  (body: unknown)          => post('/api/drops', body),
       update:  (id: string, body: unknown) => patch(`/api/drops/${id}`, body),
+      /** Seller-only: the drop's notify-me waitlist growth, by the seller's local day. */
+      hype: (dropId: string) =>
+        get<DropHype>(`/api/drops/${encodeURIComponent(dropId)}/hype?tz=${-new Date().getTimezoneOffset()}`),
       /** Return the number of unique recipients who would receive a drop broadcast. */
       broadcastPreview: (dropId: string) =>
         get<{ followers: number }>(`/api/drops/${encodeURIComponent(dropId)}/broadcast-preview`),

@@ -31,6 +31,8 @@ import {
 } from "../lib/money/dropLifecycle";
 import { maybeCompleteDrop } from "../lib/money/escrow";
 import { MAX_EARLY_ACCESS_MINUTES, isValidEarlyAccessMinutes } from "../lib/money/dropLaunch";
+import { loadDropHype } from "../lib/dropHype";
+import { parseTzOffsetMinutes } from "../lib/analyticsTime";
 
 const router = Router();
 router.use(requireAuth);
@@ -494,6 +496,39 @@ router.get("/:id/broadcast-preview", async (req, res): Promise<void> => {
 
   const audience = await getBroadcastAudience(sellerId, drop.id);
   res.json({ followers: audience.length });
+});
+
+// ─── GET /api/drops/:id/hype?tz= ─────────────────────────────────────────────
+// Seller-only: how the drop's notify-me waitlist (drop_alert_subscriptions)
+// grew, as a gap-free cumulative series by the seller's local day. Another
+// seller's drop (or a malformed id) is a 404, never a 403, so drop ids
+// can't be probed.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+router.get("/:id/hype", async (req, res): Promise<void> => {
+  const sellerId = (req as any).clerkUserId as string;
+  if (!UUID_RE.test(req.params.id)) {
+    res.status(404).json({ error: "Drop not found" });
+    return;
+  }
+  const [drop] = await db
+    .select({ id: drops.id, name: drops.name, releaseAt: drops.releaseAt })
+    .from(drops)
+    .where(and(eq(drops.id, req.params.id), eq(drops.ownerId, sellerId)))
+    .limit(1);
+  if (!drop) {
+    res.status(404).json({ error: "Drop not found" });
+    return;
+  }
+  const hype = await loadDropHype(drop.id, sellerId, parseTzOffsetMinutes(req.query.tz));
+  res.json({
+    dropId: drop.id,
+    name: drop.name,
+    releaseAt: drop.releaseAt ? new Date(drop.releaseAt).toISOString() : null,
+    total: hype.total,
+    today: hype.today,
+    followers: hype.followers,
+    series: hype.series,
+  });
 });
 
 // ─── POST /api/drops/:id/broadcast ───────────────────────────────────────────
