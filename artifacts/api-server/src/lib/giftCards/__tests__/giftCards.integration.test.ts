@@ -96,6 +96,14 @@ async function issue(sellerId: string, amountCents: number, ownerId: string | nu
   return { card, code };
 }
 
+/** A card a buyer paid for: Brandthread holds the money (gift_card_liability) and pays the seller on redemption. */
+async function purchased(sellerId: string, amountCents: number, ownerId: string) {
+  return db.transaction(async (tx) => {
+    const pending = await createPendingCard(tx, { sellerId, amountCents, ownerId, purchaserId: ownerId, source: "purchase" });
+    return activateCard(tx, pending.id);
+  });
+}
+
 async function balanceOf(cardId: string): Promise<number> {
   const [row] = await db.select({ balance: giftCards.balanceCents }).from(giftCards).where(eq(giftCards.id, cardId)).limit(1);
   return row.balance;
@@ -433,7 +441,7 @@ describe("at checkout", () => {
     const buyer = await seedBuyer(tag);
     const productA = await seedProduct(sellerA, { priceCents: 5_000, stock: 5 });
     const productB = await seedProduct(sellerB, { priceCents: 2_500, stock: 5 });
-    const { card } = await issue(sellerA, cardCents, buyer);
+    const { card } = await purchased(sellerA, cardCents, buyer);
     const groups = (giftCard?: { cardId?: string; code?: string }, onB = false) => [
       { items: [{ variantId: productA.variantId, productId: productA.productId, quantity: 1 }], ...(giftCard && !onB ? { giftCard } : {}) },
       { items: [{ variantId: productB.variantId, productId: productB.productId, quantity: 1 }], ...(giftCard && onB ? { giftCard } : {}) },
@@ -487,6 +495,22 @@ describe("at checkout", () => {
     // Settled once, even after the redelivery.
     expect((await ledgerOf(cart.card.id)).filter((r) => r.type === "settle")).toHaveLength(1);
     expect(await balanceOf(cart.card.id)).toBe(0);
+  });
+
+  it("a store's own (seller-issued) card is a discount the seller gives: no payout transfer, no liability", async () => {
+    const cart = await seedCart("own", 3_000);
+    const { card: own } = await issue(cart.sellerA, 2_000, cart.buyer);
+    const quote = await pay(cart.buyer, cart.groups({ cardId: own.id }));
+    expect(quote.status).toBe(200);
+    expect(quote.body.groups[0].giftCardCents).toBe(2_000);
+    const intent = paid(quote.body.paymentIntentId);
+    await handleCartPaymentSucceeded(intent, `evt_${uid("pi")}`, new Date());
+    const { made } = await ordersOf(intent.id);
+    const orderA = made.find((o) => o.ownerId === cart.sellerA)!;
+    expect(fake.state.transfers.filter((t) => t.metadata?.kind === "gift_card_seller_payout" && t.transfer_group === orderA.id)).toHaveLength(0);
+    expect(await payoutSellerForOrder(fake.stripe as any, orderA.id)).toBe("none");
+    expect((await orderLedger(orderA.id)).gift_card_liability ?? 0).toBe(0);
+    expect(await balanceOf(own.id)).toBe(0);
   });
 
   it("refuses a card on another store's group and someone else's wallet card", async () => {

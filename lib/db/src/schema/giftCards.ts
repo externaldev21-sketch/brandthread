@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { pgTable, uuid, text, integer, timestamp, boolean, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 // ─── Store gift cards (migration 116) ───────────────────────────────────────
@@ -30,12 +31,15 @@ export const giftCards = pgTable('gift_cards', {
   deliveredAt:   timestamp('delivered_at', { withTimezone: true }),
   voidedAt:      timestamp('voided_at', { withTimezone: true }),
   voidedBy:      text('voided_by'),
+  /** Set when the card is store credit for an order refund (order_refunds.id, unique; migration 616). */
+  refundId:      uuid('refund_id'),
   createdAt:     timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt:     timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
   sellerIdx:    index('gift_cards_seller_idx').on(t.sellerId, t.createdAt),
   ownerIdx:     index('gift_cards_owner_idx').on(t.ownerId),
   purchaserIdx: index('gift_cards_purchaser_idx').on(t.purchaserId, t.createdAt),
+  refundUniq:   uniqueIndex('gift_cards_refund_id_unique').on(t.refundId).where(sql`refund_id IS NOT NULL`),
 }));
 
 // Append-only ledger (a DB trigger rejects UPDATE/DELETE).
