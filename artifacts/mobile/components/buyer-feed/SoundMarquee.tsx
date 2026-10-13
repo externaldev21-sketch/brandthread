@@ -50,7 +50,7 @@ export function SoundMarquee({
     <View style={[styles.clip, maxWidth > 0 && { maxWidth }]}>
       {/* Off-screen copy measures the label's natural one-line width. */}
       <View style={styles.measure} pointerEvents="none" aria-hidden>
-        <Text style={textStyle} onLayout={(e) => setTextWidth(e.nativeEvent.layout.width)}>{text}</Text>
+        <Text style={[textStyle, styles.noShrink]} onLayout={(e) => setTextWidth(e.nativeEvent.layout.width)}>{text}</Text>
       </View>
       {scrolling ? (
         <Animated.View style={[styles.row, { width: maxWidth, transform: [{ translateX: offset }] }]}>
@@ -67,7 +67,8 @@ export function SoundMarquee({
 
 const styles = StyleSheet.create({
   clip: { overflow: 'hidden', flexShrink: 1 },
-  measure: { position: 'absolute', opacity: 0, flexDirection: 'row', width: 2000, left: 0, top: 0 },
+  // Row + no-shrink child: the copy keeps its one-line width and overflows.
+  measure: { position: 'absolute', opacity: 0, flexDirection: 'row', left: 0, top: 0 },
   row: { flexDirection: 'row', alignItems: 'center' },
   noShrink: { flexShrink: 0 },
 });
