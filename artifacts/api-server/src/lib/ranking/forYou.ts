@@ -36,6 +36,7 @@ import {
   DEFAULT_EVENT_WEIGHTS, DEFAULT_RANKING_CONFIG, getRankingConfig, getRankingConfigSync,
   type RankingConfig,
 } from "./config";
+import { hiddenCreatorIds } from "./notInterested";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -558,7 +559,7 @@ async function recentlySeenPostIds(userId: string): Promise<Set<string>> {
 export async function computeForYouRankingForUser(userId: string): Promise<ForYouResultItem[]> {
   const now = Date.now();
 
-  const [cfg, hiddenIds, profile, followRows, blockedRows, seenIds] = await Promise.all([
+  const [cfg, hiddenIds, profile, followRows, blockedRows, seenIds, hiddenCreators] = await Promise.all([
     getRankingConfig(),
     notInterestedPostIds(userId),
     loadOrSeedProfile(userId),
@@ -566,6 +567,7 @@ export async function computeForYouRankingForUser(userId: string): Promise<ForYo
     db.select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId }).from(blocks)
       .where(sql`${blocks.blockerId} = ${userId} OR ${blocks.blockedId} = ${userId}`),
     recentlySeenPostIds(userId),
+    hiddenCreatorIds(userId).catch(() => new Set<string>()),
   ]);
 
   const followedIds = followRows.map((r) => r.followingId);
@@ -574,7 +576,8 @@ export async function computeForYouRankingForUser(userId: string): Promise<ForYo
   const [posts_, lives] = await Promise.all([candidatePosts(userId, followedIds), liveCandidates()]);
 
   const eligible = [...posts_, ...lives].filter(
-    (c) => !blockedSet.has(c.sellerId) && !seenIds.has(c.id) && !hiddenIds.has(c.id),
+    (c) => !blockedSet.has(c.sellerId) && !seenIds.has(c.id) && !hiddenIds.has(c.id)
+      && (c.isLive || !hiddenCreators.has(c.sellerId)),
   );
 
   const engagement = await loadPostEngagement(

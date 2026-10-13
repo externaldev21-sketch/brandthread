@@ -193,17 +193,18 @@ function VisibilityPage({ visibility, noun, onChange, onBack }: {
 }
 
 function OptionsPage({ visibility, onChange, onBack }: { visibility: PostVisibility; onChange: (v: PostVisibility) => void; onBack: () => void }) {
-  const items: Array<{ key: 'allowComments' | 'allowReposts' | 'showLikeCount'; label: string }> = [
+  const items: Array<{ key: 'allowComments' | 'allowReposts' | 'showLikeCount' | 'allowDownloads'; label: string }> = [
     { key: 'allowComments', label: 'Allow comments' },
     { key: 'allowReposts', label: 'Allow reposts' },
     { key: 'showLikeCount', label: 'Show like count' },
+    { key: 'allowDownloads', label: 'Allow downloads' },
   ];
   return (
     <SubPage title="More options" onBack={onBack} testID="options-page">
       {items.map((it) => (
         <View key={it.key} style={s.productRow}>
           <Text style={[s.rowLabel, { flex: 1 }]}>{it.label}</Text>
-          <HapticSwitch value={visibility[it.key]} onValueChange={(v: boolean) => onChange({ ...visibility, [it.key]: v })} testID={`option-${it.key}`} accessibilityLabel={it.label} />
+          <HapticSwitch value={visibility[it.key] !== false} onValueChange={(v: boolean) => onChange({ ...visibility, [it.key]: v })} testID={`option-${it.key}`} accessibilityLabel={it.label} />
         </View>
       ))}
     </SubPage>

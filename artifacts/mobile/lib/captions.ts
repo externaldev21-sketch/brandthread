@@ -16,18 +16,31 @@ export interface CaptionTrack {
   segments: CaptionSegment[];
 }
 
+// One shared value so every mounted player (each feed page has its own)
+// flips together when the viewer toggles captions on any of them.
+let sharedCaptionsEnabled: boolean | null = null;
+const captionsListeners = new Set<(on: boolean) => void>();
+
 /** The viewer's saved CC preference (default on once captions exist). */
 export function useCaptionsPreference(): [boolean, (next: boolean) => void] {
-  const [enabled, setEnabled] = useState(true);
+  const [enabled, setEnabled] = useState(sharedCaptionsEnabled ?? true);
   useEffect(() => {
     let cancelled = false;
-    void AsyncStorage.getItem(CAPTIONS_PREF_KEY)
-      .then((value) => { if (!cancelled && value !== null) setEnabled(value === '1'); })
-      .catch(() => {});
-    return () => { cancelled = true; };
+    captionsListeners.add(setEnabled);
+    if (sharedCaptionsEnabled === null) {
+      void AsyncStorage.getItem(CAPTIONS_PREF_KEY)
+        .then((value) => {
+          if (value === null || sharedCaptionsEnabled !== null) return;
+          sharedCaptionsEnabled = value === '1';
+          if (!cancelled) captionsListeners.forEach((fn) => fn(sharedCaptionsEnabled!));
+        })
+        .catch(() => {});
+    }
+    return () => { cancelled = true; captionsListeners.delete(setEnabled); };
   }, []);
   const update = useCallback((next: boolean) => {
-    setEnabled(next);
+    sharedCaptionsEnabled = next;
+    captionsListeners.forEach((fn) => fn(next));
     void AsyncStorage.setItem(CAPTIONS_PREF_KEY, next ? '1' : '0').catch(() => {});
   }, []);
   return [enabled, update];

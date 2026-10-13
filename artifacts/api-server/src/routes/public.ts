@@ -31,6 +31,7 @@ import { blockedUserIds, isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, op
 import { viewerPostStates } from "../lib/viewerPostState";
 import { taggedProductVisibleTo } from "../lib/productVisibility";
 import { sellerRatingSummary, sellerSalesCount } from "../lib/sellerRating";
+import { notHiddenFromViewer } from "../lib/ranking/notInterested";
 import {
   paginationMetadata,
   parsePagination,
@@ -1850,11 +1851,8 @@ router.get("/posts", async (req, res) => {
         ownerId ? undefined : eq(posts.surface, "thread"),
         publicPostCondition(),
         notBlockedWith(viewerId, posts.userId),
-        // "Not interested" in the general feed hides the post for this viewer
-        // for good (a creator's own grid, ?ownerId=, still lists it).
-        viewerId && !ownerId
-          ? sql`NOT EXISTS (SELECT 1 FROM feed_not_interested fni WHERE fni.user_id = ${viewerId} AND fni.post_id = ${posts.id})`
-          : undefined,
+        // For You only: honour the viewer's "Not interested" hides (post or creator).
+        ownerId ? undefined : notHiddenFromViewer(viewerId, posts.id, posts.userId),
       ))
       .orderBy(desc(posts.createdAt), asc(posts.id))
       .limit(lim)

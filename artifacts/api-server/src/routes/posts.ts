@@ -33,6 +33,7 @@ import { checkRemix, remixCredits } from "../lib/remix";
 import { cleanTaggedUserIds, MAX_POST_USER_TAGS, recordPostUserTags } from "../lib/tagApproval";
 import { scheduleHlsTranscode, scheduleMuxAssetRemoval } from "../lib/muxVideo";
 import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
+import { parseNotInterestedReason } from "../lib/ranking/notInterested";
 import { rateLimit } from "../middlewares/rateLimit";
 import { notifyCaptionMentions } from "../lib/activityEvents";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
@@ -826,6 +827,9 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
     if (controls.isPublic !== undefined && typeof controls.isPublic !== "boolean") {
       return res.status(400).json({ error: "visibility.isPublic must be a boolean" });
     }
+    if (controls.allowDownloads !== undefined && typeof controls.allowDownloads !== "boolean") {
+      return res.status(400).json({ error: "visibility.allowDownloads must be a boolean" });
+    }
   }
   const now = new Date();
   if (parsedScheduledAt) {
@@ -1350,6 +1354,9 @@ router.patch("/:id", requireAuth, validateBody(updatePostBody), async (req, res)
     }
     if (visibility.isPublic !== undefined && typeof visibility.isPublic !== "boolean") {
       return res.status(400).json({ error: "visibility.isPublic must be a boolean" });
+    }
+    if (visibility.allowDownloads !== undefined && typeof visibility.allowDownloads !== "boolean") {
+      return res.status(400).json({ error: "visibility.allowDownloads must be a boolean" });
     }
     updates.visibility = body.visibility as typeof posts.$inferInsert.visibility;
   }
@@ -1963,6 +1970,11 @@ router.post("/:id/interact", requireAuth, rateLimit("post-interact"), validateBo
   const RECORDED_ONLY_TYPES = ["view", "watch_time", "shop_click", "share", "not_interested"];
   if (!["like", "repost", ...RECORDED_ONLY_TYPES].includes(type)) {
     return res.status(400).json({ error: "type must be like, repost, view, watch_time, shop_click, share, or not_interested" });
+  }
+  // "Not interested" carries an optional reason from the long-press sheet:
+  // "video" (just this post) or "creator" (stop recommending this seller).
+  if (type === "not_interested" && parseNotInterestedReason(value) === null) {
+    return res.status(400).json({ error: "not_interested value must be video or creator" });
   }
   const [visiblePost] = await db.select({ id: posts.id, visibility: posts.visibility, ownerId: posts.userId }).from(posts)
     .where(and(eq(posts.id, id), visiblePostCondition(new Date(), clerkId)))

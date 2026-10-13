@@ -13,7 +13,7 @@ import type { Server } from "node:http";
 import crypto from "node:crypto";
 import { and, eq, inArray, like } from "drizzle-orm";
 import {
-  blocks, db, follows, mutedWords, postComments, posts, products, reports, stories, users,
+  blocks, db, feedNotInterested, follows, interactions, mutedWords, postComments, posts, products, reports, stories, users,
 } from "@workspace/db";
 
 const clerk = vi.hoisted(() => ({ banned: [] as string[], unbanned: [] as string[] }));
@@ -272,6 +272,39 @@ describe("block visibility", () => {
     const unblock = await call(`/api/social/block/${BUYER}`, { method: "DELETE", user: SELLER });
     expect(unblock.status).toBe(200);
     expect((await call(`/api/public/posts?ownerId=${SELLER}`, { user: BUYER })).body.map((p: any) => p.id)).toContain(postId);
+  });
+});
+
+describe("For You honours Not interested", () => {
+  it("drops a hidden post, then the whole seller after a creator hide, for that viewer only", async () => {
+    const [a] = await db.insert(posts).values({
+      userId: SELLER, mediaUrl: "https://cdn.test/ni-a.mp4", mediaType: "video", caption: "ni a",
+      postStatus: "published", publishedAt: new Date(),
+    }).returning({ id: posts.id });
+    const [b] = await db.insert(posts).values({
+      userId: SELLER, mediaUrl: "https://cdn.test/ni-b.mp4", mediaType: "video", caption: "ni b",
+      postStatus: "published", publishedAt: new Date(),
+    }).returning({ id: posts.id });
+    const forYou = async (user?: string) =>
+      (await call("/api/public/posts?limit=50", { user })).body.map((p: any) => p.id) as string[];
+    expect(await forYou(OTHER)).toEqual(expect.arrayContaining([a.id, b.id]));
+
+    expect((await call(`/api/posts/${a.id}/interact`, { method: "POST", user: OTHER, body: { type: "not_interested", value: "video" } })).status).toBe(200);
+    const afterVideo = await forYou(OTHER);
+    expect(afterVideo).not.toContain(a.id);
+    expect(afterVideo).toContain(b.id);
+
+    expect((await call(`/api/posts/${b.id}/interact`, { method: "POST", user: OTHER, body: { type: "not_interested", value: "creator" } })).status).toBe(200);
+    const afterCreator = await forYou(OTHER);
+    expect(afterCreator).not.toContain(b.id);
+    expect(afterCreator).not.toContain(postId);
+    // The seller's own profile grid is not a recommendation surface.
+    expect((await call(`/api/public/posts?ownerId=${SELLER}`, { user: OTHER })).body.map((p: any) => p.id)).toContain(b.id);
+    // Other viewers are unaffected.
+    expect(await forYou(BUYER)).toContain(b.id);
+
+    await db.delete(interactions).where(eq(interactions.userId, OTHER));
+    await db.delete(feedNotInterested).where(eq(feedNotInterested.userId, OTHER));
   });
 });
 

@@ -396,6 +396,8 @@ export interface PostVisibility {
   allowComments: boolean;
   allowReposts:  boolean;
   showLikeCount: boolean;
+  /** Viewers can save the video to their camera roll. Missing = allowed. */
+  allowDownloads?: boolean;
 }
 
 export interface PostSchedule {
