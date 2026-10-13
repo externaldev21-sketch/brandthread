@@ -1,33 +1,30 @@
 /**
- * Cinematic opener for onboarding — the very first screen a new user sees
- * after splash. A black canvas, one line of big type, and the signature
- * thread drawing itself edge to edge through the Brandthread mark.
+ * Onboarding opener — Pinterest's welcome, reskinned
+ * (https://mobbin.com/flows/181f0864-8d03-4f31-9aef-99dd251b93cb): real
+ * product footage playing full-bleed from the top edge, then the mark, one
+ * line and two buttons on plain black at the bottom. No glow, no gradient,
+ * nothing laid over the video.
  *
- * No network fetches or media assets: everything is vector or theme token,
- * so it renders instantly and correctly across all 12 themes.
+ * The footage is the bundled runway clips the feed already ships with (no
+ * network). Muted and looping; with Reduce Motion on it holds on the poster
+ * frame instead of playing.
  */
-import React, { useEffect } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import Animated, {
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSpring,
-} from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useState } from 'react';
+import { Image, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Glow, ThreadDraw } from './ThreadLine';
-import { PillButton, Reveal, StepHeadline } from './OnboardingUI';
-import { MOTION, SPACE, TYPE, useOnboardingMotion } from './onboardingTokens';
+import { PillButton } from './OnboardingUI';
+import { SPACE, TYPE, useOnboardingMotion } from './onboardingTokens';
 
-const THREAD_DELAY = 250;
-const HERO_HEIGHT = 200;
-const PHONE_LOGO_SIZE = 148;
+const WELCOME_VIDEO = require('../../assets/videos/fashion_runway_02.mp4');
+const WELCOME_POSTER = require('../../assets/videos/fashion_runway_02.jpg');
+
+/** Share of the screen the footage takes; the rest is the black CTA panel. */
+const VIDEO_SHARE = 0.6;
 
 export function WelcomeStep({
   onGetStarted,
@@ -42,77 +39,31 @@ export function WelcomeStep({
   const { theme } = useAppTheme();
   const { reduceMotion } = useOnboardingMotion();
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
-  const { width, height } = useWindowDimensions();
-  // Grow with wider screens, but leave room for the copy and CTAs on short phones/windows.
-  const logoSize = Math.min(248, Math.max(PHONE_LOGO_SIZE, Math.round(width * 0.3)), Math.round(height * 0.28));
-  const styles = createStyles(theme, logoSize);
-
-  // The mark resolves as the thread passes through its centre.
-  const logo = useSharedValue(reduceMotion ? 1 : 0);
-  useEffect(() => {
-    if (reduceMotion) return;
-    logo.value = withDelay(
-      THREAD_DELAY + MOTION.welcomeDrawMs * 0.36,
-      withSpring(1, { damping: 15, stiffness: 120 }),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const logoStyle = useAnimatedStyle(() => ({
-    opacity: logo.value,
-    transform: [{ scale: interpolate(logo.value, [0, 1], [0.86, 1]) }],
-  }));
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: logo.value,
-    transform: [{ scale: interpolate(logo.value, [0, 1], [0.5, 1]) }],
-  }));
-
-  const copyDelay = reduceMotion ? 0 : THREAD_DELAY + MOTION.welcomeDrawMs * 0.55;
+  const { height } = useWindowDimensions();
+  const videoHeight = Math.round(height * VIDEO_SHARE);
+  const styles = createStyles(theme);
 
   return (
-    <View style={styles.root}>
-      <LinearGradient
-        pointerEvents="none"
-        colors={[theme.heroGradient[theme.heroGradient.length - 1], theme.background]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 0.7 }}
-        style={styles.topWash}
-      />
+    <View style={styles.root} testID="onboarding-welcome">
+      <View style={[styles.media, { height: videoHeight }]}>
+        <WelcomeFootage play={!reduceMotion} />
+      </View>
 
-      <View style={[styles.content, { paddingTop: headerTopInset + SPACE.md, paddingBottom: insets.bottom + SPACE.lg }]}>
-        <Reveal>
-          <Text style={[TYPE.eyebrow, { color: theme.muted }]}>BRANDTHREAD</Text>
-        </Reveal>
-
-        {/* Hero: the thread sews through the mark. */}
-        <View style={styles.hero}>
-          <ThreadDraw
-            height={HERO_HEIGHT}
-            color={theme.text}
-            delay={THREAD_DELAY}
-            style={styles.heroThread}
-          />
-          <Animated.View pointerEvents="none" style={[styles.heroGlow, glowStyle]}>
-            <Glow size={logoSize * 3} color={theme.text} intensity={0.13} />
-          </Animated.View>
-          <Animated.View style={logoStyle}>
-            <BrandthreadLogo size={logoSize} />
-          </Animated.View>
+      <View style={[styles.panel, { paddingBottom: insets.bottom + SPACE.md }]}>
+        <View style={styles.brandRow}>
+          <BrandthreadLogo size={40} />
+          <Text style={[TYPE.title1, styles.tagline]} numberOfLines={2}>
+            Where brands find their people.
+          </Text>
         </View>
 
-        <View style={styles.copy}>
-          <StepHeadline size="display" delay={copyDelay}>
-            Where brands{'\n'}find their{'\n'}people.
-          </StepHeadline>
-        </View>
-
-        <Reveal delay={copyDelay} index={3} style={styles.ctas}>
+        <View style={styles.ctas}>
           <PillButton
             testID="onboarding-welcome-get-started"
             accessibilityLabel="Get started"
             label="Get started"
             haptic={false}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onGetStarted(); }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onGetStarted(); }}
           />
           <PillButton
             testID="onboarding-welcome-sign-in"
@@ -120,32 +71,65 @@ export function WelcomeStep({
             label="I already have an account"
             variant="secondary"
             haptic={false}
-            onPress={() => { Haptics.selectionAsync(); onSignIn(); }}
+            onPress={onSignIn}
           />
           {onBrowse ? (
-            <PillButton
+            <PressableScale
               testID="onboarding-welcome-browse-guest"
+              accessibilityRole="button"
               accessibilityLabel="Browse as a guest"
-              label="Browse as a guest"
-              variant="ghost"
-              haptic={false}
-              onPress={() => { Haptics.selectionAsync(); onBrowse(); }}
-            />
+              onPress={onBrowse}
+              style={styles.guest}
+            >
+              <Text style={[TYPE.label, { color: theme.muted }]}>Browse as a guest</Text>
+            </PressableScale>
           ) : null}
-        </Reveal>
+        </View>
       </View>
     </View>
   );
 }
 
-const createStyles = (theme: ReturnType<typeof useAppTheme>['theme'], logoSize: number) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: theme.background, overflow: 'hidden' },
-  topWash: { position: 'absolute', top: 0, left: 0, right: 0, height: '60%', opacity: 0.9 },
-  content: { flex: 1, paddingHorizontal: SPACE.lg },
-  hero: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: HERO_HEIGHT },
-  // Full-bleed: cancel the content gutter so the thread runs edge to edge.
-  heroThread: { position: 'absolute', left: -SPACE.lg, right: -SPACE.lg, top: '50%', marginTop: -HERO_HEIGHT / 2 },
-  heroGlow: { position: 'absolute', width: logoSize * 3, height: logoSize * 3 },
-  copy: { marginBottom: SPACE.xl },
+function WelcomeFootage({ play }: { play: boolean }) {
+  const player = useVideoPlayer(WELCOME_VIDEO, (p) => {
+    p.loop = true;
+    p.muted = true;
+  });
+  const [started, setStarted] = useState(false);
+
+  useEffect(() => {
+    const sub = player.addListener('playingChange', ({ isPlaying }) => {
+      if (isPlaying) setStarted(true);
+    });
+    return () => sub.remove();
+  }, [player]);
+
+  useEffect(() => {
+    if (play) player.play();
+    else player.pause();
+  }, [play, player]);
+
+  return (
+    <>
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        nativeControls={false}
+        accessible={false}
+      />
+      {/* Poster until the first frame plays (and for Reduce Motion). */}
+      {!started ? <Image source={WELCOME_POSTER} style={StyleSheet.absoluteFill} resizeMode="cover" accessible={false} /> : null}
+    </>
+  );
+}
+
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: theme.background },
+  media: { width: '100%', overflow: 'hidden', backgroundColor: theme.background },
+  panel: { flex: 1, paddingHorizontal: SPACE.lg, paddingTop: SPACE.lg, justifyContent: 'space-between' },
+  brandRow: { gap: SPACE.sm },
+  tagline: { color: theme.text },
   ctas: { width: '100%', gap: SPACE.sm },
+  guest: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: SPACE.md },
 });
