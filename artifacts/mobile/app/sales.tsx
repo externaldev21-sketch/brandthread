@@ -10,10 +10,10 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, ActivityIndicator,
+  StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
@@ -22,8 +22,11 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
-import { BrandthreadCard, PrimaryButton, StatusBadge, SectionHeader, HapticSwitch } from '@/components/BrandthreadUI';
+import { BrandthreadCard, StatusBadge, SectionHeader, HapticSwitch } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { OptionSheet } from '@/components/ui/OptionSheet';
+import { hapticSuccess } from '@/lib/haptics';
 import { EmptyState } from '@/components/layout';
 
 type DiscountType = 'percent' | 'fixed';
@@ -187,7 +190,7 @@ export default function SalesScreen() {
         const created = await api.sales.create(payload);
         setSales(prev => [normalizeSale(created), ...prev]);
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hapticSuccess();
       setShowModal(false);
     } catch (err: any) {
       Alert.alert("Couldn't save the sale", err?.message ?? 'Try again.');
@@ -278,10 +281,14 @@ export default function SalesScreen() {
         </ScrollView>
       )}
 
-      <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowModal(false)}>
-        <SafeAreaProvider style={s.modal}>
-          <ScreenHeader hideDivider title={editingId ? 'Edit sale' : 'Create sale'} variant="modal" onBack={() => setShowModal(false)} />
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: SP.md, gap: SP.lg, paddingBottom: 60 }}>
+      <Sheet
+        visible={showModal}
+        onClose={() => setShowModal(false)}
+        title={editingId ? 'Edit sale' : 'Create sale'}
+        testID="sale-editor-sheet"
+        contentContainerStyle={{ gap: SP.lg }}
+        primaryAction={{ label: editingId ? 'Save changes' : 'Create sale', onPress: handleSave, loading: saving, disabled: saving }}
+      >
             <View>
               <Text style={s.label}>Sale name</Text>
               <TextInput style={s.input} value={name} onChangeText={setName} placeholder="Summer sale" placeholderTextColor={MUTED} maxLength={80} />
@@ -341,16 +348,16 @@ export default function SalesScreen() {
               <Text style={s.summaryLine}>{summaryDates}</Text>
               <Text style={s.summaryLine}>Discount codes apply on top of the sale price</Text>
             </View>
+      </Sheet>
 
-            <PrimaryButton label={saving ? 'Saving…' : editingId ? 'Save changes' : 'Create sale'} onPress={handleSave} disabled={saving} />
-          </ScrollView>
-        </SafeAreaProvider>
-      </Modal>
-
-      <Modal visible={showProductPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowProductPicker(false)}>
-        <SafeAreaProvider style={s.modal}>
-          <ScreenHeader hideDivider title="Choose products" variant="modal" onBack={() => setShowProductPicker(false)} actions={[{ icon: 'check', onPress: () => setShowProductPicker(false), accessibilityLabel: 'Done choosing products' }]} />
-          <ScrollView contentContainerStyle={{ padding: SP.md, gap: 8 }}>
+      <Sheet
+        visible={showProductPicker}
+        onClose={() => setShowProductPicker(false)}
+        title="Choose products"
+        headerRight="done"
+        testID="sale-product-picker"
+        contentContainerStyle={{ gap: 8 }}
+      >
             {products.length === 0 ? (
               <Text style={{ color: MUTED, fontSize: FS.sm, textAlign: 'center', marginTop: 30 }}>No products found.</Text>
             ) : products.map(p => {
@@ -362,28 +369,18 @@ export default function SalesScreen() {
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
-        </SafeAreaProvider>
-      </Modal>
+      </Sheet>
 
-      <Modal visible={showCollectionPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowCollectionPicker(false)}>
-        <SafeAreaProvider style={s.modal}>
-          <ScreenHeader hideDivider title="Choose a collection" variant="modal" onBack={() => setShowCollectionPicker(false)} />
-          <ScrollView contentContainerStyle={{ padding: SP.md, gap: 8 }}>
-            {collections.length === 0 ? (
-              <Text style={{ color: MUTED, fontSize: FS.sm, textAlign: 'center', marginTop: 30 }}>No categories or tags on your products yet.</Text>
-            ) : collections.map(c => {
-              const on = collection === c;
-              return (
-                <TouchableOpacity key={c} style={[s.pickRow, on && { borderColor: theme.accent }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCollection(c); setShowCollectionPicker(false); }}>
-                  <Text style={s.pickName}>{c}</Text>
-                  <Feather name={on ? 'check-circle' : 'circle'} size={18} color={on ? theme.accent : MUTED} />
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </SafeAreaProvider>
-      </Modal>
+      <OptionSheet
+        visible={showCollectionPicker}
+        onClose={() => setShowCollectionPicker(false)}
+        title="Choose a collection"
+        description={collections.length === 0 ? 'No categories or tags on your products yet.' : undefined}
+        options={collections.map(c => ({ id: c, label: c }))}
+        selectedId={collection ?? ''}
+        onSelect={(c) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCollection(c); setShowCollectionPicker(false); }}
+        testID="sale-collection-picker"
+      />
     </View>
   );
 }
@@ -393,7 +390,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: 'transparent' },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    modal: { flex: 1, backgroundColor: theme.background },
     card: { marginBottom: SP.sm },
     cardName: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
     cardValue: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginTop: 2, marginBottom: 2 },

@@ -48,6 +48,20 @@ export const withSpring = (toValue: unknown, _config?: unknown, callback?: (fini
   callback?.(true);
   return toValue;
 };
+export const Extrapolation = { CLAMP: 'clamp', EXTEND: 'extend', IDENTITY: 'identity' } as const;
+export function interpolate(value: number, input: number[], output: number[]): number {
+  const [i0, i1] = [input[0], input[input.length - 1]];
+  const [o0, o1] = [output[0], output[output.length - 1]];
+  if (i1 === i0) return o0;
+  const t = Math.min(1, Math.max(0, (value - i0) / (i1 - i0)));
+  return o0 + (o1 - o0) * t;
+}
+export function useAnimatedScrollHandler(_handler: unknown) {
+  return () => undefined;
+}
+export function useReducedMotion() {
+  return false;
+}
 export const runOnJS = <T extends (...args: never[]) => unknown>(fn: T) => fn;
 export const runOnUI = <T extends (...args: never[]) => unknown>(fn: T) => fn;
 export const cancelAnimation = () => undefined;

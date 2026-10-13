@@ -5,14 +5,14 @@
 import React, { useState, useCallback } from 'react';
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, TextInput, Modal,
+  ActivityIndicator, Alert, TextInput,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { hapticSuccess } from '@/lib/haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
-import { Button } from '@/components/ui/Button';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -94,6 +94,7 @@ export default function LocationsScreen() {
       } else {
         await api.seller.createLocation(form) as any;
       }
+      hapticSuccess();
       setModalVisible(false);
       await load();
     } catch {
@@ -226,17 +227,15 @@ export default function LocationsScreen() {
         </ScrollView>
       )}
 
-      {/* Add / Edit Modal */}
-      <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
-        <ModalSafeArea>
-        <View style={[s.modal, { backgroundColor: colors.background }]}>
-          <ScreenHeader
-            title={editTarget ? 'Edit location' : 'Add location'}
-            variant="modal"
-            onBack={() => setModalVisible(false)}
-            rightElement={<Button label="Save" variant="primary" size="compact" loading={saving} onPress={handleSave} />}
-          />
-          <ScrollView contentContainerStyle={s.modalBody}>
+      {/* Add / edit sheet */}
+      <Sheet
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        title={editTarget ? 'Edit location' : 'Add location'}
+        testID="location-editor-sheet"
+        contentContainerStyle={s.modalBody}
+        primaryAction={{ label: 'Save location', onPress: () => { void handleSave(); }, loading: saving, disabled: saving }}
+      >
             {[
               { label: 'Location name *', key: 'name', placeholder: 'e.g. Main Warehouse' },
               { label: 'Address', key: 'address', placeholder: '123 Example St' },
@@ -253,14 +252,12 @@ export default function LocationsScreen() {
                   onChangeText={v => setForm(prev => ({ ...prev, [key]: v }))}
                   placeholder={placeholder}
                   placeholderTextColor={colors.mutedForeground}
+                  accessibilityLabel={label.replace(' *', '')}
                   style={[s.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
                 />
               </View>
             ))}
-          </ScrollView>
-        </View>
-        </ModalSafeArea>
-      </Modal>
+      </Sheet>
     </View>
   );
 }
@@ -294,8 +291,7 @@ const s = StyleSheet.create({
   statusPillText: { fontSize: 11, fontFamily: FONT.semibold },
   iconAction: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   // Modal
-  modal: { flex: 1 },
-  modalBody: { padding: 20, gap: 16, paddingBottom: 60 },
+  modalBody: { gap: 16 },
   formField: { gap: 6 },
   formLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.6 },
   formInput: { borderRadius: RADIUS.sm, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: FS.sm, fontFamily: FONT.regular },

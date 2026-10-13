@@ -8,11 +8,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, ActivityIndicator, Platform,
+  StyleSheet, Alert, ActivityIndicator, Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { InlineSlider } from '@/components/InlineSlider';
-import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -26,10 +26,12 @@ import {
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import {
-  BrandthreadCard, PrimaryButton, SecondaryButton, TertiaryButton,
+  BrandthreadCard, SecondaryButton, TertiaryButton,
   StatusBadge, SectionHeader, HapticSwitch,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { hapticSuccess } from '@/lib/haptics';
 import { EmptyState } from '@/components/layout';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
@@ -344,7 +346,7 @@ export default function DiscountsScreen() {
         const created = await api.discountCodes.create(payload);
         setDiscounts(prev => [normalizeDiscount(created), ...prev]);
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hapticSuccess();
       setShowModal(false);
     } catch (err: any) {
       Alert.alert("Couldn't save the code", err?.message ?? 'Try again.');
@@ -438,16 +440,15 @@ export default function DiscountsScreen() {
         </ScrollView>
       )}
 
-      {/* Create / Edit Modal — one page */}
-      <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowModal(false)}>
-        <SafeAreaProvider style={s.modal}>
-          <ScreenHeader
-            title={editingId ? 'Edit Discount Code' : 'New Discount Code'}
-            variant="modal"
-            onBack={() => setShowModal(false)}
-          />
-
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ padding: SP.md, gap: SP.md, paddingBottom: 60 }}>
+      {/* Create / edit sheet — one page */}
+      <Sheet
+        visible={showModal}
+        onClose={() => setShowModal(false)}
+        title={editingId ? 'Edit discount code' : 'New discount code'}
+        testID="discount-editor-sheet"
+        contentContainerStyle={{ gap: SP.md }}
+        primaryAction={{ label: editingId ? 'Save changes' : 'Create code', onPress: handleSave, loading: saving, disabled: saving }}
+      >
 
             {/* Live summary card */}
             <View style={[s.summaryCard, { borderColor: theme.accent + '55' }]}>
@@ -668,27 +669,17 @@ export default function DiscountsScreen() {
                 />
               )}
             </View>
-
-            <PrimaryButton
-              label={saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Code'}
-              onPress={handleSave}
-              disabled={saving}
-              style={{ marginTop: SP.sm }}
-            />
-          </ScrollView>
-        </SafeAreaProvider>
-      </Modal>
+      </Sheet>
 
       {/* Product picker sheet */}
-      <Modal visible={showProductPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowProductPicker(false)}>
-        <SafeAreaProvider style={s.modal}>
-          <ScreenHeader
-            title="Choose products"
-            variant="modal"
-            onBack={() => setShowProductPicker(false)}
-            actions={[{ icon: 'check', onPress: () => setShowProductPicker(false), accessibilityLabel: 'Done choosing products' }]}
-          />
-          <ScrollView contentContainerStyle={{ padding: SP.md, gap: 8 }}>
+      <Sheet
+        visible={showProductPicker}
+        onClose={() => setShowProductPicker(false)}
+        title="Choose products"
+        headerRight="done"
+        testID="discount-product-picker"
+        contentContainerStyle={{ gap: 8 }}
+      >
             {products.length === 0 ? (
               <Text style={{ color: MUTED, fontSize: FS.sm, textAlign: 'center', marginTop: 30 }}>No products found.</Text>
             ) : products.map(p => {
@@ -707,9 +698,7 @@ export default function DiscountsScreen() {
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
-        </SafeAreaProvider>
-      </Modal>
+      </Sheet>
     </View>
   );
 }
@@ -816,7 +805,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   statPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: 6, paddingVertical: 3 },
   statText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
 
-  modal:       { flex: 1, backgroundColor: BG },
 
   summaryCard: { backgroundColor: CARD_ELEVATED, borderWidth: 1.5, borderRadius: RADIUS.md, padding: SP.md, gap: 6 },
   summaryCode: { fontSize: FS.md, fontFamily: FONT.bold, letterSpacing: 1.5 },

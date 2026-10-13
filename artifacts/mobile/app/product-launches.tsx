@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Alert, Image, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,10 +17,13 @@ import { useColors } from '@/hooks/useColors';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { Header } from '@/components/layout';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { EmptyState, HapticSwitch, PrimaryButton } from '@/components/BrandthreadUI';
+import { EmptyState, HapticSwitch } from '@/components/BrandthreadUI';
 import { LaunchTimePicker, parseWallClock } from '@/components/products/LaunchTimePicker';
 import { listSupportedTimeZones, zonedTimeToUtc } from '@/lib/dropSchedule';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { Sheet, SHEET_GUTTER } from '@/components/ui/BottomSheet';
+import { showActionSheet } from '@/components/ui/ActionSheet';
+import { hapticSuccess } from '@/lib/haptics';
 
 type Launch = {
   productId: string; name: string; imageUrl: string | null; status: string;
@@ -52,6 +55,15 @@ export default function ProductLaunchesScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [editing, setEditing] = useState<{ productId: string; name: string; existing: Launch | null } | null>(null);
+  // Each open gets a fresh editor (new key); after close it keeps rendering
+  // the last target so the sheet can animate out.
+  const lastEditing = React.useRef(editing);
+  const editorSession = React.useRef(0);
+  if (editing && editing !== lastEditing.current) {
+    lastEditing.current = editing;
+    editorSession.current += 1;
+  }
+  const editorTarget = editing ?? lastEditing.current;
   const [picking, setPicking] = useState(false);
   const [autoOpened, setAutoOpened] = useState(false);
 
@@ -121,10 +133,13 @@ export default function ProductLaunchesScreen() {
         </ScrollView>
       )}
 
-      <Modal visible={picking} animationType="slide" onRequestClose={() => setPicking(false)}>
-        <View style={[s.root, { backgroundColor: colors.background }]}>
-          <Header title="Choose a product" dividerVariant="none" onBack={() => setPicking(false)} />
-          <ScrollView contentContainerStyle={[s.list, { paddingBottom: insets.bottom + 24 }]}>
+      <Sheet
+        visible={picking}
+        onClose={() => setPicking(false)}
+        title="Choose a product"
+        testID="launch-product-picker"
+        contentContainerStyle={{ gap: SP.sm }}
+      >
             {available.length === 0 && (
               <Text style={[s.empty, { color: colors.mutedForeground }]}>Every product already has a launch.</Text>
             )}
@@ -139,20 +154,19 @@ export default function ProductLaunchesScreen() {
                 <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
               </TouchableOpacity>
             ))}
-          </ScrollView>
-        </View>
-      </Modal>
+      </Sheet>
 
-      <Modal visible={!!editing} animationType="slide" onRequestClose={() => setEditing(null)}>
-        {editing && (
-          <LaunchEditor
-            key={editing.productId}
-            target={editing}
-            onClose={() => setEditing(null)}
-            onSaved={() => { setEditing(null); load(true); }}
-          />
-        )}
-      </Modal>
+      {/* The editor stays mounted on its last target while the sheet slides
+          out, so closing animates instead of vanishing. */}
+      {editorTarget && (
+        <LaunchEditor
+          key={`${editorTarget.productId}-${editorSession.current}`}
+          visible={!!editing}
+          target={editorTarget}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load(true); }}
+        />
+      )}
     </View>
   );
 }
@@ -190,15 +204,15 @@ function LaunchRow({ launch, onPress }: { launch: Launch; onPress: () => void })
 }
 
 function LaunchEditor({
-  target, onClose, onSaved,
+  target, visible, onClose, onSaved,
 }: {
   target: { productId: string; name: string; existing: Launch | null };
+  visible: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const api = useApi();
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const existing = target.existing;
   const tomorrow = useMemo(() => { const d = new Date(Date.now() + 86400000); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }, []);
   const [date, setDate] = useState(existing ? localDate(existing.launchAt) : tomorrow);
@@ -223,6 +237,7 @@ function LaunchEditor({
     setSaving(true);
     try {
       await api.productLaunches.schedule(target.productId, { launchAt: launchAt.toISOString(), notifyFollowers });
+      hapticSuccess();
       onSaved();
     } catch (e: any) {
       Alert.alert("Couldn't save", e?.message ?? 'Try again.');
@@ -232,7 +247,7 @@ function LaunchEditor({
   }
 
   function cancelLaunch() {
-    Alert.alert('Cancel this launch?', 'The product becomes available right away and nobody is notified.', [
+    showActionSheet('Cancel this launch?', 'The product becomes available right away and nobody is notified.', [
       { text: 'Keep launch', style: 'cancel' },
       {
         text: 'Cancel launch', style: 'destructive',
@@ -244,63 +259,79 @@ function LaunchEditor({
     ]);
   }
 
-  if (zoneOpen) {
-    return (
-      <View style={[s.root, { backgroundColor: colors.background }]}>
-        <Header title="Timezone" dividerVariant="none" onBack={() => setZoneOpen(false)} />
-        <TextInput
-          style={[s.filter, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }, WEB_INPUT_RESET]}
-          value={zoneFilter}
-          onChangeText={setZoneFilter}
-          placeholder="Search timezones"
-          placeholderTextColor={colors.mutedForeground}
-        />
-        <ScrollView>
+  // The timezone list is a second step inside the same sheet: a back chevron
+  // in the title row returns to the form.
+  const zoneBack = zoneOpen ? (
+    <TouchableOpacity
+      onPress={() => setZoneOpen(false)}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      accessibilityRole="button"
+      accessibilityLabel="Back"
+    >
+      <Feather name="chevron-left" size={ICON.md} color={colors.foreground} />
+    </TouchableOpacity>
+  ) : undefined;
+
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={zoneOpen ? 'Timezone' : existing ? 'Edit launch' : 'Schedule launch'}
+      headerLeft={zoneBack}
+      padded={!zoneOpen}
+      testID="launch-editor-sheet"
+      contentContainerStyle={zoneOpen ? undefined : s.form}
+      primaryAction={zoneOpen ? undefined : {
+        label: existing ? 'Save launch' : 'Schedule launch',
+        onPress: () => { void save(); },
+        loading: saving,
+        disabled: saving,
+      }}
+      secondaryAction={!zoneOpen && existing ? { label: 'Cancel launch', onPress: cancelLaunch, variant: 'destructive' } : undefined}
+    >
+      {zoneOpen ? (
+        <>
+          <TextInput
+            style={[s.filter, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }, WEB_INPUT_RESET]}
+            value={zoneFilter}
+            onChangeText={setZoneFilter}
+            placeholder="Search timezones"
+            placeholderTextColor={colors.mutedForeground}
+            accessibilityLabel="Search timezones"
+          />
           {filtered.map((z) => (
             <TouchableOpacity key={z} style={[s.zoneRow, { borderColor: colors.border }]} onPress={() => { setZone(z); setZoneOpen(false); setZoneFilter(''); }}>
               <Text style={[s.name, { color: colors.foreground }]}>{z}</Text>
               {z === zone && <Feather name="check" size={16} color={colors.foreground} />}
             </TouchableOpacity>
           ))}
-        </ScrollView>
-      </View>
-    );
-  }
+        </>
+      ) : (
+        <>
+          <Text style={[s.productName, { color: colors.foreground }]} numberOfLines={2}>{target.name}</Text>
 
-  return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
-      <Header title={existing ? 'Edit launch' : 'Schedule launch'} dividerVariant="none" onBack={onClose} />
-      <ScrollView contentContainerStyle={[s.form, { paddingBottom: insets.bottom + 24 }]} keyboardShouldPersistTaps="handled">
-        <Text style={[s.productName, { color: colors.foreground }]} numberOfLines={2}>{target.name}</Text>
-
-        <Text style={[s.label, { color: colors.mutedForeground }]}>LAUNCH DATE AND TIME</Text>
-        <LaunchTimePicker dateValue={date} timeValue={time} onDateChange={setDate} onTimeChange={setTime} />
-        <TouchableOpacity
-          style={[s.zoneBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
-          onPress={() => setZoneOpen(true)}
-          accessibilityLabel={`Timezone ${zone}`}
-        >
-          <Feather name="globe" size={14} color={colors.mutedForeground} />
-          <Text style={[s.name, { color: colors.foreground, flex: 1 }]}>{zone}</Text>
-          <Feather name="chevron-down" size={14} color={colors.mutedForeground} />
-        </TouchableOpacity>
-
-        <View style={[s.switchRow, { borderColor: colors.border }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.name, { color: colors.foreground }]}>Notify my followers</Text>
-            <Text style={[s.meta, { color: colors.mutedForeground }]}>Everyone who follows you, plus anyone who tapped Notify me.</Text>
-          </View>
-          <HapticSwitch value={notifyFollowers} onValueChange={setNotifyFollowers} />
-        </View>
-
-        <PrimaryButton label={existing ? 'Save launch' : 'Schedule launch'} onPress={save} loading={saving} disabled={saving} />
-        {existing && (
-          <TouchableOpacity style={s.cancelBtn} onPress={cancelLaunch} accessibilityRole="button">
-            <Text style={[s.cancelText, { color: colors.destructive }]}>Cancel launch</Text>
+          <Text style={[s.label, { color: colors.mutedForeground }]}>LAUNCH DATE AND TIME</Text>
+          <LaunchTimePicker dateValue={date} timeValue={time} onDateChange={setDate} onTimeChange={setTime} />
+          <TouchableOpacity
+            style={[s.zoneBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+            onPress={() => setZoneOpen(true)}
+            accessibilityLabel={`Timezone ${zone}`}
+          >
+            <Feather name="globe" size={14} color={colors.mutedForeground} />
+            <Text style={[s.name, { color: colors.foreground, flex: 1 }]}>{zone}</Text>
+            <Feather name="chevron-down" size={14} color={colors.mutedForeground} />
           </TouchableOpacity>
-        )}
-      </ScrollView>
-    </View>
+
+          <View style={[s.switchRow, { borderColor: colors.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.name, { color: colors.foreground }]}>Notify my followers</Text>
+              <Text style={[s.meta, { color: colors.mutedForeground }]}>Everyone who follows you, plus anyone who tapped Notify me.</Text>
+            </View>
+            <HapticSwitch value={notifyFollowers} onValueChange={setNotifyFollowers} />
+          </View>
+        </>
+      )}
+    </Sheet>
   );
 }
 
@@ -316,13 +347,11 @@ const s = StyleSheet.create({
   meta: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   empty: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: SP.lg },
-  form: { padding: SP.md, gap: SP.md },
+  form: { gap: SP.md },
   productName: { fontFamily: FONT.bold, fontSize: FS.lg },
   label: { fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1 },
   zoneBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, minHeight: 44 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, borderTopWidth: 1, borderBottomWidth: 1, paddingVertical: SP.md },
-  cancelBtn: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  cancelText: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  filter: { margin: SP.md, borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 10, fontSize: FS.sm, fontFamily: FONT.medium },
-  zoneRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: 14, borderBottomWidth: 1 },
+  filter: { marginHorizontal: SHEET_GUTTER, marginBottom: SP.sm, borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 10, fontSize: FS.sm, fontFamily: FONT.medium },
+  zoneRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SHEET_GUTTER, paddingVertical: 14, borderBottomWidth: 1 },
 });

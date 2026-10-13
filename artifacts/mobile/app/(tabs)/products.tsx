@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, LayoutAnimation, UIManager, Platform } from 'react-native';
+import { View, Text, StyleSheet, Alert, Share, LayoutAnimation, UIManager, Platform } from 'react-native';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
@@ -17,10 +17,10 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { SellerListHeader, sellerListCountRowStyles } from '@/components/SellerListHeader';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { PrimaryButton, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
+import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGridPadding } from '@/components/layout';
 import { useScrollReset } from '@/hooks/useScrollReset';
-import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
+import { hapticPrimaryAction, hapticToggle, hapticSuccess } from '@/lib/haptics';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProductCard } from '@/components/products/ProductCard';
 import { StockEditorSheet } from '@/components/products/StockEditorSheet';
@@ -28,7 +28,8 @@ import { getProducts, getProductStats, getProduct, archiveProduct, unarchiveProd
 import { Product, ProductFilter } from '@/services/productTypes';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { FormInput } from '@/components/BrandthreadUI';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { OptionSheet } from '@/components/ui/OptionSheet';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
@@ -183,30 +184,17 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
   ];
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      presentationStyle="overFullScreen"
-      onRequestClose={closeSheet}
-    >
-      <Pressable style={sh.overlay} onPress={closeSheet} />
-      <SheetRise style={sh.sheet}>
-        <View style={sh.handle} />
-        <Text style={sh.sheetTitle} numberOfLines={1}>{p.name}</Text>
-        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
-          {actions.map((item, idx) => (
-            <PressableScale key={idx} style={sh.actionItem} onPress={item.onPress} accessibilityLabel={`${item.label}, ${p.name}`}>
-              <View style={[sh.actionIcon, { backgroundColor: (item.accent ?? theme.accent) + '18' }]}>
-                <Feather name={item.icon} size={ICON.sm} color={item.accent ?? MUTED} />
-              </View>
-              <Text style={[sh.actionLabel, item.accent ? { color: item.accent } : {}]}>{item.label}</Text>
-              <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
-            </PressableScale>
-          ))}
-        </ScrollView>
-      </SheetRise>
-    </Modal>
+    <Sheet visible={visible} onClose={closeSheet} title={p.name} testID="product-actions-sheet">
+      {actions.map((item, idx) => (
+        <PressableScale key={idx} style={sh.actionItem} onPress={item.onPress} accessibilityLabel={`${item.label}, ${p.name}`}>
+          <View style={[sh.actionIcon, { backgroundColor: (item.accent ?? theme.accent) + '18' }]}>
+            <Feather name={item.icon} size={ICON.sm} color={item.accent ?? MUTED} />
+          </View>
+          <Text style={[sh.actionLabel, item.accent ? { color: item.accent } : {}]}>{item.label}</Text>
+          <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
+        </PressableScale>
+      ))}
+    </Sheet>
   );
 }
 
@@ -231,7 +219,6 @@ interface QuickEditPriceSheetProps {
 
 function QuickEditPriceSheet({ product, visible, onClose, onSaved }: QuickEditPriceSheetProps) {
   const { theme } = useAppTheme();
-  const sh = React.useMemo(() => createSheetStyles(theme), [theme]);
   const [priceInput, setPriceInput] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -261,6 +248,7 @@ function QuickEditPriceSheet({ product, visible, onClose, onSaved }: QuickEditPr
     setSaving(true);
     try {
       await updateProduct(p.id, { pricing: { ...p.pricing, priceCents: newCents } });
+      hapticSuccess();
       closeSheet();
       onSaved(p, newCents, previousCents);
     } catch {
@@ -271,42 +259,44 @@ function QuickEditPriceSheet({ product, visible, onClose, onSaved }: QuickEditPr
   }
 
   return (
-    <Modal
+    <Sheet
       visible={visible}
-      transparent
-      animationType="fade"
-      presentationStyle="overFullScreen"
-      onRequestClose={closeSheet}
+      onClose={closeSheet}
+      title="Edit price"
+      testID="quick-edit-price-sheet"
+      primaryAction={{ label: 'Save price', onPress: handleSave, loading: saving, disabled: saving }}
     >
-      <Pressable style={sh.overlay} onPress={closeSheet} />
-      <SheetRise style={sh.sheet}>
-        <View style={sh.handle} />
-        <Text style={sh.sheetTitle} numberOfLines={1}>Edit price · {p.name}</Text>
-        <Text style={{ fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted, marginBottom: SP.md }}>
-          Current price: {formatCents(p.pricing.priceCents)}
-        </Text>
-        <FormInput
-          label="New price"
-          value={priceInput}
-          onChange={setPriceInput}
-          placeholder="0.00"
-          keyboardType="decimal-pad"
-          returnKeyType="done"
-          onSubmitEditing={handleSave}
-        />
-        <PrimaryButton
-          label="Save price"
-          onPress={handleSave}
-          loading={saving}
-          disabled={saving}
-          style={{ marginTop: SP.lg }}
-        />
-      </SheetRise>
-    </Modal>
+      <Text style={{ fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted, marginBottom: SP.md }} numberOfLines={1}>
+        {p.name} · Current price: {formatCents(p.pricing.priceCents)}
+      </Text>
+      <FormInput
+        label="New price"
+        value={priceInput}
+        onChange={setPriceInput}
+        placeholder="0.00"
+        keyboardType="decimal-pad"
+        returnKeyType="done"
+        onSubmitEditing={handleSave}
+      />
+    </Sheet>
   );
 }
 
-// ─── Filter Modal ─────────────────────────────────────────────────────────────
+// ─── Filter sheet ─────────────────────────────────────────────────────────────
+// A single-choice picker, so it is the shared OptionSheet (Instagram radio
+// list): picking a row applies the filter and closes the sheet.
+
+const FILTER_OPTIONS: { id: ProductFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'active', label: 'Active' },
+  { id: 'draft', label: 'Draft' },
+  { id: 'scheduled', label: 'Scheduled' },
+  { id: 'archived', label: 'Archived' },
+  { id: 'pre-order', label: 'Pre-order' },
+  { id: 'pre-made', label: 'Pre-made' },
+  { id: 'low-stock', label: 'Low stock' },
+  { id: 'out-of-stock', label: 'Out of stock' },
+];
 
 interface FilterModalProps {
   visible: boolean;
@@ -316,68 +306,30 @@ interface FilterModalProps {
 }
 
 function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
-  const { theme } = useAppTheme();
-  const sh = React.useMemo(() => createSheetStyles(theme), [theme]);
-  const PURPLE_LIGHT = theme.accentLight;
-  const [selected, setSelected] = useState<ProductFilter>(current);
-
-  useEffect(() => { setSelected(current); }, [current, visible]);
-
-  const staticChips: { label: string; value: ProductFilter }[] = [
-    { label: 'All',          value: 'all' },
-    { label: 'Active',       value: 'active' },
-    { label: 'Draft',        value: 'draft' },
-    { label: 'Scheduled',    value: 'scheduled' },
-    { label: 'Archived',     value: 'archived' },
-    { label: 'Pre-order',    value: 'pre-order' },
-    { label: 'Pre-made',     value: 'pre-made' },
-    { label: 'Low Stock',    value: 'low-stock' },
-    { label: 'Out of Stock', value: 'out-of-stock' },
-  ];
-
   return (
-    <Modal
+    <OptionSheet
       visible={visible}
-      transparent
-      animationType="fade"
-      presentationStyle="overFullScreen"
-      onRequestClose={onClose}
-    >
-      <Pressable style={sh.overlay} onPress={onClose} />
-      <SheetRise style={[sh.sheet, { paddingBottom: SP.xl }]}>
-        <View style={sh.handle} />
-        <Text style={sh.sheetTitle}>Filter Products</Text>
-        <View style={fm.chips}>
-          {staticChips.map(chip => (
-            <FilterChip
-              key={chip.value}
-              label={chip.label}
-              active={selected === chip.value}
-              onPress={() => setSelected(chip.value)}
-            />
-          ))}
-        </View>
-        <PrimaryButton
-          label="Apply"
-          onPress={() => { onApply(selected); onClose(); }}
-          style={{ marginTop: SP.md, marginHorizontal: SP.md }}
-        />
-      </SheetRise>
-    </Modal>
+      onClose={onClose}
+      title="Filter products"
+      options={FILTER_OPTIONS}
+      selectedId={current}
+      onSelect={(id) => { hapticToggle(); onApply(id as ProductFilter); onClose(); }}
+      testID="product-filter-sheet"
+    />
   );
 }
 
-// ─── Sort Modal ───────────────────────────────────────────────────────────────
+// ─── Sort sheet ───────────────────────────────────────────────────────────────
 
 type SortKey = 'name' | 'price_asc' | 'price_desc' | 'newest' | 'oldest' | 'sales';
 
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: 'newest', label: 'Newest first' },
-  { key: 'oldest', label: 'Oldest first' },
-  { key: 'name', label: 'Name A-Z' },
-  { key: 'price_asc', label: 'Price: low to high' },
-  { key: 'price_desc', label: 'Price: high to low' },
-  { key: 'sales', label: 'Best selling' },
+const SORT_OPTIONS: { id: SortKey; label: string }[] = [
+  { id: 'newest', label: 'Newest first' },
+  { id: 'oldest', label: 'Oldest first' },
+  { id: 'name', label: 'Name A-Z' },
+  { id: 'price_asc', label: 'Price: low to high' },
+  { id: 'price_desc', label: 'Price: high to low' },
+  { id: 'sales', label: 'Best selling' },
 ];
 
 function SortModal({
@@ -388,31 +340,16 @@ function SortModal({
   onSelect: (k: SortKey) => void;
   onClose: () => void;
 }) {
-  const { theme } = useAppTheme();
-  const sh = React.useMemo(() => createSheetStyles(theme), [theme]);
-  const PURPLE_LIGHT = theme.accentLight;
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={sh.overlay} onPress={onClose} />
-      <SheetRise style={sh.sheet}>
-        <View style={sh.handle} />
-        <Text style={sh.sheetTitle}>Sort Products</Text>
-        {SORT_OPTIONS.map(({ key, label }) => (
-          <PressableScale
-            key={key}
-            style={[sh.sortOption, current === key && sh.sortOptionActive]}
-            onPress={() => { hapticToggle(); onSelect(key); onClose(); }}
-            accessibilityLabel={label}
-            accessibilityState={{ selected: current === key }}
-          >
-            <Text style={[sh.sortOptionText, current === key && sh.sortOptionTextActive]}>
-              {label}
-            </Text>
-            {current === key && <Feather name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
-          </PressableScale>
-        ))}
-      </SheetRise>
-    </Modal>
+    <OptionSheet
+      visible={visible}
+      onClose={onClose}
+      title="Sort products"
+      options={SORT_OPTIONS}
+      selectedId={current}
+      onSelect={(id) => { hapticToggle(); onSelect(id as SortKey); onClose(); }}
+      testID="product-sort-sheet"
+    />
   );
 }
 
@@ -689,7 +626,7 @@ export default function ProductsScreen() {
     { label: 'Out of Stock', value: 'out-of-stock' },
   ];
 
-  const currentSortLabel = SORT_OPTIONS.find(o => o.key === sort)?.label ?? 'Sort';
+  const currentSortLabel = SORT_OPTIONS.find(o => o.id === sort)?.label ?? 'Sort';
   // The selected status chip already shows Active/Draft/etc. as selected.
   // Highlight the separate filter control only for choices outside that row.
   const hasActiveFilter = filter !== 'all' && !filterPills.some(pill => pill.value === filter);
@@ -966,40 +903,8 @@ const createStyles = (theme: any) => {
 };
 
 const createSheetStyles = (theme: any) => {
-  const SURFACE = theme.surface, BORDER = theme.border, FG = theme.text, MUTED = theme.muted;
-  const PURPLE_LIGHT = theme.accentLight;
+  const BORDER = theme.border, FG = theme.text;
   return StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.72)',
-  },
-  sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: SURFACE,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    paddingTop: SP.sm,
-    paddingBottom: SP.xxl,
-    paddingHorizontal: SP.md,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: RADIUS.pill,
-    backgroundColor: BORDER,
-    alignSelf: 'center',
-    marginBottom: SP.md,
-  },
-  sheetTitle: {
-    fontSize: FS.md,
-    fontFamily: FONT.bold,
-    color: FG,
-    marginBottom: SP.md,
-    letterSpacing: -0.2,
-  },
   actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1021,33 +926,5 @@ const createSheetStyles = (theme: any) => {
     fontFamily: FONT.medium,
     color: FG,
   },
-  sortOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  sortOptionActive: {},
-  sortOptionText: {
-    fontSize: FS.base,
-    fontFamily: FONT.medium,
-    color: MUTED,
-  },
-  sortOptionTextActive: {
-    color: PURPLE_LIGHT,
-    fontFamily: FONT.semibold,
-  },
   });
 };
-
-const fm = StyleSheet.create({
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SP.sm,
-    paddingHorizontal: SP.xs,
-    marginBottom: SP.sm,
-  },
-});

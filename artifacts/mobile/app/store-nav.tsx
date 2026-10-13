@@ -4,7 +4,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, } from 'react-native';
+  StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,12 +19,13 @@ import {
   GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
+  BrandthreadCard, GradientCard, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
   EmptyState, StatCard, HapticSwitch,} from '@/components/BrandthreadUI';
 import { getMenus, updateMenu } from '@/services/storeService';
 import { StoreMenu, StoreMenuItem, MenuType, MenuItemTarget } from '@/services/storeTypes';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { hapticSuccess } from '@/lib/haptics';
 
 const MENU_TABS: { type: MenuType; label: string }[] = [
   { type: 'main', label: 'Main Menu' },
@@ -160,6 +161,7 @@ export default function StoreNavScreen() {
     try {
       await updateMenu(activeMenu.id, updatedItems);
       await loadMenus();
+      hapticSuccess();
     } catch {
       Alert.alert('Error', 'Failed to save menu item.');
     }
@@ -378,26 +380,14 @@ export default function StoreNavScreen() {
         </View>
       </ScrollView>
 
-      {/* Item Editor Modal */}
-      <Modal
+      {/* Item editor sheet */}
+      <Sheet
         visible={modalVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setModalVisible(false)}
+        onClose={() => setModalVisible(false)}
+        title={isNewItem ? 'Add menu item' : 'Edit menu item'}
+        testID="menu-item-sheet"
+        primaryAction={{ label: 'Save item', onPress: () => { void handleSaveItem(); } }}
       >
-        <View style={styles.modalOverlay}>
-          <SheetRise style={[styles.modalSheet, { paddingBottom: insets.bottom + SP.md }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Menu Item</Text>
-              <TouchableOpacity
-                onPress={() => setModalVisible(false)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Feather name="x" size={ICON.md} color={FG} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {/* Label */}
               <Text style={styles.fieldLabel}>Label *</Text>
               <TextInput
@@ -409,7 +399,7 @@ export default function StoreNavScreen() {
               />
 
               {/* Link type */}
-              <Text style={[styles.fieldLabel, { marginTop: SP.md }]}>Link Type</Text>
+              <Text style={[styles.fieldLabel, { marginTop: SP.md }]}>Link type</Text>
               <View style={styles.chipRow}>
                 {LINK_TARGETS.map((t) => (
                   <FilterChip
@@ -485,17 +475,7 @@ export default function StoreNavScreen() {
                   onValueChange={(v) => setItemForm((p) => ({ ...p, visible: v }))}
                 />
               </View>
-
-              {/* Save */}
-              <PrimaryButton
-                label="Save Item"
-                onPress={handleSaveItem}
-                style={{ marginTop: SP.md }}
-              />
-            </ScrollView>
-          </SheetRise>
-        </View>
-      </Modal>
+      </Sheet>
     </View>
   );
 }
@@ -666,32 +646,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontFamily: FONT.regular,
     color: MUTED,
     lineHeight: 16,
-  },
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.72)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: SURFACE,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: SP.md,
-    maxHeight: '85%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SP.md,
-  },
-  modalTitle: {
-    fontSize: FS.lg,
-    fontFamily: FONT.bold,
-    color: FG,
   },
   fieldLabel: {
     fontSize: FS.sm,

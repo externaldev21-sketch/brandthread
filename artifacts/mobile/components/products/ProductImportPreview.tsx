@@ -1,10 +1,10 @@
 import React from 'react';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { StatusBadge, PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
+import { StatusBadge } from '@/components/BrandthreadUI';
 import type { ImportCommitResult, ImportPreview } from '@/lib/productImportTypes';
 
 type Props = {
@@ -22,7 +22,6 @@ const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { min
 
 export function ProductImportPreview({ visible, preview, result, busy, error, onClose, onCommit, onViewProducts }: Props) {
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   if (!preview && !result) return null;
   const importable = preview ? preview.counts.create + preview.counts.update : 0;
@@ -32,16 +31,22 @@ export function ProductImportPreview({ visible, preview, result, busy, error, on
     : 0;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[s.root, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
-        <View style={s.top}>
-          <Text style={s.title}>{result ? 'Import finished' : 'Review import'}</Text>
-          <TouchableOpacity onPress={onClose} style={s.close} accessibilityRole="button" accessibilityLabel="Close">
-            <Feather name="x" size={18} color={theme.text} />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={result ? 'Import finished' : 'Review import'}
+      testID="product-import-preview"
+      contentContainerStyle={s.scroll}
+      primaryAction={result
+        ? { label: 'View products', onPress: onViewProducts }
+        : {
+          label: toWrite > 0 ? `Import ${toWrite} product${toWrite === 1 ? '' : 's'}` : 'Nothing to import',
+          onPress: onCommit,
+          disabled: toWrite === 0,
+          loading: busy,
+        }}
+      secondaryAction={{ label: result ? 'Done' : 'Cancel', onPress: onClose, variant: 'secondary' }}
+    >
           {result ? (
             <>
               <View style={s.tiles}>
@@ -120,30 +125,7 @@ export function ProductImportPreview({ visible, preview, result, busy, error, on
             </>
           ) : null}
           {error ? <Text style={s.error}>{error}</Text> : null}
-        </ScrollView>
-
-        <View style={s.footer}>
-          {result ? (
-            <>
-              <PrimaryButton label="View products" onPress={onViewProducts} style={s.btn} />
-              <SecondaryButton label="Done" onPress={onClose} style={s.btn} />
-            </>
-          ) : busy ? (
-            <View style={s.busy}><ActivityIndicator color={theme.text} /><Text style={s.muted}>Importing…</Text></View>
-          ) : (
-            <>
-              <PrimaryButton
-                label={toWrite > 0 ? `Import ${toWrite} product${toWrite === 1 ? '' : 's'}` : 'Nothing to import'}
-                onPress={onCommit}
-                disabled={toWrite === 0}
-                style={s.btn}
-              />
-              <SecondaryButton label="Cancel" onPress={onClose} style={s.btn} />
-            </>
-          )}
-        </View>
-      </View>
-    </Modal>
+    </Sheet>
   );
 }
 
@@ -157,11 +139,7 @@ function Tile({ s, label, value }: { s: ReturnType<typeof makeStyles>; label: st
 }
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: theme.background },
-  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.sm },
-  title: { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.3 },
-  close: { width: 44, height: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center' },
-  scroll: { paddingHorizontal: SP.md, paddingBottom: SP.lg, gap: SP.sm },
+  scroll: { gap: SP.sm },
   badgeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   tiles: { flexDirection: 'row', gap: SP.xs },
   tile: { flex: 1, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, borderRadius: RADIUS.sm, paddingVertical: SP.sm, alignItems: 'center' },
@@ -177,7 +155,4 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   sample: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, borderRadius: RADIUS.sm, padding: SP.sm },
   sampleName: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
   error: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 20 },
-  footer: { paddingHorizontal: SP.md, paddingTop: SP.sm, gap: SP.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
-  btn: { width: '100%' },
-  busy: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingVertical: SP.md },
 });
