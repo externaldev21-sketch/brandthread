@@ -11,6 +11,8 @@ import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/layout';
 import { FONT, FS } from '@/lib/theme';
 import type { DiscoverPost } from '@/lib/discoverFeed';
+import { formatVideoDuration } from '@/lib/discoverFormat';
+import { TABULAR_NUMS } from '@/constants/typography';
 
 export function DiscoverTileView({
   post, width, height, onPress, onLongPress,
@@ -54,8 +56,11 @@ export function DiscoverTileView({
         </View>
       )}
       {post.media === 'video' && (
-        <View style={styles.glyphWrap}>
+        <View style={[styles.glyphWrap, styles.videoGlyph]}>
           <Feather name="play" size={13} color="#FFFFFF" />
+          {!!formatVideoDuration(post.durationSec) && (
+            <Text style={[styles.duration, TABULAR_NUMS]}>{formatVideoDuration(post.durationSec)}</Text>
+          )}
         </View>
       )}
       {post.media === 'slideshow' && (
@@ -77,4 +82,6 @@ const styles = StyleSheet.create({
   fallbackInitials: { color: '#FFFFFF99', fontFamily: FONT.bold, fontSize: FS.md },
   fallbackCaption: { color: '#FFFFFF66', fontFamily: FONT.regular, fontSize: 11, textAlign: 'center' },
   glyphWrap: { position: 'absolute', top: 6, right: 6 },
+  videoGlyph: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  duration: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 11 },
 });

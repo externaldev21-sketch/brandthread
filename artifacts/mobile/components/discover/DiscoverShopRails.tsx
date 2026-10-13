@@ -14,11 +14,16 @@ import { EditorialTile, type EditorialTileItem } from './EditorialTile';
 import { SP, FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { lowestPriceCents, initialsOf, type DiscoveryCategory } from '@/lib/discoveryShelves';
+import { DiscoverSectionHeader } from './DiscoverSectionHeader';
 
 const CATEGORY_TILE = 112;
 
-export function ShelfHeader({ title, onSeeAll, padded = true }: { title: string; onSeeAll?: () => void; padded?: boolean }) {
+export function ShelfHeader({ title, onSeeAll, padded = true, discoverHeader = false }: { title: string; onSeeAll?: () => void; padded?: boolean; discoverHeader?: boolean }) {
   const { theme } = useAppTheme();
+  // Discover's one section-header style; Search keeps its own smaller header.
+  if (discoverHeader) {
+    return <DiscoverSectionHeader title={title} onSeeAll={onSeeAll} style={padded ? { paddingHorizontal: SP.md } : undefined} />;
+  }
   return (
     <View style={[styles.header, padded && { paddingHorizontal: SP.md }]}>
       <Text style={[TYPE_SCALE.headline, { color: theme.text }]}>{title}</Text>
@@ -35,13 +40,13 @@ export function openCategory(router: ReturnType<typeof useRouter>, c: { slug: st
   router.push(`/buyer-category?slug=${encodeURIComponent(c.slug)}&label=${encodeURIComponent(c.label)}` as never);
 }
 
-export function ShopByCategoryRail({ categories, padded = true }: { categories: DiscoveryCategory[]; padded?: boolean }) {
+export function ShopByCategoryRail({ categories, padded = true, discoverHeader = false }: { categories: DiscoveryCategory[]; padded?: boolean; discoverHeader?: boolean }) {
   const router = useRouter();
   const { theme } = useAppTheme();
   if (categories.length === 0) return null;
   return (
     <View style={{ marginVertical: SP.md }}>
-      <ShelfHeader title="Shop by category" padded={padded} />
+      <ShelfHeader title="Shop by category" padded={padded} discoverHeader={discoverHeader} />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -77,7 +82,7 @@ export function TrendingProductsRail({ products, onSeeAll }: { products: any[]; 
   if (products.length === 0) return null;
   return (
     <View style={{ marginVertical: SP.md }}>
-      <ShelfHeader title="Trending products" onSeeAll={onSeeAll} />
+      <ShelfHeader title="Trending products" onSeeAll={onSeeAll} discoverHeader />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
