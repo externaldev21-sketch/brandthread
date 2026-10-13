@@ -28,6 +28,11 @@
  *
  * --stress lengthens product/brand/user names and inflates counts in the
  * fake API's responses, so long names and big numbers are exercised.
+ *
+ * Sheets and modals: a route may carry taps after " >> " — e.g.
+ *   "/buyer-product-detail?productId=prod_nl_hoodie_ember >> Select options"
+ * opens the screen, taps the element whose text or accessibility label is
+ * "Select options", and audits what is on screen after the last tap.
  */
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -43,6 +48,7 @@ import {
   waitForQuietNetwork,
 } from './store-screenshots/harness.mjs';
 import { ensureDemoImages } from './store-screenshots/demo-images.mjs';
+import { respond } from './store-screenshots/demo-data.mjs';
 
 const args = process.argv.slice(2);
 const flag = (n) => args.includes(n);
@@ -241,7 +247,8 @@ function scrollAllToEnd() {
   return n;
 }
 
-async function auditRoute(browser, origin, images, route, sizeId, dynamicType) {
+async function auditRoute(browser, origin, images, spec, sizeId, dynamicType) {
+  const [route, ...taps] = spec.split(' >> ').map((x) => x.trim());
   const size = SIZES[sizeId];
   const device = { viewport: size, scale: 2, isMobile: true, userAgent: UA };
   const { context, page, activity } = await openContext(browser, { device, role, origin, images });
@@ -249,15 +256,22 @@ async function auditRoute(browser, origin, images, route, sizeId, dynamicType) {
   const out = [];
   try {
     if (stress) {
+      // Registered after the harness's own handler, so it runs first: answer
+      // demo-API calls from the same fake data, with names lengthened and
+      // counts inflated.
       await context.route('https://api.brandthread.test/**', async (r) => {
-        const response = await r.fetch().catch(() => null);
-        if (!response) return r.fallback();
-        try {
-          const json = await response.json();
-          return r.fulfill({ response, body: JSON.stringify(stressBody(json)) });
-        } catch {
-          return r.fulfill({ response });
-        }
+        const request = r.request();
+        if (request.method() === 'OPTIONS') return r.fallback();
+        const url = new URL(request.url());
+        const body = respond({ method: request.method(), path: url.pathname, query: url.searchParams, role, options: {} });
+        if (body === undefined) return r.fallback();
+        activity.lastApiAt = Date.now();
+        return r.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: { 'access-control-allow-origin': origin, 'access-control-allow-credentials': 'true' },
+          body: JSON.stringify(stressBody(body)),
+        });
       });
     }
     await openScreen(page, activity, origin, role, route);
@@ -268,11 +282,16 @@ async function auditRoute(browser, origin, images, route, sizeId, dynamicType) {
     }
     await waitForQuietNetwork(activity, 600, 8000);
     await waitForImages(page, 5000);
+    for (const tap of taps) {
+      const target = page.getByText(tap, { exact: true }).or(page.getByLabel(tap, { exact: true })).first();
+      await target.click({ timeout: 5000 });
+      await page.waitForTimeout(900);
+    }
     if (dynamicType) {
       await page.evaluate(applyDynamicType, DYNAMIC_TYPE_SCALE);
       await page.waitForTimeout(300);
     }
-    const base = shotsDir ? path.join(shotsDir, `${route.replace(/\W+/g, '_') || 'root'}__${tag}`) : null;
+    const base = shotsDir ? path.join(shotsDir, `${spec.replace(/\W+/g, '_') || 'root'}__${tag}`) : null;
     if (base) await page.screenshot({ path: `${base}__top.png` });
     out.push(...(await page.evaluate(inPageCheck, 'top')));
     const scrolled = await page.evaluate(scrollAllToEnd);
@@ -295,11 +314,11 @@ async function auditRoute(browser, origin, images, route, sizeId, dynamicType) {
       seen.add(k);
       return true;
     })
-    .map((f) => ({ route, size: tag, ...f }));
+    .map((f) => ({ route: spec, size: tag, ...f }));
 }
 
 async function main() {
-  const routes = val('--routes', null)?.split(',').filter(Boolean) ?? staticRoutes();
+  const routes = val('--routes', null)?.split(/,(?=\s*\/)/).filter(Boolean) ?? staticRoutes();
   if (!flag('--skip-build') || !existsSync(path.join(DEFAULT_BUILD_DIR, 'index.html'))) buildPreviewWeb();
   const { origin, close } = await serveBuild(DEFAULT_BUILD_DIR);
   const browser = await launchBrowser();
