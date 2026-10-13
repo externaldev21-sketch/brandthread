@@ -142,6 +142,8 @@ async function buildBuyerPosts(
   limit: number,
   offset: number,
   postId?: string,
+  /** Profile grid only: pinned posts first (most recently pinned first). */
+  pinnedFirst = false,
 ) {
   if (authorIds.length === 0) return [];
   const pageRows = await db.select({
@@ -157,6 +159,7 @@ async function buildBuyerPosts(
     styleTags: posts.styleTags,
     postStatus: posts.postStatus,
     createdAt: posts.createdAt,
+    pinnedAt: posts.pinnedAt,
     name: users.name,
     displayName: users.displayName,
     username: users.username,
@@ -177,7 +180,7 @@ async function buildBuyerPosts(
       notBlockedWith(viewerId, posts.userId),
       ...(postId ? [eq(posts.id, postId)] : []),
     ))
-    .orderBy(desc(posts.createdAt))
+    .orderBy(...(pinnedFirst ? [sql`${posts.pinnedAt} DESC NULLS LAST`] : []), desc(posts.createdAt))
     .limit(limit)
     .offset(offset);
 
@@ -246,6 +249,7 @@ async function buildBuyerPosts(
       isDraft: row.postStatus === "draft",
       createdAt: row.createdAt,
       updatedAt: row.createdAt,
+      pinnedAt: row.pinnedAt ?? null,
     };
   });
   return attachQuoteData(mapped, viewerId);
@@ -660,7 +664,7 @@ router.get("/profile/:userId/posts", async (req, res) => {
       res.status(403).json({ error: "Posts are available to friends only" }); return;
     }
   }
-  res.json(await buildBuyerPosts(myId, [other], limit, offset));
+  res.json(await buildBuyerPosts(myId, [other], limit, offset, undefined, true));
 });
 
 // ─── GET /api/social/profile/:userId/tagged ──────────────────────────────────

@@ -673,6 +673,8 @@ export const posts = pgTable('posts', {
   // stays 'quote' so readers can tell "original gone" from "not a quote".
   quotedPostId: uuid('quoted_post_id'),
   repostKind: text('repost_kind'), // null | 'quote'
+  /** Pinned to the top of the author's profile grid (max 3; migration 301). */
+  pinnedAt: timestamp('pinned_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -684,6 +686,9 @@ export const posts = pgTable('posts', {
   createdPublishedIdx: index('posts_created_published_idx')
     .on(table.createdAt)
     .where(sql`${table.postStatus} = 'published'`),
+  userPinnedIdx: index('posts_user_pinned_idx')
+    .on(table.userId, table.pinnedAt.desc())
+    .where(sql`${table.pinnedAt} IS NOT NULL`),
 }));
 
 // ─── Interactions ─────────────────────────────────────────────────────────────

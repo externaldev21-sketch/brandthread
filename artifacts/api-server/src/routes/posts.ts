@@ -1441,6 +1441,55 @@ router.post("/:id/publish-now", requireAuth, async (req, res) => {
   return res.json((await postDetails([updated]))[0]);
 });
 
+// ─── Pinned posts (Instagram "Pin to your profile") ──────────────────────────
+// POST   /api/posts/:id/pin — owner pins a published post to the top of their
+//   profile grid (most recently pinned first). At most MAX_PINNED_POSTS.
+// DELETE /api/posts/:id/pin — owner unpins it. Both are idempotent.
+export const MAX_PINNED_POSTS = 3;
+
+router.post("/:id/pin", requireAuth, async (req, res) => {
+  const ctx = await loadOwnedPost(req, res);
+  if (!ctx) return;
+  const { clerkId, existing } = ctx;
+  if (existing.postStatus !== "published") {
+    return res.status(409).json({ error: "Only published posts can be pinned.", code: "POST_NOT_PINNABLE" });
+  }
+  if (existing.pinnedAt) return res.json({ id: existing.id, pinnedAt: existing.pinnedAt });
+  const result = await db.transaction(async (tx) => {
+    // Serialise pins per author so two quick taps can't exceed the limit.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`post-pin:${clerkId}`}))`);
+    const [{ n }] = await tx.select({ n: count() }).from(posts).where(and(
+      eq(posts.userId, clerkId),
+      sql`${posts.pinnedAt} IS NOT NULL`,
+      eq(posts.postStatus, "published"),
+      sql`${posts.id} <> ${existing.id}`,
+    ));
+    if (Number(n) >= MAX_PINNED_POSTS) return null;
+    const [updated] = await tx.update(posts)
+      .set({ pinnedAt: new Date() })
+      .where(and(eq(posts.id, existing.id), eq(posts.userId, clerkId)))
+      .returning({ id: posts.id, pinnedAt: posts.pinnedAt });
+    return updated ?? null;
+  });
+  if (!result) {
+    return res.status(409).json({
+      error: `You can pin up to ${MAX_PINNED_POSTS} posts. Unpin one to pin this post.`,
+      code: "PIN_LIMIT_REACHED",
+      limit: MAX_PINNED_POSTS,
+    });
+  }
+  return res.json(result);
+});
+
+router.delete("/:id/pin", requireAuth, async (req, res) => {
+  const ctx = await loadOwnedPost(req, res);
+  if (!ctx) return;
+  const { clerkId, existing } = ctx;
+  await db.update(posts).set({ pinnedAt: null })
+    .where(and(eq(posts.id, existing.id), eq(posts.userId, clerkId)));
+  return res.json({ id: existing.id, pinnedAt: null });
+});
+
 // ─── DELETE /api/posts/:id ───────────────────────────────────────────────────
 router.delete("/:id", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;

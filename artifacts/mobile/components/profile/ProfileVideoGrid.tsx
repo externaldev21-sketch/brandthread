@@ -6,6 +6,7 @@ import React, { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/layout';
@@ -32,6 +33,8 @@ export interface ProfileGridItem {
   slideCount?: number;
   /** Owner-only lifecycle label, e.g. Draft / Scheduled. */
   statusLabel?: string;
+  /** Pinned to the top of the profile (Instagram's pin glyph, top-right). */
+  pinned?: boolean;
 }
 
 function kindOf(type: string | undefined): ProfileGridItem['kind'] {
@@ -57,6 +60,7 @@ export function gridItemFromThreadPost(post: SellerThreadPost): ProfileGridItem 
     slideCount: post.slides?.length ?? (post.mediaUris?.length > 1 ? post.mediaUris.length : undefined),
     surface: post.surface,
     statusLabel,
+    pinned: !!post.pinnedAt,
   };
 }
 
@@ -71,12 +75,14 @@ export function gridItemFromBuyerPost(post: BuyerPost): ProfileGridItem {
     caption: post.caption ?? '',
     likesCount: post.likesCount,
     productCount: 0,
+    pinned: !!post.pinnedAt,
   };
 }
 
 function tileLabel(item: ProfileGridItem): string {
   const noun = item.kind === 'video' ? 'video' : item.kind === 'slideshow' ? 'slideshow' : 'photo';
   const parts = [`Play ${noun}`];
+  if (item.pinned) parts.push('Pinned');
   if (typeof item.viewsCount === 'number') parts.push(`${formatCompactCount(item.viewsCount)} views`);
   if (item.productCount > 0) parts.push(`${item.productCount} product${item.productCount === 1 ? '' : 's'} tagged`);
   if (item.statusLabel) parts.push(item.statusLabel);
@@ -146,7 +152,11 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
               colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.72)']} // theme-exempt: legibility scrim over media
               style={styles.scrim}
             />
-            {(item.slideCount ?? 0) > 1 || item.kind !== 'video' ? (
+            {item.pinned ? (
+              <View style={styles.kindBadge} pointerEvents="none" testID={`profile-video-tile-pinned-${item.id}`}>
+                <MaterialCommunityIcons name="pin" size={12} color="#FFFFFF" /* theme-exempt: over media */ />
+              </View>
+            ) : (item.slideCount ?? 0) > 1 || item.kind !== 'video' ? (
               <View style={styles.kindBadge} pointerEvents="none">
                 <Feather name={(item.slideCount ?? 0) > 1 || item.kind === 'slideshow' ? 'layers' : 'image'} size={11} color="#FFFFFF" /* theme-exempt: over media */ />
               </View>
