@@ -162,6 +162,7 @@ import affiliateCreatorRouter from "./affiliate-creator";
 import sellerAffiliateRouter from "./seller-affiliate";
 import growthRouter from "./growth";
 import { publicProductFeedRouter, sellerProductFeedRouter } from "./product-feed";
+import { trackedLinkRedirect } from "./growthPublic";
 import sellerPushBroadcastsRouter from "./seller-push-broadcasts";
 import { sellerGiveawaysRouter, publicGiveawaysRouter } from "./giveaways";
 
@@ -173,6 +174,9 @@ router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
 router.use("/public/feeds",     publicProductFeedRouter); // secret-token Meta / TikTok catalog CSV feeds (public data only)
+// Tracked short links under /api too: on brandthread.app only /api/* reaches this
+// server, so printed QR stickers encode /api/l/:code (same handler as /l/:code).
+router.get("/l/:code",         trackedLinkRedirect);
 router.use("/public",          emailMarketingPublicRouter); // /stores/:slug/subscribe, /email/unsubscribe/:token
 router.use("/access",          accessRouter); // invite-only launch: validate/waitlist public, status/redeem authed
 router.use("/public/featured", featuredPublicRouter); // admin-curated Discover picks
