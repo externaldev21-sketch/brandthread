@@ -15,6 +15,7 @@
  * Buyer posts are friends-only (mutual follows), exactly as the API enforces;
  * a non-friend sees a clear locked state instead of an empty grid.
  */
+import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, Text, Alert, StyleSheet, Modal, Pressable, Platform, Share } from 'react-native';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -399,7 +400,8 @@ export default function BuyerOtherProfileScreen() {
               accessibilityLabel="Send Thread Cash"
               style={[styles.chip, { borderColor: `${theme.accent}66`, backgroundColor: theme.cardGlass }]}
             >
-              <Feather name="dollar-sign" size={11} color={theme.accent} />
+              {/* Item 149: Thread Cash is always its bill mark, never a "$" glyph. */}
+              <ThreadCashBillIcon size={14} />
               <Text style={[styles.chipText, { color: theme.accent }]}>Thread Cash</Text>
             </PressableScale>
           )}

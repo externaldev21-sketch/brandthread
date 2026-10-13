@@ -1,37 +1,31 @@
 /**
- * Global "money burst" celebration, played whenever the current user
- * RECEIVES Thread Cash (a chat payment lands, a blast/gift is received, or
- * the daily active-time reward claims). Mounted once at the app root;
- * anywhere in the app calls `celebrateThreadCash({ amount, from })` via the
+ * "Thread Cash received" toast, shown whenever the current user RECEIVES
+ * Thread Cash (a chat payment lands, a blast/gift is received, or the daily
+ * active-time reward claims). Mounted once at the app root; anywhere in the
+ * app calls `celebrateThreadCash({ amount, from })` via the
  * `useCelebrateThreadCash()` hook.
  *
  * Small and notification-shaped, anchored under the notch — never a
- * full-screen takeover. A burst of little Thread Cash bills + green
- * metallic confetti flips and flutters in 3D, falls with gravity, and fades
- * by ~2s; a compact pill toast (coin + amount + sender) overshoots in,
- * holds, then slides back up. Runs entirely on the UI thread via reanimated
- * worklets so it stays smooth alongside whatever else is on screen, and
- * never intercepts touches.
+ * full-screen takeover: a compact pill (bill icon + amount + sender) fades
+ * in, holds, then slides back up, with a success haptic. Item 148: the bill
+ * + confetti burst that used to play with it is gone; the toast is the
+ * signal, and the seller swipe glow stays the app's only "wow" effect.
  */
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Image, Platform, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Platform, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
-  cancelAnimation,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
-  withSequence,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticSuccess } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
-import { ThreadCashBillIcon, THREAD_CASH_GREEN_DEEP, THREAD_CASH_GREEN_MID } from './ThreadCashBill';
+import { ThreadCashBillIcon } from './ThreadCashBill';
 
 export type CelebrateThreadCashPayload = {
   /** Cents received. */
@@ -71,149 +65,18 @@ function topInset(insetsTop: number): number {
   return Platform.OS === 'web' ? Math.max(insetsTop, 54) : insetsTop + 6;
 }
 
-const PARTICLE_COUNT = 48;
-const BURST_DURATION_MS = 2000;
 const TOAST_HOLD_MS = 1400;
-
-type ParticleKind = 'bill' | 'square' | 'ribbon';
-
-type ParticleSpec = {
-  kind: ParticleKind;
-  size: number;
-  color: string;
-  angle: number; // launch direction, radians
-  speed: number; // px/s-ish outward impulse
-  spinX: number;
-  spinY: number;
-  spinZ: number;
-  driftX: number;
-  delay: number;
-};
-
-const CONFETTI_COLORS = [THREAD_CASH_GREEN_DEEP, THREAD_CASH_GREEN_MID, '#8FE39B', '#155C22', '#2FA33F'];
-
-function buildParticles(seed: number): ParticleSpec[] {
-  const particles: ParticleSpec[] = [];
-  for (let i = 0; i < PARTICLE_COUNT; i++) {
-    // Deterministic-ish pseudo-random spread using the index + seed so each
-    // burst still looks organic without pulling in a random-number dep.
-    const r = (n: number) => {
-      const x = Math.sin(seed * 999 + i * 37.13 + n * 7.77) * 10000;
-      return x - Math.floor(x);
-    };
-    const kindRoll = r(1);
-    const kind: ParticleKind = kindRoll < 0.32 ? 'bill' : kindRoll < 0.68 ? 'square' : 'ribbon';
-    const angle = (-Math.PI / 2) + (r(2) - 0.5) * Math.PI * 1.15; // mostly upward/outward
-    particles.push({
-      kind,
-      size: kind === 'bill' ? 18 + r(3) * 22 : 6 + r(3) * 8,
-      color: CONFETTI_COLORS[Math.floor(r(4) * CONFETTI_COLORS.length)],
-      angle,
-      speed: 160 + r(5) * 220,
-      spinX: (r(6) - 0.5) * 900,
-      spinY: (r(7) - 0.5) * 900,
-      spinZ: (r(8) - 0.5) * 720,
-      driftX: (r(9) - 0.5) * 90,
-      delay: r(10) * 90,
-    });
-  }
-  return particles;
-}
-
-function Particle({ spec }: { spec: ParticleSpec }) {
-  const progress = useSharedValue(0);
-
-  React.useEffect(() => {
-    progress.value = withDelay(
-      spec.delay,
-      withTiming(1, { duration: BURST_DURATION_MS - spec.delay, easing: Easing.out(Easing.cubic) }),
-    );
-    return () => cancelAnimation(progress);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const style = useAnimatedStyle(() => {
-    const t = progress.value;
-    // Outward ballistic launch, then gravity pulls it down; horizontal drift
-    // layered on top so pieces flutter rather than fly in a straight line.
-    const outX = Math.cos(spec.angle) * spec.speed * t;
-    const outY = Math.sin(spec.angle) * spec.speed * t;
-    const gravity = 520 * t * t;
-    const drift = Math.sin(t * Math.PI * 2.2) * spec.driftX * t;
-    const translateX = outX + drift;
-    const translateY = outY + gravity;
-    const opacity = t < 0.75 ? 1 : Math.max(0, 1 - (t - 0.75) / 0.25);
-    const scale = t < 0.12 ? t / 0.12 : 1;
-
-    return {
-      opacity,
-      transform: [
-        { translateX },
-        { translateY },
-        { scale },
-        { perspective: 400 },
-        { rotateX: `${spec.spinX * t}deg` },
-        { rotateY: `${spec.spinY * t}deg` },
-        { rotateZ: `${spec.spinZ * t}deg` },
-      ],
-    };
-  });
-
-  if (spec.kind === 'bill') {
-    return (
-      <Animated.View style={[styles.particle, style]}>
-        <MiniBill size={spec.size} />
-      </Animated.View>
-    );
-  }
-  if (spec.kind === 'ribbon') {
-    return (
-      <Animated.View
-        style={[
-          styles.particle,
-          style,
-          { width: spec.size * 0.45, height: spec.size * 2.2, borderRadius: spec.size * 0.25, backgroundColor: spec.color },
-        ]}
-      />
-    );
-  }
-  return (
-    <Animated.View
-      style={[styles.particle, style, { width: spec.size, height: spec.size, backgroundColor: spec.color, borderRadius: 2 }]}
-    />
-  );
-}
-
-// Falls back to `1` outside Metro (see ThreadCashBill.tsx for why).
-let BILL_SPRITE_SOURCE: number = 1;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  BILL_SPRITE_SOURCE = require('../../assets/thread-cash/thread-cash-bill.png');
-} catch {
-  // Non-Metro test environment.
-}
-
-/** The real bill art as a burst particle sprite, cheap enough for ~15 on screen at once. */
-function MiniBill({ size }: { size: number }) {
-  const w = size;
-  const h = size * (510 / 1200);
-  return (
-    <Image source={BILL_SPRITE_SOURCE} style={{ width: w, height: h }} resizeMode="contain" />
-  );
-}
 
 function BurstToast({ event, onDone }: { event: CelebrationEvent; onDone: () => void }) {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
-  const scale = useSharedValue(0.5);
+  const scale = useSharedValue(0.96);
   const translateY = useSharedValue(0);
   const opacity = useSharedValue(1);
 
   React.useEffect(() => {
-    scale.value = withSequence(
-      withSpring(1.08, { damping: 9, stiffness: 260 }),
-      withSpring(1, { damping: 14, stiffness: 260 }),
-    );
+    // Plain ease-in, no overshoot: the toast arriving is the information.
+    scale.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
     const timer = setTimeout(() => {
       translateY.value = withTiming(-40, { duration: 260, easing: Easing.in(Easing.cubic) });
       opacity.value = withTiming(0, { duration: 220 }, (finished) => {
@@ -248,29 +111,7 @@ function BurstToast({ event, onDone }: { event: CelebrationEvent; onDone: () => 
   );
 }
 
-function BurstLayer({ event, onDone }: { event: CelebrationEvent; onDone: () => void }) {
-  const insets = useSafeAreaInsets();
-  const particles = useMemo(() => buildParticles(event.id), [event.id]);
-
-  React.useEffect(() => {
-    const timer = setTimeout(onDone, BURST_DURATION_MS + 150);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event.id]);
-
-  return (
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.overlay]}>
-      <View style={[styles.origin, { top: topInset(insets.top) + 18 }]}>
-        {particles.map((spec, i) => (
-          <Particle key={i} spec={spec} />
-        ))}
-      </View>
-    </View>
-  );
-}
-
 export function CelebrationHost({ children }: { children: React.ReactNode }) {
-  const [burst, setBurst] = useState<CelebrationEvent | null>(null);
   const [toast, setToast] = useState<CelebrationEvent | null>(null);
   const reduceMotionRef = useRef(false);
   const idRef = useRef(0);
@@ -289,13 +130,10 @@ export function CelebrationHost({ children }: { children: React.ReactNode }) {
   const celebrateThreadCash = useCallback((payload: CelebrateThreadCashPayload) => {
     const event: CelebrationEvent = { ...payload, id: ++idRef.current };
     setToast(event);
-    if (!reduceMotionRef.current) {
-      setBurst(event);
-      // hapticSuccess() is itself a safe no-op on web (expo-haptics falls
-      // back to the Vibration API / a switch-click trick there), so the
-      // `Platform.OS !== 'web'` guard this used to need is gone.
-      hapticSuccess();
-    }
+    // Item 148: the toast says money arrived; the bill + confetti burst that
+    // used to play with it was decoration and is gone (the seller swipe glow
+    // is the app's only "wow" effect).
+    if (!reduceMotionRef.current) hapticSuccess();
   }, []);
 
   const value = useMemo(() => ({ celebrateThreadCash }), [celebrateThreadCash]);
@@ -303,16 +141,12 @@ export function CelebrationHost({ children }: { children: React.ReactNode }) {
   return (
     <CelebrationContext.Provider value={value}>
       {children}
-      {burst && <BurstLayer event={burst} onDone={() => setBurst(null)} />}
       {toast && <BurstToast event={toast} onDone={() => setToast(null)} />}
     </CelebrationContext.Provider>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { zIndex: 9998, elevation: 9998 },
-  origin: { position: 'absolute', left: '50%', width: 1, height: 1, alignItems: 'center' },
-  particle: { position: 'absolute' },
   toast: {
     position: 'absolute',
     alignSelf: 'center',
