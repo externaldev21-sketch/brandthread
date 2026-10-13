@@ -18,6 +18,7 @@ import {
   defaultFulfillmentDeadline, failDrop, validateFulfillmentDeadline,
 } from "../lib/money/dropLifecycle";
 import { maybeCompleteDrop } from "../lib/money/escrow";
+import { MAX_EARLY_ACCESS_MINUTES, isValidEarlyAccessMinutes } from "../lib/money/dropLaunch";
 
 const router = Router();
 router.use(requireAuth);
@@ -34,6 +35,7 @@ const dropFields = {
   heroVideoUrl: drops.heroVideoUrl,
   launchTimezone: drops.launchTimezone,
   earlyAccessMinutes: drops.earlyAccessMinutes,
+  membersOnly: drops.membersOnly,
   scheduledBroadcastAt: drops.scheduledBroadcastAt,
   estimatedShipDate: drops.estimatedShipDate,
   totalCollectedCents: drops.totalCollectedCents,
@@ -85,7 +87,7 @@ router.post("/", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const {
     name, type, estimatedShipDate, estimatedPayoutDate, fulfillmentDeadlineAt,
-    releaseAt, endsAt, heroImageUrl, heroVideoUrl, launchTimezone, earlyAccessMinutes,
+    releaseAt, endsAt, heroImageUrl, heroVideoUrl, launchTimezone, earlyAccessMinutes, membersOnly,
   } = req.body;
   if (!name || typeof name !== "string") { res.status(400).json({ error: "name required" }); return; }
   if (!["pre-order", "pre-made"].includes(type)) {
@@ -106,8 +108,11 @@ router.post("/", requireRole("manager"), async (req, res) => {
   if (parsedReleaseAt && parsedEndsAt && parsedEndsAt.valueOf() <= parsedReleaseAt.valueOf()) {
     res.status(400).json({ error: "endsAt must be after releaseAt" }); return;
   }
-  if (earlyAccessMinutes !== undefined && (!Number.isInteger(earlyAccessMinutes) || earlyAccessMinutes < 0)) {
-    res.status(400).json({ error: "earlyAccessMinutes must be a non-negative integer" }); return;
+  if (earlyAccessMinutes !== undefined && !isValidEarlyAccessMinutes(earlyAccessMinutes)) {
+    res.status(400).json({ error: `earlyAccessMinutes must be a whole number from 0 to ${MAX_EARLY_ACCESS_MINUTES}` }); return;
+  }
+  if (membersOnly !== undefined && typeof membersOnly !== "boolean") {
+    res.status(400).json({ error: "membersOnly must be a boolean" }); return;
   }
   // Pre-order money is held by Brandthread until each order ships, and is
   // refunded automatically if unshipped orders remain after the deadline.
@@ -135,6 +140,7 @@ router.post("/", requireRole("manager"), async (req, res) => {
     ...(typeof heroVideoUrl === "string" && { heroVideoUrl }),
     ...(typeof launchTimezone === "string" && launchTimezone && { launchTimezone }),
     ...(earlyAccessMinutes !== undefined && { earlyAccessMinutes }),
+    ...(membersOnly !== undefined && { membersOnly }),
     ...(type === "pre-order" ? { escrowState: "collecting", fulfillmentDeadlineAt: deadline } : {}),
   }).returning();
   res.status(201).json(drop);
@@ -197,7 +203,7 @@ router.patch("/:id", requireRole("manager"), async (req, res) => {
   const {
     name, status, mfgProgress, estimatedShipDate,
     scheduledBroadcastAt, fulfillmentDeadlineAt,
-    releaseAt, endsAt, heroImageUrl, heroVideoUrl, launchTimezone, earlyAccessMinutes,
+    releaseAt, endsAt, heroImageUrl, heroVideoUrl, launchTimezone, earlyAccessMinutes, membersOnly,
   } = req.body;
   const scheduleWasProvided = Object.prototype.hasOwnProperty.call(req.body, "scheduledBroadcastAt");
 
@@ -223,8 +229,11 @@ router.patch("/:id", requireRole("manager"), async (req, res) => {
       res.status(400).json({ error: "endsAt must be a valid ISO date" }); return;
     }
   }
-  if (earlyAccessMinutes !== undefined && (!Number.isInteger(earlyAccessMinutes) || earlyAccessMinutes < 0)) {
-    res.status(400).json({ error: "earlyAccessMinutes must be a non-negative integer" }); return;
+  if (earlyAccessMinutes !== undefined && !isValidEarlyAccessMinutes(earlyAccessMinutes)) {
+    res.status(400).json({ error: `earlyAccessMinutes must be a whole number from 0 to ${MAX_EARLY_ACCESS_MINUTES}` }); return;
+  }
+  if (membersOnly !== undefined && typeof membersOnly !== "boolean") {
+    res.status(400).json({ error: "membersOnly must be a boolean" }); return;
   }
 
   const [currentDrop] = await db.select({
@@ -232,10 +241,14 @@ router.patch("/:id", requireRole("manager"), async (req, res) => {
     status: drops.status,
     releaseAt: drops.releaseAt,
     escrowState: drops.escrowState,
+    earlyAccessMinutes: drops.earlyAccessMinutes,
   }).from(drops)
     .where(and(eq(drops.id, req.params.id), eq(drops.ownerId, ownerId)))
     .limit(1);
   if (!currentDrop) { res.status(404).json({ error: "Not found" }); return; }
+  const earlyAccessWindowMoved =
+    (!!parsedReleaseAt && parsedReleaseAt.getTime() !== currentDrop.releaseAt?.getTime()) ||
+    (earlyAccessMinutes !== undefined && earlyAccessMinutes !== currentDrop.earlyAccessMinutes);
 
   let deadline: Date | undefined;
   if (fulfillmentDeadlineAt !== undefined) {
@@ -306,6 +319,9 @@ router.patch("/:id", requireRole("manager"), async (req, res) => {
       ...(typeof heroVideoUrl === "string" && { heroVideoUrl }),
       ...(typeof launchTimezone === "string" && launchTimezone && { launchTimezone }),
       ...(earlyAccessMinutes !== undefined && { earlyAccessMinutes }),
+      ...(membersOnly !== undefined && { membersOnly }),
+      // A moved launch or a changed window re-arms the follower early-access push.
+      ...(earlyAccessWindowMoved && { earlyAccessNotifiedAt: null }),
       updatedAt: new Date(),
     })
     .where(and(...updateConditions))
