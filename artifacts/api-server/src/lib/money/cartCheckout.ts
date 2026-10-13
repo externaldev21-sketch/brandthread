@@ -342,6 +342,17 @@ export async function priceCartGroup(input: {
   };
 }
 
+/**
+ * What one seller group charges: subtotal + shipping − discount + sales tax
+ * + DDP duties (intl #109; 0 for every other checkout, so the total is
+ * exactly what it was before duties existed).
+ */
+export function groupChargeTotalCents(group: {
+  subtotalCents: number; shippingCents: number; discountCents: number; taxCents: number; dutiesCents?: number;
+}): number {
+  return group.subtotalCents + group.shippingCents - group.discountCents + group.taxCents + (group.dutiesCents ?? 0);
+}
+
 /** Spreads a discount across line amounts in proportion, exact to the cent (the last line takes the remainder). */
 export function spreadDiscount(lineAmounts: number[], discountCents: number): number[] {
   const total = lineAmounts.reduce((sum, amount) => sum + amount, 0);

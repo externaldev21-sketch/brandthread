@@ -36,7 +36,7 @@ import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
 import {
   CART_CHECKOUT_KIND, CartCheckoutError, MAX_CART_GROUPS, MIN_CARD_CHARGE_CENTS,
-  calculateGroupTax, findCardDataInRequest, priceCartGroup, type CartShipping, type PricedGroup,
+  calculateGroupTax, findCardDataInRequest, groupChargeTotalCents, priceCartGroup, type CartShipping, type PricedGroup,
 } from "../lib/money/cartCheckout";
 import { paymentIntentMethodParams, paymentMethodTypesFor } from "../lib/payments/bnpl";
 import { bnplMethodsForCart } from "../lib/payments/sellerPaymentSettings";
@@ -165,7 +165,7 @@ async function priceCart(
     sellers.add(pricedGroup.sellerId);
     const tax = await calculateGroupTax(stripe, pricedGroup, shipping);
     // Duties (item 109) are 0 unless the seller's zone is DDP and the flag is on.
-    const fullTotalCents = pricedGroup.subtotalCents + pricedGroup.shippingCents - pricedGroup.discountCents + tax.taxCents + pricedGroup.dutiesCents;
+    const fullTotalCents = groupChargeTotalCents({ ...pricedGroup, taxCents: tax.taxCents });
     // A store gift card covers part of THIS seller's group only.
     const gift = group.giftCard
       ? await applyGiftCardToGroup({
