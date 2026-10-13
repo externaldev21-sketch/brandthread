@@ -21,9 +21,11 @@ import * as ExpoLinking from 'expo-linking';
 import {
   createOrGetConversation,
   getAcceptedFriends,
+  getConversations,
   sendMessage,
 } from '@/services/socialService';
-import type { Friendship } from '@/services/socialTypes';
+import { recentShareTargets, type ShareTarget } from '@/lib/shareRecents';
+import { useAuth } from '@clerk/expo';
 import { FONT, FS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SheetRise } from '@/components/motion/SheetRise';
@@ -68,7 +70,9 @@ export function ThreadShareSheet({
   const insets = useSafeAreaInsets();
   const api = useApi();
   const router = useRouter();
-  const [friends, setFriends] = useState<Friendship[]>([]);
+  // "Send to" row (#145): recent chats first, then friends (lib/shareRecents).
+  const [friends, setFriends] = useState<ShareTarget[]>([]);
+  const { userId: myUserId } = useAuth();
   const [busy, setBusy] = useState<BusyAction>(null);
   const [savingProgress, setSavingProgress] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -98,15 +102,19 @@ export function ThreadShareSheet({
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
-    void getAcceptedFriends()
-      .then(rows => {
-        if (!cancelled) setFriends(rows.slice(0, 4));
+    void Promise.all([
+      // Signed out: no DM history to read (and never a protected call).
+      myUserId ? getConversations().catch(() => []) : Promise.resolve([]),
+      getAcceptedFriends().catch(() => []),
+    ])
+      .then(([conversations, accepted]) => {
+        if (!cancelled) setFriends(recentShareTargets(conversations, accepted, myUserId));
       })
       .catch(() => {
         if (!cancelled) setFriends([]);
       });
     return () => { cancelled = true; };
-  }, [visible]);
+  }, [visible, myUserId]);
 
   async function runAction(name: string, action: () => Promise<void>) {
     if (actionInFlightRef.current) return;
@@ -122,9 +130,10 @@ export function ThreadShareSheet({
     }
   }
 
-  async function sendToFriend(friend: Friendship) {
+  async function sendToFriend(friend: ShareTarget) {
     await runAction(`friend:${friend.userId}`, async () => {
-      const conversation = await createOrGetConversation({
+      // A recent chat already has a conversation: send straight into it.
+      const conversation = friend.conversationId ? { id: friend.conversationId } : await createOrGetConversation({
         type: 'buyer_to_buyer',
         participant: {
           userId: friend.userId,
