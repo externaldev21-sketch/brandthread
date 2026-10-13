@@ -69,7 +69,7 @@ function logError(req: Request, err: unknown, msg: string) {
 // ─── Product page SEO ────────────────────────────────────────────────────────
 router.get("/seo/products/:id", rateLimit("public-read"), async (req, res) => {
   const id = String(req.params.id);
-  if (!UUID_RE.test(id)) return res.status(404).json({ error: "Product not found", code: "NOT_FOUND" });
+  if (!UUID_RE.test(id)) return res.status(404).json({ error: "Product not found", code: "NOT_FOUND", notPublic: true });
   try {
     const [row] = await db
       .select({
@@ -95,7 +95,7 @@ router.get("/seo/products/:id", rateLimit("public-read"), async (req, res) => {
       .leftJoin(storefronts, eq(storefronts.ownerId, products.ownerId))
       .where(and(eq(products.id, id), publicProductCondition()))
       .limit(1);
-    if (!row) return res.status(404).json({ error: "Product not found", code: "NOT_FOUND" });
+    if (!row) return res.status(404).json({ error: "Product not found", code: "NOT_FOUND", notPublic: true });
     const p = row.product;
 
     const rawVariants = await db

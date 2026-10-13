@@ -133,7 +133,10 @@ describe("GET /public/seo/products/:id", () => {
   });
 
   it.each(["draft", "deleted", "suspendedSeller"])("404s a non-public product (%s)", async (key) => {
-    expect((await get(`/api/v1/public/seo/products/${p[key]}`)).status).toBe(404);
+    const r = await get(`/api/v1/public/seo/products/${p[key]}`);
+    expect(r.status).toBe(404);
+    // The web server only treats this explicit marker as "not public".
+    expect(r.body.notPublic).toBe(true);
   });
 
   it("404s unknown and malformed ids", async () => {
