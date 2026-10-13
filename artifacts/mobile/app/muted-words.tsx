@@ -165,6 +165,7 @@ export default function MutedWordsScreen() {
             chevron
             onPress={() => router.push('/hidden-words' as never)}
             testID="muted-words-hidden-words"
+            style={{ marginBottom: SP.sm }}
           />
         ) : null}
 

@@ -67,7 +67,7 @@ export default function HiddenWordsCustomScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Custom words and phrases" />
+      <ScreenHeader title="Custom words" />
       <View style={s.form}>
         <TextInput
           style={s.input}
