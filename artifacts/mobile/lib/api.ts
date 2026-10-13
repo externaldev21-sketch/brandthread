@@ -2726,8 +2726,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Thread post comments (filtered, block-aware, moderated). */
     comments: {
-      list: (postId: string, before?: string) =>
-        freshGet<CommentThread>(`/api/posts/${encodeURIComponent(postId)}/comments${before ? `?before=${encodeURIComponent(before)}` : ''}`),
+      /** `sort` = 'top' | 'newest' (server default newest); `before` is the previous page's nextCursor. */
+      list: (postId: string, before?: string, sort?: 'top' | 'newest') => {
+        const qs = [before ? `before=${encodeURIComponent(before)}` : '', sort ? `sort=${sort}` : ''].filter(Boolean).join('&');
+        return freshGet<CommentThread>(`/api/posts/${encodeURIComponent(postId)}/comments${qs ? `?${qs}` : ''}`);
+      },
       create: (postId: string, body: string, parentId?: string | null) =>
         post<CreatedComment>(`/api/posts/${encodeURIComponent(postId)}/comments`, { body, ...(parentId ? { parentId } : {}) }),
       remove: (postId: string, commentId: string) =>
