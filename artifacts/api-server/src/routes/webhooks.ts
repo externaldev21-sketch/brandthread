@@ -973,6 +973,8 @@ export async function handleCheckoutPaid(
         grossChargedCents: totalCents,
         paidAt: successfulPaymentAt,
         discountAmountCents: stripeDiscountCents,
+        // The bundle part of discountAmountCents (lib/bundles), for reporting.
+        bundleDiscountCents: Math.min(Math.max(0, csRecord.bundleDiscountCents ?? 0), stripeDiscountCents),
         threadCashAppliedCents: oversoldItems.length === 0 ? threadCashAppliedCents : 0,
         stripePaymentIntentId:   piId,
         stripeCheckoutSessionId: sessionId,

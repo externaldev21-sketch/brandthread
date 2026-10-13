@@ -5,7 +5,8 @@
  *  - prices come from the database;
  *  - it checks the seller's Connect account and vacation;
  *  - shipping comes from the seller's zones, else the legacy flat rate;
- *  - the discount code is validated fresh.
+ *  - seller bundles ("Buy the set", lib/bundles) come off merchandise first;
+ *  - the discount code is validated fresh, on what the bundles left.
  * The difference is that the result feeds a line of ONE cart-wide
  * PaymentIntent instead of a Stripe Checkout Session. Tax comes from Stripe
  * Tax, calculated on the seller's own connected account, so the seller stays
@@ -35,6 +36,8 @@ import { effectiveUnitPrice } from "../pricing/salesRuntime";
 import { CheckoutPlanError, resolveChargePlan } from "./checkoutPlan";
 import { destinationApplicationFeeCents } from "./fees";
 import { resolveSellerPlatformFeeBps } from "../planPerks";
+import { bundleDiscountsForGroup } from "../bundles/activeBundles";
+import type { AppliedBundle } from "../bundles/applyBundleDiscounts";
 
 export const CART_CHECKOUT_KIND = "cart_checkout";
 /** Stripe's minimum USD card charge. */
@@ -130,10 +133,15 @@ export type PricedGroup = {
   processingDays: number | null;
   discountCodeId: string | null;
   discountCode: string | null;
-  /** Promo on merchandise + any free-shipping part, as the hosted flow computes it. */
+  /** Bundle discount + promo on merchandise + any free-shipping part, as the hosted flow computes it. */
   discountCents: number;
-  /** Merchandise-only part of the promo (for spreading across tax lines). */
+  /** Merchandise-only part of all discounts (for spreading across tax lines). */
   merchandiseDiscountCents: number;
+  /** Seller bundle part of discountCents (applied before the code). */
+  bundleDiscountCents: number;
+  bundles: AppliedBundle[];
+  /** Discount code part of discountCents (incl. free shipping); what the code's use records. */
+  promoDiscountCents: number;
   shippingDiscountCents: number;
   platformFeeCents: number;
   /** Commission rate (bps) fixed for this checkout from the seller's plan. */
@@ -256,11 +264,19 @@ export async function priceCartGroup(input: {
     shippingLineName = rate?.name ?? "Shipping";
   }
 
+  // Order: bundles first, then the code on the merchandise they left.
+  const bundle = await bundleDiscountsForGroup(sellerId, items.map((item) => ({
+    productId: item.productId, variantId: item.variantId, unitPriceCents: item.priceCents, quantity: item.quantity,
+  })));
+  const bundleDiscountCents = Math.min(bundle.totalDiscountCents, subtotalCents);
+  const merchandiseAfterBundleCents = subtotalCents - bundleDiscountCents;
+
   let discount: Awaited<ReturnType<typeof validateDiscountCode>> | null = null;
   if (input.discountCode?.trim()) {
     try {
       discount = await validateDiscountCode({
-        sellerId, code: input.discountCode, customerKey: input.buyerId, cartSubtotalCents: subtotalCents, lines: discountLines,
+        sellerId, code: input.discountCode, customerKey: input.buyerId, cartSubtotalCents: merchandiseAfterBundleCents,
+        lines: discountLines.map((line, index) => ({ ...line, reductionCents: bundle.lineDiscountCents[index] ?? 0 })),
         liveStreamId: input.liveStreamId ?? null,
       });
     } catch (error) {
@@ -271,9 +287,8 @@ export async function priceCartGroup(input: {
     }
   }
   const shippingDiscountCents = discount?.freeShipping ? shippingCents : 0;
-  const discountCents = discount
-    ? Math.min(discount.appliedAmountCents + shippingDiscountCents, subtotalCents + shippingCents)
-    : 0;
+  const promoMerchandiseCents = discount ? Math.min(discount.appliedAmountCents, merchandiseAfterBundleCents) : 0;
+  const discountCents = Math.min(bundleDiscountCents + promoMerchandiseCents + shippingDiscountCents, subtotalCents + shippingCents);
   const merchandiseDiscountCents = Math.max(0, Math.min(subtotalCents, discountCents - shippingDiscountCents));
 
   const platformFeeBps = await resolveSellerPlatformFeeBps(sellerId);
@@ -295,6 +310,9 @@ export async function priceCartGroup(input: {
     discountCode: discount?.discount.code ?? null,
     discountCents,
     merchandiseDiscountCents,
+    bundleDiscountCents,
+    bundles: bundle.applied,
+    promoDiscountCents: discountCents - bundleDiscountCents,
     shippingDiscountCents,
     platformFeeCents: fee.platformFeeCents,
     platformFeeBps,
