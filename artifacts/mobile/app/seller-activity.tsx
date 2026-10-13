@@ -11,7 +11,7 @@
  * the unread dot on the bell clears; rows keep their own dot for this visit.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, SectionList, Text, View, type ViewToken } from 'react-native';
+import { ActivityIndicator, Alert, SectionList, Text, View, type ViewToken } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
 
@@ -60,6 +60,7 @@ import {
 } from '@/lib/previewActivity';
 import { applyPreviewFollowState } from '@/lib/previewFollowStore';
 
+import { ChipRow } from '@/components/ui/ChipRow';
 export default function SellerActivityScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -389,12 +390,12 @@ export default function SellerActivityScreen() {
     <View style={styles.container}>
       <ScreenHeader title="Activity" divider={false} onBack={() => goBackOr(router, '/(tabs)/profile')} />
       <View style={styles.chipRow}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
+        <ChipRow
           bounces={false}
           overScrollMode="never"
           contentContainerStyle={styles.chipScrollContent}
+          selectedIndex={SELLER_ACTIVITY_CHIPS.findIndex((c) => c.key === chip)}
+          hapticOnSelect={false}
         >
           {SELLER_ACTIVITY_CHIPS.map((c) => (
             <Chip
@@ -405,7 +406,7 @@ export default function SellerActivityScreen() {
               testID={`activity-chip-${c.key}`}
             />
           ))}
-        </ScrollView>
+        </ChipRow>
       </View>
 
       {status === 'loading' ? (

@@ -9,6 +9,7 @@
  * are safe to keep static.
  */
 import React, { useMemo, useState } from 'react';
+import { ChipRow } from '@/components/ui/ChipRow';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Easing } from 'react-native';
 import { useEffect, useRef } from 'react';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -134,9 +135,7 @@ export function PillTabs<T extends string>({
 }) {
   const colors = useColors();
   const s = useMemo(() => pillTabStyles(colors), [colors]);
-  const content = (
-    <View style={{ flexDirection: 'row', gap: SP.xs, flexWrap: scroll ? 'nowrap' : 'wrap' }}>
-      {options.map(opt => {
+  const pills = options.map(opt => {
         const active = opt.key === value;
         return (
           <TouchableOpacity
@@ -149,14 +148,12 @@ export function PillTabs<T extends string>({
             <Text style={[s.pillText, active && s.pillTextActive]}>{opt.label}</Text>
           </TouchableOpacity>
         );
-      })}
-    </View>
-  );
-  if (!scroll) return <View style={{ marginBottom: SP.md }}>{content}</View>;
+      });
+  if (!scroll) return <View style={{ marginBottom: SP.md }}><View style={{ flexDirection: 'row', gap: SP.xs, flexWrap: 'wrap' }}>{pills}</View></View>;
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SP.md }} contentContainerStyle={{ paddingRight: SP.md }}>
-      {content}
-    </ScrollView>
+    <ChipRow selectedIndex={options.findIndex(opt => opt.key === value)} hapticOnSelect={false} bleed={SP.md} inset={SP.md} gap={SP.xs} style={{ marginBottom: SP.md }}>
+      {pills}
+    </ChipRow>
   );
 }
 const pillTabStyles = (colors: Colors) => StyleSheet.create({

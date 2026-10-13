@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { haptics } from '@/lib/haptics';
@@ -8,6 +8,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { radius } from '@/constants/radii';
 
+import { ChipRow } from '@/components/ui/ChipRow';
 // Mirrors Instagram's post-submit results tabs (Mobbin "Instagram iOS
 // Searching Instagram") 1:1 in layout/interaction — only the tab set itself
 // is Brandthread's own, per the owner's explicit mapping: Audio -> Products
@@ -42,11 +43,11 @@ export function SegmentedTabs({
 
   return (
     <View style={styles.wrap}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
+      <ChipRow
         contentContainerStyle={styles.track}
         testID="search-tabs"
+        selectedIndex={SEARCH_TABS.findIndex((tab) => tab.key === active)}
+        hapticOnSelect={false}
       >
         {SEARCH_TABS.map((tab) => {
           const isActive = tab.key === active;
@@ -80,7 +81,7 @@ export function SegmentedTabs({
             </TouchableOpacity>
           );
         })}
-      </ScrollView>
+      </ChipRow>
       {/* Signals more tabs scroll off the right edge (LIVE is often clipped
           at 375–430pt widths) without a hard cut. */}
       <LinearGradient

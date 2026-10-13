@@ -6,7 +6,7 @@ import { radius as ControlRadius } from '@/constants/radii';
  * caller with lib/dropSchedule#zonedTimeToUtc.
  */
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -14,6 +14,7 @@ import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
 import { dateToHm, dateToYmd, hmToDate, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 
+import { ChipRow } from '@/components/ui/ChipRow';
 function pad(n: number) { return String(n).padStart(2, '0'); }
 
 function dayValue(offset: number): string {
@@ -72,12 +73,12 @@ export function LaunchTimePicker({
 
   return (
     <View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.bleed} contentContainerStyle={s.chipRow}>
+      <ChipRow style={s.bleed} contentContainerStyle={s.chipRow} selectedIndex={DAY_CHIPS.findIndex((c) => c.value === dateValue)} gap={8}>
         {DAY_CHIPS.map((c) => chip(c.label, dateValue === c.value, () => onDateChange(c.value), c.value))}
-      </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.bleed, { marginTop: 8 }]} contentContainerStyle={s.chipRow}>
+      </ChipRow>
+      <ChipRow style={[s.bleed, { marginTop: 8 }]} contentContainerStyle={s.chipRow} selectedIndex={TIME_CHIPS.findIndex((c) => c.value === timeValue)} gap={8}>
         {TIME_CHIPS.map((c) => chip(c.label, timeValue === c.value, () => onTimeChange(c.value), c.value))}
-      </ScrollView>
+      </ChipRow>
       <TouchableOpacity onPress={() => setCustomOpen((v) => !v)} style={s.customToggle} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <Icon name={showCustom ? 'chevron-up' : 'chevron-down'} size={13} color={colors.mutedForeground} />
         <Text style={[s.customText, { color: colors.mutedForeground }]}>Enter an exact date & time</Text>

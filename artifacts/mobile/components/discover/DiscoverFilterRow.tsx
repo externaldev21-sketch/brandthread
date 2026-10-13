@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { haptics } from '@/lib/haptics';
@@ -13,6 +13,7 @@ import { minHitSlop } from '@/lib/hitSlop';
 // Sized from the 32pt padding box: on web the slop sits inside the 1pt border.
 const PILL_HIT_SLOP = minHitSlop({ height: 32 });
 
+import { ChipRow } from '@/components/ui/ChipRow';
 export type DiscoverFilterKey = 'forYou' | 'fits' | 'brands' | 'people' | 'drops';
 
 export const DISCOVER_FILTERS: Array<{ key: DiscoverFilterKey; label: string }> = [
@@ -40,11 +41,11 @@ export function DiscoverFilterRow({
 
   return (
     <View style={styles.wrap}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
+      <ChipRow
         contentContainerStyle={styles.track}
         testID="discover-filter-row"
+        selectedIndex={DISCOVER_FILTERS.findIndex((filter) => filter.key === active)}
+        hapticOnSelect={false}
       >
         {DISCOVER_FILTERS.map((filter) => {
           const isActive = filter.key === active;
@@ -76,7 +77,7 @@ export function DiscoverFilterRow({
             </TouchableOpacity>
           );
         })}
-      </ScrollView>
+      </ChipRow>
       <LinearGradient
         pointerEvents="none"
         colors={['transparent', theme.background]}

@@ -12,6 +12,7 @@ export * from './GlassIconButton';
 export { SectionHeader } from '@/components/BrandthreadUI';
 export * from './IconButton';
 export * from './Chip';
+export * from './ChipRow';
 export * from './SegmentedControl';
 export * from './ListRow';
 export * from './Card';
