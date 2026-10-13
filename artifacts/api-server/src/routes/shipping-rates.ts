@@ -1,7 +1,10 @@
 import { Router } from "express";
-import { db, shippingRates, shippingZones } from "@workspace/db";
-import { eq, and, asc } from "drizzle-orm";
+import { db, shippingRates, shippingZones, users } from "@workspace/db";
+import { eq, and, asc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { setPublicCacheHeaders } from "../lib/httpCache";
+import { resolveFreeShippingThreshold } from "../lib/freeShippingThreshold";
+import type { ShippingZoneRow } from "../lib/shippingZones";
 import crypto from "crypto";
 
 const router = Router();
@@ -61,6 +64,40 @@ router.get("/calculate", async (req, res) => {
     rateName: rate.name,
     processingDays,
   });
+});
+
+// Public endpoint — no auth required. Read-only.
+// GET /api/shipping-rates/free-shipping?sellerIds=a,b (at most 20 ids)
+// → { thresholds: { [sellerId]: cents | null } } — each seller's
+// free-shipping threshold for a domestic order (lib/freeShippingThreshold.ts),
+// for the bag's "Spend $X more for free shipping" strip.
+const FREE_SHIPPING_MAX_SELLERS = 20;
+router.get("/free-shipping", async (req, res) => {
+  const sellerIds = [...new Set(
+    String(req.query.sellerIds ?? "").split(",").map((id) => id.trim()).filter(Boolean),
+  )].slice(0, FREE_SHIPPING_MAX_SELLERS);
+  if (sellerIds.length === 0) {
+    res.status(400).json({ error: "sellerIds is required" });
+    return;
+  }
+
+  const [zones, rates, sellers] = await Promise.all([
+    db.select().from(shippingZones).where(inArray(shippingZones.sellerId, sellerIds)),
+    db.select().from(shippingRates).where(and(inArray(shippingRates.sellerId, sellerIds), eq(shippingRates.active, true))),
+    db.select({ clerkId: users.clerkId, shipFrom: users.sellerShipFromCountry }).from(users).where(inArray(users.clerkId, sellerIds)),
+  ]);
+
+  const thresholds: Record<string, number | null> = {};
+  for (const sellerId of sellerIds) {
+    const legacy = rates.find((r) => r.sellerId === sellerId) ?? null;
+    thresholds[sellerId] = resolveFreeShippingThreshold({
+      zones: zones.filter((z) => z.sellerId === sellerId) as unknown as ShippingZoneRow[],
+      legacyRate: legacy ? { flatRateCents: legacy.flatRateCents, freeAboveCents: legacy.freeAboveCents, active: legacy.active } : null,
+      sellerHomeCountry: sellers.find((s) => s.clerkId === sellerId)?.shipFrom ?? "US",
+    });
+  }
+  setPublicCacheHeaders(res, { maxAgeSeconds: 30, staleWhileRevalidateSeconds: 120 });
+  res.json({ thresholds });
 });
 
 // All routes below require authentication

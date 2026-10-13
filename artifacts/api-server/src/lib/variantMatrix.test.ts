@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_MATRIX_VARIANTS, baseSkuFromName, buildSku, buildStockInfo, columnAxisFor, comboKey, decideSoldOutAction,
-  generateCombos, matrixSize, normalizeAxes, optionCode, uniqueSku, validateBulkUpdates, validateStockRules,
+  generateCombos, matrixSize, normalizeAxes, optionCode, publicCounterThreshold, uniqueSku, validateBulkUpdates, validateStockRules,
 } from "./variantMatrix";
 
 const axes = [
@@ -129,6 +129,17 @@ describe("decideSoldOutAction", () => {
     expect(decideSoldOutAction({ ...base, inDrop: true })).toBe("none");
     expect(decideSoldOutAction({ ...base, variantCount: 0 })).toBe("none");
     expect(decideSoldOutAction({ ...base, status: "draft" })).toBe("none");
+  });
+});
+
+describe("publicCounterThreshold", () => {
+  const off = { showRemainingCounter: false, counterThreshold: 5 };
+  it("is the seller's threshold only when they opted into the counter", () => {
+    expect(publicCounterThreshold(null)).toBeNull();
+    expect(publicCounterThreshold(off)).toBeNull();
+    expect(publicCounterThreshold({ ...off, showRemainingCounter: true })).toBe(5);
+    expect(publicCounterThreshold({ showRemainingCounter: true, counterThreshold: null })).toBeNull();
+    expect(publicCounterThreshold({ showRemainingCounter: true, counterThreshold: 0 })).toBeNull();
   });
 });
 
