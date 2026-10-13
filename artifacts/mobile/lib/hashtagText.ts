@@ -38,3 +38,39 @@ export function hasHashtags(text: string): boolean {
 export function hashtagHref(tag: string): string {
   return `/hashtag/${encodeURIComponent(tag)}`;
 }
+
+/**
+ * Caption text split into plain, #hashtag and @mention segments (item 143:
+ * mentions and hashtags are white-bold and tappable). Hashtags follow
+ * splitCaption's rules exactly; a mention is '@' + 1–30 letters, digits,
+ * '_' or '.', not preceded by a word character or '@' (so emails stay plain),
+ * with any trailing '.' left as text ("thanks @maya." → "@maya" + ".").
+ */
+export type RichCaptionSegment = CaptionSegment | { kind: 'mention'; text: string; handle: string };
+
+const MENTION_RE = /(^|[^\p{L}\p{M}\p{N}_.@])@([A-Za-z0-9_.]{1,30})/gu;
+
+export function splitRichCaption(text: string): RichCaptionSegment[] {
+  const out: RichCaptionSegment[] = [];
+  for (const segment of splitCaption(text)) {
+    if (segment.kind !== 'text' || !segment.text.includes('@')) { out.push(segment); continue; }
+    const value = segment.text;
+    let cursor = 0;
+    for (const match of value.matchAll(MENTION_RE)) {
+      const lead = match[1] ?? '';
+      const handle = match[2].replace(/\.+$/, '');
+      if (!handle || /^\.+$/.test(handle)) continue;
+      const start = (match.index ?? 0) + lead.length;
+      if (start > cursor) out.push({ kind: 'text', text: value.slice(cursor, start) });
+      out.push({ kind: 'mention', text: `@${handle}`, handle: handle.toLowerCase() });
+      cursor = start + 1 + handle.length;
+    }
+    if (cursor < value.length) out.push({ kind: 'text', text: value.slice(cursor) });
+  }
+  return out;
+}
+
+/** The public profile route for an @handle (works signed in and out). */
+export function mentionHref(handle: string): string {
+  return `/u/${encodeURIComponent(handle.toLowerCase())}`;
+}
