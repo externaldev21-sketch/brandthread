@@ -65,6 +65,7 @@ import notificationPrefsRouter from "./notification-prefs";
 import postsRouter from "./posts";
 import postCaptionsRouter from "./post-captions";
 import feedRouter from "./feed";
+import feedFollowedFreshRouter from "./feed-followed-fresh";
 import reportsRouter from "./reports";
 import postCommentsRouter from "./post-comments";
 import moderationRouter from "./moderation";
@@ -307,6 +308,7 @@ router.use("/posts",                     postCommentsRouter);
 router.use("/posts",                     postCaptionsRouter);
 router.use("/posts",                     tc, postsRouter);
 router.use("/feed",                      feedRouter); // buyer-scoped (For You ranking + event ingestion); no tc
+router.use("/feed",                      feedFollowedFreshRouter); // GET /followed-fresh (requireAuth); no tc
 router.use("/reports",                   reportsRouter);
 router.use("/moderation",                auditModerationActions, moderationRouter);
 router.use("/admin",                     adminRouter); // platform admin dashboard API (users.role = admin)
