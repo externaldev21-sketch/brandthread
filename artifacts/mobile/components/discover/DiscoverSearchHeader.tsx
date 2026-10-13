@@ -24,11 +24,17 @@ export function DiscoverSearchHeader({
   onSearchPress,
   onBellPress,
   bellBadge,
+  searchBarRef,
+  searchBarHidden,
 }: {
   title: string;
   onSearchPress: () => void;
   onBellPress?: () => void;
   bellBadge?: number;
+  /** Lets Discover measure the bar so its in-place search overlay starts from it. */
+  searchBarRef?: React.Ref<View>;
+  /** Hidden while the search overlay's copy of this bar is on screen. */
+  searchBarHidden?: boolean;
 }) {
   const { theme } = useAppTheme();
   const topPad = useHeaderTopInset();
@@ -37,10 +43,11 @@ export function DiscoverSearchHeader({
     <View style={[styles.row, { paddingTop: topPad + 12 }]}>
       <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{title}</Text>
       <TouchableOpacity
+        ref={searchBarRef as never}
         onPress={onSearchPress}
         accessibilityRole="button"
         accessibilityLabel="Search products and brands"
-        style={[styles.searchBar, { backgroundColor: theme.surface, borderColor: theme.border }]}
+        style={[styles.searchBar, { backgroundColor: theme.surface, borderColor: theme.border }, searchBarHidden && { opacity: 0 }]}
         testID="discover-search-bar"
       >
         <Icon name="search" size={16} color={theme.muted} />

@@ -279,7 +279,7 @@ describe('search screen — skeleton and empty already in place', () => {
   it('shows a lightweight loading indicator while searching', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const src = readFileSync(resolve(__dirname, '../app/buyer-search.tsx'), 'utf8');
+    const src = readFileSync(resolve(__dirname, '../components/discover/search/SearchSuggestions.tsx'), 'utf8');
     expect(src).toContain('ActivityIndicator');
     expect(src).toContain('searching');
   });
@@ -287,7 +287,7 @@ describe('search screen — skeleton and empty already in place', () => {
   it('uses EmptyState for no results', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const src = readFileSync(resolve(__dirname, '../app/buyer-search.tsx'), 'utf8');
+    const src = readFileSync(resolve(__dirname, '../components/discover/search/SearchResults.tsx'), 'utf8');
     expect(src).toContain('EmptyState');
     expect(src).toMatch(/No results/);
   });

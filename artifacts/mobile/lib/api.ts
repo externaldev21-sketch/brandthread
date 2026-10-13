@@ -2703,6 +2703,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<{ trending: Array<{ term: string; type: 'category' | 'brand' | 'query' }> }>(
           `/api/public/search/trending?limit=${encodeURIComponent(String(limit))}`
         ),
+      /** Ranked trending searches (last 72h, real Hot/New tags) for the Discover search empty state. */
+      hot: (limit = 10) =>
+        get<{ windowHours: number; queries: Array<{ term: string; rank: number; count: number; tag: 'hot' | 'new' | null }> }>(
+          `/api/public/search/hot?limit=${encodeURIComponent(String(limit))}`
+        ),
       /** This signed-in buyer's own recent searches, most recent first. */
       recent: (limit = 10) =>
         get<{ recent: Array<{ query: string; normalized: string }> }>(

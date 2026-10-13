@@ -82,7 +82,7 @@ vi.mock("../../lib/contentModerator", () => ({
   matchesMutedWords: () => false,
 }));
 
-import publicRouter from "../public";
+import publicRouter, { resetHotSearchMemo } from "../public";
 
 let server: Server;
 let base = "";
@@ -107,6 +107,7 @@ afterAll(async () => {
 
 beforeEach(() => {
   state.selectQueue = [];
+  resetHotSearchMemo();
 });
 
 describe("search empty-state endpoints", () => {
@@ -181,6 +182,49 @@ describe("search empty-state endpoints", () => {
 
   it("rejects a non-positive limit on /search/categories", async () => {
     const response = await fetch(`${base}/api/public/search/categories?limit=0`);
+    expect(response.status).toBe(400);
+  });
+
+  it("ranks hot searches with real Hot/New tags and a 10-minute public cache", async () => {
+    state.selectQueue = [[
+      { term: "linen shirt", recent: 1, prior: 6 },
+      { term: "cargo pants", recent: 6, prior: 2 },
+      { term: "baggy jorts", recent: 3, prior: 0 },
+      { term: "x", recent: 40, prior: 0 }, // too short — dropped
+      { term: "one-off", recent: 1, prior: 0 }, // below the minimum — dropped
+    ]];
+
+    const response = await fetch(`${base}/api/public/search/hot?limit=5`);
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("max-age=600");
+    const json = JSON.parse(body);
+    expect(json.windowHours).toBe(72);
+    expect(json.queries).toEqual([
+      { term: "cargo pants", rank: 1, count: 8, tag: "hot" },
+      { term: "linen shirt", rank: 2, count: 7, tag: null },
+      { term: "baggy jorts", rank: 3, count: 3, tag: "new" },
+    ]);
+  });
+
+  it("serves hot searches from the in-process memo on the next call", async () => {
+    state.selectQueue = [[{ term: "cargo pants", recent: 4, prior: 0 }]];
+    await fetch(`${base}/api/public/search/hot`);
+    // No second result queued: a second DB read would return [] and change the answer.
+    const response = await fetch(`${base}/api/public/search/hot?limit=1`);
+    const json = (await response.json()) as { queries: unknown[] };
+    expect(json.queries).toEqual([{ term: "cargo pants", rank: 1, count: 4, tag: "new" }]);
+  });
+
+  it("returns an empty hot list when nothing has been searched yet", async () => {
+    state.selectQueue = [[]];
+    const response = await fetch(`${base}/api/public/search/hot`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ windowHours: 72, queries: [] });
+  });
+
+  it("rejects a non-positive limit on /search/hot", async () => {
+    const response = await fetch(`${base}/api/public/search/hot?limit=0`);
     expect(response.status).toBe(400);
   });
 });

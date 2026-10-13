@@ -44,7 +44,7 @@ describe('ReportSheet reason -> payload mapping', () => {
 
 describe('report entry points use the shared sheet', () => {
   it('no longer submits silent "other" reports or hand-built report URLs', () => {
-    for (const file of ['app/buyer-search.tsx', 'app/(buyer)/discover.tsx', 'app/(buyer)/friends.tsx', 'app/(tabs)/feed.tsx']) {
+    for (const file of ['app/(buyer)/discover.tsx', 'app/(buyer)/friends.tsx', 'app/(tabs)/feed.tsx']) {
       const source = read(file);
       expect(source, file).not.toContain("reason: 'other'");
       expect(source, file).not.toContain('/buyer-report?targetType=');

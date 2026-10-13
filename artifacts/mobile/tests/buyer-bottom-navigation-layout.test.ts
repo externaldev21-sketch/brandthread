@@ -8,7 +8,8 @@ const layout = read('app/(buyer)/_layout.tsx');
 const bar = read('components/buyer-nav/BuyerTabBar.tsx');
 const parts = read('components/tab-bar/TabBarParts.tsx');
 const sellerBar = read('components/SellerGlobalTabBar.tsx');
-const search = read('app/buyer-search.tsx');
+const search = read('components/discover/search/DiscoverSearchOverlay.tsx');
+const searchRedirect = read('app/buyer-search.tsx');
 const profile = read('app/(buyer)/profile.tsx');
 const feed = read('app/(tabs)/feed.tsx');
 // The feed's top bar (LIVE / Friends / tabs / search) moved into its own
@@ -20,9 +21,9 @@ const tabItemsBlock = bar.slice(bar.indexOf('export const BUYER_TAB_ITEMS'), bar
 describe('buyer navigation contract', () => {
   it('renders Home · Discover · Inbox · Activity in the capsule and Profile in a separate circle', () => {
     expect(layout).toContain('<BuyerTabBar {...props} inboxBadgeCount={inboxBadgeCount} />');
-    // Search is not a Tabs.Screen and not a bottom-bar slot — it's a
-    // standalone full-screen page (app/buyer-search.tsx) reachable only from
-    // the feed's top-row icon and Discover. Activity (bell) takes the 4th
+    // Search is not a Tabs.Screen and not a bottom-bar slot — it opens in
+    // place on Discover (components/discover/search/DiscoverSearchOverlay);
+    // /buyer-search only redirects there. Activity (bell) takes the 4th
     // capsule slot instead, as a Tabs.Screen (href: null, like Friends/Cart/
     // Orders/Following/Edit profile) so the floating bar stays mounted.
     for (const route of ['index', 'discover', 'inbox', 'profile', 'activity']) {
@@ -117,9 +118,10 @@ describe('buyer navigation contract', () => {
   });
 });
 
-describe('buyer search page', () => {
-  it('is a standalone full-screen page, not a tab-bar morph', () => {
-    expect(search).toContain('goBackOr(router)');
+describe('buyer search', () => {
+  it('opens in place on Discover (no pushed page), never as a tab-bar morph', () => {
+    expect(searchRedirect).toContain("pathname: '/(buyer)/discover'");
+    expect(searchRedirect).toContain("search: '1'");
     expect(search).toContain("testID=\"buyer-search-field\"");
     expect(search).toContain('keyboardDismissMode="on-drag"');
     expect(bar).not.toContain('setFieldMounted');

@@ -52,6 +52,7 @@ describe('each named screen wires its thread-motif illustration through the shar
   const cases: [path: string, needle: string][] = [
     ['../components/profile/profileEmptyStates.ts', "illustration: 'spool'"],
     ['../app/(buyer)/friends.tsx', 'illustration="friends"'],
+    ['../components/discover/search/SearchResults.tsx', 'illustration="search"'],
     ['../components/discover/DiscoverGrid.tsx', 'illustration="trending"'],
     ['../components/inbox/MessagesInbox.tsx', 'illustration="envelope"'],
     ['../app/activity-center.tsx', 'illustration="bell"'],

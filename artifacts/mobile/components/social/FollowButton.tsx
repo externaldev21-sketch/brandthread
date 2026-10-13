@@ -24,6 +24,8 @@ type Props = {
   onChange?: (next: FollowState, delta: 1 | -1) => void;
   disabled?: boolean;
   size?: 'default' | 'compact';
+  /** Runs before following/unfollowing; return false to stop (e.g. useSignInGate's requireSignIn for guests). */
+  guard?: () => boolean;
   style?: any;
   /** Shown when a follow/unfollow fails (after the rollback). Defaults to a native alert. */
   onError?: (message: string) => void;
@@ -38,7 +40,7 @@ type Props = {
  * through lib/previewFollowStore, a signed-out viewer is sent to sign in,
  * and a failed request rolls back AND says so (`onError`, else an alert).
  */
-export default function FollowButton({ userId, initial, onChange, disabled, size = 'default', style, onError }: Props) {
+export default function FollowButton({ userId, initial, onChange, disabled, size = 'default', style, onError, guard }: Props) {
   const { theme } = useAppTheme();
   const api = useApi();
   const router = useRouter();
@@ -66,6 +68,7 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
 
   const handlePress = async () => {
     if (busy || disabled || userId.startsWith('u_')) return;
+    if (guard && !guard()) return;
     touchedRef.current = true;
     if (!previewId && !isSignedIn) {
       router.push('/sign-in' as never);
