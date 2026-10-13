@@ -1,21 +1,30 @@
+import { haptic } from '@/lib/haptics';
 import { CachedImage as Image } from '@/components/CachedImage';
+
 /**
  * Product transfer (A): "Import from Shopify" — connect (read-only scopes),
  * pick products, one tap import. Never touches orders — separate from
  * Fulfillment via Shopify (see app/integrations/shopify-fulfillment.tsx).
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList,
-  ActivityIndicator, Alert, Linking, } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList, ActivityIndicator, Alert, Linking } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { haptics } from '@/lib/haptics';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useApi } from '@/hooks/useApi';
-import { BrandthreadCard, PrimaryButton, EmptyState, LoadingSkeleton, SkeletonText, HapticSwitch} from '@/components/BrandthreadUI';
+
+import { BrandthreadCard, PrimaryButton, EmptyState, LoadingSkeleton, SkeletonText, HapticSwitch } from '@/components/BrandthreadUI';
+
 import { COMP, FONT } from '@/lib/theme';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 type ShopifyProductRow = {
@@ -110,10 +119,10 @@ export default function ShopifyImportScreen() {
     try {
       const result = await api.shopify.importProducts([...selected], publishActive ? 'active' : 'draft');
       setSummary(result);
-      haptics.success();
+      haptic('productListed');
       await loadProducts();
     } catch (err: any) {
-      haptics.error();
+      haptic('error');
       Alert.alert('Import failed', String(err?.message ?? 'Please try again.'));
     } finally {
       setImporting(false);

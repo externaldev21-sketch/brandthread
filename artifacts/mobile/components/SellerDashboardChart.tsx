@@ -1,20 +1,28 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
+
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+
 import Animated, {
   runOnJS,
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
-import { haptics } from '@/lib/haptics';
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
 import { Glass } from '@/components/ui/Glass';
+
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { layoutSeriesPoints, smoothPath } from '@/lib/svgSmoothPath';
+
 import { selectEvenlySpacedIndices } from '@/lib/sellerHomeChartLabels';
+
 import { BORDER_SUBTLE, FONT, FS, SP } from '@/lib/theme';
+
 import { radius } from '@/constants/radii';
 
 import { DASHBOARD_RANGES, SellerDashboardRangePills, type SellerDashboardRange } from '@/components/SellerDashboardRangePills';
@@ -120,7 +128,7 @@ export function SellerDashboardChart({
   const handleIndexChange = useCallback((index: number) => {
     if (lastHapticIndex.current !== index) {
       lastHapticIndex.current = index;
-      haptics.selection();
+      haptic('select');
     }
     setTooltipIndex(index);
     onScrub(index);

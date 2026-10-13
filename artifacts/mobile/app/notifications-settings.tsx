@@ -1,4 +1,5 @@
 import { hapticToggle } from '@/lib/haptics';
+
 /**
  * Settings → Notifications, for buyers and sellers (the server resolves the
  * role from the session).
@@ -18,19 +19,33 @@ import { hapticToggle } from '@/lib/haptics';
  */
 import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+
 import { useFocusEffect, useRouter } from 'expo-router';
+
 import { useApi } from '@/lib/api';
+
 import { useRole } from '@/contexts/RoleContext';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ListRow } from '@/components/ui';
+
 import { OptionSheet } from '@/components/ui/OptionSheet';
+
 import { QUIET_HOURS_PRESETS, quietHoursPresetFor } from '@/components/notifications/QuietHoursRow';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { FONT } from '@/lib/theme';
+
 import { PAUSE_OPTIONS, pagesFor, pausedUntilLabel, type Role } from '@/lib/notificationSettingsModel';
+
 import { isSellerDevPreview } from '@/lib/devPreview';
 
 export default function NotificationsSettingsScreen() {

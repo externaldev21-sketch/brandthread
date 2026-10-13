@@ -4,7 +4,9 @@
  */
 import React, { useCallback, useMemo, useRef } from 'react';
 import { View, StyleSheet, PanResponder, type LayoutChangeEvent } from 'react-native';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
 
 export function InlineSlider({
   value, min, max, step = 1, steps, onChange, accessibilityLabel, trackColor = 'rgba(255,255,255,0.10)', accentColor = '#fff',
@@ -79,7 +81,7 @@ export function InlineSlider({
         } else {
           onChange(snapValue(min + (e.nativeEvent.locationX / widthRef.current) * (max - min)));
         }
-        haptics.selection();
+        haptic('select');
       }}
       accessible
       accessibilityRole="adjustable"

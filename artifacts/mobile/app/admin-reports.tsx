@@ -8,30 +8,45 @@
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, FlatList, ScrollView, StyleSheet, RefreshControl, ActivityIndicator,
-  Pressable, TextInput, Platform } from 'react-native';
+
+import { View, Text, FlatList, ScrollView, StyleSheet, RefreshControl, ActivityIndicator, Pressable, TextInput, Platform } from 'react-native';
+
 import { useFocusEffect, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { useApi } from '@/lib/api';
+
 import { EmptyState, PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Sheet } from '@/components/ui/BottomSheet';
-import {
-  REPORT_REASONS, TARGET_ICONS, TARGET_LABELS, apiErrorMessage, normalizeReportTarget, reportSla, shortRelativeTime,
-} from '@/lib/safety';
+
+import { REPORT_REASONS, TARGET_ICONS, TARGET_LABELS, apiErrorMessage, normalizeReportTarget, reportSla, shortRelativeTime } from '@/lib/safety';
+
 import type {
   ModerationAction, ModerationQueue, ModerationQueueItem, ProfileSummary, ReportTargetType,
 } from '@/lib/safetyTypes';
 import { radius, nestedRadius } from '@/constants/radii';
+
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 import { ChipRow } from '@/components/ui/ChipRow';
+
 type Status = 'open' | 'resolved';
 type TypeFilter = 'all' | ReportTargetType;
 
@@ -109,7 +124,6 @@ export default function ReviewQueueScreen() {
 
   async function resolve(item: ModerationQueueItem, action: ModerationAction, note: string) {
     const result = await api.moderation.resolve(item.id, action, note || undefined);
-    haptics.success();
     setSelected(null);
     setQueue((prev) => prev ? {
       ...prev,
@@ -128,7 +142,6 @@ export default function ReviewQueueScreen() {
 
   async function reinstate(owner: ProfileSummary) {
     await api.moderation.reinstate(owner.userId);
-    haptics.success();
     setSelected(null);
     showToast(`${owner.name} reinstated`);
     load(true);
@@ -164,7 +177,7 @@ export default function ReviewQueueScreen() {
               return (
                 <Pressable
                   key={key}
-                  onPress={() => { haptics.selection(); setStatus(key); }}
+                  onPress={() => { haptic('select'); setStatus(key); }}
                   style={({ pressed }) => [s.segmentItem, active && s.segmentItemActive, pressed && !active && { opacity: 0.7 }]}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
@@ -183,7 +196,7 @@ export default function ReviewQueueScreen() {
               return (
                 <PressableScale
                   key={filter.key}
-                  onPress={() => { haptics.selection(); setTypeFilter(filter.key); }}
+                  onPress={() => { haptic('select'); setTypeFilter(filter.key); }}
                   style={[s.filterChip, active && s.filterChipActive]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}

@@ -5,9 +5,13 @@
  */
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
 
+import { Feather } from '@expo/vector-icons';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 
 export default function SetupContinueBanner({

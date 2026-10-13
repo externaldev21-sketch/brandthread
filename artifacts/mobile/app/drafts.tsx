@@ -7,29 +7,31 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View, Platform } from 'react-native';
+
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useFocusEffect, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { haptics } from '@/lib/haptics';
 
-import {
-  BG, BORDER, CARD, FG, MUTED,
-  FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+import { BG, BORDER, CARD, FG, MUTED, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
 import { useColors } from '@/hooks/useColors';
+
 import { EmptyState, SearchBar } from '@/components/BrandthreadUI';
+
 import { deleteDraft, listDrafts } from '@/services/productService';
+
 import { ProductDraft } from '@/services/productTypes';
+
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+
 import { minHitSlop } from '@/lib/hitSlop';
 
 // Sort options draw 40pt tall with a 1pt border (slop is measured from the
@@ -150,7 +152,6 @@ export default function DraftsScreen() {
 
   const discardDraft = useCallback((draft: ProductDraft) => {
     const name = draft.name?.trim() || 'Untitled product';
-    haptics.warning();
     Alert.alert(
       'Discard draft?',
       `"${name}" will be permanently deleted.`,

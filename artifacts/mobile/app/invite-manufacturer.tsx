@@ -8,24 +8,36 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator, Alert, Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import * as Clipboard from 'expo-clipboard';
 import { haptics } from '@/lib/haptics';
+
 import { BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, ICON, MUTED, ORANGE, RADIUS, SP, SUBTLE, SUCCESS } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { FormInput, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
+
 import { createInvitation, getInvitations } from '@/services/manufacturerService';
+
 import type { ManufacturerInvitation } from '@/services/manufacturerTypes';
 import { getEntitlementRejection } from '@/lib/entitlementError';
+
 import { radius } from '@/constants/radii';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 function inviteMessage(companyName: string, link: string) {
@@ -82,7 +94,6 @@ export default function InviteManufacturerScreen() {
       });
       setCreated(invitation);
       setCopied(false);
-      haptics.success();
       void loadInvites();
     } catch (error) {
       const rejection = getEntitlementRejection(error);

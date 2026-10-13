@@ -245,7 +245,7 @@ export default function BuyerSettingsDetail() {
         const row = <ListRow
             icon={item.icon}
             title={item.label}
-            subtitle={item.sub}
+            subtitle={section === 'notifications' ? undefined : item.sub}
             value={!item.toggle && !item.remoteToggle ? item.value : undefined}
             chevron={!item.toggle && !item.remoteToggle && !!item.action}
             toggle={item.toggle && settings ? { value: Boolean(settings[item.toggle]), onChange: (v) => toggle(item.toggle!, v) } : item.remoteToggle}

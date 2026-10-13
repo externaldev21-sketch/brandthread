@@ -1,5 +1,8 @@
+import { apiErrorMessage } from '@/lib/safety';
 import { CachedImage as Image } from '@/components/CachedImage';
-import { hapticToggle } from '@/lib/haptics';
+
+import { hapticToggle, haptics, haptic } from '@/lib/haptics';
+
 /**
  * Add Product — single-scroll product creation
  *
@@ -12,58 +15,99 @@ import { hapticToggle } from '@/lib/haptics';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { plural } from '@/lib/plural';
+
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, Platform, LayoutAnimation, UIManager, ActivityIndicator } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useRouter, useLocalSearchParams, useNavigation, useFocusEffect } from 'expo-router';
+
 import { takePendingAiDescription, toUploadObjectPath } from '@/lib/aiHelperHandoff';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import * as ImagePicker from 'expo-image-picker';
 import { showActionSheet } from '@/components/ui/ActionSheet';
+
 import { MediaCropper } from '@/components/media/MediaCropper';
+
 import { applyCropRect } from '@/lib/mediaCrop';
+
 import * as ImageManipulator from 'expo-image-manipulator';
 import { File, Paths } from 'expo-file-system';
 
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { RADII, radius } from '@/constants/radii';
+
 import { TYPE_SCALE } from '@/constants/typography';
-import { haptics } from '@/lib/haptics';
+
+
+
 import { Button } from '@/components/ui/Button';
+
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
+
 import { openShareStoreSheet } from '@/lib/shareStoreSheet';
 
 import { preOrderShipDateError, PREORDER_SHIP_DATE_REQUIRED_MESSAGE } from '@/lib/deliveryGuarantee';
+
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
+
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+
 import { dateToYmd, dateToYmdHm, startOfToday, ymdHmToDate, ymdToDate } from '@/lib/dateTimeField';
 
 import { getProduct, saveDraft, loadDraft, deleteDraft, getCollections, createProduct, updateProduct } from '@/services/productService';
+
 import { useAuth } from '@clerk/expo';
+
 import { isSellerDevPreview } from '@/lib/devPreview';
+
 import { isPreviewSellerProductId } from '@/lib/previewSellerProducts';
+
 import { buildServerVariants, sanitizeMoneyInput } from '@/lib/productSave';
+
 import { useApi } from '@/hooks/useApi';
+
 import { confirmPublishWithoutPayouts } from '@/lib/payoutReadinessPrompt';
+
 import { getEntitlementRejection } from '@/lib/entitlementError';
 
 import { Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES, SIZE_PRESETS, COLOR_PRESETS, SalesModel, OptionType, ProductOption, OptionValue, ProductVariant, ProductMedia, ProductCollection } from '@/services/productTypes';
 
 import { calcPricing, generateVariantCombinations, buildVariantTitle, validateForPublish, applyBulkEditToVariants } from '@/lib/productUtils';
+
 import { formatCents, parseDecimalToCents } from '@/lib/money';
+
 import { displayPriceInput, sanitizePriceInput } from '@/lib/priceInput';
+
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
+
 import { completeSetupTaskAfter, completeSetupTaskWhen } from '@/lib/setupCompletion';
+
 import { confirmChoice } from '@/lib/confirmChoice';
+
 import { publishesSoldOut, SOLD_OUT_CONFIRM } from '@/lib/productPublishChecks';
+
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+
 import { FeeBreakdown } from '@/components/money/FeeBreakdown';
+
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
+
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+
 import { takePendingMockup } from '@/lib/mockupProductHandoff';
+
 import { minHitSlop } from '@/lib/hitSlop';
+
 import { crispPx } from '@/lib/crispPixel';
 
 // Enable LayoutAnimation on Android
@@ -132,7 +176,7 @@ function Stepper({ label, value, onChange, min = 0 }: {
         <TouchableOpacity
           style={s.stepperBtn}
           disabled={value <= min}
-          onPress={() => { hapticToggle(); onChange(Math.max(min, value - 1)); }}
+          onPress={() => {  onChange(Math.max(min, value - 1)); }}
           hitSlop={STEPPER_BTN_HIT_SLOP}
           accessibilityRole="button"
           accessibilityLabel={`Decrease ${label}`}
@@ -152,7 +196,7 @@ function Stepper({ label, value, onChange, min = 0 }: {
         />
         <TouchableOpacity
           style={s.stepperBtn}
-          onPress={() => { hapticToggle(); onChange(value + 1); }}
+          onPress={() => {  onChange(value + 1); }}
           hitSlop={STEPPER_BTN_HIT_SLOP}
           accessibilityRole="button"
           accessibilityLabel={`Increase ${label}`}
@@ -1070,6 +1114,7 @@ export default function AddProductScreen() {
   /** Opens the shared MediaCropper for an existing photo ("Edit crop"),
    *  always re-cropping from its uncropped original. */
   function openCropperFor(item: ProductMedia) {
+    haptic('sheet');
     setCropTargetId(item.id);
   }
 
@@ -1132,7 +1177,6 @@ export default function AddProductScreen() {
       const media = draftData.media ?? [];
       patchDraft({ media: media.map(m => m.id === item.id ? { ...m, cutoutUri: localFile.uri, useCutout: true } : m) });
       setBgRemovalState(prev => ({ ...prev, [item.id]: 'done' }));
-      haptics.success();
 
       // Upload the cutout in the background so it has a remote URL by publish time.
       try {
@@ -1195,7 +1239,7 @@ export default function AddProductScreen() {
    *  sheet instead of a permanent row of chips under every thumbnail. */
   function openPhotoActionsFor(m: ProductMedia) {
     const bgStatus = bgRemovalState[m.id];
-    haptics.rigid();
+    haptic('longPress');
     showActionSheet(undefined, undefined, [
       ...(!m.isCover ? [{ text: 'Set as cover photo', onPress: () => setCoverImage(m.id) }] : []),
       { text: 'Edit crop', onPress: () => openCropperFor(m) },
@@ -1333,7 +1377,7 @@ export default function AddProductScreen() {
           {canAddSlot && (
             <TouchableOpacity
               style={[s.photoMoreSlot, tileDims]}
-              onPress={() => { hapticToggle(); setPhotoSlotCount(c => Math.min(10, c + 1)); }}
+              onPress={() => {  setPhotoSlotCount(c => Math.min(10, c + 1)); }}
               // 40pt-wide tile: widen the tap area into the 8pt gap on its
               // left only (5 = 4 + its 1pt border), so nothing extends past
               // the end of the strip.
@@ -1351,6 +1395,7 @@ export default function AddProductScreen() {
   }
 
   function openCategoryPicker() {
+    haptic('sheet');
     showActionSheet('Category', undefined, [
       ...PRODUCT_CATEGORIES.map(cat => ({ text: cat, onPress: () => patchDraft({ category: cat }) })),
       { text: 'Cancel', style: 'cancel' as const },
@@ -1949,7 +1994,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="How will you sell this product?" style={s.sectionHdr} />
         {models.map(m => (
-          <TouchableOpacity key={m.key} onPress={() => { haptics.selection(); patchDraft({ salesModel: m.key }); }} activeOpacity={0.8}>
+          <TouchableOpacity key={m.key} onPress={() => { haptic('select'); patchDraft({ salesModel: m.key }); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, sm === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{m.title}</Text>
@@ -2013,7 +2058,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="Manufacturer" style={s.sectionHdr} />
         {modes.map(m => (
-          <TouchableOpacity key={m.key} onPress={() => { haptics.selection(); updateUnsavedState(setMfgMode, m.key); }} activeOpacity={0.8}>
+          <TouchableOpacity key={m.key} onPress={() => { haptic('select'); updateUnsavedState(setMfgMode, m.key); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, mfgMode === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{m.label}</Text>
@@ -2053,7 +2098,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="More visibility options" style={s.sectionHdr} />
         {statuses.map(st => (
-          <TouchableOpacity key={st.key} onPress={() => { haptics.selection(); patchDraft({ storeSettings: { ...ss, status: st.key }, status: st.key }); }} activeOpacity={0.8}>
+          <TouchableOpacity key={st.key} onPress={() => { haptic('select'); patchDraft({ storeSettings: { ...ss, status: st.key }, status: st.key }); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, ss.status === st.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{st.label}</Text>
@@ -2212,6 +2257,7 @@ export default function AddProductScreen() {
   const currentStatus: 'active' | 'draft' = draftData.storeSettings?.status === 'active' ? 'active' : 'draft';
 
   function openStatusPicker() {
+    haptic('sheet');
     showActionSheet('Product status', undefined, [
       {
         text: 'Active — visible and purchasable', onPress: () => {

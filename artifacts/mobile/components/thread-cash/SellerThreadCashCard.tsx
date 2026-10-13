@@ -1,4 +1,5 @@
 import { hapticLight } from '@/lib/haptics';
+
 /**
  * Seller Thread Cash card — shown at the top of the Payouts screen. Big
  * balance in Thread Cash green (one of the app's allowed non-monochrome
@@ -11,14 +12,23 @@ import { hapticLight } from '@/lib/haptics';
  */
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useApi } from '@/lib/api';
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
+
 import { RetryRow } from '@/components/ui/RetryRow';
+
 import { radius } from '@/constants/radii';
+
 import { formatMoney } from '@/lib/format';
 
 export function SellerThreadCashCard({

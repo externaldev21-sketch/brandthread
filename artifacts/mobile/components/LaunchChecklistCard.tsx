@@ -9,14 +9,21 @@
  */
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+
 import { useRouter } from 'expo-router';
 
 import { Icon } from '@/components/ui';
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
+
 import { hapticLight } from '@/lib/haptics';
+
 import { getReadyRows } from '@/lib/launchChecklist';
+
 import { FILL_ELEVATED, FONT, SP, TEXT } from '@/lib/theme';
+
 import { radius } from '@/constants/radii';
 
 export default function LaunchChecklistCard() {

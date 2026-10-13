@@ -18,31 +18,50 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  ActivityIndicator, Alert, Modal, Platform,
-  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
-} from 'react-native';
+
+import { ActivityIndicator, Alert, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
 import { CachedImage as Image } from '@/components/CachedImage';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
+
 import * as ImagePicker from 'expo-image-picker';
 import { haptics } from '@/lib/haptics';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { useApi } from '@/lib/api';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { LoadingSkeleton, HapticSwitch} from '@/components/BrandthreadUI';
+
+import { LoadingSkeleton, HapticSwitch } from '@/components/BrandthreadUI';
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { Sheet, SHEET_GUTTER } from '@/components/ui/BottomSheet';
+
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+
 import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
+
 import { radius } from '@/constants/radii';
+
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+
 import { dateToHm, dateToYmd, hmToDate, startOfToday, ymdToDate } from '@/lib/dateTimeField';
+
 import { crispPx } from '@/lib/crispPixel';
 
 interface SellerProductRow {
@@ -385,7 +404,6 @@ export default function SellerDropCreate() {
         ]);
       }
 
-      haptics.success();
       if (effectiveDropId) {
         router.replace((`/seller-drop-preview?dropId=${encodeURIComponent(effectiveDropId)}`) as never);
       } else {

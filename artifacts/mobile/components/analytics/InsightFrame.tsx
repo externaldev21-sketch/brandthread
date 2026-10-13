@@ -1,4 +1,5 @@
 import { radius as ControlRadius } from '@/constants/radii';
+
 /**
  * Shared chrome for the seller analytics report screens: the app's standard
  * header (bare back arrow, no subtitle), the Dashboard's Today / Week / Month
@@ -7,15 +8,26 @@ import { radius as ControlRadius } from '@/constants/radii';
  */
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader, type ScreenHeaderAction } from '@/components/ScreenHeader';
+
 import { ErrorState } from '@/components/ui/ErrorState';
+
 import { AnalyticsSkeleton } from '@/components/analytics/AnalyticsKit';
+
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { SellerDashboardRangePills } from '@/components/SellerDashboardRangePills';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { INSIGHT_RANGES, type InsightRange } from '@/services/sellerInsightsService';
 
 /** Space a report screen keeps clear at the bottom for the floating seller bar. */
@@ -78,7 +90,7 @@ export function SegmentedPills<T extends string>({ options, value, onChange, tes
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             accessibilityLabel={o.label}
-            onPress={() => { haptics.selection(); onChange(o.key); }}
+            onPress={() => { haptic('select'); onChange(o.key); }}
             style={{
               flex: 1, minHeight: 40, borderRadius: ControlRadius.md, alignItems: 'center', justifyContent: 'center',
               paddingHorizontal: SP.xs, borderWidth: 1,

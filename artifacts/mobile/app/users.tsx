@@ -1,16 +1,29 @@
-import { haptics } from '@/lib/haptics';
-const haptic = haptics.light;
+import { haptics, haptic } from '@/lib/haptics';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Icon } from '@/components/ui/Icon';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import { useRouter, useLocalSearchParams } from 'expo-router';
+
 import { Badge } from '@/components/Badge';
+
 import { EmptyState } from '@/components/BrandthreadUI';
+
 import { useApi } from '@/lib/api';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { openPullDownMenu } from '@/lib/contextMenu';
+
 import { FONT } from '@/lib/theme';
 
 function relTime(iso: string) {
@@ -69,6 +82,7 @@ export default function UsersScreen() {
 
   const changeRole = () => {
     if (!detail) return;
+    haptic('sheet');
     const { member } = detail;
     Alert.alert('Change role', `Choose a new role for ${member.name ?? member.email}`, [
       { text: 'Cancel', style: 'cancel' },
@@ -233,8 +247,7 @@ export default function UsersScreen() {
         rightElement={
           <View style={styles.headerActions}>
             <TouchableOpacity
-              onPress={(event) => {
-                openPullDownMenu(event, [
+              onPress={(event) => { haptic('sheet'); openPullDownMenu(event, [
                   { label: 'Invite someone', icon: 'user-plus', onPress: () => router.push('/team' as never) },
                 ], { title });
               }}
@@ -255,7 +268,7 @@ export default function UsersScreen() {
             <EmptyState
               icon="users"
               title={role ? `No one has the ${ROLE_LABEL[String(role)] ?? role} role yet` : 'No team members yet'}
-              action={{ label: 'Invite someone', icon: 'user-plus', onPress: () => { haptic(); router.push('/team' as never); } }}
+              action={{ label: 'Invite someone', icon: 'user-plus', onPress: () => { router.push('/team' as never); } }}
             />
           ) : (
             members.map((m) => (

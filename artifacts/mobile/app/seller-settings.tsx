@@ -1,4 +1,5 @@
-import { hapticLight } from '@/lib/haptics';
+import { hapticLight, haptics, haptic } from '@/lib/haptics';
+
 /**
  * Seller Settings Hub — its own screen, separate from Buyer Settings.
  *
@@ -14,30 +15,53 @@ import { hapticLight } from '@/lib/haptics';
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { previewSellerBrandName } from '@/lib/previewIdentity';
+
 import { isSellerDevPreview } from '@/lib/devPreview';
+
 import { ActivityIndicator, Animated, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
 import { appVersion } from '@/lib/appVersion';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import { useAuth, useUser } from '@clerk/expo';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { getInitials } from '@/lib/format';
-import { haptics } from '@/lib/haptics';
+
+
+
 import { useApi } from '@/hooks/useApi';
+
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
+
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
+
 import { SELLER_SETTINGS_CATALOG, SettingsCatalogItem, settingsGroupsFor } from '@/services/settingsCatalog';
+
 import { ConfirmSheet } from '@/components/settings/SettingsKit';
+
 import { PressableScale } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useLargeTitleCollapse } from '@/hooks/useLargeTitleCollapse';
+
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+
 import { collectAppDiagnostics, formatAppVersion } from '@/lib/appDiagnostics';
 
 const APP_VERSION_LABEL = formatAppVersion(collectAppDiagnostics());
@@ -106,7 +130,7 @@ export default function SellerSettingsScreen() {
   async function chooseAccountScope(nextScope: 'global' | 'us') {
     if (scopeLoading || scopeSaving) return;
     if (nextScope === accountScope) { setScopeVisible(false); return; }
-    haptics.selection();
+    haptic('select');
     setScopeSaving(nextScope);
     setScopeSaveError(null);
     try {
@@ -127,12 +151,13 @@ export default function SellerSettingsScreen() {
       (planLoading || !!planError || !hasPlan('growth'))
     ) {
       if (planError) retryPlan();
+      haptic('sheet');
       setUpsellFeature(item.label);
       return;
     }
-    if (item.action === 'sign-out') { setSignOutVisible(true); return; }
+    if (item.action === 'sign-out') { haptic('sheet'); setSignOutVisible(true); return; }
     if (item.action === 'delete-account') { router.push('/delete-account' as never); return; }
-    if (item.action === 'account-scope') { await openAccountScope(); return; }
+    if (item.action === 'account-scope') { haptic('sheet'); await openAccountScope(); return; }
     if (item.route) router.push(item.route as never);
   }
 
@@ -152,7 +177,7 @@ export default function SellerSettingsScreen() {
     <View style={s.page}>
       <ScreenHeader
         title="Settings"
-        onBack={() => { hapticLight(); goBackOr(router); }}
+        onBack={() => {  goBackOr(router); }}
       />
 
       <Animated.ScrollView

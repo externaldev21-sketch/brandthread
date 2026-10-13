@@ -1,4 +1,5 @@
 import { radius as ControlRadius } from '@/constants/radii';
+
 /**
  * Invites and waitlist — platform moderators run the invite-only launch from
  * here: the signup switch (feature flag `inviteOnlySignup`), access codes
@@ -8,21 +9,32 @@ import { radius as ControlRadius } from '@/constants/radii';
  * /api/config/features (moderators only: users.role = 'admin').
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator, TextInput,
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator, TextInput } from 'react-native';
+
 import { useFocusEffect, useRouter } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
+
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import * as Clipboard from 'expo-clipboard';
-import { haptics } from '@/lib/haptics';
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { useApi, type AccessInviteCode, type AccessWaitlist } from '@/lib/api';
+
 import { EmptyState, HapticSwitch, PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { apiErrorMessage } from '@/lib/safety';
+
 import { isPreviewDemoMode } from '@/lib/devPreview';
 
 type Tab = 'codes' | 'waitlist';
@@ -138,7 +150,6 @@ export default function AdminInvitesScreen() {
     setBusy('generate');
     try {
       const made = await api.access.admin.createInvites({ count: qty, maxUses: perCode });
-      haptics.success();
       say(`${made.codes.length} ${made.codes.length === 1 ? 'code' : 'codes'} generated`);
       await load(true);
     } catch (err) {
@@ -163,7 +174,6 @@ export default function AdminInvitesScreen() {
     setBusy(item.id);
     try {
       const res = await api.access.admin.inviteFromWaitlist(item.id);
-      haptics.success();
       await Clipboard.setStringAsync(res.code).catch(() => {});
       say('Invited. Code copied');
       await load(true);
@@ -226,7 +236,7 @@ export default function AdminInvitesScreen() {
               return (
                 <PressableScale
                   key={key}
-                  onPress={() => { haptics.selection(); setTab(key); }}
+                  onPress={() => { haptic('select'); setTab(key); }}
                   style={[s.segmentItem, active && s.segmentItemActive]}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}

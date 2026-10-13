@@ -1,28 +1,43 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput } from 'react-native';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useRouter, useFocusEffect } from 'expo-router';
+
 import * as DocumentPicker from 'expo-document-picker';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@clerk/expo';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic, hapticSuccess } from '@/lib/haptics';
+
 
 import { FONT, FS, SP, RADIUS, COMP, ICON, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, EmptyState, FormInput, StatusBadge } from '@/components/BrandthreadUI';
 
 import { useApi } from '@/lib/api';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { ProductImportPreview } from '@/components/products/ProductImportPreview';
+
 import { Sheet } from '@/components/ui/BottomSheet';
-import { hapticSuccess } from '@/lib/haptics';
+
+
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 import { createdProductIds, publishProducts } from '@/lib/bulkPublish';
+
 import { fmtRelativeDay } from '@/lib/format';
 
 function methodIcon(method: string): IconName {
@@ -177,7 +192,7 @@ export default function ProductImportScreen() {
   }
 
   function selectMethod(method: 'csv' | 'shopify' | 'manual') {
-    haptics.selection();
+    haptic('select');
     setSelectedMethod(prev => (prev === method ? null : method));
   }
 

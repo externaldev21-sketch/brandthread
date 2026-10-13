@@ -13,31 +13,39 @@ import * as Haptics from 'expo-haptics';
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
+
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { haptics } from '@/lib/haptics';
-import {
-  BG, CARD, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  RED, RED_DIM,
-  SUCCESS, SUCCESS_DIM,
-  FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
+import { Feather } from '@expo/vector-icons';
+
+import { BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM, RED, RED_DIM, SUCCESS, SUCCESS_DIM, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
-import {
-  PrimaryButton, SecondaryButton,
-  BrandedLoadingState, HapticSwitch,} from '@/components/BrandthreadUI';
+
+import { PrimaryButton, SecondaryButton, BrandedLoadingState, HapticSwitch } from '@/components/BrandthreadUI';
+
 import { useApi } from '@/lib/api';
+
 import { formatCents, integerPercent, parseDecimalToCents } from '@/lib/money';
+
 import { displayPriceInput, sanitizePriceInput } from '@/lib/priceInput';
+
 import { KeyboardStickyFooter } from '@/components/KeyboardStickyFooter';
+
 import { radius } from '@/constants/radii';
+
 import { formatMoney } from '@/lib/format';
 
 function centsToDecimalInput(cents: number | undefined): string {
@@ -165,7 +173,6 @@ export default function ProductBundleEditScreen() {
           compareAtCents,
           status:           isActive ? 'active' : 'draft',
         });
-        haptics.success();
         Alert.alert('Saved', 'Bundle updated successfully.');
       }
     } catch { Alert.alert("Couldn't save bundle", 'Try again.'); }
@@ -282,7 +289,7 @@ export default function ProductBundleEditScreen() {
           {!isNew && (
           <TouchableOpacity
             style={[s.addItemBtn, isNew && { opacity: 0.5 }]}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPickerOpen(o => !o); }}
+            onPress={() => {  setPickerOpen(o => !o); }}
             disabled={isNew}
             accessibilityState={{ disabled: isNew }}
             activeOpacity={0.7}

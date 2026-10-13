@@ -15,7 +15,6 @@ export function useBlockAction(): (subject: BlockSubject) => Promise<boolean> {
   const api = useApi();
   return useCallback(async (subject: BlockSubject) => {
     const done = await confirmBlock(subject, api.social.block);
-    if (done) 
     return done;
   }, [api]);
 }

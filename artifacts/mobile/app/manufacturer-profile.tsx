@@ -4,43 +4,46 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { plural } from '@/lib/plural';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, Platform,
-} from 'react-native';
+
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Platform } from 'react-native';
+
 import { CachedImage as Image } from '@/components/CachedImage';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useLocalSearchParams } from 'expo-router';
+
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
 
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_LIGHT,
-  SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK, GRAD_PRIMARY, GRAD_CARD_GLOW,
-  FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
-} from '@/lib/theme';
+import { haptics, haptic } from '@/lib/haptics';
 
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  FilterChip, StatusBadge, SectionHeader, EmptyState, FormInput,
-} from '@/components/BrandthreadUI';
 
-import {
-  getManufacturer, getFavoriteManufacturerIds, saveManufacturer, unfavoriteManufacturer,
-  getOrCreateConversation,
-} from '@/services/manufacturerService';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_LIGHT, SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK, GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
+
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, EmptyState, FormInput } from '@/components/BrandthreadUI';
+
+import { getManufacturer, getFavoriteManufacturerIds, saveManufacturer, unfavoriteManufacturer, getOrCreateConversation } from '@/services/manufacturerService';
+
 import { getManufacturerProducts, lowestTierPriceCents, type ManufacturerProduct } from '@/services/manufacturerCatalog';
 
 import { Manufacturer } from '@/services/manufacturerTypes';
+
 import { localTimeLabel } from '@workspace/manufacturer-flow';
+
 import { isSellerDevPreview } from '@/lib/devPreview';
+
 import { formatMoney, fmtRelativeDay } from '@/lib/format';
 
 // ─── Star Rating ──────────────────────────────────────────────────────────────
@@ -130,7 +133,7 @@ export default function ManufacturerProfileScreen() {
 
   async function handleSave() {
     if (!id || actionLoading) return;
-    haptics.light();
+    if (!saved) haptic('save');
     setActionLoading(true);
     try {
       if (saved) {

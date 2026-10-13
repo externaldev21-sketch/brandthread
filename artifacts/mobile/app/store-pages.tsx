@@ -1,31 +1,32 @@
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal,
-} from 'react-native';
+
+import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { Button } from '@/components/ui/Button';
+
 import { useRouter, useFocusEffect } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, FilterChip, StatusBadge, SectionHeader,
-  EmptyState, StatCard,
-} from '@/components/BrandthreadUI';
+
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState, StatCard } from '@/components/BrandthreadUI';
+
 import { getPages, createPage, updatePage, duplicatePage, deletePage } from '@/services/storeService';
+
 import { StorePage, PageType, PageStatus } from '@/services/storeTypes';
+
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+
 import { ErrorState } from '@/components/ui/ErrorState';
 
 type Mode = 'list' | 'edit' | 'new';

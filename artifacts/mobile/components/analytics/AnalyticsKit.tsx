@@ -10,15 +10,25 @@
  */
 import React, { useMemo, useState } from 'react';
 import { ChipRow } from '@/components/ui/ChipRow';
+
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Easing } from 'react-native';
+
 import { useEffect, useRef } from 'react';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import Svg, { Rect, Line, Text as SvgText } from 'react-native-svg';
-import { haptics } from '@/lib/haptics';
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { useColors } from '@/hooks/useColors';
+
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { radius } from '@/constants/radii';
 
 type Colors = ReturnType<typeof useColors>;
@@ -140,7 +150,7 @@ export function PillTabs<T extends string>({
         return (
           <TouchableOpacity
             key={opt.key}
-            onPress={() => { haptics.selection(); onChange(opt.key); }}
+            onPress={() => { haptic('select'); onChange(opt.key); }}
             style={[s.pill, active && s.pillActive]}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}

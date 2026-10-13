@@ -9,30 +9,56 @@
  */
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { Image } from 'expo-image';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { useApi } from '@/hooks/useApi';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
+
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
+
 import { cropToRect } from '@/lib/storeBrandImage';
+
 import { greyHex, STORE_ACCENT_COLORS } from '@/lib/storeSetup';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { FONT, SP } from '@/lib/theme';
+
 import { RADII } from '@/constants/radii';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { MediaCropper } from '@/components/media/MediaCropper';
+
 import { useImageSourceSheet } from '@/components/profile/ImageSourceSheet';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { StoreSetupScreen } from '@/components/store-setup/StoreSetupScreen';
+
 import { useProfileBanner } from '@/components/profile/ProfileBannerEditor';
+
 import { BannerMedia } from '@/components/profile/ProfileBannerHeader';
+
 import { resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
+
 import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 
 type Slot = 'logo' | 'banner';
@@ -201,7 +227,7 @@ export default function StoreSetupBrandScreen() {
               return (
                 <Pressable
                   key={color}
-                  onPress={() => { haptics.selection(); setAccent(selected ? null : color); setSaveError(null); }}
+                  onPress={() => { haptic('select'); setAccent(selected ? null : color); setSaveError(null); }}
                   accessibilityRole="radio"
                   accessibilityState={{ selected }}
                   accessibilityLabel={`Accent ${color}`}

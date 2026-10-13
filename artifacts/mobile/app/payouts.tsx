@@ -1,39 +1,72 @@
 import * as Haptics from 'expo-haptics';
 import { radius as ControlRadius } from '@/constants/radii';
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAgeStatus } from '@/lib/ageGate';
+
 import { AgeRestrictedScreen } from '@/components/age/AgeNotices';
+
 import { AppState, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@clerk/expo';
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { ErrorState } from '@/components/ui/ErrorState';
+
 import { RetryRow } from '@/components/ui/RetryRow';
+
 import { LoadingSkeleton } from '@/components/BrandthreadUI';
+
 import { EmptyState } from '@/components/layout';
+
 import { useApi } from '@/lib/api';
+
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
 import { buildPreviewPayouts } from '@/lib/previewPayouts';
+
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
+
 import { RoleLockedView } from '@/components/RoleLockedView';
+
 import StripeConnectWarning, { ConnectStatus, normalizeConnectStatus } from '@/components/StripeConnectWarning';
 import { useTeamRole } from '@/hooks/useTeamRole';
+
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
+
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
+
 import { scheduleLabel, requirementLabel, taxInfoConfig } from '@/lib/payoutSetup';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
+
 import { SellerThreadCashCard } from '@/components/thread-cash/SellerThreadCashCard';
+
 import { CashOutSheet } from '@/components/thread-cash/CashOutSheet';
+
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
+
 import { formatCents } from '@/lib/money';
+
 import { signedBalance, pausedRowCaption } from '@/lib/recoveries';
+
 import { HeldForDeliverySection } from '@/components/payouts/HeldForDeliveryRow';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
@@ -229,9 +262,6 @@ function PayoutsScreenContent() {
     }
   }, [api, isPreview, refreshConnectStatus]);
 
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
 
   // A lost chargeback still being recovered: the balance is shown net of it
   // (it can be negative) and every cash-out is paused until it is covered.
@@ -326,7 +356,7 @@ function PayoutsScreenContent() {
         {payoutsPaused && !loadError && (
           <TouchableOpacity
             style={styles.pausedRow}
-            onPress={() => { haptic(); router.push('/recoveries' as never); }}
+            onPress={() => { router.push('/recoveries' as never); }}
             accessibilityRole="button"
             accessibilityLabel={`Payouts paused. ${pausedRowCaption(balance?.recoveryOwedCents ?? 0)}`}
             testID="payouts-paused-row"
@@ -354,7 +384,7 @@ function PayoutsScreenContent() {
             key={t}
             testID={`seller-payouts-tab-${t}`}
             style={[styles.tab, activeTab === t && styles.tabActive]}
-            onPress={() => { haptics.selection(); setActiveTab(t); }}
+            onPress={() => { haptic('select'); setActiveTab(t); }}
           >
             <Text style={[styles.tabText, activeTab === t && styles.tabTextActive]}>
               {t === 'payouts' ? 'Payout history' : 'Bank account'}

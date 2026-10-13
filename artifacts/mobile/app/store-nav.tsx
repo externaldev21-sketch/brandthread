@@ -1,29 +1,33 @@
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, } from 'react-native';
+
+import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useFocusEffect } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, FilterChip, StatusBadge, SectionHeader,
-  EmptyState, StatCard, HapticSwitch,} from '@/components/BrandthreadUI';
+
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState, StatCard, HapticSwitch } from '@/components/BrandthreadUI';
+
 import { getMenus, updateMenu } from '@/services/storeService';
+
 import { StoreMenu, StoreMenuItem, MenuType, MenuItemTarget } from '@/services/storeTypes';
+
 import { SheetRise } from '@/components/motion/SheetRise';
 
 const MENU_TABS: { type: MenuType; label: string }[] = [
@@ -329,7 +333,7 @@ export default function StoreNavScreen() {
             <TouchableOpacity
               key={tab.type}
               style={[styles.menuTab, isActive && styles.menuTabActive]}
-              onPress={() => { haptics.selection(); if (menu) setActiveMenuId(menu.id); }}
+              onPress={() => { haptic('select'); if (menu) setActiveMenuId(menu.id); }}
             >
               <Text style={[styles.menuTabText, isActive && styles.menuTabTextActive]}>
                 {tab.label}

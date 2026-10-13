@@ -15,13 +15,22 @@
 
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
+import { haptic } from '@/lib/haptics';
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { GROWTH_EXTRAS, GROWTH_STUDIO_TOOLS, getGrowthStudioTools } from '@/lib/growthTools';
+
 import { getSellerPlan } from '@/lib/sellerPlans';
+
 import { useRevenueCat } from '@/lib/revenueCat';
 
 interface Props {
@@ -62,6 +71,7 @@ export default function PlanUpsellModal({
   }
 
   function handleClose() {
+    haptic('sheet');
     onClose();
   }
 

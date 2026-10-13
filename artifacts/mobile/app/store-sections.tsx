@@ -1,30 +1,35 @@
 import * as Haptics from 'expo-haptics';
 import React, { useState } from 'react';
 import { useColors } from '@/hooks/useColors';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { haptics } from '@/lib/haptics';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, FilterChip, StatusBadge, SectionHeader,
-  EmptyState, StatCard,
-} from '@/components/BrandthreadUI';
+
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState, StatCard } from '@/components/BrandthreadUI';
+
 import { createSection, getStorefront } from '@/services/storeService';
+
 import { StoreSectionType, SECTION_TYPE_LABELS } from '@/services/storeTypes';
+
 import { radius } from '@/constants/radii';
 
 const SECTION_CATALOG = [
@@ -107,7 +112,7 @@ export default function StoreSectionsScreen() {
     <View style={styles.root}>
       <ScreenHeader
         title="Add section"
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+        onBack={() => {  goBackOr(router); }}
       />
 
       <ScrollView

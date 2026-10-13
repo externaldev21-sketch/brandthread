@@ -1,22 +1,39 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { parseTeamInviteTarget } from '@/lib/teamInviteTarget';
+
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator, Modal, Share, RefreshControl } from 'react-native';
+
 import { Sheet } from '@/components/ui/BottomSheet';
+
 import { ListRow } from '@/components/ui/ListRow';
-import { hapticSuccess } from '@/lib/haptics';
+
+import { hapticSuccess, haptics, haptic } from '@/lib/haptics';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { Badge } from '@/components/Badge';
+
 import { useRouter } from 'expo-router';
-import { haptics } from '@/lib/haptics';
+
+
+
 import * as Clipboard from 'expo-clipboard';
 import { useApi } from '@/lib/api';
+
 import { useTeamRole } from '@/hooks/useTeamRole';
+
 import { getEntitlementRejection } from '@/lib/entitlementError';
+
 import { FONT, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
+
 import { radius } from '@/constants/radii';
+
 import { minHitSlop } from '@/lib/hitSlop';
 
 // Header "Invite" pill is 30pt tall; error-state "Retry" pill is 36pt tall.
@@ -140,6 +157,7 @@ export default function TeamScreen() {
   };
 
   const openInvite = () => {
+    haptic('sheet');
     setInviteEmail('');
     setInviteRole('viewer');
     setInviteResult(null);

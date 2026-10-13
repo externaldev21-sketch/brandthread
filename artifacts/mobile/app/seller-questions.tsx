@@ -6,18 +6,31 @@
  */
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, ActivityIndicator } from 'react-native';
+
 import { useFocusEffect } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
+
 import { Button } from '@/components/ui/Button';
+
 import { Snackbar } from '@/components/ui/Snackbar';
+
 import { useApi } from '@/lib/api';
+
 import type { SellerProductQuestion } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT, FS, SP } from '@/lib/theme';
+
 import { ANSWER_MAX, checkAnswerDraft } from '@/lib/reviewDisplay';
+
 import { fmtRelativeDay } from '@/lib/format';
 
 const fmtDate = (iso: string) => fmtRelativeDay(iso);
@@ -115,7 +128,7 @@ export default function SellerQuestionsScreen() {
   const onAnswered = (id: string, body: string) => {
     setItems(prev => (prev ?? []).map(q => q.id === id ? { ...q, answer: { id: q.answer?.id ?? id, body, createdAt: new Date().toISOString() } } : q));
     setToast('Answer posted');
-    haptics.success();
+    haptic('postPublished');
   };
 
   return (

@@ -1,46 +1,45 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, FlatList, TouchableOpacity,
-  TextInput, StyleSheet, Alert, Animated, RefreshControl,
-  PanResponder, GestureResponderEvent, PanResponderGestureState, Platform } from 'react-native';
+
+import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, Animated, RefreshControl, PanResponder, GestureResponderEvent, PanResponderGestureState, Platform } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { LinearGradient } from 'expo-linear-gradient';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, FilterChip, StatusBadge, SectionHeader,
-  EmptyState, StatCard, HapticSwitch,} from '@/components/BrandthreadUI';
+
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState, StatCard, HapticSwitch } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
 import { showActionSheet } from '@/components/ui/ActionSheet';
-import {
-  getStorefront, updateSection, toggleSection, deleteSection,
-  duplicateSection, reorderSections, undoLastAction, redoLastAction,
-  updateThemeSettings, updateBranding, saveDraftAnswers, autosaveStorefront,
-  createVersion, getThemeById, saveDraft,
-} from '@/services/storeService';
-import {
-  Storefront, StoreSection, StoreSectionType,
-  SECTION_TYPE_LABELS, StoreThemeSettings, THREAD_THEME_NAME,
-  TYPOGRAPHY_STYLES,
-} from '@/services/storeTypes';
+
+import { getStorefront, updateSection, toggleSection, deleteSection, duplicateSection, reorderSections, undoLastAction, redoLastAction, updateThemeSettings, updateBranding, saveDraftAnswers, autosaveStorefront, createVersion, getThemeById, saveDraft } from '@/services/storeService';
+
+import { Storefront, StoreSection, StoreSectionType, SECTION_TYPE_LABELS, StoreThemeSettings, THREAD_THEME_NAME, TYPOGRAPHY_STYLES } from '@/services/storeTypes';
+
 import { radius } from '@/constants/radii';
+
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+
 import { isoToDate } from '@/lib/dateTimeField';
 
 import { ChipRow } from '@/components/ui/ChipRow';
+
 type EditorMode = 'sections' | 'branding' | 'header' | 'footer' | 'product_page' | 'collection_page';
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';
 
@@ -67,7 +66,7 @@ function ChipGroup({
       {options.map(opt => (
         <TouchableOpacity
           key={opt}
-          onPress={() => { haptics.selection(); onChange(opt); }}
+          onPress={() => { haptic('select'); onChange(opt); }}
           style={[chipStyles.chip, value === opt && chipStyles.active]}
         >
           <Text style={[chipStyles.label, value === opt && chipStyles.activeLabel]}>
@@ -1209,7 +1208,7 @@ export default function StoreEditor() {
         {TABS.map(tab => (
           <TouchableOpacity
             key={tab.value}
-            onPress={() => { haptics.selection(); setMode(tab.value); }}
+            onPress={() => { haptic('select'); setMode(tab.value); }}
             style={[styles.tab, mode === tab.value && styles.tabActive]}
           >
             <Text style={[styles.tabLabel, mode === tab.value && styles.tabLabelActive]}>

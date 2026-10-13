@@ -1,4 +1,5 @@
 import { radius as ControlRadius } from '@/constants/radii';
+
 /**
  * Seller > Messages > Away message — the automatic reply a buyer gets when
  * they message while the seller is away (always-on, or outside business
@@ -10,21 +11,38 @@ import { radius as ControlRadius } from '@/constants/radii';
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+
 import { useRouter } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
+
 import { useApi, type SellerAwaySettings } from '@/lib/api';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
+
 import { Button } from '@/components/ui/Button';
+
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { isSellerDevPreview } from '@/lib/devPreview';
+
 import { apiErrorMessage } from '@/lib/safety';
+
 import { formatMinute, parseMinute } from '@/lib/awayHours';
+
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+
 import { dateToHm, hmToDate } from '@/lib/dateTimeField';
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 const MESSAGE_MAX = 1000;
@@ -96,7 +114,6 @@ export default function AwayMessageScreen() {
     try {
       if (!offline) await api.seller.awayMessage.update(body);
       setForm(body);
-      haptics.success();
       setSaved(true);
     } catch (e) {
       setError(apiErrorMessage(e, 'Could not save your away message.'));
@@ -157,7 +174,7 @@ export default function AwayMessageScreen() {
                   return (
                   <View key={label} style={styles.chipCell}>
                     <PressableScale
-                      onPress={() => { haptics.selection(); patch({ openDays: form.openDays ^ (1 << i) }); }}
+                      onPress={() => { haptic('select'); patch({ openDays: form.openDays ^ (1 << i) }); }}
                       accessibilityRole="button"
                       accessibilityLabel={DAY_NAMES[i]}
                       accessibilityState={{ selected: on }}

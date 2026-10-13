@@ -1,28 +1,38 @@
 import * as Haptics from 'expo-haptics';
 import React, { useCallback, useEffect, useState } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import {
-  FlatList, View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert,
-} from 'react-native';
+import { FlatList, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import type { ContentPost, ContentType, ContentStatus } from '@/services/types';
-import {
-  archiveSellerPost, deleteSellerPost, getSellerPosts, publishSellerPostNow, unscheduleSellerPost, updateSellerPost,
-} from '@/services/socialService';
+import { archiveSellerPost, deleteSellerPost, getSellerPosts, publishSellerPostNow, unscheduleSellerPost, updateSellerPost } from '@/services/socialService';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { RetryRow } from '@/components/ui/RetryRow';
+
 import { isSellerDevPreview } from '@/lib/devPreview';
+
 import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
+
 import { useAuth } from '@clerk/expo';
+
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
+
 import { radius } from '@/constants/radii';
 
 import { ChipRow } from '@/components/ui/ChipRow';
+
 type FilterTab = 'all' | ContentStatus;
 
 // Only types that create-post.tsx actually supports today. See docs/polish/punch-list.md
@@ -149,7 +159,7 @@ export default function ContentScreen() {
   };
 
   function createPost(type: ContentType) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptic('sheet');
     // The composer chooses its mode from ?mode= (thread = video, post = photos);
     // it never read ?type=, so the picked kind was dropped.
     router.push(('/create-post?mode=' + (type === 'image' ? 'post' : 'thread')) as never);
@@ -407,7 +417,7 @@ export default function ContentScreen() {
                   { backgroundColor: colors.card, borderColor: colors.border },
                   tab === t && { backgroundColor: colors.accent, borderColor: colors.primary },
                 ]}
-                onPress={() => { setTab(t); haptics.selection(); }}
+                onPress={() => { setTab(t); haptic('select'); }}
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityState={{ selected: tab === t }}

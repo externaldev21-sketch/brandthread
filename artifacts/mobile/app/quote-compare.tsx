@@ -5,26 +5,33 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { plural } from '@/lib/plural';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, Platform } from 'react-native';
+
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { haptics } from '@/lib/haptics';
+
 import { getQuotesForRequest, acceptQuote, getManufacturer } from '@/services/manufacturerService';
+
 import { Quote, Manufacturer } from '@/services/manufacturerTypes';
+
 import { BrandthreadCard, PrimaryButton, StatusBadge } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { ErrorState } from '@/components/ui/ErrorState';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM,
-  FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+
+import { BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
 import { useColors } from '@/hooks/useColors';
+
 import { formatCents } from '@/lib/money';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

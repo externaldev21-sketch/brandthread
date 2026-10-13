@@ -7,23 +7,24 @@
  * same haptics) while their content differs.
  */
 import React from 'react';
-import {
-  StyleProp,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  ViewStyle,
-} from 'react-native';
+import { StyleProp, StyleSheet, Text, TextInput, TouchableOpacity, View, ViewStyle } from 'react-native';
+
 import { useRouter } from 'expo-router';
+
 import { useColors } from '@/hooks/useColors';
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { haptics } from '@/lib/haptics';
+
 import { Sheet } from '@/components/ui/BottomSheet';
+
 import { PressableScale, SheetHandle, HapticSwitch } from '@/components/BrandthreadUI';
+
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+
 import { radius } from '@/constants/radii';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
 
 type Colors = ReturnType<typeof useColors>;

@@ -12,56 +12,59 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePersistedChoice } from '@/hooks/usePersistedChoice';
+
 import { ActivityIndicator, Alert, ScrollView, SectionList, Text, View, type ViewToken } from 'react-native';
+
 import { useFocusEffect, useRouter } from 'expo-router';
+
 import { useUser } from '@clerk/expo';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { SP } from '@/lib/theme';
+
 import { EmptyState, useScreenPadding } from '@/components/layout';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { useScrollReset } from '@/hooks/useScrollReset';
+
 import { useUndoToast } from '@/components/BrandthreadUI';
+
 import { ThemedRefreshControl } from '@/components/ui';
+
 import { Chip } from '@/components/ui/Chip';
+
 import { showActionSheet } from '@/components/ui/ActionSheet';
+
 import { CenteredToast } from '@/components/social/CenteredToast';
+
 import { ActivityRowView, SkeletonRows, makeStyles } from '@/app/activity-center';
+
 import { useApi } from '@/lib/api';
+
 import { ApiError } from '@/lib/networkNotice';
+
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
+
 import { haptics } from '@/lib/haptics';
-import {
-  ACTIVITY_PAGE_SIZE,
-  ACTIVITY_UNDO_MS,
-  activityRowHref,
-  applyRead,
-  createDeferredDelete,
-  createReadTracker,
-  type ActivityItem,
-  type ActivityRow,
-} from '@/lib/activity';
-import {
-  SELLER_ACTIVITY_CHIPS,
-  buildSellerActivitySections,
-  isSellerActivityItem,
-  matchesSellerChip,
-  sellerChipEmpty,
-  type SellerActivityChip,
-  type SellerActivitySection,
-} from '@/lib/sellerActivity';
+
+import { ACTIVITY_PAGE_SIZE, ACTIVITY_UNDO_MS, activityRowHref, applyRead, createDeferredDelete, createReadTracker, type ActivityItem, type ActivityRow } from '@/lib/activity';
+
+import { SELLER_ACTIVITY_CHIPS, buildSellerActivitySections, isSellerActivityItem, matchesSellerChip, sellerChipEmpty, type SellerActivityChip, type SellerActivitySection } from '@/lib/sellerActivity';
+
 import { dismissActivity, getActivity, markActivityRead, watchActivityRealtime } from '@/services/activityService';
+
 import { blockUser, seeLessNotificationType, setSellerFollowing } from '@/services/socialService';
-import {
-  getVisiblePreviewActivity,
-  isPreviewActivityEnabled,
-  isPreviewActivityId,
-  markPreviewActivityDismissed,
-} from '@/lib/previewActivity';
+
+import { getVisiblePreviewActivity, isPreviewActivityEnabled, isPreviewActivityId, markPreviewActivityDismissed } from '@/lib/previewActivity';
+
 import { applyPreviewFollowState } from '@/lib/previewFollowStore';
 
 import { ChipRow } from '@/components/ui/ChipRow';
+
 export default function SellerActivityScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -345,7 +348,6 @@ export default function SellerActivityScreen() {
         text: 'Block',
         style: 'destructive',
         onPress: () => {
-          haptics.warning();
           void blockUser({ userId: actor.id!, name: actor.name, handle: '', initials: actor.initials, color: actor.color ?? '#3F3F46' })
             .then(() => {
               setItems((prev) => prev.filter((item) => item.actorId !== actor.id));

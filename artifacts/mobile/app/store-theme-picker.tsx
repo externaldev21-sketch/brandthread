@@ -1,29 +1,36 @@
 import * as Haptics from 'expo-haptics';
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, FlatList, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator,
-} from 'react-native';
+
+import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useFocusEffect } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
-import {
-  FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, FilterChip, StatusBadge, SectionHeader,
-  EmptyState, StatCard,
-} from '@/components/BrandthreadUI';
+
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState, StatCard } from '@/components/BrandthreadUI';
+
 import { getThemes, getStorefront, applyTheme } from '@/services/storeService';
+
 import { StoreTheme, TYPOGRAPHY_STYLES } from '@/services/storeTypes';
+
 import { radius } from '@/constants/radii';
 
 export default function StoreThemePicker() {
@@ -69,7 +76,6 @@ export default function StoreThemePicker() {
               await applyTheme(themeId, presetId);
               setCurrentThemeId(themeId);
               setPreviewingThemeId(null);
-              haptics.success();
               if (andNavigate) {
                 router.push('/store-editor' as never);
               }
@@ -94,6 +100,7 @@ export default function StoreThemePicker() {
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => {
+            haptic('sheet');
             setPreviewingThemeId(item.id);
             setSelectedPresetId(item.presets[0]?.paletteId ?? null);
           }}
@@ -141,6 +148,7 @@ export default function StoreThemePicker() {
             <TouchableOpacity
               style={styles.previewBtn}
               onPress={() => {
+                haptic('sheet');
                 setPreviewingThemeId(item.id);
                 setSelectedPresetId(item.presets[0]?.paletteId ?? null);
               }}
@@ -169,7 +177,7 @@ export default function StoreThemePicker() {
     <View style={styles.root}>
       <ScreenHeader
         title="Storefront theme"
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+        onBack={() => {  goBackOr(router); }}
       />
 
       {/* Thread Theme */}
@@ -251,7 +259,7 @@ export default function StoreThemePicker() {
                     key={preset.paletteId}
                     style={[styles.presetChip, isSelected && styles.presetChipActive]}
                     onPress={() => {
-                      haptics.selection();
+                      if (!isSelected) haptic('select');
                       setSelectedPresetId(preset.paletteId);
                     }}
                   >

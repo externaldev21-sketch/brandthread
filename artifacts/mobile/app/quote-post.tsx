@@ -11,21 +11,38 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Button } from '@/components/ui/Button';
+
 import { QuotedPostCard } from '@/components/social/QuotedPostCard';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useApi } from '@/lib/api';
+
 import { isBuyerDevPreview } from '@/lib/devPreview';
+
 import { isUUID } from '@/lib/engagementUtils';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { QUOTE_MAX_LENGTH, quoteErrorMessage } from '@/lib/quotePost';
+
 import { RADII } from '@/constants/radii';
+
 import { FONT, FS } from '@/lib/theme';
+
 import type { QuotedPostSummary } from '@/services/socialTypes';
 
 type Params = { postId?: string; author?: string; caption?: string; thumb?: string; mediaType?: string };
@@ -65,7 +82,7 @@ export default function QuotePostScreen() {
         return;
       }
       await api.posts.create({ quotedPostId: postId, caption: trimmed, mediaType: 'photo' });
-      haptics.success();
+      haptic('postPublished');
       goBackOr(router, '/');
     } catch (err) {
       setError(quoteErrorMessage(err));

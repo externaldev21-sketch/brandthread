@@ -1,14 +1,19 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  ActivityIndicator, Alert, Linking,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Linking } from 'react-native';
+
 import { useColors } from '@/hooks/useColors';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { useApi } from '@/hooks/useApi';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { FS, FONT, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 
 type KlaviyoStatus = {
@@ -54,10 +59,10 @@ export default function KlaviyoIntegrationScreen() {
       const res = await api.integrations.klaviyoConnect(apiKey.trim());
       setStatus(res);
       setApiKey('');
-      haptics.success();
+      
       Alert.alert('Connected', 'Your existing Klaviyo email & SMS subscribers are now synced.');
     } catch (err: any) {
-      haptics.error();
+      haptic('error');
       const msg = String(err?.message ?? '');
       Alert.alert(
         'Connection failed',

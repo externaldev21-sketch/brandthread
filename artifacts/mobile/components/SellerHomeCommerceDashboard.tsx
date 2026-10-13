@@ -1,67 +1,66 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { useRouter, useFocusEffect } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useApi } from '@/hooks/useApi';
+
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { ApiError } from '@/lib/networkNotice';
+
 import { useTeamRole } from '@/hooks/useTeamRole';
+
 import { subscribeStoreContext } from '@/lib/api';
-import {
-  selectSellerHomeAnalytics,
-  sellerHomeAnalyticsKey,
-  type SellerHomeAnalyticsSnapshot,
-} from '@/lib/sellerHomeAnalytics';
-import {
-  completeTask, isSetupComplete, completionPercent, nextTask,
-  markWalkthroughShown, markCelebrated,
-  type SetupState, type SetupTask,
-} from '@/lib/setupStore';
+
+import { selectSellerHomeAnalytics, sellerHomeAnalyticsKey, type SellerHomeAnalyticsSnapshot } from '@/lib/sellerHomeAnalytics';
+
+import { completeTask, isSetupComplete, completionPercent, nextTask, markWalkthroughShown, markCelebrated, type SetupState, type SetupTask } from '@/lib/setupStore';
+
 import { withOrigin } from '@/lib/navigation/flowOrigin';
+
 import { useStoreLink } from '@/hooks/useStoreLink';
+
 import { navigateOrShareStore } from '@/lib/shareStoreSheet';
+
 import { middleTruncate } from '@/lib/middleTruncate';
+
 import SetupWalkthroughSheet from '@/components/SetupWalkthroughSheet';
 import SetupContinueBanner from '@/components/SetupContinueBanner';
 import SetupCelebration from '@/components/SetupCelebration';
 import LaunchChecklistCard from '@/components/LaunchChecklistCard';
 import { ResponsiveContainer, SkeletonBlock, useBreakpoint } from '@/components/layout';
+
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { PressableScale } from '@/components/BrandthreadUI';
+
 import { bucketLabel, type SellerHomeTimeRange } from '@/lib/sellerHomeChartLabels';
+
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
 import { allPreviewSellerOrders } from '@/lib/previewSellerOrders';
+
 import { buildPreviewSellerAnalytics } from '@/lib/previewSellerChartData';
+
 import { formatCents } from '@/lib/money';
+
 import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
+
 import { computeMetricChange } from '@/lib/sellerMetricChange';
+
 import { optionalList } from '@/lib/optionalList';
-import {
-  countOrderReturns,
-  deriveHubStats,
-  deriveInventoryStats,
-  describeDashboardDelta,
-  isNewSeller,
-  mergeTopProductImages,
-  normalizeRecentOrder,
-  type DashboardActionCounts,
-  type RecentOrderSummary,
-  type TopProductSummary,
-} from '@/lib/sellerDashboardStats';
+
+import { countOrderReturns, deriveHubStats, deriveInventoryStats, describeDashboardDelta, isNewSeller, mergeTopProductImages, normalizeRecentOrder, type DashboardActionCounts, type RecentOrderSummary, type TopProductSummary } from '@/lib/sellerDashboardStats';
+
 // Reused (not reimplemented) so the "orders to ship" tile can never drift
 // from what the Orders screen itself counts as unfulfilled — see item 31 /
 // docs/qa/full-crawl-report.md #7: this tile used to read a separately
@@ -69,32 +68,39 @@ import {
 // paid), while Orders' own "Unfulfilled" filter/count uses a different rule
 // (order status only, via `FULFILLMENT_MAP`), so the two disagreed.
 import { apiRowToOrder } from '@/app/(tabs)/orders';
+
 import { filterOrders } from '@/services/orderService';
+
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
+
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
+
 import { DASHBOARD_RANGES, SellerDashboardChart, type SellerDashboardRange } from '@/components/SellerDashboardChart';
+
 import { SellerDashboardStatGrid, type SellerDashboardStatTileData } from '@/components/SellerDashboardStatGrid';
+
 import { SellerDashboardActionNeeded } from '@/components/SellerDashboardActionNeeded';
+
 import { useScrollReset } from '@/hooks/useScrollReset';
+
 import { SellerDashboardTopProducts } from '@/components/SellerDashboardTopProducts';
+
 import { SellerDashboardTrafficSources } from '@/components/SellerDashboardTrafficSources';
+
 import { SellerDashboardRecentOrders } from '@/components/SellerDashboardRecentOrders';
+
 import { SellerDashboardSetupCard } from '@/components/SellerDashboardSetupCard';
+
 import { SellerDashboardAISuggestions } from '@/components/SellerDashboardAISuggestions';
+
 import { ReadyToSellChecklist } from '@/components/ReadyToSellChecklist';
+
 import { useReadyToSell } from '@/hooks/useReadyToSell';
-import {
-  BG,
-  FG,
-  FONT,
-  FS,
-  GRID_MAX_WIDTH,
-  MUTED,
-  RADIUS,
-  SCREEN_BG,
-  SP,
-} from '@/lib/theme';
+
+import { BG, FG, FONT, FS, GRID_MAX_WIDTH, MUTED, RADIUS, SCREEN_BG, SP } from '@/lib/theme';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { updateSellerTodayWidget } from '@/lib/nativeSystem';
 
 type MetricKey = 'sales' | 'orders' | 'visitors' | 'conversion' | 'aov';
@@ -625,7 +631,6 @@ export default function SellerHomeCommerceDashboard({
                 payoutAttemptKeyRef.current = null;
                 await AsyncStorage.removeItem(storageKey).catch(() => {});
                 await loadFinanceBalance();
-                haptics.success();
                 Alert.alert(
                   'Cash out requested',
                   `${payout.formatted ?? financeBalance.available.formatted} is being sent to your bank account.`,
@@ -649,7 +654,7 @@ export default function SellerHomeCommerceDashboard({
                       ? 'This payout needs review before it can continue. Do not start another cash out for the same funds.'
                     : 'The cash-out request could not be confirmed. Try again to safely retry the same request.';
                 await loadFinanceBalance();
-                haptics.error();
+                haptic('error');
                 Alert.alert('Could not cash out', message);
               } finally {
                 setCashingOut(false);

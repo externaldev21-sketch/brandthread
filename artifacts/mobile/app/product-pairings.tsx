@@ -10,18 +10,33 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { haptics } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { PrimaryButton } from '@/components/BrandthreadUI';
+
 import { Header } from '@/components/layout';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useApi } from '@/lib/api';
+
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+
 import { FONT, FS, RADIUS, SP, TEXT_DISABLED } from '@/lib/theme';
+
 import { crispPx } from '@/lib/crispPixel';
 
 const MAX_PAIRINGS = 6;
@@ -82,7 +97,6 @@ export default function ProductPairingsScreen() {
   const move = (index: number, delta: -1 | 1) => {
     const target = index + delta;
     if (target < 0 || target >= paired.length) return;
-    haptics.selection();
     const next = [...paired];
     [next[index], next[target]] = [next[target], next[index]];
     setPaired(next);

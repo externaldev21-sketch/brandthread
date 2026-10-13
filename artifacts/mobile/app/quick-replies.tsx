@@ -9,18 +9,31 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+
 import { useRouter } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
+
 import { useApi, type SellerQuickReply } from '@/lib/api';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { PressableScale } from '@/components/BrandthreadUI';
+
 import { Button } from '@/components/ui/Button';
+
 import { EmptyState } from '@/components/layout';
+
 import { haptics } from '@/lib/haptics';
+
 import { isSellerDevPreview } from '@/lib/devPreview';
+
 import { apiErrorMessage } from '@/lib/safety';
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 const TITLE_MAX = 40;
@@ -85,7 +98,6 @@ export default function QuickRepliesScreen() {
           : await api.seller.quickReplies.create(payload);
         setItems((cur) => (draft.id ? cur.map((r) => (r.id === saved.id ? saved : r)) : [...cur, saved]));
       }
-      haptics.success();
       setDraft(null);
     } catch (e) {
       setError(apiErrorMessage(e, 'Could not save this quick reply.'));

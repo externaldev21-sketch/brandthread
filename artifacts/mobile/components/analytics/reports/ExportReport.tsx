@@ -1,4 +1,5 @@
-import { haptics } from '@/lib/haptics';
+import { haptics, haptic } from '@/lib/haptics';
+
 /**
  * Export analytics — CSV (or PDF) of orders, products, analytics, threads and
  * videos, audience and goals for a Dashboard range, generated server-side and
@@ -7,18 +8,32 @@ import { haptics } from '@/lib/haptics';
  */
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+
 import { Icon as Feather } from '@/components/ui/Icon';
+
 import * as Haptics from 'expo-haptics';
+
+
 import { useColors } from '@/hooks/useColors';
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { PrimaryButton } from '@/components/BrandthreadUI';
+
 import { Card, CardDivider, SectionTitle } from '@/components/analytics/AnalyticsKit';
+
 import { SegmentedPills, useReportBottomInset } from '@/components/analytics/InsightFrame';
+
 import { DEFAULT_INSIGHT_RANGE, INSIGHT_RANGES, previewMode, requestExport, type ExportSectionKey, type InsightRange } from '@/services/sellerInsightsService';
+
 import { saveExportFile } from '@/lib/saveExportFile';
+
 import { useRouter } from 'expo-router';
+
 import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
+
 import { crispPx } from '@/lib/crispPixel';
 
 const SECTIONS: { key: ExportSectionKey; label: string; detail: string }[] = [
@@ -40,7 +55,7 @@ export default function ExportReport() {
   const [picked, setPicked] = useState<ExportSectionKey[]>(['orders', 'products', 'analytics']);
   const [busy, setBusy] = useState(false);
 
-  const toggle = (k: ExportSectionKey) => { haptics.selection(); setPicked(p => (p.includes(k) ? p.filter(x => x !== k) : [...p, k])); };
+  const toggle = (k: ExportSectionKey) => { haptic('select'); setPicked(p => (p.includes(k) ? p.filter(x => x !== k) : [...p, k])); };
 
   async function onExport() {
     if (previewMode()) { Alert.alert('Preview', 'Exports are generated for signed-in sellers.'); return; }

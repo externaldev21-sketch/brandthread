@@ -9,23 +9,37 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+
 import { useRouter } from 'expo-router';
+
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import { BottomSheet } from '@/components/ui/BottomSheet';
+
 import { Button } from '@/components/ui/Button';
+
 import { Snackbar } from '@/components/ui/Snackbar';
+
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useApi } from '@/hooks/useApi';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { FONT } from '@/lib/theme';
+
 import { reorderFromOrder } from '@/services/reorderService';
-import {
-  priceChangeNote, reorderNeedsReview, summarizeReorder, unavailableReasonLabel,
-  type ReorderOutcome,
-} from '@/lib/reorderSummary';
+
+import { priceChangeNote, reorderNeedsReview, summarizeReorder, unavailableReasonLabel, type ReorderOutcome } from '@/lib/reorderSummary';
 
 const SNACKBAR_MS = 5000;
 
@@ -62,7 +76,7 @@ export function useReorderFlow(options: { aboveTabBar?: boolean } = {}) {
       const result = await reorderFromOrder(orderId, api);
       setOutcome(result);
       showMessage(summarizeReorder(result));
-      if (result.addedUnits > 0) haptics.light();
+      if (result.addedUnits > 0) haptic('addToBag');
       if (reorderNeedsReview(result)) setSheetOpen(true);
     } catch {
       setOutcome(null);

@@ -8,28 +8,49 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { haptic } from '@/lib/haptics';
+
 import * as Sharing from 'expo-sharing';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { BrandthreadCard, PrimaryButton, SecondaryButton, SectionHeader } from '@/components/BrandthreadUI';
+
 import { EmptyState } from '@/components/layout/EmptyState';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
 import { Button, Icon, ICON_SIZE } from '@/components/ui';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { FulfillSheet } from '@/components/orders/FulfillSheet';
+
 import { useApi } from '@/lib/api';
+
 import { adaptApiOrder } from '@/app/order-detail';
+
 import { applyFulfillLocally, linesToFulfill, orderTitle, submitFulfillRequest, type FulfillRequest } from '@/lib/orderFulfillment';
+
 import { isLocalPreviewSellerOrderId, loadPreviewSellerOrder, savePreviewSellerOrder } from '@/lib/previewOrderEdits';
+
 import { sellerOrderConflictMessage } from '@/lib/deliveryGuarantee';
-import {
-  getPackagePresets, getParcelSuggestion, getShippingRates, isShipFromError, purchaseShippingLabel, type PackagePreset,
-} from '@/services/orderService';
+
+import { getPackagePresets, getParcelSuggestion, getShippingRates, isShipFromError, purchaseShippingLabel, type PackagePreset } from '@/services/orderService';
+
 import { Order, ShippingRate } from '@/services/orderTypes';
+
 import { formatCents } from '@/lib/money';
+
 import { batchParcelWeightLb } from '@/lib/batchLabels';
 
 type RowResult = { orderId: string; orderNumber: string; ok: boolean; message: string; labelUrl?: string };
@@ -101,7 +122,7 @@ export default function FulfillBatchScreen() {
   // saved package preset) and the items' stored weights, from the seller's
   // ship-from address. Nothing is bought until the seller confirms the total.
   async function handlePrintLabels(pickedBoxId?: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    
     setRunning('labels');
     setLastRun('labels');
     setNotice(null);
@@ -172,6 +193,7 @@ export default function FulfillBatchScreen() {
     setQuotes([]);
     setResults(rows);
     setRunning(null);
+    if (rows.some(r => r.ok)) haptic('orderShipped');
 
     const urls = rows.filter(r => r.ok && r.labelUrl).map(r => r.labelUrl!) as string[];
     if (urls.length > 0 && await Sharing.isAvailableAsync().catch(() => false)) {
@@ -183,7 +205,7 @@ export default function FulfillBatchScreen() {
   const fulfillable = orders.filter(o => linesToFulfill(o).length > 0);
 
   function startShip() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    
     setResults([]);
     setLastRun('ship');
     setQueue(fulfillable);
@@ -223,6 +245,7 @@ export default function FulfillBatchScreen() {
       }
     }
     record({ orderId: order.id, orderNumber: order.orderNumber, ok: true, message: 'Fulfilled' });
+    haptic('orderShipped');
     advance();
   }
 

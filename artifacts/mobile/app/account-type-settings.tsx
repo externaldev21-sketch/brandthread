@@ -12,7 +12,6 @@
  * Replaces the old flip-your-role cards, which merged a buyer and a brand into
  * one public account.
  */
-import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';

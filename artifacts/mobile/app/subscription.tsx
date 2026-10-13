@@ -11,42 +11,61 @@
  * from the shared plan config (lib/sellerPlanConfig.ts).
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, Linking, AppState, AppStateStatus, Platform,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Linking, AppState, AppStateStatus, Platform } from 'react-native';
+
 import { useAuth } from '@clerk/expo';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useFocusEffect } from 'expo-router';
+
 import { LinearGradient } from 'expo-linear-gradient';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { FONT, FS, SP, RADIUS, ON_LIGHT_MUTED } from '@/lib/theme';
+
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { useApi } from '@/hooks/useApi';
+
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
+
 import { isManagerRole, parseRoleError } from '@/lib/roleError';
+
 import { RoleLockedView } from '@/components/RoleLockedView';
+
 import { formatCents } from '@/lib/money';
-import {
-  STORE_BILLED_NOTICE, WEB_BILLED_NOTICE, currentPlanSummary, manageSubscriptionAction,
-} from '@/lib/currentPlan';
+
+import { STORE_BILLED_NOTICE, WEB_BILLED_NOTICE, currentPlanSummary, manageSubscriptionAction } from '@/lib/currentPlan';
+
 import { pollSubscriptionStatus } from '@/lib/pollSubscriptionStatus';
+
 import { useTeamRole } from '@/hooks/useTeamRole';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
 import { isSellerDevPreview } from '@/lib/devPreview';
+
 import { useRevenueCat } from '@/lib/revenueCat';
+
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
+
 import { getSellerPlan, SELLER_PLANS } from '@/lib/sellerPlans';
+
 import { formatPlanPrice, useSellerPlanConfig } from '@/lib/sellerPlanConfig';
+
 import { PlanTierCard } from '@/components/plans/PlanTierCard';
+
 import { CompareFeaturesSheet } from '@/components/plans/CompareFeaturesSheet';
-import {
-  isSubscriptionPaymentRecoveryRequired,
-  platformSubscriptionSettingsUrl,
-  type SubscriptionBillingProvider,
-} from '@/lib/subscriptionRecovery';
+
+import { isSubscriptionPaymentRecoveryRequired, platformSubscriptionSettingsUrl, type SubscriptionBillingProvider } from '@/lib/subscriptionRecovery';
+
 import { manageOrCancelLine } from '@/lib/trialOffer';
+
 import { accessEndLabel, cancelConfirmCopy, planCancelAction } from '@/lib/planCancel';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -210,6 +229,7 @@ export default function SubscriptionScreen() {
           throw new Error('Subscriptions are temporarily unavailable. Please try again shortly.');
         }
         await purchase(packageToPurchase);
+        haptic('purchaseSuccess');
         invalidatePlanCache();
         await fetchStatus();
         return;
@@ -387,7 +407,7 @@ export default function SubscriptionScreen() {
             key={t}
             testID={`seller-subscription-tab-${t}`}
             style={[styles.tab, activeTab === t && styles.tabActive]}
-            onPress={() => { haptics.selection(); setActiveTab(t); }}
+            onPress={() => { haptic('select'); setActiveTab(t); }}
           >
             <Text style={[styles.tabText, activeTab === t && styles.tabTextActive]}>
               {t.charAt(0).toUpperCase() + t.slice(1)}

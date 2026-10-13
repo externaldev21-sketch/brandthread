@@ -8,11 +8,19 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Linking, TextInput } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
+import { Feather } from '@expo/vector-icons';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useApi } from '@/hooks/useApi';
-import { BrandthreadCard, LoadingSkeleton, SkeletonText, HapticSwitch} from '@/components/BrandthreadUI';
+
+import { BrandthreadCard, LoadingSkeleton, SkeletonText, HapticSwitch } from '@/components/BrandthreadUI';
+
 import { COMP, FS, SP, FONT } from '@/lib/theme';
 
 export default function ShopifyFulfillmentScreen() {

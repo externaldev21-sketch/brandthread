@@ -29,52 +29,69 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  ActivityIndicator,
-  Alert,
-  AppState,
-  AppStateStatus,
-  Linking,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+
+import { ActivityIndicator, Alert, AppState, AppStateStatus, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useRouter, useLocalSearchParams } from 'expo-router';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
+import { haptic } from '@/lib/haptics';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ONBOARDING_KEY } from './_layout';
+
 import { useApi } from '@/lib/api';
+
 import { parseRoleError } from '@/lib/roleError';
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useRevenueCat } from '@/lib/revenueCat';
+
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
+
 import { useTeamRole } from '@/hooks/useTeamRole';
+
 import { track } from '@/lib/analytics';
+
 import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
+
 import { displayPriceFor } from '@/lib/sellerPlansDisplay';
+
 import { formatPlanPrice, useSellerPlanConfig } from '@/lib/sellerPlanConfig';
+
 import { PlanTierCard } from '@/components/plans/PlanTierCard';
+
 import { CompareFeaturesSheet } from '@/components/plans/CompareFeaturesSheet';
+
 import { commissionSummary, wantsProHighlight, DEMO_PERKS, type PerksResponse } from '@/lib/proPerks';
+
 import { isPreviewDemoMode, isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
-import {
-  ONE_TIME_OFFER_DISCOUNT_PERCENT,
-  isOneTimeOfferAvailable,
-} from '@/lib/paywallRetentionConfig';
+
+import { ONE_TIME_OFFER_DISCOUNT_PERCENT, isOneTimeOfferAvailable } from '@/lib/paywallRetentionConfig';
+
 import { SellerPaywallHeadline } from '@/components/paywall/SellerPaywallHeadline';
+
 import { SellerPaywallBullets } from '@/components/paywall/SellerPaywallBullets';
+
 import { freeTrialDays, manageOrCancelLine } from '@/lib/trialOffer';
+
 import type { PlanPricing } from '@/components/paywall/SellerPlanSelector';
 import { SellerTrialTimeline, type TrialTimelineStep } from '@/components/paywall/SellerTrialTimeline';
+
 import { SellerPaywallCTA } from '@/components/paywall/SellerPaywallCTA';
+
 import { SellerPaywallExitDrawer } from '@/components/paywall/SellerPaywallExitDrawer';
+
 import { SellerPaywallOneTimeOffer } from '@/components/paywall/SellerPaywallOneTimeOffer';
 
 // ─── Benefit bullets shown above the plan selector — apply to every tier, so
@@ -334,6 +351,7 @@ export default function PlansScreen() {
   /** X (settings) / "Not now" (onboarding) — opens the exit drawer instead
    *  of leaving immediately. */
   function requestExit() {
+    haptic('sheet');
     exitHandledRef.current = false;
     setExitDrawerVisible(true);
   }

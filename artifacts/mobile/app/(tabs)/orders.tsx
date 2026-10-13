@@ -5,51 +5,96 @@
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { usePersistedChoice } from '@/hooks/usePersistedChoice';
+
 import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Platform, Share } from 'react-native';
+
 import { showActionSheet } from '@/components/ui/ActionSheet';
+
 import { openPullDownMenu } from '@/lib/contextMenu';
+
 import { FlashList } from '@shopify/flash-list';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { FONT, FS, SP, RADIUS, ICON, ANIM } from '@/lib/theme';
+
 import { useResponsive } from '@/hooks/useResponsive';
+
 import { useIsWebShell } from '@/components/web/WebAppShell';
+
 import OrderDetailScreen from '@/app/order-detail';
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { SellerListHeader, sellerListCountRowStyles } from '@/components/SellerListHeader';
+
 import { orderEmptyCopy } from '@/lib/sellerLists/emptyCopy';
+
 import { Button } from '@/components/ui/Button';
+
 import { SkeletonBlock, EmptyState, useCenteredContentPadding } from '@/components/layout';
+
 import { RetryRow } from '@/components/ui/RetryRow';
+
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
+
 import { useTabBarClearance, useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { filterOrders, sortOrders } from '@/services/orderService';
+
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus } from '@/lib/orderStatusAdapter';
+
 import { Order, OrderFilterKey, OrderSortKey, OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType, OrderStatus, PaymentStatus, CancellationReason, CANCELLATION_REASONS } from '@/services/orderTypes';
+
 import { useApi } from '@/hooks/useApi';
+
 import { useAuth } from '@clerk/expo';
+
 import { clearBadge } from '@/lib/orderBadgeStore';
+
 import { formatCents } from '@/lib/money';
+
 import SwipeRow from '@/components/ui/SwipeRow';
 import { SheetRise } from '@/components/motion/SheetRise';
+
 import { useScrollReset } from '@/hooks/useScrollReset';
+
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
 import { allPreviewSellerOrders } from '@/lib/previewSellerOrders';
+
 import { sellerCountdown } from '@/lib/deliveryGuarantee';
+
 import { DeadlineChip } from '@/components/orders/SellerDelivery';
+
 import { useQueryClient } from '@tanstack/react-query';
+
 import { queryKeys } from '@/lib/queryClient';
+
 import { prefetchOnPressIn } from '@/lib/prefetch';
+
 import { seedDetailOnInteraction, type DetailSeedSnapshot } from '@/lib/seedDetailOnInteraction';
+
 import { groupByLocalDate } from '@/lib/groupByLocalDate';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+
 import { SELLER_ORDERS_GESTURE } from '@/lib/firstRunTips/content';
+
 import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
+
 import { useRouteIsFocused } from '@/hooks/useRouteIsFocused';
+
 import { crispPx } from '@/lib/crispPixel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -552,7 +597,7 @@ function SortModal({
           <TouchableOpacity
             key={key}
             style={[s.sortOption, current === key && s.sortOptionActive]}
-            onPress={() => { haptics.selection(); onSelect(key); onClose(); }}
+            onPress={() => { haptic('select'); onSelect(key); onClose(); }}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel={`Sort by ${label}`}
@@ -593,7 +638,7 @@ function FilterSheet({
             <TouchableOpacity
               key={key}
               style={[s.sortOption, current === key && s.sortOptionActive]}
-              onPress={() => { haptics.selection(); onSelect(key); onClose(); }}
+              onPress={() => { haptic('select'); onSelect(key); onClose(); }}
               activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityLabel={`Filter orders by ${label}`}
@@ -971,6 +1016,7 @@ export default function OrdersScreen() {
   }, [loadData]);
 
   const onRefresh = useCallback(() => {
+    haptic('refresh');
     setRefreshing(true);
     retryUpdates();
   }, [retryUpdates]);
@@ -1045,7 +1091,6 @@ export default function OrdersScreen() {
   }, [selectedIds, queryClient, api, userId]);
 
   const handleLongPress = useCallback((orderId: string) => {
-    haptics.selection();
     setSelectedIds(prev =>
       prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
     );
@@ -1054,6 +1099,7 @@ export default function OrdersScreen() {
   const handleBulkMarkReady = useCallback(async () => {
     try {
       await Promise.all(selectedIds.map(id => api.orders.updateStatus(id, 'fulfilled')));
+      haptic('orderShipped');
       setSelectedIds([]);
       haptics.success();
       await loadData(generationRef.current);

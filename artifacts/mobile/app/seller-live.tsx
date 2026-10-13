@@ -6,35 +6,62 @@ import * as Haptics from 'expo-haptics';
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Platform, ActivityIndicator } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import { useApi } from '@/lib/api';
+
 import { useUser } from '@clerk/expo';
+
 import { FILL_ELEVATED, FONT, FS, SP, RADIUS, FG, TEXT_SECONDARY } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { useScrollToEndOnContentChange } from '@/hooks/useScrollToEndOnContentChange';
+
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
+
 import Composer from '@/components/ui/Composer';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
+
 import { LiveCodesHostSheet } from '@/components/live/LiveCodesHostSheet';
+
 import { useLiveModeration } from '@/lib/live/useLiveModeration';
+
 import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
+
 import { LiveCommentActionsSheet, type CommentAction, type CommentActionTarget } from '@/components/live/LiveCommentActionsSheet';
+
 import { radius } from '@/constants/radii';
+
 import { loadAgoraModule } from '@/lib/agoraAvailability';
+
 import { LiveCohostSplit } from '@/components/live/LiveCohostSplit';
+
 import { LivePurchaseToast, useLivePurchaseToasts } from '@/components/live/LivePurchaseToast';
+
 import type { LiveCohostPerson } from '@/lib/live/moderationTypes';
 import { endLiveStreamActivity, startLiveStreamActivity, updateLiveStreamActivity } from '@/lib/nativeSystem';
-import { crispPx } from '@/lib/crispPixel';
-import { formatMoney } from '@/lib/format';
 
+import { crispPx } from '@/lib/crispPixel';
+
+import { formatMoney } from '@/lib/format';
 
 // ─── Agora SDK (native-only, gracefully skipped on web/Expo Go) ───────────────
 const AgoraModule = loadAgoraModule();
@@ -341,7 +368,7 @@ function SellerLiveNativeScreen() {
   }
 
   async function toggleProduct(product: any) {
-    haptics.selection();
+    haptic('select');
     const exists = productTags.find(t => t.productId === product.id);
     const updated = exists
       ? productTags.filter(t => t.productId !== product.id)
@@ -350,7 +377,7 @@ function SellerLiveNativeScreen() {
   }
 
   async function highlightProduct(productId: string) {
-    haptics.selection();
+    haptic('select');
     // Tapping the featured product again unpins it. The pin is stored and
     // broadcast by the server (POST /api/live/:id/pin), which also keeps the
     // legacy `highlighted` flag in step.
@@ -404,7 +431,7 @@ function SellerLiveNativeScreen() {
             Alert.alert('Could not end live', e?.message ?? 'Check your connection and try again.');
             return;
           }
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          
           openSummary();
         },
       },

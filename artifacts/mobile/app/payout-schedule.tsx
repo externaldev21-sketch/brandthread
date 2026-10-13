@@ -1,29 +1,49 @@
 import { radius as ControlRadius } from '@/constants/radii';
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { useRouter } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { AppThemePreset, useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { ErrorState } from '@/components/ui/ErrorState';
+
 import { Button } from '@/components/ui/Button';
+
 import { LoadingSkeleton } from '@/components/BrandthreadUI';
+
 import { EmptyState } from '@/components/layout';
+
 import { RoleLockedView } from '@/components/RoleLockedView';
+
 import { useApi } from '@/lib/api';
+
 import { ApiError } from '@/lib/networkNotice';
+
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+
 import { hasPayoutsAccess, isManagerRole } from '@/lib/roleError';
+
 import { useTeamRole } from '@/hooks/useTeamRole';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { formatCents } from '@/lib/money';
-import {
-  WEEKLY_ANCHORS, cap, choiceFromSchedule, instantFeeLabel, instantUnavailableReason, nextPayoutLabel,
-  type PayoutScheduleInfo, type ScheduleChoice, type WeeklyAnchor,
-} from '@/lib/payoutScheduleView';
+
+import { WEEKLY_ANCHORS, cap, choiceFromSchedule, instantFeeLabel, instantUnavailableReason, nextPayoutLabel, type PayoutScheduleInfo, type ScheduleChoice, type WeeklyAnchor } from '@/lib/payoutScheduleView';
+
 import { crispPx } from '@/lib/crispPixel';
 
 /** Weekday picker: a fixed 4-column grid of equal chips. */
@@ -108,7 +128,7 @@ export default function PayoutScheduleScreen() {
   function pick(next: ScheduleChoice) {
     if (!canEdit) return;
     if (next === 'instant' && instantBlocked) return;
-    haptics.selection();
+    haptic('select');
     setChoice(next);
   }
 
@@ -122,7 +142,6 @@ export default function PayoutScheduleScreen() {
           ? { interval: 'weekly', weeklyAnchor: anchor }
           : { interval: choice === 'instant' ? 'manual' : 'daily' },
       );
-      haptics.success();
       await load();
     } catch (error) {
       const message = error instanceof ApiError && error.status < 500
@@ -159,13 +178,12 @@ export default function PayoutScheduleScreen() {
                   idempotencyKey: cashoutKeyRef.current.key, amount: max, currency: 'usd', method: 'instant',
                 });
                 cashoutKeyRef.current = null;
-                haptics.success();
                 Alert.alert('Cash out requested', `${payout.formatted ?? formatCents(max)} is on its way to your card.`);
               } catch (error) {
                 if (error instanceof ApiError && error.status < 500 && error.code !== 'PAYOUT_REVIEW_REQUIRED') {
                   cashoutKeyRef.current = null;
                 }
-                haptics.error();
+                haptic('error');
                 Alert.alert(
                   "Couldn't cash out",
                   error instanceof ApiError && error.code === 'BALANCE_CHANGED'
@@ -249,7 +267,7 @@ export default function PayoutScheduleScreen() {
                       key={day}
                       testID={`payout-schedule-day-${day}`}
                       style={[styles.dayChip, { width: Math.floor((gridWidth - DAY_GAP * (DAY_COLUMNS - 1)) / DAY_COLUMNS) }, anchor === day && styles.dayChipOn]}
-                      onPress={() => { if (canEdit) { haptics.selection(); setAnchor(day); } }}
+                      onPress={() => { if (canEdit) { haptic('select'); setAnchor(day); } }}
                       accessibilityRole="button"
                       accessibilityState={{ selected: anchor === day }}
                       accessibilityLabel={cap(day)}

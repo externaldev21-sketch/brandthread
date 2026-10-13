@@ -39,7 +39,6 @@ import { confirmSponsoredImpression } from '@/services/sponsoredService';
 import * as Haptics from 'expo-haptics';
 import { isPreviewDemoMode, isBuyerDevPreview } from '@/lib/devPreview';
 
-import type { SellerThreadPost } from '@/services/socialService';
 
 import { LinearGradient } from 'expo-linear-gradient';
 

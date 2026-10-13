@@ -30,7 +30,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { formatMoney as formatCents } from '@/lib/format';
 
-import { formatCents } from '@/lib/money';
 
 import { useColors } from '@/hooks/useColors';
 
@@ -1141,7 +1140,6 @@ export default function BuyerProductDetailScreen() {
       setAddedToCart(true);
       setCartCount(result.cart.items.reduce((sum, item) => sum + item.quantity, 0));
       bumpCart();
-      setShowAddedSheet(true);
       // Auto-clear the icon-button checkmark after 2.5s; the sheet itself
       // stays open until the buyer taps View bag or Keep shopping.
       if (addedBannerTimerRef.current) clearTimeout(addedBannerTimerRef.current);

@@ -7,23 +7,27 @@
  * merged onboarding PR) — no duplicate task list or completion logic.
  */
 import React, { useCallback, useMemo } from 'react';
-import {
-  Modal, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Pressable,
-} from 'react-native';
+import { Modal, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Pressable } from 'react-native';
+
 import Animated from 'react-native-reanimated';
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { haptic } from '@/lib/haptics';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
 import { withOrigin } from '@/lib/navigation/flowOrigin';
+
 import { useSheetTransition } from '@/components/ui/BottomSheet';
-import {
-  SetupState, SetupTask, SetupTaskId,
-  completionPercent, nextTask, completedRequiredTaskCount, requiredTaskCount,
-  markSetupStarted, dismissWelcome, skipTask,
-} from '@/lib/setupStore';
+
+import { SetupState, SetupTask, SetupTaskId, completionPercent, nextTask, completedRequiredTaskCount, requiredTaskCount, markSetupStarted, dismissWelcome, skipTask } from '@/lib/setupStore';
+
 import SetupProgressRing from '@/components/SetupProgressRing';
 import { radius } from '@/constants/radii';
 
@@ -65,6 +69,7 @@ export default function SetupWalkthroughSheet({
   const total = requiredTaskCount(setupState);
 
   const handleClose = useCallback(async () => {
+    haptic('sheet');
     const next = await dismissWelcome(userId);
     onSetupStateChange(next);
     onClose();

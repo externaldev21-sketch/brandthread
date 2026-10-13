@@ -1,11 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Icon } from '@/components/ui/Icon';
+
+import { Feather } from '@expo/vector-icons';
+
 import { useRouter } from 'expo-router';
+
 import { useApi } from '@/lib/api';
-import { Alert } from 'react-native';
+
+
 import { FONT } from '@/lib/theme';
 
 // Fallback role data if API not connected

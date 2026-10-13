@@ -1,5 +1,7 @@
-import { haptics } from '@/lib/haptics';
+import { haptics, haptic, hapticSuccess } from '@/lib/haptics';
+
 import { radius as ControlRadius } from '@/constants/radii';
+
 /**
  * Goals — several targets per seller (revenue, orders, units, visits, new
  * followers) for this week / month / quarter / year, with real progress and a
@@ -9,22 +11,34 @@ import { radius as ControlRadius } from '@/constants/radii';
  */
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+
 import { Icon as Icon } from '@/components/ui/Icon';
+
 import * as Haptics from 'expo-haptics';
+import { Feather } from '@expo/vector-icons';
+
+
 import { useColors } from '@/hooks/useColors';
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { formatCents } from '@/lib/money';
+
 import { EmptyState, SecondaryButton } from '@/components/BrandthreadUI';
+
 import { Sheet } from '@/components/ui/BottomSheet';
-import { hapticSuccess } from '@/lib/haptics';
+
+
 import { Card, ProgressBar, SectionTitle } from '@/components/analytics/AnalyticsKit';
+
 import { InsightFrame, SegmentedPills } from '@/components/analytics/InsightFrame';
+
 import { useSellerInsight } from '@/hooks/useSellerInsight';
+
 import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
-import {
-  GOAL_METRICS, GOAL_PERIODS, createGoal, deleteGoal, getGoals, goalLabel, previewMode, updateGoal,
-  type Goal, type GoalMetric, type GoalPeriod,
-} from '@/services/sellerInsightsService';
+
+import { GOAL_METRICS, GOAL_PERIODS, createGoal, deleteGoal, getGoals, goalLabel, previewMode, updateGoal, type Goal, type GoalMetric, type GoalPeriod } from '@/services/sellerInsightsService';
+
 import { formatMoney } from '@/lib/format';
 
 const STATUS_TEXT: Record<Goal['status'], string> = {
@@ -38,7 +52,7 @@ function GoalCard({ goal, onEdit }: { goal: Goal; onEdit: () => void }) {
   const s = React.useMemo(() => styles(colors), [colors]);
   const pct = Math.min(100, goal.progressPct);
   return (
-    <TouchableOpacity onPress={() => onEdit()} accessibilityRole="button" accessibilityLabel={`Edit ${goalLabel(goal.metric)} goal`} activeOpacity={0.85}>
+    <TouchableOpacity onPress={() => { haptic('sheet'); onEdit(); }} accessibilityRole="button" accessibilityLabel={`Edit ${goalLabel(goal.metric)} goal`} activeOpacity={0.85}>
       <Card padded>
         <View style={s.rowBetween}>
           <Text style={s.title}>{goalLabel(goal.metric)} {PERIOD_TEXT[goal.period]}</Text>
@@ -134,7 +148,7 @@ export default function GoalsReport() {
             {GOAL_METRICS.map(m => {
               const active = m.key === metric;
               return (
-                <TouchableOpacity key={m.key} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => { haptics.selection(); setMetric(m.key); }}
+                <TouchableOpacity key={m.key} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => { haptic('select'); setMetric(m.key); }}
                   style={[s.chip, active && s.chipOn]}>
                   <Text style={[s.chipText, active && s.chipTextOn]}>{m.label}</Text>
                 </TouchableOpacity>

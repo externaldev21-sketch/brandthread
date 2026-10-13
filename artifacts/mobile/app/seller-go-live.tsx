@@ -5,34 +5,58 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { formatCents } from '@/lib/money';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
-  Animated, Platform, Linking, FlatList,
-} from 'react-native';
+
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Animated, Platform, Linking, FlatList } from 'react-native';
+
 import { CachedImage as Image } from '@/components/CachedImage';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import { useApi } from '@/lib/api';
+
 import { FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_DISABLED } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useLiveAvailable } from '@/hooks/useLiveAvailable';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
+
 import { useAgeStatus } from '@/lib/ageGate';
+
 import { AgeRestrictedScreen } from '@/components/age/AgeNotices';
+
 import { radius } from '@/constants/radii';
+
 import { toLiveProductOptions } from '@/lib/liveProductOptions';
+
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
+
 import { getEntitlementRejection, type EntitlementRejection } from '@/lib/entitlementError';
+
 import { LIVE_HOST_MIN_PLAN } from '@/lib/sellerPlans';
+
 import { crispPx } from '@/lib/crispPixel';
 
 const FG = '#FFFFFF';
@@ -113,7 +137,7 @@ function SellerGoLiveNativeScreen() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleFeaturedProduct(product: any) {
-    haptics.selection();
+    haptic('select');
     setFeaturedProducts(prev =>
       prev.some(p => p.id === product.id)
         ? prev.filter(p => p.id !== product.id)
@@ -133,7 +157,6 @@ function SellerGoLiveNativeScreen() {
   }, []);
 
   const flipCamera = useCallback(() => {
-    haptics.selection();
     Animated.sequence([
       Animated.timing(flipAnim, { toValue: 0, duration: 140, useNativeDriver: true }),
       Animated.timing(flipAnim, { toValue: 1, duration: 140, useNativeDriver: true }),
@@ -146,7 +169,6 @@ function SellerGoLiveNativeScreen() {
   }, [flipAnim]);
 
   const toggleTorch = useCallback(() => {
-    haptics.selection();
     setTorch(v => !v);
   }, []);
 

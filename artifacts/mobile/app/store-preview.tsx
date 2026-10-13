@@ -1,19 +1,35 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions, Platform } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useFocusEffect } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { WebView } from 'react-native-webview';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { useApi } from '@/lib/api';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { EmptyState } from '@/components/BrandthreadUI';
+
 import { isSellerDevPreview, isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
 import { isAuthError } from '@/lib/networkNotice';
+
 import { buildPreviewStorefrontHtml } from '@/lib/previewStorefrontHtml';
+
 import { radius, nestedRadius } from '@/constants/radii';
 
 /**
@@ -187,7 +203,7 @@ export default function StorePreview() {
           {(['mobile', 'desktop'] as DeviceMode[]).map((mode) => (
             <TouchableOpacity
               key={mode}
-              onPress={() => { haptics.selection(); setDevice(mode); }}
+              onPress={() => { haptic('select'); setDevice(mode); }}
               style={[styles.deviceBtn, device === mode && styles.deviceBtnActive]}
               accessibilityLabel={mode === 'mobile' ? 'Mobile preview' : 'Desktop preview'}
               accessibilityRole="button"

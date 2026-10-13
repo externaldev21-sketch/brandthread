@@ -1,20 +1,27 @@
 import * as Haptics from 'expo-haptics';
 import React, { useEffect, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { validEmailOrPhone } from '@/lib/contactInput';
-import {
-  ActivityIndicator, Alert, ScrollView, StyleSheet, Text,
-  TextInput, TouchableOpacity, View, Platform } from 'react-native';
+
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Platform } from 'react-native';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { EmptyState } from '@/components/BrandthreadUI';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { haptics } from '@/lib/haptics';
+
 import { useColors } from '@/hooks/useColors';
+
 import { COMP, FONT, ICON } from '@/lib/theme';
-import {
-  getManufacturer, saveQuoteRequestDraft, submitQuoteRequest,
-} from '@/services/manufacturerService';
+
+import { getManufacturer, saveQuoteRequestDraft, submitQuoteRequest } from '@/services/manufacturerService';
+
 import type { Manufacturer } from '@/services/manufacturerTypes';
 import { radius } from '@/constants/radii';
 
@@ -84,7 +91,6 @@ export default function RequestSampleScreen() {
         currentStep: 5,
       });
       await submitQuoteRequest(draft.id);
-      haptics.success();
       Alert.alert(
         'Sample request sent',
         `Your request is now visible to ${manufacturer.name}.`,
@@ -106,7 +112,7 @@ export default function RequestSampleScreen() {
       <View style={styles.root}>
         <ScreenHeader
           title="Request Sample"
-          onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+          onBack={() => { goBackOr(router); }}
         />
         <EmptyState
           icon="wifi-off"

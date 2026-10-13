@@ -1,56 +1,70 @@
 import { CachedImage as Image } from '@/components/CachedImage';
+
 /**
  * Manufacturer Hub — 6-tab main screen
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { relativeTime } from '@/lib/activity';
+
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import {
-  View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator,
-} from 'react-native';
+
+import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { Button } from '@/components/ui/Button';
+
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
 import { Sheet } from '@/components/ui/BottomSheet';
+
+
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
+
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { getEntitlementRejection } from '@/lib/entitlementError';
+
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
+
 import { isSellerDevPreview, isPreviewDemoMode, isPreviewFreshMode } from '@/lib/devPreview';
+
 import { getPreviewManufacturers } from '@/lib/previewManufacturers';
+
 import { completeSetupTaskAfter, completeSetupTaskWhen } from '@/lib/setupCompletion';
+
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
+
 import { ListSkeleton } from '@/components/layout';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
-import {
-  BrandthreadCard, GradientCard,
-  IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState,
-  StatCard, HapticSwitch,} from '@/components/BrandthreadUI';
-import {
-  searchManufacturers, getRelationships, getRelationship,
-  saveManufacturer, getManufacturer, favoriteManufacturer,
-  getFavoriteManufacturerIds, unfavoriteManufacturer,
-  getQuoteRequests, getQuotes, acceptQuote, declineQuote, withdrawQuoteRequest,
-  getSamples, getProductionOrders,
-  getConversations, getOrCreateConversation, type DirectorySort,
-} from '@/services/manufacturerService';
+
+import { BrandthreadCard, GradientCard, IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState, StatCard, HapticSwitch } from '@/components/BrandthreadUI';
+
+import { searchManufacturers, getRelationships, getRelationship, saveManufacturer, getManufacturer, favoriteManufacturer, getFavoriteManufacturerIds, unfavoriteManufacturer, getQuoteRequests, getQuotes, acceptQuote, declineQuote, withdrawQuoteRequest, getSamples, getProductionOrders, getConversations, getOrCreateConversation, type DirectorySort } from '@/services/manufacturerService';
+
 import { getDirectoryFacets, getSellerOrders, type DirectoryFacets, type SellerOrderRow } from '@/services/manufacturerOrderFlow';
+
 import { formatMoney, orderStatusLabel, stageIndex } from '@workspace/manufacturer-flow';
-import {
-  Manufacturer, ManufacturerRelationship, QuoteRequest, Quote, Sample,
-  ProductionOrder, ManufacturerConversation, PRODUCTION_STAGES,
-} from '@/services/manufacturerTypes';
+
+import { Manufacturer, ManufacturerRelationship, QuoteRequest, Quote, Sample, ProductionOrder, ManufacturerConversation, PRODUCTION_STAGES } from '@/services/manufacturerTypes';
+
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+
 import { formatCents } from '@/lib/money';
+
 import { fmtRelativeDay } from '@/lib/format';
 
 import { ChipRow } from '@/components/ui/ChipRow';
+
 // ─── Tab config ───────────────────────────────────────────────────────────────
 
 type Tab = 'discover' | 'my_manufacturers' | 'quotes' | 'samples' | 'production' | 'messages';
@@ -207,7 +221,7 @@ export default function ManufacturerHub() {
   );
 
   const handleTabPress = (tab: Tab) => {
-    haptics.selection();
+    if (tab !== activeTab) haptic('select');
     setActiveTab(tab);
   };
 
@@ -445,7 +459,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
 
   const toggleSave = async (mfg: Manufacturer) => {
     if (savingIds.has(mfg.id)) return;
-    haptics.light();
+    if (!savedIds.has(mfg.id)) haptic('save');
     setMutationError('');
     // Preview mode has no signed-in seller to persist a favorite for — the
     // heart still works, purely as local UI state, same as every other

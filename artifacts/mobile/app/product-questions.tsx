@@ -8,19 +8,33 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useAuth } from '@clerk/expo';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
+
 import { Button } from '@/components/ui/Button';
+
 import { Snackbar } from '@/components/ui/Snackbar';
+
 import { useApi } from '@/lib/api';
+
 import type { ProductQuestion } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT, FS, SP } from '@/lib/theme';
+
 import { QUESTION_MAX, checkQuestionDraft, questionCountLabel } from '@/lib/reviewDisplay';
+
 import { fmtRelativeDay } from '@/lib/format';
 
 const fmtDate = (iso: string) => fmtRelativeDay(iso);
@@ -71,7 +85,7 @@ export default function ProductQuestionsScreen() {
       setDraft('');
       setComposing(false);
       setToast('Question posted');
-      haptics.success();
+      haptic('postPublished');
     } catch (err: any) {
       let message = 'Couldn’t post your question. Try again.';
       try {

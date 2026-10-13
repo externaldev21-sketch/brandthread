@@ -13,34 +13,44 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
-  ActivityIndicator, TextInput,
-} from 'react-native';
+
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput } from 'react-native';
+
 import { Image } from 'expo-image';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useLocalSearchParams } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useApi } from '@/hooks/useApi';
-import {
-  BrandthreadScreen, BrandthreadCard,
-  PrimaryButton, EmptyState, FormInput, HapticSwitch,
-} from '@/components/BrandthreadUI';
+
+import { BrandthreadScreen, BrandthreadCard, PrimaryButton, EmptyState, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+
 import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
-import {
-  BUDGET_STEPS, BUDGET_MIN_CENTS, BUDGET_MAX_CENTS, formatBudgetCents,
-  META_OBJECTIVE_OPTIONS, META_CTA_OPTIONS, formatReachRange,
-} from '@/services/metaAdsService';
+
+import { BUDGET_STEPS, BUDGET_MIN_CENTS, BUDGET_MAX_CENTS, formatBudgetCents, META_OBJECTIVE_OPTIONS, META_CTA_OPTIONS, formatReachRange } from '@/services/metaAdsService';
+
 import { InlineSlider } from '@/components/InlineSlider';
+
 import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
+
 import { adDestinationUrl } from '@/lib/adDestination';
+
 import type {
   MetaAdObjective, MetaAdPromoteKind, MetaCampaign, MetaTargetingResult,
 } from '@/lib/api';
@@ -581,7 +591,7 @@ function SourceChip({ label, active, onPress, colors, theme }: any) {
   return (
     <TouchableOpacity
       style={[s.sourceChip, { backgroundColor: colors.elevated, borderColor: colors.border }, active && { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
-      onPress={() => { haptics.selection(); onPress(); }}
+      onPress={() => { haptic('select'); onPress(); }}
       accessibilityRole="radio"
       accessibilityState={{ checked: active }}
     >
@@ -594,7 +604,7 @@ function Chip({ label, active, onPress, colors, theme }: any) {
   return (
     <TouchableOpacity
       style={[s.chip, { backgroundColor: colors.elevated, borderColor: colors.border }, active && { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
-      onPress={() => { haptics.selection(); onPress(); }}
+      onPress={() => { haptic('select'); onPress(); }}
       accessibilityRole="radio"
       accessibilityState={{ checked: active }}
     >

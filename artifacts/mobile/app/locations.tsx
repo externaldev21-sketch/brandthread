@@ -3,22 +3,32 @@
  * Multi-location inventory management wired to real backend.
  */
 import React, { useState, useCallback } from 'react';
-import {
-  ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, TextInput,
-} from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native';
+
 import { useFocusEffect } from 'expo-router';
+
 import { useColors } from '@/hooks/useColors';
+
 import { Sheet } from '@/components/ui/BottomSheet';
-import { hapticSuccess } from '@/lib/haptics';
+
+import { hapticSuccess, haptics, haptic } from '@/lib/haptics';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { Button } from '@/components/ui/Button';
+
 import { Chip } from '@/components/ui/Chip';
+
 import { useApi } from '@/lib/api';
-import { haptics } from '@/lib/haptics';
+
+
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { radius } from '@/constants/radii';
+
 import { minHitSlop } from '@/lib/hitSlop';
 
 interface Location {
@@ -79,12 +89,14 @@ export default function LocationsScreen() {
   });
 
   function openAdd() {
+    haptic('sheet');
     setEditTarget(null);
     setForm({ name: '', address: '', city: '', state: '', country: 'US', zip: '', phone: '' });
     setModalVisible(true);
   }
 
   function openEdit(loc: Location) {
+    haptic('sheet');
     setEditTarget(loc);
     setForm({
       name: loc.name, address: loc.address ?? '', city: loc.city ?? '',
@@ -130,7 +142,6 @@ export default function LocationsScreen() {
   }
 
   async function toggleActive(loc: Location) {
-    haptics.selection();
     try {
       await api.seller.updateLocation(loc.id, { isActive: !loc.is_active }) as any;
       await load();
@@ -176,7 +187,7 @@ export default function LocationsScreen() {
                   {TABS.map((tab) => (
                     <TouchableOpacity
                       key={tab}
-                      onPress={() => { haptics.selection(); setActiveTab(tab); }}
+                      onPress={() => { haptic('select'); setActiveTab(tab); }}
                       activeOpacity={0.7}
                       style={[s.tabChip, activeTab === tab && { backgroundColor: colors.card }]}
                       hitSlop={TAB_HIT_SLOP}

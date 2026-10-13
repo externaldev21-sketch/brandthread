@@ -20,17 +20,30 @@
  */
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
+
 import { orderPhotoFirst } from '@/lib/reviewOrder';
+
 import { useReviewActions } from '@/lib/useReviewActions';
+
 import { useAuth } from '@clerk/expo';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import { useApi } from '@/lib/api';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { StarRating } from '@/components/StarRating';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { FONT, FS, BORDER_SUBTLE, FG, MUTED, SUBTLE, CARD_ELEVATED } from '@/lib/theme';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { applyHelpfulToggle, fitChipText, isVerifiedReview } from '@/lib/reviewDisplay';
 
 export interface ReviewItem {
@@ -145,7 +158,7 @@ export function ProductReviewsSection({
   const toggleHelpful = (review: ReviewItem) => {
     const current = helpful[review.id] ?? { helpfulCount: review.helpfulCount ?? 0, viewerHelpful: !!review.viewerHelpful };
     const next = applyHelpfulToggle(current);
-    haptics.light();
+    if (next.viewerHelpful) haptic('like');
     setHelpful(prev => ({ ...prev, [review.id]: next }));
     // Seeded preview data has no server rows; everything else persists.
     if (seed) return;

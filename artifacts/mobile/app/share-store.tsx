@@ -5,11 +5,27 @@
  */
 import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { Feather } from '@expo/vector-icons';
+
+import { useRouter } from 'expo-router';
+
+import * as Clipboard from 'expo-clipboard';
+import QRCode from 'react-native-qrcode-svg';
+import { useApi } from '@/lib/api';
+
+import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
+
 import { ShareStoreContent, ShareStoreToast, useToast } from '@/components/store/ShareStoreSheet';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 export default function ShareStoreScreen() {

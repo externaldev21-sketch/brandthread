@@ -1,22 +1,27 @@
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
-import {
-  View, Text, ScrollView, TextInput,
-  StyleSheet, Alert,
-} from 'react-native';
+
+import { View, Text, ScrollView, TextInput, StyleSheet, Alert } from 'react-native';
+
 import { useFocusEffect, useRouter } from 'expo-router';
-import {
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
-import {
-  BrandthreadCard, PrimaryButton, SectionHeader, FilterChip, PressableScale, LoadingSkeleton,
-} from '@/components/BrandthreadUI';
+
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
+import { BrandthreadCard, PrimaryButton, SectionHeader, FilterChip, PressableScale, LoadingSkeleton } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
 import { ListRow } from '@/components/ui/ListRow';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { getStorefront, updateSettings } from '@/services/storeService';
+
 import { Storefront, StoreSettings, StorePublishStatus } from '@/services/storeTypes';
+
 import { radius } from '@/constants/radii';
 
 type Colors = ReturnType<typeof useColors>;
@@ -241,7 +246,7 @@ export default function StoreSettingsScreen() {
                 <PressableScale
                   key={opt.value}
                   onPress={() => {
-                    haptics.selection();
+                    if (!isActive) haptic('select');
                     patch({ storeStatus: opt.value, passwordProtected: opt.value === 'password_protected' });
                   }}
                   accessibilityRole="button"

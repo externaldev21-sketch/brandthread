@@ -8,13 +8,22 @@
  */
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@clerk/expo';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { Icon } from '@/components/ui/Icon';
+
+import { Feather } from '@expo/vector-icons';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useApi } from '@/lib/api';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { FONT } from '@/lib/theme';
 
 export const PENDING_INVITE_KEY = 'bt:pendingTeamInvite';

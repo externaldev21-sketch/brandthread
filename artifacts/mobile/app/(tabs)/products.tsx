@@ -1,4 +1,5 @@
 import { openPullDownMenu } from '@/lib/contextMenu';
+
 /**
  * Brandthread — Seller Products Tab: "The Rack"
  *
@@ -10,37 +11,70 @@ import { openPullDownMenu } from '@/lib/contextMenu';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePersistedChoice } from '@/hooks/usePersistedChoice';
+
 import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, LayoutAnimation, UIManager, Platform } from 'react-native';
+
 import { showActionSheet } from '@/components/ui/ActionSheet';
+
 import { FlashList } from '@shopify/flash-list';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { SellerListHeader, sellerListCountRowStyles } from '@/components/SellerListHeader';
+
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { PrimaryButton, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
+
+import { PrimaryButton, FilterChip, PressableScale, useUndoToast, FormInput } from '@/components/BrandthreadUI';
+
 import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGridPadding } from '@/components/layout';
+
 import { useScrollReset } from '@/hooks/useScrollReset';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
 import { useTabBarClearance, useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+
+
+
 import { ProductCard } from '@/components/products/ProductCard';
+
 import { StockEditorSheet } from '@/components/products/StockEditorSheet';
+
 import { getProducts, getProductStats, getProduct, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct, updateProduct, summarizeProducts } from '@/services/productService';
+
 import { localPreviewSaves } from '@/lib/sellerProductPreview';
+
 import { Product, ProductFilter } from '@/services/productTypes';
+
 import { formatCents, parseDecimalToCents } from '@/lib/money';
-import { FormInput } from '@/components/BrandthreadUI';
+
+
 import { SheetRise } from '@/components/motion/SheetRise';
+
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+
 import { useQueryClient } from '@tanstack/react-query';
+
 import { queryKeys } from '@/lib/queryClient';
+
 import { prefetchOnPressIn } from '@/lib/prefetch';
+
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+
 import { DEFAULT_PRODUCT_SORT, PRODUCT_SORT_OPTIONS, productSortLabel, productSortQuery, type ProductSortKey } from '@/lib/sellerLists/productSort';
+
 import { productEmptyCopy } from '@/lib/sellerLists/emptyCopy';
+
 import { SELLER_PRODUCTS_GESTURE } from '@/lib/firstRunTips/content';
+
 import { useApi } from '@/lib/api';
+
 import { setPendingMockup, takePendingMockup, attachMockupToListedProduct } from '@/lib/mockupProductHandoff';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -403,7 +437,7 @@ function SortModal({
           <PressableScale
             key={key}
             style={[sh.sortOption, current === key && sh.sortOptionActive]}
-            onPress={() => { haptics.selection(); onSelect(key); onClose(); }}
+            onPress={() => { haptic('select'); onSelect(key); onClose(); }}
             accessibilityLabel={label}
             accessibilityState={{ selected: current === key }}
           >
@@ -743,6 +777,7 @@ export default function ProductsScreen() {
       showPreviewOnlyFeedback();
       return;
     }
+    haptic('sheet');
     setActionProduct(product);
     setActionSheetVisible(true);
   }, [previewOnly, showPreviewOnlyFeedback]);
@@ -752,6 +787,7 @@ export default function ProductsScreen() {
       showPreviewOnlyFeedback();
       return;
     }
+    haptic('sheet');
     setStockEditProduct(product);
     setStockEditVisible(true);
   }, [previewOnly, showPreviewOnlyFeedback]);
@@ -856,7 +892,7 @@ export default function ProductsScreen() {
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
         searchPlaceholder="Search products…"
-        onFilterPress={() => setFilterModalVisible(true)}
+        onFilterPress={() => { haptic('sheet'); setFilterModalVisible(true); }}
         hasActiveFilter={hasActiveFilter}
         filterAccessibilityLabel={filter !== 'all' ? `Filter: ${filter}` : 'Filter products'}
         onSortPress={() => setSortModalVisible(true)}

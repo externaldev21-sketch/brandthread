@@ -1,4 +1,5 @@
 import { hapticPrimaryAction } from '@/lib/haptics';
+
 /**
  * More Screen — Brandthread Seller App
  * Hub for store, studio, operations, growth, money, and account.
@@ -9,23 +10,39 @@ import { hapticPrimaryAction } from '@/lib/haptics';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
-import { useRouter } from 'expo-router';
+
+import { useRouter, useFocusEffect } from 'expo-router';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { useFocusEffect } from 'expo-router';
+
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser, useAuth } from '@clerk/expo';
+
 import { getSetupState, completionPercent, SetupState } from '@/lib/setupStore';
+
 import { useApi } from '@/lib/api';
+
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
+
 import { FONT, FS, SP } from '@/lib/theme';
+
 import { useScrollReset } from '@/hooks/useScrollReset';
+
 import { RADII } from '@/constants/radii';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { BrandthreadCard, GradientCard, SecondaryButton, NavigationCard, StatusBadge } from '@/components/BrandthreadUI';
+
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
+
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { minHitSlop } from '@/lib/hitSlop';
+
 import { formatMoney } from '@/lib/format';
 
 // 'Continue setup →' is a 22pt-tall text link; section headers are 36pt tall.

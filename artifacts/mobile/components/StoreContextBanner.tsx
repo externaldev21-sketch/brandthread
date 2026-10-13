@@ -1,36 +1,22 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useSegments, useGlobalSearchParams } from 'expo-router';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { haptics } from '@/lib/haptics';
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { useAuth } from '@clerk/expo';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import {
-  getStoreContext,
-  setStoreContext,
-  storeContextStorageKey,
-  subscribeStoreContext,
-  type StoreContext,
-  useApi,
-} from '@/lib/api';
-import {
-  BG,
-  BORDER,
-  CARD,
-  FONT,
-  FS,
-  FG,
-  MUTED,
-  SP,
-} from '@/lib/theme';
+
+import { getStoreContext, setStoreContext, storeContextStorageKey, subscribeStoreContext, type StoreContext, useApi } from '@/lib/api';
+
+import { BG, BORDER, CARD, FONT, FS, FG, MUTED, SP } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 const NON_SELLER_ROOT_ROUTES = new Set([
@@ -127,7 +113,7 @@ export default function StoreContextBanner() {
 
   const switchStore = useCallback(async (nextContext: StoreContext) => {
     if (!userId || switchingTo) return;
-    haptics.selection();
+    haptic('select');
     setSwitchingTo(nextContext);
     try {
       await api.team.selectContext(nextContext);

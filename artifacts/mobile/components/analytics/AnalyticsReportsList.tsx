@@ -1,10 +1,15 @@
 import * as Haptics from 'expo-haptics';
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import { useColors } from '@/hooks/useColors';
+
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { Card, CardDivider, SectionTitle } from '@/components/analytics/AnalyticsKit';
 
 /**
@@ -43,7 +48,7 @@ export function AnalyticsReportsList() {
               accessibilityRole="button"
               accessibilityLabel={r.badge ? `${r.label}, ${r.badge}` : r.label}
               testID={`report-${r.href.split('report=')[1]}`}
-              onPress={() => { Haptics.selectionAsync(); router.push(r.href as never); }}
+              onPress={() => {  router.push(r.href as never); }}
             >
               <Icon name={r.icon} size={18} color={colors.foreground} />
               <Text style={s.label}>{r.label}</Text>

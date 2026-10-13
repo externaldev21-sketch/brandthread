@@ -1,4 +1,5 @@
 import { radius as ControlRadius } from '@/constants/radii';
+
 /**
  * Promotion review — platform admins approve or reject paid boosts and
  * Featured slots. Rejecting needs a reason the seller will see, and refunds
@@ -7,18 +8,31 @@ import { radius as ControlRadius } from '@/constants/radii';
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+
 import { useFocusEffect, useRouter } from 'expo-router';
+
 import { haptics } from '@/lib/haptics';
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useApi, type AdminPromotionItem, type AdminPromotionQueue } from '@/lib/api';
+
 import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { useAuth } from '@clerk/expo';
+
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+
 import { formatCents } from '@/lib/money';
+
 import { apiErrorMessage } from '@/lib/safety';
 
 type Tab = 'in_review' | 'approved' | 'rejected';
@@ -93,7 +107,6 @@ export default function AdminPromotionsScreen() {
     try {
       if (action === 'approve') await api.adminPromotions.approve(item.kind, item.id);
       else await api.adminPromotions.reject(item.kind, item.id, reason.trim());
-      haptics.success();
       setRejecting(null);
       setReason('');
       await load(true);

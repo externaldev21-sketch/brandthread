@@ -8,20 +8,33 @@
  */
 import React, { useState, useEffect, useMemo } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert, ActivityIndicator, useWindowDimensions } from 'react-native';
+
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Alert, ActivityIndicator, useWindowDimensions } from 'react-native';
+
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { PrimaryButton } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useApi } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -147,7 +160,6 @@ export default function ProductSizeChartScreen() {
         notes: notes.trim() || undefined,
       };
       await (api as any).products.update(productId, { sizeChart: chart });
-      haptics.success();
       Alert.alert('Saved', 'Size chart updated successfully.', [
         { text: 'OK', onPress: () => goBackOr(router) },
       ]);
@@ -217,7 +229,7 @@ export default function ProductSizeChartScreen() {
               <TouchableOpacity
                 key={u}
                 style={[s.unitBtn, unit === u && s.unitBtnActive]}
-                onPress={() => { haptics.selection(); setUnit(u); }}
+                onPress={() => { haptic('select'); setUnit(u); }}
                 activeOpacity={0.7}
               >
                 <Text style={[s.unitBtnText, unit === u && { color: theme.accentLight }]}>{u}</Text>

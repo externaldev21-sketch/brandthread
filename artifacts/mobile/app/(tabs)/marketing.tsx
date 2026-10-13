@@ -1,24 +1,41 @@
 import * as Haptics from 'expo-haptics';
 import React, { useCallback, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+
 import { useColors } from '@/hooks/useColors';
+
 import { SectionHeader } from '@/components/SectionHeader';
+
 import { Badge } from '@/components/Badge';
+
 import { EmptyState, IconButton } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useFocusEffect } from 'expo-router';
+
 import * as Clipboard from 'expo-clipboard';
 import { FS, FONT, SP, COMP } from '@/lib/theme';
+
 import { useApi } from '@/hooks/useApi';
+
 import type { AdCampaign } from '@/lib/api';
 import { useScrollReset } from '@/hooks/useScrollReset';
+
 import { RetryRow } from '@/components/ui/RetryRow';
+
 import { isSellerDevPreview } from '@/lib/devPreview';
+
 import { ListRow } from '@/components/ui/ListRow';
+
 import { SellerReferralRow } from '@/components/marketing/SellerReferralRow';
+
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { formatCompactCount } from '@/lib/compactFormat';
+
 import { formatMoney } from '@/lib/format';
 
 type KlaviyoStatus = {

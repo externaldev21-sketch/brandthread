@@ -37,7 +37,7 @@ import { useColors } from '@/hooks/useColors';
 
 import { FONT, FS, SP } from '@/lib/theme';
 
-import { BUYER_SETTINGS_CATALOG, SettingsCatalogItem, settingsGroupsFor, type SettingsCatalogItem } from '@/services/settingsCatalog';
+import { BUYER_SETTINGS_CATALOG, settingsGroupsFor, type SettingsCatalogItem } from '@/services/settingsCatalog';
 
 import { SettingsProfileCard, SettingsSearchBar, ConfirmSheet } from '@/components/settings/SettingsKit';
 

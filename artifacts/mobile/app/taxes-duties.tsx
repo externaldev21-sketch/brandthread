@@ -1,18 +1,33 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { plural } from '@/lib/plural';
+
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Linking } from 'react-native';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { HapticSwitch } from '@/components/BrandthreadUI';
+
 import { Icon } from '@/components/ui/Icon';
+
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
+
+import { Feather } from '@expo/vector-icons';
+
 import { useApi } from '@/lib/api';
+
 import { formatCents } from '@/lib/money';
+
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
 import { buildDemoSellerFinance } from '@/lib/previewSellerFinance';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
 import { minHitSlop } from '@/lib/hitSlop';
+
 import { FONT } from '@/lib/theme';
 
 const STRIPE_TAX_REGISTRATIONS_URL = 'https://dashboard.stripe.com/tax/registrations';

@@ -7,41 +7,46 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Animated, Alert, Platform } from 'react-native';
+
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert, Platform } from 'react-native';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useFocusEffect, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { haptics } from '@/lib/haptics';
+
 import { useAuth } from '@clerk/expo';
 
-import {
-  BG, CARD, BORDER,
-  FG, MUTED, SUBTLE, ON_DARK,
-  FONT, FS, SP, RADIUS, COMP, ICON,
-} from '@/lib/theme';
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
+
 import { useColors } from '@/hooks/useColors';
+
 import { withOrigin } from '@/lib/navigation/flowOrigin';
-import {
-  getSetupState, completeTask, skipTask,
-  SetupState, SetupTask, SetupTaskId,
-  completionPercent, nextTask, completedRequiredTaskCount,
-  requiredTaskCount, isSetupComplete,
-} from '@/lib/setupStore';
+
+import { getSetupState, completeTask, skipTask, SetupState, SetupTask, SetupTaskId, completionPercent, nextTask, completedRequiredTaskCount, requiredTaskCount, isSetupComplete } from '@/lib/setupStore';
+
 import { useApi } from '@/hooks/useApi';
-import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+
+import { isPreviewDemoMode, isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
+
 import { PREVIEW_DEMO_SETUP_TASKS, previewSetupUserId } from '@/lib/previewAccount';
-import {
-  GradientCard, PrimaryButton, SecondaryButton,
-  SectionHeader,
-} from '@/components/BrandthreadUI';
+
+import { GradientCard, PrimaryButton, SecondaryButton, SectionHeader } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { ThreadProgress } from '@/components/onboarding/ThreadLine';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
-import { isBuyerDevPreview } from '@/lib/devPreview';
+
+
 import { crispPx } from '@/lib/crispPixel';
 
 // ─── Task Step Card ───────────────────────────────────────────────────────────
@@ -60,7 +65,6 @@ function TaskCard({
   const scale = useRef(new Animated.Value(1)).current;
 
   function handleComplete() {
-    haptics.success();
     Animated.sequence([
       Animated.timing(scale, { toValue: 0.97, duration: 80, useNativeDriver: true }),
       Animated.timing(scale, { toValue: 1, duration: 150, useNativeDriver: true }),

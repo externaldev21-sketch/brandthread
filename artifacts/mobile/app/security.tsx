@@ -1,9 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Button } from '@/components/ui/Button';
+
 import { useRouter } from 'expo-router';
+
 import { FONT } from '@/lib/theme';
 
 // Note: the previous "Collaborators" block (a fake local-only collaborator

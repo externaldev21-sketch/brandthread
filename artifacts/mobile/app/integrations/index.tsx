@@ -1,18 +1,27 @@
 import { Button } from '@/components/ui/Button';
+
 /**
  * Brandthread — Integrations
  * Lists third-party integrations with real connected status from backend.
  */
 import React, { useState, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native';
+
 import { useFocusEffect, useRouter } from 'expo-router';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useApi } from '@/lib/api';
+
 import { ApiError } from '@/lib/networkNotice';
+
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+
 import { isStripeFullyConnected, normalizeConnectStatus, type ConnectStatus } from '@/lib/stripeConnectStatus';
 
 interface IntegrationDef {

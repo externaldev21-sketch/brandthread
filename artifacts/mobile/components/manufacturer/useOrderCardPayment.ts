@@ -3,10 +3,14 @@
  * session, which offers Apple Pay / Google Pay and cards).
  */
 import { useCallback, useState } from 'react';
+
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
-import { haptics } from '@/lib/haptics';
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { confirmSamplePayment, createSampleCheckoutSession } from '@/services/manufacturerService';
+
 import { payOrderCard, type OrderCardSnapshot, type PayOutcome } from '@/services/manufacturerOrderFlow';
 
 export function useOrderCardPayment(onSettled?: () => void) {
@@ -24,7 +28,7 @@ export function useOrderCardPayment(onSettled?: () => void) {
         openCheckout: (url, returnUrl) => WebBrowser.openAuthSessionAsync(url, returnUrl),
         confirmPayment: confirmSamplePayment,
       });
-      if (result.status === 'paid') haptics.success();
+      if (result.status === 'paid') haptic('purchaseSuccess');
       setOutcome({ orderId: order.id, result });
       return result;
     } finally {

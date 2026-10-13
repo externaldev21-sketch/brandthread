@@ -5,17 +5,27 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
 
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { PressableScale } from '@/components/BrandthreadUI';
+
 import { Button } from '@/components/ui/Button';
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
+
 import { LAUNCH_STEP_META, nextLaunchStep, type LaunchStepId } from '@/lib/launchChecklist';
+
 import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+
 import { crispPx } from '@/lib/crispPixel';
 
 export default function LaunchChecklistScreen() {

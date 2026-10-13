@@ -1,5 +1,5 @@
-import { haptics } from '@/lib/haptics';
-const haptic = haptics.light;
+import { haptics, haptic } from '@/lib/haptics';
+
 /**
  * Seller Plan & billing — one screen modelled on Shopify's Settings → Plan
  * and Settings → Billing (iOS), reskinned black/white/silver:
@@ -12,44 +12,65 @@ const haptic = haptics.light;
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Linking, Share, ActivityIndicator, Alert, Platform } from 'react-native';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useRouter, useFocusEffect } from 'expo-router';
+
 import * as Haptics from 'expo-haptics';
+import { Feather } from '@expo/vector-icons';
+
+
+
 import { useApi } from '@/lib/api';
+
 import { isManagerRole, parseRoleError } from '@/lib/roleError';
+
 import { RoleLockedView } from '@/components/RoleLockedView';
+
 import { useTeamRole } from '@/hooks/useTeamRole';
+
 import { formatCents } from '@/lib/money';
+
 import { useRevenueCat } from '@/lib/revenueCat';
+
 import { useAuth } from '@clerk/expo';
+
 import { billingAccess } from '@/lib/billingAccess';
+
 import { RetryRow } from '@/components/ui/RetryRow';
+
 import { platformSubscriptionSettingsUrl } from '@/lib/subscriptionRecovery';
-import { FONT } from '@/lib/theme';
+
+import { FONT, TABULAR, TEXT } from '@/lib/theme';
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { TABULAR, TEXT } from '@/lib/theme';
+
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
+
 import { Button, Icon, SkeletonBlock, SkeletonLine } from '@/components/ui';
+
 import { ChangePlanSheet, CancelPlanSheet, PlanFeaturesSheet, PlanOptionCard } from '@/components/billing/PlanSheets';
+
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
+
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+
 import { DEMO_PERKS, findPlanPerk, type PerksResponse } from '@/lib/proPerks';
+
 import { SELLER_PLANS, getSellerPlan } from '@/lib/sellerPlans';
+
 import type { SellerPlanId } from '@/lib/sellerBilling';
 import { apiErrorCode, apiErrorMessage } from '@/lib/safety';
+
 import { demoBillingStatus, demoInvoices, type PreviewInvoice } from '@/lib/previewBilling';
-import {
-  isNativeStorePlan,
-  lowerPlanId,
-  planDateLine,
-  planFacts,
-  planPriceLabel,
-  planState,
-  planStatusBadge,
-  type PlanBillingStatus,
-} from '@/lib/sellerPlanBilling';
+
+import { isNativeStorePlan, lowerPlanId, planDateLine, planFacts, planPriceLabel, planState, planStatusBadge, type PlanBillingStatus } from '@/lib/sellerPlanBilling';
 
 type BillFilter = 'all' | 'paid' | 'unpaid';
 
@@ -139,7 +160,7 @@ export default function BillingScreen() {
   }, [isPreview, loadStatus]));
 
   async function openBillingPortal() {
-    haptic();
+    
     if (isPreview) return;
     try {
       if (Platform.OS !== 'web') {
@@ -172,7 +193,7 @@ export default function BillingScreen() {
   }
 
   function exportBills() {
-    haptic();
+    
     const text = bills.map(b => `${b.date} — ${b.note}: ${formatCents(b.amountCents, b.currency)} (${b.status})`).join('\n');
     Share.share({ message: `Billing History\n\n${text}` });
   }
@@ -203,7 +224,7 @@ export default function BillingScreen() {
 
   /** New plan with no subscription: Stripe Checkout on web, the store paywall on iOS/Android. */
   async function startPlan(planId: SellerPlanId) {
-    haptic();
+    haptic('sheet');
     if (isPreview) return;
     if (Platform.OS !== 'web') {
       router.push(`/plans?highlight=${planId}&source=billing` as never);
@@ -262,7 +283,7 @@ export default function BillingScreen() {
   }
 
   async function keepPlan() {
-    haptic();
+    haptic('sheet');
     if (busy || !status) return;
     setBusy(true);
     try {
@@ -374,7 +395,7 @@ export default function BillingScreen() {
               <View style={styles.rowBetween}>
                 <Text style={styles.sectionTitle}>Plan details</Text>
                 {canManage && !nativeStore && state !== 'cancelling' && (
-                  <Button label="Change plan" variant="secondary" size="compact" onPress={() => { haptic(); setSheet('change'); }} testID="billing-change-plan" />
+                  <Button label="Change plan" variant="secondary" size="compact" onPress={() => { haptic('sheet'); setSheet('change'); }} testID="billing-change-plan" />
                 )}
               </View>
 
@@ -401,7 +422,7 @@ export default function BillingScreen() {
                 )}
 
                 <TouchableOpacity
-                  onPress={() => { haptic(); setSheet('features'); }}
+                  onPress={() => { haptic('sheet'); setSheet('features'); }}
                   activeOpacity={0.7}
                   style={[styles.featuresRow, styles.hairlineTop]}
                   accessibilityRole="button"
@@ -428,7 +449,7 @@ export default function BillingScreen() {
                   {' '}and{' '}
                   <Text style={styles.link} onPress={() => router.push('/privacy' as never)}>privacy policy</Text>
                 </Text>
-                <Button label="Cancel plan" variant="secondary" size="compact" onPress={() => { haptic(); setSheet('cancel'); }} testID="billing-cancel-plan" />
+                <Button label="Cancel plan" variant="secondary" size="compact" onPress={() => { haptic('sheet'); setSheet('cancel'); }} testID="billing-cancel-plan" />
               </View>
             ) : null)}
           </>
@@ -499,7 +520,7 @@ export default function BillingScreen() {
               {(['all', 'paid', 'unpaid'] as BillFilter[]).map((f) => (
                 <TouchableOpacity
                   key={f}
-                  onPress={() => { haptics.selection(); setFilter(f); }}
+                  onPress={() => { haptic('select'); setFilter(f); }}
                   style={[styles.filterTab, { backgroundColor: filter === f ? colors.card : 'transparent' }]}
                   activeOpacity={0.7}
                 >

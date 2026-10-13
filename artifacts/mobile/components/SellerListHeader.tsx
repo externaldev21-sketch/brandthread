@@ -1,4 +1,5 @@
-import { haptics } from '@/lib/haptics';
+import { haptics, hapticSelection, haptic } from '@/lib/haptics';
+
 /**
  * Shared fixed header for every seller list screen with the
  * title+chevron / search+filter+sort / status-chips pattern (currently
@@ -17,14 +18,23 @@ import { haptics } from '@/lib/haptics';
  */
 import React, { useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
 import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { PressableScale, SearchBar } from '@/components/BrandthreadUI';
+
+import { PressableScale, SearchBar, FilterChip } from '@/components/BrandthreadUI';
+
 import { ChipRail } from '@/components/ChipRail';
+
 import { ModalSafeArea } from '@/components/ModalSafeArea';
+
 import { ArrowUpDownIcon } from '@/components/icons/ArrowUpDownIcon';
-import { hapticSelection } from '@/lib/haptics';
+
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
+
 
 export interface SellerListHeaderAction {
   icon: IconName;
@@ -103,6 +113,7 @@ export function SellerListHeader({
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null);
 
   function openTitleMenu() {
+    haptic('sheet');
     titleWrapRef.current?.measureInWindow((x, y, _width, height) => {
       setMenuAnchor({ x, y: y + height + 6 });
     });
@@ -174,7 +185,7 @@ export function SellerListHeader({
                   key={option.key}
                   style={s.titleMenuRow}
                   onPress={() => {
-                    haptics.selection();
+                    if (!option.selected) haptic('select');
                     closeTitleMenu();
                     option.onSelect();
                   }}

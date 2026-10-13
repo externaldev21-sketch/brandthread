@@ -1,4 +1,5 @@
-import { haptics } from '@/lib/haptics';
+import { haptics, hapticLight, hapticSuccessAction, haptic } from '@/lib/haptics';
+
 /**
  * Launch publish — confirm and publish the store, then the "you're live" moment
  * with the share link and a downloadable QR code. Publishing reuses
@@ -7,25 +8,41 @@ import { haptics } from '@/lib/haptics';
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Easing, Platform, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import StripeConnectWarning from '@/components/StripeConnectWarning';
 import { Button } from '@/components/ui/Button';
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
+
 import { saveImageToCameraRoll } from '@/lib/aiToolMedia';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { confirmPublishWithoutPayouts } from '@/lib/payoutReadinessPrompt';
+
 import { useApi } from '@/hooks/useApi';
-import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
+
+
+
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
+
 import { buildStoreUrl, storeQrDataUri } from '@/lib/storeQr';
+
 import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+
 import { getStorefront, publishStore } from '@/services/storeService';
 
 export default function LaunchPublishScreen() {
@@ -81,7 +98,7 @@ export default function LaunchPublishScreen() {
       const result = await publishStore();
       if (result.success) {
         await completeSetupTaskWhen('publish_store', true);
-        haptics.success();
+        haptic('productListed');
         setLive(true);
       } else {
         setProblem(result.message);

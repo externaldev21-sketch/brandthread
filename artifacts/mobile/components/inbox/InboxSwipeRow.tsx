@@ -1,4 +1,3 @@
-import React from 'react';
 import type { IconName } from '@/components/ui/Icon';
 import React, { useMemo, useRef } from 'react';
 import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';

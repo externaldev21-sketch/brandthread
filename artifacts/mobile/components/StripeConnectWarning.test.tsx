@@ -1,6 +1,8 @@
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+
 import { readFileSync } from 'node:fs';
+
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -181,6 +183,7 @@ describe('StripeConnectWarning', () => {
     expect(api.seller.connect.onboard).toHaveBeenCalledTimes(1);
     expect(canOpenURLMock).toHaveBeenCalledWith(onboardingUrl);
     expect(openURLMock).toHaveBeenCalledWith(onboardingUrl);
+// Opening a link is a plain tap: no haptic (lib/haptics.ts HAPTIC_MAP).
     expect(hapticMock).not.toHaveBeenCalled();
     renderer.unmount();
   });

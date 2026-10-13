@@ -1,21 +1,37 @@
 import * as Haptics from 'expo-haptics';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform, Alert } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform, Alert, ActivityIndicator } from 'react-native';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { useRouter } from 'expo-router';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { useApi } from '@/hooks/useApi';
+
 import { apiErrorMessage } from '@/lib/safety';
-import { ActivityIndicator } from 'react-native';
+
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FS, FONT } from '@/lib/theme';
+
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
+
 import { radius } from '@/constants/radii';
+
 import { minHitSlop } from '@/lib/hitSlop';
 
 const BRAND_CHECKLIST_ITEMS = [
@@ -145,7 +161,6 @@ export default function BrandScreen() {
   const completionPct = Math.round((doneCount / totalCount) * 100);
 
   function toggleCheck(i: number) {
-    haptics.selection();
     setChecklist(prev => prev.map((v, idx) => idx === i ? !v : v));
   }
 
@@ -222,7 +237,6 @@ export default function BrandScreen() {
               activeOpacity={0.7}
               hitSlop={CHIP_HIT_SLOP}
               onPress={() => {
-                haptics.selection();
                 setNameInput(name);
               }}
             >
@@ -248,7 +262,7 @@ export default function BrandScreen() {
           {LOGO_STYLES.map((s) => (
             <TouchableOpacity
               key={s}
-              onPress={() => { haptics.selection(); setLogoStyle(s); }}
+              onPress={() => { haptic('select'); setLogoStyle(s); }}
               activeOpacity={0.7}
               hitSlop={CHIP_HIT_SLOP}
               accessibilityRole="button"
@@ -288,7 +302,7 @@ export default function BrandScreen() {
                   <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Logo option ${i + 1}`}
                     key={i}
                     activeOpacity={0.85}
-                    onPress={() => { haptics.selection(); setSelectedLogo(i); }}
+                    onPress={() => { haptic('select'); setSelectedLogo(i); }}
                     style={[styles.logoCard, { backgroundColor: colors.card, borderColor: isSelected ? colors.primary : colors.border, borderWidth: isSelected ? 2 : 1 }]}
                   >
                     <CachedImage

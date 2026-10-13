@@ -11,7 +11,10 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, Pressable, StyleSheet, View } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
+import { Feather } from '@expo/vector-icons';
 
 export interface SwipeAction {
   key: string;

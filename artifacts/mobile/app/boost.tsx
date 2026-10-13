@@ -24,44 +24,48 @@
 import React, {
   useState, useCallback, useRef, useMemo, useEffect,
 } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, PanResponder, LayoutChangeEvent,
-  } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, PanResponder, LayoutChangeEvent } from 'react-native';
+
 import { Image } from 'expo-image';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import * as WebBrowser from 'expo-web-browser';
 import { useApi } from '@/hooks/useApi';
+
 import { useRevenueCat } from '@/lib/revenueCat';
-import {
-  applyStoreCredit, confirmNativePromotion, isPurchaseCancelled, nativePromotionsEnabled,
-  nearestPromoTierCents, promoProductId,
-} from '@/lib/iapPromotions';
+
+import { applyStoreCredit, confirmNativePromotion, isPurchaseCancelled, nativePromotionsEnabled, nearestPromoTierCents, promoProductId } from '@/lib/iapPromotions';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, ICON, SHADOW_SM,
-} from '@/lib/theme';
+
+import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, ICON, SHADOW_SM } from '@/lib/theme';
+
 import { divideCents } from '@/lib/money';
-import {
-  BOOST_BUDGET_STEPS,
-  BOOST_BUDGET_MIN_CENTS,
-  BOOST_BUDGET_MAX_CENTS,
-  BOOST_DURATION_MIN_DAYS,
-  BOOST_DURATION_MAX_DAYS,
-  estimateBoostReach,
-  buildBoostReturnUrl,
-} from '@/services/boostService';
+
+import { BOOST_BUDGET_STEPS, BOOST_BUDGET_MIN_CENTS, BOOST_BUDGET_MAX_CENTS, BOOST_DURATION_MIN_DAYS, BOOST_DURATION_MAX_DAYS, estimateBoostReach, buildBoostReturnUrl } from '@/services/boostService';
+
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
 import { boostPreselectPostId, findBoostTarget } from '@/lib/boostPreselect';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Button } from '@/components/ui/Button';
+
 import { EmptyState } from '@/components/BrandthreadUI';
+
 import { radius } from '@/constants/radii';
+
 import { getEntitlementRejection } from '@/lib/entitlementError';
+
 import { formatMoney, fmtRelativeDay } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -271,7 +275,7 @@ function BudgetStepSlider({
       onTouchEnd={(e) => {
         const idx = indexFromX(e.nativeEvent.locationX);
         onChange(steps[idx]);
-        haptics.selection();
+        haptic('select');
       }}
       accessible
       accessibilityRole="adjustable"
@@ -664,7 +668,7 @@ export default function BoostScreen() {
       if (boost.status === 'active' || boost.status === 'in_review') {
         setActiveBoost(boost);
         setSucceeded(true);
-        haptics.success();
+        haptic('purchaseSuccess');
         loadHistory();
         boostsRef.current.summary().then((s) => setSummary(s)).catch(() => {});
       } else if (boost.status === 'pending_payment') {
@@ -704,7 +708,6 @@ export default function BoostScreen() {
   }
 
   function selectTarget(target: BoostTarget) {
-    haptics.selection();
     setSelectedTarget(target);
     setStep(1);
   }
@@ -861,7 +864,6 @@ export default function BoostScreen() {
           setPausingId(boost.id);
           try {
             await boostsRef.current.update(boost.id, { status: newStatus as 'paused' | 'cancelled' });
-            haptics.success();
             setExisting((prev) =>
               prev.map((b) => b.id === boost.id ? { ...b, status: newStatus } : b),
             );

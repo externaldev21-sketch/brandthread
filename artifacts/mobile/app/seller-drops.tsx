@@ -4,15 +4,29 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { useRouter } from 'expo-router';
+
 import { Icon } from '@/components/ui/Icon';
+
+import { Feather } from '@expo/vector-icons';
+
+import { haptic } from '@/lib/haptics';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useApi } from '@/lib/api';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { EmptyState } from '@/components/layout';
+
 import { SectionError } from '@/components/InlineFeedback';
+
 import { StatusBadge } from '@/components/BrandthreadUI';
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
 type DropStatusVariant = 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple';
@@ -61,6 +75,7 @@ export default function SellerDrops() {
 
   function handleRefresh() {
     setRefreshing(true);
+    haptic('refresh');
     load().finally(() => setRefreshing(false));
   }
 

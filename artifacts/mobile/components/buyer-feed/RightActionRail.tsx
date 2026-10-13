@@ -19,7 +19,7 @@ import * as Haptics from 'expo-haptics';
  * EngagementButton-driven icon here (like/repost/save/follow).
  */
 import React from 'react';
-import { Animated, Text, TouchableOpacity, View, StyleSheet, Platform, type StyleProp, type ViewStyle, Image } from 'react-native';
+import { Animated, Text, TouchableOpacity, View, StyleSheet, Platform, type StyleProp, type ViewStyle } from 'react-native';
 
 import { FontAwesome, Feather } from '@expo/vector-icons';
 

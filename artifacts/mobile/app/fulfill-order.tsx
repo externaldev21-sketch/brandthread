@@ -1,4 +1,5 @@
 import { CachedImage as Image } from '@/components/CachedImage';
+
 /**
  * Fulfill Order — single-order fulfillment wizard
  *
@@ -7,36 +8,51 @@ import { CachedImage as Image } from '@/components/CachedImage';
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
-  Alert, ActivityIndicator, Animated, Linking, Share,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator, Animated, Linking, Share } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+
 import { FONT, FS, SP, RADIUS, ICON, MUTED } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionHeader } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { EmptyState } from '@/components/layout/EmptyState';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { useApi } from '@/lib/api';
+
 import { adaptApiOrder } from '@/app/order-detail';
+
 import { formatCents } from '@/lib/money';
+
 import { Order, ShippingRate, ShippingLabel } from '@/services/orderTypes';
-import {
-  getShippingRates, purchaseShippingLabel, voidShippingLabel, addTracking as addTrackingService,
-  getPackagePresets, createPackagePreset, deletePackagePreset,
-  updateFulfillmentChecklist, PackagePreset, getParcelSuggestion, isShipFromError,
-} from '@/services/orderService';
+
+import { getShippingRates, purchaseShippingLabel, voidShippingLabel, addTracking as addTrackingService, getPackagePresets, createPackagePreset, deletePackagePreset, updateFulfillmentChecklist, PackagePreset, getParcelSuggestion, isShipFromError } from '@/services/orderService';
+
 import { sharePackingSlip } from '@/lib/packingSlip';
+
 import { radius } from '@/constants/radii';
+
 import { errorMessageOr } from '@/lib/errorMessage';
+
 import { SHIPPING_CARRIERS } from '@/lib/orderFulfillment';
 
 const LAST_PACKAGE_KEY = '@brandthread/fulfill-last-package:v1';
@@ -173,7 +189,6 @@ export default function FulfillOrderScreen() {
   const allChecked = order ? order.lineItems.length > 0 && order.lineItems.every(li => checked[li.id]) : false;
 
   function toggleItem(id: string) {
-    haptics.selection();
     setChecked(prev => ({ ...prev, [id]: !prev[id] }));
   }
 
@@ -303,7 +318,6 @@ export default function FulfillOrderScreen() {
 
   async function handleScanBarcode({ data }: { data: string }) {
     setShowScanner(false);
-    haptics.success();
     setManualTracking(data);
   }
 
@@ -347,6 +361,7 @@ export default function FulfillOrderScreen() {
         await api.orders.updateStatus(orderId, 'shipped');
       }
       setDone(true);
+      haptic('orderShipped');
       playSuccessAnimation(() => {
         router.replace('/(tabs)/orders');
       });
@@ -565,7 +580,7 @@ export default function FulfillOrderScreen() {
                 return (
                   <TouchableOpacity
                     key={p.id}
-                    onPress={() => { haptics.selection(); setPackageChoice({ kind: 'preset', presetId: p.id }); }}
+                    onPress={() => { haptic('select'); setPackageChoice({ kind: 'preset', presetId: p.id }); }}
                     onLongPress={() => Alert.alert('Delete box?', `Remove "${p.name}"?`, [
                       { text: 'Keep', style: 'cancel' },
                       { text: 'Delete box', style: 'destructive', onPress: () => handleDeletePreset(p.id) },
@@ -578,7 +593,7 @@ export default function FulfillOrderScreen() {
                 );
               })}
               <TouchableOpacity
-                onPress={() => { haptics.selection(); setPackageChoice({ kind: 'custom', weight: suggestedWeightLb, length: '', width: '', height: '' }); }}
+                onPress={() => { haptic('select'); setPackageChoice({ kind: 'custom', weight: suggestedWeightLb, length: '', width: '', height: '' }); }}
                 style={[s.presetChip, packageChoice?.kind === 'custom' && { borderColor: ACCENT, backgroundColor: ACCENT_DIM }]}
               >
                 <Text style={[s.presetChipText, packageChoice?.kind === 'custom' && { color: FG, fontFamily: FONT.semibold }]}>Custom</Text>
@@ -709,7 +724,7 @@ export default function FulfillOrderScreen() {
                   {CARRIERS.map(c => (
                     <TouchableOpacity
                       key={c}
-                      onPress={() => { haptics.selection(); setManualCarrier(c); }}
+                      onPress={() => { haptic('select'); setManualCarrier(c); }}
                       style={[s.carrierChip, manualCarrier === c && { borderColor: ACCENT, backgroundColor: ACCENT_DIM }]}
                     >
                       <Text style={[s.presetChipText, manualCarrier === c && { color: FG, fontFamily: FONT.semibold }]}>{c}</Text>

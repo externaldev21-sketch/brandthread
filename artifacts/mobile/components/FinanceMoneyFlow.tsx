@@ -1,14 +1,18 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useColors } from '@/hooks/useColors';
+
 import { FS, FONT } from '@/lib/theme';
+
 import { formatCents } from '@/lib/money';
-import {
-  activityLabel, buildMoneyTiles, deadlineText, dropOrdersText, dropStateLabel, isEmptySummary, signedCents,
-  type FinanceSummary, type Tone,
-} from '@/lib/financeSummary';
+
+import { activityLabel, buildMoneyTiles, deadlineText, dropOrdersText, dropStateLabel, isEmptySummary, signedCents, type FinanceSummary, type Tone } from '@/lib/financeSummary';
+
 import { TABULAR_NUMS } from '@/constants/typography';
+
 import { radius } from '@/constants/radii';
 
 type Props = {

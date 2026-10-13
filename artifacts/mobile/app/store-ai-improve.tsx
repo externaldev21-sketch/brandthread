@@ -1,26 +1,26 @@
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
-import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator,
-} from 'react-native';
+
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+
 import { useRouter, useFocusEffect } from 'expo-router';
+
 import { Icon } from '@/components/ui/Icon';
+
+import { Feather } from '@expo/vector-icons';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
-import {
-  GRAD_CARD_GLOW,
-  FONT, FS, SP, ICON,
-} from '@/lib/theme';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  FilterChip, StatusBadge, EmptyState,
-} from '@/components/BrandthreadUI';
-import {
-  getStorefront, generateAISuggestions, applyAISuggestion, dismissAISuggestion, storefrontStorageKey,
-} from '@/services/storeService';
+
+import { GRAD_CARD_GLOW, FONT, FS, SP, ICON } from '@/lib/theme';
+
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, EmptyState } from '@/components/BrandthreadUI';
+
+import { getStorefront, generateAISuggestions, applyAISuggestion, dismissAISuggestion, storefrontStorageKey } from '@/services/storeService';
+
 import { Storefront, StoreAISuggestion } from '@/services/storeTypes';
 
 import { ChipRow } from '@/components/ui/ChipRow';
+
 type Category = StoreAISuggestion['category'] | 'all';
 
 const CATEGORIES: { value: Category; label: string }[] = [

@@ -7,10 +7,19 @@
  */
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
 import { FONT, FS, RADIUS, SP, ON_LIGHT_MUTED } from '@/lib/theme';
+
+import { Feather } from '@expo/vector-icons';
+
+
+
 import { weeklyEquivalentFor } from '@/lib/sellerPlansDisplay';
+
 import type { SellerPlanDefinition } from '@/lib/sellerPlans';
 import type { useAppTheme } from '@/contexts/AppThemeContext';
 
@@ -66,7 +75,7 @@ export function SellerPlanSelector({
           <TouchableOpacity
             key={plan.id}
             activeOpacity={0.85}
-            onPress={() => { haptics.selection(); onSelect(plan.id); }}
+            onPress={() => { haptic('select'); onSelect(plan.id); }}
             testID={`seller-plan-card-${plan.id}`}
             style={[
               styles.card,

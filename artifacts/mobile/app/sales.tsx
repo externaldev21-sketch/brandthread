@@ -8,27 +8,43 @@
  * Applies to, Active dates, Summary).
  */
 import React, { useState, useCallback, useMemo } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
+
 import { useFocusEffect } from 'expo-router';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
 import { Sheet } from '@/components/ui/BottomSheet';
+
 import { OptionSheet } from '@/components/ui/OptionSheet';
+
+
 import { useAuth } from '@clerk/expo';
+
 import { useApi } from '@/hooks/useApi';
+
 import { isSellerDevPreview } from '@/lib/devPreview';
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { formatCents, parseDecimalToCents } from '@/lib/money';
+
 import { BrandthreadCard, StatusBadge, SectionHeader, HapticSwitch } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+
 import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
+
 import { EmptyState } from '@/components/layout';
+
 import { formatMoney } from '@/lib/format';
 
 type DiscountType = 'percent' | 'fixed';
@@ -191,7 +207,6 @@ export default function SalesScreen() {
         const created = await api.sales.create(payload);
         setSales(prev => [normalizeSale(created), ...prev]);
       }
-      haptics.success();
       setShowModal(false);
     } catch (err: any) {
       Alert.alert("Couldn't save the sale", err?.message ?? 'Try again.');
@@ -201,7 +216,6 @@ export default function SalesScreen() {
   }
 
   async function togglePause(x: Sale) {
-    haptics.selection();
     const nextActive = !x.active;
     setSales(prev => prev.map(r => r.id === x.id ? { ...r, active: nextActive, status: nextActive ? 'live' : 'paused' } : r));
     try { await api.sales.update(x.id, { active: nextActive }); }
@@ -224,7 +238,7 @@ export default function SalesScreen() {
   const Seg = ({ on, label, onPress, flex = true }: { on: boolean; label: string; onPress: () => void; flex?: boolean }) => (
     <TouchableOpacity
       style={[s.seg, flex && { flex: 1 }, on && { backgroundColor: theme.accent, borderColor: theme.accent }]}
-      onPress={() => { haptics.selection(); onPress(); }}
+      onPress={() => { haptic('select'); onPress(); }}
       accessibilityRole="button" accessibilityState={{ selected: on }}
     >
       <Text style={[s.segText, on && { color: theme.onAccent }]}>{label}</Text>
@@ -380,7 +394,7 @@ export default function SalesScreen() {
             ) : products.map(p => {
               const on = selectedProductIds.includes(p.id);
               return (
-                <TouchableOpacity key={p.id} style={[s.pickRow, on && { borderColor: theme.accent }]} onPress={() => { haptics.selection(); setSelectedProductIds(prev => on ? prev.filter(id => id !== p.id) : [...prev, p.id]); }}>
+                <TouchableOpacity key={p.id} style={[s.pickRow, on && { borderColor: theme.accent }]} onPress={() => { haptic('select'); setSelectedProductIds(prev => on ? prev.filter(id => id !== p.id) : [...prev, p.id]); }}>
                   <Text style={s.pickName}>{p.name}</Text>
                   <Icon name={on ? 'check-circle' : 'circle'} size={18} color={on ? theme.accent : MUTED} />
                 </TouchableOpacity>
@@ -395,7 +409,7 @@ export default function SalesScreen() {
         description={collections.length === 0 ? 'No categories or tags on your products yet.' : undefined}
         options={collections.map(c => ({ id: c, label: c }))}
         selectedId={collection ?? ''}
-        onSelect={(c: string) => { haptics.light(); setCollection(c); setShowCollectionPicker(false); }}
+        onSelect={(c: string) => { haptic('select'); setCollection(c); setShowCollectionPicker(false); }}
         testID="sale-collection-picker"
       />
     </View>

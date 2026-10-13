@@ -1,4 +1,5 @@
-import { haptics } from '@/lib/haptics';
+import { haptics, haptic } from '@/lib/haptics';
+
 /**
  * RFQ Post — broadcast a Request for Quotation to up to 10 manufacturers at
  * once. Mirrors quote-request.tsx's conventions (no fake file upload: there
@@ -7,29 +8,47 @@ import { haptics } from '@/lib/haptics';
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
-  TextInput, ActivityIndicator, Platform,
-} from 'react-native';
+
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator, Platform } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+
 import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import * as Haptics from 'expo-haptics';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
+
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
 import { getPreviewManufacturers } from '@/lib/previewManufacturers';
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { FormInput, PrimaryButton, EmptyState, StatusBadge } from '@/components/BrandthreadUI';
+
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+
 import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
+
 import { formatCents, parseDecimalToCents } from '@/lib/money';
+
 import { createRfq, getRfqTargetManufacturers, type RfqTargetManufacturer } from '@/services/manufacturerRfq';
+
 import { radius } from '@/constants/radii';
+
 import { crispPx } from '@/lib/crispPixel';
 
 const MAX_TARGETS = 10;
@@ -92,7 +111,7 @@ export default function RfqPostScreen() {
   });
 
   const toggle = (id: string) => {
-    haptics.selection();
+    haptic('select');
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) { next.delete(id); return next; }
@@ -122,7 +141,6 @@ export default function RfqPostScreen() {
         deadline: deadline.trim() ? new Date(deadline.trim()).toISOString() : undefined,
         manufacturerIds: [...selected],
       });
-      haptics.success();
       router.replace(`/rfq-compare?rfqId=${rfq.id}` as never);
     } catch (e: any) {
       if (promptUpgradeOnPlanGate(e, router)) return;

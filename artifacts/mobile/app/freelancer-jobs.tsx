@@ -6,28 +6,38 @@
  * (releases payment), requests a revision, or reports a problem.
  */
 import React, { useCallback, useRef, useState } from 'react';
-import {
-  ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, RefreshControl,
-} from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+
 import { useRouter, useFocusEffect } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
+
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useApi, type FreelancerJob } from '@/lib/api';
+
 import { serviceLabel, formatPrice, apiErrorMessage } from '@/lib/freelancer';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
+
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { useColors } from '@/hooks/useColors';
+
 import { EmptyState } from '@/components/layout';
-import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+
+import { isBuyerDevPreview, isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
 import { showActionSheet } from '@/components/ui/ActionSheet';
+
 import { JobNoteSheet } from '@/components/freelancer/JobNoteSheet';
-import { isPreviewDemoMode } from '@/lib/devPreview';
+
+
 import { applyDemoAction, demoFreelancerJobs } from '@/lib/freelancerDemo';
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -130,13 +140,13 @@ export default function FreelancerJobsScreen() {
     try {
       if (action === 'accept') {
         await api.freelancerJobs.accept(job.id);
-        haptics.success();
+        
       } else if (action === 'start') {
         await api.freelancerJobs.start(job.id);
-        haptics.success();
+        ;
       } else if (action === 'cancel') {
         await api.freelancerJobs.cancel(job.id);
-        haptics.warning();
+        
       } else if (action === 'sync') {
         const r = await api.freelancerJobs.syncPayment(job.id);
         if (r.paymentStatus !== 'paid') {
@@ -148,7 +158,7 @@ export default function FreelancerJobsScreen() {
       }
       await load();
     } catch (e) {
-      haptics.error();
+      haptic('error');
       Alert.alert("Couldn't update job", apiErrorMessage(e));
     } finally {
       setBusyId(null);
@@ -355,7 +365,7 @@ export default function FreelancerJobsScreen() {
               ]}
               activeOpacity={0.8}
               onPress={() => {
-                haptics.selection();
+                haptic('select');
                 setTab(t.key);
               }}
             >

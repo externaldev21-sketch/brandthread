@@ -1,38 +1,66 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, Platform, TextInput, Animated, ActivityIndicator,
-} from 'react-native';
+
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, TextInput, Animated, ActivityIndicator } from 'react-native';
+
 import { CachedImage as Image } from '@/components/CachedImage';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { Button } from '@/components/ui/Button';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { useNavigation, useRouter } from 'expo-router';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '@clerk/expo';
+
 import { useApi } from '@/hooks/useApi';
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { NavigationCard } from '@/components/BrandthreadUI';
+
 import { useImageSourceSheet, AVATAR_VIDEO_MAX_SECONDS } from '@/components/profile/ImageSourceSheet';
+
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
+
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
+
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
+
 import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
+
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+
 import { getPreviewAccount } from '@/lib/previewAccount';
+
 import { Avatar } from '@/components/ui/Avatar';
+
 import { getInitials } from '@/lib/format';
+
 import { FONT, TEXT_DISABLED } from '@/lib/theme';
+
 import { crispPx } from '@/lib/crispPixel';
+
 import { EditProfileBanner, useProfileBanner } from '@/components/profile/ProfileBannerEditor';
+
 import { BannerBottomFade } from '@/components/profile/ProfileBannerHeader';
+
 import { bannerStill, resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
+
 import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
@@ -274,10 +302,10 @@ export default function EditProfileScreen() {
         );
         setUri(result[responseKey]);
       }
-      haptics.success();
       showToast(`${title.replace('Update ', '')} updated`);
       if (setupTaskOnSuccess) void completeSetupTaskWhen('customize_store', true);
     } catch {
+      haptic('error');
       setUri(previousUri);
       setUploadError(prev => ({ ...prev, [key]: 'Upload failed. Check your connection and try again.' }));
     } finally {
@@ -315,9 +343,9 @@ export default function EditProfileScreen() {
         // A photo replaces any existing moving avatar server-side too.
         if (previousVideoUri) await api.avatarVideo.remove().catch(() => {});
       }
-      haptics.success();
       showToast('Avatar updated');
     } catch {
+      haptic('error');
       setAvatarUri(previousUri);
       setAvatarVideoUri(previousVideoUri);
       setUploadError(prev => ({ ...prev, avatar: 'Upload failed. Check your connection and try again.' }));
@@ -360,9 +388,9 @@ export default function EditProfileScreen() {
       }
       setAvatarUri(finalPosterUri || null);
       setAvatarVideoUri(finalVideoUri);
-      haptics.success();
       showToast('Profile video updated');
     } catch {
+      haptic('error');
       setAvatarUri(previousUri);
       setAvatarVideoUri(previousVideoUri);
       setUploadError(prev => ({ ...prev, avatar: 'Upload failed. Check your connection and try again.' }));
@@ -387,14 +415,14 @@ export default function EditProfileScreen() {
   async function handleSave() {
     if (saving || Object.values(uploading).some(Boolean) || !profileLoaded) return;
     if (!validate()) {
-      haptics.warning();
+      haptic('error');
       return;
     }
     const rawUsername = fields.username.trim().toLowerCase();
     if (rawUsername !== initial.username.trim().toLowerCase()) {
       const available = await checkUsernameAvailability(rawUsername);
       if (!available) {
-        haptics.warning();
+        haptic('error');
         return;
       }
     }
@@ -419,7 +447,6 @@ export default function EditProfileScreen() {
           },
         });
       }
-      haptics.success();
       setInitial(fields);
       showToast('Profile updated');
       setTimeout(() => goBackOr(router), 500);

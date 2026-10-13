@@ -14,28 +14,42 @@ import * as Haptics from 'expo-haptics';
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@clerk/expo';
+
 import { useApi } from '@/hooks/useApi';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { formatCents } from '@/lib/money';
+
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Button } from '@/components/ui/Button';
-import {
-  buildFeaturedReturnUrl, featuredStateLabel, needsStoreRefund, storeName, storeRefundUrl,
-} from '@/services/featuredSlotService';
+
+import { buildFeaturedReturnUrl, featuredStateLabel, needsStoreRefund, storeName, storeRefundUrl } from '@/services/featuredSlotService';
+
 import type { FeaturedAvailability, FeaturedSlot } from '@/lib/api';
 import { useRevenueCat } from '@/lib/revenueCat';
-import {
-  applyStoreCredit, confirmNativePromotion, featuredProductId, isPurchaseCancelled, nativePromotionsEnabled,
-} from '@/lib/iapPromotions';
+
+import { applyStoreCredit, confirmNativePromotion, featuredProductId, isPurchaseCancelled, nativePromotionsEnabled } from '@/lib/iapPromotions';
+
 import { crispPx } from '@/lib/crispPixel';
 
 const DAY = 86_400_000;
@@ -105,7 +119,7 @@ export default function FeaturedSlotScreen() {
     setBusy(true);
     try {
       const slot = await api.featuredSlots.verify(id);
-      haptics.success();
+      haptic('purchaseSuccess');
       if (slot.displayState === 'in_review') {
         Alert.alert('In review', "Payment confirmed. We'll review your brand before it goes live, and refund you in full if it isn't approved.");
       }

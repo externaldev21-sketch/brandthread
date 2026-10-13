@@ -1,34 +1,40 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
+
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Platform, Alert, ActivityIndicator } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useLocalSearchParams } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import * as ImagePicker from 'expo-image-picker';
 import { useApi } from '@/lib/api';
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, FilterChip, StatusBadge, SectionHeader,
-  EmptyState, StatCard, HapticSwitch} from '@/components/BrandthreadUI';
+
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
+
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState, StatCard, HapticSwitch } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { saveDraftAnswers, loadDraftAnswers, clearDraftAnswers,
-  generateStoreFromAnswers, applyGenerationResult } from '@/services/storeService';
-import { StoreGenerationAnswers, StoreColorPalette,
-  BRAND_STYLES, BRAND_MOODS, HOMEPAGE_PRIORITIES, TARGET_CUSTOMERS,
-  STORE_FEATURES, STORE_CONTENT_OPTIONS, TYPOGRAPHY_STYLES,
-  COLOR_PRESETS, TypographyStyle, BrandStyle, BrandMood,
-  HomepagePriority, TargetCustomer, StoreFeature, StoreContent } from '@/services/storeTypes';
+
+import { saveDraftAnswers, loadDraftAnswers, clearDraftAnswers, generateStoreFromAnswers, applyGenerationResult } from '@/services/storeService';
+
+import { StoreGenerationAnswers, StoreColorPalette, BRAND_STYLES, BRAND_MOODS, HOMEPAGE_PRIORITIES, TARGET_CUSTOMERS, STORE_FEATURES, STORE_CONTENT_OPTIONS, TYPOGRAPHY_STYLES, COLOR_PRESETS, TypographyStyle, BrandStyle, BrandMood, HomepagePriority, TargetCustomer, StoreFeature, StoreContent } from '@/services/storeTypes';
 
 import { radius } from '@/constants/radii';
+
 const TOTAL_STEPS = 10;
 
 const DEFAULT_ANSWERS: Partial<StoreGenerationAnswers> = {
@@ -200,7 +206,7 @@ export default function StoreGenerateScreen() {
             <TouchableOpacity
               key={value}
               onPress={() => {
-                haptics.selection();
+                if (!isPrimary) haptic('select');
                 const newSecondary = (answers.secondaryStyles ?? []).filter(s => s !== value);
                 updateAnswers({ primaryStyle: value, secondaryStyles: newSecondary });
               }}
@@ -231,7 +237,7 @@ export default function StoreGenerateScreen() {
                 <TouchableOpacity
                   key={value}
                   onPress={() => {
-                    haptics.selection();
+                    haptic('select');
                     const current = answers.secondaryStyles ?? [];
                     if (isSelected) {
                       updateAnswers({ secondaryStyles: current.filter(s => s !== value) });
@@ -265,7 +271,7 @@ export default function StoreGenerateScreen() {
             <TouchableOpacity
               key={value}
               onPress={() => {
-                haptics.selection();
+                haptic('select');
                 const current = answers.moods ?? [];
                 updateAnswers({
                   moods: isSelected ? current.filter(m => m !== value) : [...current, value],
@@ -307,7 +313,7 @@ export default function StoreGenerateScreen() {
               <TouchableOpacity
                 key={preset.label}
                 onPress={() => {
-                  haptics.selection();
+                  if (!isSelected) haptic('select');
                   setColorPresetIdx(idx);
                   updateAnswers({ colors: preset.colors });
                 }}
@@ -402,7 +408,7 @@ export default function StoreGenerateScreen() {
             key={value}
             style={[st.typoCard, isSelected && st.typoCardSelected]}
             onPress={() => {
-              haptics.selection();
+              if (!isSelected) haptic('select');
               updateAnswers({ typography: value });
             }}
           >
@@ -439,7 +445,7 @@ export default function StoreGenerateScreen() {
             <TouchableOpacity
               key={value}
               onPress={() => {
-                haptics.selection();
+                if (!isSelected) haptic('select');
                 const addl = (answers.additionalSections ?? []).filter(s => s !== value);
                 updateAnswers({ homepagePriority: value, additionalSections: addl });
               }}
@@ -472,7 +478,7 @@ export default function StoreGenerateScreen() {
                 <TouchableOpacity
                   key={value}
                   onPress={() => {
-                    haptics.selection();
+                    haptic('select');
                     const current = answers.additionalSections ?? [];
                     updateAnswers({
                       additionalSections: isSelected
@@ -583,7 +589,7 @@ export default function StoreGenerateScreen() {
             <TouchableOpacity
               key={value}
               onPress={() => {
-                haptics.selection();
+                haptic('select');
                 const current = answers.targetCustomers ?? [];
                 updateAnswers({
                   targetCustomers: isSelected
@@ -661,7 +667,7 @@ export default function StoreGenerateScreen() {
               <TouchableOpacity
                 key={value}
                 onPress={() => {
-                  haptics.selection();
+                  haptic('select');
                   if (value === 'none') {
                     updateAnswers({ existingContent: isSelected ? [] : ['none'] });
                   } else {
@@ -698,7 +704,6 @@ export default function StoreGenerateScreen() {
                           const existing = answers.contentUploads?.[value] ?? [];
                           updateAnswers({ contentUploads: { ...(answers.contentUploads ?? {}), [value]: [...existing, remoteUri] } });
                         }
-                        haptics.success();
                       } catch {
                         Alert.alert("Couldn't upload photo", 'Try again.');
                       } finally {

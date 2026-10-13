@@ -4,37 +4,38 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
-  Platform,
-} from 'react-native';
+
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useLocalSearchParams } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_LIGHT,
-  SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK, GRAD_PRIMARY, GRAD_CARD_GLOW,
-  FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_LIGHT, SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK, GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
+
 import { useColors } from '@/hooks/useColors';
 
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  FilterChip, StatusBadge, SectionHeader, FormInput, EmptyState, HapticSwitch,} from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput, EmptyState, HapticSwitch } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
 
-import {
-  getManufacturer, getRelationships, saveQuoteRequestDraft, submitQuoteRequest, getQuoteRequest,
-} from '@/services/manufacturerService';
+import { getManufacturer, getRelationships, saveQuoteRequestDraft, submitQuoteRequest, getQuoteRequest } from '@/services/manufacturerService';
 
 import { QuoteRequest, Manufacturer } from '@/services/manufacturerTypes';
+
 import { radius } from '@/constants/radii';
+
 import { minHitSlop } from '@/lib/hitSlop';
 
 // Header 'Save draft' text button draws 24pt tall; pad touch area vertically to 44pt.
@@ -377,7 +378,7 @@ export default function QuoteRequestScreen() {
             return (
               <TouchableOpacity
                 key={mfg.id}
-                onPress={() => { setPickedManufacturerId(mfg.id); haptics.selection(); }}
+                onPress={() => { setPickedManufacturerId(mfg.id); haptic('select'); }}
                 style={[sc.radioCard, active && sc.radioCardActive]}
                 activeOpacity={0.8}
               >
@@ -424,7 +425,7 @@ export default function QuoteRequestScreen() {
           return (
             <TouchableOpacity
               key={src}
-              onPress={() => { setProductSource(src); haptics.selection(); }}
+              onPress={() => { setProductSource(src); haptic('select'); }}
               style={[sc.radioCard, active && sc.radioCardActive]}
               activeOpacity={0.8}
             >

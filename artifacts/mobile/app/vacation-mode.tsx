@@ -5,29 +5,41 @@ import * as Haptics from 'expo-haptics';
  */
 import React, { useState, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { futureDateInputError, toDateInputValue } from '@/lib/calendarDate';
-import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator } from 'react-native';
+
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useFocusEffect } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { haptics } from '@/lib/haptics';
+
 import { useApi } from '@/hooks/useApi';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM, SUCCESS, SUCCESS_DIM,
-  ORANGE, RED, FONT, FS, SP, RADIUS, COMP,
-} from '@/lib/theme';
+
+import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM, SUCCESS, SUCCESS_DIM, ORANGE, RED, FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { HapticSwitch } from '@/components/BrandthreadUI';
+
 import { ErrorState } from '@/components/ui/ErrorState';
+
 import { useAuth } from '@clerk/expo';
+
 import { isSellerDevPreview } from '@/lib/devPreview';
+
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+
 import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
+
 import { crispPx } from '@/lib/crispPixel';
 
 export default function VacationModeScreen() {
@@ -76,7 +88,7 @@ export default function VacationModeScreen() {
 
   async function handleSave() {
     if (loading || loadError || skipProtectedReads) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
     const dateError = vacationMode ? futureDateInputError(returnDate) : null;
     if (dateError) { setReturnDateError(dateError); return; }
     setSaving(true);
@@ -86,7 +98,6 @@ export default function VacationModeScreen() {
         vacationMessage: message.trim() || null,
         vacationUntil:   vacationMode && returnDate.trim() ? returnDate.trim() : null,
       });
-      haptics.success();
       Alert.alert(
         vacationMode ? 'Vacation mode is on' : 'Your store is open',
         vacationMode

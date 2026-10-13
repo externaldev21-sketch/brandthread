@@ -1,31 +1,55 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Linking, ActivityIndicator } from 'react-native';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { Badge } from '@/components/Badge';
+
 import { useRouter } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
-import { useApi } from '@/lib/api';
+
+import { useApi, API_BASE_URL, storeContextHeaders, versionApiPath } from '@/lib/api';
+
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+
 import { buildDemoSellerFinance } from '@/lib/previewSellerFinance';
+
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
+
 import { RoleLockedView } from '@/components/RoleLockedView';
+
 import { FS, FONT } from '@/lib/theme';
+
 import { useTeamRole } from '@/hooks/useTeamRole';
+
 import { formatCents, formatDeductionCents } from '@/lib/money';
+
 import { currentPlanSummary } from '@/lib/currentPlan';
+
 import { FinanceMoneyFlow } from '@/components/FinanceMoneyFlow';
+
 import type { FinanceSummary } from '@/lib/financeSummary';
 import { zeroFinanceSummary } from '@/lib/financeSummary';
+
 import { getPreviewFinanceDemo } from '@/lib/previewFinance';
+
 import type { FinanceTransactionRow } from '@/lib/previewFinance';
 import { TABULAR_NUMS } from '@/constants/typography';
+
 import { RetryRow } from '@/components/ui/RetryRow';
-import { API_BASE_URL, storeContextHeaders, versionApiPath } from '@/lib/api';
+
+
 import { fetchStatementCsv, statementErrorLabel, statementFilename, STATEMENT_CSV_PATH } from '@/lib/financeStatement';
+
 import { saveCsvFile } from '@/lib/saveCsvFile';
+
 import { RecoveryPauseCard } from '@/components/finance/RecoveryPauseCard';
+
 import { HeldForDeliveryRow } from '@/components/payouts/HeldForDeliveryRow';
 
 function fmtDate(iso: string | number) {

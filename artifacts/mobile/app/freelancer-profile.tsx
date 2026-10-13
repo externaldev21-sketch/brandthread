@@ -5,23 +5,43 @@
  */
 import React, { useCallback, useState } from 'react';
 import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, Platform, Linking } from 'react-native';
+
 import { CachedImage as Image } from '@/components/CachedImage';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
+
 import { useApi, type Freelancer } from '@/lib/api';
+
 import { serviceLabel, serviceIcon, formatHourlyRate, formatPrice, ratingLabel, apiErrorMessage, apiErrorCode } from '@/lib/freelancer';
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { centsAtBasisPoints, parseDecimalToCents } from '@/lib/money';
+
 import { SheetRise } from '@/components/motion/SheetRise';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const PLATFORM_FEE_BASIS_POINTS = 500; // display only — server computes the real fee
@@ -100,7 +120,6 @@ export default function FreelancerProfileScreen() {
           onPress: async () => {
             try {
               await api.freelancers.deactivate();
-              haptics.success();
               goBackOr(router);
             } catch (e) {
               Alert.alert("Couldn't deactivate listing", apiErrorMessage(e));
@@ -134,7 +153,7 @@ export default function FreelancerProfileScreen() {
         // Webhooks can lag in dev — confirm payment status directly
         try { await api.freelancerJobs.syncPayment(job.id); } catch {}
         if (result.type === 'success') {
-          haptics.success();
+          haptic('purchaseSuccess');
           Alert.alert(
             'Payment sent',
             `${freelancer.name} has been notified. Funds are held by Brandthread until the job is completed.`,
@@ -149,7 +168,7 @@ export default function FreelancerProfileScreen() {
       setTitle(''); setDescription(''); setPriceText('');
       router.push('/freelancer-jobs' as any);
     } catch (e) {
-      haptics.error();
+      haptic('error');
       const code = apiErrorCode(e);
       Alert.alert(
         code === 'FREELANCER_NOT_PAYABLE' ? 'Not available yet' : "Couldn't create job",
@@ -355,6 +374,7 @@ export default function FreelancerProfileScreen() {
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={() => {
+                haptic('sheet');
                 setHireVisible(true);
               }}
             >

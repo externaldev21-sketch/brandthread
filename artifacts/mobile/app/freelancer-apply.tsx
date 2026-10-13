@@ -4,26 +4,36 @@
  * Also used to edit an existing profile (prefills from /api/freelancers/me).
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, Platform,
-} from 'react-native';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { useRouter } from 'expo-router';
+
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
 import { useApi } from '@/lib/api';
+
 import { FREELANCER_SERVICE_TYPES, apiErrorMessage } from '@/lib/freelancer';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, RED, FILL_ELEVATED, TEXT_TERTIARY, TEXT_DISABLED,
-} from '@/lib/theme';
+
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, RED, FILL_ELEVATED, TEXT_TERTIARY, TEXT_DISABLED } from '@/lib/theme';
+
 import { useColors } from '@/hooks/useColors';
+
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 
 const STEPS = ['Service', 'Rate & Bio', 'Portfolio'];
@@ -123,14 +133,13 @@ export default function FreelancerApplyScreen() {
         skillTags,
         portfolioUrls,
       });
-      haptics.success();
       if (!freelancer.hasConnectedAccount) {
         promptConnect(freelancer.id);
       } else {
         router.replace(`/freelancer-profile?id=${freelancer.id}` as any);
       }
     } catch (e) {
-      haptics.error();
+      haptic('error');
       Alert.alert("Couldn't save profile", apiErrorMessage(e));
     } finally {
       setSubmitting(false);
@@ -179,7 +188,7 @@ export default function FreelancerApplyScreen() {
                       style={[styles.typeCard, active && { backgroundColor: colors.accent, borderColor: colors.primary }]}
                       activeOpacity={0.8}
                       onPress={() => {
-                        haptics.selection();
+                        haptic('select');
                         setServiceType(t.value);
                       }}
                     >

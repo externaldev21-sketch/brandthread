@@ -7,17 +7,29 @@
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking, Pressable } from 'react-native';
+
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useAuth } from '@clerk/expo';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
 
+import { Feather } from '@expo/vector-icons';
+
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { PrimaryButton, SecondaryButton, GradientCard, BrandedLoadingState } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useApi } from '@/lib/api';
+
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
+
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 
 type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'failed';

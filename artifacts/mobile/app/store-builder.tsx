@@ -1,39 +1,47 @@
 import { haptics } from '@/lib/haptics';
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { relativeTime } from '@/lib/activity';
+
 import { plural } from '@/lib/plural';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  RefreshControl, ActivityIndicator, Alert, Modal, TextInput, Platform } from 'react-native';
+
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert, Modal, TextInput, Platform } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import * as Haptics from 'expo-haptics';
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, TEXT_SECONDARY } from '@/lib/theme';
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  FilterChip, StatusBadge, SectionHeader,
-  EmptyState, StatCard } from '@/components/BrandthreadUI';
+import { LinearGradient } from 'expo-linear-gradient';
+
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, TEXT_SECONDARY } from '@/lib/theme';
+
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, EmptyState, StatCard } from '@/components/BrandthreadUI';
+
 import { Button } from '@/components/ui';
-import {
-  getStorefront, applyTheme, generateAISuggestions,
-  startShopifyImport, getLatestShopifyImport, getShopifyImport, continueShopifyImport,
-  syncShopifyImportedStorefront, ShopifyImportJob,
-} from '@/services/storeService';
-import {
-  Storefront, StorePublishStatus, THREAD_THEME_ID, THREAD_THEME_NAME,
-  THREAD_THEME_LIGHT_PALETTE,
-} from '@/services/storeTypes';
+
+import { getStorefront, applyTheme, generateAISuggestions, startShopifyImport, getLatestShopifyImport, getShopifyImport, continueShopifyImport, syncShopifyImportedStorefront, ShopifyImportJob } from '@/services/storeService';
+
+import { Storefront, StorePublishStatus, THREAD_THEME_ID, THREAD_THEME_NAME, THREAD_THEME_LIGHT_PALETTE } from '@/services/storeTypes';
+
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
+
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
+
 import { Sheet } from '@/components/ui/BottomSheet';
+
 import { radius } from '@/constants/radii';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
 
 function getStatusVariant(status: StorePublishStatus): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
@@ -212,7 +220,6 @@ export default function StoreBuilderScreen() {
         'customize_store',
         () => applyTheme(THREAD_THEME_ID, 'light'),
       );
-      haptics.success();
       router.push('/store-editor' as never);
     } catch {
       Alert.alert('Could not open Thread Theme', 'Please try again.');

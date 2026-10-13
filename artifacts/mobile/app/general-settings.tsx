@@ -1,11 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native';
+
 import { useRouter } from 'expo-router';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
+import { Feather } from '@expo/vector-icons';
+
 import { useApi } from '@/lib/api';
+
 import { FONT } from '@/lib/theme';
 
 export default function GeneralSettingsScreen() {
