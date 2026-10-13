@@ -71,6 +71,7 @@ import { guestAccessToken, tokenHash } from "./guest-checkout";
 import {
   firstOrderDiscountForGroup, isFirstOrderDiscountEligible, reserveFirstOrderDiscount,
 } from "../lib/firstOrderDiscount";
+import { giftColumns, giftSchema, moderateGift } from "../lib/giftOptions";
 
 /** Refuses any request that carries card data, before auth, parsing or logging touch it. */
 export function rejectCardData(req: Request, res: Response, next: NextFunction): void {
@@ -140,6 +141,8 @@ const createSchema = z.object({
   /** Keep the card on the buyer's Stripe customer for next time (the hosted flow always did). Ignored for guests. */
   saveCard: z.boolean().optional(),
   ...rewardTokens,
+  /** "Gift this": a gift receipt with prices hidden, with an optional note. */
+  gift: giftSchema.optional(),
 });
 const guestTokenSchema = z.object({ guestAccessToken: z.string().min(32).max(512) });
 

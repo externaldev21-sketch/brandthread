@@ -11,6 +11,7 @@ import { quoteFromSchedule } from '@/lib/feeSchedule';
  */
 
 import { shareInvoice, invoiceFromSellerOrder } from '@/lib/invoice';
+import { OrderGiftNote } from '@/components/orders/OrderGiftNote';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert, ActivityIndicator, Modal, Image } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
@@ -345,6 +346,11 @@ export function adaptApiOrder(raw: any): Order {
     updatedAt: raw.updatedAt ?? raw.createdAt,
     shopifyFulfillment: raw.shopifyFulfillment ?? null,
     sellerRisk: raw.risk ?? null,
+    gift: raw.isGift ? {
+      to: raw.gift?.to ?? raw.giftTo ?? null,
+      from: raw.gift?.from ?? raw.giftFrom ?? null,
+      message: raw.gift?.message ?? raw.giftMessage ?? null,
+    } : null,
   };
 }
 

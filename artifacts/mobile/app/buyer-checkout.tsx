@@ -106,6 +106,8 @@ import { CheckoutSheet } from '@/components/checkout/CheckoutSheet';
 import { addressName, addressOneLine } from '@/lib/addressFormat';
 import { PromoCodeSection } from '@/components/checkout/PromoCodeSection';
 import { GiftCardSection } from '@/components/checkout/GiftCardSection';
+import { GiftOptionRow } from '@/components/checkout/GiftOptionRow';
+import { giftOptionBody, resetGiftOption } from '@/lib/checkout/giftOptionStore';
 import { ThreadCashSection } from '@/components/checkout/ThreadCashSection';
 import { OrderSummarySection } from '@/components/checkout/OrderSummarySection';
 import { TipSection } from '@/components/checkout/TipSection';
@@ -573,6 +575,7 @@ export default function BuyerCheckoutScreen() {
         // A "Guest checkout only" store saves nothing to the buyer's account.
         saveCard: !guestCheckoutOnly,
         tips,
+        ...giftOptionBody(),
       }));
       startedRef.current = started;
       // Remember the intent so a restart can find the orders it produced.
@@ -649,6 +652,7 @@ export default function BuyerCheckoutScreen() {
       { valueCents: started.amountCents, currency: base.summary.currency },
     );
     await removeCartItems(base.deliveryGroups.flatMap(group => group.items.map(item => item.id)));
+    resetGiftOption();
     await saveAddressIfAsked(who);
     startedRef.current = null;
     await persist({ ...base, paidGroups, step: 'confirmation' }, who);
@@ -835,6 +839,7 @@ export default function BuyerCheckoutScreen() {
               clientIdempotencyKey: `${current.idempotencyKey}_${group.sellerId}`,
               // A line added from a live attributes this seller's order to it.
               ...(liveStreamIdForItems(group.items) ? { liveStreamId: liveStreamIdForItems(group.items) } : {}),
+              ...giftOptionBody(),
               ...(current.loyaltyRedemption && current.deliveryGroups.length === 1
                 ? { loyaltyToken: current.loyaltyRedemption.token }
                 : {}),
@@ -874,6 +879,7 @@ export default function BuyerCheckoutScreen() {
               },
               clientIdempotencyKey: `${current.idempotencyKey}_${group.sellerId}`,
               ...groupDiscountFields(current, group.sellerId),
+              ...giftOptionBody(),
             },
           );
         }
@@ -972,6 +978,7 @@ export default function BuyerCheckoutScreen() {
       if (!unresolved.length) {
         await removeCartItems(current.deliveryGroups.flatMap(group => group.items.map(item => item.id)));
       }
+      resetGiftOption();
       await saveAddressIfAsked({ address, contact });
       await persist({ ...current, paidGroups, step: 'confirmation' });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1256,6 +1263,7 @@ export default function BuyerCheckoutScreen() {
             onPress={() => setSheet('contact')}
             testID="order-review-contact"
           />
+          <GiftOptionRow />
 
           <ReviewDetailRow
             label="Ship to"

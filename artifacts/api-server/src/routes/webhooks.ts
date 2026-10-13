@@ -1193,6 +1193,10 @@ export async function handleCheckoutPaid(
         // An accepted post-purchase offer (lib/postPurchaseOffer.ts) links to the order it adds to.
         ...(csRecord.upsellOfOrderId ? { upsellOfOrderId: csRecord.upsellOfOrderId } : {}),
         ...(sourceLiveStreamId ? { sourceLiveStreamId } : {}),
+        // "Gift this": every order of the session (one per seller) carries it.
+        ...(csRecord.isGift ? {
+          isGift: true, giftTo: csRecord.giftTo, giftFrom: csRecord.giftFrom, giftMessage: csRecord.giftMessage,
+        } : {}),
       })
       .returning();
     createdOrderId = order.id;

@@ -22,6 +22,7 @@ const GUEST_TOP_LEVEL = new Set([
   'buyer-checkout', // guest checkout exists (api.guest.checkout)
   'thread-checkout', // alias of buyer-checkout (cart + Shop sheet "Buy now")
   'checkout-return', // Stripe hosted Checkout's return page
+  'checkout-gift-message', // local to checkout; calls no API
   'buyer-search',
   'buyer-post-viewer',
   'buyer-post-comments', // read-only for guests; composer prompts sign-in

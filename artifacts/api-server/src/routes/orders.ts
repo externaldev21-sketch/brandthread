@@ -30,6 +30,7 @@ import { bodyObject, centsLike, idArray, idParams, intLike, str, validateInput }
 import { formatRefundAmount, parseSellerRefundRequest, sellerRefundBlockedReason } from "../lib/sellerRefundRequest";
 import { notifyOrderLiveActivity } from "../lib/liveActivityPush";
 import { generateOrderNumberIn } from "../lib/orderNumber";
+import { giftResponse } from "../lib/giftOptions";
 
 const router = Router();
 router.use(requireAuth);
@@ -464,7 +465,7 @@ router.get("/:id", async (req, res) => {
     if (live) sourceLive = { streamId: live.id, title: live.title, startedAt: new Date(live.started_at).toISOString() };
   }
 
-  res.json({ ...withRiskView(order), items, customer, shopifyFulfillment, sourceLive });
+  res.json({ ...withRiskView(order), items, customer, shopifyFulfillment, sourceLive, ...giftResponse(order) });
 });
 
 // Recognized cancellation reasons — kept in sync with mobile orderTypes.ts

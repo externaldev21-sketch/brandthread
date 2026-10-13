@@ -62,6 +62,7 @@ import { BundlePricingError, linesAfterBundles } from "../lib/money/bundlePricin
 import { priceGroupBundles } from "../lib/money/bundleLoader";
 import { CHECKOUT_PAUSED_ERROR, isThreadCashPaused } from "../lib/threadCash/killSwitch";
 import { emptyMysteryBoxVariants } from "../lib/mysteryBox";
+import { giftColumns, giftResponse, giftSchema, moderateGift } from "../lib/giftOptions";
 
 import { liveStreamIdFromItems, resolveLiveAttribution } from "../lib/liveAttribution";
 const router = Router();
@@ -110,6 +111,7 @@ const checkoutBodySchema = z.object({
   discountCode: z.string().trim().min(1).max(64).optional(),
   /** Live stream this purchase was made from (lib/liveAttribution.ts validates it; a bad id is ignored). */
   liveStreamId: z.string().trim().max(64).nullable().optional(),
+  gift: giftSchema.optional(),
 }).passthrough();
 const addressSuggestionQuerySchema = z.object({
   q: z.string().trim().min(3).max(160),
@@ -585,6 +587,11 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       items, successUrl, cancelUrl, contactEmail, contactPhone, shippingAddress,
       clientIdempotencyKey, dropId, loyaltyToken, threadCashToken, discountCode, liveStreamId,
     } = req.body;
+    const giftCheck = moderateGift(req.body.gift);
+    if (!giftCheck.ok) {
+      res.status(422).json({ error: giftCheck.reason, code: "CONTENT_REJECTED" });
+      return;
+    }
 
     // ── Thread Cash ─────────────────────────────────────────────────────
     // Platform-funded reward credit: a DISCOUNT on a card purchase, never a
@@ -1205,6 +1212,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       ...(validatedShipping ? { shippingAddress: validatedShipping } : {}),
       ...(hasKey ? { clientIdempotencyKey } : {}),
       ...(sourceLiveStreamId ? { sourceLiveStreamId } : {}),
+      ...giftColumns(req.body.gift),
     };
     let checkoutRecord: { id: string } | undefined;
     try {
@@ -1597,6 +1605,10 @@ router.get("/orders/:id", async (req, res) => {
         cancellationNotes:       orders.cancellationNotes,
         createdAt:               orders.createdAt,
         sellerCancelWindowHours: users.buyerCancelWindowHours,
+        isGift:                  orders.isGift,
+        giftTo:                  orders.giftTo,
+        giftFrom:                orders.giftFrom,
+        giftMessage:             orders.giftMessage,
         ...deliveryColumns,
       })
       .from(orders)
@@ -1628,6 +1640,7 @@ router.get("/orders/:id", async (req, res) => {
       // 21-day default); null once the order can't be cancelled by status.
       buyerCancelDeadline: buyerCancelDeadline(row.status, row.createdAt, row.sellerCancelWindowHours),
       items,
+      ...giftResponse(row),
       delivery: await loadBuyerDelivery(row.id, row),
     });
   } catch (err) {

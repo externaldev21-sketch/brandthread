@@ -50,6 +50,7 @@ import { getShippingRates, purchaseShippingLabel, voidShippingLabel, addTracking
 import { sharePackingSlip } from '@/lib/packingSlip';
 
 import { printLabel, printPackingSlip } from '@/lib/airPrint';
+import { OrderGiftNote } from '@/components/orders/OrderGiftNote';
 import { radius } from '@/constants/radii';
 import { HelpLink } from '@/components/help/HelpLink';
 
@@ -564,6 +565,7 @@ export default function FulfillOrderScreen() {
         {step === 1 && (
           <>
             <SectionHeader title={`Order #${order.orderNumber}`} action={{ label: 'Packing slip', onPress: handlePackingSlip }} />
+            <OrderGiftNote gift={order.gift} />
             {order.lineItems.map(li => (
               <TouchableOpacity key={li.id} onPress={() => toggleItem(li.id)} activeOpacity={0.8}>
                 <BrandthreadCard style={s.itemCard}>

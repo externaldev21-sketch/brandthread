@@ -27,6 +27,7 @@ import { DiscountValidationError, validateDiscountCode } from "../lib/discounts"
 import {
   buildGuestCheckoutSessionParams, guestCustomerParams, guestDiscountCents,
 } from "../lib/money/guestCheckoutSession";
+import { giftColumns, giftSchema, moderateGift } from "../lib/giftOptions";
 
 const router = Router();
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -73,6 +74,7 @@ const guestCheckoutSchema = z.object({
   // "embedded": Stripe's payment form mounts on the page that asked (the
   // store's own checkout page). Default "hosted" redirects to Stripe.
   uiMode: z.enum(["hosted", "embedded"]).optional(),
+  gift: giftSchema.optional(),
 }).passthrough();
 const guestVerifyParamsSchema = z.object({ sessionId: requestPrimitives.id });
 const guestVerifyBodySchema = z.object({
@@ -131,6 +133,8 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       discountCode, liveStreamId,
     } = req.body ?? {};
     const embedded = req.body?.uiMode === "embedded";
+    const giftCheck = moderateGift(req.body?.gift);
+    if (!giftCheck.ok) return res.status(422).json({ error: giftCheck.reason, code: "CONTENT_REJECTED" });
     const email = typeof contactEmail === "string" ? contactEmail.trim().toLowerCase() : "";
     if (!emailPattern.test(email)) return res.status(400).json({ error: "A valid contactEmail is required" });
     const phone = typeof contactPhone === "string" ? contactPhone.trim() : "";
@@ -370,6 +374,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
           discountCodeId: discountApplication.discount.id,
           discountCodeAmountCents,
         } : {}),
+        ...giftColumns(req.body.gift),
       }).returning({ id: checkoutSessions.id });
     } catch (error: any) {
       // A concurrent duplicate request lost the DB uniqueness race. Reuse only
