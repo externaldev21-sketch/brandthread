@@ -35,6 +35,7 @@ const SELLER_ROWS: NotifRow[] = [
   { key: 'inventory_alerts',       icon: 'archive',        label: 'Inventory alerts',       description: 'Low and out of stock' },
   { key: 'seller_announcements', icon: 'bell', label: 'Brand announcements', description: 'Pushes that brands you follow send to their followers' },
   { key: 'subscription_trial',     icon: 'clock',          label: 'Trial reminders',        description: 'Before your trial converts' },
+  { key: 'login_alerts',           icon: 'shield',         label: 'Login alerts',           description: 'A new device signs in' },
 ];
 
 const BUYER_ROWS: NotifRow[] = [

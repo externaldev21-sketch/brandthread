@@ -594,6 +594,9 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return id ? `/return-detail?returnId=${q(id)}` : null;
     case 'buyer_order':
       return id ? `/buyer-order-detail?id=${q(id)}` : '/(buyer)/orders';
+    case 'login_session':
+      // New-device sign-in alert (server: lib/security/signInAlerts.ts).
+      return role === 'seller' ? '/login-activity' : '/buyer-login-activity';
     case 'sample_order':
       return id ? `/sample-detail?id=${q(id)}` : null;
     case 'bulk_order':
