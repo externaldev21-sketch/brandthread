@@ -2417,16 +2417,22 @@ export default function FeedScreen({
       index: activeIndex,
     };
     const snapshot = tabSnapshotsRef.current[next];
-    if (snapshot && snapshot.posts.length > 0) {
-      restoringTabRef.current = next;
-      // A fetch for the tab being left must not land on this one.
-      feedGenerationRef.current += 1;
-      feedLoadKeyRef.current = null;
-      setSellerFeedPosts(snapshot.posts);
-      feedCursorRef.current = snapshot.cursor;
-      feedHasMoreRef.current = snapshot.hasMore;
-      setFeedHasMore(snapshot.hasMore);
-      setFeedLoading(false);
+    if (snapshot) {
+      // Reuse the tab's own list when it had one; otherwise it loads as
+      // usual and the position is applied once enough rows are back.
+      if (snapshot.posts.length > 0) {
+        restoringTabRef.current = next;
+        // A fetch for the tab being left must not land on this one.
+        feedGenerationRef.current += 1;
+        feedLoadKeyRef.current = null;
+        setSellerFeedPosts(snapshot.posts);
+        feedCursorRef.current = snapshot.cursor;
+        feedHasMoreRef.current = snapshot.hasMore;
+        setFeedHasMore(snapshot.hasMore);
+        setFeedLoading(false);
+      } else {
+        restoringTabRef.current = null;
+      }
       setActiveIndex(snapshot.index);
       pendingRestoreIndexRef.current = snapshot.index;
     } else {
