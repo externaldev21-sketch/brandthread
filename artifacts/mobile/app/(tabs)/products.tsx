@@ -36,7 +36,7 @@ import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGri
 
 import { useScrollReset } from '@/hooks/useScrollReset';
 
-import { haptics, haptic } from '@/lib/haptics';
+import { haptics, haptic, hapticToggle, hapticPrimaryAction } from '@/lib/haptics';
 
 import { useTabBarClearance, useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 
@@ -1005,7 +1005,7 @@ export default function ProductsScreen() {
         accessibilityLabel="Add product"
         testID="products-add-fab"
       >
-        <Feather name="plus" size={ICON.lg} color={theme.background} />
+        <Icon name="plus" size={ICON.lg} color={theme.background} />
       </Pressable>
 
       {/* Action sheet */}

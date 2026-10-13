@@ -115,9 +115,9 @@ describe('monotonePath', () => {
     for (const y of sampledYs(d).slice(0, 81)) expect(y).toBeCloseTo(points[0].y, 9);
   });
 
-  it('is needed: the Catmull-Rom smoothPath overshoots below the baseline here', () => {
+  it('keeps the existing clamped Catmull-Rom baseline protection', () => {
     const points = layoutSeriesPoints([0, 0, 0, 120, 0, 0], 358, 168);
     const baselineY = Math.max(...points.map((p) => p.y));
-    expect(Math.max(...sampledYs(smoothPath(points)))).toBeGreaterThan(baselineY + 0.5);
+    expect(Math.max(...sampledYs(smoothPath(points)))).toBeLessThanOrEqual(baselineY + 0.000001);
   });
 });

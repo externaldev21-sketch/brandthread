@@ -170,12 +170,15 @@ const PERIOD_LABEL: Record<SellerHomeDashboardRange, string> = {
 // Scope suffix for the Orders tile: it counts orders in the selected range,
 // while "N orders to ship" below is every open order — without the scope the
 // two numbers read as contradictory.
-const ORDERS_TILE_SCOPE: Record<SellerDashboardRange, string> = {
+const ORDERS_TILE_SCOPE: Record<SellerDashboardRange | SellerHomeDashboardRange, string> = {
   today: 'today',
   week: 'this week',
   month: 'this month',
   year: 'this year',
   all: 'all time',
+  '7d': 'in the last 7 days',
+  '30d': 'in the last 30 days',
+  '90d': 'in the last 90 days',
 };
 
 // Range-aware empty-chart copy — "No sales yet" alone reads the same for

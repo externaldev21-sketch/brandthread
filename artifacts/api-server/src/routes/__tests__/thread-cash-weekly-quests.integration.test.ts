@@ -14,6 +14,18 @@ import {
 } from "@workspace/db";
 import { getWeeklyQuestsStatus } from "../../lib/threadCash/weeklyQuests";
 import { addDays, previousWeekKey, weekWindow } from "../../lib/threadCash/weeklyQuestsWeek";
+import { ThreadCashError } from "../../lib/threadCash/wallet";
+
+// Exercise quest counting and database claims independently of deployment's
+// intentionally disabled earn switch and GMV-dependent reward budget.
+const earnGate = vi.hoisted(() => ({
+  assertThreadCashEarnAllowed: vi.fn(async () => {}),
+  reserveRewardsBudget: vi.fn(async () => {}),
+}));
+vi.mock("../../lib/threadCash/earnGate", async (importOriginal) => ({
+  ...await importOriginal(),
+  ...earnGate,
+}));
 
 vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (req: any, _res: any, next: any) => {
@@ -170,6 +182,14 @@ describe("GET /weekly-quests progress", () => {
 });
 
 describe("POST /weekly-quests/claim", () => {
+  it("honors the shared earn pause instead of minting an unspendable reward", async () => {
+    const buyerId = await newBuyer("earn-paused");
+    await completeAllQuests(buyerId);
+    earnGate.assertThreadCashEarnAllowed.mockRejectedValueOnce(new ThreadCashError("Rewards are paused.", 503, "THREAD_CASH_EARN_PAUSED"));
+    const response = await call("POST", "/weekly-quests/claim", buyerId);
+    expect(response.status).toBe(503);
+    expect(await entries(buyerId)).toHaveLength(0);
+  });
   it("refuses until every quest is complete", async () => {
     const buyerId = await newBuyer("incomplete");
     const week = weekWindow(new Date(), "UTC");

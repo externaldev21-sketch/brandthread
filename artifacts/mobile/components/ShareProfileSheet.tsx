@@ -57,7 +57,7 @@ import { useApi } from '@/lib/api';
 
 import { PressableScale } from '@/components/BrandthreadUI';
 
-import { haptics, haptic } from '@/lib/haptics';
+import { haptics, haptic, hapticLight } from '@/lib/haptics';
 
 
 import { buildCanonicalProfileUrl, normalizeUsername, shareLinkWithFallback } from '@/lib/shareProfile';

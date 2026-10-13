@@ -126,7 +126,7 @@ describe("follower / following list search", () => {
 
   it("returns the full list when q is blank", async () => {
     const rows = await get(`/api/social/followers?userId=${target}&q=%20`, viewer).then((r) => r.json() as Promise<any[]>);
-    expect(rows).toHaveLength(7);
+    expect(rows).toHaveLength(6); // Blocked users stay excluded even for a blank search.
   });
 });
 

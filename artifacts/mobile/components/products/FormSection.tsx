@@ -3,7 +3,7 @@
  * a small header line above one bordered card that holds the fields.
  */
 import React from 'react';
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle, type ViewProps } from 'react-native';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -17,12 +17,13 @@ interface Props {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  onLayout?: ViewProps['onLayout'];
 }
 
-export function FormSection({ title, meta, action, children, style, testID }: Props) {
+export function FormSection({ title, meta, action, children, style, testID, onLayout }: Props) {
   const { theme } = useAppTheme();
   return (
-    <View style={[styles.wrap, style]} testID={testID}>
+    <View style={[styles.wrap, style]} testID={testID} onLayout={onLayout}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.muted }]} numberOfLines={1} accessibilityRole="header">{title}</Text>
         {meta ? <Text style={[styles.meta, { color: theme.muted }]}>{meta}</Text> : null}

@@ -45,9 +45,6 @@ router.post("/register", requireAuth, validateBody(registerPushBody), async (req
   const { token, platform, accountIds, timezone } = req.body as { token: string; platform?: string; accountIds?: unknown; timezone?: unknown };
 
   if (!token) return res.status(400).json({ error: "token is required" });
-  if (timezone !== undefined && !isValidTimeZone(timezone)) {
-    return res.status(400).json({ error: "timezone must be an IANA time zone" });
-  }
 
   const keep = accountsToKeep(userId, accountIds);
   await db.delete(pushTokens).where(and(eq(pushTokens.token, token), notInArray(pushTokens.userId, keep)));
@@ -66,7 +63,7 @@ router.post("/register", requireAuth, validateBody(registerPushBody), async (req
       },
     });
 
-  if (timezone !== undefined) {
+  if (isValidTimeZone(timezone)) {
     try {
       await db.update(users).set({ quietHoursTimezone: timezone, timezone: timezone as string }).where(eq(users.clerkId, userId));
     } catch (err) {

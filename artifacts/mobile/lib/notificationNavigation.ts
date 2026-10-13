@@ -36,6 +36,7 @@ export function notificationHref(rawData: unknown): string | null {
     communityId?: unknown;
   } | undefined;
 
+  if (data?.targetType === 'following_feed') return '/(buyer)?tab=following';
   if (data?.route === '/subscription') {
     return '/subscription';
   }

@@ -2,6 +2,9 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { FONT, FS, SP } from '@/lib/theme';
 import { DEFAULT_THEME } from '@/contexts/AppThemeContext';
+import type { AppThemePreset } from '@/contexts/AppThemeContext';
+
+const QRCode = React.lazy(() => import('react-native-qrcode-svg'));
 
 // On-screen size of the card. The shared image is captured at
 // STORY_CARD_WIDTH x STORY_CARD_HEIGHT (see lib/shareCard.ts) regardless.
@@ -19,6 +22,9 @@ export const shareCardTextStyles = StyleSheet.create({
 
 interface ShareCardFrameProps {
   children: React.ReactNode;
+  /** Existing purchase/drop cards keep their theme and canonical QR link. */
+  theme?: AppThemePreset;
+  qrValue?: string | null;
 }
 
 /**
@@ -27,11 +33,18 @@ interface ShareCardFrameProps {
  * border, square corners (the captured PNG fills the story edge to edge).
  */
 export const ShareCardFrame = React.forwardRef<View, ShareCardFrameProps>(
-  function ShareCardFrame({ children }, ref) {
+  function ShareCardFrame({ children, theme = shareCardColors, qrValue }, ref) {
     return (
-      <View ref={ref} collapsable={false} style={[styles.root, { backgroundColor: shareCardColors.background }]}>
+      <View ref={ref} collapsable={false} style={[styles.root, { backgroundColor: theme.background }]}>
         <View style={styles.content}>{children}</View>
-        <Text style={[styles.wordmark, { color: shareCardColors.muted }]} numberOfLines={1}>brandthread</Text>
+        {qrValue ? (
+          <React.Suspense fallback={null}>
+            <View style={{ alignItems: 'center', paddingBottom: SP.md }}>
+              <QRCode value={qrValue} size={48} color={theme.text} backgroundColor={theme.background} />
+            </View>
+          </React.Suspense>
+        ) : null}
+        <Text style={[styles.wordmark, { color: theme.muted }]} numberOfLines={1}>brandthread</Text>
       </View>
     );
   },

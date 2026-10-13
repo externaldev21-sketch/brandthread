@@ -14,6 +14,8 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db, threadCashConfig, threadCashEntries, threadCashStreaks } from "@workspace/db";
 import { assertThreadCashNotFrozen, getBalanceCents, ThreadCashError } from "./wallet";
+import { assertThreadCashEarnAllowed, reserveRewardsBudget } from "./earnGate";
+import { postRewardIssued } from "./liability";
 import {
   DEFAULT_WEEKLY_QUEST_REWARD_CENTS,
   WEEKLY_QUESTS,
@@ -152,8 +154,10 @@ export async function claimWeeklyQuests(buyerId: string, now = new Date()): Prom
   if (!status.quests.every((q) => q.progress >= q.target)) {
     throw new ThreadCashError("Finish this week's quests first.", 409, "WEEKLY_QUESTS_INCOMPLETE");
   }
-  await assertThreadCashNotFrozen(db, buyerId);
-  const [row] = await db
+  await assertThreadCashEarnAllowed();
+  const row = await db.transaction(async (tx) => {
+    await assertThreadCashNotFrozen(tx, buyerId);
+    const [entry] = await tx
     .insert(threadCashEntries)
     .values({
       buyerId,
@@ -165,6 +169,13 @@ export async function claimWeeklyQuests(buyerId: string, now = new Date()): Prom
     })
     .onConflictDoNothing()
     .returning({ id: threadCashEntries.id, amountCents: threadCashEntries.amountCents });
+    if (entry) {
+      // Commit the reward, existing budget guard and liability together.
+      await reserveRewardsBudget(tx, entry.amountCents);
+      await postRewardIssued(tx, { entryId: entry.id, buyerId, amountCents: entry.amountCents, source: WEEKLY_QUEST_SOURCE });
+    }
+    return entry;
+  });
   const [balanceCents, keys] = await Promise.all([getBalanceCents(db, buyerId), claimedWeekKeys(db, buyerId)]);
   return {
     created: Boolean(row),

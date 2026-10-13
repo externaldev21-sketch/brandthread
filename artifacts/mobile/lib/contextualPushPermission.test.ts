@@ -20,11 +20,11 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 
 import { requestContextualPushPermission, registerGrantedPushToken } from './contextualPushPermission';
 import { registerPushPrePrompt } from './pushPrePrompt';
+import {deviceTimeZone} from './deviceTimeZone';
 
 const api = { push: { register: vi.fn(async () => ({})) } };
 
 describe('requestContextualPushPermission', () => {
-import {deviceTimeZone} from './deviceTimeZone';
   beforeEach(() => {
     store.clear();
     store.set('onboarding_complete', 'true');
@@ -58,7 +58,7 @@ import {deviceTimeZone} from './deviceTimeZone';
     await requestContextualPushPermission('user_1', api, 'message');
     off();
     expect(notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
-    expect(api.push.register).toHaveBeenCalledWith({ token: 'ExponentPushToken[x]', platform: 'expo' });
+    expect(api.push.register).toHaveBeenCalledWith({ token: 'ExponentPushToken[x]', platform: 'expo', timezone: deviceTimeZone() });
   });
 
   it('never shows the sheet when permission is already granted', async () => {
@@ -82,6 +82,7 @@ import {deviceTimeZone} from './deviceTimeZone';
   });
 
   it("sends the device's IANA timezone with the token", async () => {
+    notifications.getPermissionsAsync.mockResolvedValue({ status: 'granted' });
     const register = vi.fn(async () => ({}));
     await registerGrantedPushToken('user_1', { push: { register } });
     expect(register).toHaveBeenCalledWith({

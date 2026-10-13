@@ -382,23 +382,6 @@ export async function composeDiscoverPeople({ getFriendSuggestions }: { getFrien
 
 export async function composeDiscoverDrops({ api }: { api: DiscoverApi }): Promise<DiscoverDrop[]> {
   let drops: DiscoverDrop[] = [];
-<<<<<<< HEAD
-  try {
-    const rows = await api.publicDrops.list('upcoming');
-    drops = (Array.isArray(rows) ? rows : []).map((r: PublicDropRow) => ({
-      id: r.id,
-      name: r.name ?? r.title ?? 'Drop',
-      // /api/public/drops sends `seller` + `heroImageUrl` + `isLive`; the
-      // flat fields are kept for older payloads.
-      brandName: r.brandName ?? r.sellerDisplayName ?? r.seller?.brandName ?? r.seller?.displayName ?? 'Brand',
-      imageUri: r.imageUri ?? r.heroImageUrl ?? (r.images ?? [])[0] ?? (r.products ?? [])[0]?.images?.[0],
-      releaseAt: r.releaseAt ?? null,
-      live: !!(r.live ?? r.isLive),
-    }));
-  } catch {
-    // Preview backfill below.
-  }
-=======
   // Live + upcoming for the drops calendar; either section failing keeps the other.
   const [liveRes, upcomingRes] = await Promise.allSettled([
     api.publicDrops.list('live'),
@@ -410,7 +393,6 @@ export async function composeDiscoverDrops({ api }: { api: DiscoverApi }): Promi
     rowsOf(upcomingRes).map((r) => mapPublicDropRow(r, false)),
   );
   // Preview backfill below.
->>>>>>> origin/pr982
   if (drops.length === 0 && isPreviewCatalogEnabled()) drops = getPreviewDrops();
   return drops;
 }

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useRef } from 'react';
 import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -105,6 +105,7 @@ export function SellerDashboardChart({
 }) {
   const [width, setWidth] = useState(0);
   const [tooltipIndex, setTooltipIndex] = useState<number | null>(null);
+  const lastHapticIndex = useRef<number | null>(null);
   const chartHeight = isEmpty ? EMPTY_CHART_HEIGHT : CHART_HEIGHT;
 
   const onLayout = useCallback((event: LayoutChangeEvent) => {

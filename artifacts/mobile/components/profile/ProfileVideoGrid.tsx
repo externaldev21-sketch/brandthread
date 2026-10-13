@@ -6,6 +6,7 @@ import React, { useCallback, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Icon } from '@/components/ui/Icon';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/layout';
@@ -166,7 +167,7 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
             {item.pinned ? (
               // Instagram: a pinned tile shows only the pushpin in the top-right corner.
               <View style={styles.pinBadge} pointerEvents="none" testID={`profile-tile-pinned-${item.id}`}>
-                <Icon name="pin" size={16} color="#FFFFFF" /* theme-exempt: over media */ style={styles.pinGlyph} />
+                <MaterialCommunityIcons name="pin" size={16} color="#FFFFFF" /* theme-exempt: over media */ style={styles.pinGlyph} />
               </View>
             ) : (item.slideCount ?? 0) > 1 || item.kind !== 'video' ? (
               <View style={styles.kindBadge} pointerEvents="none">

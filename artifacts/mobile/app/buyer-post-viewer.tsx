@@ -120,7 +120,7 @@ function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () =
         testID="post-video-mute"
         hitSlop={8}
       >
-        <Feather name={muted ? 'volume-x' : 'volume-2'} size={14} color={CREATE_CANVAS.white} />
+        <Icon name={muted ? 'volume-x' : 'volume-2'} size={14} color={CREATE_CANVAS.white} />
       </Pressable>
     </>
   );

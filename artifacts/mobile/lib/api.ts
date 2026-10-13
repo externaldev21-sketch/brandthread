@@ -5023,7 +5023,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<WeeklyQuestsStatus>('/api/thread-cash/weekly-quests'),
       /** Pays the weekly reward once every quest is complete. Idempotent per week. */
       claimWeeklyQuests: () =>
-        post<WeeklyQuestsClaimResult>('/api/thread-cash/weekly-quests/claim', {}),
+        afterThreadCashWrite(post<WeeklyQuestsClaimResult>('/api/thread-cash/weekly-quests/claim', {})),
     },
     /** Public trending feed — no auth required. */
     publicTrending: {
