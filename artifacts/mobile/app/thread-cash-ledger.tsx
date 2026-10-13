@@ -25,6 +25,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { ledgerLabel, groupLedgerByMonth, formatExpiryDate, LEDGER_FILTERS, demoLedger } from '@/lib/threadCashLedger';
 import type { ThreadCashLedger, ThreadCashLedgerKind, ThreadCashLedgerRow } from '@/lib/threadCashTypes';
 
+import { ChipRow } from '@/components/ui/ChipRow';
 const EMPTY: ThreadCashLedger = {
   balanceCents: 0, expiryDays: null, expiringSoon: { totalCents: 0, nextExpiresAt: null, buckets: [] }, rows: [], hasMore: false,
 };
@@ -120,7 +121,7 @@ export default function ThreadCashLedgerScreen() {
           </Text>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
+        <ChipRow contentContainerStyle={styles.pills} selectedIndex={LEDGER_FILTERS.findIndex((f) => f.kind === filter)}>
           {LEDGER_FILTERS.map((f) => {
             const active = f.kind === filter;
             return (
@@ -135,7 +136,7 @@ export default function ThreadCashLedgerScreen() {
               </Pressable>
             );
           })}
-        </ScrollView>
+        </ChipRow>
 
         {loading ? (
           <View style={{ padding: SP.md, gap: SP.sm }}>

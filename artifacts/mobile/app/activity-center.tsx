@@ -30,7 +30,6 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  ScrollView,
   SectionList,
   StyleSheet,
   Text,
@@ -76,6 +75,7 @@ import {
 } from '@/lib/previewActivity';
 import { applyPreviewFollowState, getPreviewFollowing } from '@/lib/previewFollowStore';
 import { Chip } from '@/components/ui/Chip';
+import { ChipRow } from '@/components/ui/ChipRow';
 import {
   ACTIVITY_PAGE_SIZE,
   ACTIVITY_CHIPS,
@@ -161,11 +161,11 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
     // of its own can collapse to nothing in this screen's flex column,
     // letting the SectionList below render through/over it.
     <View style={styles.chipRow}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        bounces={false}
-        overScrollMode="never"
+      <ChipRow
+        selectedIndex={ACTIVITY_CHIPS.findIndex((chip) => chip.key === selected)}
+        hapticOnSelect={false}
+        inset={SP.md}
+        gap={SP.sm}
         contentContainerStyle={styles.chipScrollContent}
       >
         {ACTIVITY_CHIPS.map((chip) => (
@@ -177,7 +177,7 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
             onSelect={onSelect}
           />
         ))}
-      </ScrollView>
+      </ChipRow>
       {/* No edge-fade overlay on top of the chips: `chipScrollContent`'s own
           trailing padding is what lets the last chip clip naturally at the
           screen edge as a scroll affordance. A `GRAD_DARK_FADE` scrim used

@@ -31,6 +31,7 @@ import type {
 import { SheetRise } from '@/components/motion/SheetRise';
 import { radius, nestedRadius } from '@/constants/radii';
 
+import { ChipRow } from '@/components/ui/ChipRow';
 type Status = 'open' | 'resolved';
 type TypeFilter = 'all' | ReportTargetType;
 
@@ -184,7 +185,7 @@ export default function ReviewQueueScreen() {
             })}
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filters} style={{ flexGrow: 0 }}>
+          <ChipRow contentContainerStyle={s.filters} style={{ flexGrow: 0 }} selectedIndex={TYPE_FILTERS.findIndex((filter) => filter.key === typeFilter)} hapticOnSelect={false}>
             {TYPE_FILTERS.map((filter) => {
               const active = typeFilter === filter.key;
               return (
@@ -199,7 +200,7 @@ export default function ReviewQueueScreen() {
                 </PressableScale>
               );
             })}
-          </ScrollView>
+          </ChipRow>
 
           {loading || access === 'checking' ? (
             <View style={s.center}><ActivityIndicator color={theme.text} /></View>

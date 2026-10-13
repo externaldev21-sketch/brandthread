@@ -21,6 +21,7 @@ import {
 } from '@/services/storeService';
 import { Storefront, StoreAISuggestion } from '@/services/storeTypes';
 
+import { ChipRow } from '@/components/ui/ChipRow';
 type Category = StoreAISuggestion['category'] | 'all';
 
 const CATEGORIES: { value: Category; label: string }[] = [
@@ -140,7 +141,7 @@ export default function StoreAiImproveScreen() {
         />
 
         {/* Category Chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={ai.chipScroll} contentContainerStyle={ai.chipRow}>
+        <ChipRow style={ai.chipScroll} contentContainerStyle={ai.chipRow} selectedIndex={CATEGORIES.findIndex(cat => cat.value === activeCategory)} hapticOnSelect={false}>
           {CATEGORIES.map(cat => (
             <FilterChip
               key={cat.value}
@@ -149,7 +150,7 @@ export default function StoreAiImproveScreen() {
               onPress={() => setActiveCategory(cat.value)}
             />
           ))}
-        </ScrollView>
+        </ChipRow>
 
         {/* Active Suggestions */}
         {filtered.length === 0 && !loading ? (

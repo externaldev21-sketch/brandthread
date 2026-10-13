@@ -15,11 +15,12 @@
  * screen's own root background shows straight through.
  */
 import React, { useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FilterChip, PressableScale, SearchBar } from '@/components/BrandthreadUI';
+import { ChipRow } from '@/components/ui/ChipRow';
 import { hapticSelection } from '@/lib/haptics';
 
 export interface SellerListHeaderAction {
@@ -219,7 +220,13 @@ export function SellerListHeader({
           top of the chips (a previous `GRAD_DARK_FADE` scrim here went
           fully opaque at its own edge, painting a solid black block over
           the last chip instead of fading it). */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.pillsRow}>
+      <ChipRow
+        selectedIndex={chips.findIndex((chip) => chip.active)}
+        hapticOnSelect={false}
+        inset={SP.md}
+        gap={SP.xs}
+        contentContainerStyle={s.pillsRow}
+      >
         {chips.map((chip) => (
           <FilterChip
             key={chip.key}
@@ -229,7 +236,7 @@ export function SellerListHeader({
             count={chip.count}
           />
         ))}
-      </ScrollView>
+      </ChipRow>
     </View>
   );
 }
