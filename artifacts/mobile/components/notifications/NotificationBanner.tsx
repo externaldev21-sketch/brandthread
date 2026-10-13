@@ -56,7 +56,7 @@ export default function NotificationBanner() {
       visibleRef.current = true;
       setPayload(next);
       // Only a new order earns a haptic (success); other banners arrive silently.
-      if (isNewOrderNotification(next.data)) haptic('newOrder');
+      if (isNewOrderNotification(next.data) && next.haptic !== 'none') haptic('newOrder');
       translateY.setValue(-200);
       Animated.spring(translateY, {
         toValue: 0,

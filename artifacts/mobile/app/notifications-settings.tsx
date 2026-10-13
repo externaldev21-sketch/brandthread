@@ -41,6 +41,8 @@ import { QUIET_HOURS_PRESETS, quietHoursPresetFor } from '@/components/notificat
 import { TYPE_SCALE } from '@/constants/typography';
 
 import { SPACING } from '@/constants/spacing';
+import { getSaleAlertPrefs, rememberSaleAlertPrefs } from '@/lib/saleAlerts';
+import { playSaleSoundPreview } from '@/lib/saleSoundPreview';
 
 import { FONT } from '@/lib/theme';
 
@@ -70,6 +72,12 @@ export default function NotificationsSettingsScreen() {
         setPushEnabled(data.pushEnabled ?? true);
         setPausedUntil(data.pausedUntil ?? null);
         setQuietHours({ start: data.quietHours?.start ?? null, end: data.quietHours?.end ?? null });
+        if (data.role === 'seller') {
+          const sale = { saleSound: data.saleSound ?? true, saleHaptic: data.saleHaptic ?? true };
+          setSaleSound(sale.saleSound);
+          setSaleHaptic(sale.saleHaptic);
+          rememberSaleAlertPrefs(sale);
+        }
       })
       .catch(() => { /* rows keep their defaults; each change goes to the server */ });
   }, [api]);

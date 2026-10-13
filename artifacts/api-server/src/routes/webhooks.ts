@@ -111,6 +111,7 @@ import { recordSellerPayoutEvent } from "../lib/money/sellerPayouts";
 import { refreshManufacturerVerification } from "../lib/manufacturerTrust";
 import { emailManufacturerOrderPaid, inBackground } from "../lib/manufacturerNotifications";
 import { applyMysteryBoxPicks } from "../lib/mysteryBox";
+import { newOrderPushDelivery } from "../lib/saleAlerts";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -1434,6 +1435,11 @@ export async function handleCheckoutPaid(
             // Order numbers count up per seller from BT-00001 (step 3 above).
             firstSale: createdOrder.orderNumber === "BT-00001",
           });
+          const [sellerPrefs] = await db
+            .select({ preferences: users.notificationPreferences })
+            .from(users)
+            .where(eq(users.clerkId, createdOrder.ownerId))
+            .limit(1);
           await publishNotification({
             userId: createdOrder.ownerId,
             category: "orders",
@@ -1443,8 +1449,7 @@ export async function handleCheckoutPaid(
             targetId: createdOrderId,
             targetType: "order",
             targetImageUrl: productThumbnail(firstItem?.images),
-            pushSound: ORDER_SOUND_FILE,
-            pushChannelId: "orders",
+            ...newOrderPushDelivery(sellerPrefs?.preferences),
           });
           // The buyer's side of the same event (guest checkouts have no feed).
           if (buyerId) {

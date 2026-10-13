@@ -24,6 +24,7 @@ import { channelView, parseChannelKey, channelPrefKey } from "../lib/notificatio
 import { cappedUnknown, jsonValue, looseBody, validateBody } from "../middlewares/bodySchemas";
 import { preferenceKey } from "../lib/push";
 import { PAUSE_DURATIONS_MINUTES, PUSH_TYPE_PREF_PREFIX, isPushPaused, isValidValueFor, pushTypeDefByKey, pushTypeView } from "../lib/pushTypes";
+import { readSaleAlertPrefs, saleAlertPatch } from "../lib/saleAlerts";
 
 const router = Router();
 
@@ -140,6 +141,7 @@ router.get("/", async (req, res) => {
       channels: channelView(row?.accountType, row?.preferences),
       pushTypes: pushTypeView(row?.accountType, row?.preferences as Record<string, unknown> | null),
       pausedUntil: await readPausedUntil(clerkId),
+      ...readSaleAlertPrefs(row?.preferences),
     });
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to fetch notification preferences");
@@ -150,7 +152,7 @@ router.get("/", async (req, res) => {
 // ── PUT /api/seller/notification-prefs ───────────────────────────────────────
 router.put("/", validateBody(updateNotificationPrefsBody), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const { digest, categories, channels, pushEnabled, promotionalPush, quietHours, pushTypes, pause } = req.body as {
+  const { digest, categories, channels, pushEnabled, promotionalPush, quietHours, pushTypes, pause, saleSound, saleHaptic } = req.body as {
     /** { [key]: "off" | "following" | "everyone" } — see lib/pushTypes.ts */
     pushTypes?: Record<string, unknown>;
     /** { minutes: 15 | 60 | 120 | 240 | 480 } pauses all pushes; null resumes. */
@@ -162,6 +164,9 @@ router.put("/", validateBody(updateNotificationPrefsBody), async (req, res) => {
     pushEnabled?: unknown;
     promotionalPush?: unknown;
     quietHours?: { start?: unknown; end?: unknown; timezone?: unknown } | null;
+    /** Seller new-order alert feel (lib/saleAlerts.ts). */
+    saleSound?: unknown;
+    saleHaptic?: unknown;
   };
   if (digest !== undefined && !VALID_DIGEST.includes(digest as DigestMode)) {
     res.status(400).json({ error: `digest must be one of: ${VALID_DIGEST.join(", ")}` });
@@ -179,6 +184,8 @@ router.put("/", validateBody(updateNotificationPrefsBody), async (req, res) => {
   if (promotionalPush !== undefined && typeof promotionalPush !== "boolean") {
     return res.status(400).json({ error: "promotionalPush must be a boolean" });
   }
+  const salePatch = saleAlertPatch({ saleSound, saleHaptic });
+  if (!salePatch.ok) return res.status(400).json({ error: salePatch.error });
   let quietHoursPatch: { start: string | null; end: string | null; timezone?: string } | undefined;
   if (quietHours !== undefined) {
     if (quietHours === null) {
@@ -214,8 +221,8 @@ router.put("/", validateBody(updateNotificationPrefsBody), async (req, res) => {
       pausedUntilPatch = new Date(Date.now() + minutes * 60_000);
     }
   }
-  if (digest === undefined && categories === undefined && channels === undefined && pushEnabled === undefined && promotionalPush === undefined && quietHoursPatch === undefined && pushTypes === undefined && pausedUntilPatch === undefined) {
-    return res.status(400).json({ error: "digest, categories, channels, pushEnabled, promotionalPush, quietHours, pushTypes, or pause is required" });
+  if (digest === undefined && categories === undefined && channels === undefined && pushEnabled === undefined && promotionalPush === undefined && quietHoursPatch === undefined && pushTypes === undefined && pausedUntilPatch === undefined && Object.keys(salePatch.patch).length === 0) {
+    return res.status(400).json({ error: "digest, categories, channels, pushEnabled, promotionalPush, quietHours, pushTypes, pause, saleSound, or saleHaptic is required" });
   }
 
   try {
@@ -261,7 +268,7 @@ router.put("/", validateBody(updateNotificationPrefsBody), async (req, res) => {
         patch[channelPrefKey(channelName, parsed.key)] = value;
       }
     }
-    const merged = { ...defaults, ...(current.preferences ?? {}), ...patch };
+    const merged = { ...defaults, ...(current.preferences ?? {}), ...patch, ...salePatch.patch };
 
     const updates: Record<string, unknown> = {
       notificationPreferences: merged,
@@ -310,6 +317,7 @@ router.put("/", validateBody(updateNotificationPrefsBody), async (req, res) => {
       channels: channelView(current.accountType, merged),
       pushTypes: pushTypeView(current.accountType, merged),
       pausedUntil: await readPausedUntil(clerkId),
+      ...readSaleAlertPrefs(merged),
     });
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to update notification preferences");

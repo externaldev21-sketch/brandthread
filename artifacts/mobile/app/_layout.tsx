@@ -120,6 +120,7 @@ import { setRequestGuard } from '@workspace/api-client-react';
 import { emitThreadCashChanged, isThreadCashNotification } from '@/lib/threadCashEvents';
 import { hydrateHapticsPreference } from '@/lib/hapticsPreference';
 import { installPushGuard } from '@/lib/navigation/pushGuard';
+import { bannerHapticFor, getSaleAlertPrefs, hydrateSaleAlertPrefs } from '@/lib/saleAlerts';
 
 // Generated API hooks share this guard with the app-local API clients so
 // signed-out seller preview never reaches the backend through an alternate
@@ -1369,6 +1370,7 @@ function RootLayoutNav() {
     const subscription = Notifications.addNotificationResponseReceivedListener(
       handleNotificationResponse,
     );
+    void hydrateSaleAlertPrefs();
     const receiptSubscription = Notifications.addNotificationReceivedListener(
       (notification) => {
         void trackNotificationEvent(notification, 'receipt').catch(() => {});
@@ -1384,6 +1386,7 @@ function RootLayoutNav() {
             body: typeof content.body === 'string' ? content.body : '',
             category: typeof data.category === 'string' ? data.category : undefined,
             data,
+            haptic: bannerHapticFor(data, getSaleAlertPrefs()),
           });
         }
 

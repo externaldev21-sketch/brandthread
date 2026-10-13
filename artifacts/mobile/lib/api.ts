@@ -2051,6 +2051,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           pushTypes?: Record<string, 'off' | 'following' | 'everyone'>;
           /** ISO end of "Pause all", or null when not paused. */
           pausedUntil?: string | null;
+          saleSound?: boolean;
+          saleHaptic?: boolean;
         }>('/api/notification-prefs'),
       update: (body: {
         digest?: 'realtime' | 'daily';
@@ -2062,6 +2064,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         pushTypes?: Record<string, 'off' | 'following' | 'everyone'>;
         /** Pause all pushes for 15, 60, 120, 240 or 480 minutes; null resumes. */
         pause?: { minutes: number } | null;
+        saleSound?: boolean;
+        saleHaptic?: boolean;
       }) =>
         put<{
           digest: 'realtime' | 'daily';
@@ -2073,6 +2077,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           channels: Record<'push' | 'inApp' | 'email', Record<string, boolean>>;
           pushTypes?: Record<string, 'off' | 'following' | 'everyone'>;
           pausedUntil?: string | null;
+          saleSound?: boolean;
+          saleHaptic?: boolean;
         }>('/api/notification-prefs', body),
     },
     logo: {
