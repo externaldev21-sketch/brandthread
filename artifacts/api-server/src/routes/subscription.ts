@@ -25,7 +25,7 @@ import { requireStripe } from "../lib/stripe";
 import { logger } from "../lib/logger";
 import { getWebOrigin } from "../lib/webOrigin";
 import { intervalFromSubscription, parseBillingInterval, planAmountCents, priceSpecFor, type BillingInterval } from "../lib/billing/annual";
-import { dunningAwareStatus } from "../lib/billing/dunning";
+import { dunningAwareStatus, needsPaymentUpdate } from "../lib/billing/dunning";
 import { loadDunningSummary } from "../lib/billing/dunningWebhooks";
 import { getEffectiveEntitlement, reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
 import { PLAN_CATALOGUE, isSellerPlanId, type SellerPlanId as PlanId } from "../lib/planCatalogue";
@@ -408,6 +408,16 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
     if (user?.subscriptionId) {
       try {
         const sub = await (stripe.subscriptions.retrieve as any)(user.subscriptionId);
+        // An unpaid plan is recovered by paying it (Update card → portal),
+        // never by a second subscription (item 115).
+        if (sub && needsPaymentUpdate(sub)) {
+          res.status(409).json({
+            error: "Payment update required",
+            code: "SUBSCRIPTION_NEEDS_PAYMENT_UPDATE",
+            message: "Update your card to restore your plan.",
+          });
+          return;
+        }
         if (sub && ["active", "trialing"].includes(sub.status)) {
           // Update the existing subscription to the new plan — no new Checkout needed.
           const priceId = await ensurePrice(stripe, planId);

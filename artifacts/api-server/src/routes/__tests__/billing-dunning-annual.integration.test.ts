@@ -190,7 +190,7 @@ describe("dunning: 3 retries, then pause; resume on payment", () => {
     await deliver("invoice.payment_failed", failedInvoice(3, now + 9 * DAY));
     expect(calls.push).toHaveLength(3);
 
-    const status = await fetch(`${base}/api/seller/subscription/status`, { headers: { "x-test-user": sellerId } }).then((r) => r.json());
+    const status = await fetch(`${base}/api/seller/subscription/status`, { headers: { "x-test-user": sellerId } }).then((r) => r.json() as Promise<any>);
     expect(status.dunning).toMatchObject({ state: "retrying", retryNumber: 3, maxRetries: 3 });
 
     // Attempt 4 = the 3rd retry failed → pause.
@@ -218,7 +218,7 @@ describe("dunning: 3 retries, then pause; resume on payment", () => {
     expect(calls.subscriptionUpdates).toHaveLength(1);
     expect(calls.push).toHaveLength(0);
 
-    const pausedStatus = await fetch(`${base}/api/seller/subscription/status`, { headers: { "x-test-user": sellerId } }).then((r) => r.json());
+    const pausedStatus = await fetch(`${base}/api/seller/subscription/status`, { headers: { "x-test-user": sellerId } }).then((r) => r.json() as Promise<any>);
     expect(pausedStatus.status).toBe("paused");
     expect(pausedStatus.dunning).toMatchObject({ state: "paused", maxRetries: 3 });
 
@@ -258,8 +258,29 @@ describe("annual checkout", () => {
       headers: { "content-type": "application/json", "x-test-user": sellerId },
       body: JSON.stringify(body),
     });
-    return { status: response.status, body: await response.json() };
+    return { status: response.status, body: (await response.json()) as any };
   }
+
+  it("refuses a new checkout while the plan is past due or paused (no second subscription)", async () => {
+    const sub = calls.subscriptions.get(subscriptionId);
+    const states = [
+      { ...sub, status: "past_due", pause_collection: null, metadata: {} },
+      { ...sub, status: "past_due", pause_collection: { behavior: "void" }, metadata: { dunningPausedAt: "2026-10-13T00:00:00Z" } },
+      { ...sub, status: "unpaid", pause_collection: null, metadata: {} },
+    ];
+    for (const state of states) {
+      calls.subscriptions.set(subscriptionId, state);
+      const createsBefore = fake.state.checkoutSessionCreates.length;
+      const updatesBefore = calls.subscriptionUpdates.length;
+      for (const body of [{ planId: "pro" }, { planId: "growth", interval: "year" }]) {
+        const result = await checkout(body);
+        expect(result.status).toBe(409);
+        expect(result.body).toMatchObject({ code: "SUBSCRIPTION_NEEDS_PAYMENT_UPDATE", message: "Update your card to restore your plan." });
+      }
+      expect(fake.state.checkoutSessionCreates.length).toBe(createsBefore);
+      expect(calls.subscriptionUpdates.length).toBe(updatesBefore);
+    }
+  });
 
   it("rejects an unknown interval", async () => {
     const result = await checkout({ planId: "growth", interval: "weekly" });
@@ -268,7 +289,7 @@ describe("annual checkout", () => {
   });
 
   it("switches an active monthly plan to yearly in place, prorated, on a $790/yr price", async () => {
-    calls.subscriptions.set(subscriptionId, { ...calls.subscriptions.get(subscriptionId), status: "active" });
+    calls.subscriptions.set(subscriptionId, { ...calls.subscriptions.get(subscriptionId), status: "active", pause_collection: null, metadata: {} });
     const result = await checkout({ planId: "growth", interval: "year" });
     expect(result.status).toBe(200);
     expect(result.body.updated).toBe(true);

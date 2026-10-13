@@ -124,6 +124,14 @@ export function isDunningPaused(sub: SubscriptionLike): boolean {
 }
 
 /**
+ * Past due, unpaid or paused by dunning: the seller must pay the open invoice
+ * (Update card) — checkout must not start a second subscription.
+ */
+export function needsPaymentUpdate(sub: SubscriptionLike): boolean {
+  return sub.status === "past_due" || sub.status === "unpaid" || isDunningPaused(sub);
+}
+
+/**
  * The status stored in users.subscription_status. "paused" is not a granting
  * status in resolveEffectiveEntitlement (only active / trialing / past_due
  * are), so a dunning-paused seller is restricted exactly like a canceled one.

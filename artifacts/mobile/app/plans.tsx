@@ -59,6 +59,7 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
+import { isSubscriptionPaymentRecoveryRequired } from '@/lib/subscriptionRecovery';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import {
   ANNUAL_SAVINGS_LABEL, annualPackageFor, canOfferYearly, yearlyDisplayFor, type BillingInterval,
@@ -259,6 +260,11 @@ export default function PlansScreen() {
     // Only treat the plan as already active when there's a real paid subscription.
     // status:'none' means no paid plan yet — Starter must remain selectable.
     if (!isOnboarding && isCurrentPlan(plan.id)) return;
+    // Past due / paused: pay the open invoice (Update card), never a second plan.
+    if (!isOnboarding && isSubscriptionPaymentRecoveryRequired(currentPlanStatus)) {
+      await openPaymentUpdate();
+      return;
+    }
 
     setLoadingId(plan.id);
 
@@ -289,6 +295,10 @@ export default function PlansScreen() {
       // setLoadingId stays set until AppState fires on return
     } catch (e: any) {
       setLoadingId(null);
+      if (e?.code === 'SUBSCRIPTION_NEEDS_PAYMENT_UPDATE') {
+        await openPaymentUpdate();
+        return;
+      }
       if (parseRoleError(e)) {
         Alert.alert('Only the store owner can do this');
         return;
@@ -298,6 +308,16 @@ export default function PlansScreen() {
         e?.message ?? 'Please check your connection and try again.',
         [{ text: 'OK' }],
       );
+    }
+  }
+
+  /** Same "Update card" flow as Settings → Subscription: the Stripe billing portal. */
+  async function openPaymentUpdate() {
+    try {
+      const { url } = await api.seller.subscription.portal();
+      await Linking.openURL(url);
+    } catch (e: any) {
+      Alert.alert('Could not open billing', e?.message ?? 'Please try again.');
     }
   }
 
