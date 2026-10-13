@@ -32,6 +32,7 @@ import {
 } from "../lib/pagination";
 import { setPublicCacheHeaders, setViewerScopedCacheHeaders } from "../lib/httpCache";
 import { applySalesToVariants } from "../lib/pricing/salesRuntime";
+import { getPriceHistory } from "../lib/priceHistory";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -431,6 +432,27 @@ router.get("/products/:id/related", async (req, res) => {
   } catch (err) {
     req.log.error({ err, productId: req.params.id }, "Failed to fetch related products");
     return res.status(500).json({ error: "Failed to fetch related products" });
+  }
+});
+
+// GET /api/public/products/:id/price-history — the product page's 90-day chart.
+router.get("/products/:id/price-history", async (req, res) => {
+  try {
+    const viewerId = optionalViewerId(req);
+    setViewerScopedCacheHeaders(res, viewerId);
+    const [product] = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt), notBlockedWith(viewerId, products.ownerId)))
+      .limit(1);
+    if (!product) {
+      res.status(404).json({ error: "Product not found" });
+      return;
+    }
+    res.json(await getPriceHistory(product.id));
+  } catch (err) {
+    req.log.error({ err, productId: req.params.id }, "Failed to fetch price history");
+    res.status(500).json({ error: "Failed to fetch price history" });
   }
 });
 

@@ -7,6 +7,7 @@ import type { SizeChartData, SizeChartPreset, SizeChartTemplateSummary, SizeChar
 import { prepareImageForUpload } from '@/lib/imageUploadPrep';
 import { useAuth } from '@clerk/expo';
 import type { LaunchChecklistResponse } from '@/lib/launchChecklist';
+import type { PriceHistory } from '@/lib/priceHistory';
 import type {
   AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
   ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
@@ -1848,6 +1849,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         save:   (body: { type: string; targetId: string; title: string; subtitle?: string; accentColor?: string }) =>
           post<any>('/api/buyer/saved', body),
         remove: (targetId: string) => del<any>(`/api/buyer/saved/${encodeURIComponent(targetId)}`),
+        /** "Tell me if the price drops" on a saved product — off until the buyer turns it on. */
+        priceAlert: {
+          get: (productId: string) =>
+            get<{ saved: boolean; enabled: boolean }>(`/api/buyer/saved/${encodeURIComponent(productId)}/price-alert`),
+          set: (productId: string, enabled: boolean) =>
+            put<{ saved: boolean; enabled: boolean }>(`/api/buyer/saved/${encodeURIComponent(productId)}/price-alert`, { enabled }),
+        },
       },
       /** Server-side cart — full-replace sync model. */
       cart: {
@@ -2131,6 +2139,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         return get<any[]>(`/api/public/products${q ? `?${q}` : ''}`);
       },
       get: (id: string) => get<any>(`/api/public/products/${encodeURIComponent(id)}`),
+      /** 90-day lowest-price history for the product page chart (empty unless it changed). */
+      priceHistory: (id: string) =>
+        get<PriceHistory>(`/api/public/products/${encodeURIComponent(id)}/price-history`),
       related: (productId: string, limit?: number) =>
         get<any[]>(`/api/public/products/${encodeURIComponent(productId)}/related${limit ? `?limit=${limit}` : ''}`),
       /** Product-backed rows that meet the platform qualified high-demand criteria.
