@@ -34,10 +34,12 @@ const CATALOG = [
   { id: 'preview-product-5', name: 'Studio Sweatpants', priceCents: 5600 },
 ] as const;
 const VARIANTS = ['Black / S', 'Black / M', 'Black / L', 'Bone / M', 'Bone / L', 'Graphite / M'];
+// [name, city, state/region, postcode, country]. One EU customer so the
+// dashboard Live map (lib/previewLiveMap.ts) has a city outside the US.
 const CUSTOMERS = [
-  ['Jordan Reyes', 'New York', 'NY', '10012'], ['Maya Chen', 'Los Angeles', 'CA', '90028'], ['Sam Okafor', 'Chicago', 'IL', '60614'],
-  ['Priya Nair', 'Austin', 'TX', '78702'], ['Leo Martin', 'Portland', 'OR', '97209'], ['Ava Rossi', 'Brooklyn', 'NY', '11211'],
-  ['Noah Kim', 'Seattle', 'WA', '98103'], ['Zoe Adams', 'Miami', 'FL', '33137'],
+  ['Jordan Reyes', 'New York', 'NY', '10012', 'US'], ['Maya Chen', 'Los Angeles', 'CA', '90028', 'US'], ['Sam Okafor', 'London', 'England', 'EC1V 9NR', 'GB'],
+  ['Priya Nair', 'Austin', 'TX', '78702', 'US'], ['Leo Martin', 'Portland', 'OR', '97209', 'US'], ['Ava Rossi', 'Brooklyn', 'NY', '11211', 'US'],
+  ['Noah Kim', 'Seattle', 'WA', '98103', 'US'], ['Zoe Adams', 'Miami', 'FL', '33137', 'US'],
 ] as const;
 
 export interface PreviewSellerOrder {
@@ -146,7 +148,7 @@ function generatedOrdersForDay(y: number, m: number, d: number, now: Date): Prev
       paidAt: status === 'cancelled' ? null : createdIso,
       totalCents: subtotalCents + shippingCents, subtotalCents, shippingCents, itemCount,
       customerName: customer[0], customerEmail: `${customer[0].toLowerCase().replace(/[^a-z]+/g, '.')}@example.com`,
-      shippingAddress: { name: customer[0], street: `${100 + Math.floor(rand() * 800)} Mercer Street`, city: customer[1], state: customer[2], zip: customer[3], country: 'US' },
+      shippingAddress: { name: customer[0], street: `${100 + Math.floor(rand() * 800)} Mercer Street`, city: customer[1], state: customer[2], zip: customer[3], country: customer[4] },
       items,
       trackingNumber: shipped ? `1Z999AA1${String(idx % 100000).padStart(5, '0')}${String(i).padStart(2, '0')}` : null,
       carrier: shipped ? 'UPS' : null,

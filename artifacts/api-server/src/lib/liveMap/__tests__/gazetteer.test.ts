@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizePlaceName, resolveCity } from "../gazetteer";
+import { displayCityName, normalizePlaceName, resolveCity } from "../gazetteer";
 
 describe("live map gazetteer", () => {
   it("resolves a US city by (city, state, country)", () => {
@@ -15,12 +15,20 @@ describe("live map gazetteer", () => {
   });
 
   it("matches loosely on case, accents and St./Saint", () => {
-    expect(resolveCity({ city: "  new YORK ", region: "ny", country: "usa" })).toMatchObject({ city: "New York City", region: "NY", precision: "city" });
+    expect(resolveCity({ city: "  new YORK ", region: "ny", country: "usa" })).toMatchObject({ key: "US:NY:new york city", city: "New York", region: "NY", precision: "city" });
     expect(resolveCity({ city: "Saint Louis", region: "MO", country: "US" })?.precision).toBe("city");
     expect(resolveCity({ city: "St. Louis", region: "MO", country: "US" })?.key)
       .toBe(resolveCity({ city: "Saint Louis", region: "MO", country: "US" })?.key);
     expect(resolveCity({ city: "Zurich", region: "", country: "CH" })?.precision).toBe("city");
     expect(normalizePlaceName("Zürich")).toBe("zurich");
+  });
+
+  it("displays GeoNames' \"New York City\" as \"New York\" (display only)", () => {
+    expect(displayCityName("New York City")).toBe("New York");
+    expect(displayCityName("Austin")).toBe("Austin");
+    for (const city of ["New York", "New York City", "new york city"]) {
+      expect(resolveCity({ city, region: "NY", country: "US" })).toMatchObject({ key: "US:NY:new york city", city: "New York" });
+    }
   });
 
   it("resolves non-US cities by country", () => {

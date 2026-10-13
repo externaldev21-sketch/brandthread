@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyOrderCity, EMPTY_LIVE_MAP, isOrderCityEvent, liveMapCityLabel, liveMapDotRadius, type OrderCityEvent } from './liveMap';
 import { projectLatLng, WORLD_LAND_PATH, WORLD_VIEWBOX } from './worldLand';
 import { previewLiveMap } from '../previewLiveMap';
+import { buildPreviewSellerAnalytics } from '../previewSellerChartData';
 
 const ev = (key: string, at: string, extra: Partial<OrderCityEvent> = {}): OrderCityEvent => ({
   type: 'order_city', key, city: 'Austin', region: 'TX', country: 'US', lat: 30.27, lng: -97.74, at, ...extra,
@@ -49,14 +50,20 @@ describe('live map helpers', () => {
     expect(WORLD_LAND_PATH.length).toBeLessThan(16_000);
   });
 
-  it('preview: demo has a handful of US/EU cities, fresh is empty', () => {
-    const now = new Date(2026, 9, 13, 15, 0, 0);
-    const demo = previewLiveMap('demo', now);
-    expect(demo.cities.length).toBeGreaterThanOrEqual(5);
-    expect(demo.total).toBe(demo.cities.reduce((s, c) => s + c.count, 0));
-    expect(new Set(demo.cities.map((c) => c.country))).toEqual(new Set(['US', 'GB', 'FR', 'DE']));
-    const midnight = new Date(2026, 9, 13).getTime();
-    for (const c of demo.cities) expect(new Date(c.lastAt).getTime()).toBeGreaterThanOrEqual(midnight);
-    expect(previewLiveMap('fresh', now)).toEqual({ total: 0, cities: [] });
+  it('preview: demo is the same set of orders the dashboard counts for today; fresh is empty', () => {
+    // Several clocks, including the screenshot harness's (2026-09-18 16:30 LA).
+    const clocks = [new Date(Date.parse('2026-09-18T23:30:00Z')), new Date(2026, 9, 13, 15, 0, 0), new Date(2026, 9, 17, 21, 30, 0)];
+    for (const now of clocks) {
+      const demo = previewLiveMap('demo', now);
+      const tile = buildPreviewSellerAnalytics('today', 'demo', now);
+      expect(demo.total).toBe(tile.orderCount);
+      expect(demo.cities.reduce((s, c) => s + c.count, 0)).toBe(demo.total);
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      for (const c of demo.cities) {
+        expect(new Date(c.lastAt).getTime()).toBeGreaterThanOrEqual(midnight);
+        expect(new Date(c.lastAt).getTime()).toBeLessThanOrEqual(now.getTime());
+      }
+    }
+    expect(previewLiveMap('fresh', clocks[0])).toEqual({ total: 0, cities: [] });
   });
 });

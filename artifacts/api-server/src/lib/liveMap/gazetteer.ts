@@ -56,6 +56,18 @@ export function normalizePlaceName(raw: string): string {
     .replace(/^(saint|ste|st) /, "st ");
 }
 
+/**
+ * GeoNames' canonical name → the name sellers expect to read. Display only:
+ * matching and the aggregation key still use the GeoNames name.
+ */
+const DISPLAY_NAMES: Record<string, string> = {
+  "New York City": "New York",
+};
+
+export function displayCityName(name: string): string {
+  return DISPLAY_NAMES[name] ?? name;
+}
+
 let index: Map<string, CityRow[]> | null = null;
 let stateCentroids: Map<string, [number, number]> | null = null;
 let countryCentroids: Map<string, [number, number]> | null = null;
@@ -151,7 +163,7 @@ export function resolveCity(input: {
       if (match) {
         return {
           key: `${country}:${match.admin1}:${normalizePlaceName(match.name)}`,
-          city: match.name,
+          city: displayCityName(match.name),
           region: match.admin1,
           country,
           lat: match.lat,
