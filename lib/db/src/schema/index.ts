@@ -2945,3 +2945,4 @@ export * from './reviewRequests';
 // Seller lifecycle messages (migration 511).
 export * from './sellerLifecycle';
 export * from './mysteryBoxes';
+export * from './dropSmsWaitlist';

@@ -33,7 +33,8 @@ export type RateLimitPolicyName =
   | "contact-match"
   | "post-create"
   | "review"
-  | "money-transfer";
+  | "money-transfer"
+  | "drop-waitlist";
 
 export type RateLimitPolicy = {
   id: RateLimitPolicyName;
@@ -228,6 +229,14 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     limit: 15,
     windowMs: 15 * 60_000,
     message: "Too many gift card code attempts. Please wait a few minutes and try again.",
+  },
+  "drop-waitlist": {
+    id: "drop-waitlist",
+    // Public brand drop page phone signups (brandthread.app/@handle/drop):
+    // per-IP cap. A tighter per-IP+phone bucket is applied inside the route.
+    limit: 10,
+    windowMs: 10 * 60_000,
+    message: "Too many signups from this connection. Please try again later.",
   },
   "contact-match": {
     id: "contact-match",

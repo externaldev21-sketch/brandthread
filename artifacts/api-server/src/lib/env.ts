@@ -56,6 +56,10 @@ const OPTIONAL_VARS = [
   "REVENUECAT_WEBHOOK_AUTHORIZATION",
   "SHIPPO_WEBHOOK_SECRET",
   "POSTHOG_API_KEY",
+  // Drop SMS waitlist "drop is live" text blast (lib/sms). All three or none.
+  "TWILIO_ACCOUNT_SID",
+  "TWILIO_AUTH_TOKEN",
+  "TWILIO_MESSAGING_SERVICE_SID",
 ];
 
 // Not needed to boot, and never a boot failure (an existing deploy without

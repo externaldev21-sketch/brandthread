@@ -208,6 +208,8 @@ import { sellerGiveawaysRouter, publicGiveawaysRouter } from "./giveaways";
 import geoPostalRouter from "./geo-postal";
 import appInstallsRouter from "./app-installs";
 import { killSwitchGate } from "../lib/killSwitches";
+import dropWaitlistPublicRouter from "./drop-waitlist-public";
+import webhooksTwilioRouter from "./webhooks-twilio";
 
 const router = Router();
 router.use(aiConsentGate);
@@ -233,6 +235,7 @@ router.use("/public",          publicPayLaterRouter); // GET /sellers/:sellerId/
 router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
 router.use("/public",          emailMarketingPublicRouter); // /stores/:slug/subscribe, /email/unsubscribe/:token
 router.use("/public",          sellerEmailsPublicRouter); // /seller-emails/unsubscribe/:token (store tips)
+router.use("/public/drop-waitlist", dropWaitlistPublicRouter); // brandthread.app/@handle/drop data + phone signup
 router.use("/access",          accessRouter); // invite-only launch: validate/waitlist public, status/redeem authed
 router.use("/public/featured", featuredPublicRouter); // admin-curated Discover picks
 router.use("/public/store-trust", storeTrustRouter); // "Ships in N days" + detail ratings for a store
@@ -281,6 +284,7 @@ router.use("/guest/checkout/payment-intent", guestCheckoutIntentRouter);
 router.use("/guest/checkout",  guestCheckoutRouter);
 router.use("/webhooks/resend-marketing", emailMarketingWebhookRouter);
 router.use("/checkout-profile", checkoutProfileRouter); // public: store language + checkout mode for the buyer checkout
+router.use("/webhooks/twilio", webhooksTwilioRouter); // inbound SMS STOP/START for the drop waitlist
 router.use("/webhooks",        webhooksRouter);
 router.use("/webhooks/shippo", webhooksShippoRouter);
 router.use("/webhooks/shopify", webhooksShopifyRouter);

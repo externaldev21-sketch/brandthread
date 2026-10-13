@@ -358,7 +358,7 @@ export function unreadRowTint(background: string): string {
  */
 const ORDER_CATEGORIES = new Set(['orders', 'order', 'production', 'returns', 'disputes']);
 const ORDER_TYPES = new Set(['low_stock', 'out_of_stock']);
-const MONEY_CATEGORIES = new Set(['payout', 'payouts', 'payment', 'finance', 'subscription']);
+const MONEY_CATEGORIES = new Set(['payout', 'payouts', 'payment', 'finance', 'subscription', 'money']);
 /**
  * Money rows actually published to notifications_feed (grep publishNotification
  * / insert(notificationsFeed) in artifacts/api-server/src): payouts

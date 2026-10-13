@@ -7,9 +7,11 @@ import {
   follows,
   dropAlertSubscriptions,
   dropBroadcasts,
+  dropSmsBlasts,
   products,
   productVariants,
   orderItems,
+  users,
 } from "@workspace/db";
 import { eq, desc, and, notExists, isNull, isNotNull, notInArray, sql } from "drizzle-orm";
 import { attachPreOrderProgress } from "../lib/dropPreOrderProgress";
@@ -19,6 +21,11 @@ import { requireRole } from "../middlewares/requireRole";
 import { z } from "@workspace/api-zod";
 import { bodyObject, idParams, validateInput } from "../lib/commerceValidation";
 import { deliverDropBroadcast } from "../lib/dropBroadcast";
+import {
+  activeWaitlistCount, brandDisplayName, buildBlastMessage, deliverDropSmsBlast, isDropLive,
+} from "../lib/dropSmsWaitlist";
+import { isSmsConfigured } from "../lib/sms";
+import { CANONICAL_WEB_ORIGIN } from "../lib/webOrigin";
 import {
   defaultFulfillmentDeadline, failDrop, validateFulfillmentDeadline, validatePreorderShipDate,
 } from "../lib/money/dropLifecycle";
@@ -513,6 +520,88 @@ router.post("/:id/broadcast", requireRole("manager"), validateInput({ params: dr
     return res.status(409).json({ error: "This drop has already been broadcast to your followers.", code: "ALREADY_BROADCAST" });
   }
   return res.json({ ok: true, ...result });
+});
+
+// ─── GET /api/drops/:id/sms-blast ────────────────────────────────────────────
+// Everything the seller's drop waitlist screen needs: the public page link,
+// how many people are on the SMS waitlist, whether texting is configured,
+// whether this drop is live, and the result if the blast was already sent.
+router.get("/:id/sms-blast", async (req, res): Promise<void> => {
+  const sellerId = (req as any).clerkUserId as string;
+  const [drop] = await db
+    .select({
+      id: drops.id, name: drops.name, status: drops.status, releaseAt: drops.releaseAt, endsAt: drops.endsAt,
+      heroImageUrl: drops.heroImageUrl, launchTimezone: drops.launchTimezone,
+    })
+    .from(drops)
+    .where(and(eq(drops.id, req.params.id), eq(drops.ownerId, sellerId)))
+    .limit(1);
+  if (!drop) { res.status(404).json({ error: "Drop not found" }); return; }
+
+  const [[seller], waitlistCount, [blast]] = await Promise.all([
+    db.select({ username: users.username, brandName: users.brandName, displayName: users.displayName })
+      .from(users).where(eq(users.clerkId, sellerId)).limit(1),
+    activeWaitlistCount(sellerId),
+    db.select({
+      status: dropSmsBlasts.status, recipientCount: dropSmsBlasts.recipientCount, sentCount: dropSmsBlasts.sentCount,
+      failedCount: dropSmsBlasts.failedCount, createdAt: dropSmsBlasts.createdAt, completedAt: dropSmsBlasts.completedAt,
+    }).from(dropSmsBlasts).where(eq(dropSmsBlasts.dropId, drop.id)).limit(1),
+  ]);
+  const brandName = brandDisplayName(seller ?? {});
+  const handle = seller?.username ?? null;
+  res.json({
+    drop: {
+      id: drop.id, name: drop.name, status: drop.status,
+      releaseAt: drop.releaseAt ? drop.releaseAt.toISOString() : null,
+      heroImageUrl: drop.heroImageUrl, launchTimezone: drop.launchTimezone,
+    },
+    brandName,
+    handle,
+    publicUrl: handle ? `${CANONICAL_WEB_ORIGIN}/@${handle}/drop` : null,
+    waitlistCount,
+    smsConfigured: isSmsConfigured(),
+    dropLive: isDropLive(drop),
+    message: buildBlastMessage(brandName, drop.name, drop.id),
+    blast: blast ?? null,
+  });
+});
+
+// ─── POST /api/drops/:id/sms-blast ───────────────────────────────────────────
+// Text "drop is live" to every non-opted-out number on this seller's waitlist.
+// Once per drop: the claim in drop_sms_blasts is taken under a row lock that
+// rechecks the drop is active and live (see lib/dropSmsWaitlist.ts).
+router.post("/:id/sms-blast", requireRole("manager"), async (req, res): Promise<void> => {
+  const sellerId = (req as any).clerkUserId as string;
+  const [drop] = await db
+    .select({ id: drops.id, status: drops.status, releaseAt: drops.releaseAt, endsAt: drops.endsAt })
+    .from(drops)
+    .where(and(eq(drops.id, req.params.id), eq(drops.ownerId, sellerId)))
+    .limit(1);
+  if (!drop) { res.status(404).json({ error: "Drop not found" }); return; }
+  if (!isSmsConfigured()) {
+    res.status(503).json({ error: "Texting isn't set up yet.", code: "SMS_NOT_CONFIGURED" });
+    return;
+  }
+  if (!isDropLive(drop)) {
+    res.status(400).json({ error: "Text the waitlist once the drop is live.", code: "DROP_NOT_LIVE" });
+    return;
+  }
+
+  const outcome = await deliverDropSmsBlast(drop.id, sellerId);
+  switch (outcome.kind) {
+    case "not_configured":
+      res.status(503).json({ error: "Texting isn't set up yet.", code: "SMS_NOT_CONFIGURED" });
+      return;
+    case "not_eligible":
+      res.status(400).json({ error: "Text the waitlist once the drop is live.", code: "DROP_NOT_LIVE" });
+      return;
+    case "already_sent":
+      res.status(409).json({ error: "This drop's waitlist was already texted.", code: "ALREADY_SENT" });
+      return;
+    case "sent":
+      res.json({ ok: true, ...outcome.result });
+      return;
+  }
 });
 
 export default router;

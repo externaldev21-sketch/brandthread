@@ -363,12 +363,12 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
 
   bar: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
-    flexDirection: 'row', alignItems: 'center', gap: SP.md,
+    flexDirection: 'column', alignItems: 'stretch', gap: SP.sm,
     paddingHorizontal: SP.md, paddingTop: SP.sm,
     backgroundColor: theme.background,
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border,
   },
-  barTotal: { flexShrink: 1, minWidth: 0 },
+  barTotal: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 22 },
   barLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted },
   barAmount: { fontFamily: FONT.semibold, fontSize: FS.lg, color: theme.text, ...TABULAR_NUMS },
   barButton: { alignSelf: 'stretch' },
