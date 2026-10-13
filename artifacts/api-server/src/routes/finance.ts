@@ -2,7 +2,7 @@
  * Finance / Payouts dashboard — Stripe Connect data
  * Mounted at /api/finance
  *
- * GET  /balance                 available + pending balance, next payout date
+ * GET  /balance                 available + pending + in-transit balance, next payout date
  * GET  /payouts                 payout history list
  * GET  /transactions            balance transaction list (for finance P&L view)
  * GET  /statement.csv           download CSV of transactions
@@ -10,7 +10,7 @@
  *                               body.method 'standard' (default) | 'instant'
  * GET  /payout-schedule         current schedule, instant eligibility + fee quote, next payout
  * PATCH /payout-schedule        set daily | weekly(+anchor) | manual
- * GET  /payouts/:id             per-payout breakdown (sales, fees, refunds, holds)
+ * GET  /payouts/:id             per-payout breakdown (sales, fees, refunds, holds) + its orders
  * GET  /summary                 held vs releasing vs available vs paid out
  */
 import { denyIfAgeRestricted } from "../lib/ageGate";
@@ -36,6 +36,7 @@ import {
   validateScheduleInput,
 } from "../lib/money/payoutSchedule";
 import { assertBreakdownReconciles, buildPayoutBreakdown } from "../lib/money/payoutBreakdown";
+import { mapPayoutOrders, payoutOrderLookupIds, type PayoutTxnLike } from "../lib/money/payoutOrders";
 
 const router = Router();
 router.use(requireAuth);
@@ -177,6 +178,22 @@ async function balanceExtras(input: {
   }
 }
 
+// Payouts already sent to the bank but not yet arrived (Shopify "In transit").
+// Never throws; a failure reports null so the client hides the line.
+async function inTransitBalance(accountId: string, log: { warn: (...args: any[]) => void }) {
+  if (!stripe) return null;
+  try {
+    const result = await stripe.payouts.list({ status: "in_transit", limit: 100 }, { stripeAccount: accountId });
+    const amount = (result?.data ?? [])
+      .filter((p: any) => p.currency === PAYOUT_CURRENCY)
+      .reduce((sum: number, p: any) => sum + (Number.isSafeInteger(p.amount) ? p.amount : 0), 0);
+    return { amount, currency: PAYOUT_CURRENCY, formatted: formatCents(amount, PAYOUT_CURRENCY) };
+  } catch (err) {
+    log.warn({ err }, "In-transit payouts unavailable for balance");
+    return null;
+  }
+}
+
 // ─── GET /api/finance/balance ─────────────────────────────────────────────────
 
 // Reads are owner + manager + finance/admin (requirePayoutsRead — manager
@@ -195,6 +212,7 @@ router.get("/balance", requirePayoutsRead(), async (req, res) => {
       res.json({
         available: { amount: 0, currency: "usd", formatted: "$0.00" },
         pending:   { amount: 0, currency: "usd", formatted: "$0.00" },
+        inTransit: { amount: 0, currency: "usd", formatted: "$0.00" },
         nextPayout: null,
         connected:  false,
       });
@@ -257,6 +275,7 @@ router.get("/balance", requirePayoutsRead(), async (req, res) => {
         currency:  pending.currency,
         formatted: formatCents(pending.amount, pending.currency),
       },
+      inTransit: await inTransitBalance(accountId, req.log),
       nextPayout: nextP ? {
         id:          nextP.id,
         amount:      nextP.amount,
@@ -1125,6 +1144,38 @@ router.patch("/payout-schedule", requirePermission("payouts"), async (req, res) 
 const PAYOUT_ID = /^po_[A-Za-z0-9]{6,64}$/;
 const BREAKDOWN_PAGE_LIMIT = 5; // x100 balance transactions per payout
 
+/** The seller's orders behind a payout's balance transactions; [] on failure. */
+async function loadPayoutOrders(sellerId: string, transactions: PayoutTxnLike[], log: { warn: (...args: any[]) => void }) {
+  try {
+    const ids = payoutOrderLookupIds(transactions);
+    if (!ids.length) return [];
+    const rows = await db.select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      shippingAddress: orders.shippingAddress,
+      stripeTransferId: orders.stripeTransferId,
+      stripeChargeId: orders.stripeChargeId,
+      stripePaymentIntentId: orders.stripePaymentIntentId,
+      createdAt: orders.createdAt,
+    }).from(orders).where(and(
+      eq(orders.ownerId, sellerId),
+      sql`(${inArray(orders.stripeTransferId, ids)} OR ${inArray(orders.stripeChargeId, ids)} OR ${inArray(orders.stripePaymentIntentId, ids)})`,
+    ));
+    return mapPayoutOrders(transactions, rows.map((row: any) => ({
+      id: row.id,
+      orderNumber: row.orderNumber,
+      buyerName: row.shippingAddress?.name ?? null,
+      stripeTransferId: row.stripeTransferId ?? null,
+      stripeChargeId: row.stripeChargeId ?? null,
+      stripePaymentIntentId: row.stripePaymentIntentId ?? null,
+      createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
+    })));
+  } catch (err) {
+    log.warn({ err }, "Payout orders unavailable");
+    return [];
+  }
+}
+
 router.get("/payouts/:id", requirePayoutsRead(), async (req, res) => {
   const sellerId = getSellerId(req);
   const payoutId = String(req.params.id);
@@ -1163,7 +1214,7 @@ router.get("/payouts/:id", requirePayoutsRead(), async (req, res) => {
       let startingAfter: string | undefined;
       for (let page = 0; page < BREAKDOWN_PAGE_LIMIT; page += 1) {
         const result = await stripe.balanceTransactions.list(
-          { payout: payoutId, limit: 100, ...(startingAfter ? { starting_after: startingAfter } : {}) },
+          { payout: payoutId, limit: 100, expand: ["data.source"], ...(startingAfter ? { starting_after: startingAfter } : {}) },
           { stripeAccount: accountId },
         );
         transactions.push(...result.data);
@@ -1176,6 +1227,7 @@ router.get("/payouts/:id", requirePayoutsRead(), async (req, res) => {
       ? buildPayoutBreakdown({ payoutAmountCents: payout.amount, transactions })
       : null;
     if (breakdown) assertBreakdownReconciles(breakdown);
+    const payoutOrders = automatic ? await loadPayoutOrders(sellerId, transactions, req.log) : [];
 
     const instantFee = payout.method === "instant" && typeof payout.balance_transaction === "object"
       ? Math.max(0, Number(payout.balance_transaction?.fee ?? 0))
@@ -1213,6 +1265,7 @@ router.get("/payouts/:id", requirePayoutsRead(), async (req, res) => {
             truncated,
           }
         : null,
+      orders: payoutOrders,
     });
   } catch (err: any) {
     req.log.error({ err }, "Failed to load payout breakdown");
