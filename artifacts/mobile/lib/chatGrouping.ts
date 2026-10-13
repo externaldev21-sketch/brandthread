@@ -120,3 +120,59 @@ export const SENT_BUBBLE = '#FFFFFF';
 export const SENT_BUBBLE_TEXT = '#000000';
 export const RECEIVED_BUBBLE = '#262628';
 export const RECEIVED_BUBBLE_TEXT = '#FFFFFF';
+
+export interface PreviewableMessage {
+  text?: string | null;
+  attachment?: { title?: string | null; type?: string | null } | null;
+}
+
+/** A short, human preview of a message's content — used both for the
+ *  swipe-to-reply "Replying to …" banner (ReplyBanner) and the in-bubble
+ *  quoted-reply strip. Falls back through the attachment's own title (e.g.
+ *  "Photo", "Voice message") for an attachment-only original with no text,
+ *  so a reply to a photo/voice/product card never renders a blank quote. */
+export function messagePreviewText(msg: PreviewableMessage): string {
+  const text = msg.text?.trim();
+  if (text) return text;
+  const title = msg.attachment?.title?.trim();
+  if (title) return title;
+  switch (msg.attachment?.type) {
+    case 'image': return 'Photo';
+    case 'video': return 'Video';
+    case 'voice': return 'Voice message';
+    case 'product': return 'Product';
+    case 'order': return 'Order';
+    case 'post': return 'Post';
+    default: return 'Message';
+  }
+}
+
+export interface SeenableMessage {
+  id: string;
+  fromId: string;
+  ts: number;
+  readAt?: string | null;
+}
+
+/** Real, honest granularity: the backend marks every one of the OTHER
+ *  participant's unread messages `readAt` at once, the moment I open the
+ *  conversation and it calls `PATCH /conversations/:id/read` (see
+ *  artifacts/api-server/src/routes/conversations.ts). There's no
+ *  per-message "they scrolled past this exact bubble" signal — so "Seen"
+ *  means "read up through this point", shown only under the sender's own
+ *  most recent message once it (and everything before it) has been read.
+ *  This mirrors Instagram's own "Seen" receipt, which is also
+ *  conversation-level, not scroll-position-level. */
+export function lastOwnMessageId(messages: SeenableMessage[], myId: string): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].fromId === myId) return messages[i].id;
+  }
+  return null;
+}
+
+/** Whether this particular bubble should show the "Seen" receipt: it must
+ *  be my own most recent message in the thread, AND the other participant
+ *  must have read it (readAt set). */
+export function isSeenReceipt(msg: SeenableMessage, myId: string, lastOwnId: string | null): boolean {
+  return msg.fromId === myId && msg.id === lastOwnId && !!msg.readAt;
+}
