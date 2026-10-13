@@ -39,6 +39,14 @@ import SetupWalkthroughSheet from '@/components/SetupWalkthroughSheet';
 import SetupContinueBanner from '@/components/SetupContinueBanner';
 import SetupCelebration from '@/components/SetupCelebration';
 import LaunchChecklistCard from '@/components/LaunchChecklistCard';
+import DashboardTopCard, { pickTopCard, type DashboardTopCardCandidate } from '@/components/dashboard/DashboardTopCard';
+import MorningBriefCard from '@/components/dashboard/MorningBriefCard';
+import MilestoneCard from '@/components/dashboard/MilestoneCard';
+import { useMorningBrief } from '@/hooks/useMorningBrief';
+import { useMilestone } from '@/hooks/useMilestone';
+import { TOP_CARD_PRIORITY } from '@/lib/dashboardTopCard';
+import { primaryActionRoute } from '@/lib/morningBrief';
+import { hapticLight } from '@/lib/haptics';
 import { ResponsiveContainer, SkeletonBlock, useBreakpoint } from '@/components/layout';
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -275,6 +283,8 @@ export default function SellerHomeCommerceDashboard({
   }), []);
 
   const data = selectSellerHomeAnalytics(snapshot, analyticsUserId, range);
+  const morningBrief = useMorningBrief(userId, storeContextTick);
+  const milestone = useMilestone(userId, storeContextTick);
 
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
   const [celebrationVisible, setCelebrationVisible] = useState(false);
@@ -650,6 +660,36 @@ export default function SellerHomeCommerceDashboard({
 
   const addProductTask = setupState.tasks.find((task) => task.id === 'first_product') ?? null;
   const newSeller = everSoldCount !== null && isNewSeller(everSoldCount);
+  // ── The one top-card slot (milestones, morning brief, …). While it shows a
+  // card, the bottom setup prompts wait, so only one promo is on screen. ──
+  const topCard = pickTopCard<DashboardTopCardCandidate>([
+    {
+      key: 'milestone',
+      priority: TOP_CARD_PRIORITY.milestone,
+      visible: milestone.milestone !== null,
+      render: () => milestone.milestone && (
+        <MilestoneCard milestone={milestone.milestone} theme={theme} onDone={milestone.markSeen} />
+      ),
+    },
+    {
+      key: 'morning-brief',
+      priority: TOP_CARD_PRIORITY.morningBrief,
+      visible: morningBrief.visible,
+      render: () => morningBrief.brief && (
+        <MorningBriefCard
+          brief={morningBrief.brief}
+          theme={theme}
+          onAction={() => {
+            hapticLight();
+            router.push(primaryActionRoute(morningBrief.brief!) as never);
+          }}
+          onDismiss={morningBrief.dismiss}
+          onTurnOff={morningBrief.turnOff}
+        />
+      ),
+    },
+  ], { blocked: newSeller });
+
   const actionCounts: DashboardActionCounts | null = actionInputs ? {
     toShip: actionInputs.toShip,
     toAnswer: actionInputs.unreadMessages,
@@ -770,6 +810,8 @@ export default function SellerHomeCommerceDashboard({
               badgeBorderColor={theme.background ?? BG}
             />}
           </View>
+
+          <DashboardTopCard card={topCard} />
 
           {!data && analyticsError ? (
             <View style={styles.errorBanner} testID="seller-dashboard-error">
@@ -962,7 +1004,7 @@ export default function SellerHomeCommerceDashboard({
           {/* ── Setup checklist: "Continue setup" banner opens the guided
               walkthrough sheet, which owns the full task list — no separate
               inline checklist duplicated here. ──────────────────────────── */}
-          {!setupComplete && setupState.walkthroughShown && (
+          {!topCard && !setupComplete && setupState.walkthroughShown && (
             <View style={styles.section}>
               <SetupContinueBanner
                 percent={setupPercent}
@@ -972,7 +1014,7 @@ export default function SellerHomeCommerceDashboard({
             </View>
           )}
 
-          <LaunchChecklistCard />
+          {!topCard && <LaunchChecklistCard />}
         </ResponsiveContainer>
         <View testID="seller-dashboard-scroll-end" accessibilityLabel="Seller dashboard scroll end" style={styles.scrollEndMarker} />
       </ScrollView>
