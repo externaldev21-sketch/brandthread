@@ -249,6 +249,21 @@ describe("product description", () => {
     expect((await call("/product-description", { imagePaths: [THEIR_PATH] })).status).toBe(404);
   });
 
+  it("returns a category only from the app's own category list", async () => {
+    state.aiReply = () => ({ ...reply(), category: "t shirt" });
+    const r = await call("/product-description", { imagePaths: [GOOD_PATH] });
+    expect(r.status).toBe(200);
+    expect(r.json.category).toBe("T-shirt");
+    const system = JSON.stringify(state.aiCalls[0]?.messages?.[0] ?? "");
+    expect(system).toContain("category");
+    expect(system).toContain("Sweatpants");
+
+    state.aiReply = () => ({ ...reply(), category: "Spaceship" });
+    const unknown = await call("/product-description", { imagePaths: [GOOD_PATH] });
+    expect(unknown.status).toBe(200);
+    expect(unknown.json).not.toHaveProperty("category");
+  });
+
   it("reads a product the caller owns and hides other sellers' products", async () => {
     const [mine] = await db.insert(products).values({ ownerId: ME, name: "Mine", images: [GOOD_PATH] } as any).returning();
     const [theirs] = await db.insert(products).values({ ownerId: OTHER, name: "Theirs", images: [THEIR_PATH] } as any).returning();

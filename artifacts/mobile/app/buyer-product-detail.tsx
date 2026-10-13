@@ -117,7 +117,7 @@ function useChrome() {
 // shape expected by addToCart. Variant UUIDs from the DB are preserved so the
 // checkout server can look them up correctly.
 
-function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
+export function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
   const apiVariants: any[] = row.variants ?? [];
 
   // Derive options from unique size / color values across all variants
@@ -301,7 +301,7 @@ const galleryStyles = StyleSheet.create({
   thumbImage: { width: '100%', height: '100%' },
 });
 
-function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accentColor: string }) {
+export function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accentColor: string }) {
   const images = imageUris.filter(Boolean);
   const scrollX = useRef(new Animated.Value(0)).current;
   const listRef = useRef<Animated.FlatList<string>>(null);
@@ -389,7 +389,7 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
 
 // ─── Option Picker ────────────────────────────────────────────────────────────
 
-function OptionPicker({ product, option, selections, onSelect, recommendedLabel }: {
+export function OptionPicker({ product, option, selections, onSelect, recommendedLabel }: {
   /** Size chip to mark (never select) from the buyer's saved sizes. */
   recommendedLabel?: string | null;
   product: BuyerProduct;
@@ -1823,7 +1823,7 @@ const makeSizeChartStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => 
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-function PolicyRow({ icon, label, value }: { icon: keyof typeof Feather.glyphMap; label: string; value: string }) {
+export function PolicyRow({ icon, label, value }: { icon: keyof typeof Feather.glyphMap; label: string; value: string }) {
   const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, GOLD } = useThemeAliases();
   return (
     <View style={pr.root}>
@@ -1841,7 +1841,7 @@ const pr = StyleSheet.create({
   value: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, marginTop: 2, lineHeight: 17 },
 });
 
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const BG = theme.background;
   const CARD = theme.card;
   const CARD_ELEVATED = theme.cardElevated;
