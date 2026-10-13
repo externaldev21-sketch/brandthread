@@ -210,7 +210,7 @@ const createStyles = (theme: { accent: string; accentDim: string; onAccent: stri
     width: 36,
     height: 36,
     borderRadius: RADIUS.sm,
-    backgroundColor: theme.accentDim,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },

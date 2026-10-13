@@ -3639,7 +3639,6 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%', borderRadius: RADII.pill, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.9)',
-    shadowColor: '#fff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 4,
   },
   scrubBubble: {
     position: 'absolute', minWidth: 40, alignItems: 'center',

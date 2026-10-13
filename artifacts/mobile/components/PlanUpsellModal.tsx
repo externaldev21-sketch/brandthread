@@ -133,7 +133,7 @@ export default function PlanUpsellModal({
                       style={[s.toolRow, isTapped && { backgroundColor: theme.accentDim, borderColor: `${theme.accent}40` }]}
                     >
                       {/* Colored icon */}
-                      <View style={[s.toolIconBg, { backgroundColor: tool.accentDim }]}>
+                      <View style={s.toolIconBg}>
                         <Feather name={tool.icon} size={16} color={tool.accent} />
                       </View>
 

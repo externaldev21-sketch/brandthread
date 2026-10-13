@@ -67,7 +67,7 @@ export function BuyerProtectionNote({
       accessibilityRole="summary"
     >
       <View style={styles.head}>
-        <View style={[styles.icon, { backgroundColor: theme.accentDim }]}>
+        <View style={styles.icon}>
           <Feather name="shield" size={15} color={theme.accent} />
         </View>
         <View style={styles.headCopy}>

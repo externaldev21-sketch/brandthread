@@ -401,9 +401,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   successIconGrad: {
     width: 64, height: 64, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
-     shadowColor: theme.success, shadowOpacity: 0.5,
-    shadowRadius: 16, shadowOffset: { width: 0, height: 0 },
-    elevation: 12,
   },
   successTitle: {
      fontSize: 26, fontFamily: 'Inter_700Bold', color: theme.text,
