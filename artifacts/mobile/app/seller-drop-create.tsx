@@ -337,7 +337,7 @@ export default function SellerDropCreate() {
     }
     const releaseParts = parseDateAndTime(releaseDate, releaseTime);
     if (!releaseParts) {
-      Alert.alert('Launch date required', 'Enter the launch date as YYYY-MM-DD and time as HH:MM (24h).');
+      Alert.alert('Drop date required', 'Enter the drop date as YYYY-MM-DD and time as HH:MM (24h).');
       return;
     }
     let endsAtIso: string | undefined;
@@ -544,7 +544,7 @@ export default function SellerDropCreate() {
           </View>
 
           <View style={styles.field}>
-            <Text style={[styles.label, { color: theme.muted }]}>LAUNCH DATE & TIME</Text>
+            <Text style={[styles.label, { color: theme.muted }]}>DROP DATE & TIME</Text>
             <DateTimeChipPicker
               dateValue={releaseDate}
               timeValue={releaseTime}

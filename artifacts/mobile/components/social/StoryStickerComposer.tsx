@@ -146,7 +146,7 @@ export function CountdownPicker({ visible, onClose, onPick }: {
       {drops === null ? (
         <View style={s.center}><ActivityIndicator color={theme.text} /></View>
       ) : drops.length === 0 ? (
-        <Text style={[s.empty, { color: theme.muted }]}>No upcoming drops. Schedule a drop with a launch time to count down to it.</Text>
+        <Text style={[s.empty, { color: theme.muted }]}>No upcoming drops. Schedule one with a drop time to count down to it.</Text>
       ) : (
         <ScrollView style={{ maxHeight: 320 }}>
           {drops.map((d) => (

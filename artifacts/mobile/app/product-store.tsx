@@ -229,7 +229,7 @@ export default function ProductStoreScreen() {
       return { label: 'Pre-order', variant: 'purple' };
     }
     if (inventory.totalStock === 0) {
-      return { label: 'Out of stock', variant: 'error' };
+      return { label: 'Sold out', variant: 'error' };
     }
     if (inventory.totalStock <= inventory.lowStockThreshold) {
       return { label: 'Low stock', variant: 'warning' };
@@ -245,7 +245,7 @@ export default function ProductStoreScreen() {
 
   const handleShare = useCallback(async () => {
     const link = buildProductUrl(product?.id);
-    const message = `Check out ${product?.name ?? 'this product'} on Brandthread!`;
+    const message = `Check out ${product?.name ?? 'this product'} on Brandthread`;
     await Share.share(link
       ? { message: Platform.OS === 'ios' ? message : `${message} ${link}`, url: link }
       : { message });

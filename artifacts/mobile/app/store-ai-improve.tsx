@@ -157,7 +157,7 @@ export default function StoreAiImproveScreen() {
           <EmptyState
             icon="check-circle"
             title="No suggestions right now"
-            description="Your store looks good! Check back after making changes."
+            description="Your store looks good. Check back after making changes."
             action={{ label: 'Refresh', onPress: handleRefresh, icon: 'refresh-cw' }}
             style={ai.emptyState}
           />

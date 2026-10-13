@@ -78,7 +78,8 @@ export const ProductCard = React.memo(function ProductCard({
   // Monochrome stock marker (Shopify's "N available" line): silver count when
   // healthy, a white "Low stock" pill at/below the threshold, a quiet dark
   // "Out of stock" pill at 0 — no warning colours.
-  const { level: stockLevelKey, label: stockLabel } = stockStatusLabel(stock, threshold);
+  const { level: stockLevelKey, label: stockStatusText } = stockStatusLabel(stock, threshold);
+  const stockLabel = stock === 0 ? 'Sold out' : stockStatusText;
   const flagColors = stockFlagColors(stockLevelKey === 'low_stock' ? 'low_stock' : 'out_of_stock', theme);
 
   const price = product.pricing.priceCents;

@@ -61,7 +61,7 @@ export default function SetupCelebration({
             onPress={onDismiss}
             accessibilityRole="button"
           >
-            <Text style={[styles.btnText, { color: theme.onAccent }]}>Let's go</Text>
+            <Text style={[styles.btnText, { color: theme.onAccent }]}>Done</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>

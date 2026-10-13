@@ -54,7 +54,7 @@ export function cannedAgentReply(userText: string): { text: string; cardKind?: '
     return { text: "Discover's the move — fresh drops and brands picked for you. tap in and I'll keep learning what you like.", cardKind: 'discover' };
   }
   if (lower.includes('vibing') || lower.includes('just')) {
-    return { text: "bet, I'm right here whenever 🤙" };
+    return { text: "bet, I'm right here whenever" };
   }
   return { text: "hear you — I'm here 24/7 for fits, brands, Thread Cash, or anything else. what's up?" };
 }

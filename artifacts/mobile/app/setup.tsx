@@ -240,7 +240,7 @@ export default function SetupScreen() {
           )}
           {allDone && (
             <Text style={[s.progressNext, { color: theme.text }]}>
-              ✓ All required steps complete — you're ready to go!
+              ✓ All required steps complete — you're ready to go
             </Text>
           )}
         </GradientCard>

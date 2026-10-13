@@ -28,7 +28,7 @@ interface Faq {
 }
 
 const FAQS: Faq[] = [
-  { q: 'How do drops work?', a: 'Drops are limited-time releases from brands you follow. When a drop goes live you get a notification. Tap the drop to view it and place your order before it sells out. Pre-orders are charged immediately and shipped when production is complete.', category: 'General', popular: true },
+  { q: 'How do drops work?', a: 'Drops are limited-time products from brands you follow. When a drop goes live you get a notification. Tap the drop to view it and place your order before it sells out. Pre-orders are charged immediately and shipped when production is complete.', category: 'General', popular: true },
   { q: 'When does my payment get charged?', a: 'For in-stock items your card is charged at checkout. For pre-order drops your card is charged immediately, but the brand only receives funds once your order ships — we hold the money in escrow to protect you.', category: 'Billing', popular: true },
   { q: 'How do I track my order?', a: 'Go to your Profile → My Orders and tap any order to see its tracking number and live delivery status.', category: 'General', popular: true },
   { q: 'Can I return or exchange an item?', a: 'Returns and exchanges are handled per-brand. Tap "Get Help" or "Return / Exchange" on any delivered order in My Orders to start the process with that brand.', category: 'General' },
@@ -278,7 +278,7 @@ export default function HelpScreen() {
             {submitted ? (
               <View style={s.submittedBadge}>
                 <Icon name="check-circle" size={ICON.sm} color={theme.success} />
-                <Text style={s.submittedText}>We'll be in touch shortly.</Text>
+                <Text style={s.submittedText}>Got it. We'll be in touch shortly.</Text>
                 <TouchableOpacity onPress={() => setSubmitted(false)}>
                   <Text style={s.sendAnotherText}>Send another</Text>
                 </TouchableOpacity>
