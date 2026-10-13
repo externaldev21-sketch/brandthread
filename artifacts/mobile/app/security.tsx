@@ -38,7 +38,7 @@ export default function SecurityScreen() {
       <View style={styles.section}>
         <View style={styles.rowBetween}>
           <View style={{ flex: 1, paddingRight: 12 }}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>User activity logs</Text>
+            <Text style={[styles.sectionTitle, styles.titleOnly, { color: colors.foreground }]}>User activity logs</Text>
           </View>
           <Button label="View" variant="secondary" size="small" style={styles.rowBtn} onPress={viewActivityLog} />
         </View>
@@ -48,7 +48,7 @@ export default function SecurityScreen() {
         <View key={row.route} style={styles.section}>
           <View style={styles.rowBetween}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{row.title}</Text>
+              <Text style={[styles.sectionTitle, !row.subtitle && styles.titleOnly, { color: colors.foreground }]}>{row.title}</Text>
               {row.subtitle ? <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>{row.subtitle}</Text> : null}
             </View>
             <Button
@@ -68,6 +68,8 @@ export default function SecurityScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   section: { paddingHorizontal: 20, paddingVertical: 18 },
+  // A row without a subtitle centers its title on the button.
+  titleOnly: { marginBottom: 0 },
   sectionTitle: { fontSize: 15, fontFamily: FONT.semibold, marginBottom: 4 },
   sectionSubtitle: { fontSize: 13, fontFamily: FONT.regular, lineHeight: 18 },
   rowBetween: { flexDirection: 'row', alignItems: 'center' },
