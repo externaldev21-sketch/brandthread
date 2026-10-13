@@ -17,6 +17,7 @@ export const PROMOTIONAL_PUSH_TYPES: ReadonlySet<string> = new Set([
   "new_product", // "a brand you follow just listed ..."
   "price_drop", // price-drop nudge on saved items
   "back_in_stock", // restock nudge on saved items
+  "size_back", // "Your size is back" restock nudge to savers/viewers whose saved size matches
   "abandoned_cart", // cart recovery
   "promotion",
   "marketing",

@@ -120,6 +120,7 @@ router.patch("/:variantId/adjust", requireRole("manager"), async (req, res) => {
     productName: row.productName,
     previousStock: row.stock,
     newStock: updatedStock,
+    variantId,
   });
 
   await afterStockChange(row.productId);

@@ -122,6 +122,7 @@ export async function processStockChanges(changes: StockChange[]): Promise<void>
       await notifyBackInStock({
         productId: row.productId, ownerId: row.ownerId, productName: row.name,
         previousStock: change.previousStock, newStock: change.newStock,
+        variantId: change.variantId,
       });
     }
     for (const productId of productIds) await afterStockChange(productId);
