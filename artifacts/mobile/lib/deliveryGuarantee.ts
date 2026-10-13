@@ -306,3 +306,12 @@ export function sellerOrderConflictMessage(code: string | undefined | null): str
 export function unshippedItems<T extends { trackingNumber?: string | null; refundedAt?: string | null }>(items: T[]): T[] {
   return items.filter(i => !i.trackingNumber && !i.refundedAt);
 }
+
+/** Days a paid item has to arrive before it is refunded automatically. */
+export const GUARANTEE_DAYS = { regular: 15, preorder: 60 } as const;
+
+/** The product page promise: "Delivered in 15 days or your money back". */
+export function deliveryPromiseLine(isPreOrder: boolean): string {
+  const days = isPreOrder ? GUARANTEE_DAYS.preorder : GUARANTEE_DAYS.regular;
+  return `Delivered in ${days} days or your money back`;
+}

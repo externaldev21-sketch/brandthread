@@ -300,9 +300,9 @@ export function ExpressPay({ amountCents, subtotalCents, shippingCents, quote, c
   return (
     <View style={{ opacity: disabled ? 0.4 : 1 }} pointerEvents={disabled ? 'none' : 'auto'}>
       <PlatformPayButton
-        type={PlatformPay.ButtonType.Buy}
+        type={PlatformPay.ButtonType.Pay}
         appearance={PlatformPay.ButtonStyle.White}
-        borderRadius={999}
+        borderRadius={12}
         onPress={() => void pay()}
         onShippingContactSelected={event => void onShippingContactSelected(event as { shippingContact: ShippingContact })}
         disabled={disabled}

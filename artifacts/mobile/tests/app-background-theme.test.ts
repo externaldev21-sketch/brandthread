@@ -28,9 +28,9 @@ describe('app background theme', () => {
     expect(ACCENT_LIGHT).toBe('#FFFFFF');
     expect(colors.dark.primary).toBe(ACCENT);
     expect(colors.dark.primaryForeground).toBe(BG);
-    // SUBTLE is now a solid opaque silver, not an alpha blend — see the
-    // "fix the type system" fine-print pass in lib/theme.ts.
-    expect(colors.dark.info).toBe('#B0B0B0');
+    // SUBTLE is a solid opaque grey, not an alpha blend: the tertiary
+    // #8E8E93 from BRANDTHREAD_DESIGN.md's color usage.
+    expect(colors.dark.info).toBe('#8E8E93');
   });
 
   it('isolates every root stack scene on an opaque background plane', () => {

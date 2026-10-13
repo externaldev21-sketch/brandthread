@@ -23,7 +23,7 @@ export function SellerDashboardTopProducts({
   return (
     <View testID="seller-dashboard-top-products">
       <View style={styles.headerRow}>
-        <Text style={[styles.sectionHeader, { color: theme.muted }]}>Top products</Text>
+        <Text style={[styles.sectionHeader, { color: theme.text }]}>Top products</Text>
         <TouchableOpacity onPress={onSeeAll} accessibilityRole="button" accessibilityLabel="See all products">
           <Text style={[styles.seeAll, { color: theme.subtle }]}>See all</Text>
         </TouchableOpacity>
@@ -67,11 +67,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SP.sm,
   },
+  // Section header: sentence case, 17 semibold, white (BRANDTHREAD_DESIGN.md).
   sectionHeader: {
-    fontFamily: FONT.bold,
-    fontSize: FS.xs,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    fontFamily: FONT.semibold,
+    fontSize: 17,
+    lineHeight: 22,
   },
   seeAll: {
     fontFamily: FONT.medium,

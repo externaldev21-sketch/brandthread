@@ -78,18 +78,20 @@ import { CheckoutSkeleton, PressableScale } from '@/components/BrandthreadUI';
 import { StickyFooter } from '@/components/layout';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import { Button, ErrorState, IconButton } from '@/components/ui';
-import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { CheckoutSection, GUTTER, useCheckoutColors, type CheckoutColors } from '@/components/checkout/CheckoutPrimitives';
 import { ContactSection } from '@/components/checkout/ContactSection';
 import { ShippingSection, type CheckoutAddressDraft, type SavedAddress } from '@/components/checkout/ShippingSection';
 import {
-  BNPL, ExpressSection, HostedExpressButton, NEW_CARD, PaymentSection, type SavedCard,
+  BNPL, NEW_CARD, PaymentSection, WALLET_NAMES, useWalletKind, type SavedCard,
 } from '@/components/checkout/PaymentSection';
+import {
+  ReviewDetailRow, ReviewItems, ReviewLegal, ReviewRow, ReviewTotals, ShippingOptions, WalletMark,
+} from '@/components/checkout/OrderReview';
+import { CheckoutSheet } from '@/components/checkout/CheckoutSheet';
+import { addressName, addressOneLine } from '@/lib/addressFormat';
 import { PromoCodeSection } from '@/components/checkout/PromoCodeSection';
 import { GiftCardSection } from '@/components/checkout/GiftCardSection';
 import { ThreadCashSection } from '@/components/checkout/ThreadCashSection';
-import { OrderSummarySection } from '@/components/checkout/OrderSummarySection';
-import { CheckoutTermsLine } from '@/components/checkout/CheckoutTermsLine';
 import { OrderConfirmation, OrderConfirmationActions } from '@/components/checkout/OrderConfirmation';
 import {
   ExpressPay, PaymentController, StripePaymentProvider, stripePaymentAvailable,
@@ -97,8 +99,6 @@ import {
 import type { ConfirmOutcome, PaymentControllerApi } from '@/components/checkout/stripePaymentTypes';
 import { FONT, FS, SP } from '@/lib/theme';
 import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
-import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
-import { BUYER_CHECKOUT_STEPS } from '@/lib/firstRunTips/content';
 
 /**
  * A fully verified order reference returned from the server after payment.
@@ -155,6 +155,14 @@ export default function BuyerCheckoutScreen() {
   const [error, setError] = useState<CheckoutError | null>(null);
   const [canRetryPayment, setCanRetryPayment] = useState(false);
   const [footerHeight, setFooterHeight] = useState(150);
+  // Order review (Shop): Contact and Ship to are collapsed rows that open a
+  // sheet; Payment lists Apple Pay first (the default), cards below.
+  const [sheet, setSheet] = useState<'contact' | 'address' | null>(null);
+  const [payOpen, setPayOpen] = useState(false);
+  const [payMethod, setPayMethod] = useState<'wallet' | 'card'>('wallet');
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [giftOpen, setGiftOpen] = useState(false);
+  const walletKind = useWalletKind();
   const scrollRef = useRef<ScrollView>(null);
   const controllerRef = useRef<PaymentControllerApi>(null);
   const startedRef = useRef<PaymentIntentStart | null>(null);
@@ -314,6 +322,21 @@ export default function BuyerCheckoutScreen() {
   };
 
   const current = session as CheckoutSession;
+
+  /** A store that offers 2+ ways to ship: the buyer's pick, with the totals in step. */
+  const selectShippingMethod = (sellerId: string, methodId: string) => {
+    const base = sessionRef.current ?? current;
+    const deliveryGroups = base.deliveryGroups.map(group => group.sellerId === sellerId ? { ...group, selectedMethodId: methodId } : group);
+    const shippingTotalCents = deliveryGroups.reduce((sum, group) => sum + (group.availableMethods.find(m => m.id === group.selectedMethodId)?.priceCents ?? 0), 0);
+    const delta = shippingTotalCents - base.summary.shippingTotalCents;
+    void persist({
+      ...base,
+      deliveryGroups,
+      summary: { ...base.summary, shippingTotalCents, totalCents: base.summary.totalCents + delta },
+      // A new total is a new payment attempt (an intent opened for the old total isn't reused).
+      idempotencyKey: `ck_${randomUUID()}`,
+    });
+  };
 
   // Dev-web preview only (lib/previewCheckout.ts): every group is seeded
   // preview products, so there is no server cart or Stripe to talk to.
@@ -1004,17 +1027,27 @@ export default function BuyerCheckoutScreen() {
     );
   }
 
-  const expressVisible = inApp ? walletAvailable : true;
+  // Apple Pay / Google Pay is the default when the device has it; the
+  // buyer can pick a card instead in Payment.
+  const payWithWallet = inApp && walletAvailable && payMethod === 'wallet';
+  const shipName = addressName(address);
+  const shipLine = addressOneLine(address);
+  const savedCardInUse = savedCards.find(card => card.id === selectedCard);
+  const cardRowLabel = !inApp ? (previewOnly ? 'Card' : 'Apple Pay or card')
+    : savedCardInUse ? `${savedCardInUse.brand} •••• ${savedCardInUse.last4}`
+    : 'Card';
 
   const page = (
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {header('Checkout', leaveCheckout, 'Close checkout')}
+        {header('Order review', leaveCheckout, 'Close order review')}
         {inApp ? <PaymentController ref={controllerRef} /> : null}
 
         <ScrollView
           ref={scrollRef}
           style={styles.scroll}
-          contentContainerStyle={{ paddingHorizontal: GUTTER, paddingBottom: footerHeight + SP.lg }}
+          // Everything scrolls clear of the pinned footer: its measured height
+          // plus a full row of space, so the last section is never under Pay.
+          contentContainerStyle={{ paddingHorizontal: GUTTER, paddingBottom: footerHeight + SP.xl + SP.md }}
           keyboardShouldPersistTaps="handled"
           bounces={false}
           overScrollMode="never"
@@ -1032,44 +1065,61 @@ export default function BuyerCheckoutScreen() {
             </View>
           ) : null}
 
-          <ExpressSection visible={expressVisible}>
-            {inApp ? (
-              <ExpressPay
-                amountCents={totals.totalCents}
-                subtotalCents={totals.subtotalCents}
-                shippingCents={totals.shippingCents}
-                quote={expressQuote}
-                createIntent={expressCreateIntent}
-                onOutcome={expressOutcome}
-                onAvailability={setWalletAvailable}
-                disabled={placing || !cardReadyForWallet(current)}
-              />
-            ) : (
-              <HostedExpressButton onPress={onCta} disabled={!ready} loading={placing} />
-            )}
-          </ExpressSection>
+          <ReviewItems session={current} />
 
-          <ContactSection contact={contact} onChange={setContact} showErrors={false} first />
+          <ShippingOptions session={current} quotedGroups={inApp ? activeQuote?.groups : undefined} onSelectMethod={selectShippingMethod} />
 
-          <ShippingSection
-            address={address}
-            onChange={setAddress}
-            savedAddresses={isSignedIn ? savedAddresses : []}
-            onSelectSaved={handleSelectAddress}
-            canSaveAddresses={!!isSignedIn}
-            showErrors={false}
+          <ReviewDetailRow
+            label="Contact"
+            title={contact.email?.trim() || null}
+            detail={contact.phone?.trim() || null}
+            placeholder={payWithWallet ? `From ${WALLET_NAMES[walletKind]}` : 'Add email and phone'}
+            onPress={() => setSheet('contact')}
+            testID="order-review-contact"
           />
 
-          <PaymentSection
-            path={payment.path}
-            savedCards={isSignedIn ? savedCards : []}
-            selectedCard={selectedCard}
-            onSelectCard={setSelectedCard}
-            onCardComplete={setCardComplete}
-            sellerCount={current.deliveryGroups.length}
-            bnplAvailable={Platform.OS === 'web' && quoteOffersBnpl(quote?.value)}
+          <ReviewDetailRow
+            label="Ship to"
+            title={shipLine ? shipName || null : null}
+            detail={shipLine}
+            placeholder={payWithWallet ? `Your ${WALLET_NAMES[walletKind]} address` : 'Add address'}
+            onPress={() => setSheet('address')}
+            testID="order-review-ship-to"
           />
 
+          <ReviewRow
+            label="Payment"
+            value={payWithWallet && walletKind !== 'express' ? <WalletMark kind={walletKind} /> : cardRowLabel}
+            // A new card's details live in Stripe's field, which must stay
+            // mounted while it's the chosen method: the list stays open then.
+            expanded={payOpen || (inApp && !payWithWallet && !savedCardInUse)}
+            onPress={() => setPayOpen(open => !open)}
+            testID="order-review-payment"
+          >
+            <PaymentSection
+              wallet={inApp && walletAvailable ? {
+                kind: walletKind,
+                selected: payMethod === 'wallet',
+                onSelect: () => setPayMethod('wallet'),
+                onSelectCard: () => setPayMethod('card'),
+              } : null}
+              path={payment.path}
+              savedCards={isSignedIn ? savedCards : []}
+              selectedCard={selectedCard}
+              onSelectCard={setSelectedCard}
+              onCardComplete={setCardComplete}
+              sellerCount={current.deliveryGroups.length}
+              bnplAvailable={Platform.OS === 'web' && quoteOffersBnpl(quote?.value)}
+            />
+          </ReviewRow>
+
+          <ReviewRow
+            label="Promo code"
+            value={current.discounts.map(d => d.code).join(', ')}
+            expanded={promoOpen}
+            onPress={() => setPromoOpen(open => !open)}
+            testID="order-review-promo"
+          >
           {/* Multi-store: each store's code is its own section and only discounts that store's items. */}
           {multiSeller && current.deliveryGroups.map(group => (
             <PromoCodeSection
@@ -1113,22 +1163,31 @@ export default function BuyerCheckoutScreen() {
               )
             }
           />}
+          </ReviewRow>
 
           {/* Store gift cards: in-app, signed-in orders. Each card pays only its own store's items. */}
           {inApp && isSignedIn && !previewOnly ? (
-            <GiftCardSection
-              groups={current.deliveryGroups.map(group => ({ sellerId: group.sellerId, sellerName: group.sellerName }))}
-              applied={current.giftCards ?? {}}
-              coveredCents={Object.fromEntries((activeQuote?.groups ?? []).map(group => [group.sellerId, group.giftCardCents ?? 0]))}
-              onApply={(sellerId, card) => void persist({
-                ...current, giftCards: { ...(current.giftCards ?? {}), [sellerId]: card }, idempotencyKey: `ck_${randomUUID()}`,
-              })}
-              onRemove={sellerId => {
-                const next = { ...(current.giftCards ?? {}) };
-                delete next[sellerId];
-                void persist({ ...current, giftCards: next, idempotencyKey: `ck_${randomUUID()}` });
-              }}
-            />
+            <ReviewRow
+              label="Gift card"
+              value={Object.keys(current.giftCards ?? {}).length > 0 ? 'Applied' : ''}
+              expanded={giftOpen}
+              onPress={() => setGiftOpen(open => !open)}
+              testID="order-review-gift-card"
+            >
+              <GiftCardSection
+                groups={current.deliveryGroups.map(group => ({ sellerId: group.sellerId, sellerName: group.sellerName }))}
+                applied={current.giftCards ?? {}}
+                coveredCents={Object.fromEntries((activeQuote?.groups ?? []).map(group => [group.sellerId, group.giftCardCents ?? 0]))}
+                onApply={(sellerId, card) => void persist({
+                  ...current, giftCards: { ...(current.giftCards ?? {}), [sellerId]: card }, idempotencyKey: `ck_${randomUUID()}`,
+                })}
+                onRemove={sellerId => {
+                  const next = { ...(current.giftCards ?? {}) };
+                  delete next[sellerId];
+                  void persist({ ...current, giftCards: next, idempotencyKey: `ck_${randomUUID()}` });
+                }}
+              />
+            </ReviewRow>
           ) : null}
 
           {/* Thread Cash (item 109): hidden while the flag is off, for guests
@@ -1165,54 +1224,81 @@ export default function BuyerCheckoutScreen() {
             </CheckoutSection>
           )}
 
-          <OrderSummarySection
-            session={current}
+          <ReviewTotals
             totals={totals}
             itemCount={itemCount}
             taxNote={taxNote}
-            quotedGroups={inApp ? activeQuote?.groups : undefined}
             giftCardCents={quoted?.giftCardCents ?? 0}
           />
-
-          {/* Purchase protection trust row — the app's existing copy (Terms-sourced). */}
-          <BuyerProtectionNote
-            flat
-            style={styles.trust}
-            preorder={current.deliveryGroups.some(group => group.items.some(item => item.isPreOrder))}
-          />
         </ScrollView>
+
+        {/* Contact and Ship to open as sheets over the page (Shop). */}
+        <CheckoutSheet visible={sheet === 'contact'} title="Contact" onClose={() => setSheet(null)} testID="checkout-contact-sheet">
+          <ContactSection contact={contact} onChange={setContact} showErrors={false} bare />
+        </CheckoutSheet>
+        <CheckoutSheet visible={sheet === 'address'} title="Shipping address" onClose={() => setSheet(null)} testID="checkout-address-sheet">
+          <ShippingSection
+            address={address}
+            onChange={setAddress}
+            savedAddresses={isSignedIn ? savedAddresses : []}
+            onSelectSaved={saved => { handleSelectAddress(saved); setSheet(null); }}
+            canSaveAddresses={!!isSignedIn}
+            showErrors={false}
+            bare
+          />
+        </CheckoutSheet>
 
         {/* Sticky footer: one primary action carrying the live total, what's
             still missing (while disabled), and the terms line. */}
         <StickyFooter style={{ paddingBottom: footerBottomPad, paddingTop: SP.sm + 4, backgroundColor: ck.bg, borderTopColor: ck.divider }}>
           <View onLayout={event => setFooterHeight(event.nativeEvent.layout.height + footerBottomPad + SP.sm + 4)} testID="checkout-footer">
-            {!ready && nextStep ? (
+            {!payWithWallet && !ready && nextStep ? (
               <View style={styles.hintRow} testID="checkout-next-step">
                 <Feather name="info" size={13} color={ck.muted} />
                 <Text style={styles.hint}>{nextStep}</Text>
               </View>
             ) : null}
-            <Button
-              label={ctaLabel}
-              icon="lock"
-              loading={placing}
-              disabled={!ready}
-              fullWidth
-              onPress={onCta}
-              accessibilityHint={ready ? (inApp ? 'Pays now with the card you chose' : 'Opens Stripe secure checkout') : nextStep ?? undefined}
-              testID="checkout-place-order"
-            />
+            {/* GOAT: one full-width white "Buy with  Pay" when the wallet
+                pays; otherwise the card / hosted Pay button. The wallet
+                button stays mounted (hidden) so it can report availability. */}
+            {payWithWallet ? (
+              // Apple's own button can't carry an amount, so the Total that
+              // the sheet will charge sits right above it.
+              <View style={styles.walletTotal} testID="checkout-wallet-total">
+                <Text style={styles.walletTotalLabel}>Total</Text>
+                <Text style={styles.walletTotalValue}>{formatCents(totals.totalCents)}</Text>
+              </View>
+            ) : null}
+            {inApp ? (
+              <View style={payWithWallet ? undefined : styles.hidden}>
+                <ExpressPay
+                  amountCents={totals.totalCents}
+                  subtotalCents={totals.subtotalCents}
+                  shippingCents={totals.shippingCents}
+                  quote={expressQuote}
+                  createIntent={expressCreateIntent}
+                  onOutcome={expressOutcome}
+                  onAvailability={setWalletAvailable}
+                  disabled={placing || !cardReadyForWallet(current)}
+                />
+              </View>
+            ) : null}
+            {!payWithWallet ? (
+              <Button
+                label={ctaLabel}
+                loading={placing}
+                disabled={!ready}
+                fullWidth
+                onPress={onCta}
+                accessibilityHint={ready ? (inApp ? 'Pays now with the card you chose' : 'Opens Stripe secure checkout') : nextStep ?? undefined}
+                testID="checkout-place-order"
+              />
+            ) : null}
             <View style={{ marginTop: SP.sm + 2 }}>
-              <CheckoutTermsLine />
+              <ReviewLegal preorder={current.deliveryGroups.some(group => group.items.some(item => item.isPreOrder))} />
             </View>
           </View>
         </StickyFooter>
-        <FirstRunTip
-          id="buyer-checkout"
-          variant="anchored"
-          contentReady={!loading}
-          anchored={{ steps: BUYER_CHECKOUT_STEPS }}
-        />
       </KeyboardAvoidingView>
   );
   // Stripe (and Stripe.js on web) is only loaded when this order pays in the app.
@@ -1257,5 +1343,9 @@ function makeStyles(ck: CheckoutColors) {
     trust: { paddingVertical: SP.md, paddingHorizontal: 0, borderTopWidth: 1, borderTopColor: ck.divider },
     hintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: SP.sm },
     hint: { fontFamily: FONT.medium, fontSize: FS.sm, color: ck.muted },
+    hidden: { display: 'none' },
+    walletTotal: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SP.sm },
+    walletTotalLabel: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
+    walletTotalValue: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text, fontVariant: ['tabular-nums'] },
   });
 }

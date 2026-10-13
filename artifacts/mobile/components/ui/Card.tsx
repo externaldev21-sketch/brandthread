@@ -31,8 +31,7 @@ export function Card({ children, onPress, elevated = false, style, testID, acces
   const baseStyle: ViewStyle = {
     backgroundColor: elevated ? palette.elevated : palette.card,
     borderRadius: RADII.card,
-    borderWidth: 1,
-    borderColor: palette.border,
+    // No border: surfaces sit on black (BRANDTHREAD_DESIGN.md, "Surfaces").
     padding: SPACING.md,
   };
 

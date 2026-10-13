@@ -28,11 +28,13 @@ describe('buyer protection shown wherever a buyer commits money', () => {
   });
 
   it('renders the same note on product detail, checkout, and order detail', () => {
-    for (const file of ['app/buyer-product-detail.tsx', 'app/buyer-checkout.tsx', 'app/buyer-order-detail.tsx']) {
+    for (const file of ['app/buyer-product-detail.tsx', 'app/buyer-order-detail.tsx']) {
       const source = read(file);
       expect(source, file).toContain("import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';");
       expect(source, file).toContain('<BuyerProtectionNote');
     }
+    // Checkout carries it in GOAT's legal line (Buyer Protection Policy link + the delivery guarantee).
+    expect(read('components/checkout/OrderReview.tsx')).toContain('Buyer Protection Policy');
   });
 });
 

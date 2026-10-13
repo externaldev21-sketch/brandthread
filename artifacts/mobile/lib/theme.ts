@@ -1,3 +1,5 @@
+import type { TextStyle } from 'react-native';
+
 /**
  * Brandthread Global Design System
  *
@@ -20,19 +22,30 @@ export const SURFACE       = '#000000';
 export const CARD          = '#000000';
 export const CARD_ELEVATED = '#000000';
 export const OVERLAY       = 'rgba(0,0,0,0.72)'; // modal overlay
-export const SURFACE_GLASS = 'rgba(0, 0, 0, 0.72)';
-export const CARD_GLASS    = 'rgba(0, 0, 0, 0.58)';
-export const CARD_ELEVATED_GLASS = 'rgba(0, 0, 0, 0.72)';
+// The "glass" names are kept for existing imports; every one is plain opaque
+// black now (BRANDTHREAD_DESIGN.md, "Surfaces"): content sits on black.
+export const SURFACE_GLASS = '#000000';
+export const CARD_GLASS    = '#000000';
+export const CARD_ELEVATED_GLASS = '#000000';
 export const SKELETON_GLASS = 'rgba(192,192,192,0.10)'; // translucent shimmer
-export const SELLER_DASHBOARD_GLASS = 'rgba(0, 0, 0, 0.54)'; // black dashboard panels, silver-bordered
-export const SELLER_DASHBOARD_GLASS_ELEVATED = 'rgba(0, 0, 0, 0.68)'; // black elevated dashboard panels, silver-bordered
+export const SELLER_DASHBOARD_GLASS = '#000000'; // plain black, no border
+export const SELLER_DASHBOARD_GLASS_ELEVATED = '#000000'; // plain black, no border
+/**
+ * The one elevated near-black (Dev's addendum to BRANDTHREAD_DESIGN.md):
+ * text inputs and bottom sheets only. Solid and opaque, never glass.
+ */
+export const FILL_ELEVATED = '#1C1C1E';
 
 
 // ─── Borders ─────────────────────────────────────────────────────────────────
-// Surfaces are black fill + thin silver border, never a grey fill. Borders
-// stay translucent on purpose (they sit on top of varying card/image content).
-export const BORDER          = 'rgba(192,192,192,0.28)';
-export const BORDER_SUBTLE   = 'rgba(192,192,192,0.14)';
+// Borders belong only to text inputs, outline buttons, the selected state of
+// a chip/size option, and hairline dividers between list rows — never to a
+// card or surface (BRANDTHREAD_DESIGN.md, "Surfaces"). Hairlines are white
+// at 12–15%. CARD_BORDER is what card/surface components draw: nothing.
+export const HAIRLINE        = 'rgba(255,255,255,0.14)';
+export const BORDER          = HAIRLINE;
+export const BORDER_SUBTLE   = 'rgba(255,255,255,0.08)';
+export const CARD_BORDER     = 'transparent';
 export const BORDER_ACTIVE   = '#FFFFFF';
 export const BORDER_FOCUS    = '#FFFFFF';
 // Translucent washes for the handful of non-text call sites (dot/timeline
@@ -53,7 +66,7 @@ export const SUBTLE_WASH = 'rgba(192,192,192,0.28)';
 export const FG      = '#FFFFFF';
 export const TEXT_PRIMARY   = FG;
 export const TEXT_SECONDARY = '#C0C0C0';
-export const TEXT_TERTIARY  = '#B0B0B0';
+export const TEXT_TERTIARY  = '#8E8E93'; // tertiary / disabled
 export const MUTED   = TEXT_SECONDARY;
 export const SUBTLE  = TEXT_TERTIARY;
 /**
@@ -96,7 +109,6 @@ export const CYAN_DIM      = ACCENT_DIM;
 // ─── Semantic Colors ──────────────────────────────────────────────────────────
 export const SUCCESS        = '#10B981';   // completion, available, shipped
 export const SUCCESS_DIM    = 'rgba(16,185,129,0.15)';
-export const GREEN_BRIGHT   = '#39FF88';   // revenue highlight ONLY (not UI chrome)
 /** @deprecated Use ACCENT. Kept for compatibility; info chrome is grayscale. */
 export const BLUE           = ACCENT;
 /** @deprecated Use ACCENT_DIM. Kept for compatibility; info chrome is grayscale. */
@@ -112,20 +124,44 @@ export const GRAD_PRIMARY   = [ACCENT, ACCENT] as const;
 export const GRAD_HERO      = ['#000000', '#000000'] as const;
 export const GRAD_CARD_GLOW = ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.01)'] as const;
 export const GRAD_SUCCESS_G = ['#10B981', '#34D399'] as const;
-export const GRAD_REVENUE   = ['#39FF88', '#10B981'] as const;
 export const GRAD_DARK_FADE = ['rgba(0,0,0,0)', 'rgba(0,0,0,1)'] as const;
 export const GRAD_TAB_BAR   = ['rgba(0,0,0,0.96)', 'rgba(0,0,0,1)'] as const;
 
 // ─── Typography ───────────────────────────────────────────────────────────────
+// The platform system font (SF Pro / Roboto / OS UI font on web); no font
+// files are loaded. Each FONT value is a weight token: `fontFamily: FONT.bold`
+// renders as the system font at 700. lib/systemFont.ts does the mapping
+// inside every Text/TextInput, so existing styles need no fontWeight.
 export const FONT = {
-  thin:     'Inter_400Regular'  as const,
-  light:    'Inter_400Regular'  as const,
-  regular:  'Inter_400Regular'  as const,
-  medium:   'Inter_500Medium'   as const,
-  semibold: 'Inter_600SemiBold' as const,
-  bold:     'Inter_700Bold'     as const,
-  extrabold:'Inter_700Bold'     as const,
+  thin:     'system-400' as const,
+  light:    'system-400' as const,
+  regular:  'system-400' as const,
+  medium:   'system-500' as const,
+  semibold: 'system-600' as const,
+  bold:     'system-700' as const,
+  extrabold:'system-700' as const,
 } as const;
+
+/** Prices, counts, money: digits that keep their width as they change. */
+export const TABULAR = { fontVariant: ['tabular-nums'] } as const satisfies TextStyle;
+
+/**
+ * The iOS type scale (BRANDTHREAD_DESIGN.md). Use these roles for all new
+ * and restyled text; hierarchy comes from size and weight, never from
+ * letter-spacing or caps. `money` is body-size tabular figures.
+ */
+export const TEXT = {
+  largeTitle: { fontSize: 34, lineHeight: 41, fontFamily: FONT.bold },
+  title1:     { fontSize: 28, lineHeight: 34, fontFamily: FONT.bold },
+  title2:     { fontSize: 22, lineHeight: 28, fontFamily: FONT.bold },
+  headline:   { fontSize: 17, lineHeight: 22, fontFamily: FONT.semibold },
+  body:       { fontSize: 17, lineHeight: 22, fontFamily: FONT.regular },
+  callout:    { fontSize: 16, lineHeight: 21, fontFamily: FONT.regular },
+  subhead:    { fontSize: 15, lineHeight: 20, fontFamily: FONT.regular },
+  footnote:   { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular },
+  caption:    { fontSize: 12, lineHeight: 16, fontFamily: FONT.regular },
+  money:      { fontSize: 17, lineHeight: 22, fontFamily: FONT.semibold, ...TABULAR },
+} as const satisfies Record<string, TextStyle>;
 
 export const FS = {
   // 11 is the absolute floor — badges/chips only, never body copy. Any
@@ -250,8 +286,6 @@ export const WEB_SAFE_AREA_TOP = 47;
 // Heading / body type scale (paired with FS above). Use these role names
 // instead of picking raw FS.* sizes per screen.
 export const TYPE = {
-  // Large titles get a touch of negative tracking — big Inter Bold reads
-  // slightly loose otherwise; smaller roles keep the font's natural tracking.
   largeTitle: { fontSize: FS.h1, fontFamily: FONT.bold, lineHeight: 42, letterSpacing: -0.3 },
   title:      { fontSize: FS.h2, fontFamily: FONT.bold, lineHeight: 36, letterSpacing: -0.3 },
   heading:    { fontSize: FS.xl, fontFamily: FONT.semibold, lineHeight: 28 },

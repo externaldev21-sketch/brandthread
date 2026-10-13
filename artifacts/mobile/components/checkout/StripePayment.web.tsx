@@ -246,7 +246,7 @@ function ElementsExpressPay({ amountCents, shippingCents, quote, createIntent, o
     <View style={{ opacity: disabled ? 0.4 : 1 }} pointerEvents={disabled ? 'none' : 'auto'} testID="checkout-express-pay">
       <ExpressCheckoutElement
         options={{
-          buttonType: { applePay: 'buy', googlePay: 'buy' },
+          buttonType: { applePay: 'plain', googlePay: 'pay' },
           buttonTheme: { applePay: 'white', googlePay: 'white' },
           buttonHeight: 50,
           layout: { maxColumns: 1, maxRows: 2, overflow: 'never' },

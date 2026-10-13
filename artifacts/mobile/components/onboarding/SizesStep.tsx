@@ -14,6 +14,7 @@ import { SURVEY_SIZE_CATEGORIES, toggleSize, type OnboardingSurvey } from '@/lib
 import type { SizeCategory } from '@/lib/sizeRecommendation';
 import { PressableScale, Reveal, StepHeadline, StepSub } from './OnboardingUI';
 import { RADIUS, SPACE, TYPE } from './onboardingTokens';
+import { FONT } from '@/lib/theme';
 
 interface Props {
   sizes: OnboardingSurvey['sizes'];
@@ -65,7 +66,7 @@ export function SizesStep({ sizes, onChange }: Props) {
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   scroll: { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xxl },
   section: { marginTop: SPACE.lg },
-  sectionTitle: { ...TYPE.label, color: theme.text, fontFamily: 'Inter_600SemiBold', marginBottom: SPACE.sm },
+  sectionTitle: { ...TYPE.label, color: theme.text, fontFamily: FONT.semibold, marginBottom: SPACE.sm },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.xs },
   cell: { width: '31.5%' },
   chip: {
@@ -73,5 +74,5 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
   },
-  chipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
+  chipText: { fontSize: 15, fontFamily: FONT.medium, color: theme.muted },
 });

@@ -6,17 +6,22 @@
  *    selectable rows, then "Use a new address", which opens the form right
  *    here.
  *  - Everyone else gets the form directly:
- *      full name, street (the app's Google Places autocomplete), apt, city,
- *      state (picker), ZIP, country (picker).
+ *      full name, street (the app's Google Places autocomplete), apt,
+ *      ZIP + state, city, country. Typing a US ZIP fills City and State
+ *      (GET /api/geo/postal), so most buyers never open the State picker;
+ *      the State / Country pickers are bottom sheets with search and the
+ *      likely value first (components/checkout/RegionPickerSheet).
  *  - "Save to my addresses" for signed-in buyers entering a new one.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { AddressAutocompleteInput } from '@/components/AddressAutocompleteInput';
 import { getCheckoutAddressErrors } from '@/lib/checkoutReadiness';
 import { recipientName } from '@/lib/checkoutPayment';
 import { COUNTRIES, US_STATES, normalizeUsState } from '@/lib/addressRegions';
+import { deviceCountry, suggestedRegion, usStateForZip } from '@/lib/regionPicker';
+import { useApi } from '@/hooks/useApi';
 import type { CheckoutAddress } from '@/services/cartTypes';
 import { FONT, FS, SP } from '@/lib/theme';
 import { CheckoutField, CheckoutSection, OptionRow, PickerField, useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
@@ -54,7 +59,7 @@ export function splitFullName(fullName: string): { firstName: string; lastName: 
 }
 
 export function ShippingSection({
-  address, onChange, savedAddresses, onSelectSaved, canSaveAddresses, showErrors,
+  address, onChange, savedAddresses, onSelectSaved, canSaveAddresses, showErrors, bare,
 }: {
   address: CheckoutAddressDraft;
   onChange: (next: CheckoutAddressDraft) => void;
@@ -62,6 +67,8 @@ export function ShippingSection({
   onSelectSaved: (address: SavedAddress) => void;
   canSaveAddresses: boolean;
   showErrors: boolean;
+  /** Inside a sheet that already says "Shipping address": no heading or divider. */
+  bare?: boolean;
 }) {
   const ck = useCheckoutColors();
   const styles = useMemo(() => makeStyles(ck), [ck]);
@@ -80,6 +87,40 @@ export function ShippingSection({
     if (incoming !== nameText.replace(/\s+/g, ' ').trim()) setNameText(incoming);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address.firstName, address.lastName]);
+
+  // ZIP → City and State. The ZIP decides the state (USPS); the city is
+  // filled when empty, when this autofill put it there, or when the state
+  // changed with the ZIP (a city typed for another state is stale).
+  const api = useApi();
+  const autofilled = useRef<{ city?: string; state?: string }>({});
+  const addressRef = useRef(address);
+  addressRef.current = address;
+  const zip5 = country === 'US' && /^\d{5}$/.test((address.postalCode ?? '').trim()) ? address.postalCode!.trim() : null;
+  useEffect(() => {
+    if (!zip5) return;
+    let active = true;
+    const timer = setTimeout(() => {
+      void api.buyer.addresses.lookupPostal(zip5)
+        .then(found => {
+          const latest = addressRef.current;
+          if (!active || !found || (latest.postalCode ?? '').trim() !== zip5) return;
+          const patch: CheckoutAddressDraft = {};
+          const city = (latest.city ?? '').trim();
+          const state = (latest.state ?? '').trim();
+          const stateChanged = !!state && normalizeUsState(state) !== found.state;
+          if (!city || city === autofilled.current.city || stateChanged) patch.city = found.city;
+          if (normalizeUsState(state) !== found.state) patch.state = found.state;
+          autofilled.current = { city: patch.city ?? autofilled.current.city, state: patch.state ?? autofilled.current.state };
+          if (patch.city !== undefined || patch.state !== undefined) onChange({ ...latest, ...patch, id: undefined });
+        })
+        .catch(() => {});
+    }, 250);
+    return () => { active = false; clearTimeout(timer); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zip5]);
+
+  const zipState = suggestedRegion(US_STATES, usStateForZip(address.postalCode));
+  const localeCountry = suggestedRegion(COUNTRIES, deviceCountry());
 
   const form = (
     <View style={hasSaved ? styles.formUnderRows : undefined} testID="checkout-address-form">
@@ -114,17 +155,20 @@ export function ShippingSection({
         style={{ marginTop: SP.sm }}
         testID="checkout-line2"
       />
-      <CheckoutField
-        label="City"
-        value={address.city ?? ''}
-        onChangeText={city => set({ city })}
-        error={errors.city}
-        showError={showErrors}
-        autoCapitalize="words"
-        textContentType="addressCity"
-        testID="checkout-city"
-      />
       <View style={styles.twoCol}>
+        <CheckoutField
+          label={country === 'US' ? 'ZIP code' : 'Postal code'}
+          value={address.postalCode ?? ''}
+          onChangeText={postalCode => set({ postalCode })}
+          error={errors.postalCode}
+          showError={showErrors}
+          autoCapitalize="characters"
+          keyboardType={country === 'US' ? 'number-pad' : 'default'}
+          autoComplete="postal-code"
+          textContentType="postalCode"
+          style={styles.col}
+          testID="checkout-zip"
+        />
         {country === 'US' ? (
           <PickerField
             label="State"
@@ -134,6 +178,8 @@ export function ShippingSection({
             error={errors.state}
             showError={showErrors}
             placeholder="Select"
+            suggested={zipState}
+            suggestedLabel="From your ZIP code"
             style={styles.col}
             testID="checkout-state"
           />
@@ -150,20 +196,17 @@ export function ShippingSection({
             testID="checkout-state"
           />
         )}
-        <CheckoutField
-          label={country === 'US' ? 'ZIP code' : 'Postal code'}
-          value={address.postalCode ?? ''}
-          onChangeText={postalCode => set({ postalCode })}
-          error={errors.postalCode}
-          showError={showErrors}
-          autoCapitalize="characters"
-          keyboardType={country === 'US' ? 'number-pad' : 'default'}
-          autoComplete="postal-code"
-          textContentType="postalCode"
-          style={styles.col}
-          testID="checkout-zip"
-        />
       </View>
+      <CheckoutField
+        label="City"
+        value={address.city ?? ''}
+        onChangeText={city => set({ city })}
+        error={errors.city}
+        showError={showErrors}
+        autoCapitalize="words"
+        textContentType="addressCity"
+        testID="checkout-city"
+      />
       <PickerField
         label="Country"
         value={country}
@@ -171,6 +214,8 @@ export function ShippingSection({
         onChange={next => set({ country: next, ...(next !== country ? { state: '' } : {}) })}
         error={errors.country}
         showError={showErrors}
+        suggested={localeCountry}
+        suggestedLabel="Your region"
         testID="checkout-country"
       />
       {canSaveAddresses ? (
@@ -190,7 +235,7 @@ export function ShippingSection({
   );
 
   return (
-    <CheckoutSection title="Shipping address" testID="checkout-shipping">
+    <CheckoutSection title={bare ? undefined : 'Shipping address'} first={bare} testID="checkout-shipping">
       {hasSaved ? (
         <View accessibilityRole="radiogroup">
           {savedAddresses.map(saved => (

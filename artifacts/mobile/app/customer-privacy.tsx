@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { Feather } from '@expo/vector-icons';
+import { FONT } from '@/lib/theme';
 
 /**
  * This screen used to show fabricated compliance status ("Brandthread
@@ -33,6 +34,6 @@ export default function CustomerPrivacyScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 40 },
-  title: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginTop: 8 },
-  body: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 18 },
+  title: { fontSize: 17, fontFamily: FONT.semibold, marginTop: 8 },
+  body: { fontSize: 13, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 18 },
 });

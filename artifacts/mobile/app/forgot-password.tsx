@@ -19,6 +19,7 @@ import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
+import { FONT } from '@/lib/theme';
 
 type Step = 'email' | 'code' | 'done';
 
@@ -242,7 +243,7 @@ export default function ForgotPasswordScreen() {
               >
                 <Text style={s.resendText}>
                   {"Didn't get it? "}
-                  <Text style={{ color: theme.accent, fontFamily: 'Inter_600SemiBold' }}>Resend code</Text>
+                  <Text style={{ color: theme.accent, fontFamily: FONT.semibold }}>Resend code</Text>
                 </Text>
               </TouchableOpacity>
             </>
@@ -340,27 +341,27 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   backBtn: { width: 40, height: 40, justifyContent: 'center', marginBottom: 20 },
 
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 36 },
-  logoText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: theme.text, letterSpacing: 2.5 },
+  logoText: { fontSize: 12, fontFamily: FONT.bold, color: theme.text, letterSpacing: 2.5 },
 
   headline: {
-    fontSize: 32, fontFamily: 'Inter_700Bold',
+    fontSize: 32, fontFamily: FONT.bold,
     color: theme.text, letterSpacing: -0.8, marginBottom: 8,
   },
   subtitle: {
-    fontSize: 15, fontFamily: 'Inter_400Regular',
+    fontSize: 15, fontFamily: FONT.regular,
     color: theme.muted, lineHeight: 22, marginBottom: 32,
   },
 
   fieldWrap: { marginBottom: 16 },
-  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.muted, marginBottom: 6 },
+  label:     { fontSize: 12, fontFamily: FONT.semibold, color: theme.muted, marginBottom: 6 },
   input: {
     backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border,
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
-    fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text,
+    fontSize: 15, fontFamily: FONT.regular, color: theme.text,
   },
   codeInput: {
     letterSpacing: 8, fontSize: 22, textAlign: 'center',
-    fontFamily: 'Inter_700Bold',
+    fontFamily: FONT.bold,
   },
   pwRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -368,7 +369,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   pwInput: { flex: 1, borderWidth: 0, backgroundColor: 'transparent' },
   eyeBtn:  { paddingHorizontal: 14 },
-  hint:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: theme.muted, marginTop: 4 },
+  hint:    { fontSize: 12, fontFamily: FONT.regular, color: theme.muted, marginTop: 4 },
 
   errorBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -376,20 +377,20 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     borderWidth: 1, borderColor: `${theme.error}40`,
     paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16,
   },
-  errorText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.error, flex: 1 },
+  errorText: { fontSize: 13, fontFamily: FONT.regular, color: theme.error, flex: 1 },
 
   primaryWrap: { marginBottom: 10 },
   primaryBtn:  { borderRadius: 14, paddingVertical: 17, alignItems: 'center' },
-  primaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: theme.onAccent },
+  primaryBtnText: { fontSize: 15, fontFamily: FONT.bold, color: theme.onAccent },
 
   secondaryBtn: {
     borderRadius: 14, paddingVertical: 16, alignItems: 'center',
     borderWidth: 1, borderColor: theme.border,
   },
-  secondaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: theme.text },
+  secondaryBtnText: { fontSize: 15, fontFamily: FONT.bold, color: theme.text },
 
   resendBtn:  { paddingVertical: 14, alignItems: 'center' },
-  resendText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: theme.muted },
+  resendText: { fontSize: 14, fontFamily: FONT.regular, color: theme.muted },
 
   // Success card
   successCard: {
@@ -406,11 +407,11 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     elevation: 12,
   },
   successTitle: {
-     fontSize: 26, fontFamily: 'Inter_700Bold', color: theme.text,
+     fontSize: 26, fontFamily: FONT.bold, color: theme.text,
     letterSpacing: -0.5, marginBottom: 8, textAlign: 'center',
   },
   successSub: {
-    fontSize: 14, fontFamily: 'Inter_400Regular',
+    fontSize: 14, fontFamily: FONT.regular,
      color: theme.muted, lineHeight: 21, textAlign: 'center',
   },
 
