@@ -123,10 +123,16 @@ function ReviewPhotoViewer({ photos, startIndex, onClose }: { photos: string[]; 
 }
 
 export function ProductReviewsSection({
-  productId, productName, seed,
+  productId, productName, seed, summaryLayout = 'stacked',
 }: {
   productId: string;
   productName?: string;
+  /**
+   * 'inline' — big average, stars and count on one row with the breakdown
+   * underneath (the buyer product page, Nike PDP reviews row). 'stacked'
+   * (default) keeps the Shop sheet's side-by-side average + breakdown.
+   */
+  summaryLayout?: 'stacked' | 'inline';
   /** Preview-mode: seeded data, skips the network call entirely. */
   seed?: ReviewsSeed;
 }) {
@@ -190,13 +196,21 @@ export function ProductReviewsSection({
         </TouchableOpacity>
       </View>
 
-      <View style={s.summaryRow}>
-        <View style={s.avgBlock}>
-          <Text style={s.avgNumber}>{data.avgRating.toFixed(1)}</Text>
-          <StarRating rating={data.avgRating} size={14} />
-          <Text style={s.countText}>{data.totalCount} review{data.totalCount !== 1 ? 's' : ''}</Text>
-        </View>
-        <View style={s.breakdownBlock}>
+      <View style={summaryLayout === 'inline' ? s.summaryStack : s.summaryRow}>
+        {summaryLayout === 'inline' ? (
+          <View style={s.avgInlineRow} testID="product-reviews-average-row">
+            <Text style={s.avgNumberLarge}>{data.avgRating.toFixed(1)}</Text>
+            <StarRating rating={data.avgRating} size={16} />
+            <Text style={s.countTextInline}>{data.totalCount} review{data.totalCount !== 1 ? 's' : ''}</Text>
+          </View>
+        ) : (
+          <View style={s.avgBlock}>
+            <Text style={s.avgNumber}>{data.avgRating.toFixed(1)}</Text>
+            <StarRating rating={data.avgRating} size={14} />
+            <Text style={s.countText}>{data.totalCount} review{data.totalCount !== 1 ? 's' : ''}</Text>
+          </View>
+        )}
+        <View style={summaryLayout === 'inline' ? s.breakdownBlockFull : s.breakdownBlock}>
           {breakdown.map(b => (
             <View key={b.star} style={s.breakdownRow}>
               <Text style={s.breakdownLabel}>{b.star}</Text>
@@ -304,6 +318,11 @@ const s = StyleSheet.create({
   avgNumber: { fontSize: FS.xxl, fontFamily: FONT.bold, color: FG },
   countText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
   breakdownBlock: { flex: 1, gap: 4 },
+  summaryStack: { gap: 12, marginBottom: 16 },
+  avgInlineRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avgNumberLarge: { fontSize: 34, lineHeight: 40, fontWeight: '700', color: FG },
+  countTextInline: { fontSize: 13, color: MUTED },
+  breakdownBlockFull: { gap: 4 },
   breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   breakdownLabel: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, width: 10 },
   breakdownTrack: { flex: 1, height: 4, borderRadius: 2, backgroundColor: CARD_ELEVATED, overflow: 'hidden' },
