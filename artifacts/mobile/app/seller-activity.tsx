@@ -11,6 +11,7 @@
  * the unread dot on the bell clears; rows keep their own dot for this visit.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePersistedChoice } from '@/hooks/usePersistedChoice';
 import { ActivityIndicator, Alert, ScrollView, SectionList, Text, View, type ViewToken } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
@@ -83,7 +84,7 @@ export default function SellerActivityScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [chip, setChip] = useState<SellerActivityChip>('all');
+  const [chip, setChip] = usePersistedChoice<SellerActivityChip>('seller-activity.chip', 'all', SELLER_ACTIVITY_CHIPS.map((c) => c.key));
 
   const requestId = useRef(0);
   const itemsRef = useRef<ActivityItem[]>([]);

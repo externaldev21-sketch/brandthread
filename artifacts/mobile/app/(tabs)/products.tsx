@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { usePersistedChoice } from '@/hooks/usePersistedChoice';
 import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, LayoutAnimation, UIManager, Platform } from 'react-native';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
@@ -371,6 +372,9 @@ function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
 
 type SortKey = 'name' | 'price_asc' | 'price_desc' | 'newest' | 'oldest' | 'sales';
 
+// Restored across launches when it's still one of these.
+const PRODUCT_FILTER_KEYS: ProductFilter[] = ['all', 'active', 'draft', 'scheduled', 'archived', 'pre-order', 'pre-made', 'low-stock', 'out-of-stock'];
+
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'newest', label: 'Newest first' },
   { key: 'oldest', label: 'Oldest first' },
@@ -446,7 +450,9 @@ export default function ProductsScreen() {
   const params = useLocalSearchParams<{ filter?: ProductFilter }>();
   const [products, setProducts] = useState<Product[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [filter, setFilter] = useState<ProductFilter>(params.filter ?? 'all');
+  const [filter, setFilter] = usePersistedChoice<ProductFilter>(
+    'seller-products.filter', params.filter ?? 'all', PRODUCT_FILTER_KEYS, { restore: !params.filter },
+  );
   const [sort, setSort] = useState<SortKey>('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [actionProduct, setActionProduct] = useState<Product | null>(null);
