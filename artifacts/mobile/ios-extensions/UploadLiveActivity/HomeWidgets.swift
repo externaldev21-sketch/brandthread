@@ -68,6 +68,17 @@ struct SellerTodayView: View {
     let entry: SellerTodayEntry
 
     var body: some View {
+        switch family {
+        case .accessoryRectangular, .accessoryInline:
+            SellerTodayAccessoryView(entry: entry, inline: family == .accessoryInline)
+                .widgetURL(SellerWidgetLinks.salesToday)
+                .widgetBackgroundBlack()
+        default:
+            homeScreen
+        }
+    }
+
+    @ViewBuilder private var homeScreen: some View {
         let isToday = entry.snapshot.map { Calendar.current.isDateInToday(Date(timeIntervalSince1970: $0.updatedAt)) } ?? false
         let sales = isToday ? (entry.snapshot?.salesCents ?? 0) : 0
         let orders = isToday ? (entry.snapshot?.ordersCount ?? 0) : 0
@@ -100,7 +111,7 @@ struct SellerTodayView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .widgetURL(URL(string: "brandthread://orders"))
+        .widgetURL(SellerWidgetLinks.salesToday)
         .widgetBackgroundBlack()
     }
 }
@@ -110,9 +121,131 @@ struct SellerTodayWidget: Widget {
         StaticConfiguration(kind: "SellerTodayWidget", provider: SellerTodayProvider()) { entry in
             SellerTodayView(entry: entry)
         }
-        .configurationDisplayName("Today's sales")
+        .configurationDisplayName("Sales today")
         .description("Sales and orders for your store today.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryInline])
+    }
+}
+
+// MARK: - Seller: lock screen + "To ship" (Shopify's iOS widgets)
+
+/// Where each seller widget opens. "Sales today" → Analytics (today's
+/// chart); "To ship" → Orders filtered to unfulfilled.
+enum SellerWidgetLinks {
+    static let salesToday = URL(string: "brandthread://analytics")
+    static let toShip = URL(string: "brandthread://orders?filter=unfulfilled")
+}
+
+/// Today's figures, or nil for a snapshot from an earlier day (sales and
+/// orders reset at midnight; the to-ship backlog doesn't).
+struct SellerFigures {
+    let sales: String?
+    let orders: Int?
+    let toShip: Int?
+
+    init(_ snapshot: SellerTodaySnapshot?) {
+        guard let snapshot else {
+            sales = nil; orders = nil; toShip = nil
+            return
+        }
+        let isToday = Calendar.current.isDateInToday(Date(timeIntervalSince1970: snapshot.updatedAt))
+        sales = formatMoney(isToday ? snapshot.salesCents : 0, snapshot.currency)
+        orders = isToday ? snapshot.ordersCount : 0
+        toShip = snapshot.toShipCount
+    }
+}
+
+private func countText(_ n: Int?) -> String { n.map(String.init) ?? "–" }
+
+struct SellerTodayAccessoryView: View {
+    let entry: SellerTodayEntry
+    let inline: Bool
+
+    var body: some View {
+        let f = SellerFigures(entry.snapshot)
+        if inline {
+            Text("\(f.sales ?? "–") · \(countText(f.orders)) \(f.orders == 1 ? "order" : "orders")")
+                .monospacedDigit()
+        } else {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Sales today").font(.system(size: 13, weight: .semibold)).widgetAccentable()
+                Text(f.sales ?? "–").font(.system(size: 20, weight: .bold)).monospacedDigit()
+                    .minimumScaleFactor(0.6).lineLimit(1)
+                Text("\(countText(f.orders)) \(f.orders == 1 ? "order" : "orders")")
+                    .font(.system(size: 13)).monospacedDigit()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+struct SellerToShipView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: SellerTodayEntry
+
+    var body: some View {
+        content
+            .widgetURL(SellerWidgetLinks.toShip)
+            .widgetBackgroundBlack()
+    }
+
+    @ViewBuilder private var content: some View {
+        let f = SellerFigures(entry.snapshot)
+        switch family {
+        case .accessoryCircular:
+            ZStack {
+                AccessoryWidgetBackground()
+                VStack(spacing: 0) {
+                    Text(countText(f.toShip)).font(.system(size: 20, weight: .bold)).monospacedDigit()
+                        .minimumScaleFactor(0.5).lineLimit(1)
+                    Text("to ship").font(.system(size: 10))
+                }
+            }
+        case .accessoryRectangular:
+            VStack(alignment: .leading, spacing: 1) {
+                Text("To ship").font(.system(size: 13, weight: .semibold)).widgetAccentable()
+                Text(countText(f.toShip)).font(.system(size: 20, weight: .bold)).monospacedDigit()
+                Text(f.toShip == 1 ? "order" : "orders").font(.system(size: 13))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        case .accessoryInline:
+            Text("\(countText(f.toShip)) to ship").monospacedDigit()
+        case .systemMedium:
+            HStack(alignment: .top, spacing: 0) {
+                figure(title: "To ship", value: countText(f.toShip), big: true)
+                figure(title: "Orders today", value: countText(f.orders), big: true)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        default:
+            figure(title: "To ship", value: countText(f.toShip), big: true)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private func figure(title: String, value: String, big: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.6))
+            Text(value)
+                .font(.system(size: big ? 40 : 17, weight: .bold))
+                .monospacedDigit()
+                .foregroundStyle(Color.white)
+                .minimumScaleFactor(0.5)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct SellerToShipWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "SellerToShipWidget", provider: SellerTodayProvider()) { entry in
+            SellerToShipView(entry: entry)
+        }
+        .configurationDisplayName("To ship")
+        .description("Orders waiting to ship.")
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }
 

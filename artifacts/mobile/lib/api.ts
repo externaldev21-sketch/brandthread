@@ -1952,6 +1952,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     analytics: {
       dashboard:  () => get(`/api/analytics/dashboard?tz=${-new Date().getTimezoneOffset()}`),
+      /** Seller widget numbers (iOS Home / Lock Screen); `{ enabled: false }` while the nativeSurfaces flag is off. */
+      widgetSummary: () =>
+        get<
+          | { enabled: false }
+          | { enabled: true; salesTodayCents: number; ordersToday: number; toShipCount: number; currency: string; asOf: string }
+        >(`/api/analytics/widget-summary?tz=${-new Date().getTimezoneOffset()}`),
       home: (range: 'live' | 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'all' | '7d' | '30d' | '90d') =>
         get<{
           range: string;

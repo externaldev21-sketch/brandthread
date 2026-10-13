@@ -146,6 +146,8 @@ export function endLiveStreamActivity(streamId: string, stats: LiveStats): void 
 
 // ─── Widgets ──────────────────────────────────────────────────────────────────
 
+/** Feeds both seller widgets ("Sales today" and "To ship"): one snapshot,
+ *  `*` reloads every widget kind. */
 export function updateSellerTodayWidget(snapshot: {
   salesCents: number; ordersCount: number; toShipCount: number; currency?: string;
 }): void {
@@ -154,7 +156,7 @@ export function updateSellerTodayWidget(snapshot: {
   quietly(() => native.setWidgetSnapshot(
     'sellerToday',
     JSON.stringify({ ...snapshot, updatedAt: Date.now() / 1000 }),
-    'SellerTodayWidget',
+    '*',
   ));
 }
 
@@ -168,11 +170,18 @@ export function updateBuyerCashWidget(snapshot: { balanceCents: number; streakDa
   ));
 }
 
+/** Seller widgets only (the flag was switched off, or a buyer session). */
+export function clearSellerWidgets(): void {
+  const native = getSystemModule();
+  if (!native) return;
+  quietly(() => native.clearWidgetSnapshot('sellerToday', '*'));
+}
+
 /** Sign-out / account switch: no one else's numbers stay on the Home Screen. */
 export function clearHomeWidgets(): void {
   const native = getSystemModule();
   if (!native) return;
-  quietly(() => native.clearWidgetSnapshot('sellerToday', 'SellerTodayWidget'));
+  quietly(() => native.clearWidgetSnapshot('sellerToday', '*'));
   quietly(() => native.clearWidgetSnapshot('buyerCash', 'BuyerCashWidget'));
 }
 
