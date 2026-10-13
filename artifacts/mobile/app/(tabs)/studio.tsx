@@ -91,10 +91,22 @@ const STANDARD_STUDIO_TOOLS: StudioTool[] = [
   },
 ];
 
+// Opens the composer with the "Behind the scenes" label already on.
+const BEHIND_THE_SCENES_TOOL: StudioTool = {
+  id: 'behind-the-scenes',
+  title: 'Behind the Scenes',
+  desc: 'Post studio moments with a Behind the scenes label.',
+  icon: 'film',
+  accent: '',
+  accentDim: '',
+  route: '/create-post?mode=thread&bts=1',
+};
+
 const STUDIO_TOOLS: StudioTool[] = [
   ...GROWTH_STUDIO_TOOL_CARDS.slice(0, 1),
   ...STANDARD_STUDIO_TOOLS,
   ...GROWTH_STUDIO_TOOL_CARDS.slice(1),
+  BEHIND_THE_SCENES_TOOL,
 ];
 
 const TEMPLATES = [
@@ -232,8 +244,9 @@ export default function StudioScreen() {
               !planError &&
               GROWTH_REQUIRED_TOOLS.has(tool.id) &&
               !hasPlan('growth');
-            const toolAccent = tool.id === 'ai-design' || tool.id === 'create-content' ? theme.accentLight : tool.accent;
-            const toolAccentDim = tool.id === 'ai-design' || tool.id === 'create-content' ? theme.accentDim : tool.accentDim;
+            const themed = tool.id === 'ai-design' || tool.id === 'create-content' || tool.id === BEHIND_THE_SCENES_TOOL.id;
+            const toolAccent = themed ? theme.accentLight : tool.accent;
+            const toolAccentDim = themed ? theme.accentDim : tool.accentDim;
             return (
               <TouchableOpacity
                 key={tool.id}

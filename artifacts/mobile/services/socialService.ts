@@ -26,6 +26,7 @@ import type {
 } from './socialTypes';
 import type { PostSlide } from './socialTypes';
 import { DEFAULT_PRIVACY_SETTINGS, DEFAULT_NOTIFICATION_PREFS } from './socialTypes';
+import { mapApiProductMentions, type PostProductMention } from '@/lib/captionMentions';
 
 // ─── Keys (scoped by user ID so two accounts never share storage) ─────────────
 
@@ -560,6 +561,10 @@ export interface SellerThreadPost {
   /** Paid promotion served in For You; must be rendered with a "Sponsored" label. */
   sponsored?:        boolean;
   sponsoredBoostId?: string;
+  /** Caption labels linked to the seller's products (GET reads carry `productMentions`). */
+  productMentions?:  PostProductMention[];
+  /** Post labels, e.g. 'bts' ("Behind the scenes"). */
+  labels?:           string[];
   visibility:        { isPublic?: boolean; allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
   scheduledAt:       string | null;
   publishedAt?:      string;
@@ -649,6 +654,8 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
       slideIndex: tag.slideIndex,
       timestamp: tag.timestamp,
     })),
+    productMentions: mapApiProductMentions(p.productMentions),
+    labels:          Array.isArray(p.labels) ? p.labels : [],
     visibility:      p.visibility ?? { allowComments: true, allowReposts: true, showLikeCount: true },
     scheduledAt:     p.scheduledAt ?? null,
     publishedAt:     p.publishedAt ?? (status === 'published' ? p.createdAt ?? now : undefined),
@@ -921,6 +928,8 @@ export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadP
       priceCents: typeof t.priceCents === 'number' ? t.priceCents : 0,
       imageUri: Array.isArray(t.images) ? t.images[0] : t.imageUri,
     })),
+    productMentions: mapApiProductMentions(p.productMentions),
+    labels:        Array.isArray(p.labels) ? p.labels : [],
     visibility:    p.visibility ?? { allowComments: true, allowReposts: true, showLikeCount: true },
     scheduledAt:   null,
     publishedAt:   p.createdAt ?? now,
