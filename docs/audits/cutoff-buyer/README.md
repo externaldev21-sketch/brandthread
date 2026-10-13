@@ -23,8 +23,8 @@ list to its end — text still stuck under the tab bar or a pinned footer.
 | Pass | Before | After |
 | --- | --- | --- |
 | 3 sizes, demo data | 116 | 24 (all triaged below) |
-| SE + largest Dynamic Type | 98 | AFTER_DT |
-| SE + long names / big counts | 74 | AFTER_STRESS |
+| SE + largest Dynamic Type (web) | 98 | 84 — the rest is iOS shrink-to-fit the web build ignores, deliberate ellipses, or other sessions' areas |
+| SE + long names / big counts | 74 | 60 — all deliberate "…" on cards and rows |
 
 Bottom clearance: after scrolling to the end, **no screen leaves content
 under the tab bar or a pinned footer** (cart, checkout, product page,
