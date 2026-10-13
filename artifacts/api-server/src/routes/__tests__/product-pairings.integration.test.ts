@@ -38,10 +38,12 @@ async function request(path: string, method = "GET", body?: unknown) {
   });
 }
 
-async function makeProduct(ownerId: string, opts: { status?: string; deleted?: boolean; stock?: number; price?: number; name?: string } = {}) {
+async function makeProduct(ownerId: string, opts: { status?: string; deleted?: boolean; stock?: number; price?: number; name?: string; category?: string; preOrder?: boolean } = {}) {
   const [p] = await db.insert(products).values({
     ownerId,
     name: opts.name ?? `P-${crypto.randomBytes(3).toString("hex")}`,
+    ...(opts.category ? { category: opts.category } : {}),
+    isPreOrder: opts.preOrder ?? false,
     status: opts.status ?? "active",
     deletedAt: opts.deleted ? new Date() : null,
     images: ["https://example.test/a.jpg"],
@@ -153,6 +155,7 @@ describe("product pairings", () => {
     expect(body.map((p) => p.name)).toEqual(["OK", "SoldOut"]);
     expect(body[0]).toMatchObject({ priceCents: 4200, available: true, image: "https://example.test/a.jpg" });
     expect(body[1].available).toBe(false);
+    expect(body.every((p) => p.source === "curated")).toBe(true);
     // The seller's management view still shows the hidden ones, flagged.
     auth.userId = seller;
     const mine = (await (await request(`/api/product-pairings/${main}`)).json()) as any;
@@ -178,5 +181,53 @@ describe("product pairings", () => {
     await request(`/api/product-pairings/${main}`, "PUT", { pairedProductIds: [a] });
     await db.delete(products).where(eq(products.id, a));
     expect(await db.select().from(productPairings).where(eq(productPairings.productId, main))).toHaveLength(0);
+  });
+
+  it("public endpoint fills with complementary same-seller products when nothing is curated", async () => {
+    const brand = `${prefix}-auto-${crypto.randomBytes(3).toString("hex")}`;
+    const tee = await makeProduct(brand, { name: "Box Tee" });
+    await makeProduct(brand, { name: "Heavy Hoodie" }); // same slot (top) → excluded
+    await makeProduct(brand, { name: "Loop Tee" }); // same slot → excluded
+    await makeProduct(brand, { name: "Wide Jeans" });
+    await makeProduct(brand, { name: "Sold Out Cargo Pants", stock: 0 }); // sold out → excluded
+    await makeProduct(brand, { name: "Pre-order Boots", stock: 0, preOrder: true }); // pre-order stays
+    await makeProduct(brand, { name: "Logo Cap", category: "accessories" });
+    await makeProduct(brand, { name: "Coach Jacket", status: "archived" }); // inactive → excluded
+    await makeProduct(brand, { name: "Deleted Shorts", deleted: true }); // deleted → excluded
+    await makeProduct(brand, { name: "Mystery piece" }); // unclassifiable → excluded
+    await makeProduct(`${brand}-other`, { name: "Other Brand Jeans" }); // other seller → excluded
+
+    const body = (await (await request(`/api/product-pairings/public/${tee}`)).json()) as any[];
+    expect(body.map((p) => p.name).sort()).toEqual(["Logo Cap", "Pre-order Boots", "Wide Jeans"]);
+    // Interleaved by outfit slot: bottom, (outerwear), footwear, accessory.
+    expect(body.map((p) => p.name)).toEqual(["Wide Jeans", "Pre-order Boots", "Logo Cap"]);
+    expect(body.every((p) => p.source === "auto" && p.available && p.sellerId === brand)).toBe(true);
+    expect(body[0]).toMatchObject({ priceCents: 5000, image: "https://example.test/a.jpg" });
+    expect(body[0].variants).toHaveLength(1);
+  });
+
+  it("curated pairings come first, auto items fill up to the cap without duplicates", async () => {
+    const brand = `${prefix}-mix-${crypto.randomBytes(3).toString("hex")}`;
+    const tee = await makeProduct(brand, { name: "Main Tee" });
+    const curatedJeans = await makeProduct(brand, { name: "Curated Jeans" });
+    const curatedHoodie = await makeProduct(brand, { name: "Curated Hoodie" }); // curated keeps the seller's choice
+    for (let i = 0; i < 10; i++) await makeProduct(brand, { name: `Track Pants ${i}` });
+    await db.insert(productPairings).values([
+      { productId: tee, pairedProductId: curatedJeans, position: 0 },
+      { productId: tee, pairedProductId: curatedHoodie, position: 1 },
+    ]);
+
+    const body = (await (await request(`/api/product-pairings/public/${tee}`)).json()) as any[];
+    expect(body).toHaveLength(8);
+    expect(body.slice(0, 2).map((p) => [p.name, p.source])).toEqual([["Curated Jeans", "curated"], ["Curated Hoodie", "curated"]]);
+    expect(body.slice(2).every((p) => p.source === "auto" && p.name.startsWith("Track Pants"))).toBe(true);
+    expect(new Set(body.map((p) => p.id)).size).toBe(8);
+  });
+
+  it("public endpoint stays empty when nothing complements the product", async () => {
+    const brand = `${prefix}-none-${crypto.randomBytes(3).toString("hex")}`;
+    const tee = await makeProduct(brand, { name: "Only Tee" });
+    await makeProduct(brand, { name: "Another Tee" });
+    expect(await (await request(`/api/product-pairings/public/${tee}`)).json()).toEqual([]);
   });
 });

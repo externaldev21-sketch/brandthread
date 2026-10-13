@@ -1,7 +1,9 @@
 /**
- * "Recently viewed" row — shared by Discover and the bag.
+ * "Recently viewed" row — shared by Discover, the bag and the product page.
  * Backed by GET /api/buyer/recently-viewed (real per-buyer view history,
  * recorded from buyer-product-detail.tsx on each product view).
+ * `excludeProductId` drops the product being viewed, so on a product page
+ * the row hides when that product is the only one in the history.
  */
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -23,7 +25,11 @@ interface RecentlyViewedItem {
   viewedAt: string;
 }
 
-export function RecentlyViewedRow({ style }: { style?: object }) {
+export function excludeRecentlyViewed<T extends { productId: string }>(items: T[], excludeProductId?: string | null): T[] {
+  return excludeProductId ? items.filter((item) => item.productId !== excludeProductId) : items;
+}
+
+export function RecentlyViewedRow({ style, excludeProductId }: { style?: object; excludeProductId?: string | null }) {
   const router = useRouter();
   const { theme } = useAppTheme();
   const api = useApi();
@@ -44,7 +50,8 @@ export function RecentlyViewedRow({ style }: { style?: object }) {
   // No skeleton/empty-state here by design — a "Recently viewed" section
   // simply isn't shown until there's real history, same as the pattern used
   // for the "Worn in these videos" row on product detail.
-  if (!loaded || items.length === 0) return null;
+  const visible = excludeRecentlyViewed(items, excludeProductId);
+  if (!loaded || visible.length === 0) return null;
 
   return (
     <View style={style}>
@@ -54,7 +61,7 @@ export function RecentlyViewedRow({ style }: { style?: object }) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ gap: SP.sm }}
       >
-        {items.map((item) => (
+        {visible.map((item) => (
           <TouchableOpacity
             key={item.productId}
             style={s.card}
