@@ -34,6 +34,7 @@ import {
   storedSizeChartSchema,
   toStoredSizeChart,
 } from "../lib/aiHelpers/sizeChart";
+import { PRODUCT_CATEGORIES, pickCategory } from "../lib/aiHelpers/categories";
 
 const router = Router();
 router.use(requireAuth);
@@ -173,6 +174,7 @@ const PRODUCT_SYSTEM = [
   "Return JSON: {\"title\": string, \"description\": string, \"bullets\": [3 to 6 strings]}.",
   "Only state what is visible in the photos or given in the data (colour, cut, graphics, details). Never invent materials, sizes, origin, certifications or prices.",
   "title: at most 80 characters. description: 2 to 4 sentences, at most 700 characters. bullets: at most 100 characters each.",
+  `Also return "category": exactly one of ${JSON.stringify(PRODUCT_CATEGORIES)} that best fits the item.`,
 ].join("\n");
 
 router.post("/product-description", requireAi, rateLimit("expensive"), async (req, res): Promise<void> => {
@@ -218,7 +220,9 @@ router.post("/product-description", requireAi, rateLimit("expensive"), async (re
       .slice(0, 6);
     if (!title || !description || bullets.length < 3) throw new AiProviderError("Incomplete description");
     if (![title, description, ...bullets].every(isPublicSafe)) throw new AiProviderError("Unsafe output");
-    res.json({ title, description, bullets });
+    // Only a category from the app's own list; anything else is dropped.
+    const category = pickCategory((out as { category?: unknown }).category);
+    res.json({ title, description, bullets, ...(category ? { category } : {}) });
   } catch (err) {
     handleFailure(req, res, err);
   }
