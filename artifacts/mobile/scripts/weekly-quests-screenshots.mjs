@@ -26,6 +26,7 @@ import {
 } from './store-screenshots/harness.mjs';
 import { collectTextFitIssues } from './textFitCheck.mjs';
 
+const WORK_DIR_DEBUG = path.join(MOBILE_ROOT, '.store-screenshots');
 const OUT = path.resolve(MOBILE_ROOT, '../../docs/pr-assets/weekly-quests');
 const BASELINE_BUILD = '/home/user/baseline-web-build';
 const AFTER_BUILD = path.join(MOBILE_ROOT, '.store-screenshots', 'web-build');
@@ -35,6 +36,7 @@ const DEVICES = [
   { tag: '393', viewport: { width: 393, height: 852 } },
 ];
 // DEMO_NOW is Fri 2026-09-18 16:30 America/Los_Angeles; the week ends Monday 00:00 PDT.
+const API_HOST = 'api.brandthread.test';
 const ENDS_AT = '2026-09-21T07:00:00.000Z';
 const WALLET_BALANCE = 4260;
 
@@ -57,7 +59,7 @@ function json(origin, body, status = 200) {
 
 async function routeFakeApi(context, origin, state) {
   const passOptions = (route) => route.request().method() === 'OPTIONS';
-  await context.route((url) => url.pathname.endsWith('/api/thread-cash'), (route) => {
+  await context.route((url) => url.hostname === API_HOST && url.pathname.endsWith('/thread-cash'), (route) => {
     if (passOptions(route)) return route.fallback();
     return route.fulfill(json(origin, {
       balanceCents: state.balanceCents,
@@ -65,7 +67,7 @@ async function routeFakeApi(context, origin, state) {
       streak: { currentStreak: 4, longestStreak: 11, lastCheckInDate: '2026-09-18', timezone: 'America/Los_Angeles', alreadyCheckedInToday: true, dayInCycle: 4, streakBonusDays: 7 },
     }));
   });
-  await context.route((url) => url.pathname.endsWith('/api/thread-cash/history'), (route) => {
+  await context.route((url) => url.hostname === API_HOST && url.pathname.endsWith('/thread-cash/history'), (route) => {
     if (passOptions(route)) return route.fallback();
     const history = [
       ...(state.claimed ? [{ id: 'wq', buyerId: 'buyer', amountCents: 50, source: 'weekly_quests', referenceId: '2026-W38', note: null, createdAt: '2026-09-18T23:31:00.000Z' }] : []),
@@ -74,11 +76,11 @@ async function routeFakeApi(context, origin, state) {
     ];
     return route.fulfill(json(origin, { history }));
   });
-  await context.route((url) => url.pathname.endsWith('/api/thread-cash/weekly-quests'), (route) => {
+  await context.route((url) => url.hostname === API_HOST && url.pathname.endsWith('/thread-cash/weekly-quests'), (route) => {
     if (passOptions(route)) return route.fallback();
     return route.fulfill(json(origin, weekly(state.progress, state.claimed, state.weekStreak)));
   });
-  await context.route((url) => url.pathname.endsWith('/api/thread-cash/weekly-quests/claim'), (route) => {
+  await context.route((url) => url.hostname === API_HOST && url.pathname.endsWith('/thread-cash/weekly-quests/claim'), (route) => {
     if (passOptions(route)) return route.fallback();
     state.claimed = true;
     state.weekStreak += 1;
@@ -90,28 +92,59 @@ async function routeFakeApi(context, origin, state) {
   });
 }
 
-async function open(browser, server, device, { signedIn, state }) {
+async function open(browser, server, device, opts) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await openOnce(browser, server, device, opts);
+    } catch (error) {
+      if (attempt >= 3) throw error;
+      console.log(`  retry open (${error.message.split('\n')[0]})`);
+    }
+  }
+}
+
+async function openOnce(browser, server, device, { signedIn, state }) {
   const { context, page, activity } = await openContext(browser, {
     device: { viewport: device.viewport, scale: 2, isMobile: true, userAgent: UA },
     role: 'buyer', origin: server.origin, images: {},
   });
   page.setDefaultNavigationTimeout(240_000);
   if (signedIn) await routeFakeApi(context, server.origin, state);
-  if (!signedIn) {
-    await openScreen(page, activity, server.origin, 'buyer', '/thread-cash', { extraQuery: '&demo=1' });
-  } else {
-    // Settle on "/" with the demo account, then leave preview mode: clear the
-    // remembered preview role and navigate without bt_preview, so the screen
-    // takes its real (signed-in) API path against the fake API.
-    await openScreen(page, activity, server.origin, 'buyer', '/(buyer)');
-    await page.waitForTimeout(800);
-    await page.evaluate(() => {
-      try { localStorage.removeItem('user_role'); sessionStorage.removeItem('bt_preview_role'); } catch {}
-      history.pushState(history.state, '', '/thread-cash');
-      window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
-    });
+  // Under CPU load the app's one-time navigation remount can land after the
+  // client-side push and put it back on "/"; push again until it sticks.
+  const push = (url, leavePreview) => page.evaluate(({ url, leavePreview }) => {
+    if (leavePreview) {
+      try { localStorage.removeItem('user_role'); } catch {}
+    }
+    history.pushState(history.state, '', url);
+    window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+  }, { url, leavePreview });
+  // Preview: the buyer dev preview with demo data (no API). Signed-in: settle
+  // with the demo account, then leave preview mode (drop the remembered role
+  // and the bt_preview flag) so the screen takes its real API path against
+  // the fake API.
+  const target = signedIn ? '/thread-cash' : '/thread-cash?bt_preview=buyer&demo=1';
+  await openScreen(page, activity, server.origin, 'buyer', signedIn ? '/(buyer)' : '/thread-cash', signedIn ? {} : { extraQuery: '&demo=1' });
+  try {
+    for (let i = 0; ; i++) {
+      try {
+        await page.getByText('Your balance').first().waitFor({ timeout: 8_000 });
+        break;
+      } catch (error) {
+        if (i >= 6) throw error;
+        await push(target, signedIn);
+      }
+    }
+    if (signedIn) {
+      // The first push from "/" can still be in preview mode; make sure it is the API-backed screen.
+      await page.getByTestId('weekly-quests-reward').waitFor({ timeout: 20_000 });
+    }
+  } catch (error) {
+    await page.screenshot({ path: path.join(WORK_DIR_DEBUG, `debug-${device.tag}-${signedIn ? 'api' : 'preview'}.png`) }).catch(() => {});
+    console.log('  url at failure:', page.url());
+    await context.close();
+    throw error;
   }
-  await page.getByText('Your balance').first().waitFor({ timeout: 30_000 });
   await waitForQuietNetwork(activity, 900, 20_000);
   await waitForImages(page);
   await page.waitForTimeout(1200);
@@ -150,7 +183,7 @@ async function run() {
         await page.getByText(/Longest streak/).first().scrollIntoViewIfNeeded();
         await page.evaluate(() => {
           const el = [...document.querySelectorAll('div')].find((d) => /^Longest streak/.test(d.textContent ?? '') && d.children.length === 0);
-          el?.scrollIntoView({ block: 'start' });
+          el?.scrollIntoView({ block: 'center' });
         });
         await page.waitForTimeout(500);
         issues += await shot(page, `before-${device.tag}.png`);
@@ -189,7 +222,11 @@ async function run() {
           await scrollTo(page, '[data-testid="weekly-quests"]');
           issues += await shot(page, `after-${device.tag}-3-claimed.png`);
           // Balance refreshed after the claim ($42.60 -> $43.10).
-          await page.evaluate(() => window.scrollTo(0, 0));
+          await page.getByText('Your balance').first().scrollIntoViewIfNeeded();
+          await page.evaluate(() => {
+            const el = [...document.querySelectorAll('div')].find((d) => d.textContent === 'Your balance' && d.children.length === 0);
+            el?.scrollIntoView({ block: 'center' });
+          });
           await page.waitForTimeout(400);
           issues += await shot(page, `after-${device.tag}-4-claimed-balance.png`);
           await context.close();
