@@ -1197,7 +1197,7 @@ export default function BoostScreen() {
           <View style={s.successIcon}>
             <Feather name="zap" size={32} color={FG} />
           </View>
-          <Text style={s.successTitle}>{b?.status === 'in_review' ? 'Boost in review' : 'Boost active!'}</Text>
+          <Text style={s.successTitle}>{b?.status === 'in_review' ? 'Boost in review' : 'Boost active'}</Text>
           <Text style={s.successSub}>
             {b?.status === 'in_review'
               ? "Your payment is confirmed. We'll review your boost before it goes live, and refund you in full if it isn't approved."

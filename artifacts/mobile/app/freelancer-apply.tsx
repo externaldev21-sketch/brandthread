@@ -83,7 +83,7 @@ export default function FreelancerApplyScreen() {
   const promptConnect = useCallback(
     (freelancerId: string) => {
       Alert.alert(
-        isEdit ? 'Profile updated' : 'Welcome to the community!',
+        isEdit ? 'Profile updated' : 'Welcome to the community',
         'Connect your bank account so you can get paid for jobs.',
         [
           {

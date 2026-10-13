@@ -92,7 +92,7 @@ export default function DesignExportScreen() {
     setExporting(true);
     try {
       await exportProject(project.id, 'png');
-      Alert.alert('Export complete!', 'File saved to your device.');
+      Alert.alert('Export complete', 'File saved to your device.');
     } catch {
       Alert.alert('Error', 'Export failed. Please try again.');
     } finally {

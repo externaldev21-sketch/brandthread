@@ -118,7 +118,7 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
       setMsgs([{
         id:      'welcome',
         role:    'assistant',
-        content: "Hi! I'm the Brandthread Support AI 👋\n\nI can answer questions about your orders, payouts, drops, live shopping, the Manufacturer Hub, and more — using your real account data.\n\nWhat can I help you with?",
+        content: "Hi, I'm the Brandthread Support AI.\n\nI can answer questions about your orders, payouts, drops, live shopping, the Manufacturer Hub, and more — using your real account data.\n\nWhat can I help you with?",
         ts:      Date.now(),
       }]);
     }
@@ -179,7 +179,7 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
       setEscalated(true);
       setMsgs(prev => [...prev, {
         id: uid(), role: 'assistant', ts: Date.now(),
-        content: "✅ I've flagged your case for our human support team. You'll receive a reply at your account email within 2 business hours.",
+        content: "I've flagged your case for our human support team. You'll receive a reply at your account email within 2 business hours.",
       }]);
     } catch {
       setMsgs(prev => [...prev, {
@@ -213,7 +213,7 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
             </View>
             <View>
               <Text style={s.headerTitle}>Brandthread Support</Text>
-              <Text style={s.headerSub}>AI-powered · Account-aware</Text>
+              <Text style={s.headerSub}>Automated replies</Text>
             </View>
           </View>
           <View style={s.headerActions}>

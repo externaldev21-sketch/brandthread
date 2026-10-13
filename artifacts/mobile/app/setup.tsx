@@ -223,7 +223,7 @@ export default function SetupScreen() {
           )}
           {allDone && (
             <Text style={[s.progressNext, { color: theme.text }]}>
-              ✓ All required steps complete — you're ready to go!
+              ✓ All required steps complete — you're ready to go
             </Text>
           )}
         </GradientCard>
@@ -239,7 +239,7 @@ export default function SetupScreen() {
                 <Feather name="check-circle" size={ICON.lg} color={theme.text} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[s.title, { fontSize: FS.md }]}>Your store is ready!</Text>
+                <Text style={[s.title, { fontSize: FS.md }]}>Your store is ready</Text>
                 <Text style={s.subtitle}>All required setup steps complete. Time to publish.</Text>
               </View>
             </View>

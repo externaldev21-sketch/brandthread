@@ -34,7 +34,7 @@ describe('reorder review state', () => {
     expect(reorderNeedsReview(outcome({ reducedQuantityTitles: ['Tee'] }))).toBe(true);
   });
   it('words reasons and price changes', () => {
-    expect(unavailableReasonLabel('out_of_stock')).toBe('Out of stock');
+    expect(unavailableReasonLabel('out_of_stock')).toBe('Sold out');
     expect(unavailableReasonLabel('discontinued')).toBe('No longer sold');
     expect(unavailableReasonLabel('variant_removed')).toMatch(/no longer offered/);
     expect(priceChangeNote({ previousPriceCents: 4000, currentPriceCents: 4500 })).toBe('Now $45.00 (was $40.00)');

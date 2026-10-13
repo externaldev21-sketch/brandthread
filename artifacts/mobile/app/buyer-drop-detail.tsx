@@ -187,7 +187,7 @@ function Countdown({
         <View style={styles.livePulse} />
         <View style={{ flex: 1 }}>
           <Text style={styles.liveTitle}>LIVE NOW</Text>
-          <Text style={styles.liveSub}>Limited release · while stock lasts</Text>
+          <Text style={styles.liveSub}>Limited drop · while stock lasts</Text>
         </View>
         <Feather name="zap" size={22} color={ON_DARK} />
       </View>
@@ -253,7 +253,7 @@ function ProductTile({
         activeOpacity={0.86}
         disabled={soldOut}
         accessibilityRole="button"
-        accessibilityLabel={locked ? 'Locked — unlocks at launch' : `${product.name}${soldOut ? ', sold out' : ''}`}
+        accessibilityLabel={locked ? 'Locked — unlocks at the drop' : `${product.name}${soldOut ? ', sold out' : ''}`}
       >
         <View style={styles.productMedia}>
           {imageUri ? (
@@ -595,7 +595,7 @@ export default function BuyerDropDetail() {
         <View style={styles.content}>
           <View style={styles.releaseMeta}>
             <View>
-              <Text style={styles.metaLabel}>RELEASE</Text>
+              <Text style={styles.metaLabel}>DROPS</Text>
               <Text style={styles.metaValue}>
                 {drop.releaseAt ? new Date(drop.releaseAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Available now'}
               </Text>

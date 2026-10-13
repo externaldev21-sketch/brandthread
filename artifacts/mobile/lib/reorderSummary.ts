@@ -57,7 +57,7 @@ export function summarizeReorder(outcome: Pick<ReorderOutcome, 'addedUnits' | 'u
 /** Sheet-row reason copy. */
 export function unavailableReasonLabel(reason: ReorderUnavailableReason): string {
   switch (reason) {
-    case 'out_of_stock': return 'Out of stock';
+    case 'out_of_stock': return 'Sold out';
     case 'discontinued': return 'No longer sold';
     case 'variant_removed': return 'This size or colour is no longer offered';
     default: return 'Unavailable';

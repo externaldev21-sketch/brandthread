@@ -94,7 +94,7 @@ export default function VacationModeScreen() {
           <View style={[s.statusIndicator, { backgroundColor: vacationMode ? ORANGE : SUCCESS }]} />
           <View style={{ flex: 1 }}>
             <Text style={s.statusTitle}>
-              {vacationMode ? '🏖  Currently Away' : '🟢  Store Open'}
+              {vacationMode ? 'Currently Away' : 'Store Open'}
             </Text>
             <Text style={s.statusSub}>
               {vacationMode

@@ -1196,7 +1196,7 @@ export default function BuyerProductDetailScreen() {
                   ? variant.inventoryQuantity <= 5
                     ? `Only ${variant.inventoryQuantity} left in stock`
                     : 'In stock'
-                  : 'Out of stock — select another option'
+                  : 'Sold out — select another option'
                 }
               </Text>
             </View>
@@ -1210,7 +1210,7 @@ export default function BuyerProductDetailScreen() {
               disabled={waitlistLoading || waitlistJoined}
               activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel={waitlistJoined ? "You're on the waitlist" : 'Notify me when back in stock'}
+              accessibilityLabel={waitlistJoined ? "You're on the waitlist" : 'Notify me when restocked'}
               accessibilityState={{ disabled: waitlistLoading || waitlistJoined, busy: waitlistLoading }}
             >
               {waitlistLoading ? (
@@ -1219,7 +1219,7 @@ export default function BuyerProductDetailScreen() {
                 <>
                   <Feather name={waitlistJoined ? 'check' : 'bell'} size={14} color={waitlistJoined ? SUCCESS : PURPLE_LIGHT} />
                   <Text style={[wl.text, waitlistJoined && { color: SUCCESS }]}>
-                    {waitlistJoined ? "You're on the waitlist" : 'Notify me when back in stock'}
+                    {waitlistJoined ? "You're on the waitlist" : 'Notify me when restocked'}
                   </Text>
                 </>
               )}
@@ -1446,7 +1446,7 @@ export default function BuyerProductDetailScreen() {
             onPress={handleAddToCart}
             loading={addingToCart}
             disabled={addingToCart || launching || (allSelected && !inStock)}
-            accessibilityLabel={!allSelected ? 'Add to cart. Select a size first' : !inStock ? 'Out of stock' : 'Add to cart'}
+            accessibilityLabel={!allSelected ? 'Add to cart. Select a size first' : !inStock ? 'Sold out' : 'Add to cart'}
             style={s.buyNowBtn}
             testID="product-add-to-cart"
           />
