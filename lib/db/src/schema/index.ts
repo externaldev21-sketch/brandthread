@@ -16,6 +16,7 @@ export * from './metaAds';
 export * from './communities';
 export * from './iapPromotions';
 export * from './sales';
+export * from './wholesale';
 export * from './sellerAnalytics';
 export * from './affiliate';
 export * from './liveCommerce';
