@@ -303,7 +303,8 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
     if (newQty > cap) {
       return { success: false, message: `You already have ${existing.quantity} in your cart. Can't add more.`, cart };
     }
-    cart.items[existingIdx] = { ...existing, quantity: newQty };
+    // Refresh the line's cap with the real stock we just read (it was a snapshot from the first add).
+    cart.items[existingIdx] = { ...existing, quantity: newQty, maxQuantity: variant.inventoryQuantity > 0 ? variant.inventoryQuantity : existing.maxQuantity };
   } else {
     const item: CartItem = {
       id: uid(),
@@ -572,7 +573,7 @@ export function calculateCartSummary(items: CartItem[], discountTotalCents = 0, 
  * Returns seller-configured rate details in dollars. It deliberately throws on
  * failure so checkout never labels an unavailable rate as free shipping.
  */
-async function fetchShippingRateDetails(
+export async function fetchShippingRateDetails(
   sellerId: string,
   subtotalCents: number,
 ): Promise<{ id: string; name: string; amountCents: number; processingDays: number | null }> {

@@ -57,6 +57,11 @@ import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_CART_STEPS } from '@/lib/firstRunTips/content';
+import { GroupShippingLine } from '@/components/cart/GroupShippingLine';
+import { StockLimitNote } from '@/components/cart/StockLimitNote';
+import { useBagShippingRates } from '@/hooks/useBagShippingRates';
+import { bagShippingTotal } from '@/lib/cart/bagShipping';
+import { knownStockLimit, stepperMax } from '@/lib/cart/quantityLimit';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -96,19 +101,27 @@ function QuantityControl({
   const { theme } = useAppTheme();
   const busy = pendingDec || pendingInc;
   const handleChange = useCallback((next: number) => (next > value ? onInc() : onDec()), [value, onInc, onDec]);
+  // + at the real stock limit: one warning haptic (in the stepper) + "Only N left".
+  const stockLimit = knownStockLimit(max);
+  const [limitNoteAt, setLimitNoteAt] = useState<number | null>(null);
+  const handleMaxReached = useCallback(() => setLimitNoteAt(value), [value]);
   return (
     <View style={{ opacity: busy ? 0.5 : 1, flexDirection: 'row', alignItems: 'center', gap: SP.xs }}>
       <QuantityStepper
         value={value}
         min={1}
-        max={Math.max(max, 1)}
+        max={stepperMax(max)}
         disabled={busy}
         onChange={handleChange}
         onRemoveAtMin={onRemove}
+        onMaxReached={stockLimit ? handleMaxReached : undefined}
         itemLabel={itemLabel}
         testID={testID}
       />
       {busy && <ActivityIndicator size="small" color={theme.text} style={{ marginLeft: 2 }} />}
+      {!busy && stockLimit !== null && limitNoteAt === value && (
+        <StockLimitNote max={stockLimit} testID={testID ? `${testID}-limit-note` : undefined} />
+      )}
     </View>
   );
 }
@@ -364,11 +377,13 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
 // ─── Seller Group ─────────────────────────────────────────────────────────────
 
 function SellerGroup({
-  group, first, pendingByItemId, selectedIds, checkingOut, checkoutDisabled, onCheckoutGroup, onToggleSelect, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
+  group, first, shippingCents, pendingByItemId, selectedIds, checkingOut, checkoutDisabled, onCheckoutGroup, onToggleSelect, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
 }: {
   group: CartSellerGroup;
   /** The first section has no hairline above it. */
   first: boolean;
+  /** This brand's shipping for its subtotal; undefined = unknown (no line). */
+  shippingCents?: number;
   pendingByItemId: Record<string, RowPendingAction>;
   selectedIds: Set<string>;
   /** This seller's own checkout is starting. */
@@ -453,6 +468,7 @@ function SellerGroup({
           </View>
         )}
         <Text style={sg.groupSubtotal}>Group subtotal: {fmtPrice(group.subtotalCents)}</Text>
+        <GroupShippingLine cents={shippingCents} sellerId={group.sellerId} />
         {/* The only per-line purchase path now: this seller's items, as one
             payment (a cart section = one checkout delivery group). */}
         <Button
@@ -741,8 +757,12 @@ export default function CartScreen() {
   }, [api, load, isSignedIn]));
 
   const groups = groupCartBySeller(cart.items);
+  // Per-brand shipping from the seller rates checkout uses; the summary only
+  // includes shipping once every brand's rate is known, so the lines add up.
+  const shippingRates = useBagShippingRates(groups);
+  const bagShipping = bagShippingTotal(groups, shippingRates);
   const hasPreOrder = cart.items.some(i => i.isPreOrder);
-  const summary = calculateCartSummary(cart.items);
+  const summary = calculateCartSummary(cart.items, 0, bagShipping ?? 0);
   const requestedPoints = Math.floor(Number(pointsInput));
   const maxRedeemablePoints = Math.min(
     loyaltyBalance,
@@ -775,7 +795,6 @@ export default function CartScreen() {
 
   async function handleQtyDec(itemId: string) {
     if (pendingByItemId[itemId]) return;
-    Haptics.selectionAsync();
     const item = cart.items.find(i => i.id === itemId);
     if (!item) return;
     const snapshot = cart;
@@ -796,7 +815,6 @@ export default function CartScreen() {
 
   async function handleQtyInc(itemId: string) {
     if (pendingByItemId[itemId]) return;
-    Haptics.selectionAsync();
     const item = cart.items.find(i => i.id === itemId);
     if (!item) return;
     setPending(itemId, 'qty_inc');
@@ -1124,6 +1142,7 @@ export default function CartScreen() {
                 key={group.sellerId}
                 group={group}
                 first={index === 0}
+                shippingCents={shippingRates[group.sellerId]}
                 pendingByItemId={pendingByItemId}
                 selectedIds={selectedIds}
                 checkingOut={checkingOutSellerId === group.sellerId}
