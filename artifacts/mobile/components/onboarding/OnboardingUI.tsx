@@ -452,7 +452,7 @@ export function HairlineDivider({ children }: { children?: React.ReactNode }) {
 
 const styles = StyleSheet.create({
   pill: {
-    minHeight: 56,
+    minHeight: 52,
     borderRadius: radius.md,
     paddingHorizontal: SPACE.lg,
     alignItems: 'center',

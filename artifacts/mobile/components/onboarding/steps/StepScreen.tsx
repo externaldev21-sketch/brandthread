@@ -156,8 +156,8 @@ const styles = StyleSheet.create({
   subtitle: { ...TEXT.subhead, marginTop: SPACING.sm },
   body: { marginTop: SPACING.lg },
   error: { ...TEXT.footnote, marginTop: SPACING.sm },
-  primary: { marginTop: SPACING.md },
-  secondary: { marginTop: SPACING.sm },
+  primary: { marginTop: SPACING.md, minHeight: 52 },
+  secondary: { marginTop: SPACING.sm, minHeight: 52 },
   pinned: { paddingTop: SPACING.xs },
   // The shared Button's disabled fill is the (now black) card color, which
   // disappears on a black screen; keep it visible as Instagram does.

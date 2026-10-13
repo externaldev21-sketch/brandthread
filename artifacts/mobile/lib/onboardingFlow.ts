@@ -45,6 +45,7 @@ export type StepId =
   | 'STYLE'
   | 'SIZES'
   | 'BRANDS'
+  | 'FEED_PREVIEW'
   // seller finish
   | 'BUILDING'
   | 'PLAN';
@@ -58,7 +59,7 @@ export const BUYER_STEPS: readonly StepId[] = [
   'WELCOME', 'ACCOUNT_TYPE',
   'EMAIL', 'CODE', 'PASSWORD', 'BIRTHDAY', 'TERMS',
   'NAME', 'USERNAME', 'PHOTO', 'WELCOME_USER',
-  'STYLE', 'SIZES', 'BRANDS',
+  'STYLE', 'SIZES', 'BRANDS', 'FEED_PREVIEW',
 ];
 
 export const SELLER_STEPS: readonly StepId[] = [

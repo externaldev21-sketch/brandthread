@@ -703,7 +703,7 @@ export default function SignInScreen() {
           </Text>
 
           {/* ── OAuth ─────────────────────────────────────────────────────────── */}
-          {/* Apple first — solid black button per Apple HIG, iOS only. Shown above
+          {/* Apple first — white button per Apple HIG (dark background), iOS only. Shown above
               Google per App Store guideline 4.8: Sign in with Apple must be at
               least as prominent as other third-party social login options. */}
           {showAppleOAuth && (
@@ -714,11 +714,11 @@ export default function SignInScreen() {
               disabled={!!oauthLoading || isFetching}
             >
               {oauthLoading === 'Apple' ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
+                <ActivityIndicator color="#000000" size="small" />
               ) : (
                 <>
-                  <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
-                  <Text style={[s.oauthText, { color: '#FFFFFF' }]}>Continue with Apple</Text>
+                  <Ionicons name="logo-apple" size={20} color="#000000" />
+                  <Text style={[s.oauthText, { color: '#000000' }]}>Continue with Apple</Text>
                 </>
               )}
             </PressableScale>
@@ -899,10 +899,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   oauthBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm,
     backgroundColor: theme.cardGlass, borderRadius: RADII.card, borderWidth: 1, borderColor: theme.border,
-    paddingVertical: 15, marginBottom: SPACING.xs,
+    height: 52, marginBottom: SPACING.xs,
   },
-  // Apple button: solid black per Apple Human Interface Guidelines
-  appleBtn: { backgroundColor: '#000000', borderColor: 'rgba(255,255,255,0.15)' },
+  // Apple button per the HIG on a dark background: white fill, black logo
+  // and label. Same 52pt height and full width as Google and email.
+  appleBtn: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
   oauthText: { fontSize: 15, fontFamily: FONT.semibold, color: theme.text },
 
   divider: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginVertical: SPACING.lg },

@@ -81,7 +81,7 @@ import { ApiError } from '@/lib/networkNotice';
 
 import { APPLE_OAUTH_STRATEGY, oauthProviderVisibility, isOAuthCancellationError, isOAuthFlowComplete, makeBrandthreadRedirectUri, mapOAuthError } from '@/lib/oauthFlow';
 
-import { allStepsFor, isAccountStep, firstStepAfterAccount, isStepId, nextStepId, prevStepId, progressFraction, DRAFT_VERSION, SELLER_QUESTION_STEPS, type AuthMethod, type Flow, type StepId } from '@/lib/onboardingFlow';
+import { allStepsFor, stepsFor, isAccountStep, firstStepAfterAccount, isStepId, nextStepId, prevStepId, progressFraction, DRAFT_VERSION, SELLER_QUESTION_STEPS, type AuthMethod, type Flow, type StepId } from '@/lib/onboardingFlow';
 
 import { PENDING_DRAFT_KEY, parseDraft, resolveResumeStep, sanitizeDraftForStorage, userDraftKey, type OnboardingDraft } from '@/lib/onboardingDraft';
 
@@ -92,6 +92,8 @@ import { Icon, Input } from '@/components/ui';
 import { WelcomeStep } from '@/components/onboarding/WelcomeStep';
 
 import { BrandsToFollowStep } from '@/components/onboarding/BrandsToFollowStep';
+import { InterestTileGrid } from '@/components/onboarding/InterestTileGrid';
+import { FeedPreviewStep } from '@/components/onboarding/FeedPreviewStep';
 
 import { SizesStep } from '@/components/onboarding/SizesStep';
 
@@ -1153,16 +1155,11 @@ export default function OnboardingScreen() {
             primary={{ label: 'Next', onPress: () => goNext('STYLE'), disabled: styleInterests.length === 0, testID: 'onboarding-style-next' }}
             secondary={{ label: 'Skip', onPress: () => goNext('STYLE'), testID: 'onboarding-style-skip' }}
           >
-            <View style={styles.chipGrid}>
-              {STYLE_INTERESTS.map((item) => (
-                <StyleChip
-                  key={item}
-                  label={item}
-                  selected={styleInterests.includes(item)}
-                  onPress={() => setStyleArr((prev) => prev.includes(item) ? prev.filter((v) => v !== item) : [...prev, item])}
-                />
-              ))}
-            </View>
+            <InterestTileGrid
+              interests={STYLE_INTERESTS}
+              selected={styleInterests}
+              onToggle={(item) => setStyleArr((prev) => prev.includes(item) ? prev.filter((v) => v !== item) : [...prev, item])}
+            />
           </StepScreen>
         );
 
@@ -1187,12 +1184,15 @@ export default function OnboardingScreen() {
             title="Try following 5+ brands"
             subtitle="Following isn't required, but it makes your feed yours from the start."
             pinActions
-            primary={{ label: 'Next', onPress: () => { void finishBuyer(); }, loading: finishing, disabled: survey.likedBrandIds.length === 0, testID: 'onboarding-brands-next' }}
-            secondary={{ label: 'Skip', onPress: () => { void finishBuyer(); }, disabled: finishing, testID: 'onboarding-brands-skip' }}
+            primary={{ label: 'Next', onPress: () => goNext('BRANDS'), disabled: survey.likedBrandIds.length === 0, testID: 'onboarding-brands-next' }}
+            secondary={{ label: 'Skip', onPress: () => goNext('BRANDS'), testID: 'onboarding-brands-skip' }}
           >
             <BrandsToFollowStep onLikedChange={setSurveyBrands} />
           </StepScreen>
         );
+
+      case 'FEED_PREVIEW':
+        return <FeedPreviewStep interests={styleInterests.length ? styleInterests : DEFAULT_BUYER_INTERESTS} onFinish={() => { void finishBuyer(); }} finishing={finishing} />;
 
       case 'BUILDING':
         return (
@@ -1244,7 +1244,11 @@ export default function OnboardingScreen() {
     return <View style={{ flex: 1, backgroundColor: theme.background }} accessible accessibilityLabel="Loading" />;
   }
 
-  const fullBleed = stepId === 'WELCOME';
+  const fullBleed = stepId === 'WELCOME' || stepId === 'FEED_PREVIEW';
+  const buyerProgressSteps: StepId[] = flow === 'buyer'
+    ? stepsFor('buyer', ctx).filter((id) => id !== 'WELCOME' && id !== 'FEED_PREVIEW')
+    : [];
+  const buyerProgressIndex = buyerProgressSteps.indexOf(stepId);
   const showBack = !fullBleed
     && stepId !== 'WELCOME_USER'
     && (stepId === 'ACCOUNT_TYPE' ? !isAddAccount && !accountReady : (!!flow && prevStepId(flow, stepId, ctx) !== null));
@@ -1271,6 +1275,19 @@ export default function OnboardingScreen() {
           ) : null}
         </View>
       )}
+      {buyerProgressIndex >= 0 ? (
+        <View
+          testID="onboarding-buyer-progress"
+          accessibilityRole="progressbar"
+          accessibilityLabel={`Step ${buyerProgressIndex + 1} of ${buyerProgressSteps.length}`}
+          accessibilityValue={{ min: 0, max: buyerProgressSteps.length, now: buyerProgressIndex + 1 }}
+          style={{ flexDirection: 'row', gap: 3, paddingHorizontal: SPACING.md, paddingTop: SPACING.xs }}
+        >
+          {buyerProgressSteps.map((id, index) => (
+            <View key={id} style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: index <= buyerProgressIndex ? theme.text : theme.border }} />
+          ))}
+        </View>
+      ) : null}
 
       <Animated.View
         style={[

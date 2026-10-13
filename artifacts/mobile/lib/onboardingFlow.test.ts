@@ -25,12 +25,12 @@ describe('step order', () => {
   it('buyer follows Instagram: email, code, password, birthday, terms, name, username, photo, welcome, then styles and brands', () => {
     expect(stepsFor('buyer', signedOutEmail)).toEqual([
       'WELCOME', 'ACCOUNT_TYPE', 'EMAIL', 'CODE', 'PASSWORD', 'BIRTHDAY', 'TERMS',
-      'NAME', 'USERNAME', 'PHOTO', 'WELCOME_USER', 'STYLE', 'SIZES', 'BRANDS',
+      'NAME', 'USERNAME', 'PHOTO', 'WELCOME_USER', 'STYLE', 'SIZES', 'BRANDS', 'FEED_PREVIEW',
     ]);
   });
 
-  it('buyer onboarding ends with picking styles and following brands', () => {
-    expect(BUYER_STEPS.slice(-3)).toEqual(['STYLE', 'SIZES', 'BRANDS']);
+  it('buyer onboarding ends with a real feed preview after picking styles and following brands', () => {
+    expect(BUYER_STEPS.slice(-4)).toEqual(['STYLE', 'SIZES', 'BRANDS', 'FEED_PREVIEW']);
   });
 
   it('seller follows Shopify: questions and location before the account, store preview, then plan', () => {
@@ -77,7 +77,8 @@ describe('navigation', () => {
     expect(prevStepId('buyer', 'BIRTHDAY', signedOutApple)).toBe('EMAIL');
     expect(nextStepId('seller', 'LOCATION', signedOutEmail)).toBe('EMAIL');
     expect(nextStepId('seller', 'LOCATION', signedIn)).toBe('NAME');
-    expect(nextStepId('buyer', 'BRANDS', signedIn)).toBeNull();
+    expect(nextStepId('buyer', 'BRANDS', signedIn)).toBe('FEED_PREVIEW');
+    expect(nextStepId('buyer', 'FEED_PREVIEW', signedIn)).toBeNull();
   });
 
   it('there is no way back into the account steps once the account exists', () => {

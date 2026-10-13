@@ -477,6 +477,28 @@ vi.mock('@/components/onboarding/BrandsToFollowStep', () => {
   return { BrandsToFollowStep: () => React.createElement('View', { testID: 'onboarding-brands-step' }) };
 });
 
+// This suite drives the real onboarding state machine, not image rendering.
+// Photo loading has its own tests; keep the new steps interactive here.
+vi.mock('@/components/onboarding/InterestTileGrid', () => {
+  const React = require('react') as typeof import('react');
+  return {
+    InterestTileGrid: ({ onToggle }: { onToggle: (interest: string) => void }) =>
+      React.createElement('TouchableOpacity', {
+        testID: 'onboarding-style-streetwear',
+        onPress: () => onToggle('Streetwear'),
+      }),
+  };
+});
+
+vi.mock('@/components/onboarding/FeedPreviewStep', () => {
+  const React = require('react') as typeof import('react');
+  return {
+    FeedPreviewStep: ({ onFinish }: { onFinish: () => void }) =>
+      React.createElement('View', { testID: 'onboarding-feed-preview' },
+        React.createElement('TouchableOpacity', { testID: 'onboarding-see-feed', onPress: onFinish })),
+  };
+});
+
 vi.mock('@/components/onboarding/ThreadLine', () => ({
   Glow: () => null,
   ThreadDraw: () => null,
@@ -593,7 +615,7 @@ describe('onboarding flow (buyer, Instagram order)', () => {
     renderer = undefined;
   });
 
-  it('one question per screen from email to brands, then lands on the thread explainer with the right API calls', async () => {
+  it('one question per screen through the feed preview, then lands on the thread explainer with the right API calls', async () => {
     renderer = await renderScreen();
     await tap(renderer, 'onboarding-welcome-get-started');
     await tap(renderer, 'onboarding-account-type-buyer');
@@ -618,6 +640,9 @@ describe('onboarding flow (buyer, Instagram order)', () => {
     await tap(renderer, 'onboarding-style-next');
     await tap(renderer, 'onboarding-sizes-skip');
     await tap(renderer, 'onboarding-brands-skip');
+    expect(has(renderer, 'onboarding-feed-preview')).toBe(true);
+    expect(routerReplaceMock).not.toHaveBeenCalledWith('/thread-explainer');
+    await tap(renderer, 'onboarding-see-feed');
 
     const names = apiCalls.map((c) => c.name);
     expect(names).toContain('ageGate.submit');

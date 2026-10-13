@@ -11,7 +11,7 @@ describe('onboarding visual structure', () => {
     const screen = read('components/onboarding/steps/StepScreen.tsx');
     expect(onboarding).toContain('<Icon name="chevron-left" size={24}');
     expect(onboarding).not.toContain('ThreadWeave');
-    expect(onboarding).not.toContain('StepDots');
+    expect(onboarding).toContain('onboarding-buyer-progress');
     expect(screen).toContain('title: { ...TEXT.title1 }');
     expect(screen).toContain("import { Button } from '@/components/ui';");
   });
@@ -73,7 +73,7 @@ describe('onboarding visual structure', () => {
 
   it('does not navigate backward from the Welcome opener, nor back into account steps', () => {
     const onboarding = read('app/onboarding.tsx');
-    expect(onboarding).toContain("const fullBleed = stepId === 'WELCOME';");
+    expect(onboarding).toContain("const fullBleed = stepId === 'WELCOME' || stepId === 'FEED_PREVIEW';");
     expect(read('lib/onboardingFlow.ts')).toContain('if (ctx.accountReady && current === firstStepAfterAccount(flow, ctx)) return null;');
   });
 

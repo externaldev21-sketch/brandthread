@@ -81,6 +81,7 @@ export function UsernameStep({ username, onChange, onNext, checking, takenError,
   takenError: string;
   loading?: boolean;
 }) {
+  const palette = useColors();
   const formatOk = USERNAME_PATTERN.test(username);
   const formatError = username.length > 0 && username.length < 3 ? 'Use at least 3 characters.' : '';
   const available = formatOk && !checking && !takenError;
@@ -105,6 +106,14 @@ export function UsernameStep({ username, onChange, onNext, checking, takenError,
         onSubmitEditing={() => { if (available) onNext(); }}
         right={checking && formatOk ? <ActivityIndicator size="small" /> : <AvailableCheck visible={available} />}
       />
+      {username.length > 0 ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.sm, marginTop: SPACING.xs }}>
+          <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: FONT.bold, fontSize: 22, color: palette.foreground }}>@{username}</Text>
+          <Text accessibilityLiveRegion="polite" style={{ color: palette.mutedForeground }}>
+            {checking ? 'Checking' : takenError ? 'Not available' : available ? 'Available' : 'Too short'}
+          </Text>
+        </View>
+      ) : null}
     </StepScreen>
   );
 }

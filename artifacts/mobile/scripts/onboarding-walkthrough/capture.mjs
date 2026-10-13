@@ -242,6 +242,12 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir, demo }) 
       await page.getByTestId(demo ? 'onboarding-brands-next' : 'onboarding-brands-skip').click();
     });
 
+    await report.step('feed preview finale', async () => {
+      await page.getByTestId('onboarding-feed-preview').waitFor({ timeout: 10_000 });
+      await shot('feed-finale');
+      await page.getByTestId('onboarding-see-feed').click();
+    });
+
     await report.step('lands on thread explainer', async () => {
       await page.getByText('Enter the Thread', { exact: false }).waitFor({ timeout: 20_000 });
       await shot('thread-explainer');
