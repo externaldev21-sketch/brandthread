@@ -32,6 +32,7 @@ import {
   updateFulfillmentChecklist, PackagePreset, getParcelSuggestion,
 } from '@/services/orderService';
 import { sharePackingSlip } from '@/lib/packingSlip';
+import { OrderGiftNote } from '@/components/orders/OrderGiftNote';
 import { radius } from '@/constants/radii';
 
 const LAST_PACKAGE_KEY = '@brandthread/fulfill-last-package:v1';
@@ -493,6 +494,7 @@ export default function FulfillOrderScreen() {
         {step === 1 && (
           <>
             <SectionHeader title={`Order #${order.orderNumber}`} action={{ label: 'Packing slip', onPress: handlePackingSlip }} />
+            <OrderGiftNote gift={order.gift} />
             {order.lineItems.map(li => (
               <TouchableOpacity key={li.id} onPress={() => toggleItem(li.id)} activeOpacity={0.8}>
                 <BrandthreadCard style={s.itemCard}>

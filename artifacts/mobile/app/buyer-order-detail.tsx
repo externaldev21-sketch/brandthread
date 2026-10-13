@@ -510,6 +510,7 @@ export function adaptOrderDetail(row: any): BuyerOrderView {
     isCustomerVisible: row.isCustomerVisible === true,
     delivery,
     createdAt:         row.createdAt ?? new Date().toISOString(),
+    gift: row.isGift ? { to: row.gift?.to ?? null, from: row.gift?.from ?? null, message: row.gift?.message ?? null } : null,
   };
 }
 
@@ -1123,6 +1124,14 @@ export default function BuyerOrderDetailScreen() {
           <Text style={styles.addressLine}>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zip}</Text>
           <Text style={styles.addressLine}>{order.shippingAddress.country}</Text>
         </SectionCard>
+
+        {order.gift ? (
+          <SectionCard title="Gift message">
+            {order.gift.to ? <Row label="To" value={order.gift.to} /> : null}
+            {order.gift.from ? <Row label="From" value={order.gift.from} /> : null}
+            {order.gift.message ? <Text style={styles.addressLine} testID="buyer-order-gift-message">{order.gift.message}</Text> : null}
+          </SectionCard>
+        ) : null}
 
         {/* ── 4. Payment / totals receipt ──────────────────────────────────── */}
         <SectionCard title="Payment Summary">

@@ -4,6 +4,7 @@
  */
 
 import { shareInvoice, invoiceFromSellerOrder } from '@/lib/invoice';
+import { OrderGiftNote } from '@/components/orders/OrderGiftNote';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -323,6 +324,11 @@ export function adaptApiOrder(raw: any): Order {
     updatedAt: raw.updatedAt ?? raw.createdAt,
     shopifyFulfillment: raw.shopifyFulfillment ?? null,
     sellerRisk: raw.risk ?? null,
+    gift: raw.isGift ? {
+      to: raw.gift?.to ?? raw.giftTo ?? null,
+      from: raw.gift?.from ?? raw.giftFrom ?? null,
+      message: raw.gift?.message ?? raw.giftMessage ?? null,
+    } : null,
   };
 }
 
@@ -1088,6 +1094,8 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
       </BrandthreadCard>
 
       <SellerDeliveryBanner order={order} shipped={order.status === 'shipped' || order.status === 'delivered'} />
+
+      <OrderGiftNote gift={order.gift} />
 
       {/* Fulfillment via Shopify — only shown for orders containing a Shopify-linked product */}
       {order.shopifyFulfillment && (

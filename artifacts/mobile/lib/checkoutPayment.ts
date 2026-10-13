@@ -81,6 +81,8 @@ export type CreatePaymentIntentBody = {
   shippingAddress: PaymentIntentAddress;
   clientIdempotencyKey: string;
   saveCard: boolean;
+  /** "Gift this": a gift receipt with prices hidden (lib/checkout/giftOptionStore.ts). */
+  gift?: { to?: string; from?: string; message?: string };
 };
 
 export type QuoteBody = {
@@ -125,6 +127,7 @@ export function buildCreatePaymentIntentBody(input: {
   address: Partial<CheckoutAddress>;
   idempotencyKey: string;
   saveCard: boolean;
+  gift?: CreatePaymentIntentBody['gift'];
 }): CreatePaymentIntentBody {
   const { address, contact } = input;
   return {
@@ -142,6 +145,7 @@ export function buildCreatePaymentIntentBody(input: {
     },
     clientIdempotencyKey: String(input.idempotencyKey),
     saveCard: input.saveCard === true,
+    ...(input.gift ? { gift: input.gift } : {}),
   };
 }
 

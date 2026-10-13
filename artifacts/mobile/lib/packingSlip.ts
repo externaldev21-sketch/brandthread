@@ -17,11 +17,14 @@ function escapeHtml(value: string): string {
 
 export function buildPackingSlipHtml(order: Order): string {
   const addr = order.customer.shippingAddress;
+  // "Gift this": the slip goes in the box as a gift receipt, so the recipient
+  // never sees a price (no Price column, no totals) and gets the gift note.
+  const gift = order.gift ?? null;
   const rows = order.lineItems.map(li => `
     <tr>
       <td>${escapeHtml(li.productName)}${li.variant ? ` — ${escapeHtml(li.variant)}` : ''}</td>
       <td style="text-align:center;">${li.quantity}</td>
-      <td style="text-align:right;">${formatCents(li.unitPriceCents)}</td>
+      ${gift ? '' : `<td style="text-align:right;">${formatCents(li.unitPriceCents)}</td>`}
     </tr>
   `).join('');
 
@@ -42,8 +45,9 @@ export function buildPackingSlipHtml(order: Order): string {
         </style>
       </head>
       <body>
-        <h1>${escapeHtml(order.sellerName ?? 'Packing Slip')}</h1>
-        <p class="muted">Order #${escapeHtml(order.orderNumber)}</p>
+        <h1>${gift ? 'Gift receipt' : escapeHtml(order.sellerName ?? 'Packing Slip')}</h1>
+        <p class="muted">${gift && order.sellerName ? `${escapeHtml(order.sellerName)} · ` : ''}Order #${escapeHtml(order.orderNumber)}</p>
+${gift ? giftNoteHtml(gift) : ''}
 
         <div class="section">
           <strong>Ship to</strong><br/>
@@ -55,7 +59,7 @@ export function buildPackingSlipHtml(order: Order): string {
 
         <table>
           <thead>
-            <tr><th>Item</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Price</th></tr>
+            <tr><th>Item</th><th style="text-align:center;">Qty</th>${gift ? '' : '<th style="text-align:right;">Price</th>'}</tr>
           </thead>
           <tbody>
             ${rows}
@@ -66,6 +70,15 @@ export function buildPackingSlipHtml(order: Order): string {
       </body>
     </html>
   `;
+}
+
+function giftNoteHtml(gift: NonNullable<Order['gift']>): string {
+  const lines = [
+    gift.to ? `<strong>To:</strong> ${escapeHtml(gift.to)}` : '',
+    gift.message ? `<span class="gift-message">${escapeHtml(gift.message).replace(/\n/g, '<br/>')}</span>` : '',
+    gift.from ? `<strong>From:</strong> ${escapeHtml(gift.from)}` : '',
+  ].filter(Boolean);
+  return lines.length ? `<div class="note gift">${lines.join('<br/>')}</div>` : '';
 }
 
 /** Render a packing slip to PDF and open the native share sheet. */

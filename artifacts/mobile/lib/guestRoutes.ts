@@ -16,6 +16,7 @@ const GUEST_BUYER_TABS = new Set(['', 'index', 'feed', 'discover', 'discover-fee
 const GUEST_TOP_LEVEL = new Set([
   'buyer-product-detail',
   'buyer-checkout', // guest checkout exists (api.guest.checkout)
+  'checkout-gift-message', // local to checkout; calls no API
   'buyer-search',
   'buyer-post-viewer',
   'buyer-post-comments', // read-only for guests; composer prompts sign-in
