@@ -59,6 +59,20 @@ router.get("/:orderId/parcel-suggestion", requireRole("staff"), async (req, res)
   res.json(suggestParcel(lines));
 });
 
+// Newest active outbound label with a printable file, for "Print label" on order detail.
+router.get("/:orderId/printable", requireRole("staff"), async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const [label] = await db.select({
+    id: shippingLabels.id, labelUrl: shippingLabels.labelUrl,
+    carrier: shippingLabels.carrier, trackingNumber: shippingLabels.trackingNumber,
+  }).from(shippingLabels).where(and(
+    eq(shippingLabels.orderId, req.params.orderId), eq(shippingLabels.ownerId, ownerId),
+    eq(shippingLabels.status, "active"), eq(shippingLabels.direction, "outbound"),
+    sql`${shippingLabels.labelUrl} is not null`,
+  )).orderBy(sql`${shippingLabels.createdAt} desc`).limit(1);
+  res.json({ label: label ?? null });
+});
+
 router.post("/:orderId/rates", requireRole("staff"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const parcelError = parcelInputError(req.body ?? {});

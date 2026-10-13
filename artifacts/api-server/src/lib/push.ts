@@ -30,6 +30,35 @@ export interface PushPayload {
   kind?: "transactional" | "promotional";
   /** The user asked for this exact push (e.g. a per-drop "notify me"). */
   explicitRequest?: boolean;
+  /** Deliver without any sound (overrides `sound`). */
+  silent?: boolean;
+}
+
+/** Bundled new-order sound (artifacts/mobile/assets/sounds, app.json expo-notifications). */
+export const NEW_ORDER_PUSH_SOUND = "order_received.wav";
+/** Android channel for new orders when the seller turned the sound off (app/_layout.tsx). */
+export const SILENT_ORDERS_CHANNEL_ID = "orders_silent";
+/** Seller preference key (users.notification_preferences) for the new-order sound. */
+export const NEW_ORDER_SOUND_PREF = "new_order_sound";
+
+/**
+ * Settings > Notifications > "New order sound": when a seller turns it off,
+ * new-order pushes are delivered silently and flagged so the app's
+ * foreground banner also skips its sound and haptic.
+ */
+export function applyNewOrderSoundPreference(
+  payload: PushPayload,
+  preferences: Record<string, unknown> | null | undefined,
+): PushPayload {
+  if (payload.data?.type !== "new_order_received") return payload;
+  if (preferences?.[NEW_ORDER_SOUND_PREF] !== false) return payload;
+  return {
+    ...payload,
+    silent: true,
+    sound: null,
+    channelId: SILENT_ORDERS_CHANNEL_ID,
+    data: { ...payload.data, silent: true },
+  };
 }
 
 export type NotificationEventType = "receipt" | "open" | "tap";
@@ -157,7 +186,7 @@ export function buildExpoPushMessages(
     title: payload.title,
     body: payload.body,
     data: payload.data ?? {},
-    sound: payload.sound ?? "default",
+    sound: payload.silent ? null : (payload.sound ?? "default"),
     badge: payload.badge,
     channelId: payload.channelId,
   }));
@@ -278,10 +307,10 @@ export async function sendPushToUser(
       typeof payload.data?.notificationId === "string" && payload.data.notificationId
         ? payload.data.notificationId
         : crypto.randomUUID();
-    const enrichedPayload: PushPayload = {
+    const enrichedPayload: PushPayload = applyNewOrderSoundPreference({
       ...payload,
       data: { ...(payload.data ?? {}), notificationId },
-    };
+    }, recipient?.preferences);
     // Stable notification IDs are also the delivery idempotency key. Never
     // include a token whose delivery is already sent: a second token failing
     // must not cause a successful device to receive the same push again.

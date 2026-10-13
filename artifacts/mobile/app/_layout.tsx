@@ -93,6 +93,7 @@ import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import NotificationBanner from '@/components/notifications/NotificationBanner';
 import { ActionSheetHost } from '@/components/ui/ActionSheet';
 import { showNotificationBanner } from '@/lib/notificationBannerBus';
+import { isNewOrderPush } from '@/lib/newOrderAlert';
 import { getNotifications as getFeedNotifications } from '@/services/socialService';
 import { syncNotificationBadge } from '@/lib/notificationBadge';
 import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
@@ -498,8 +499,9 @@ if (Platform.OS !== 'web') {
     // themed in-app banner (components/notifications/NotificationBanner)
     // takes over that job instead. Background/killed-app notifications are
     // unaffected: the OS always shows those regardless of this handler.
-    handleNotification: async () =>
-      ({ shouldShowAlert: false, shouldPlaySound: true, shouldSetBadge: true }) as any,
+    // New-order pushes: the banner plays the order sound itself (once).
+    handleNotification: async (notification: Notifications.Notification) =>
+      ({ shouldShowAlert: false, shouldPlaySound: !isNewOrderPush(notification.request.content.data), shouldSetBadge: true }) as any,
   });
 
   // ─── Android notification channels ──────────────────────────────────────────
@@ -517,6 +519,13 @@ if (Platform.OS !== 'web') {
       vibrationPattern: [0, 250, 250, 250],
       sound: 'order_received.wav',
       lightColor: '#F7F7FA',
+    });
+    // New orders while Settings > Notifications > New order sound is off.
+    Notifications.setNotificationChannelAsync('orders_silent', {
+      name:       'Orders (silent)',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound:      null,
+      enableVibrate: false,
     });
     Notifications.setNotificationChannelAsync('messages', {
       name:       'Messages',

@@ -61,7 +61,7 @@ import { processDisputeEvent } from "../lib/disputes/webhook";
 import { buildDisputeDeps } from "../lib/disputes/store";
 import { productThumbnail } from "../lib/activityEvents";
 import { notifyBuyerOrderCancelled, notifyBuyerOrderConfirmed } from "../lib/orderNotifications";
-import { sendPushToUser, stableNotificationId } from "../lib/push";
+import { NEW_ORDER_PUSH_SOUND, sendPushToUser, stableNotificationId } from "../lib/push";
 import { connectReadiness } from "./manufacturer-connect";
 import { recordPaidPhysicalOrder } from "../lib/sellerTaxLedger";
 import {
@@ -1303,7 +1303,7 @@ export async function handleCheckoutPaid(
             targetId: createdOrderId,
             targetType: "order",
             targetImageUrl: productThumbnail(firstItem?.images),
-            pushSound: "order-received.wav",
+            pushSound: NEW_ORDER_PUSH_SOUND,
             pushChannelId: "orders",
           });
           // The buyer's side of the same event (guest checkouts have no feed).

@@ -28,6 +28,7 @@ interface NotifRow {
 
 const SELLER_ROWS: NotifRow[] = [
   { key: 'new_orders',             icon: 'shopping-bag',   label: 'New orders',             description: 'A customer places an order' },
+  { key: 'new_order_sound',        icon: 'volume-2',       label: 'New order sound',        description: 'Sound and vibration for each new order' },
   { key: 'production_milestones',  icon: 'package',        label: 'Production milestones',  description: 'Sampling and production' },
   { key: 'payout_confirmations',   icon: 'credit-card',    label: 'Payout confirmations',   description: 'Payout sent or delayed' },
   { key: 'customer_messages',      icon: 'message-circle', label: 'Customer messages',      description: 'Messages from customers' },
