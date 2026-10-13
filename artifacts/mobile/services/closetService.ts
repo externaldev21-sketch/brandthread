@@ -8,6 +8,7 @@
  */
 import { serviceRequest } from '@/lib/serviceConfig';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { NAVIGATION_ISOLATION_TEST } from '@/lib/buildFlags';
 
 export interface ClosetPiece {
   /** order_items.id */
@@ -37,8 +38,14 @@ let previewOutfits: ClosetOutfit[] = [];
 
 function previewPieces(): ClosetPiece[] {
   if (!isPreviewDemoMode()) return [];
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const catalog = require('@/lib/previewCatalog') as typeof import('@/lib/previewCatalog');
+  let catalog: typeof import('@/lib/previewCatalog');
+  try {
+    // Lazy: the catalog pulls in bundled preview assets (dev builds only).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    catalog = require('../lib/previewCatalog') as typeof import('@/lib/previewCatalog');
+  } catch {
+    return [];
+  }
   if (!catalog.isPreviewCatalogEnabled()) return [];
   const day = 24 * 60 * 60_000;
   const now = Date.now();
@@ -58,11 +65,12 @@ function previewPieces(): ClosetPiece[] {
 }
 
 /**
- * Fresh preview → empty closet. Demo preview → the API when it answers (the
- * screenshot harness mocks it), else the preview-catalog pieces above.
+ * Preview: the screenshot build (its API is mocked) and the `demo=1` preview
+ * ask the API first; the fresh dev preview has no backend and stays empty.
+ * Demo falls back to the preview-catalog pieces above when nothing answers.
  */
 async function previewOr<T>(request: () => Promise<T>, fallback: () => T): Promise<T> {
-  if (!isPreviewDemoMode()) return fallback();
+  if (!NAVIGATION_ISOLATION_TEST && !isPreviewDemoMode()) return fallback();
   try { return await request(); } catch { return fallback(); }
 }
 
@@ -101,7 +109,7 @@ export async function saveClosetOutfit(pieceIds: string[]): Promise<ClosetOutfit
 export async function deleteClosetOutfit(id: string): Promise<void> {
   if (isBuyerDevPreview()) {
     previewOutfits = previewOutfits.filter((o) => o.id !== id);
-    if (isPreviewDemoMode()) await serviceRequest(`/api/buyer/closet/outfits/${encodeURIComponent(id)}`, { method: 'DELETE' }, false).catch(() => {});
+    if (NAVIGATION_ISOLATION_TEST || isPreviewDemoMode()) await serviceRequest(`/api/buyer/closet/outfits/${encodeURIComponent(id)}`, { method: 'DELETE' }, false).catch(() => {});
     return;
   }
   await serviceRequest(`/api/buyer/closet/outfits/${encodeURIComponent(id)}`, { method: 'DELETE' });
