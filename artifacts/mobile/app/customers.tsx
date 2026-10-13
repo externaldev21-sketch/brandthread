@@ -43,6 +43,7 @@ export default function CustomersScreen() {
   const [error, setError] = useState(false);
   const [sortBy, setSortBy] = useState<CustomerSort>('recent');
   const [sortOpen, setSortOpen] = useState(false);
+  const [segment, setSegment] = useState<'all' | 'top'>('all');
   const hasDataRef = useRef(false);
 
   const fetchCustomers = useCallback(async (searchText: string) => {
@@ -79,7 +80,12 @@ export default function CustomersScreen() {
     return () => clearTimeout(timer);
   }, [search, fetchCustomers]);
 
-  const sortedCustomers = useMemo(() => sortCustomers(customers, sortBy), [customers, sortBy]);
+  const sortedCustomers = useMemo(() => {
+    const list = segment === 'top'
+      ? sortCustomers(customers.filter(c => (c.orderCount ?? 0) > 0), 'spend').slice(0, 20)
+      : customers;
+    return sortCustomers(list, sortBy);
+  }, [customers, sortBy, segment]);
 
   // A–Z index (S5 #100): only for a long list sorted by name.
   const showIndex = sortBy === 'name' && !loading && !error && sortedCustomers.length >= INDEX_MIN_ROWS;
@@ -144,6 +150,17 @@ export default function CustomersScreen() {
         </View>
 
         {/* Flat on black — no card behind the empty state or the rows. */}
+        <View style={{ flexDirection: 'row', gap: 16, marginBottom: 12 }} accessibilityRole="tablist">
+          {(['all', 'top'] as const).map(key => (
+            <TouchableOpacity key={key} style={{ minHeight: 44, justifyContent: 'center' }}
+              onPress={() => { hapticLight(); setSegment(key); if (key === 'top') setSortBy('spend'); }}
+              accessibilityRole="tab" accessibilityState={{ selected: segment === key }}>
+              <Text style={[TEXT.body, { color: segment === key ? colors.foreground : colors.mutedForeground }]}>
+                {key === 'all' ? 'All' : 'Top 20'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
         {loading ? (
           <View style={{ gap: 22, marginTop: 14 }}>
             {[0, 1, 2].map((i) => (

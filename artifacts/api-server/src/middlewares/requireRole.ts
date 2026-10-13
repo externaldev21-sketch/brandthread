@@ -273,6 +273,9 @@ export function teamContext(): RequestHandler<any, any, any, any> {
       throw err;
     }
     if (!enforcePackerScope(req as Request, res as any, (req as any).actorRole)) return;
+    // A packer's deny-by-default allowlist replaces the broad store write
+    // capability; it already rejected everything except packing/shipping.
+    if ((req as any).actorRole === "packer") { next(); return; }
     if ((req as any).actAsSelf) {
       (req as any).clerkUserId = (req as any).actorClerkId ?? (req as any).clerkUserId;
     } else if (rule?.writes && !SAFE_METHODS.has(req.method)) {

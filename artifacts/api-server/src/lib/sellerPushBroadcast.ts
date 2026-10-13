@@ -10,7 +10,7 @@
  *     announcements switched off, the seller muted, deleted/suspended);
  *   - text moderation via lib/contentModerator.
  */
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 import {
   db,
   drops,
@@ -26,6 +26,27 @@ import { evaluateContent } from "./contentModerator";
 import { logger } from "./logger";
 
 export const BROADCAST_WINDOW_MS = 24 * 60 * 60 * 1000;
+/**
+ * Past-buyer messages (audience 'past_buyers'): buyers with a non-cancelled
+ * order from the seller. Their own cap, separate from the follower push:
+ * one per seller per rolling 7 days, to at most PAST_BUYER_RECIPIENT_CAP
+ * people (most recent buyers first). The device push is promotional, so it
+ * also needs the buyer's promotional-push opt-in (lib/pushPolicy.ts).
+ */
+export const PAST_BUYER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+export const PAST_BUYER_RECIPIENT_CAP = 2000;
+export type BroadcastAudience = "followers" | "past_buyers";
+export const BROADCAST_AUDIENCES: readonly BroadcastAudience[] = ["followers", "past_buyers"];
+
+export function audienceWindowMs(audience: BroadcastAudience): number {
+  return audience === "past_buyers" ? PAST_BUYER_WINDOW_MS : BROADCAST_WINDOW_MS;
+}
+
+/** Missing/empty means followers (the original behaviour); anything else unknown is rejected. */
+export function parseAudience(raw: unknown): BroadcastAudience | null {
+  if (raw === undefined || raw === null || raw === "") return "followers";
+  return BROADCAST_AUDIENCES.includes(raw as BroadcastAudience) ? (raw as BroadcastAudience) : null;
+}
 export const BROADCAST_TITLE_MAX = 50;
 export const BROADCAST_BODY_MAX = 178;
 export const BROADCAST_FEED_TYPE = "seller_broadcast";
@@ -50,9 +71,10 @@ export interface BroadcastInput {
 export function broadcastWindow(
   lastSentAt: Date | null | undefined,
   now: Date = new Date(),
+  windowMs: number = BROADCAST_WINDOW_MS,
 ): { canSend: boolean; nextAt: Date | null; retryAfterSec: number } {
   if (!lastSentAt) return { canSend: true, nextAt: null, retryAfterSec: 0 };
-  const nextAt = new Date(lastSentAt.getTime() + BROADCAST_WINDOW_MS);
+  const nextAt = new Date(lastSentAt.getTime() + windowMs);
   if (nextAt.getTime() <= now.getTime()) return { canSend: true, nextAt: null, retryAfterSec: 0 };
   return {
     canSend: false,
@@ -139,27 +161,35 @@ export interface Audience {
  * deleted/suspended. Quiet hours are applied downstream by sendPushToUser (the
  * in-app feed row is kept, the device push is held back).
  */
+/**
+ * The opt-out filter shared by both audiences, for a candidate id column
+ * `idCol` joined to `users u`. One definition so the past-buyer audience can
+ * never be looser than the follower one.
+ */
+function eligibleRecipientSql(idCol: SQL, sellerId: string): SQL {
+  return sql`(
+    ${idCol} <> ${sellerId}
+    AND (u.id IS NULL OR (
+      u.deleted_at IS NULL
+      AND u.suspended_at IS NULL
+      AND u.push_enabled IS NOT FALSE
+      AND COALESCE(u.notification_preferences->>'seller_announcements', 'true') <> 'false'
+    ))
+    AND NOT EXISTS (
+      SELECT 1 FROM blocks b
+      WHERE (b.blocker_id = ${idCol} AND b.blocked_id = ${sellerId})
+         OR (b.blocker_id = ${sellerId} AND b.blocked_id = ${idCol})
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM activity_mutes m
+      WHERE m.user_id = ${idCol} AND m.mute_key = ${"actor:" + sellerId}
+    )
+  )`;
+}
+
 export async function resolveAudience(sellerId: string): Promise<Audience> {
   const res = await db.execute(sql`
-    SELECT f.follower_id AS id,
-      (
-        f.follower_id <> ${sellerId}
-        AND (u.id IS NULL OR (
-          u.deleted_at IS NULL
-          AND u.suspended_at IS NULL
-          AND u.push_enabled IS NOT FALSE
-          AND COALESCE(u.notification_preferences->>'seller_announcements', 'true') <> 'false'
-        ))
-        AND NOT EXISTS (
-          SELECT 1 FROM blocks b
-          WHERE (b.blocker_id = f.follower_id AND b.blocked_id = ${sellerId})
-             OR (b.blocker_id = ${sellerId} AND b.blocked_id = f.follower_id)
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM activity_mutes m
-          WHERE m.user_id = f.follower_id AND m.mute_key = ${"actor:" + sellerId}
-        )
-      ) AS ok
+    SELECT f.follower_id AS id, ${eligibleRecipientSql(sql`f.follower_id`, sellerId)} AS ok
     FROM follows f
     LEFT JOIN users u ON u.clerk_id = f.follower_id
     WHERE f.following_id = ${sellerId}
@@ -167,6 +197,63 @@ export async function resolveAudience(sellerId: string): Promise<Audience> {
   const rows = ((res as any).rows ?? []) as { id: string; ok: boolean }[];
   const recipientIds = rows.filter((r) => r.ok).map((r) => r.id);
   return { followers: rows.length, recipientIds, skipped: rows.length - recipientIds.length };
+}
+
+export interface PastBuyerAudience {
+  /** Signed-in buyers with at least one non-cancelled order from the seller. */
+  buyers: number;
+  /** Eligible after opt-outs, before the recipient cap. */
+  eligible: number;
+  /** Who will get it: the most recent `cap` eligible buyers. */
+  recipientIds: string[];
+  /** Opted out (push off, announcements off, blocked, muted, deleted/suspended). */
+  skipped: number;
+  cap: number;
+}
+
+/**
+ * Past buyers who should receive a message. Guest checkouts have no account to
+ * notify, so only orders with a buyer_id count. Same opt-outs as followers;
+ * when more than `cap` qualify, the most recent buyers are kept.
+ */
+export async function resolvePastBuyerAudience(
+  sellerId: string,
+  cap: number = PAST_BUYER_RECIPIENT_CAP,
+): Promise<PastBuyerAudience> {
+  const res = await db.execute(sql`
+    WITH pb AS (
+      SELECT o.buyer_id AS id, MAX(o.created_at) AS last_at
+      FROM orders o
+      WHERE o.owner_id = ${sellerId}
+        AND o.status <> 'cancelled'
+        AND o.buyer_id IS NOT NULL
+        AND o.buyer_id <> ${sellerId}
+      GROUP BY o.buyer_id
+    )
+    SELECT pb.id, ${eligibleRecipientSql(sql`pb.id`, sellerId)} AS ok
+    FROM pb
+    LEFT JOIN users u ON u.clerk_id = pb.id
+    ORDER BY pb.last_at DESC, pb.id
+  `);
+  const rows = ((res as any).rows ?? []) as { id: string; ok: boolean }[];
+  const eligibleIds = rows.filter((r) => r.ok).map((r) => r.id);
+  return {
+    buyers: rows.length,
+    eligible: eligibleIds.length,
+    recipientIds: eligibleIds.slice(0, cap),
+    skipped: rows.length - eligibleIds.length,
+    cap,
+  };
+}
+
+/** Audience summary the API returns (no ids). */
+export async function audienceSummary(sellerId: string, audience: BroadcastAudience) {
+  if (audience === "past_buyers") {
+    const a = await resolvePastBuyerAudience(sellerId);
+    return { buyers: a.buyers, eligible: a.eligible, recipients: a.recipientIds.length, cap: a.cap };
+  }
+  const a = await resolveAudience(sellerId);
+  return { followers: a.followers, recipients: a.recipientIds.length };
 }
 
 // ─── DB: claim + deliver ─────────────────────────────────────────────────────
@@ -184,18 +271,20 @@ export async function claimBroadcastSlot(
   sellerId: string,
   input: BroadcastInput,
   now: Date = new Date(),
+  audience: BroadcastAudience = "followers",
 ): Promise<ClaimResult> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"seller_push_broadcast:" + sellerId}))`);
     const [last] = await tx.select({ createdAt: sellerPushBroadcasts.createdAt })
       .from(sellerPushBroadcasts)
-      .where(eq(sellerPushBroadcasts.sellerId, sellerId))
+      .where(and(eq(sellerPushBroadcasts.sellerId, sellerId), eq(sellerPushBroadcasts.audience, audience)))
       .orderBy(desc(sellerPushBroadcasts.createdAt))
       .limit(1);
-    const window = broadcastWindow(last?.createdAt, now);
+    const window = broadcastWindow(last?.createdAt, now, audienceWindowMs(audience));
     if (!window.canSend) return { ok: false as const, nextAt: window.nextAt!, retryAfterSec: window.retryAfterSec };
     const [row] = await tx.insert(sellerPushBroadcasts).values({
       sellerId,
+      audience,
       title: input.title,
       body: input.body,
       deeplinkType: input.deeplinkType,
@@ -229,8 +318,12 @@ export async function deliverBroadcast(
   claimId: string,
   sellerId: string,
   input: BroadcastInput,
+  audienceType: BroadcastAudience = "followers",
 ): Promise<BroadcastDelivery> {
-  const [audience, identity] = await Promise.all([resolveAudience(sellerId), sellerIdentity(sellerId)]);
+  const [audience, identity] = await Promise.all([
+    audienceType === "past_buyers" ? resolvePastBuyerAudience(sellerId) : resolveAudience(sellerId),
+    sellerIdentity(sellerId),
+  ]);
   await db.update(sellerPushBroadcasts)
     .set({ recipientCount: audience.recipientIds.length, skippedCount: audience.skipped })
     .where(eq(sellerPushBroadcasts.id, claimId));
@@ -258,10 +351,13 @@ export async function deliverBroadcast(
       targetId,
       cta: "View",
       analyticsOwnerId: sellerId,
+      // A message to past buyers is marketing: the device push also needs the
+      // buyer's promotional-push opt-in (Guideline 4.5.4, lib/pushPolicy.ts).
+      ...(audienceType === "past_buyers" ? { pushKind: "promotional" as const } : {}),
     })));
     for (const r of results) {
       if (r.status === "fulfilled") sent += 1;
-      else { failed += 1; logger.warn({ err: r.reason }, "Seller broadcast delivery failed for a follower"); }
+      else { failed += 1; logger.warn({ err: r.reason, audience: audienceType }, "Seller broadcast delivery failed for a recipient"); }
     }
   }
 
@@ -274,13 +370,20 @@ export async function deliverBroadcast(
 // ─── DB: results ─────────────────────────────────────────────────────────────
 
 /**
- * Distinct followers who opened/tapped a broadcast, read from the same
- * notification_events pipeline the app reports into. One seller can only
- * broadcast once per 24h, so feed rows of type seller_broadcast created in
- * [createdAt, createdAt + 24h) belong to exactly this broadcast.
+ * Distinct recipients who opened/tapped a broadcast, read from the same
+ * notification_events pipeline the app reports into. A seller sends at most
+ * one broadcast per audience per window, so feed rows of type
+ * seller_broadcast created in [createdAt, createdAt + window) with the same
+ * title and body belong to exactly this broadcast (the text match keeps a
+ * follower push and a past-buyer message sent in the same window apart).
  */
-export async function countOpens(sellerId: string, createdAt: Date): Promise<number> {
-  const windowEnd = new Date(createdAt.getTime() + BROADCAST_WINDOW_MS);
+export async function countOpens(
+  sellerId: string,
+  createdAt: Date,
+  match?: { title: string; body: string; audience?: BroadcastAudience },
+): Promise<number> {
+  const windowEnd = new Date(createdAt.getTime() + audienceWindowMs(match?.audience ?? "followers"));
+  const textMatch = match ? sql`AND n.title = ${match.title} AND n.body = ${match.body}` : sql``;
   const res = await db.execute(sql`
     SELECT COUNT(DISTINCT e.user_id)::int AS opened
     FROM ${notificationEvents} e
@@ -290,13 +393,14 @@ export async function countOpens(sellerId: string, createdAt: Date): Promise<num
       AND n.created_at::timestamptz >= ${createdAt.toISOString()}::timestamptz
       AND n.created_at::timestamptz < ${windowEnd.toISOString()}::timestamptz
       AND e.event_type IN ('open', 'tap')
+      ${textMatch}
   `);
   return Number(((res as any).rows?.[0]?.opened) ?? 0);
 }
 
-export async function latestBroadcast(sellerId: string) {
+export async function latestBroadcast(sellerId: string, audience: BroadcastAudience = "followers") {
   const [row] = await db.select().from(sellerPushBroadcasts)
-    .where(eq(sellerPushBroadcasts.sellerId, sellerId))
+    .where(and(eq(sellerPushBroadcasts.sellerId, sellerId), eq(sellerPushBroadcasts.audience, audience)))
     .orderBy(desc(sellerPushBroadcasts.createdAt)).limit(1);
   return row ?? null;
 }

@@ -4111,9 +4111,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     /** Seller follower push broadcasts (1 per rolling 24h, enforced server-side). */
     sellerPush: {
       status: () => get<any>('/api/seller/push-broadcasts'),
-      preview: (body: { title: string; body: string; deeplinkType?: string | null; deeplinkId?: string | null }) =>
+      // `audience`: 'followers' (default, 1 per 24h) or 'past_buyers' (1 per 7 days, capped recipients).
+      preview: (body: { title: string; body: string; deeplinkType?: string | null; deeplinkId?: string | null; audience?: 'followers' | 'past_buyers' }) =>
         post<any>('/api/seller/push-broadcasts/preview', body),
-      send: (body: { title: string; body: string; deeplinkType?: string | null; deeplinkId?: string | null }) =>
+      send: (body: { title: string; body: string; deeplinkType?: string | null; deeplinkId?: string | null; audience?: 'followers' | 'past_buyers' }) =>
         post<any>('/api/seller/push-broadcasts', body),
       results: (id: string) => get<any>(`/api/seller/push-broadcasts/${encodeURIComponent(id)}`),
     },

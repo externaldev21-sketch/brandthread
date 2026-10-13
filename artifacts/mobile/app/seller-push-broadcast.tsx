@@ -3,6 +3,9 @@
  * live notification preview, then send. One broadcast per rolling 24 hours,
  * enforced by the server; this screen shows when the next one opens.
  * Mobbin reference: Instagram "New reel" share form (rows + bottom Share button).
+ * Audience picker (Followers / Past buyers): Instagram "Audience" screen rows.
+ * Past buyers have their own server-enforced window (one per 7 days, capped
+ * recipients) next to the follower push's 24 hours.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -18,11 +21,19 @@ import { OptionSheet } from '@/components/ui/OptionSheet';
 import { SectionHeader } from '@/components/SectionHeader';
 import { FONT, FS, SP } from '@/lib/theme';
 import { formatNextSend } from '@/lib/sellerEngagement';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { hapticSelection } from '@/lib/haptics';
 
 const TITLE_MAX = 50;
 const BODY_MAX = 178;
 
 type LinkOption = { id: string; label: string; type: 'product' | 'drop' | 'post' | 'none'; refId: string | null };
+
+// Audience picker (Instagram "Audience" rows: icon, title, subtitle, radio).
+// Each audience has its own server-enforced window.
+type Audience = 'followers' | 'past_buyers';
+const AUDIENCE_WINDOW_MS: Record<Audience, number> = { followers: 24 * 3600_000, past_buyers: 7 * 24 * 3600_000 };
+const AUDIENCE_NOUN: Record<Audience, string> = { followers: 'followers', past_buyers: 'past buyers' };
 
 export default function SellerPushBroadcastScreen() {
   const api = useApi();
@@ -74,12 +85,25 @@ export default function SellerPushBroadcastScreen() {
     return () => { cancelled = true; };
   }, [api]);
 
-  const limited = status && !status.canSendNow;
+  const [audience, setAudience] = useState<Audience>('followers');
+  // Older servers don't report a past-buyer audience: offer followers only.
+  const hasPastBuyers = !!status?.pastBuyers;
+  const selected = audience === 'past_buyers' ? status?.pastBuyers : status;
+  const limited = selected && !selected.canSendNow;
   const valid = title.trim().length > 0 && body.trim().length > 0;
   const payload = useMemo(() => ({
     title: title.trim(), body: body.trim(),
     deeplinkType: link.type === 'none' ? null : link.type, deeplinkId: link.refId,
-  }), [title, body, link]);
+    audience,
+  }), [title, body, link, audience]);
+
+  function chooseAudience(next: Audience) {
+    if (next === audience) return;
+    hapticSelection();
+    setAudience(next);
+    setReview(null);
+    setError(null);
+  }
 
   async function onReview() {
     setBusy(true); setError(null);
@@ -128,17 +152,50 @@ export default function SellerPushBroadcastScreen() {
           ) : (
             <>
               <Text style={[styles.lead, { color: c.foreground }]}>
-                {limited
-                  ? `You can send your next push ${formatNextSend(status.nextSendAt)}.`
-                  : `Send one push to your ${status?.audience?.recipients ?? 0} reachable followers. You can send one every 24 hours.`}
+                {audience === 'past_buyers'
+                  ? limited
+                    ? `You can message past buyers again ${formatNextSend(selected.nextSendAt)}.`
+                    : `Send one push to your ${selected?.audience?.recipients ?? 0} reachable past buyers. You can send one every 7 days.`
+                  : limited
+                    ? `You can send your next push ${formatNextSend(status.nextSendAt)}.`
+                    : `Send one push to your ${status?.audience?.recipients ?? 0} reachable followers. You can send one every 24 hours.`}
               </Text>
 
               {sent ? (
                 <View style={[styles.banner, { borderColor: c.border }]}>
                   <Icon name="check-circle" size={18} color={c.success} />
                   <Text style={[styles.note, { color: c.foreground, flex: 1 }]}>
-                    Sent to {sent.delivery.sent} followers. Your next push opens {formatNextSend(sent.nextSendAt)}.
+                    Sent to {sent.delivery.sent} {AUDIENCE_NOUN[sent.audienceType === 'past_buyers' ? 'past_buyers' : 'followers']}. Your next push opens {formatNextSend(sent.nextSendAt)}.
                   </Text>
+                </View>
+              ) : null}
+
+              {hasPastBuyers && !review ? (
+                <View style={styles.audienceGroup} accessibilityRole="radiogroup">
+                  <SectionHeader title="Audience" />
+                  {([
+                    { key: 'followers', icon: 'users', label: 'Followers', state: status },
+                    { key: 'past_buyers', icon: 'shopping-bag', label: 'Past buyers', state: status.pastBuyers },
+                  ] as const).map((a) => {
+                    const checked = audience === a.key;
+                    const reach = a.state?.audience?.recipients ?? 0;
+                    const sub = a.state && !a.state.canSendNow && a.state.nextSendAt
+                      ? `Next one ${formatNextSend(a.state.nextSendAt)}`
+                      : `${reach.toLocaleString()} reachable · 1 every ${a.key === 'past_buyers' ? '7 days' : '24 hours'}`;
+                    return (
+                      <PressableScale key={a.key} onPress={() => chooseAudience(a.key)} style={styles.audienceRow}
+                        accessibilityRole="radio" accessibilityLabel={`${a.label}, ${sub}`} accessibilityState={{ checked }}>
+                        <Feather name={a.icon} size={20} color={c.foreground} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.audienceTitle, { color: c.foreground }]}>{a.label}</Text>
+                          <Text style={[styles.audienceSub, { color: c.mutedForeground }]} numberOfLines={1}>{sub}</Text>
+                        </View>
+                        <View style={[styles.radio, { borderColor: checked ? c.foreground : c.border }]}>
+                          {checked ? <View style={[styles.radioDot, { backgroundColor: c.foreground }]} /> : null}
+                        </View>
+                      </PressableScale>
+                    );
+                  })}
                 </View>
               ) : null}
 
@@ -163,7 +220,14 @@ export default function SellerPushBroadcastScreen() {
                   <SectionHeader title="Review" />
                   {previewCard(review.notification.title, review.notification.body)}
                   <Text style={[styles.note, { color: c.mutedForeground, marginTop: SP.sm }]}>
-                    Goes to {review.audience.recipients} of your {review.audience.followers} followers. People who muted brand announcements, turned push off or blocked you are skipped.
+                    {review.audienceType === 'past_buyers'
+                      ? `Goes to ${review.audience.recipients} of your ${review.audience.buyers} past buyers.${review.audience.eligible > review.audience.recipients ? ` Your ${review.audience.cap.toLocaleString()} most recent buyers get it.` : ''} People who muted brand announcements, turned push off or blocked you are skipped.`
+                      : `Goes to ${review.audience.recipients} of your ${review.audience.followers} followers. People who muted brand announcements, turned push off or blocked you are skipped.`}
+                  </Text>
+                  <Text style={[styles.note, { color: c.mutedForeground, marginTop: SP.sm }]}>
+                    {review.canSendNow
+                      ? `After this, your next one opens ${formatNextSend(new Date(Date.now() + AUDIENCE_WINDOW_MS[audience]).toISOString())}.`
+                      : review.nextSendAt ? `Your next one opens ${formatNextSend(review.nextSendAt)}.` : ''}
                   </Text>
                 </>
               ) : null}
@@ -187,7 +251,7 @@ export default function SellerPushBroadcastScreen() {
                 <>
                   <SectionHeader title="Past pushes" />
                   {status.history.map((h: any) => (
-                    <ListRow key={h.id} title={h.title} subtitle={`${h.sentCount} sent · ${formatNextSend(h.createdAt)}`} chevron
+                    <ListRow key={h.id} title={h.title} subtitle={`${h.audience === 'past_buyers' ? 'Past buyers · ' : ''}${h.sentCount} sent · ${formatNextSend(h.createdAt)}`} chevron
                       onPress={() => router.push(`/seller-push-broadcast-results?id=${encodeURIComponent(h.id)}` as never)} />
                   ))}
                 </>
@@ -224,4 +288,10 @@ const styles = StyleSheet.create({
   previewBody: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2 },
   previewNow: { fontFamily: FONT.regular, fontSize: FS.xs },
   actions: { marginTop: SP.lg, marginBottom: SP.sm },
+  audienceGroup: { marginBottom: SP.sm },
+  audienceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 8 },
+  audienceTitle: { fontFamily: FONT.medium, fontSize: FS.base },
+  audienceSub: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2 },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  radioDot: { width: 12, height: 12, borderRadius: 6 },
 });
