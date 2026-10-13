@@ -497,6 +497,8 @@ function sellerOrderDetail(id, count = 9) {
       variantLabel: 'M',
       quantity: row.itemCount,
       priceCents: Math.round(row.totalCents / row.itemCount),
+      // GET /api/orders/:id items carry the product's first photo (item 55).
+      imageUrl: img(CATALOGUE.find((c) => c.brand === 'northline')?.image ?? 'hoodie-ember'),
     }],
   };
 }
@@ -916,7 +918,23 @@ export function respond({ method, path, query, role, options = {} }) {
   }
   if (p === '/buyer/notifications/unread-count') return { count: 0 };
   if (p === '/buyer/saved') return [];
-  if (p === '/buyer/orders') return [];
+  if (p === '/buyer/orders') {
+    // GET /buyer/orders rows in the real API shape. Since item 55 each row
+    // carries its lines with the product's first photo (`items[].imageUrl`,
+    // `thumbnailUrl`); BT_OLD_ORDER_API=1 serves the row without them, the
+    // way the API answered before, for before/after screenshots.
+    const rows = [[CATALOGUE[1], 'shipped', 'BT-10482', 2], [CATALOGUE[0], 'delivered', 'BT-10391', 9]];
+    return rows.map(([item, status, orderNumber, ago]) => {
+      const brand = BRANDS[item.brand];
+      const lines = [{ id: `${orderNumber}-1`, productId: item.id, productName: item.name, variantLabel: 'L', quantity: 1, priceCents: item.priceCents, imageUrl: img(item.image) }];
+      return {
+        id: `ord_${orderNumber}`, orderNumber, ownerId: brand.clerkId, sellerDisplayName: brand.name, sellerHandle: brand.handle,
+        status, subtotalCents: item.priceCents, shippingCents: 1200, totalCents: item.priceCents + 1200,
+        createdAt: iso(ago * DAY), stripePaymentIntentId: 'pi_demo',
+        ...(process.env.BT_OLD_ORDER_API ? {} : { items: lines, thumbnailUrl: lines[0].imageUrl }),
+      };
+    });
+  }
   // A single populated order so buyer-order-detail / -refund-request /
   // -return-request / -problem-report (all keyed by :orderId) render real
   // content instead of 404ing on load — see services/orderTypes.ts's
