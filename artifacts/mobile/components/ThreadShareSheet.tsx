@@ -17,6 +17,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import * as ExpoLinking from 'expo-linking';
+import { smsComposeUrl } from '@/lib/smsLink';
 
 import {
   createOrGetConversation,
@@ -159,7 +160,7 @@ export function ThreadShareSheet({
 
   async function openExternal(kind: 'sms' | 'email') {
     const url = kind === 'sms'
-      ? `sms:${Platform.OS === 'ios' ? '&' : '?'}body=${encodeURIComponent(shareText)}`
+      ? smsComposeUrl(shareText, Platform.OS)
       : `mailto:?subject=${encodeURIComponent(`Shared from Brandthread`)}&body=${encodeURIComponent(shareText)}`;
     await runAction(kind, async () => {
       const supported = await Linking.canOpenURL(url);
