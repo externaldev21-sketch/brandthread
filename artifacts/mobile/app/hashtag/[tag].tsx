@@ -22,7 +22,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi, type HashtagPostItem } from '@/lib/api';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { formatCompactCount } from '@/lib/compactFormat';
-import { hapticSelection, hapticToggle } from '@/lib/haptics';
+import { hapticFollow, hapticSelection } from '@/lib/haptics';
 import { normalizeTag } from '@/lib/hashtagText';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -126,11 +126,11 @@ export default function HashtagScreen() {
   }, [api, tag, sort, cursor, loadingMore, loading, preview]);
 
   const toggleFollow = useCallback(async () => {
-    if (preview) { setIsFollowing((v) => !v); hapticToggle(); return; }
+    if (preview) { hapticFollow(!isFollowing); setIsFollowing((v) => !v); return; }
     if (!isSignedIn) { router.push('/sign-in' as never); return; }
     const next = !isFollowing;
+    hapticFollow(next);
     setIsFollowing(next);
-    hapticToggle();
     try {
       if (next) await api.hashtags.follow(tag); else await api.hashtags.unfollow(tag);
     } catch {
