@@ -2,7 +2,8 @@
  * Brandthread Design System — RetryRow
  *
  * The inline companion to `useQueryResult`'s 'unavailable' status: a quiet,
- * monochrome, single-line row — "Couldn't load — Tap to retry" — for money
+ * monochrome row — "Couldn't load — Tap to retry", wrapping to a second line
+ * rather than running off-screen at large text sizes — for money
  * and analytics surfaces where a fetch failure must never look like a
  * genuine `$0` / `0` result.
  *
@@ -43,7 +44,7 @@ export function RetryRow({ label = "Couldn't load", onRetry, style, testID }: Re
       noMinHeight
     >
       <Feather name="refresh-cw" size={14} color={colors.mutedForeground} />
-      <Text style={[TYPE_SCALE.footnote, styles.text, { color: colors.mutedForeground }]} numberOfLines={1}>
+      <Text style={[TYPE_SCALE.footnote, styles.text, { color: colors.mutedForeground }]} numberOfLines={2}>
         {label} — Tap to retry
       </Text>
     </PressableScale>
@@ -62,6 +63,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   text: {
+    flexShrink: 1,
     fontFamily: FONT.medium,
   },
 });

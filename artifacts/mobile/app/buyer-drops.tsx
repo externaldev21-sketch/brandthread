@@ -150,7 +150,7 @@ export default function BuyerDrops() {
             accessibilityRole="tab"
             accessibilityState={{ selected: tab === t.key }}
           >
-            <Text style={[styles.tabText, { color: tab === t.key ? theme.text : theme.muted }]} numberOfLines={1}>
+            <Text style={[styles.tabText, { color: tab === t.key ? theme.text : theme.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {t.label}
             </Text>
             {tab === t.key && <View style={[styles.tabUnderline, { backgroundColor: theme.accent }]} />}
