@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/Button';
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
 
 import { preOrderShipDateError, PREORDER_SHIP_DATE_REQUIRED_MESSAGE } from '@/lib/deliveryGuarantee';
+import { EDITION_SIZE_MAX, EDITION_SIZE_MIN, parseEditionSize } from '@/lib/editions';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
 
 import { getProduct, saveDraft, loadDraft, deleteDraft, getCollections } from '@/services/productService';
@@ -270,6 +271,9 @@ export default function AddProductScreen() {
 
   // A drop starts in pre-order mode, matching its initial sales model.
   const [isPreOrder, setIsPreOrder] = useState(params.intent === 'drop');
+  // Limited numbered run: each unit sold gets "No. 014 of 200" in the buyer's Closet.
+  const [numbered, setNumbered] = useState(false);
+  const [editionSizeText, setEditionSizeText] = useState('');
 
   // ── Variants: bulk-edit selection ──
   const [bulkEditMode, setBulkEditMode] = useState(false);
@@ -386,6 +390,8 @@ export default function AddProductScreen() {
       }
       let product = await getProduct(editId!);
       if (product) {
+        const runSize = (product as unknown as { editionSize?: number | null }).editionSize;
+        if (typeof runSize === 'number' && runSize > 0) { setNumbered(true); setEditionSizeText(String(runSize)); }
         // API rows carry isPreOrder / preOrderEstShipDate; map them onto the
         // form so editing a pre-order shows its ship date (required on save).
         const row = product as unknown as { isPreOrder?: boolean; preOrderEstShipDate?: string | null };
@@ -746,6 +752,13 @@ export default function AddProductScreen() {
       return compareAt && compareAt > v.priceCents ? { ...v, compareAtPriceCents: compareAt } : v;
     });
 
+    const editionSize = numbered ? parseEditionSize(editionSizeText) : null;
+    if (numbered && editionSize === null) {
+      showPublishError('Check the run size', `A numbered run is ${EDITION_SIZE_MIN} to ${EDITION_SIZE_MAX.toLocaleString()} pieces.`);
+      setPublishing(false);
+      return;
+    }
+
     const serverCreatePayload = {
       name:        productPayload.name ?? '',
       description: productPayload.description,
@@ -759,6 +772,7 @@ export default function AddProductScreen() {
       isPreOrder,
       preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
       preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,
+      ...(editionSize !== null && { editionSize }),
     };
 
     const serverUpdatePayload = {
@@ -774,6 +788,7 @@ export default function AddProductScreen() {
       isPreOrder,
       preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
       preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,
+      editionSize,
     };
 
     try {
@@ -792,9 +807,10 @@ export default function AddProductScreen() {
       }
     } catch (err: any) {
       const needsShipDate = err?.code === 'PREORDER_SHIP_DATE_REQUIRED';
+      const runError = typeof err?.code === 'string' && err.code.startsWith('EDITION_');
       showPublishError(
-        needsShipDate ? 'Add a ship date' : 'Error',
-        needsShipDate ? PREORDER_SHIP_DATE_REQUIRED_MESSAGE : 'Could not publish. Please try again.',
+        needsShipDate ? 'Add a ship date' : runError ? 'Check the run size' : 'Error',
+        needsShipDate ? PREORDER_SHIP_DATE_REQUIRED_MESSAGE : runError ? String(err?.message ?? 'Check the run size.') : 'Could not publish. Please try again.',
       );
     } finally {
       setPublishing(false);
@@ -1936,6 +1952,23 @@ export default function AddProductScreen() {
               helper={shipDateError ? undefined : PREORDER_SHIP_DATE_REQUIRED_MESSAGE}
             />
           </>
+        )}
+        <View style={s.switchRow}>
+          <View style={{ flex: 1, paddingRight: SP.sm }}>
+            <Text style={s.switchLabel}>Numbered run</Text>
+            <Text style={s.collapsibleHint}>Each buyer gets their number, like No. 014 of 200.</Text>
+          </View>
+          <HapticSwitch value={numbered} onValueChange={setNumbered} testID="numbered-run-switch" />
+        </View>
+        {numbered && (
+          <FormInput
+            label="Pieces in the run"
+            value={editionSizeText}
+            onChange={(v) => setEditionSizeText(v.replace(/[^0-9]/g, ''))}
+            placeholder="200"
+            keyboardType="numeric"
+            error={editionSizeText && parseEditionSize(editionSizeText) === null ? `${EDITION_SIZE_MIN} to ${EDITION_SIZE_MAX.toLocaleString()} pieces` : undefined}
+          />
         )}
       </>
     );

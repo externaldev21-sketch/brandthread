@@ -2,6 +2,7 @@
  * Stripe webhook handler — raw body required for signature verification.
  * Mounted at /api/webhooks (before express.json() middleware).
  */
+import { assignEditionNumbers } from "../lib/editions";
 import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
 import type Stripe from "stripe";
@@ -1121,7 +1122,7 @@ export async function handleCheckoutPaid(
     }
 
     // Step 5: Insert order items (from original cart, not aggregated map, to preserve line detail)
-    await tx.insert(orderItems).values(
+    const insertedItems = await tx.insert(orderItems).values(
       rawItems.map((item) => ({
         orderId:      order.id,
         variantId:    item.variantId,
@@ -1130,7 +1131,18 @@ export async function handleCheckoutPaid(
         quantity:     item.quantity,
         priceCents:   item.priceCents,
       })),
-    );
+    ).returning({ id: orderItems.id, variantId: orderItems.variantId, quantity: orderItems.quantity });
+
+    // Numbered runs: each unit takes the next number, in payment order.
+    // Isolated in a savepoint like the affiliate step: a failure here leaves
+    // the order and payment exactly as they were (the piece just has no number).
+    if (oversoldItems.length === 0) {
+      try {
+        await tx.transaction((sp) => assignEditionNumbers(sp as any, insertedItems));
+      } catch (editionError) {
+        logger.error({ err: editionError, orderId: order.id }, "Numbered-run assignment failed; order unaffected");
+      }
+    }
 
     // Delivery guarantee: stamp the 15-day / 60-day deadlines now, in the same
     // transaction as the order and its items.
