@@ -19,7 +19,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { CachedImage } from '@/components/CachedImage';
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Chip } from '@/components/ui/Chip';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
@@ -148,9 +149,7 @@ export function VariantPickerSheet({
           <>
             <ScrollView showsVerticalScrollIndicator={false} bounces={false} contentContainerStyle={s.scrollContent}>
               <View style={s.productRow}>
-                {product.imageUris[0] ? (
-                  <CachedImage source={{ uri: product.imageUris[0] }} style={s.thumb} contentFit="cover" />
-                ) : <View style={[s.thumb, s.thumbPlaceholder]}><Feather name="image" size={18} color={theme.subtle} /></View>}
+                <ProductPhoto uri={product.imageUris[0]} brand={product.sellerName} name={product.name} style={s.thumb} />
                 <View style={{ flex: 1 }}>
                   <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
                   <Text style={s.productPrice}>{formatCents(price)}</Text>
@@ -272,7 +271,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   centerBox: { alignItems: 'center', justifyContent: 'center', paddingVertical: SP.xl },
   scrollContent: { paddingHorizontal: SP.md, paddingBottom: SP.md },
   productRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.lg, alignItems: 'center' },
-  thumb: { width: 68, height: 68, borderRadius: RADIUS.md, backgroundColor: theme.cardElevated },
+  thumb: { width: 68, height: productPhotoHeight(68), borderRadius: RADIUS.md, backgroundColor: theme.cardElevated },
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   productName: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
   productPrice: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.accent, marginTop: 3 },

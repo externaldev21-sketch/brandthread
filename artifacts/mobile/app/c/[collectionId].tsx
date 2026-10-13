@@ -22,6 +22,8 @@ import { ResponsiveContainer } from '@/components/layout';
 import { formatCents } from '@/lib/money';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { radius } from '@/constants/radii';
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 
 const { width: W } = Dimensions.get('window');
 const GAP = SP.sm;
@@ -151,13 +153,7 @@ export default function PublicCollectionScreen() {
             contentContainerStyle={{ gap: GAP, marginTop: SP.lg }}
             renderItem={({ item }) => (
               <View style={styles.tile}>
-                {item.image ? (
-                  <Image source={{ uri: item.image }} style={styles.tileImage} />
-                ) : (
-                  <View style={[styles.tileImage, styles.coverPlaceholder]}>
-                    <Feather name="shopping-bag" size={20} color={MUTED} />
-                  </View>
-                )}
+                <ProductPhoto uri={item.image} brand={item.brand} name={item.title} style={styles.tileImage} />
                 <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
                 {item.priceCents != null ? <Text style={styles.tilePrice}>{formatCents(item.priceCents)}</Text> : null}
               </View>
@@ -183,7 +179,7 @@ const styles = StyleSheet.create({
   title: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl, marginTop: SP.md, textAlign: 'center' },
   subtitle: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 2 },
   tile: { width: TILE_SIZE, gap: 4 },
-  tileImage: { width: TILE_SIZE, height: TILE_SIZE, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER },
+  tileImage: { width: TILE_SIZE, height: productPhotoHeight(TILE_SIZE), borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER },
   tileTitle: { color: FG, fontFamily: FONT.medium, fontSize: FS.sm, marginTop: 4 },
   tilePrice: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs },
   messageTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.md, marginTop: SP.sm, textAlign: 'center' },

@@ -28,6 +28,8 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { buildCanonicalDropUrl } from '@/lib/shareDrop';
 import { computeCountdownParts, type CountdownParts } from '@/lib/dropCountdown';
+import { ProductPhotoPlaceholder } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -219,9 +221,10 @@ function Countdown({
 }
 
 function ProductTile({
-  product, locked, isLive, onPress,
+  product, brand, locked, isLive, onPress,
 }: {
   product: DropProduct;
+  brand?: string;
   locked: boolean;
   isLive: boolean;
   onPress: () => void;
@@ -259,7 +262,7 @@ function ProductTile({
           {imageUri ? (
             <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" blurRadius={locked ? 22 : 0} />
           ) : (
-            <View style={styles.productFallback}><Feather name="image" size={28} color={SUBTLE} /></View>
+            <ProductPhotoPlaceholder brand={brand} name={product.name} style={StyleSheet.absoluteFill} />
           )}
           {soldOut && (
             <View style={StyleSheet.absoluteFill}>
@@ -639,6 +642,7 @@ export default function BuyerDropDetail() {
                 <ProductTile
                   key={product.id}
                   product={product}
+                  brand={sellerName}
                   locked={!showRecap && !isLive}
                   isLive={isLive && !showRecap}
                   onPress={() => handleProductPress(product)}
@@ -712,7 +716,7 @@ const styles = StyleSheet.create({
   stockText: { fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: SP.md },
   productTile: { borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: CARD },
-  productMedia: { height: (W - SP.md * 2 - 10) * 0.68, justifyContent: 'flex-end' },
+  productMedia: { height: productPhotoHeight((W - SP.md * 2 - 10) / 2), justifyContent: 'flex-end' },
   productFallback: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD },
   productCaption: { padding: 11 },
   productName: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.sm, lineHeight: 17 },
