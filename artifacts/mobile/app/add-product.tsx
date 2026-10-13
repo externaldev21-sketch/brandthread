@@ -4,13 +4,12 @@ import { CachedImage as Image } from '@/components/CachedImage';
 import { hapticToggle, haptics, haptic } from '@/lib/haptics';
 
 /**
- * Add Product — single-scroll product creation
+ * Add Product — four steps over the same sections
  *
- * Essential sections (always open): Photos, Basic Information, Pricing, Inventory
- * Advanced sections (collapsible):  Variants, Sales Model
- *
- * Seller can fill photo + title + price + stock and publish without clicking
- * through wizard steps.
+ * Photos → Details (title, description, category + Organization, Sales model,
+ * Size chart, Manufacturing, Storefront & SEO) → Price & sizes (price,
+ * variants, inventory + Profit, Shipping) → Publish (the buyer product page
+ * built from the form). Header Save works on every step.
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -106,6 +105,13 @@ import { FeeBreakdown } from '@/components/money/FeeBreakdown';
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
 
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { useUser } from '@clerk/expo';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { ReorderablePhotoStrip } from '@/components/product/ReorderablePhotoStrip';
+import { BuyerProductPreview, buyerProductFromDraftRow } from '@/components/product/BuyerProductPreview';
+import { movePhotoToFront, reorderPhotos, withCoverFirst } from '@/lib/photoOrder';
+import { LAST_LISTING_STEP, LISTING_STEPS, canJumpToStep, isListingStepValid, type ListingStep, type ListingStepInput } from '@/lib/listingSteps';
+import { buildDraftPreviewRow, setDraftPreviewRow } from '@/lib/draftBuyerPreview';
 
 import { takePendingMockup } from '@/lib/mockupProductHandoff';
 
@@ -377,6 +383,16 @@ export default function AddProductScreen() {
     preview:       false,
   });
 
+  // ── Steps: Photos → Details → Price & sizes → Publish (lib/listingSteps.ts).
+  // The sections below are unchanged; each step shows its own subset. ──
+  const [step, setStep] = useState<ListingStep>(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const { user } = useUser();
+  // First-photo title/category prefill: tried once, and never over a value
+  // the seller typed or picked themselves.
+  const prefillTriedRef = useRef(false);
+  const sellerEditedRef = useRef({ name: false, category: false });
+
   const draftId = useRef('draft_' + uid());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasUnsavedChangesRef = useRef(false);
@@ -567,6 +583,8 @@ export default function AddProductScreen() {
 
   // ── Helpers ──
   function patchDraft(patch: Partial<Product>) {
+    if ('name' in patch) sellerEditedRef.current.name = true;
+    if ('category' in patch) sellerEditedRef.current.category = true;
     markUnsavedChanges();
     setDraftData(prev => ({ ...prev, ...patch }));
   }
@@ -1030,8 +1048,34 @@ export default function AddProductScreen() {
       const remoteUri = (uploaded as any)?.objectPath || (uploaded as any)?.url || item.uri;
       setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'done', remoteUri } }));
       setDraftData(prev => ({ ...prev, media: (prev.media ?? []).map(m => m.id === item.id ? { ...m, uri: remoteUri } : m) }));
+      void prefillFromFirstPhoto(remoteUri);
     } catch {
       setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'error' } }));
+    }
+  }
+
+  // New listing, first photo uploaded, no title yet: ask the existing
+  // product-description helper once for a title and category and put them in
+  // as ordinary editable values. Silent no-op on any failure (no key, gated,
+  // offline); a value the seller typed or picked always wins.
+  async function prefillFromFirstPhoto(remoteUri: string) {
+    if (prefillTriedRef.current || params.editId || sellerEditedRef.current.name) return;
+    const path = toUploadObjectPath(remoteUri);
+    if (!path) return;
+    prefillTriedRef.current = true;
+    try {
+      const r = await api.aiHelpers.listingPrefill({ imagePaths: [path] });
+      const title = typeof r?.title === 'string' ? r.title.trim() : '';
+      const category = PRODUCT_CATEGORIES.find(c => c === r?.category);
+      if (!title && !category) return;
+      markUnsavedChanges();
+      setDraftData(prev => ({
+        ...prev,
+        ...(title && !sellerEditedRef.current.name && !(prev.name ?? '').trim() ? { name: title } : {}),
+        ...(category && !sellerEditedRef.current.category && !prev.category ? { category } : {}),
+      }));
+    } catch {
+      // Best-effort only.
     }
   }
 
@@ -1094,15 +1138,16 @@ export default function AddProductScreen() {
     const idx = media.findIndex(m => m.id === id);
     const target = idx + direction;
     if (idx === -1 || target < 0 || target >= media.length) return;
-    const next = [...media];
-    [next[idx], next[target]] = [next[target], next[idx]];
-    const resequenced = next.map((m, i) => ({ ...m, sortOrder: i }));
+    // Cover follows the first position (lib/photoOrder.ts).
+    const resequenced = reorderPhotos(media, idx, target);
+    hapticToggle();
     patchDraft({ media: resequenced });
   }
 
   function setCoverImage(id: string) {
     const media = draftData.media ?? [];
-    patchDraft({ media: media.map(m => ({ ...m, isCover: m.id === id })) });
+    hapticToggle();
+    patchDraft({ media: movePhotoToFront(media, id) });
   }
 
   function toggleCutoutUse(id: string) {
@@ -1253,7 +1298,7 @@ export default function AddProductScreen() {
       {
         text: 'Remove photo', style: 'destructive' as const, onPress: () => {
           const media = draftData.media ?? [];
-          patchDraft({ media: media.filter(x => x.id !== m.id).map((x, i) => ({ ...x, sortOrder: i })) });
+          patchDraft({ media: withCoverFirst(media.filter(x => x.id !== m.id)) });
           setMediaUpload(prev => { const next = { ...prev }; delete next[m.id]; return next; });
           setBgRemovalState(prev => { const next = { ...prev }; delete next[m.id]; return next; });
         },
@@ -1276,36 +1321,140 @@ export default function AddProductScreen() {
   function renderPhotos() {
     const media = draftData.media ?? [];
     return (
-      <ProductPhotoGrid
-        max={10}
-        items={media.map(m => {
-          const upload = mediaUpload[m.id];
-          const bgStatus = bgRemovalState[m.id];
-          return {
-            id: m.id,
-            uri: displayableUri(m.useCutout && m.cutoutUri ? m.cutoutUri : m.uri),
-            isCover: !!m.isCover,
-            busy: upload?.status === 'uploading' || bgStatus === 'processing',
-            error: upload?.status === 'error' ? 'upload' as const : bgStatus === 'failed' ? 'cutout' as const : null,
-          };
-        })}
-        onAdd={pickPhotos}
-        onPressItem={id => { const m = media.find(x => x.id === id); if (m) openCropperFor(m); }}
-        onLongPressItem={id => { const m = media.find(x => x.id === id); if (m) openPhotoActionsFor(m); }}
-        onRemove={id => {
-          const list = draftData.media ?? [];
-          patchDraft({ media: list.filter(x => x.id !== id).map((x, i) => ({ ...x, sortOrder: i })) });
-          setMediaUpload(prev => { const next = { ...prev }; delete next[id]; return next; });
-          setBgRemovalState(prev => { const next = { ...prev }; delete next[id]; return next; });
-        }}
-        onMove={moveMedia}
-        onRetry={(id, kind) => {
-          const m = media.find(x => x.id === id);
-          if (!m) return;
-          if (kind === 'upload') void uploadMediaAsset(m);
-          else void removeBackgroundForMedia(m);
-        }}
-      />
+      <View style={{ gap: SP.sm }}>
+        <View style={s.photoRowHeader}>
+          <Text style={s.photoRowTitle}>Photos</Text>
+          <Text style={s.photoRowCount}>{media.length}/10</Text>
+        </View>
+        <ReorderablePhotoStrip
+          items={media}
+          itemSize={84}
+          gap={SP.sm}
+          contentContainerStyle={s.photoRowContent}
+          onReorder={(from, to) => patchDraft({ media: reorderPhotos(media, from, to) })}
+          onHold={item => openPhotoActionsFor(item)}
+          testID="add-product-photo-strip"
+          renderItem={(_item, idx) => {
+            const m = media[idx];
+            if (!m) {
+              return (
+                <TouchableOpacity
+                  key={`empty-${idx}`}
+                  style={s.photoAddSlot}
+                  onPress={pickPhotos}
+                  accessibilityLabel="Add photo"
+                  accessibilityRole="button"
+                  testID="add-product-add-photos"
+                >
+                  <Icon name="camera" size={20} color={MUTED} />
+                  <Text style={s.photoAddSlotLabel}>Add photo</Text>
+                </TouchableOpacity>
+              );
+            }
+            const upload = mediaUpload[m.id];
+            const bgStatus = bgRemovalState[m.id];
+            const displayUri = m.useCutout && m.cutoutUri ? m.cutoutUri : m.uri;
+            return (
+              <TouchableOpacity
+                key={m.id}
+                style={s.photoSlot}
+                onPress={() => openCropperFor(m)}
+                accessibilityLabel={`Photo ${idx + 1}${idx === 0 ? ', cover' : ''}. Tap to crop, hold for more options.`}
+                accessibilityActions={[{ name: 'longpress', label: 'More options' }]}
+                onAccessibilityAction={e => { if (e.nativeEvent.actionName === 'longpress') openPhotoActionsFor(m); }}
+                testID={`add-product-photo-${m.id}`}
+              >
+                {displayUri && (displayUri.startsWith('http') || displayUri.startsWith('file') || displayUri.startsWith('ph://') || displayUri.startsWith('asset-library://') || displayUri.startsWith('content://') || displayUri.startsWith('/objects/')) ? (
+                  <Image source={{ uri: displayUri }} style={s.photoSlotImg} resizeMode="cover" />
+                ) : (
+                  <View style={[s.photoSlotImg, s.photoSlotImgPlaceholder]}>
+                    <Icon name="image" size={20} color={MUTED} />
+                  </View>
+                )}
+                {idx === 0 && (
+                  <View style={s.mediaCoverBadge}>
+                    <Text style={s.mediaCoverBadgeText}>Cover</Text>
+                  </View>
+                )}
+                {(upload?.status === 'uploading' || bgStatus === 'processing') && (
+                  <View style={s.mediaUploadOverlay}>
+                    <ActivityIndicator color={ON_DARK} />
+                  </View>
+                )}
+                {upload?.status === 'error' && (
+                  <TouchableOpacity style={s.mediaUploadOverlay} onPress={() => uploadMediaAsset(m)} accessibilityLabel="Retry photo upload">
+                    <Icon name="refresh-cw" size={16} color={ON_DARK} />
+                    <Text style={s.mediaRetryLabel}>Retry upload</Text>
+                  </TouchableOpacity>
+                )}
+                {bgStatus === 'failed' && upload?.status !== 'error' && (
+                  <TouchableOpacity style={s.mediaUploadOverlay} onPress={() => removeBackgroundForMedia(m)} accessibilityLabel="Retry background removal">
+                    <Icon name="refresh-cw" size={16} color={ON_DARK} />
+                    <Text style={s.mediaRetryLabel}>Retry cutout</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={s.mediaDeleteBtn}
+                  onPress={() => {
+                    const list = draftData.media ?? [];
+                    patchDraft({ media: withCoverFirst(list.filter(x => x.id !== m.id)) });
+                    setMediaUpload(prev => { const next = { ...prev }; delete next[m.id]; return next; });
+                    setBgRemovalState(prev => { const next = { ...prev }; delete next[m.id]; return next; });
+                  }}
+                  accessibilityLabel="Remove photo"
+                >
+                  <Icon name="x" size={12} color={ON_DARK} />
+                </TouchableOpacity>
+                <View style={s.mediaReorderRow}>
+                  <TouchableOpacity
+                    disabled={idx === 0}
+                    onPress={() => moveMedia(m.id, -1)}
+                    style={[s.mediaReorderBtn, idx === 0 && { opacity: 0.3 }]}
+                    accessibilityLabel="Move photo earlier"
+                  >
+                    <Icon name="chevron-left" size={12} color={ON_DARK} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    disabled={idx === media.length - 1}
+                    onPress={() => moveMedia(m.id, 1)}
+                    style={[s.mediaReorderBtn, idx === media.length - 1 && { opacity: 0.3 }]}
+                    accessibilityLabel="Move photo later"
+                  >
+                    <Icon name="chevron-right" size={12} color={ON_DARK} />
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
+          trailing={<>
+            {Array.from({ length: Math.max(0, visibleSlotCount - media.length) }, (_, i) => (
+              <TouchableOpacity
+                key={`empty-${media.length + i}`}
+                style={s.photoAddSlot}
+                onPress={pickPhotos}
+                accessibilityLabel="Add photo"
+                accessibilityRole="button"
+                testID="add-product-add-photos"
+              >
+                <Icon name="camera" size={20} color={MUTED} />
+                <Text style={s.photoAddSlotLabel}>Add photo</Text>
+              </TouchableOpacity>
+            ))}
+
+          {canAddSlot && (
+            <TouchableOpacity
+              style={s.photoMoreSlot}
+              onPress={() => { hapticToggle(); setPhotoSlotCount(c => Math.min(10, c + 1)); }}
+              accessibilityLabel="Add another photo slot"
+              accessibilityRole="button"
+              testID="add-product-add-slot"
+            >
+              <Icon name="plus" size={16} color={SUBTLE} />
+            </TouchableOpacity>
+          )}
+          </>}
+        />
+      </View>
     );
   }
 
@@ -2187,14 +2336,151 @@ export default function AddProductScreen() {
     ]);
   }
 
+  // ─── Steps (Grailed "Adding a listing" pattern: thin progress under the
+  // header, one full-width Next at the bottom, disabled until the step is
+  // valid). ────────────────────────────────────────────────────────────
+  const stepInput: ListingStepInput = {
+    media: draftData.media ?? [],
+    name: draftData.name ?? '',
+    priceStr, compareAtStr, costStr,
+    variants: localVariants.map(v => ({ title: v.title, sku: v.sku, price: v.price })),
+    isPreOrder,
+    preOrderOpenDate: draftData.preorderSettings?.openDate,
+    preOrderCloseDate: draftData.preorderSettings?.closeDate,
+    shipDateError,
+  };
+  const stepValid = isListingStepValid(step, stepInput);
+  const editingExisting = !!params.editId;
+
+  function goToStep(next: ListingStep) {
+    setStep(next);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }
+
+  function renderStepIndicator() {
+    return (
+      <View style={s.stepIndicator} accessibilityRole="tablist" testID="add-product-steps">
+        {LISTING_STEPS.map((label, i) => {
+          const target = i as ListingStep;
+          const active = target === step;
+          const reached = target <= step;
+          const enabled = canJumpToStep(target, step, stepInput, editingExisting);
+          return (
+            <View key={label} style={s.stepItem}>
+              <PressableScale
+                style={s.stepItemInner}
+                onPress={() => goToStep(target)}
+                disabled={!enabled || active}
+                accessibilityRole="tab"
+                accessibilityLabel={`Step ${i + 1} of ${LISTING_STEPS.length}: ${label}`}
+                accessibilityState={{ selected: active, disabled: !enabled }}
+                testID={`add-product-step-${i}`}
+              >
+                <View style={[s.stepBar, { backgroundColor: reached ? FG : BORDER }]} />
+                <Text style={[s.stepLabel, { color: active ? FG : MUTED }]} numberOfLines={1}>{label}</Text>
+              </PressableScale>
+            </View>
+          );
+        })}
+      </View>
+    );
+  }
+
+  function renderStepFooter() {
+    const isLast = step === LAST_LISTING_STEP;
+    return (
+      <View style={[s.stepFooter, { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
+        {step > 0 && (
+          <View style={s.stepFooterSlot}>
+            <Button
+              variant="secondary"
+              label="Back"
+              onPress={() => goToStep((step - 1) as ListingStep)}
+              fullWidth
+              testID="add-product-step-back"
+            />
+          </View>
+        )}
+        {isLast ? (
+          <View style={s.stepFooterSlot}>
+            <Button
+              label={publishing ? 'Saving…' : currentStatus === 'active' ? 'Publish' : 'Save draft'}
+              onPress={handlePublish}
+              disabled={!canSave || publishing || photosUploading}
+              loading={publishing}
+              fullWidth
+              testID="add-product-step-publish"
+            />
+          </View>
+        ) : (
+          <View style={s.stepFooterSlot}>
+            <Button
+              label="Next"
+              onPress={() => goToStep((step + 1) as ListingStep)}
+              disabled={!stepValid}
+              fullWidth
+              testID="add-product-step-next"
+            />
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  // Publish step: the buyer product page itself, built from the form.
+  function buildBuyerPreviewRow() {
+    return buildDraftPreviewRow({
+      name: draftData.name ?? '',
+      description: draftData.description ?? '',
+      category: typeof draftData.category === 'string' ? draftData.category : null,
+      // Same list handlePublish sends as `images`, so the preview matches.
+      imageUris: (draftData.media ?? []).map(m => m.uri),
+      priceCents: parseDecimalToCents(priceStr) ?? 0,
+      compareAtPriceCents: parseDecimalToCents(compareAtStr),
+      stock: parseInt(stockStr, 10) || 0,
+      trackInventory,
+      isPreOrder,
+      preOrderClosingDate: draftData.preorderSettings?.closeDate,
+      preOrderEstShipDate: draftData.preorderSettings?.estimatedShippingDate,
+      sizeChartImageUrl: draftData.sizeChartImageUrl ?? null,
+      tags: draftData.tags ?? [],
+      sellerDisplayName: user?.fullName || user?.username || null,
+      options: localOptions,
+      variants: localVariants.map(v => ({
+        id: v.id,
+        optionValues: v.optionValues,
+        priceCents: parseDecimalToCents(v.price),
+        qty: parseInt(variantQtys[v.id] ?? v.qty, 10) || 0,
+      })),
+    });
+  }
+
+  function renderPublishStep() {
+    const row = buildBuyerPreviewRow();
+    return (
+      <>
+        <BuyerProductPreview product={buyerProductFromDraftRow(row)} testID="add-product-buyer-preview" />
+        <View style={s.essentialSection}>
+          <Button
+            variant="secondary"
+            icon="eye"
+            label="Preview as buyer"
+            onPress={() => { setDraftPreviewRow(row); router.push('/product-preview-as-buyer' as never); }}
+            testID="add-product-preview-as-buyer"
+          />
+        </View>
+      </>
+    );
+  }
+
   // ─── Render ─────────────────────────────────────────────────────
 
   return (
     <View style={s.root}>
 
       {/* ── Header: Cancel · status · Save, one row, vertically centered,
-          standard 44pt height below the notch. No wizard, no bottom footer —
-          Save is the only publish action, right here. ── */}
+          standard 44pt height below the notch. Save works on every step;
+          the step footer repeats it on Publish. ── */}
       <View style={{ paddingTop: insets.top, backgroundColor: BG, borderBottomWidth: 1, borderBottomColor: BORDER }}>
         <View style={s.headerRow}>
           <Button
@@ -2226,6 +2512,7 @@ export default function AddProductScreen() {
           />
         </View>
       </View>
+      {renderStepIndicator()}
 
       {publishError ? (
         <View style={s.publishError} testID="add-product-publish-error" accessibilityRole="alert">
@@ -2248,19 +2535,19 @@ export default function AddProductScreen() {
         >
           {/* Grouped sections, Shopify product-editor order. Same fields
               and handlers as before, only grouped under headers. */}
-          <FormSection title="Media" meta={`${(draftData.media ?? []).length}/10`} testID="add-product-section-media">
+          {step === 0 && (<FormSection title="Media" meta={`${(draftData.media ?? []).length}/10`} testID="add-product-section-media">
             {renderPhotos()}
-          </FormSection>
+          </FormSection>)}
 
-          <FormSection title="Title & description" testID="add-product-section-details">
+          {step === 1 && (<FormSection title="Title & description" testID="add-product-section-details">
             {renderBasicInfo()}
-          </FormSection>
+          </FormSection>)}
 
-          <FormSection title="Pricing" testID="add-product-section-pricing">
+          {step === 2 && (<FormSection title="Pricing" testID="add-product-section-pricing">
             {renderPriceEssentials()}
-          </FormSection>
+          </FormSection>)}
 
-          <FormSection
+          {step === 2 && (<FormSection
             title="Variants"
             action={{ label: 'Add options', onPress: addVariantOption, testID: 'add-product-add-options' }}
             testID="add-product-section-variants"
@@ -2268,22 +2555,24 @@ export default function AddProductScreen() {
  onLayout={e => {variantsSectionY.current = e.nativeEvent.layout.y; if (pendingSectionScroll.current) scrollToVariantsSection();}}
           >
             {renderVariants()}
-          </FormSection>
+          </FormSection>)}
 
           <FormSection title="Inventory" testID="add-product-section-inventory">
             {renderInventory()}
           </FormSection>
 
-          <FormSection title="Organization" testID="add-product-section-organization">
+          {step === 1 && (<FormSection title="Organization" testID="add-product-section-organization">
             {renderOrganization()}
-          </FormSection>
+          </FormSection>)}
 
+          {step === 2 && <>
           <Text style={s.moreDetailsHeader} accessibilityRole="header">More details</Text>
           {/* The optional sections stay collapsible, grouped in one card. */}
           <View style={s.moreDetailsGroup}>
           {/* -1 hides the first row's top divider under the card border. */}
           <View style={{ marginTop: -1 }}>
 
+          {step === 2 && <>
           <CollapsibleSection
             title="Profit"
             icon="trending-up"
@@ -2303,7 +2592,9 @@ export default function AddProductScreen() {
           >
             {renderFulfillment()}
           </CollapsibleSection>
+          </>}
 
+          {step === 1 && <>
           <CollapsibleSection
             title="Sales model"
             icon="repeat"
@@ -2344,19 +2635,14 @@ export default function AddProductScreen() {
           >
             {renderStorefront()}
           </CollapsibleSection>
+          </>}
 
-          <CollapsibleSection
-            title="Preview"
-            icon="eye"
-            expanded={expandedSections.preview}
-            onToggle={() => toggleSection('preview')}
-            hint="See how this looks on Discover and in the feed"
-          >
-            {renderReviewStep()}
-          </CollapsibleSection>
           </View>
           </View>
+          </>}
+          {step === LAST_LISTING_STEP && renderPublishStep()}
         </ScrollView>
+        {renderStepFooter()}
       </KeyboardAvoidingView>
 
       <SuccessSheet
@@ -2467,6 +2753,19 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     backgroundColor: CARD,
   },
   publishErrorText: { fontSize: FS.sm, fontFamily: FONT.medium, color: RED, lineHeight: 20 },
+
+  // Step indicator (under the header) + sticky Back / Next footer.
+  stepIndicator: { flexDirection: 'row', gap: SP.xs, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.xs },
+  stepItem: { flex: 1 },
+  stepItemInner: { gap: 6 },
+  stepFooterSlot: { flex: 1 },
+  stepBar: { height: 2, borderRadius: 1 },
+  stepLabel: { fontSize: FS.xs, fontFamily: FONT.medium },
+  stepFooter: {
+    flexDirection: 'row', gap: SP.sm,
+    paddingHorizontal: SP.md, paddingTop: SP.sm,
+    borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: BG,
+  },
 
   // Scroll
   scrollView: { flex: 1 },
