@@ -21,6 +21,7 @@ import {
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
 import { generatePolicyDraft, getStorefront } from '@/services/storeService';
 import { useApi } from '@/lib/api';
+import { CancelWindowSetting } from '@/components/seller/CancelWindowSetting';
 
 export type PolicyType = 'shipping' | 'return' | 'refund' | 'privacy' | 'terms' | 'pre_order';
 
@@ -246,6 +247,7 @@ export default function StorePoliciesScreen() {
             })}
           </View>
 
+          <CancelWindowSetting />
         </ScrollView>
       )}
     </View>

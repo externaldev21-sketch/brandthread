@@ -39,6 +39,12 @@ describe('lib/returns', () => {
     expect(returnHeadline(v, 'seller', money).body).toContain('Jordan Reyes');
     const refunded = adaptReturnRow({ ...row, status: 'refunded', refundAmountCents: 16000 });
     expect(returnHeadline(refunded, 'buyer', money).title).toBe('Refunded $160.00');
+    // Item 124: a real date (refund time + 10 business days), not fixed copy.
+    expect(returnHeadline({ ...refunded, updatedAt: new Date(2026, 9, 13, 12).toISOString() }, 'buyer', money).body)
+      .toMatch(/^Back to your original payment method\. Expected by .+\.$/);
+    expect(adaptReturnRow({ ...row, returnLabelUrl: 'https://shippo.test/label.pdf', returnTrackingNumber: '9400' }).returnLabelUrl)
+      .toBe('https://shippo.test/label.pdf');
+    expect(adaptReturnRow(row).returnLabelUrl).toBeNull();
     const denied = adaptReturnRow({ ...row, status: 'denied', sellerResponse: 'Tags were removed.' });
     expect(returnHeadline(denied, 'buyer', money)).toEqual({ title: 'Return declined', body: 'Northline Studio: “Tags were removed.”' });
     expect(returnHeadline(adaptReturnRow({ ...row, status: 'approved' }), 'seller', money).title).toBe('Approved, refund not issued yet');
@@ -50,7 +56,9 @@ describe('lib/returns', () => {
     expect(returnSteps(v, 'seller')[1].label).toBe('You review the request');
     expect(returnSteps(v, 'buyer')[1].label).toBe('Seller reviews your request');
     expect(returnSteps({ ...v, status: 'refunded', updatedAt: '2026-09-22T09:00:00Z' }).map(s => `${s.key}:${s.state}`))
-      .toEqual(['requested:done', 'review:done', 'refund:current']);
+      .toEqual(['requested:done', 'review:done', 'refund:current', 'arrives:upcoming']);
+    expect(returnSteps({ ...v, status: 'refunded', updatedAt: '2026-09-22T09:00:00Z' }, 'seller').map(s => s.key))
+      .toEqual(['requested', 'review', 'refund']);
     const declined = returnSteps({ ...v, status: 'denied', updatedAt: '2026-09-21T09:00:00Z' });
     expect(declined.map(s => s.key)).toEqual(['requested', 'declined']);
     expect(declined[1].at).toBe('2026-09-21T09:00:00Z');

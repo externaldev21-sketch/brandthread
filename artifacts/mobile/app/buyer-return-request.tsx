@@ -170,12 +170,14 @@ export default function BuyerReturnRequestScreen() {
     }
   }
 
+  // Item 122: three taps (reason → optional photos → send). Walmart's
+  // "What is the issue? (Required)" / "Add a comment (Optional)" pattern:
+  // only the reason is required; the server stores an empty note as null.
   const reasonMissing = !reason;
-  const descriptionMissing = description.trim().length === 0;
 
   async function handleSubmit() {
     setAttempted(true);
-    if (!order || reasonMissing || descriptionMissing || submitting) return;
+    if (!order || reasonMissing || submitting) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSubmitting(true);
     setSubmitError(null);
@@ -342,9 +344,9 @@ export default function BuyerReturnRequestScreen() {
         </Section>
         {attempted && reasonMissing ? <Text style={s.fieldError}>Choose a reason.</Text> : null}
 
-        <Section title="Tell the seller what happened">
+        <Section title="Tell the seller what happened" subtitle="Optional">
           <TextInput
-            style={[s.textarea, attempted && descriptionMissing && { borderColor: theme.text }]}
+            style={s.textarea}
             value={description}
             onChangeText={text => setDescription(text.slice(0, MAX_NOTES))}
             placeholder="What’s wrong with the item? Details help the seller decide faster."
@@ -357,7 +359,6 @@ export default function BuyerReturnRequestScreen() {
           />
           <Text style={s.counter}>{description.length}/{MAX_NOTES}</Text>
         </Section>
-        {attempted && descriptionMissing ? <Text style={s.fieldError}>Describe the problem so the seller can review it.</Text> : null}
 
         <Section title="Photos" subtitle={`Optional, up to ${MAX_PHOTOS}. Show the problem and the label or tags.`}>
           <View style={s.photoGrid}>

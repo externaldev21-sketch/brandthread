@@ -553,6 +553,8 @@ export interface BuyerOrderView {
   isCustomerVisible?: boolean;
   /** Delivery guarantee block; absent on responses from before the guarantee shipped. */
   delivery?: BuyerDelivery;
+  /** When the buyer's self-cancel closes (seller-set window, item 129); absent on older responses. */
+  buyerCancelDeadline?: string | null;
   createdAt: string;
 }
 

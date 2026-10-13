@@ -54,6 +54,8 @@ import { ShipmentHeadline, ShipmentMapPlaceholder, hasShipped, type ShipmentInfo
 import { formatCents } from '@/lib/money';
 import { visibleOrderForBuyer } from '@/lib/buyerOrdersVisibility';
 import { canBuyerCancel } from '@/services/orderPolicy';
+import { CancelDeadlineNote } from '@/components/orders/CancelDeadlineNote';
+import { refundExpectedLabel } from '@/lib/refundEta';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
@@ -508,6 +510,7 @@ export function adaptOrderDetail(row: any): BuyerOrderView {
     cancellationReason: row.cancellationReason ?? null,
     cancellationNotes:  row.cancellationNotes ?? null,
     isCustomerVisible: row.isCustomerVisible === true,
+    buyerCancelDeadline: typeof row.buyerCancelDeadline === 'string' ? row.buyerCancelDeadline : null,
     delivery,
     createdAt:         row.createdAt ?? new Date().toISOString(),
   };
@@ -850,7 +853,7 @@ export default function BuyerOrderDetailScreen() {
       if (result.cancelled) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         const msg = result.refunded
-          ? 'Your order has been cancelled and a full refund has been issued. It may take 5–10 business days to appear on your statement.'
+          ? `Your order has been cancelled and a full refund has been issued. ${refundExpectedLabel(new Date())} on your statement.`
           : 'Your order has been cancelled.';
         Alert.alert('Order Cancelled', msg, [{ text: 'OK', onPress: () => goBackOr(router, '/(buyer)/orders') }]);
       }
@@ -1044,6 +1047,9 @@ export default function BuyerOrderDetailScreen() {
               {returnRequest.refundAmountCents != null && (
                 <Text style={styles.returnDetail}>Refunded: {formatCents(returnRequest.refundAmountCents)}</Text>
               )}
+              {returnRequest.status === 'refunded' && refundExpectedLabel(returnRequest.updatedAt) ? (
+                <Text style={styles.returnDetail}>{refundExpectedLabel(returnRequest.updatedAt)} on your statement</Text>
+              ) : null}
               {returnRequest.sellerResponse ? (
                 <View style={styles.sellerResponse}>
                   <Text style={[styles.sellerResponseLabel, { color: theme.muted }]}>Seller response</Text>
@@ -1216,7 +1222,8 @@ export default function BuyerOrderDetailScreen() {
 
         {/* ── 6. Contextual secondary actions ─────────────────────────────── */}
         <View style={{ paddingHorizontal: SP.md, gap: SP.sm, marginBottom: SP.md }}>
-          {canBuyerCancel(order.status, order.createdAt) && (
+          {canBuyerCancel(order.status, order.createdAt, Date.now(), order.buyerCancelDeadline) && (
+            <>
             <SecondaryButton
               label={cancelling ? 'Cancelling…' : 'Cancel Order'}
               icon="x-circle"
@@ -1224,6 +1231,8 @@ export default function BuyerOrderDetailScreen() {
               accent={theme.error}
               disabled={cancelling}
             />
+            <CancelDeadlineNote deadline={order.buyerCancelDeadline} />
+            </>
           )}
           {returnRequest || isReturnEligible(order.status) ? (
             <SecondaryButton
@@ -1293,7 +1302,7 @@ export default function BuyerOrderDetailScreen() {
                 <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text }}>Cancel this order?</Text>
               </View>
               <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 20, marginBottom: SP.lg }}>
-                Your payment will be fully refunded. Refunds typically appear within 5–10 business days depending on your bank.
+                Your payment will be fully refunded. {refundExpectedLabel(new Date())} on your statement.
               </Text>
               <View style={{ flexDirection: 'row', gap: SP.sm }}>
                 <SecondaryButton label="Keep Order" onPress={() => setShowCancelModal(false)} style={{ flex: 1 }} />

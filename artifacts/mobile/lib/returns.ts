@@ -9,6 +9,7 @@
  * yet; approving again retries the same refund.
  */
 import { RETURN_REASON_OPTIONS } from '@/services/cartTypes';
+import { refundExpectedLabel } from '@/lib/refundEta';
 
 export type ReturnStatusKey = 'pending' | 'approved' | 'denied' | 'refunded';
 export type ReturnViewer = 'buyer' | 'seller';
@@ -39,6 +40,10 @@ export interface ReturnView {
   sellerResponse: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Prepaid return label (migration 241); null until the seller buys one. */
+  returnLabelUrl?: string | null;
+  returnCarrier?: string | null;
+  returnTrackingNumber?: string | null;
 }
 
 const STATUSES: ReturnStatusKey[] = ['pending', 'approved', 'denied', 'refunded'];
@@ -71,6 +76,9 @@ export function adaptReturnRow(row: any): ReturnView {
     sellerResponse: row?.sellerResponse ?? null,
     createdAt: row?.createdAt ?? new Date(0).toISOString(),
     updatedAt: row?.updatedAt ?? row?.createdAt ?? new Date(0).toISOString(),
+    returnLabelUrl: typeof row?.returnLabelUrl === 'string' && row.returnLabelUrl ? row.returnLabelUrl : null,
+    returnCarrier: typeof row?.returnCarrier === 'string' && row.returnCarrier ? row.returnCarrier : null,
+    returnTrackingNumber: typeof row?.returnTrackingNumber === 'string' && row.returnTrackingNumber ? row.returnTrackingNumber : null,
   };
 }
 
@@ -106,7 +114,7 @@ export function statusLabel(status: ReturnStatusKey): string {
 }
 
 /** The status screen's headline for each side. */
-export function returnHeadline(view: Pick<ReturnView, 'status' | 'buyerName' | 'sellerName' | 'refundAmountCents' | 'sellerResponse' | 'orderNumber'>, viewer: ReturnViewer, money: (cents: number) => string): { title: string; body: string } {
+export function returnHeadline(view: Pick<ReturnView, 'status' | 'buyerName' | 'sellerName' | 'refundAmountCents' | 'sellerResponse' | 'orderNumber'> & { updatedAt?: string }, viewer: ReturnViewer, money: (cents: number) => string): { title: string; body: string } {
   const amount = view.refundAmountCents != null ? money(view.refundAmountCents) : null;
   switch (view.status) {
     case 'pending':
@@ -119,7 +127,7 @@ export function returnHeadline(view: Pick<ReturnView, 'status' | 'buyerName' | '
         : { title: 'Approved, refund not issued yet', body: 'The refund didn’t go through. Try it again. The buyer is never refunded twice.' };
     case 'refunded':
       return viewer === 'buyer'
-        ? { title: amount ? `Refunded ${amount}` : 'Refunded', body: 'Back to your original payment method. It can take 5–10 business days to appear.' }
+        ? { title: amount ? `Refunded ${amount}` : 'Refunded', body: `Back to your original payment method. ${refundExpectedLabel(view.updatedAt) ?? 'It can take 5–10 business days to appear'}.` }
         : { title: amount ? `Refunded ${amount}` : 'Refunded', body: `Refunded to ${view.buyerName}’s original payment method.` };
     case 'denied':
       return viewer === 'buyer'
@@ -137,10 +145,13 @@ export function returnSteps(view: Pick<ReturnView, 'status' | 'createdAt' | 'upd
     return [requested, { key: 'declined', label: 'Declined by the seller', state: 'current', at: view.updatedAt }];
   }
   if (view.status === 'refunded') {
+    // Vinted's refund progress: the last step is the date the money is due.
+    const expected = viewer === 'buyer' ? refundExpectedLabel(view.updatedAt) : null;
     return [
       requested,
       { key: 'review', label: 'Approved by the seller', state: 'done' },
       { key: 'refund', label: 'Refund issued', state: 'current', at: view.updatedAt },
+      ...(expected ? [{ key: 'arrives', label: `${expected} on your statement`, state: 'upcoming' as ReturnStepState }] : []),
     ];
   }
   if (view.status === 'approved') {
