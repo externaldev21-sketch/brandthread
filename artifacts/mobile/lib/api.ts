@@ -9,6 +9,7 @@ import { sessionProgress, uploadResumeKey, uploadStrategy, withUploadRetry } fro
 import { useAuth } from '@clerk/expo';
 import type { LaunchChecklistResponse } from '@/lib/launchChecklist';
 import type { FriendsSaved } from '@/lib/friendsSaved';
+import type { PriceHistory } from '@/lib/priceHistory';
 import type {
   AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
   ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
@@ -2514,6 +2515,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         /** People you follow who saved this product (only saves they let followers see). */
         friends: (productId: string) =>
           get<FriendsSaved>(`/api/buyer/saved/friends/${encodeURIComponent(productId)}`),
+        /** "Tell me if the price drops" on a saved product — off until the buyer turns it on. */
+        priceAlert: {
+          get: (productId: string) =>
+            get<{ saved: boolean; enabled: boolean }>(`/api/buyer/saved/${encodeURIComponent(productId)}/price-alert`),
+          set: (productId: string, enabled: boolean) =>
+            put<{ saved: boolean; enabled: boolean }>(`/api/buyer/saved/${encodeURIComponent(productId)}/price-alert`, { enabled }),
+        },
       },
       /** Server-side cart — full-replace sync model. */
       cart: {
@@ -2896,6 +2904,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         return get<any[]>(`/api/public/products${q ? `?${q}` : ''}`);
       },
       get: (id: string) => get<any>(`/api/public/products/${encodeURIComponent(id)}`),
+      /** 90-day lowest-price history for the product page chart (empty unless it changed). */
+      priceHistory: (id: string) =>
+        get<PriceHistory>(`/api/public/products/${encodeURIComponent(id)}/price-history`),
       related: (productId: string, limit?: number) =>
         get<any[]>(`/api/public/products/${encodeURIComponent(productId)}/related${limit ? `?limit=${limit}` : ''}`),
       /** Product-backed rows that meet the platform qualified high-demand criteria.

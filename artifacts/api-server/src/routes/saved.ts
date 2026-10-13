@@ -6,6 +6,8 @@
  *                                              set per-item alerts { notifyOnPriceDrop, notifyOnBackInStock }
  * DELETE /api/buyer/saved/:targetId           — unsave
  * GET    /api/buyer/saved/friends/:productId  — people you follow who saved this product
+ * GET    /api/buyer/saved/:targetId/price-alert — { saved, enabled }
+ * PUT    /api/buyer/saved/:targetId/price-alert — "Tell me if the price drops" on/off
  */
 import { Router } from "express";
 import { db, savedItems, savedCollections, posts } from "@workspace/db";
@@ -165,6 +167,26 @@ router.patch("/:targetId", validateInput({ params: targetParams, body: moveItemB
     .returning();
   if (!row) return res.status(404).json({ error: "Saved item not found" });
   return res.json((await adaptSavedRows([row]))[0]);
+});
+
+router.get("/:targetId/price-alert", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const [row] = await db.select({ enabled: savedItems.notifyOnPriceDrop }).from(savedItems)
+    .where(and(eq(savedItems.userId, userId), eq(savedItems.targetId, req.params.targetId)))
+    .limit(1);
+  return res.json({ saved: !!row, enabled: row?.enabled ?? false });
+});
+
+router.put("/:targetId/price-alert", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { enabled } = req.body as { enabled?: unknown };
+  if (typeof enabled !== "boolean") return res.status(400).json({ error: "enabled must be a boolean" });
+  const [row] = await db.update(savedItems)
+    .set({ notifyOnPriceDrop: enabled })
+    .where(and(eq(savedItems.userId, userId), eq(savedItems.targetId, req.params.targetId), eq(savedItems.itemType, "product")))
+    .returning({ enabled: savedItems.notifyOnPriceDrop });
+  if (!row) return res.status(404).json({ error: "Saved item not found" });
+  return res.json({ saved: true, enabled: row.enabled });
 });
 
 router.delete("/:targetId", validateInput({ params: targetParams }), async (req, res) => {

@@ -165,6 +165,7 @@ import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { useAutoSelectSize } from '@/hooks/useAutoSelectSize';
 import { FriendsSavedLine } from '@/components/products/FriendsSavedLine';
+import { PriceHistoryChart } from '@/components/products/PriceHistoryChart';
 import { ApiError } from '@/lib/networkNotice';
 
 type ThemeAliases = {
@@ -1871,6 +1872,7 @@ export default function BuyerProductDetailScreen() {
           {/* Bundle & save — active bundles with this product; renders nothing when none. */}
 
 
+          <PriceHistoryChart productId={product.id} />
 
           <View style={s.divider} />
           <ProductSellerRow
