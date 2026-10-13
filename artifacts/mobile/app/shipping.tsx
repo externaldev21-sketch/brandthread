@@ -10,7 +10,10 @@ import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
-import { returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
+import { quickApproveMessage, returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
+import { Button } from '@/components/ui';
+import { Snackbar } from '@/components/ui/Snackbar';
+import { hapticSuccess } from '@/lib/haptics';
 import { FS, SP, RADIUS } from '@/lib/theme';
 import { dbStatusToOrderStatus } from '@/lib/orderStatusAdapter';
 import { parseDecimalToCents } from '@/lib/money';
@@ -131,6 +134,10 @@ export default function ShippingScreen() {
   const api = useApi();
 
   const [sellerReturns, setSellerReturns] = useState<any[]>([]);
+  // One-tap approve on a pending return row (full refund).
+  const [approvingReturnId, setApprovingReturnId] = useState<string | null>(null);
+  const [returnRowError, setReturnRowError] = useState<{ id: string; message: string } | null>(null);
+  const [returnToast, setReturnToast] = useState<string | null>(null);
   const [orders, setOrders] = useState<any[]>([]);
 
   // Legacy flat-rate list — still supported server-side as a fallback, shown
@@ -202,6 +209,30 @@ export default function ShippingScreen() {
   function returnBadge(_status: string) {
     return 'default';
   }
+
+  async function approveReturnFromList(r: any) {
+    setApprovingReturnId(r.id);
+    setReturnRowError(null);
+    try {
+      const updated = await api.returns.updateStatus(r.id, { status: 'approved' });
+      setSellerReturns(prev => prev.map(row => (row.id === r.id ? { ...row, ...updated } : row)));
+      if (updated?.status === 'refunded') hapticSuccess();
+      setReturnToast(quickApproveMessage(updated, formatCents));
+    } catch (err) {
+      const raw = (err as { body?: string } | null)?.body ?? '';
+      let message = '';
+      try { message = JSON.parse(raw)?.error ?? ''; } catch { message = ''; }
+      setReturnRowError({ id: r.id, message: message || 'Couldn’t approve this return. Check your connection and try again.' });
+    } finally {
+      setApprovingReturnId(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!returnToast) return;
+    const timer = setTimeout(() => setReturnToast(null), 2500);
+    return () => clearTimeout(timer);
+  }, [returnToast]);
 
   // ── Ship-from country ────────────────────────────────────────────────────
 
@@ -510,11 +541,11 @@ export default function ShippingScreen() {
           </View>
         ) : (
           sellerReturns.map((r, i) => (
-            // Item 108: rows read the API's camelCase fields (they read
-            // r.buyer_id, so every row said "Buyer —") and open the return.
+            <View key={r.id} style={i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }}>
+            {/* Item 108: rows read the API's camelCase fields (they read
+                r.buyer_id, so every row said "Buyer —") and open the return. */}
             <TouchableOpacity
-              key={r.id}
-              style={[styles.returnRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
+              style={styles.returnRow}
               onPress={() => router.push(`/return-detail?returnId=${encodeURIComponent(r.id)}` as never)}
               activeOpacity={0.8}
               accessibilityRole="button"
@@ -530,6 +561,38 @@ export default function ShippingScreen() {
               <Badge label={returnStatusLabel(r.status as ReturnStatusKey)} variant={returnBadge(r.status) as any} />
               <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
+            {r.status === 'pending' ? (
+              // One-tap decision (Shopify returns): Approve refunds in full; Decline asks for the reason.
+              <View style={styles.returnActions}>
+                {returnRowError?.id === r.id ? (
+                  <Text style={[styles.returnReason, { color: colors.foreground }]} accessibilityRole="alert">{returnRowError?.message}</Text>
+                ) : null}
+                <View style={styles.returnActionRow}>
+                  <Button
+                    label="Decline"
+                    variant="secondary"
+                    size="small"
+                    style={{ flex: 1 }}
+                    disabled={approvingReturnId !== null}
+                    onPress={() => router.push(`/return-detail?returnId=${encodeURIComponent(r.id)}&decline=1` as never)}
+                    accessibilityLabel={`Decline return for order ${r.orderNumber ?? ''}`}
+                    testID={`return-row-decline-${r.id}`}
+                  />
+                  <Button
+                    label="Approve"
+                    variant="primary"
+                    size="small"
+                    style={{ flex: 1 }}
+                    loading={approvingReturnId === r.id}
+                    disabled={approvingReturnId !== null}
+                    onPress={() => { void approveReturnFromList(r); }}
+                    accessibilityLabel={`Approve and refund the return for order ${r.orderNumber ?? ''}`}
+                    testID={`return-row-approve-${r.id}`}
+                  />
+                </View>
+              </View>
+            ) : null}
+            </View>
           ))
         )}
       </View>
@@ -739,6 +802,8 @@ export default function ShippingScreen() {
         )}
       </View>
     </ScrollView>
+
+    <Snackbar visible={!!returnToast} message={returnToast ?? ''} onDismiss={() => setReturnToast(null)} />
 
     {/* ── Zone editor sheet ────────────────────────────────────────────────── */}
     {zoneSheetVisible && (
@@ -1083,6 +1148,8 @@ const styles = StyleSheet.create({
   stepDot: { width: 8, height: 8, borderRadius: 4 },
   stepLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium' },
   returnRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  returnActions: { paddingHorizontal: 14, paddingBottom: 14, gap: 8 },
+  returnActionRow: { flexDirection: 'row', gap: 8 },
   returnInfo: { flex: 1, gap: 2 },
   returnId: { fontSize: 11, fontFamily: 'Inter_700Bold' },
   returnItem: { fontSize: 13, fontFamily: 'Inter_500Medium' },

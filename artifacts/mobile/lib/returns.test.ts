@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  activeReturnFor, adaptReturnRow, isReturnEligible, itemsTotalCents, returnHeadline, returnReasonLabel,
-  returnSteps, returnSubmitError, statusLabel,
+  activeReturnFor, adaptReturnRow, isReturnEligible, itemsTotalCents, parseRefundAmount, quickApproveMessage,
+  returnHeadline, returnReasonLabel, returnSteps, returnSubmitError, statusLabel,
 } from './returns';
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
@@ -42,6 +42,30 @@ describe('lib/returns', () => {
     const denied = adaptReturnRow({ ...row, status: 'denied', sellerResponse: 'Tags were removed.' });
     expect(returnHeadline(denied, 'buyer', money)).toEqual({ title: 'Return declined', body: 'Northline Studio: “Tags were removed.”' });
     expect(returnHeadline(adaptReturnRow({ ...row, status: 'approved' }), 'seller', money).title).toBe('Approved, refund not issued yet');
+  });
+
+  it('reads the prepaid return label and refund-on-scan', () => {
+    const v = adaptReturnRow({ ...row, status: 'approved', refundOnScan: true, refundAmountCents: 2000, returnLabelUrl: 'https://l/1.pdf', returnCarrier: 'USPS', returnTrackingNumber: '9400' });
+    expect(v).toMatchObject({ refundOnScan: true, returnLabelUrl: 'https://l/1.pdf', returnCarrier: 'USPS', returnTrackingNumber: '9400' });
+    expect(adaptReturnRow(row)).toMatchObject({ refundOnScan: false, returnLabelUrl: null });
+    expect(returnHeadline(v, 'seller', money)).toEqual({
+      title: 'Approved, refund on first scan',
+      body: 'The refund of $20.00 is issued when the carrier first scans Jordan Reyes’s parcel.',
+    });
+    expect(returnHeadline(v, 'buyer', money).title).toBe('Return approved');
+  });
+
+  it('parses the seller refund amount', () => {
+    expect(parseRefundAmount('24.99', 16000)).toEqual({ cents: 2499 });
+    expect(parseRefundAmount('$160', 16000)).toEqual({ cents: 16000 });
+    expect(parseRefundAmount('160.01', 16000)).toHaveProperty('error');
+    expect(parseRefundAmount('0', 16000)).toHaveProperty('error');
+    expect(parseRefundAmount('abc', 16000)).toHaveProperty('error');
+  });
+
+  it('one-tap approve toast says what happened', () => {
+    expect(quickApproveMessage({ status: 'refunded', refundAmountCents: 16000 }, money)).toBe('Refunded $160.00');
+    expect(quickApproveMessage({ status: 'approved' }, money)).toBe('Approved. Open the return to retry the refund.');
   });
 
   it('steps come from real status and timestamps', () => {

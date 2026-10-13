@@ -25,15 +25,25 @@
  *
  * References (Mobbin): the Shopee "Return/Refund Details" stepper and
  * Klarna's vertical return timeline.
+ *
+ * Item 52 added the seller's missing options, Shopify "Refund" style: a
+ * refund amount field (partial refunds, "$X available for refund"), "Refund
+ * when the carrier scans it" (approve now, refund on the first scan), and
+ * "Send prepaid return label" (POST /api/return-labels/:id, which approves and
+ * refunds on scan). `?decline=1` (Decline on the returns list) opens the
+ * reason form directly.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { View, Text, ScrollView, StyleSheet, TextInput, Image, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TextInput, Image, ActivityIndicator, Linking } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BrandthreadCard, BrandthreadScreen, EmptyState } from '@/components/BrandthreadUI';
+import { BrandthreadCard, BrandthreadScreen, EmptyState, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
+import { Snackbar } from '@/components/ui/Snackbar';
+import { hapticSuccess } from '@/lib/haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -42,9 +52,19 @@ import { formatCents } from '@/lib/money';
 import { useApi } from '@/hooks/useApi';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
-  adaptReturnRow, itemsTotalCents, returnHeadline, returnReasonLabel, returnSteps, statusLabel,
+  adaptReturnRow, itemsTotalCents, parseRefundAmount, returnHeadline, returnReasonLabel, returnSteps, statusLabel,
   type ReturnView, type ReturnViewer,
 } from '@/lib/returns';
+
+/** Last return address + package the seller used, so the next label is one tap (this device only). */
+const RETURN_LABEL_DEFAULTS_KEY = '@brandthread/return-label-defaults:v1';
+type LabelForm = { name: string; street1: string; city: string; state: string; zip: string; weight: string; length: string; width: string; height: string };
+const EMPTY_LABEL_FORM: LabelForm = { name: '', street1: '', city: '', state: '', zip: '', weight: '', length: '', width: '', height: '' };
+
+function positive(value: string): number | null {
+  const n = Number(value.trim());
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 function fmtDateTime(iso: string) {
   const d = new Date(iso);
@@ -55,7 +75,7 @@ function fmtDateTime(iso: string) {
 export default function ReturnDetailScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
-  const { returnId } = useLocalSearchParams<{ returnId: string }>();
+  const { returnId, decline } = useLocalSearchParams<{ returnId: string; decline?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -66,8 +86,16 @@ export default function ReturnDetailScreen() {
   const [loadError, setLoadError] = useState<'network' | 'not_found' | null>(null);
   const [acting, setActing] = useState<'approve' | 'deny' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [showDenyForm, setShowDenyForm] = useState(false);
+  const [showDenyForm, setShowDenyForm] = useState(decline === '1');
   const [denyReason, setDenyReason] = useState('');
+  // Item 52: partial refund, refund on scan, prepaid return label.
+  const [refundText, setRefundText] = useState('');
+  const [refundOnScan, setRefundOnScan] = useState(false);
+  const [showLabelForm, setShowLabelForm] = useState(false);
+  const [labelForm, setLabelForm] = useState<LabelForm>(EMPTY_LABEL_FORM);
+  const [buyingLabel, setBuyingLabel] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const refundTextFor = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     if (!returnId) { setLoadError('not_found'); setLoading(false); return; }
@@ -87,24 +115,97 @@ export default function ReturnDetailScreen() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (!view || refundTextFor.current === view.id) return;
+    refundTextFor.current = view.id;
+    const cents = view.refundAmountCents ?? (view.orderTotalCents || itemsTotalCents(view.items));
+    setRefundText(cents > 0 ? (cents / 100).toFixed(2) : '');
+  }, [view]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    if (!showLabelForm) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem(RETURN_LABEL_DEFAULTS_KEY);
+        if (saved && !cancelled) setLabelForm(prev => ({ ...prev, ...JSON.parse(saved) }));
+      } catch { /* first label: the seller types it */ }
+    })();
+    return () => { cancelled = true; };
+  }, [showLabelForm]);
+
   const viewer: ReturnViewer = view && userId && view.sellerId === userId && view.buyerId !== userId ? 'seller' : 'buyer';
 
-  async function updateStatus(status: 'approved' | 'denied', sellerResponse?: string) {
+  function errorMessage(err: unknown, fallback: string): string {
+    const raw = (err as { body?: string } | null)?.body ?? '';
+    let message = '';
+    try { message = JSON.parse(raw)?.error ?? ''; } catch { message = ''; }
+    return message || fallback;
+  }
+
+  async function updateStatus(
+    status: 'approved' | 'denied',
+    sellerResponse?: string,
+    extra: { refundAmountCents?: number; refundOnScan?: boolean } = {},
+  ) {
     if (!view) return;
     setActing(status === 'approved' ? 'approve' : 'deny');
     setActionError(null);
     try {
-      await api.returns.updateStatus(view.id, { status, sellerResponse });
+      const updated = await api.returns.updateStatus(view.id, { status, sellerResponse, ...extra });
       setShowDenyForm(false);
       setDenyReason('');
+      if (status === 'approved') {
+        hapticSuccess();
+        setToast(updated?.status === 'refunded'
+          ? (typeof updated.refundAmountCents === 'number' ? `Refunded ${formatCents(updated.refundAmountCents)}` : 'Refunded')
+          : extra.refundOnScan ? 'Return approved' : 'Approved. Refund not confirmed yet');
+      } else {
+        setToast('Return declined');
+      }
       await load();
     } catch (err) {
-      const raw = (err as { body?: string } | null)?.body ?? '';
-      let message = '';
-      try { message = JSON.parse(raw)?.error ?? ''; } catch { message = ''; }
-      setActionError(message || 'Couldn’t update this return. Check your connection and try again.');
+      setActionError(errorMessage(err, 'Couldn’t update this return. Check your connection and try again.'));
     } finally {
       setActing(null);
+    }
+  }
+
+  async function sendReturnLabel(refundAmountCents: number | undefined) {
+    if (!view) return;
+    const f = labelForm;
+    const parcel = { weight: positive(f.weight), length: positive(f.length), width: positive(f.width), height: positive(f.height) };
+    if (![f.name, f.street1, f.city, f.state, f.zip].every(v => v.trim())) {
+      setActionError('Add your full return address.');
+      return;
+    }
+    if (Object.values(parcel).some(v => v == null)) {
+      setActionError('Add the package weight and size.');
+      return;
+    }
+    setBuyingLabel(true);
+    setActionError(null);
+    try {
+      const result = await api.returns.sendReturnLabel(view.id, {
+        returnAddress: { name: f.name.trim(), street1: f.street1.trim(), city: f.city.trim(), state: f.state.trim(), zip: f.zip.trim(), country: 'US' },
+        parcel: parcel as { weight: number; length: number; width: number; height: number },
+        ...(refundAmountCents !== undefined ? { refundAmountCents } : {}),
+      });
+      try { await AsyncStorage.setItem(RETURN_LABEL_DEFAULTS_KEY, JSON.stringify(f)); } catch { /* convenience only */ }
+      hapticSuccess();
+      setShowLabelForm(false);
+      setToast(result?.label?.carrier ? `${result.label.carrier} label sent` : 'Return label sent');
+      await load();
+    } catch (err) {
+      setActionError(errorMessage(err, 'Couldn’t create the return label. Check the address and try again.'));
+    } finally {
+      setBuyingLabel(false);
     }
   }
 
@@ -151,6 +252,11 @@ export default function ReturnDetailScreen() {
   const steps = returnSteps(view, viewer);
   const itemsTotal = itemsTotalCents(view.items);
   const refundBasis = view.orderTotalCents || itemsTotal;
+  const parsedRefund = parseRefundAmount(refundText, refundBasis);
+  const refundError = 'error' in parsedRefund ? parsedRefund.error : null;
+  const refundCents = 'cents' in parsedRefund ? parsedRefund.cents : refundBasis;
+  // Only send an amount when it is a partial refund; otherwise the server refunds all that's refundable.
+  const partialCents = 'cents' in parsedRefund && parsedRefund.cents < refundBasis ? parsedRefund.cents : undefined;
   const orderHref = viewer === 'seller' ? `/order-detail?id=${encodeURIComponent(view.orderId)}` : `/buyer-order-detail?id=${encodeURIComponent(view.orderId)}`;
 
   return (
@@ -198,13 +304,13 @@ export default function ReturnDetailScreen() {
         </BrandthreadCard>
 
         {/* Seller actions */}
-        {viewer === 'seller' && (view.status === 'pending' || view.status === 'approved') ? (
+        {viewer === 'seller' && view.status === 'pending' ? (
           <BrandthreadCard>
-            <Text style={s.cardTitle}>{view.status === 'pending' ? 'Your decision' : 'Refund'}</Text>
+            <Text style={s.cardTitle}>Your decision</Text>
             <Text style={s.cardBody}>
-              {view.status === 'pending'
-                ? `Approving refunds ${formatCents(refundBasis)} to ${view.buyerName}’s original payment. Declining keeps the order as it is. Tell the buyer why.`
-                : `The refund of ${formatCents(refundBasis)} hasn’t been confirmed yet. Retrying is safe: the buyer is only ever refunded once.`}
+              {refundOnScan
+                ? `Approving keeps the order open until the carrier scans ${view.buyerName}’s parcel, then refunds ${formatCents(refundCents)}.`
+                : `Approving refunds ${formatCents(refundCents)} to ${view.buyerName}’s original payment. Declining keeps the order as it is. Tell the buyer why.`}
             </Text>
             {actionError ? (
               <View style={s.inlineError} accessibilityRole="alert" testID="return-action-error">
@@ -212,29 +318,7 @@ export default function ReturnDetailScreen() {
                 <Text style={s.inlineErrorText}>{actionError}</Text>
               </View>
             ) : null}
-            {!showDenyForm ? (
-              <View style={s.actions}>
-                <Button
-                  label={view.status === 'pending' ? `Approve and refund ${formatCents(refundBasis)}` : 'Retry refund'}
-                  variant="primary"
-                  fullWidth
-                  loading={acting === 'approve'}
-                  disabled={acting !== null}
-                  onPress={() => { void updateStatus('approved'); }}
-                  testID="return-approve"
-                />
-                {view.status === 'pending' ? (
-                  <Button
-                    label="Decline"
-                    variant="secondary"
-                    fullWidth
-                    disabled={acting !== null}
-                    onPress={() => { setActionError(null); setShowDenyForm(true); }}
-                    testID="return-decline"
-                  />
-                ) : null}
-              </View>
-            ) : (
+            {showDenyForm ? (
               <View style={s.actions}>
                 <Text style={s.fieldLabel}>Reason for the buyer</Text>
                 <TextInput
@@ -244,6 +328,7 @@ export default function ReturnDetailScreen() {
                   placeholder="e.g. The item was worn and the tags were removed."
                   placeholderTextColor={theme.subtle}
                   multiline
+                  autoFocus={decline === '1'}
                   accessibilityLabel="Reason for declining"
                   testID="return-decline-reason"
                 />
@@ -260,7 +345,136 @@ export default function ReturnDetailScreen() {
                   />
                 </View>
               </View>
+            ) : (
+              <View style={s.actions}>
+                <FormInput
+                  label="Refund amount"
+                  value={refundText}
+                  onChange={setRefundText}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  error={refundError}
+                  helper={`${formatCents(refundBasis)} available for refund`}
+                />
+                {showLabelForm ? (
+                  <View style={s.actions}>
+                    <Text style={s.fieldLabel}>Your return address</Text>
+                    <FormInput label="Name" value={labelForm.name} onChange={v => setLabelForm(f => ({ ...f, name: v }))} placeholder="Store or your name" />
+                    <FormInput label="Street" value={labelForm.street1} onChange={v => setLabelForm(f => ({ ...f, street1: v }))} placeholder="Street address" />
+                    <View style={s.row}>
+                      <FormInput label="City" value={labelForm.city} onChange={v => setLabelForm(f => ({ ...f, city: v }))} style={{ flex: 2 }} />
+                      <FormInput label="State" value={labelForm.state} onChange={v => setLabelForm(f => ({ ...f, state: v }))} style={{ flex: 1 }} />
+                    </View>
+                    <FormInput label="ZIP" value={labelForm.zip} onChange={v => setLabelForm(f => ({ ...f, zip: v }))} keyboardType="numeric" />
+                    <Text style={s.fieldLabel}>Package</Text>
+                    <View style={s.row}>
+                      <FormInput label="Weight (lb)" value={labelForm.weight} onChange={v => setLabelForm(f => ({ ...f, weight: v }))} keyboardType="decimal-pad" style={{ flex: 1 }} />
+                      <FormInput label="L (in)" value={labelForm.length} onChange={v => setLabelForm(f => ({ ...f, length: v }))} keyboardType="decimal-pad" style={{ flex: 1 }} />
+                    </View>
+                    <View style={s.row}>
+                      <FormInput label="W (in)" value={labelForm.width} onChange={v => setLabelForm(f => ({ ...f, width: v }))} keyboardType="decimal-pad" style={{ flex: 1 }} />
+                      <FormInput label="H (in)" value={labelForm.height} onChange={v => setLabelForm(f => ({ ...f, height: v }))} keyboardType="decimal-pad" style={{ flex: 1 }} />
+                    </View>
+                    <Text style={s.cardBody}>{`The cheapest label is charged to your balance. ${view.buyerName} gets it on this return, and the refund of ${formatCents(refundCents)} is issued on the carrier’s first scan.`}</Text>
+                    <View style={s.row}>
+                      <Button label="Cancel" variant="secondary" style={{ flex: 1 }} disabled={buyingLabel} onPress={() => { setShowLabelForm(false); setActionError(null); }} />
+                      <Button
+                        label="Buy label"
+                        variant="primary"
+                        style={{ flex: 1 }}
+                        loading={buyingLabel}
+                        disabled={buyingLabel || !!refundError}
+                        onPress={() => { void sendReturnLabel(partialCents); }}
+                        testID="return-label-submit"
+                      />
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <View style={s.switchRow}>
+                      <Text style={s.switchLabel}>Refund when the carrier scans it</Text>
+                      <HapticSwitch
+                        value={refundOnScan}
+                        onValueChange={setRefundOnScan}
+                        accessibilityLabel="Refund when the carrier scans it"
+                        testID="return-refund-on-scan"
+                      />
+                    </View>
+                    <Button
+                      label={refundOnScan ? 'Approve return' : `Approve and refund ${formatCents(refundCents)}`}
+                      variant="primary"
+                      fullWidth
+                      loading={acting === 'approve'}
+                      disabled={acting !== null || !!refundError}
+                      onPress={() => { void updateStatus('approved', undefined, { refundAmountCents: partialCents, ...(refundOnScan ? { refundOnScan: true } : {}) }); }}
+                      testID="return-approve"
+                    />
+                    <Button
+                      label="Send prepaid return label"
+                      variant="secondary"
+                      icon="tag"
+                      fullWidth
+                      disabled={acting !== null || !!refundError}
+                      onPress={() => { setActionError(null); setShowLabelForm(true); }}
+                      testID="return-send-label"
+                    />
+                    <Button
+                      label="Decline"
+                      variant="secondary"
+                      fullWidth
+                      disabled={acting !== null}
+                      onPress={() => { setActionError(null); setShowDenyForm(true); }}
+                      testID="return-decline"
+                    />
+                  </>
+                )}
+              </View>
             )}
+          </BrandthreadCard>
+        ) : null}
+
+        {viewer === 'seller' && view.status === 'approved' ? (
+          <BrandthreadCard>
+            <Text style={s.cardTitle}>Refund</Text>
+            <Text style={s.cardBody}>
+              {view.refundOnScan
+                ? `${formatCents(view.refundAmountCents ?? refundBasis)} is refunded on the carrier’s first scan. Refund now if the buyer already sent it back another way.`
+                : `The refund of ${formatCents(view.refundAmountCents ?? refundBasis)} hasn’t been confirmed yet. Retrying is safe: the buyer is only ever refunded once.`}
+            </Text>
+            {actionError ? (
+              <View style={s.inlineError} accessibilityRole="alert" testID="return-action-error">
+                <Feather name="alert-circle" size={14} color={theme.text} />
+                <Text style={s.inlineErrorText}>{actionError}</Text>
+              </View>
+            ) : null}
+            <View style={s.actions}>
+              <Button
+                label={view.refundOnScan ? 'Refund now' : 'Retry refund'}
+                variant={view.refundOnScan ? 'secondary' : 'primary'}
+                fullWidth
+                loading={acting === 'approve'}
+                disabled={acting !== null}
+                onPress={() => { void updateStatus('approved', undefined, view.refundAmountCents != null ? { refundAmountCents: view.refundAmountCents } : {}); }}
+                testID="return-approve"
+              />
+            </View>
+          </BrandthreadCard>
+        ) : null}
+
+        {view.returnLabelUrl ? (
+          <BrandthreadCard>
+            <Text style={s.cardTitle}>Return label</Text>
+            <Text style={s.cardBody}>{[view.returnCarrier, view.returnTrackingNumber].filter(Boolean).join(' · ') || 'Prepaid label'}</Text>
+            <View style={s.actions}>
+              <Button
+                label="Open label"
+                variant="secondary"
+                icon="external-link"
+                fullWidth
+                onPress={() => { void Linking.openURL(view.returnLabelUrl!); }}
+                testID="return-open-label"
+              />
+            </View>
           </BrandthreadCard>
         ) : null}
 
@@ -320,6 +534,7 @@ export default function ReturnDetailScreen() {
           </Text>
         </View>
       </ScrollView>
+      <Snackbar visible={!!toast} message={toast ?? ''} onDismiss={() => setToast(null)} bottomOffset={insets.bottom + 104} />
     </BrandthreadScreen>
   );
 }
@@ -351,6 +566,8 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     backgroundColor: theme.cardElevated, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border,
     padding: SP.md, minHeight: 90, color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, textAlignVertical: 'top',
   },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 44 },
+  switchLabel: { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, color: theme.text },
   inlineError: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, marginTop: SP.sm },
   inlineErrorText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.xs + 1, color: theme.text, lineHeight: 18 },
 

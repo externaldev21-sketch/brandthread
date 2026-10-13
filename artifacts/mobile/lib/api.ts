@@ -3268,8 +3268,15 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       listBuyer:    () => get<any[]>('/api/returns/buyer'),
       listSeller:   () => get<any[]>('/api/returns'),
       get:          (id: string) => get<any>(`/api/returns/${id}`),
-      updateStatus: (id: string, data: { status: string; sellerResponse?: string; refundAmountCents?: number }) =>
+      updateStatus: (id: string, data: { status: string; sellerResponse?: string; refundAmountCents?: number; refundOnScan?: boolean }) =>
         patch<any>(`/api/returns/${id}/status`, data),
+      /** Seller buys a prepaid return label: approves the return; the refund waits for the first carrier scan. */
+      sendReturnLabel: (id: string, data: {
+        returnAddress: { name: string; street1: string; street2?: string; city: string; state: string; zip: string; country: string; phone?: string };
+        parcel: { length: number; width: number; height: number; weight: number };
+        refundAmountCents?: number;
+      }) =>
+        post<any>(`/api/return-labels/${encodeURIComponent(id)}`, data),
     },
     /** Shipping rates — seller-configured rates */
     shippingRates: {
