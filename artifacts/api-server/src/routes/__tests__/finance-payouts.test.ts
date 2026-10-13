@@ -16,6 +16,7 @@ const state = vi.hoisted(() => ({
   attempts: [] as any[],
   permissions: [] as string[],
   denyWrites: false,
+  retrieveCalls: [] as any[],
 }));
 
 vi.mock("../../middlewares/requireAuth", () => ({
@@ -42,7 +43,7 @@ vi.mock("../notifications-feed", () => ({ publishNotification: async () => undef
 vi.mock("drizzle-orm", () => {
   const fn = (...args: unknown[]) => args;
   const sql = Object.assign((..._a: unknown[]) => ({}), {});
-  return { and: fn, eq: fn, desc: fn, inArray: fn, sql };
+  return { and: fn, eq: fn, desc: fn, inArray: fn, or: fn, sql };
 });
 
 vi.mock("@workspace/db", () => {
@@ -109,7 +110,8 @@ vi.mock("../../lib/stripe", () => ({
       balance: { retrieve: async () => ({ available: [{ currency: "usd", amount: state.available }], pending: [] }) },
       payouts: {
         list: async () => ({ data: [], has_more: false }),
-        retrieve: async () => {
+        retrieve: async (...args: any[]) => {
+          state.retrieveCalls.push(args);
           if (!state.payoutRecord) throw Object.assign(new Error("No such payout"), { statusCode: 404 });
           return state.payoutRecord;
         },
@@ -294,6 +296,52 @@ describe("GET /payouts/:id", () => {
     state.stripeOn = false;
     const r = await call("GET", "/payouts/po_abc123");
     expect(r.body).toEqual({ connected: false, payout: null, breakdown: null });
+  });
+});
+
+describe("GET /payouts/:id/statement.pdf", () => {
+  const payout = (extra: object = {}) => ({
+    id: "po_abc123", amount: 9_300, currency: "usd", status: "paid", automatic: true, method: "standard",
+    arrival_date: 1_790_000_000, created: 1_789_900_000, destination: { last4: "6789", bank_name: "Chase" }, ...extra,
+  });
+
+  async function raw(path: string) {
+    const response = await fetch(`${baseUrl}/api/finance${path}`);
+    return { status: response.status, type: response.headers.get("content-type"), disposition: response.headers.get("content-disposition"), bytes: Buffer.from(await response.arrayBuffer()) };
+  }
+
+  it("renders the seller's payout as a PDF, fetched on the seller's own connected account", async () => {
+    state.payoutRecord = payout();
+    state.retrieveCalls = [];
+    state.balanceTxns = [{
+      id: "txn_1", created: 1_789_800_000, type: "payment", reporting_category: "charge", amount: 10_000, fee: 700, net: 9_300,
+      source: "py_1", description: "Order BT-1001",
+      fee_details: [{ type: "application_fee", amount: 500 }, { type: "stripe_fee", amount: 200 }],
+    }];
+    const r = await raw("/payouts/po_abc123/statement.pdf");
+    expect(r.status).toBe(200);
+    expect(r.type).toBe("application/pdf");
+    expect(r.disposition).toContain('filename="brandthread-payout-po_abc123.pdf"');
+    expect(r.bytes.subarray(0, 5).toString()).toBe("%PDF-");
+    expect(state.retrieveCalls[0][0]).toBe("po_abc123");
+    expect(state.retrieveCalls[0][2]).toEqual({ stripeAccount: "acct_1" });
+  });
+
+  it("404s another seller's payout, 400s a malformed id, 409s without a payout account", async () => {
+    state.payoutRecord = null;
+    expect((await raw("/payouts/po_missing123/statement.pdf")).status).toBe(404);
+    expect((await raw("/payouts/not-a-payout/statement.pdf")).status).toBe(400);
+    state.payoutRecord = payout();
+    state.accountId = null;
+    expect((await raw("/payouts/po_abc123/statement.pdf")).status).toBe(409);
+  });
+
+  it("does not shadow the JSON detail route", async () => {
+    state.payoutRecord = payout();
+    state.balanceTxns = [];
+    const r = await call("GET", "/payouts/po_abc123");
+    expect(r.status).toBe(200);
+    expect(r.body.payout.id).toBe("po_abc123");
   });
 });
 

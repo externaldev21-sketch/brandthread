@@ -3574,6 +3574,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** One payout with its Sales / fees / refunds / holds breakdown. */
       payoutDetail: (id: string) =>
         freshGet<PayoutDetail>(`/api/finance/payouts/${encodeURIComponent(id)}`),
+      /** Bearer-authenticated PDF statement for one payout; returns the raw bytes. */
+      payoutStatementPdf: async (id: string): Promise<ArrayBuffer> => {
+        const token = await getCachedToken(getToken);
+        const res = await fetchWithTimeout(
+          `${BASE}${versionApiPath(`/api/finance/payouts/${encodeURIComponent(id)}/statement.pdf`)}`,
+          { method: 'GET', headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...storeContextHeaders() } },
+          EXPENSIVE_REQUEST_TIMEOUT_MS,
+        );
+        if (!res.ok) throw new ApiError(res.status, await res.text());
+        return res.arrayBuffer();
+      },
     },
     /** Seller payment settings (Buy now, pay later opt-in). */
     sellerPaymentSettings: {

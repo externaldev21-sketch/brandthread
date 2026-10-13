@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { File, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import { saveDownloadedFile } from '@/lib/fileDownload';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -21,17 +20,6 @@ import {
   statementFileName, STATEMENT_MIME,
   type StatementDetail, type StatementFormat, type StatementList,
 } from '@/lib/statements';
-
-function bytesToBlobDownload(bytes: ArrayBuffer, name: string, mime: string) {
-  const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 export default function StatementsScreen() {
   const { theme } = useAppTheme();
@@ -97,24 +85,12 @@ export default function StatementsScreen() {
     setBusy(format);
     try {
       const bytes = await api.statements.download(month, format);
-      const name = statementFileName(month, format);
-      if (Platform.OS === 'web') {
-        bytesToBlobDownload(bytes, name, STATEMENT_MIME[format]);
-      } else {
-        const file = new File(Paths.cache, name);
-        if (file.exists) file.delete();
-        file.create();
-        file.write(new Uint8Array(bytes));
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(file.uri, {
-            mimeType: STATEMENT_MIME[format],
-            UTI: format === 'pdf' ? 'com.adobe.pdf' : 'public.comma-separated-values-text',
-            dialogTitle: `Statement ${month}`,
-          });
-        } else {
-          Alert.alert('Saved', `${name} was saved to the app cache.`);
-        }
-      }
+      await saveDownloadedFile(bytes, {
+        name: statementFileName(month, format),
+        mime: STATEMENT_MIME[format],
+        uti: format === 'pdf' ? 'com.adobe.pdf' : 'public.comma-separated-values-text',
+        dialogTitle: `Statement ${month}`,
+      });
     } catch {
       Alert.alert('Download failed', 'Could not download this statement. Check your connection and try again.');
     } finally {
