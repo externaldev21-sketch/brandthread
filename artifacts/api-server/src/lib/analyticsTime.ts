@@ -106,3 +106,21 @@ export function capEndAtNow(
     ?? new Date(floorToLocalStep(now, opts.stepMs!, opts.tzOffsetMinutes).getTime() + opts.stepMs!);
   return new Date(Math.min(naturalEnd.getTime(), currentBucketEnd.getTime()));
 }
+
+/** Rolling-window range keys for GET /api/analytics/home ("last N days", today included). */
+export const ROLLING_DAY_RANGES = { "7d": 7, "30d": 30, "90d": 90 } as const;
+export type RollingDayRange = keyof typeof ROLLING_DAY_RANGES;
+
+/**
+ * A rolling "last N days" window that INCLUDES today: starts at local
+ * midnight N-1 days ago and ends at the end of today, so no future day is
+ * drawn. Bucketed daily. Unlike the calendar "week"/"month" ranges, the
+ * window is always exactly N days long, so `previousPeriod` of it is always
+ * the N days right before it (e.g. 90D compares against the prior 90 days).
+ */
+export function rollingDayWindow(now: Date, days: number, tzOffsetMinutes: number): { start: Date; end: Date } {
+  const today = floorToLocalStep(now, DAY_MS, tzOffsetMinutes);
+  const start = new Date(today.getTime() - (days - 1) * DAY_MS);
+  const end = new Date(today.getTime() + DAY_MS);
+  return { start, end };
+}
