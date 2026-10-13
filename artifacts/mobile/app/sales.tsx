@@ -35,7 +35,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 
-import { BrandthreadCard, StatusBadge, SectionHeader, HapticSwitch } from '@/components/BrandthreadUI';
+import { BrandthreadCard, PrimaryButton, StatusBadge, SectionHeader, HapticSwitch } from '@/components/BrandthreadUI';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 
@@ -44,6 +44,8 @@ import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
 import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 
 import { EmptyState } from '@/components/layout';
+import { ActiveDatesFields } from '@/components/discounts/ActiveDatesFields';
+import { formatScheduleInstant, scheduleFormFromStored, schedulePayload, scheduleSummary } from '@/lib/scheduleWindow';
 
 import { formatMoney } from '@/lib/format';
 
@@ -61,6 +63,7 @@ interface Sale {
   productIds: string[];
   startsAt: string;
   endsAt: string | null;
+  scheduleTimeZone: string | null;
   active: boolean;
   status: SaleStatus;
 }
@@ -76,6 +79,7 @@ function normalizeSale(raw: any): Sale {
     productIds: Array.isArray(raw.productIds) ? raw.productIds : [],
     startsAt: raw.startsAt ?? new Date().toISOString(),
     endsAt: raw.endsAt ?? null,
+    scheduleTimeZone: raw.scheduleTimeZone ?? null,
     active: !!raw.active,
     status: raw.status ?? (raw.active ? 'live' : 'paused'),
   };
@@ -90,10 +94,6 @@ const STATUS_LABEL: Record<SaleStatus, string> = {
 
 function fmtValue(s: Pick<Sale, 'discountType' | 'value'>) {
   return s.discountType === 'percent' ? `${s.value}% off` : `${formatMoney(s.value)} off`;
-}
-function fmtDate(iso: string | null) {
-  if (!iso) return null;
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 function scopeLabel(s: Pick<Sale, 'scope' | 'collection' | 'productIds'>) {
   if (s.scope === 'store') return 'Entire store';
@@ -130,9 +130,7 @@ export default function SalesScreen() {
   const [scope, setScope] = useState<Scope>('store');
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [collection, setCollection] = useState<string | null>(null);
-  const [startDate, setStartDate] = useState('');
-  const [hasEnd, setHasEnd] = useState(false);
-  const [endDate, setEndDate] = useState('');
+  const [schedule, setSchedule] = useState(() => scheduleFormFromStored(null, null, null));
 
   const load = useCallback(async () => {
     if (previewOnly) { setLoading(false); return; }
@@ -160,14 +158,14 @@ export default function SalesScreen() {
   function resetForm() {
     setName(''); setDiscType('percent'); setPercent('20'); setFixedValue('10.00');
     setScope('store'); setSelectedProductIds([]); setCollection(null);
-    setStartDate(''); setHasEnd(false); setEndDate('');
+    setSchedule(scheduleFormFromStored(null, null, null));
   }
   function openNew() { resetForm(); setEditingId(null); setShowModal(true); }
   function openEdit(x: Sale) {
     setName(x.name); setDiscType(x.discountType);
     if (x.discountType === 'percent') setPercent(String(x.value)); else setFixedValue((x.value / 100).toFixed(2));
     setScope(x.scope); setSelectedProductIds(x.productIds); setCollection(x.collection);
-    setStartDate(x.startsAt.slice(0, 10)); setHasEnd(!!x.endsAt); setEndDate(x.endsAt ? x.endsAt.slice(0, 10) : '');
+    setSchedule(scheduleFormFromStored(x.startsAt, x.endsAt, x.scheduleTimeZone));
     setEditingId(x.id); setShowModal(true);
   }
 
@@ -175,7 +173,7 @@ export default function SalesScreen() {
   const pct = parseInt(percent, 10);
   const summaryValue = discType === 'percent' ? `${Number.isFinite(pct) ? pct : 0}% off` : `${formatMoney(valueCents ?? 0)} off`;
   const summaryScope = scopeLabel({ scope, collection, productIds: selectedProductIds });
-  const summaryDates = `${startDate ? `Starts ${startDate}` : 'Starts immediately'}${hasEnd && endDate ? ` · Ends ${endDate}` : ' · No end date'}`;
+  const summaryDates = scheduleSummary(schedule);
 
   async function handleSave() {
     if (!name.trim()) { Alert.alert('Name your sale', 'Give the sale a name so you can find it later.'); return; }
@@ -183,10 +181,8 @@ export default function SalesScreen() {
     if (discType === 'fixed' && (valueCents == null || valueCents <= 0)) { Alert.alert('Invalid amount', 'Enter a valid dollar amount.'); return; }
     if (scope === 'products' && selectedProductIds.length === 0) { Alert.alert('Select products', 'Choose at least one product.'); return; }
     if (scope === 'collection' && !collection) { Alert.alert('Select a collection', 'Choose the collection this sale applies to.'); return; }
-    const start = startDate ? new Date(startDate) : null;
-    const end = hasEnd && endDate ? new Date(endDate) : null;
-    if ((start && isNaN(start.getTime())) || (end && isNaN(end.getTime()))) { Alert.alert('Invalid date', 'Use the format YYYY-MM-DD.'); return; }
-    if (start && end && end <= start) { Alert.alert('Invalid dates', 'The end date must be after the start date.'); return; }
+    const dates = schedulePayload(schedule);
+    if ('error' in dates) { Alert.alert('Check the active dates', dates.error); return; }
     if (previewOnly) { Alert.alert('Sign in required', 'Sign in to your seller account to create sales.'); return; }
 
     setSaving(true);
@@ -197,11 +193,11 @@ export default function SalesScreen() {
         scope,
         productIds: scope === 'products' ? selectedProductIds : [],
         collection: scope === 'collection' ? collection : null,
-        startsAt: start ? start.toISOString() : null,
-        endsAt: end ? end.toISOString() : null,
+        // Untouched dates send nothing, so editing other fields never shifts a saved start/end.
+        ...dates.values,
       };
       if (editingId) {
-        const updated = await api.sales.update(editingId, { ...payload, startsAt: payload.startsAt ?? new Date().toISOString() });
+        const updated = await api.sales.update(editingId, payload);
         setSales(prev => prev.map(x => x.id === editingId ? normalizeSale(updated) : x));
       } else {
         const created = await api.sales.create(payload);
@@ -273,7 +269,7 @@ export default function SalesScreen() {
                   <Text style={s.cardValue}>{fmtValue(x)}</Text>
                   <Text style={s.metaText}>{scopeLabel(x)}</Text>
                   <Text style={s.metaText}>
-                    {x.status === 'scheduled' ? `Starts ${fmtDate(x.startsAt)}` : x.endsAt ? `Ends ${fmtDate(x.endsAt)}` : 'No end date'}
+                    {x.status === 'scheduled' ? `Starts ${formatScheduleInstant(x.startsAt, x.scheduleTimeZone)}` : x.endsAt ? `Ends ${formatScheduleInstant(x.endsAt, x.scheduleTimeZone)}` : 'No end date'}
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 8 }}>
@@ -343,33 +339,7 @@ export default function SalesScreen() {
               )}
             </View>
 
-            <View>
-              <Text style={s.label}>Active dates</Text>
-              <NativeDateTimeField
-                mode="date"
-                label="Start date"
-                placeholder="Immediately"
-                value={ymdToDate(startDate)}
-                onChange={(d) => setStartDate(dateToYmd(d))}
-                onClear={() => setStartDate('')}
-                testID="sale-start-date"
-              />
-              <View style={s.switchRow}>
-                <Text style={s.switchLabel}>Set end date</Text>
-                <HapticSwitch value={hasEnd} onValueChange={setHasEnd} />
-              </View>
-              {hasEnd && (
-                <NativeDateTimeField
-                  mode="date"
-                  label="End date"
-                  value={ymdToDate(endDate)}
-                  onChange={(d) => setEndDate(dateToYmd(d))}
-                  minimumDate={ymdToDate(startDate) ?? startOfToday()}
-                  style={{ marginTop: SP.sm }}
-                  testID="sale-end-date"
-                />
-              )}
-            </View>
+            <ActiveDatesFields value={schedule} onChange={setSchedule} />
 
             <View style={s.summaryCard}>
               <Text style={s.label}>Summary</Text>
@@ -430,8 +400,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     segRow: { flexDirection: 'row', gap: 8 },
     seg: { paddingVertical: 11, paddingHorizontal: 10, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
     segText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
-    switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.sm },
-    switchLabel: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
     pickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, marginTop: 8 },
     pickerRowText: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
     pickRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12 },

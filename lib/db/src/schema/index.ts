@@ -1918,6 +1918,8 @@ export const discountCodes = pgTable('discount_codes', {
   /** Minimum number of eligible items in the cart (0 = none). */
   minQuantity:    integer('min_quantity').notNull().default(0),
   startsAt:       timestamp('starts_at'),
+  /** IANA zone the seller picked startsAt / expiresAt in (migration 270). NULL = legacy date-only values. */
+  scheduleTimeZone: text('schedule_time_zone'),
   active:         boolean('active').notNull().default(true),
   /** Live-only code (migration 122): valid only for this stream, only while it is live. */
   liveStreamId:   uuid('live_stream_id'),

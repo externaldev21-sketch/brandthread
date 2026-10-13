@@ -17,7 +17,9 @@ export const sales = pgTable('sales', {
   collection:   text('collection'),
   startsAt:     timestamp('starts_at', { withTimezone: true }).defaultNow().notNull(),
   endsAt:       timestamp('ends_at', { withTimezone: true }),
-  active:       boolean('active').notNull().default(true),
+  /** IANA zone the seller picked startsAt / endsAt in (migration 270). NULL = legacy date-only values. */
+  scheduleTimeZone: text('schedule_time_zone'),
+  active:      boolean('active').notNull().default(true),
   createdAt:    timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt:    timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({

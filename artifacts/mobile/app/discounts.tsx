@@ -67,6 +67,10 @@ import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
 import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 
 import { crispPx } from '@/lib/crispPixel';
+import { ActiveDatesFields } from '@/components/discounts/ActiveDatesFields';
+import { UsageLimitsFields, usageLimitsFromStored, usageLimitsPayload, usageSummary } from '@/components/discounts/UsageLimitsFields';
+import { RedemptionsSheet } from '@/components/discounts/RedemptionsSheet';
+import { formatScheduleInstant, scheduleFormFromStored, schedulePayload, scheduleSummary } from '@/lib/scheduleWindow';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
 type AppliesTo = 'entire_store' | 'specific_products' | 'collections';
@@ -86,8 +90,10 @@ interface DiscountCode {
   firstOrderOnly: boolean;
   collectionIds: string[];
   minQuantity: number;
+  maxUsesPerCustomer: number | null;
   startsAt: string | null;
   expiresAt: string | null;
+  scheduleTimeZone: string | null;
   active: boolean;
   status: DiscountStatus;
   createdAt: string;
@@ -108,8 +114,10 @@ function normalizeDiscount(raw: any): DiscountCode {
     firstOrderOnly: !!raw.firstOrderOnly,
     collectionIds: Array.isArray(raw.collectionIds) ? raw.collectionIds : [],
     minQuantity: raw.minQuantity ?? 0,
+    maxUsesPerCustomer: raw.maxUsesPerCustomer ?? null,
     startsAt: raw.startsAt ?? null,
     expiresAt: raw.expiresAt ?? null,
+    scheduleTimeZone: raw.scheduleTimeZone ?? null,
     active: !!raw.active,
     status: raw.status ?? (raw.active ? 'active' : 'paused'),
     createdAt: raw.createdAt ?? new Date().toISOString(),
@@ -128,11 +136,6 @@ function randomCode() {
   let out = '';
   for (let i = 0; i < 8; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
   return out;
-}
-
-function fmtDate(iso: string | null) {
-  if (!iso) return null;
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export default function DiscountsScreen() {
@@ -169,18 +172,12 @@ export default function DiscountsScreen() {
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [minOrder, setMinOrder] = useState('');
-  const [usageMode, setUsageMode] = useState<'unlimited' | 'limited' | 'single'>('unlimited');
-  const [usageLimit, setUsageLimit] = useState('100');
-  const [oneUsePerCustomer, setOneUsePerCustomer] = useState(false);
-  const [firstOrderOnly, setFirstOrderOnly] = useState(false);
+  const [usage, setUsage] = useState(() => usageLimitsFromStored(null));
   const [minQuantity, setMinQuantity] = useState('');
   const [collections, setCollections] = useState<Array<{ id: string; title: string }>>([]);
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
-  const [hasEnd, setHasEnd] = useState(false);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  // Which date the calendar sheet is picking ('YYYY-MM-DD' local day keys).
-  const [datePickerFor, setDatePickerFor] = useState<'start' | 'end' | null>(null);
+  const [schedule, setSchedule] = useState(() => scheduleFormFromStored(null, null, null));
+  const [redemptionsFor, setRedemptionsFor] = useState<DiscountCode | null>(null);
 
   const loadDiscounts = useCallback(async () => {
     if (previewOnly) {
@@ -223,15 +220,10 @@ export default function DiscountsScreen() {
     setAppliesTo('entire_store');
     setSelectedProductIds([]);
     setMinOrder('');
-    setUsageMode('unlimited');
-    setUsageLimit('100');
-    setOneUsePerCustomer(false);
-    setFirstOrderOnly(false);
+    setUsage(usageLimitsFromStored(null));
     setMinQuantity('');
     setSelectedCollectionIds([]);
-    setHasEnd(false);
-    setStartDate('');
-    setEndDate('');
+    setSchedule(scheduleFormFromStored(null, null, null));
   }
 
   function openNewModal() {
@@ -248,15 +240,10 @@ export default function DiscountsScreen() {
     setAppliesTo(d.appliesTo);
     setSelectedProductIds(d.productIds);
     setMinOrder(d.minOrderCents ? (d.minOrderCents / 100).toFixed(2) : '');
-    setUsageMode(d.maxUses === 1 ? 'single' : d.maxUses != null ? 'limited' : 'unlimited');
-    setUsageLimit(d.maxUses != null ? String(d.maxUses) : '100');
-    setOneUsePerCustomer(d.oneUsePerCustomer);
-    setFirstOrderOnly(d.firstOrderOnly);
+    setUsage(usageLimitsFromStored(d));
     setMinQuantity(d.minQuantity ? String(d.minQuantity) : '');
     setSelectedCollectionIds(d.collectionIds);
-    setHasEnd(!!d.expiresAt);
-    setStartDate(isoToDayKey(d.startsAt));
-    setEndDate(isoToDayKey(d.expiresAt));
+    setSchedule(scheduleFormFromStored(d.startsAt, d.expiresAt, d.scheduleTimeZone));
     setEditingId(d.id);
     setShowModal(true);
   }
@@ -278,10 +265,8 @@ export default function DiscountsScreen() {
       : selectedProductIds.length > 0
         ? `${selectedProductIds.length} product${selectedProductIds.length === 1 ? '' : 's'}`
         : 'Select products';
-  const summaryUsageLabel = usageMode === 'unlimited' ? 'Unlimited uses' : usageMode === 'single' ? 'Single use (1 total)' : `${usageLimit || '0'} total uses`;
-  const summaryDatesLabel = !startDate && !hasEnd
-    ? 'Active immediately, no end date'
-    : `${startDate ? `Starts ${formatDayKey(startDate)}` : 'Starts immediately'}${hasEnd && endDate ? ` · Ends ${formatDayKey(endDate)}` : hasEnd ? '' : ' · No end date'}`;
+  const summaryUsageLabel = usageSummary(usage);
+  const summaryDatesLabel = scheduleSummary(schedule);
 
   async function handleSave() {
     if (discType !== 'free_shipping' && discType !== 'free_item') {
@@ -313,8 +298,14 @@ export default function DiscountsScreen() {
       Alert.alert('Invalid minimum', 'Enter a valid minimum order amount.');
       return;
     }
-    if (usageMode === 'limited' && (!usageLimit.trim() || Number(usageLimit) < 1)) {
-      Alert.alert('Invalid usage limit', 'Enter how many times this code can be used.');
+    const limits = usageLimitsPayload(usage);
+    if ('error' in limits) {
+      Alert.alert('Check the usage limits', limits.error);
+      return;
+    }
+    const dates = schedulePayload(schedule);
+    if ('error' in dates) {
+      Alert.alert('Check the active dates', dates.error);
       return;
     }
     // Start = start of the local start day, end = END of the local end day
@@ -334,14 +325,13 @@ export default function DiscountsScreen() {
         minOrderCents: minOrderCents ?? 0,
         appliesTo,
         productIds: appliesTo === 'specific_products' ? selectedProductIds : [],
-        maxUses: usageMode === 'unlimited' ? null : usageMode === 'single' ? 1 : Number(usageLimit),
-        singleUse: usageMode === 'single',
-        oneUsePerCustomer,
-        firstOrderOnly,
+        ...limits.values,
         collectionIds: appliesTo === 'collections' ? selectedCollectionIds : [],
         minQuantity: minQuantity.trim() ? Number(minQuantity) : 0,
-        startsAt: dates.startsAt,
-        expiresAt: dates.expiresAt,
+        // Untouched dates send nothing, so editing other fields never shifts a saved start/end.
+        ...(dates.values.startsAt !== undefined && { startsAt: dates.values.startsAt }),
+        ...(dates.values.endsAt !== undefined && { expiresAt: dates.values.endsAt }),
+        ...(dates.values.scheduleTimeZone !== undefined && { scheduleTimeZone: dates.values.scheduleTimeZone }),
       };
       if (previewOnly) {
         if (editingId) {
@@ -360,11 +350,13 @@ export default function DiscountsScreen() {
             maxUses: payload.maxUses,
             usesCount: 0,
             oneUsePerCustomer: payload.oneUsePerCustomer,
+            maxUsesPerCustomer: payload.maxUsesPerCustomer,
             firstOrderOnly: payload.firstOrderOnly,
             collectionIds: payload.collectionIds,
             minQuantity: payload.minQuantity,
-            startsAt: payload.startsAt,
-            expiresAt: payload.expiresAt,
+            startsAt: payload.startsAt ?? null,
+            expiresAt: payload.expiresAt ?? null,
+            scheduleTimeZone: payload.scheduleTimeZone ?? null,
             active: true,
             status: 'active',
             createdAt: new Date().toISOString(),
@@ -542,7 +534,7 @@ export default function DiscountsScreen() {
               <View style={s.summaryRow}><Icon name="shopping-bag" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryScopeLabel}</Text></View>
               {minQuantity.trim() ? <View style={s.summaryRow}><Icon name="layers" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. {minQuantity.trim()} item{minQuantity.trim() === '1' ? '' : 's'}</Text></View> : null}
               {minOrderCents ? <View style={s.summaryRow}><Icon name="dollar-sign" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. order {formatCents(minOrderCents)}</Text></View> : null}
-              <View style={s.summaryRow}><Icon name="hash" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryUsageLabel}{oneUsePerCustomer ? ' · 1 per customer' : ''}{firstOrderOnly ? ' · First order only' : ''}</Text></View>
+              <View style={s.summaryRow}><Icon name="hash" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryUsageLabel}</Text></View>
               <View style={s.summaryRow}><Icon name="calendar" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryDatesLabel}</Text></View>
             </View>
 
@@ -690,69 +682,10 @@ export default function DiscountsScreen() {
               />
             </View>
 
-            {/* Usage limits */}
-            <View>
-              <Text style={s.label}>Usage limits</Text>
-              <View style={s.typeGrid}>
-                {([
-                  ['unlimited', 'Unlimited'],
-                  ['limited', 'Limited total'],
-                  ['single', 'Single-use'],
-                ] as const).map(([t, label]) => (
-                  <TouchableOpacity key={t} style={[s.typeBtn, discType === discType && usageMode === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { haptic('select'); setUsageMode(t); }}>
-                    <Text style={[s.typeBtnText, usageMode === t && { color: theme.accent }]}>{label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              {usageMode === 'limited' && (
-                <TextInput
-                  style={[s.input, { marginTop: 8 }]}
-                  value={usageLimit}
-                  onChangeText={setUsageLimit}
-                  placeholder="100"
-                  placeholderTextColor={MUTED}
-                  keyboardType="number-pad"
-                />
-              )}
-              <View style={s.switchRow}>
-                <Text style={s.switchLabel}>One use per customer</Text>
-                <HapticSwitch value={oneUsePerCustomer} onValueChange={setOneUsePerCustomer} />
-              </View>
-              <View style={s.switchRow}>
-                <Text style={s.switchLabel}>First order only</Text>
-                <HapticSwitch value={firstOrderOnly} onValueChange={setFirstOrderOnly} />
-              </View>
-            </View>
+            <UsageLimitsFields value={usage} onChange={setUsage} />
 
-            {/* Active dates */}
-            <View>
-              <Text style={s.label}>Active dates</Text>
-              <NativeDateTimeField
-                mode="date"
-                label="Start date"
-                placeholder="Immediately"
-                value={ymdToDate(startDate)}
-                onChange={(d) => setStartDate(dateToYmd(d))}
-                onClear={() => setStartDate('')}
-                testID="discount-start-date"
-              />
-              <View style={[s.switchRow, { marginTop: SP.sm }]}>
-                <Text style={s.switchLabel}>Set an end date</Text>
-                <HapticSwitch value={hasEnd} onValueChange={setHasEnd} />
-              </View>
-              {hasEnd && (
-                <NativeDateTimeField
-                  mode="date"
-                  label="End date"
-                  value={ymdToDate(endDate)}
-                  onChange={(d) => setEndDate(dateToYmd(d))}
-                  minimumDate={ymdToDate(startDate) ?? startOfToday()}
-                  testID="discount-end-date"
-                />
-              )}
-            </View>
-          </ScrollView>
-          <KeyboardStickyFooter testID="discount-save-footer">
+            <ActiveDatesFields value={schedule} onChange={setSchedule} />
+
             <PrimaryButton
               label={saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Code'}
               onPress={handleSave}
@@ -805,16 +738,26 @@ export default function DiscountsScreen() {
           </ScrollView>
         </SafeAreaProvider>
       </Modal>
+
+      <RedemptionsSheet code={redemptionsFor} onClose={() => setRedemptionsFor(null)} previewOnly={previewOnly} />
     </View>
   );
 }
 
-function DiscountRow({ d, first, onPress }: { d: DiscountCode; first: boolean; onPress: () => void }) {
+function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy, onViewUses }: {
+  d: DiscountCode;
+  onViewUses: () => void;
+  onEdit: () => void;
+  onTogglePause: () => void;
+  onDelete: () => void;
+  onCopy: () => void;
+}) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
   // Status chip on the one #1C1C1E fill: Active reads white, every other status silver.
   const live = d.status === 'active';
   return (
+<View>
     <TouchableOpacity
       style={[s.row, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}
       onPress={onPress}
@@ -832,6 +775,7 @@ function DiscountRow({ d, first, onPress }: { d: DiscountCode; first: boolean; o
       <Text style={s.metaText} numberOfLines={2}>{discountSummaryLine(d)}</Text>
       <Text style={s.metaText} numberOfLines={1}>{discountUsageLine(d)}</Text>
     </TouchableOpacity>
+<TouchableOpacity onPress={onViewUses} accessibilityLabel={`View redemptions for ${d.code}`}><Text style={s.metaText}>View redemptions · {d.usesCount} uses</Text></TouchableOpacity></View>
   );
 }
 
@@ -862,7 +806,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   summaryCode: { fontSize: FS.md, fontFamily: FONT.bold },
   summaryValue: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginTop: 2 },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-  summaryLine: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  summaryLine: { flexShrink: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
 
   label:       { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 },
   subLabel:    { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 },
@@ -871,8 +815,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   typeGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   typeBtn:     { minWidth: '47%', flexGrow: 1, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   typeBtnText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  switchRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.sm },
-  switchLabel: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
   pickerRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, marginTop: 8 },
   pickerRowText: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
   productRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12 },

@@ -42,8 +42,10 @@ export interface PreviewDiscount {
   maxUses: number | null;
   usesCount: number;
   oneUsePerCustomer: boolean;
+  maxUsesPerCustomer?: number | null;
   startsAt: string | null;
   expiresAt: string | null;
+  scheduleTimeZone?: string | null;
   active: boolean;
   status: 'active' | 'scheduled' | 'paused' | 'expired' | 'exhausted';
   createdAt: string;
