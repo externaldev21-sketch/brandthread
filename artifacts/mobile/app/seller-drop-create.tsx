@@ -57,6 +57,7 @@ import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
 
 import { radius } from '@/constants/radii';
+import { HelpLink } from '@/components/help/HelpLink';
 
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
 
@@ -585,6 +586,10 @@ export default function SellerDropCreate() {
               <Text style={{ color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm }} numberOfLines={1}>{timezone}</Text>
               <Icon name="chevron-down" size={14} color={theme.muted} />
             </TouchableOpacity>
+            <Text style={[styles.hint, { color: theme.muted }]}>
+              This is the wall-clock time in the timezone above — buyers see it converted to their own countdown.
+            </Text>
+            <HelpLink article="drops-schedule" />
           </View>
 
           <View style={styles.field}>

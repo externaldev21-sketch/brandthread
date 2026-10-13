@@ -64,6 +64,7 @@ import { CashOutSheet } from '@/components/thread-cash/CashOutSheet';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
 
 import { formatCents } from '@/lib/money';
+import { HelpLink } from '@/components/help/HelpLink';
 
 import { signedBalance, pausedRowCaption } from '@/lib/recoveries';
 
@@ -360,6 +361,7 @@ function PayoutsScreenContent() {
           <Text style={styles.balanceHeroAmount}>{availFmt}</Text>
         )}
         {!loadError && !loading && <Text style={styles.balanceHeroSub} testID="seller-payouts-next">{payoutsPaused ? 'Payouts paused' : nextPayoutLabel}</Text>}
+        <HelpLink article="payouts" style={{ marginTop: SP.xs }} />
         <View style={styles.balancePendingRow}>
           <Text style={styles.balancePendingLabel}>Pending</Text>
           <Text style={styles.balancePendingAmount}>{loadError ? '—' : pendFmt}</Text>

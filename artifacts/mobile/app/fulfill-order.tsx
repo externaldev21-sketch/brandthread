@@ -51,6 +51,7 @@ import { sharePackingSlip } from '@/lib/packingSlip';
 
 import { printLabel, printPackingSlip } from '@/lib/airPrint';
 import { radius } from '@/constants/radii';
+import { HelpLink } from '@/components/help/HelpLink';
 
 import { errorMessageOr } from '@/lib/errorMessage';
 
@@ -673,6 +674,7 @@ export default function FulfillOrderScreen() {
             {!label && !manualMode && parcelDims && (
               <>
                 <SectionHeader title="Shipping rates" />
+                <HelpLink article="shipping-labels" />
                 {loadingRates ? (
                   <View style={s.centeredInline}>
                     <ActivityIndicator color={ACCENT} />

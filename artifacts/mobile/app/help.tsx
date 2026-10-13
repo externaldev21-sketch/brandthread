@@ -25,8 +25,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAfterModalDismiss } from '@/hooks/useAfterModalDismiss';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-
-import { BrandthreadCard, SearchBar, SectionHeader, FilterChip, FormInput, PrimaryButton, EmptyState, SheetHandle, NavigationCard } from '@/components/BrandthreadUI';
+import {
+  BrandthreadCard, SearchBar, SectionHeader, FilterChip, FormInput,
+  PrimaryButton, EmptyState, SheetHandle, NavigationCard,
+} from '@/components/BrandthreadUI';
+import { useLocalSearchParams } from 'expo-router';
+import { useRole } from '@/contexts/RoleContext';
+import { HelpArticleSheet } from '@/components/help/HelpArticleSheet';
+import { SELLER_ARTICLES, getSellerArticle, type SellerArticle } from '@/content/help/sellerArticles';
 
 type Category = 'General' | 'Billing' | 'Account' | 'Bug' | 'Feature';
 
@@ -82,6 +88,11 @@ export default function HelpScreen() {
   // "Contact support" from inside the article sheet scrolls once the sheet
   // has actually closed, not after a guessed delay.
   const articleSheet = useAfterModalDismiss(!!article);
+  // ?article=<id> opens that seller article directly (HelpLink ids).
+  const { role } = useRole();
+  const params = useLocalSearchParams<{ article?: string }>();
+  const [sellerArticle, setSellerArticle] = useState<SellerArticle | null>(() => getSellerArticle(params.article));
+  useEffect(() => { const next = getSellerArticle(params.article); if (next) setSellerArticle(next); }, [params.article]);
 
   // Ticket form state
   const [subject, setSubject]       = useState('');
@@ -186,6 +197,17 @@ export default function HelpScreen() {
                 ))}
               </View>
             </View>
+
+            {role === 'seller' && (
+              <View style={{ gap: SP.sm }}>
+                <SectionHeader title="Selling" />
+                <View style={{ gap: SP.sm }}>
+                  {SELLER_ARTICLES.map((a) => (
+                    <NavigationCard key={a.id} icon="file-text" label={a.title} onPress={() => setSellerArticle(a)} />
+                  ))}
+                </View>
+              </View>
+            )}
 
             {/* Category cards */}
             <View style={{ gap: SP.sm }}>
@@ -329,6 +351,8 @@ export default function HelpScreen() {
           </BrandthreadCard>
         </View>
       </ScrollView>
+
+      <HelpArticleSheet article={sellerArticle} onClose={() => setSellerArticle(null)} />
 
       {/* Article sheet */}
       <Modal
