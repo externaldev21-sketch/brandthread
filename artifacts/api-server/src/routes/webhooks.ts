@@ -74,6 +74,10 @@ import {
   type StripeWebhookClaim,
 } from "../lib/stripeWebhookLedger";
 import { sellerPlanFromStripeLookupKey } from "../lib/stripePlanMapping";
+import { dunningAwareStatus } from "../lib/billing/dunning";
+import {
+  applyDunningOnInvoicePaid, applyDunningOnPaymentFailed, applyDunningOnPaymentMethodUpdated, invoiceSubscriptionId as subscriptionIdOfInvoice,
+} from "../lib/billing/dunningWebhooks";
 import { recordDiscountCodeUse } from "../lib/discounts";
 import { attributeOrder as attributeAffiliateOrder } from "../lib/affiliate/service";
 import { splitOrder } from "../lib/money/fees";
@@ -409,6 +413,15 @@ router.post("/stripe", async (req: Request, res: Response) => {
 
       case "invoice.payment_failed":
         await handleInvoicePaymentFailed(event.data.object);
+        break;
+
+      // Dunning recovery (lib/billing/dunningWebhooks.ts, item 115).
+      case "invoice.paid":
+        await applyDunningOnInvoicePaid(event.data.object);
+        break;
+
+      case "customer.updated":
+        await applyDunningOnPaymentMethodUpdated(event.data.object, event.data.previous_attributes);
         break;
 
       case "customer.subscription.deleted":
@@ -1438,7 +1451,7 @@ async function handleSubscriptionUpdated(sub: any) {
 
   await db.update(users).set({
     subscriptionId:     sub.id,
-    subscriptionStatus: sub.status,
+    subscriptionStatus: dunningAwareStatus(sub),
     ...(planId    ? { subscriptionPlanId:     planId    } : {}),
     ...(periodEnd ? { subscriptionPeriodEnd:  periodEnd } : {}),
     ...(trialStartedAt ? { subscriptionTrialStartedAt: trialStartedAt } : {}),
@@ -1568,8 +1581,7 @@ export async function handleSubscriptionTrialWillEnd(sub: any, eventId: string):
 export async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
   const customerId: string | undefined =
     typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
-  const invoiceSubscriptionId: string | undefined =
-    typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+  const invoiceSubscriptionId: string | undefined = subscriptionIdOfInvoice(invoice);
   if (!customerId) {
     logger.warn({ invoiceId: invoice.id }, "Failed subscription invoice missing customer ID");
     return;
@@ -1583,7 +1595,7 @@ export async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
   }
 
   const [seller] = await db
-    .select({ clerkId: users.clerkId, subscriptionId: users.subscriptionId })
+    .select({ clerkId: users.clerkId, email: users.email, planId: users.subscriptionPlanId, subscriptionId: users.subscriptionId })
     .from(users)
     .where(eq(users.stripeCustomerId, customerId))
     .limit(1);
@@ -1607,38 +1619,9 @@ export async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
     return;
   }
 
-  const notificationType = "subscription_payment_failed";
-  const [notification] = await db
-    .insert(notificationsFeed)
-    .values({
-      userId: seller.clerkId,
-      category: "system",
-      type: notificationType,
-      title: "Payment failed",
-      body: "Payment failed — update your card to keep your features.",
-      targetId: invoice.id ?? null,
-      targetType: "subscription_invoice",
-      cta: "Update card",
-    })
-    // The database's partial unique index is the idempotency boundary. Do not
-    // specify a conflict target: PostgreSQL can then match that partial
-    // index, while unrelated notification uniqueness constraints remain
-    // unaffected.
-    .onConflictDoNothing()
-    .returning({ id: notificationsFeed.id });
-
-  if (notification) {
-    await sendPushToUser(seller.clerkId, {
-      title: "Payment failed",
-      body: "Update your card to keep your Brandthread features.",
-      data: {
-        notificationId: notification.id,
-        type: notificationType,
-        route: "/subscription",
-        invoiceId: invoice.id ?? null,
-      },
-    });
-  }
+  // Retry notice (in-app + push + email) or, after the last retry, pause the
+  // plan — lib/billing/dunning.ts documents the attempt_count rules.
+  await applyDunningOnPaymentFailed(invoice, seller, invoiceSubscriptionId);
 
   logger.info(
     {
@@ -1649,7 +1632,6 @@ export async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
       subscriptionId: invoiceSubscriptionId,
       attemptCount: invoice.attempt_count,
       nextPaymentAttempt: invoice.next_payment_attempt,
-      notificationSent: Boolean(notification),
     },
     "Seller subscription payment failed",
   );
