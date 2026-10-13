@@ -21,3 +21,21 @@ export async function discoverBrands(limit = 24): Promise<DiscoverBrand[]> {
   );
   return res.brands ?? [];
 }
+
+/** A brand featured at the top of onboarding's Brands-to-follow step, with its own real product photos. */
+export interface FeaturedBrand {
+  id: string;
+  sellerId: string;
+  handle: string;
+  name: string;
+  logoUrl: string | null;
+  verified: boolean;
+  productCount: number;
+  productImages: string[];
+}
+
+/** Dev's featured brands (server env ONBOARDING_FEATURED_SELLER_HANDLES); [] when none are set. */
+export async function featuredBrands(): Promise<FeaturedBrand[]> {
+  const res = await serviceRequest<{ brands: FeaturedBrand[] }>('/api/public/brands/featured');
+  return (res.brands ?? []).filter((brand) => brand.productImages?.length > 0);
+}

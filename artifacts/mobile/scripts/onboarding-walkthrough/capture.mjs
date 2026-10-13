@@ -18,6 +18,7 @@ import path from 'node:path';
 import { buildPreviewWeb, launchBrowser, serveBuild } from '../store-screenshots/harness.mjs';
 import { clerkOnboardingStubScript } from './clerk-onboarding-stub.mjs';
 import { createFakeOnboardingApi, installFakeBackend } from './fake-api.mjs';
+import { ensureDemoImages } from '../store-screenshots/demo-images.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const MOBILE_ROOT = path.resolve(HERE, '../..');
@@ -66,6 +67,8 @@ async function screenshot(page, dir, index, name) {
   await page.screenshot({ path: file, animations: 'disabled', caret: 'hide' });
 }
 
+let demoImages = {};
+
 async function openOnboardingContext(browser, { viewport, origin, api }) {
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
@@ -76,7 +79,7 @@ async function openOnboardingContext(browser, { viewport, origin, api }) {
     reducedMotion: 'reduce',
   });
   await context.addInitScript(clerkOnboardingStubScript());
-  await installFakeBackend(context, { origin, apiOrigin: DEMO_API, api });
+  await installFakeBackend(context, { origin, apiOrigin: DEMO_API, api, images: demoImages });
   const page = await context.newPage();
   page.on('pageerror', (err) => console.log(`    (page error: ${err.message.split('\n')[0]})`));
   return { context, page };
@@ -367,6 +370,9 @@ async function main() {
 
   const server = await serveBuild(BUILD_DIR);
   const browser = await launchBrowser();
+  if (process.env.WALKTHROUGH_FEATURED_BRANDS === '1') {
+    demoImages = await ensureDemoImages(browser, path.join(MOBILE_ROOT, '.store-screenshots', 'images'));
+  }
   const allRows = [];
   let hadFailure = false;
   try {
