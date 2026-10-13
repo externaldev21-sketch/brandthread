@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions, ActivityIndicator, ListRenderItemInfo, Modal, ScrollView, Linking } from 'react-native';
+import { View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions, ActivityIndicator, ListRenderItemInfo, ScrollView, Linking } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +16,6 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi, type SellerQuickReply } from '@/lib/api';
 import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
-import { Glass } from '@/components/ui/Glass';
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
 import MediaViewer from '@/components/chat/MediaViewer';
@@ -49,7 +48,7 @@ import {
   BlockedComposer, openConversationOptions, openMessageOptions, REMOVED_MESSAGE_TEXT,
   type DmMessagingState,
 } from '@/components/safety/DmSafety';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
 import { isSellerDevPreview } from '@/lib/devPreview';
@@ -1974,215 +1973,166 @@ export default function SellerConversationScreen() {
       )}
 
       {/* ── Media picker sheet ─────────────────────────────────────────────── */}
-      <Modal
+      <Sheet
         visible={showMediaSheet}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowMediaSheet(false)}
+        onClose={() => setShowMediaSheet(false)}
+        title="Add to message"
       >
-        <PressableScale style={s.modalOverlay} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
-        <SheetRise style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
-          <View style={s.sheetHandle} />
-          <Text style={s.sheetTitle}>Add to message</Text>
-          <PressableScale style={s.sheetOption} onPress={handlePickPhoto}>
-            <View style={s.sheetOptionIcon}><Feather name="image" size={ICON.md} color={PURPLE} /></View>
-            <View>
-              <Text style={s.sheetOptionLabel}>Photos</Text>
-              <Text style={s.sheetOptionDesc}>Up to 15 at once</Text>
-            </View>
-          </PressableScale>
-          <PressableScale style={s.sheetOption} onPress={handlePickVideo}>
-            <View style={s.sheetOptionIcon}><Feather name="video" size={ICON.md} color={PURPLE} /></View>
-            <View>
-              <Text style={s.sheetOptionLabel}>Video clip</Text>
-              <Text style={s.sheetOptionDesc}>Under 1 minute</Text>
-            </View>
-          </PressableScale>
-          <View style={{ height: 20 }} />
-        </SheetRise>
-      </Modal>
+        <PressableScale style={s.sheetOption} onPress={handlePickPhoto}>
+          <View style={s.sheetOptionIcon}><Feather name="image" size={ICON.md} color={PURPLE} /></View>
+          <View>
+            <Text style={s.sheetOptionLabel}>Photos</Text>
+            <Text style={s.sheetOptionDesc}>Up to 15 at once</Text>
+          </View>
+        </PressableScale>
+        <PressableScale style={s.sheetOption} onPress={handlePickVideo}>
+          <View style={s.sheetOptionIcon}><Feather name="video" size={ICON.md} color={PURPLE} /></View>
+          <View>
+            <Text style={s.sheetOptionLabel}>Video clip</Text>
+            <Text style={s.sheetOptionDesc}>Under 1 minute</Text>
+          </View>
+        </PressableScale>
+        <View style={{ height: 20 }} />
+      </Sheet>
 
       {/* ── Attach picker sheet ─────────────────────────────────────────────── */}
-      <Modal
+      <Sheet
         visible={showAttachPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowAttachPicker(false)}
+        onClose={() => setShowAttachPicker(false)}
+        title="Attach to message"
       >
         <PressableScale
-          style={s.modalOverlay}
-          activeOpacity={1}
+          style={s.sheetOption}
+          onPress={async () => {
+            setShowAttachPicker(false);
+            setShowProductPicker(true);
+            await loadProducts();
+          }}
+        >
+          <View style={s.sheetOptionIcon}>
+            <Feather name="shopping-bag" size={ICON.md} color={PURPLE} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.sheetOptionLabel}>Attach a product</Text>
+            <Text style={s.sheetOptionDesc}>Share a product card from your store</Text>
+          </View>
+          <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+        </PressableScale>
+
+        {conv?.contextOrderId ? (
+          <PressableScale style={s.sheetOption} onPress={attachLinkedOrder}>
+            <View style={s.sheetOptionIcon}>
+              <Feather name="package" size={ICON.md} color={PURPLE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.sheetOptionLabel}>Attach linked order</Text>
+              <Text style={s.sheetOptionDesc}>
+                {conv.contextOrderNumber ?? 'Order'}{conv.contextProductName ? ` · ${conv.contextProductName}` : ''}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+          </PressableScale>
+        ) : null}
+
+        <PressableScale style={s.sheetOption} onPress={openQuickReplies} testID="seller-conversation-quick-replies-row">
+          <View style={s.sheetOptionIcon}>
+            <Feather name="message-square" size={ICON.md} color={PURPLE} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.sheetOptionLabel}>Quick replies</Text>
+            <Text style={s.sheetOptionDesc}>Insert a saved reply</Text>
+          </View>
+          <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+        </PressableScale>
+
+        <PressableScale
+          style={[s.sheetOption, { marginTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER }]}
           onPress={() => setShowAttachPicker(false)}
-        />
-        <SheetRise style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
-          <View style={s.sheetHandle} />
-          <Text style={s.sheetTitle}>Attach to message</Text>
-
-          <PressableScale
-            style={s.sheetOption}
-            onPress={async () => {
-              setShowAttachPicker(false);
-              setShowProductPicker(true);
-              await loadProducts();
-            }}
-          >
-            <View style={s.sheetOptionIcon}>
-              <Feather name="shopping-bag" size={ICON.md} color={PURPLE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.sheetOptionLabel}>Attach a product</Text>
-              <Text style={s.sheetOptionDesc}>Share a product card from your store</Text>
-            </View>
-            <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
-          </PressableScale>
-
-          {conv?.contextOrderId ? (
-            <PressableScale style={s.sheetOption} onPress={attachLinkedOrder}>
-              <View style={s.sheetOptionIcon}>
-                <Feather name="package" size={ICON.md} color={PURPLE} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.sheetOptionLabel}>Attach linked order</Text>
-                <Text style={s.sheetOptionDesc}>
-                  {conv.contextOrderNumber ?? 'Order'}{conv.contextProductName ? ` · ${conv.contextProductName}` : ''}
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
-            </PressableScale>
-          ) : null}
-
-          <PressableScale style={s.sheetOption} onPress={openQuickReplies} testID="seller-conversation-quick-replies-row">
-            <View style={s.sheetOptionIcon}>
-              <Feather name="message-square" size={ICON.md} color={PURPLE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.sheetOptionLabel}>Quick replies</Text>
-              <Text style={s.sheetOptionDesc}>Insert a saved reply</Text>
-            </View>
-            <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
-          </PressableScale>
-
-          <PressableScale
-            style={[s.sheetOption, { marginTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER }]}
-            onPress={() => setShowAttachPicker(false)}
-          >
-            <Text style={[s.sheetOptionLabel, { color: MUTED, textAlign: 'center', flex: 1 }]}>Cancel</Text>
-          </PressableScale>
-        </SheetRise>
-      </Modal>
+        >
+          <Text style={[s.sheetOptionLabel, { color: MUTED, textAlign: 'center', flex: 1 }]}>Cancel</Text>
+        </PressableScale>
+      </Sheet>
 
       {/* ── Quick replies picker ────────────────────────────────────────────── */}
-      <Modal
+      <Sheet
         visible={showQuickReplies}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowQuickReplies(false)}
+        onClose={() => setShowQuickReplies(false)}
+        title="Quick replies"
       >
-        <PressableScale
-          style={s.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowQuickReplies(false)}
-        />
-        <SheetRise style={[s.productSheet, { paddingBottom: insets.bottom + SP.md }]}>
-          <View style={s.sheetHandle} />
-          <View style={s.productSheetHeader}>
-            <Text style={s.sheetTitle}>Quick replies</Text>
-            <PressableScale onPress={() => setShowQuickReplies(false)} accessibilityLabel="Close">
-              <Feather name="x" size={ICON.md} color={MUTED} />
-            </PressableScale>
+        {loadingQuickReplies ? (
+          <View style={s.centerFill}><ActivityIndicator color={PURPLE} /></View>
+        ) : quickReplies.length === 0 ? (
+          <View style={s.emptyState}>
+            <Feather name="message-square" size={32} color={MUTED} />
+            <Text style={s.emptyText}>No quick replies yet</Text>
           </View>
+        ) : (
+          <View>
+            {quickReplies.map((reply) => (
+              <PressableScale
+                key={reply.id}
+                style={s.productRow}
+                onPress={() => insertQuickReply(reply)}
+                activeOpacity={0.7}
+                testID={`seller-conversation-quick-reply-${reply.id}`}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={s.productName}>
+                    {reply.title}{reply.shortcut ? `  ${reply.shortcut}` : ''}
+                  </Text>
+                  <Text style={s.productPrice}>{reply.body}</Text>
+                </View>
+              </PressableScale>
+            ))}
+          </View>
+        )}
 
-          {loadingQuickReplies ? (
-            <View style={s.centerFill}><ActivityIndicator color={PURPLE} /></View>
-          ) : quickReplies.length === 0 ? (
-            <View style={s.emptyState}>
-              <Feather name="message-square" size={32} color={MUTED} />
-              <Text style={s.emptyText}>No quick replies yet</Text>
-            </View>
-          ) : (
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {quickReplies.map((reply) => (
-                <PressableScale
-                  key={reply.id}
-                  style={s.productRow}
-                  onPress={() => insertQuickReply(reply)}
-                  activeOpacity={0.7}
-                  testID={`seller-conversation-quick-reply-${reply.id}`}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.productName}>
-                      {reply.title}{reply.shortcut ? `  ${reply.shortcut}` : ''}
-                    </Text>
-                    <Text style={s.productPrice}>{reply.body}</Text>
-                  </View>
-                </PressableScale>
-              ))}
-            </ScrollView>
-          )}
-
-          <PressableScale
-            style={[s.sheetOption, { marginTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER }]}
-            onPress={() => { setShowQuickReplies(false); router.push('/quick-replies' as never); }}
-            testID="seller-conversation-quick-replies-manage"
-          >
-            <Text style={[s.sheetOptionLabel, { textAlign: 'center', flex: 1 }]}>Manage quick replies</Text>
-          </PressableScale>
-        </SheetRise>
-      </Modal>
+        <PressableScale
+          style={[s.sheetOption, { marginTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER }]}
+          onPress={() => { setShowQuickReplies(false); router.push('/quick-replies' as never); }}
+          testID="seller-conversation-quick-replies-manage"
+        >
+          <Text style={[s.sheetOptionLabel, { textAlign: 'center', flex: 1 }]}>Manage quick replies</Text>
+        </PressableScale>
+      </Sheet>
 
       {/* ── Product picker modal ────────────────────────────────────────────── */}
-      <Modal
+      <Sheet
         visible={showProductPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowProductPicker(false)}
+        onClose={() => setShowProductPicker(false)}
+        title="Choose a product"
       >
-        <PressableScale
-          style={s.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowProductPicker(false)}
-        />
-        <SheetRise style={[s.productSheet, { paddingBottom: insets.bottom + SP.md }]}>
-          <View style={s.sheetHandle} />
-          <View style={s.productSheetHeader}>
-            <Text style={s.sheetTitle}>Choose a product</Text>
-            <PressableScale accessibilityLabel="Close" onPress={() => setShowProductPicker(false)}>
-              <Feather name="x" size={ICON.md} color={MUTED} />
-            </PressableScale>
+        {loadingProducts ? (
+          <View style={s.centerFill}><ActivityIndicator color={PURPLE} /></View>
+        ) : products.length === 0 ? (
+          <View style={s.emptyState}>
+            <Feather name="shopping-bag" size={32} color={MUTED} />
+            <Text style={s.emptyText}>No products found</Text>
           </View>
-
-          {loadingProducts ? (
-            <View style={s.centerFill}><ActivityIndicator color={PURPLE} /></View>
-          ) : products.length === 0 ? (
-            <View style={s.emptyState}>
-              <Feather name="shopping-bag" size={32} color={MUTED} />
-              <Text style={s.emptyText}>No products found</Text>
-            </View>
-          ) : (
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {products.map((product) => (
-                <PressableScale
-                  key={product.id}
-                  style={s.productRow}
-                  onPress={() => attachProduct(product)}
-                  activeOpacity={0.7}
-                >
-                  <View style={s.productIcon}>
-                    <Feather name="shopping-bag" size={ICON.md} color={PURPLE} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.productName} numberOfLines={1}>{product.name}</Text>
-                    {formatPrice(product) ? (
-                      <Text style={s.productPrice}>{formatPrice(product)}</Text>
-                    ) : null}
-                  </View>
-                  <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
-                </PressableScale>
-              ))}
-            </ScrollView>
-          )}
-        </SheetRise>
-      </Modal>
+        ) : (
+          <View>
+            {products.map((product) => (
+              <PressableScale
+                key={product.id}
+                style={s.productRow}
+                onPress={() => attachProduct(product)}
+                activeOpacity={0.7}
+              >
+                <View style={s.productIcon}>
+                  <Feather name="shopping-bag" size={ICON.md} color={PURPLE} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.productName} numberOfLines={1}>{product.name}</Text>
+                  {formatPrice(product) ? (
+                    <Text style={s.productPrice}>{formatPrice(product)}</Text>
+                  ) : null}
+                </View>
+                <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+              </PressableScale>
+            ))}
+          </View>
+        )}
+      </Sheet>
 
       {/* ── Buyer context panel (item 144) ──────────────────────────────────
           Mobbin: Binance's chat-attached context drawer surfacing account
@@ -2194,114 +2144,87 @@ export default function SellerConversationScreen() {
           buyer's REAL order history with this seller (server-scoped, see
           api-server's GET /api/orders buyerId filter). Cart is honestly
           omitted below — see the note in that empty section. */}
-      <Modal
+      <Sheet
         visible={showBuyerContext}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowBuyerContext(false)}
+        onClose={() => setShowBuyerContext(false)}
+        title={`${displayName}'s orders`}
       >
-        <PressableScale
-          style={s.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowBuyerContext(false)}
-        />
-        <SheetRise style={[s.buyerContextSheetWrap, { paddingBottom: insets.bottom + SP.md }]}>
-          <Glass variant="regular" tint="dark" radius={RADIUS.xl} style={StyleSheet.absoluteFill} />
-          <View style={s.sheetHandle} />
-          <View style={s.buyerContextHeader}>
-            {other && (
-              <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE, marginRight: SP.sm }]}>
-                <Text style={s.headerAvatarInitials}>
-                  {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
-                </Text>
-              </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={s.sheetTitle}>{displayName}</Text>
-              <Text style={s.buyerContextSubtitle}>Orders with you</Text>
+        <View>
+          {loadingBuyerOrders ? (
+            <View style={{ paddingVertical: SP.lg }}>
+              <SkeletonBlock width="100%" height={56} radius={RADIUS.md} />
+              <View style={{ height: SP.sm }} />
+              <SkeletonBlock width="100%" height={56} radius={RADIUS.md} />
             </View>
-            <PressableScale onPress={() => setShowBuyerContext(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close">
-              <Feather name="x" size={ICON.md} color={MUTED} />
-            </PressableScale>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
-            {loadingBuyerOrders ? (
-              <View style={{ paddingVertical: SP.lg }}>
-                <SkeletonBlock width="100%" height={56} radius={RADIUS.md} />
-                <View style={{ height: SP.sm }} />
-                <SkeletonBlock width="100%" height={56} radius={RADIUS.md} />
-              </View>
-            ) : buyerOrdersError ? (
-              <View style={s.emptyState}>
-                <Feather name="alert-circle" size={28} color={MUTED} />
-                <Text style={s.emptyText}>Couldn't load {displayName}'s orders</Text>
-                <PressableScale style={s.buyerContextRetry} onPress={() => void loadBuyerOrders()} accessibilityRole="button" accessibilityLabel="Retry">
-                  <Text style={s.buyerContextRetryText}>Retry</Text>
+          ) : buyerOrdersError ? (
+            <View style={s.emptyState}>
+              <Feather name="alert-circle" size={28} color={MUTED} />
+              <Text style={s.emptyText}>Couldn't load {displayName}'s orders</Text>
+              <PressableScale style={s.buyerContextRetry} onPress={() => void loadBuyerOrders()} accessibilityRole="button" accessibilityLabel="Retry">
+                <Text style={s.buyerContextRetryText}>Retry</Text>
+              </PressableScale>
+            </View>
+          ) : (buyerOrders?.length ?? 0) === 0 ? (
+            <View style={s.emptyState}>
+              <Feather name="package" size={28} color={MUTED} />
+              <Text style={s.emptyText}>No other orders from {displayName} yet</Text>
+            </View>
+          ) : (
+            buyerOrders!.map((row) => {
+              const uiStatus = dbStatusToOrderStatus(row.status);
+              const dateLabel = new Date(row.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              return (
+                <PressableScale
+                  key={row.id}
+                  style={s.buyerContextOrderRow}
+                  activeOpacity={0.7}
+                  testID={`buyer-context-order-${row.id}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${row.orderNumber}, ${orderStatusBadgeLabel(uiStatus)}, ${formatCents(row.totalCents)}`}
+                  onPress={() => {
+                    hapticSelection();
+                    setShowBuyerContext(false);
+                    router.push(('/order-detail?id=' + row.id) as never);
+                  }}
+                >
+                  <View style={s.orderMsgCardIconCircle}>
+                    <Feather name="package" size={ICON.md} color={PURPLE} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: SP.sm }}>
+                    <Text style={s.attachTitle} numberOfLines={1}>{row.orderNumber}</Text>
+                    <View style={s.orderMsgCardBadgeRow}>
+                      <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
+                      <Text style={s.buyerContextOrderMeta}>
+                        {'  ·  '}{dateLabel}{row.itemCount ? ` · ${row.itemCount} item${row.itemCount === 1 ? '' : 's'}` : ''}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={s.buyerContextOrderTotal}>{formatCents(row.totalCents)}</Text>
+                  <Feather name="chevron-right" size={ICON.xs} color={MUTED} style={{ marginLeft: SP.xs }} />
                 </PressableScale>
-              </View>
-            ) : (buyerOrders?.length ?? 0) === 0 ? (
-              <View style={s.emptyState}>
-                <Feather name="package" size={28} color={MUTED} />
-                <Text style={s.emptyText}>No other orders from {displayName} yet</Text>
-              </View>
-            ) : (
-              buyerOrders!.map((row) => {
-                const uiStatus = dbStatusToOrderStatus(row.status);
-                const dateLabel = new Date(row.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                return (
-                  <PressableScale
-                    key={row.id}
-                    style={s.buyerContextOrderRow}
-                    activeOpacity={0.7}
-                    testID={`buyer-context-order-${row.id}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${row.orderNumber}, ${orderStatusBadgeLabel(uiStatus)}, ${formatCents(row.totalCents)}`}
-                    onPress={() => {
-                      hapticSelection();
-                      setShowBuyerContext(false);
-                      router.push(('/order-detail?id=' + row.id) as never);
-                    }}
-                  >
-                    <View style={s.orderMsgCardIconCircle}>
-                      <Feather name="package" size={ICON.md} color={PURPLE} />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: SP.sm }}>
-                      <Text style={s.attachTitle} numberOfLines={1}>{row.orderNumber}</Text>
-                      <View style={s.orderMsgCardBadgeRow}>
-                        <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
-                        <Text style={s.buyerContextOrderMeta}>
-                          {'  ·  '}{dateLabel}{row.itemCount ? ` · ${row.itemCount} item${row.itemCount === 1 ? '' : 's'}` : ''}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={s.buyerContextOrderTotal}>{formatCents(row.totalCents)}</Text>
-                    <Feather name="chevron-right" size={ICON.xs} color={MUTED} style={{ marginLeft: SP.xs }} />
-                  </PressableScale>
-                );
-              })
-            )}
+              );
+            })
+          )}
 
-            {/* Cart — honestly omitted. Brandthread's cart (lib/db's
-                cart_items table, see api-server's cart-db.ts) is
-                self-scoped storage keyed only by the shopper's own userId —
-                every route that reads it filters `WHERE userId = <the
-                authenticated caller>`, with no seller-facing endpoint or
-                concept of "whose cart is this seller's product in" at all.
-                There's nothing real to show here, so rather than fabricate
-                a cart panel to check a box, this says so plainly instead —
-                same honesty this pass has used elsewhere tonight (items
-                70/71) when a Mobbin precedent didn't map onto real,
-                queryable Brandthread data. */}
-            <View style={s.buyerContextCartNote}>
-              <Feather name="shopping-cart" size={16} color={SUBTLE} />
-              <Text style={s.buyerContextCartNoteText}>
-                Cart contents are private to the buyer — Brandthread doesn't give sellers visibility into what's in someone's cart before checkout.
-              </Text>
-            </View>
-          </ScrollView>
-        </SheetRise>
-      </Modal>
+          {/* Cart — honestly omitted. Brandthread's cart (lib/db's
+              cart_items table, see api-server's cart-db.ts) is
+              self-scoped storage keyed only by the shopper's own userId —
+              every route that reads it filters `WHERE userId = <the
+              authenticated caller>`, with no seller-facing endpoint or
+              concept of "whose cart is this seller's product in" at all.
+              There's nothing real to show here, so rather than fabricate
+              a cart panel to check a box, this says so plainly instead —
+              same honesty this pass has used elsewhere tonight (items
+              70/71) when a Mobbin precedent didn't map onto real,
+              queryable Brandthread data. */}
+          <View style={s.buyerContextCartNote}>
+            <Feather name="shopping-cart" size={16} color={SUBTLE} />
+            <Text style={s.buyerContextCartNoteText}>
+              Cart contents are private to the buyer — Brandthread doesn't give sellers visibility into what's in someone's cart before checkout.
+            </Text>
+          </View>
+        </View>
+      </Sheet>
 
       {/* Long-press reactions — Glass overlay, same component/behavior as
           app/buyer-conversation.tsx (Mobbin: Instagram DM "Tap and hold to
@@ -2652,21 +2575,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
 
   // Attach picker sheet
-  modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  sheet: {
-    backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-    paddingTop: SP.sm, paddingHorizontal: SP.md,
-  },
-  sheetHandle: {
-    width: 36, height: 4, backgroundColor: BORDER,
-    borderRadius: 2, alignSelf: 'center', marginBottom: SP.md,
-  },
-  sheetTitle: {
-    fontSize: FS.lg, fontFamily: FONT.semibold, color: FG,
-    marginBottom: SP.md,
-  },
   sheetOption: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: SP.md, gap: SP.sm,
@@ -2680,15 +2588,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   sheetOptionDesc: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 },
 
   // Product picker sheet
-  productSheet: {
-    backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-    paddingTop: SP.sm, paddingHorizontal: SP.md,
-    maxHeight: '70%',
-  },
-  productSheetHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: SP.sm,
-  },
   productRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: SP.md,
@@ -2706,13 +2605,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   emptyText: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm, textAlign: 'center', paddingHorizontal: SP.lg },
 
   // Buyer context panel (item 144)
-  buyerContextSheetWrap: {
-    borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-    paddingTop: SP.sm, paddingHorizontal: SP.md,
-    overflow: 'hidden',
-  },
-  buyerContextHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SP.sm },
-  buyerContextSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: -SP.sm + 2 },
   buyerContextOrderRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: SP.sm, marginBottom: SP.xs,

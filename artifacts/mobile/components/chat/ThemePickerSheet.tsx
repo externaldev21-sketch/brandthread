@@ -8,12 +8,12 @@
  * this account, and the grid-tile layout was explicitly specified).
  */
 import React from 'react';
-import { View, Text, StyleSheet, Modal, FlatList } from 'react-native';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { CONVERSATION_THEMES } from '@/lib/conversationThemes';
 import { hapticSelection } from '@/lib/haptics';
 
@@ -29,11 +29,7 @@ export function ThemePickerSheet({
   onPickDefault: () => void;
 }) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <PressableScale rippleEnabled={false} style={s.backdrop} activeOpacity={1} onPress={onClose} />
-      <SheetRise style={[s.sheet, { backgroundColor: theme.surface, paddingBottom: bottomInset + SP.md }]}>
-        <View style={[s.handle, { backgroundColor: theme.border }]} />
-        <Text style={[s.title, { color: theme.text }]}>Theme</Text>
+    <Sheet visible={visible} onClose={onClose} title="Theme" testID="theme-picker-sheet">
 
         <FlatList
           data={CONVERSATION_THEMES}
@@ -66,19 +62,14 @@ export function ThemePickerSheet({
             </PressableScale>
           )}
         />
-      </SheetRise>
-    </Modal>
+    </Sheet>
   );
 }
 
 const ICON_SIZE = 18;
 
 const s = StyleSheet.create({
-  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#00000066' },
-  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingHorizontal: SP.md, paddingTop: SP.sm },
-  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
-  title: { fontFamily: FONT.semibold, fontSize: FS.md, textAlign: 'center', marginBottom: SP.sm },
   tileWrap: { width: '25%', alignItems: 'center', gap: 6, marginBottom: SP.md },
   tile: { width: 56, height: 56, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center' },
-  tileLabel: { fontSize: 10, fontFamily: FONT.medium, textAlign: 'center', lineHeight: 12 },
+  tileLabel: { fontSize: 11, fontFamily: FONT.medium, textAlign: 'center', lineHeight: 14 },
 });

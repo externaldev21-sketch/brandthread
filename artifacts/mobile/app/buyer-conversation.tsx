@@ -61,7 +61,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { formatCents } from '@/lib/money';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
 import UploadRing from '@/components/chat/UploadRing';
 import MediaUploadThumb from '@/components/chat/MediaUploadThumb';
 import MediaViewer from '@/components/chat/MediaViewer';
@@ -2602,44 +2602,36 @@ export default function BuyerConversationScreen() {
       )}
 
       {/* ── Media picker sheet ─────────────────────────────────────────────── */}
-      <Modal
+      <Sheet
         visible={showMediaSheet}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowMediaSheet(false)}
+        onClose={() => setShowMediaSheet(false)}
+        title="Add to message"
+        testID="chat-media-sheet"
       >
-        <ModalSafeArea>
-          <PressableScale rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
-          <SheetRise style={s.mediaSheet}>
-            <View style={s.mediaSheetHandle} />
-            <Text style={s.mediaSheetTitle}>Add to message</Text>
-            <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickPhoto}>
-              <View style={s.mediaSheetIcon}><Feather name="image" size={ICON.md} color={theme.accent} /></View>
-              <View>
-                <Text style={s.mediaSheetLabel}>Photos</Text>
-                <Text style={s.mediaSheetDesc}>Up to 15 at once</Text>
-              </View>
-            </PressableScale>
-            <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickVideo}>
-              <View style={s.mediaSheetIcon}><Feather name="video" size={ICON.md} color={theme.accent} /></View>
-              <View>
-                <Text style={s.mediaSheetLabel}>Video clip</Text>
-                <Text style={s.mediaSheetDesc}>Under 1 minute</Text>
-              </View>
-            </PressableScale>
-            {isSellerConv && (
-              <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={openAttachmentPicker}>
-                <View style={s.mediaSheetIcon}><Feather name="shopping-bag" size={ICON.md} color={theme.accent} /></View>
-                <View>
-                  <Text style={s.mediaSheetLabel}>Product or post</Text>
-                  <Text style={s.mediaSheetDesc}>Share from {displayName}'s store</Text>
-                </View>
-              </PressableScale>
-            )}
-            <View style={{ height: 20 }} />
-          </SheetRise>
-        </ModalSafeArea>
-      </Modal>
+        <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickPhoto}>
+          <View style={s.mediaSheetIcon}><Feather name="image" size={ICON.md} color={theme.accent} /></View>
+          <View>
+            <Text style={s.mediaSheetLabel}>Photos</Text>
+            <Text style={s.mediaSheetDesc}>Up to 15 at once</Text>
+          </View>
+        </PressableScale>
+        <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickVideo}>
+          <View style={s.mediaSheetIcon}><Feather name="video" size={ICON.md} color={theme.accent} /></View>
+          <View>
+            <Text style={s.mediaSheetLabel}>Video clip</Text>
+            <Text style={s.mediaSheetDesc}>Under 1 minute</Text>
+          </View>
+        </PressableScale>
+        {isSellerConv && (
+          <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={openAttachmentPicker}>
+            <View style={s.mediaSheetIcon}><Feather name="shopping-bag" size={ICON.md} color={theme.accent} /></View>
+            <View>
+              <Text style={s.mediaSheetLabel}>Product or post</Text>
+              <Text style={s.mediaSheetDesc}>Share from {displayName}'s store</Text>
+            </View>
+          </PressableScale>
+        )}
+      </Sheet>
 
       <Modal
         visible={showAttachmentPicker}
@@ -3665,13 +3657,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
 
   // Media sheet
-  mediaSheet: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: theme.card, borderTopLeftRadius: RADIUS.lg, borderTopRightRadius: RADIUS.lg,
-    paddingHorizontal: SP.md, paddingTop: SP.sm,
-  },
-  mediaSheetHandle: { width: 36, height: 4, backgroundColor: theme.border, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
-  mediaSheetTitle:  { fontSize: FS.lg, fontFamily: FONT.semibold, color: theme.text, marginBottom: SP.md },
   mediaSheetOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: SP.md, gap: SP.sm },
   mediaSheetIcon:   { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center' },
   mediaSheetLabel:  { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },

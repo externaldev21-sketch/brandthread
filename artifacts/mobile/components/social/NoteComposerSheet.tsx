@@ -34,6 +34,7 @@ export const NOTE_AUDIENCE_LABEL: Record<Exclude<NoteAudience, 'followers'>, str
 };
 
 const AVATAR = 96;
+const LINE = 22;
 const RING = 22;
 const RING_STROKE = 2.5;
 
@@ -60,6 +61,9 @@ export function NoteComposerSheet({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
+  // Explicit content height: a web <textarea> defaults to 2 rows, so the
+  // bubble would never hug a one-line note otherwise.
+  const [inputH, setInputH] = useState(LINE);
   const inputRef = useRef<TextInput>(null);
 
   // Fresh state every time the sheet opens (edit pre-fills the current note).
@@ -162,7 +166,8 @@ export function NoteComposerSheet({
               returnKeyType="done"
               blurOnSubmit
               onSubmitEditing={share}
-              style={[styles.input, { color: theme.text }, Platform.OS === 'web' && styles.inputWeb]}
+              onContentSizeChange={e => setInputH(Math.min(LINE * 3, Math.max(LINE, Math.ceil(e.nativeEvent.contentSize.height))))}
+              style={[styles.input, { color: theme.text, height: inputH }, Platform.OS === 'web' && styles.inputWeb]}
               accessibilityLabel="Note text"
               testID="inbox-note-compose-input"
             />
@@ -172,11 +177,11 @@ export function NoteComposerSheet({
           <View style={[styles.tailDot, styles.tailDotSmall, { backgroundColor: bubbleBg }]} />
         </View>
         <View style={[styles.avatar, { backgroundColor: `${theme.text}1F` }]}>
+          {/* Initials underneath, so a slow or failed photo never leaves a blank circle. */}
+          <Text style={[styles.initials, { color: theme.text }]}>{initials ?? ''}</Text>
           {avatarUri ? (
             <Image source={{ uri: avatarUri }} style={styles.avatarImg} contentFit="cover" cachePolicy="memory-disk" transition={150} />
-          ) : (
-            <Text style={[styles.initials, { color: theme.text }]}>{initials ?? ''}</Text>
-          )}
+          ) : null}
         </View>
         {failed ? (
           <Text style={[styles.error, { color: theme.error }]} accessibilityLiveRegion="polite">
@@ -238,8 +243,7 @@ const styles = StyleSheet.create({
   input: {
     fontFamily: FONT.medium,
     fontSize: 17,
-    lineHeight: 22,
-    minHeight: 22,
+    lineHeight: LINE,
     padding: 0,
     textAlign: 'center',
   },
@@ -255,7 +259,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarImg: { width: '100%', height: '100%' },
+  avatarImg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   initials: { fontFamily: FONT.semibold, fontSize: 28 },
   error: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 18, marginTop: 12, textAlign: 'center' },
   bar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
