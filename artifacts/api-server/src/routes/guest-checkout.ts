@@ -18,6 +18,8 @@ import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { loadSellerCheckoutSettings, stripeCheckoutLocale } from "../lib/sellerCheckoutSettings";
 import { productsBeyondSellerPlan, SELLER_PLAN_LIMIT_CODE, SELLER_PLAN_LIMIT_MESSAGE } from "../lib/planGate";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
+import { resolveWithLiveRates } from "../lib/intl/liveShippingRates";
+import { DUTIES_UNAVAILABLE_RESPONSE, DutiesUnavailableError, dutiesLineItem, hostedCheckoutDuties } from "../lib/intl/duties";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
 import { recordCheckoutAttribution } from "../lib/growth/attribution";
@@ -285,6 +287,8 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       .where(and(eq(shippingZones.sellerId, sellerId), eq(shippingZones.active, true)));
     let shippingCents = 0;
     let shippingLineName = "Shipping";
+    let zoneDutiesHandling: string | null = null; // intl #109
+    let sellerHomeCountry = "US";
     if (zoneRows.length > 0) {
       const [sellerRow] = await db.select({ country: users.sellerShipFromCountry }).from(users).where(eq(users.clerkId, sellerId)).limit(1);
       const weightTierRows: ShippingZoneWeightTierRow[] = [];
@@ -293,19 +297,26 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
         const rows = await db.select().from(shippingZoneWeightTiers).where(eq(shippingZoneWeightTiers.zoneId, z.id));
         weightTierRows.push(...rows);
       }
-      const resolved = resolveShippingForDestination({
+      // Intl #108: live carrier quote for a 'calculated' zone when SHIPPO_LIVE_RATES_ENABLED (flat rate otherwise).
+      const resolved = await resolveWithLiveRates(resolveShippingForDestination({
         zones: zoneRows as unknown as ShippingZoneRow[],
         weightTiers: weightTierRows,
         destinationCountry: shippingAddressValue.country,
         sellerHomeCountry: sellerRow?.country ?? "US",
         subtotalCents: afterBundlesCents,
         weightGrams: cartWeightGrams,
+      }), {
+        sellerId: sellerId, zones: zoneRows as unknown as ShippingZoneRow[], shipFromCountry: sellerRow?.country ?? "US",
+        destination: { country: shippingAddressValue.country, postalCode: shippingAddressValue.zip, city: shippingAddressValue.city, state: shippingAddressValue.state, street: shippingAddressValue.street },
+        weightGrams: cartWeightGrams, subtotalCents: subtotalCents,
       });
       if (resolved.unavailable) {
         return res.status(400).json({ error: "This seller does not ship to the selected destination" });
       }
       shippingCents = resolved.shippingCents;
       shippingLineName = resolved.zoneName ? `Shipping (${resolved.zoneName})` : "Shipping";
+      zoneDutiesHandling = resolved.dutiesHandling;
+      sellerHomeCountry = sellerRow?.country ?? "US";
     } else {
       const [rate] = await db.select().from(shippingRates).where(and(eq(shippingRates.sellerId, sellerId), eq(shippingRates.active, true))).limit(1);
       shippingCents = !rate || (rate.freeAboveCents != null && afterBundlesCents >= rate.freeAboveCents) ? 0 : rate.flatRateCents;
@@ -346,6 +357,18 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       })
       : 0;
 
+    // Intl #109: DDP duties as their own line (0 unless DUTIES_AT_CHECKOUT_ENABLED and the zone is DDP).
+    let dutiesQuote: { dutiesCents: number; quoteId: string | null } = { dutiesCents: 0, quoteId: null };
+    try {
+      dutiesQuote = await hostedCheckoutDuties({
+        dutiesHandling: zoneDutiesHandling, shipFromCountry: sellerHomeCountry,
+        destination: shippingAddressValue, items: cartItems, shippingCents,
+      });
+    } catch (err) {
+      if (err instanceof DutiesUnavailableError) return void res.status(409).json(DUTIES_UNAVAILABLE_RESPONSE);
+      throw err;
+    }
+    if (dutiesQuote.dutiesCents > 0) lineItems.push(dutiesLineItem(dutiesQuote.dutiesCents));
     const platformFeeBps = await resolveSellerPlatformFeeBps(sellerId);
     // A seller's discount code lowers the fee basis, as on the signed-in flow.
     const money = paymentIntentMoney({
@@ -375,6 +398,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
           discountCodeAmountCents,
         } : {}),
         ...giftColumns(req.body.gift),
+        ...(dutiesQuote.dutiesCents > 0 ? { dutiesCents: dutiesQuote.dutiesCents, dutiesQuoteId: dutiesQuote.quoteId } : {}),
       }).returning({ id: checkoutSessions.id });
     } catch (error: any) {
       // A concurrent duplicate request lost the DB uniqueness race. Reuse only

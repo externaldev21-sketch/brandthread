@@ -240,6 +240,8 @@ export interface PaymentSummary {
   bundleLines?: Array<{ bundleId: string; name: string; sets: number; discountCents: number }>;
   shippingTotalCents: number;
   taxTotalCents: number;
+  /** Intl #109: DDP duties & import taxes collected at checkout. */
+  dutiesCents?: number;
   totalCents: number;
   amountPaidCents: number;
   amountRefundedCents: number;
@@ -553,6 +555,8 @@ export interface BuyerOrderView {
     discountCents?: number;
     /** Item 109 (additive): Thread Cash that paid part of the order; totalCents is the card charge. */
     threadCashCents?: number;
+    /** Intl #109 (additive): DDP duties & import taxes charged at checkout. */
+    dutiesCents?: number;
   };
   trackingNumber?: string;
   trackingCarrier?: string;

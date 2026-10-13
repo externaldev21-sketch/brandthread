@@ -703,6 +703,7 @@ export interface BuyerOrderApiRow {
   createdAt?: string | null;
   // Read by the buyer order detail screen (app/buyer-order-detail.tsx).
   taxCents?: number | null;
+  dutiesCents?: number | null;
   discountAmountCents?: number | null;
   threadCashAppliedCents?: number | null;
   cancellationNotes?: string | null;

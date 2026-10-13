@@ -32,6 +32,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { formatMoney as formatCents } from '@/lib/format';
 
 
+import { ApproxPrice } from '@/components/intl/ApproxPrice';
 import { useColors } from '@/hooks/useColors';
 
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -1696,6 +1697,8 @@ export default function BuyerProductDetailScreen() {
             <Icon name="truck" size={17} color={FG} />
             <Text style={s.promiseText}>{deliveryPromiseLine(!!product.isPreOrder)}</Text>
           </View>
+          {/* Intl #107: approximate price in the buyer's display currency (nothing when USD / off). */}
+          <ApproxPrice cents={variantPrice} style={{ marginTop: -SP.sm, marginBottom: SP.md }} />
 
           {/* No rule between price and sizes (SSENSE runs price straight into
               the size picker): keeps the size row above the fold (item 129). */}

@@ -48,7 +48,7 @@ import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
 import {
   CART_CHECKOUT_KIND, CartCheckoutError, MAX_CART_GROUPS, MIN_CARD_CHARGE_CENTS,
-  calculateGroupTax, findCardDataInRequest, priceCartGroup, type CartShipping, type PricedGroup,
+  calculateGroupTax, findCardDataInRequest, groupChargeTotalCents, priceCartGroup, type CartShipping, type PricedGroup,
 } from "../lib/money/cartCheckout";
 import { destinationApplicationFeeCents } from "../lib/money/fees";
 import { paymentIntentMethodParams, paymentMethodTypesFor } from "../lib/payments/bnpl";
@@ -165,6 +165,8 @@ type GroupBreakdown = {
   firstOrderDiscountCents: number;
   totalCents: number;
   processingDays: number | null;
+  /** Intl #109: DDP duties & import taxes; present only when above zero. */
+  dutiesCents?: number;
 };
 
 function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gift: Map<string, number> = new Map()): GroupBreakdown[] {
@@ -185,6 +187,7 @@ function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gi
       firstOrderDiscountCents: row.firstOrderDiscountCents ?? 0,
       totalCents: row.amountTotalCents ?? 0,
       processingDays: null,
+      ...((row.dutiesCents ?? 0) > 0 ? { dutiesCents: row.dutiesCents } : {}),
     };
   });
 }
@@ -256,7 +259,7 @@ async function finishPricing(
     const firstOrderDiscountCents = firstOrderAvailable && group.chargePlan.chargeModel === "destination" && loyaltyCents === 0 && threadCashCents === 0
       ? firstOrderDiscountForGroup(group.subtotalCents - group.bundleDiscountCents - group.discountCents) : 0;
     if (firstOrderDiscountCents > 0) firstOrderAvailable = false;
-    const fullTotalCents = group.subtotalCents - group.bundleDiscountCents + group.shippingCents - group.discountCents - loyaltyCents - threadCashCents + tax.taxCents - firstOrderDiscountCents;
+    const fullTotalCents = group.subtotalCents - group.bundleDiscountCents + group.shippingCents - group.discountCents - loyaltyCents - threadCashCents + tax.taxCents + group.dutiesCents - firstOrderDiscountCents;
     const giftRef = groups[index]?.giftCard;
     // A store gift card covers part of THIS seller's group only.
     const gift = giftRef && payer.buyerId
@@ -309,6 +312,7 @@ function breakdown(priced: PricedCartGroup[], rows?: Array<{ id: string }>): Gro
     firstOrderDiscountCents: group.firstOrderDiscountCents,
     totalCents: group.totalCents,
     processingDays: group.processingDays,
+    ...(group.dutiesCents > 0 ? { dutiesCents: group.dutiesCents } : {}),
   }));
 }
 
@@ -628,6 +632,8 @@ export function createCheckoutIntentRouter(mode: CheckoutIntentMode): Router {
             shippingCents: group.shippingCents,
             taxCents: group.taxCents,
             stripeTaxCalculationId: group.calculationId,
+            dutiesCents: group.dutiesCents,
+            dutiesQuoteId: group.dutiesQuoteId,
           }).returning();
           if (group.firstOrderDiscountCents > 0 && payer.buyerId && !(await reserveFirstOrderDiscount(tx, {
             buyerId: payer.buyerId, checkoutSessionId: row.id, amountCents: group.firstOrderDiscountCents,

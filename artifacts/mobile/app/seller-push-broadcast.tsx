@@ -185,7 +185,7 @@ export default function SellerPushBroadcastScreen() {
                     return (
                       <PressableScale key={a.key} onPress={() => chooseAudience(a.key)} style={styles.audienceRow}
                         accessibilityRole="radio" accessibilityLabel={`${a.label}, ${sub}`} accessibilityState={{ checked }}>
-                        <Feather name={a.icon} size={20} color={c.foreground} />
+                        <Icon name={a.icon} size={20} color={c.foreground} />
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.audienceTitle, { color: c.foreground }]}>{a.label}</Text>
                           <Text style={[styles.audienceSub, { color: c.mutedForeground }]} numberOfLines={1}>{sub}</Text>

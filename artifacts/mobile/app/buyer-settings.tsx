@@ -57,6 +57,8 @@ import { useJoinedCommunities } from '@/lib/communities/useCommunityClient';
 
 
 import { collectAppDiagnostics, formatAppVersion } from '@/lib/appDiagnostics';
+import { useDisplayCurrency } from '@/lib/displayCurrency';
+import { useApi } from '@/lib/api';
 
 const APP_VERSION_LABEL = formatAppVersion(collectAppDiagnostics());
 
@@ -74,10 +76,14 @@ export default function BuyerSettingsScreen() {
   const { communities: joinedGroups } = useJoinedCommunities(60_000);
   const groupsValue = joinedGroups.length > 0 ? `${joinedGroups.length} joined` : undefined;
 
-  const sections = useMemo(() => settingsGroupsFor(BUYER_SETTINGS_CATALOG, query), [query]);
+  const fx = useDisplayCurrency(useApi());
+  const sections = useMemo(() => settingsGroupsFor(
+    BUYER_SETTINGS_CATALOG.map(group => ({ ...group, items: group.items.filter(item => !item.requiresFx || fx.enabled) })), query,
+  ), [query, fx.enabled]);
   const s = styles(theme);
 
   function valueFor(item: SettingsCatalogItem): string | undefined {
+    if (item.requiresFx) return fx.currency;
     if (item.route === '/community') return groupsValue;
     return undefined;
   }

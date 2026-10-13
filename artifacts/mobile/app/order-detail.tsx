@@ -292,6 +292,7 @@ export function adaptApiOrder(raw: any): Order {
        discountTotalCents:      Math.max(0, raw.discountAmountCents ?? 0),
        bundleLines,
        shippingTotalCents:      shippingCents,
+       dutiesCents:             Math.max(0, raw.dutiesCents ?? 0),
        taxTotalCents:           0,
        totalCents,
       // Payment was received for active/shipped/delivered; held in limbo for refund_pending

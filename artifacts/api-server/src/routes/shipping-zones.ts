@@ -19,11 +19,17 @@ import { z } from "@workspace/api-zod";
 import { bodyObject, cents, idParams, validateInput } from "../lib/commerceValidation";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
+import { CALCULATED_PRICING_MODEL, liveRatesEnabled, resolveWithLiveRates } from "../lib/intl/liveShippingRates";
+import { dutiesAtCheckoutEnabled } from "../lib/intl/duties";
 
 const router = Router();
 
 const ZONE_TYPES = new Set(["domestic", "country", "rest_of_world"]);
 const PRICING_MODELS = new Set(["flat", "weight_tiered"]);
+/** Intl #108: 'calculated' (live carrier rates) is accepted only while SHIPPO_LIVE_RATES_ENABLED. */
+function pricingModelAllowed(model: string): boolean {
+  return PRICING_MODELS.has(model) || (model === CALCULATED_PRICING_MODEL && liveRatesEnabled());
+}
 const DUTIES = new Set(["ddp", "dap"]);
 
 function isNonNegInt(v: unknown): v is number {
@@ -38,7 +44,7 @@ async function zoneWithTiers(zoneId: string) {
 
 // ── Public: resolve shipping cost for a destination (used by buyer checkout preview) ──
 router.get("/resolve", async (req, res) => {
-  const { sellerId, country, subtotalCents, weightGrams } = req.query;
+  const { sellerId, country, subtotalCents, weightGrams, postalCode } = req.query;
   if (!sellerId || !country) {
     res.status(400).json({ error: "sellerId and country are required" });
     return;
@@ -69,13 +75,18 @@ router.get("/resolve", async (req, res) => {
     allTiers.push(...rows);
   }
 
-  const resolved = resolveShippingForDestination({
+  const resolved = await resolveWithLiveRates(resolveShippingForDestination({
     zones: zoneRows as unknown as ShippingZoneRow[],
     weightTiers: allTiers,
     destinationCountry: String(country),
     sellerHomeCountry: seller?.country ?? "US",
     subtotalCents: subtotal,
     weightGrams: weight,
+  }), {
+    // Intl #108: only a 'calculated' zone with the flag on (and a postalCode) gets a live quote.
+    sellerId: String(sellerId), zones: zoneRows as unknown as ShippingZoneRow[], shipFromCountry: seller?.country ?? "US",
+    destination: { country: String(country), postalCode: typeof postalCode === "string" ? postalCode : null },
+    weightGrams: weight, subtotalCents: subtotal,
   });
   res.json(resolved);
 });
@@ -114,14 +125,32 @@ const weightTiersBody = bodyObject({
 // GET /api/shipping-zones/settings — the seller's ship-from country (used to resolve the "domestic" zone)
 router.get("/settings", requireRole("staff"), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
-  const [seller] = await db.select({ country: users.sellerShipFromCountry }).from(users)
+  const [seller] = await db.select({ country: users.sellerShipFromCountry, postal: users.sellerShipFromPostalCode }).from(users)
     .where(eq(users.clerkId, sellerId)).limit(1);
-  res.json({ shipFromCountry: seller?.country ?? "US" });
+  const live = liveRatesEnabled();
+  const duties = dutiesAtCheckoutEnabled();
+  res.json({
+    shipFromCountry: seller?.country ?? "US",
+    // Intl #108/#109: present only while their flags are on, so the editor's
+    // extra option and copy stay hidden otherwise.
+    ...(live ? { liveRatesAvailable: true, shipFromPostalCode: seller?.postal ?? null } : {}),
+    ...(duties ? { dutiesAtCheckout: true } : {}),
+  });
 });
 
 // PATCH /api/shipping-zones/settings — update the seller's ship-from country
 router.patch("/settings", requireRole("staff"), validateInput({ body: zoneSettingsBody }), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
+  // Intl #108: the ship-from postal code (for live carrier rates) can be saved on its own.
+  const rawPostal = req.body?.shipFromPostalCode;
+  if (rawPostal !== undefined && req.body?.shipFromCountry === undefined) {
+    const postal = typeof rawPostal === "string" ? rawPostal.trim().toUpperCase() : "";
+    if (postal && !/^[A-Z0-9][A-Z0-9 -]{1,15}$/.test(postal)) {
+      return void res.status(400).json({ error: "shipFromPostalCode must be a valid postal code" });
+    }
+    await db.update(users).set({ sellerShipFromPostalCode: postal || null }).where(eq(users.clerkId, sellerId));
+    return void res.json({ shipFromPostalCode: postal || null });
+  }
   const country = typeof req.body?.shipFromCountry === "string" ? req.body.shipFromCountry.trim().toUpperCase() : "";
   if (!/^[A-Z]{2}$/.test(country)) {
     return void res.status(400).json({ error: "shipFromCountry must be a 2-letter ISO country code" });
@@ -156,7 +185,10 @@ router.post("/", requireRole("staff"), validateInput({ body: createZoneBody }), 
   if (typeof zoneType !== "string" || !ZONE_TYPES.has(zoneType)) {
     return void res.status(400).json({ error: "zoneType must be one of domestic, country, rest_of_world" });
   }
-  const cleanPricingModel = typeof pricingModel === "string" && PRICING_MODELS.has(pricingModel) ? pricingModel : "flat";
+  if (pricingModel === CALCULATED_PRICING_MODEL && (!pricingModelAllowed(pricingModel) || zoneType === "domestic")) {
+    return void res.status(400).json({ error: "Calculated rates are available for international zones only" });
+  }
+  const cleanPricingModel = typeof pricingModel === "string" && pricingModelAllowed(pricingModel) ? pricingModel : "flat";
   const rate = flatRateCents === undefined ? 0 : flatRateCents;
   if (!isNonNegInt(rate)) return void res.status(400).json({ error: "flatRateCents must be a non-negative integer" });
   if (freeAboveCents !== undefined && freeAboveCents !== null && !isNonNegInt(freeAboveCents)) {
@@ -221,8 +253,11 @@ router.patch("/:id", requireRole("staff"), validateInput({ params: zoneIdParams,
     updates.countries = [...new Set(countries.filter((c: unknown): c is string => typeof c === "string" && /^[A-Za-z]{2}$/.test(c)).map((c: string) => c.toUpperCase()))];
   }
   if (pricingModel !== undefined) {
-    if (typeof pricingModel !== "string" || !PRICING_MODELS.has(pricingModel)) {
+    if (typeof pricingModel !== "string" || !pricingModelAllowed(pricingModel)) {
       return void res.status(400).json({ error: "pricingModel must be flat or weight_tiered" });
+    }
+    if (pricingModel === CALCULATED_PRICING_MODEL && (zoneType ?? existing.zoneType) === "domestic") {
+      return void res.status(400).json({ error: "Calculated rates are available for international zones only" });
     }
     updates.pricingModel = pricingModel;
   }

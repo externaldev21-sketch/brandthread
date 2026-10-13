@@ -93,6 +93,7 @@ import { bagShippingTotal } from '@/lib/cart/bagShipping';
 import { knownStockLimit, showsLimitNote, stepperMax } from '@/lib/cart/quantityLimit';
 
 import { useScreenInteractive } from '@/lib/perf';
+import { ApproxPrice } from '@/components/intl/ApproxPrice';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -733,6 +734,7 @@ export default function CartScreen() {
                   totalCents={displayedTotal}
                   hasPreOrder={hasPreOrder}
                 />
+                <ApproxPrice cents={displayedTotal} style={{ textAlign: 'right' }} testID="cart-approx-total" />
               </>
             ) : (
               <BagEmpty

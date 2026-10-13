@@ -15,6 +15,7 @@ import { FONT, FS, SP } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { CheckoutSection, useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
 import { useCheckoutT } from './CheckoutLanguage';
+import { ApproxPrice } from '@/components/intl/ApproxPrice';
 
 type Group = CheckoutSession['deliveryGroups'][number];
 type LineItem = Group['items'][number];
@@ -106,13 +107,15 @@ export function OrderSummarySection({
   /** Shown instead of a tax amount until tax is known (e.g. "Added with your address"). */
   taxNote?: string;
   /** Per-seller numbers from the server's quote, when available. */
-  quotedGroups?: Array<{ sellerId: string; shippingCents: number; processingDays: number | null }>;
+  quotedGroups?: Array<{ sellerId: string; shippingCents: number; processingDays: number | null; dutiesCents?: number }>;
   /** Store gift card cents already taken off; `totals.totalCents` is what the card is charged. */
   giftCardCents?: number;
 }) {
   const ck = useCheckoutColors();
   const styles = useMemo(() => makeStyles(ck), [ck]);
   const t = useCheckoutT();
+  // Intl #109: DDP duties from the server quote (already inside each group's total).
+  const dutiesCents = (quotedGroups ?? []).reduce((sum, group) => sum + Math.max(0, group.dutiesCents ?? 0), 0);
   return (
     <CheckoutSection title={t('Order summary')} testID="checkout-order-summary">
       {session.deliveryGroups.map((group, index) => {
@@ -138,6 +141,9 @@ export function OrderSummarySection({
           value={taxNote ? t(taxNote) : formatCents(totals.taxCents)}
           testID="checkout-tax-line"
         />
+        {dutiesCents > 0 ? (
+          <Line styles={styles} label="Duties & import taxes" value={formatCents(dutiesCents)} testID="checkout-duties-line" />
+        ) : null}
         {(totals.bundleSavingsCents ?? 0) > 0 ? (
           <Line styles={styles} label="Bundle savings" value={`−${formatCents(totals.bundleSavingsCents ?? 0)}`} testID="checkout-bundle-savings-line" />
         ) : null}
@@ -168,6 +174,8 @@ export function OrderSummarySection({
           strong
           testID="checkout-total-line"
         />
+        {/* Intl #107: nothing unless a non-USD display currency is chosen and rates are on. */}
+        <ApproxPrice cents={totals.totalCents} suffix={' · You\u2019ll be charged in USD'} style={styles.approx} testID="checkout-approx-total" />
       </View>
     </CheckoutSection>
   );
@@ -195,5 +203,6 @@ function makeStyles(ck: CheckoutColors) {
     totalDivider: { height: 1, backgroundColor: ck.divider, marginVertical: SP.sm },
     totalLabel: { fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text },
     totalValue: { fontFamily: FONT.bold, fontSize: FS.lg, color: ck.text, ...TABULAR_NUMS },
+    approx: { textAlign: 'right', color: ck.muted, marginTop: 2 },
   });
 }

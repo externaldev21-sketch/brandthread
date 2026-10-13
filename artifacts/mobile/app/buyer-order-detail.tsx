@@ -561,6 +561,8 @@ export function adaptOrderDetail(row: OrderDetailRow): BuyerOrderView {
       // Item 109: the buyer orders API now returns these (additive); older
       // responses leave them undefined, which keeps the old receipt.
       taxTotalCents:     row.taxCents ?? 0,
+      // Intl #109: DDP duties & import taxes (0 / absent on every other order).
+      dutiesCents:       Math.max(0, row.dutiesCents ?? 0),
       totalCents:        row.totalCents ?? 0,
       discountCents:     Math.max(0, (row.discountAmountCents ?? 0) - (row.threadCashAppliedCents ?? 0)),
       threadCashCents:   Math.max(0, row.threadCashAppliedCents ?? 0),
@@ -1286,6 +1288,9 @@ export default function BuyerOrderDetailScreen() {
               display-only guard; the underlying total is unchanged. */}
           {!!order.payment.taxTotalCents && (
             <Row label="Tax" value={formatCents(order.payment.taxTotalCents)} />
+          )}
+          {!!order.payment.dutiesCents && (
+            <Row label="Duties & import taxes" value={formatCents(order.payment.dutiesCents)} />
           )}
           {!!order.payment.discountCents && (
             <Row label="Discount" value={`−${formatCents(order.payment.discountCents)}`} />

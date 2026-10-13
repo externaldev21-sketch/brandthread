@@ -116,6 +116,7 @@ import { financeFeesRouter, publicFeeScheduleRouter } from "./fees";
 import { publicWebAnnualPlansRouter } from "./web-annual-plans";
 import taxesRouter from "./taxes";
 import sellerPaymentSettingsRouter, { publicPayLaterRouter } from "./seller-payment-settings";
+import fxRouter from "./fx";
 import teamRouter from "./team";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import notificationEventsRouter from "./notification-events";
@@ -238,6 +239,7 @@ router.use("/app/installs",    appInstallsRouter); // first-launch install ping 
 router.use(killSwitchGate); // Live / Payments / AI kill switches (Admin → Kill switches); write entry points only
 // Apple Wallet pre-order passes: status + signed download are public, the link route requires auth itself.
 router.use("/wallet",          walletPassesRouter);
+router.use("/fx",             fxRouter); // GET /rates public (display-only currency, intl #107); /display-currency authed per route
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public",          publicWebAnnualPlansRouter); // GET /web-annual-plans (no auth; empty until a yearly web price is set)

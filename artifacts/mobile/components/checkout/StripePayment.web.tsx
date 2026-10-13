@@ -24,7 +24,7 @@ import { View } from 'react-native';
 import { loadStripe } from '@stripe/stripe-js/pure';
 import type { Stripe, StripeElements, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements, ExpressCheckoutElement, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
-import { MIN_CARD_CHARGE_CENTS_CLIENT, type CartQuote, type WalletContact } from '@/lib/checkoutPayment';
+import { MIN_CARD_CHARGE_CENTS_CLIENT, quoteDutiesCents, type CartQuote, type WalletContact } from '@/lib/checkoutPayment';
 import { useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
 import { reportError } from '@/lib/monitoring';
 import { reportStripeUnavailableOnce, shouldReportStripeUnavailable } from '@/lib/stripeLaunchCheck';
@@ -229,13 +229,15 @@ const ElementsPaymentController = React.forwardRef<PaymentControllerApi>(functio
 
 // ─── Apple Pay / Google Pay ──────────────────────────────────────────────────
 
-function sheetLines(amountCents: number, shippingCents: number, taxCents: number, tipCents = 0) {
-  // Items + tax + tip + the shipping rate add up to exactly the amount.
+function sheetLines(amountCents: number, shippingCents: number, taxCents: number, tipCents = 0, dutiesCents = 0) {
+  // Items, shipping, tax, tip and duties add up to the provider's exact charge.
   return {
     lineItems: [
-      { name: 'Items', amount: Math.max(0, amountCents - shippingCents - taxCents - tipCents) },
+      { name: 'Items', amount: Math.max(0, amountCents - shippingCents - taxCents - tipCents - dutiesCents) },
       ...(taxCents > 0 ? [{ name: 'Tax', amount: taxCents }] : []),
       ...(tipCents > 0 ? [{ name: 'Tip', amount: tipCents }] : []),
+      // Intl #109: DDP duties, only when the quote carries them.
+      ...(dutiesCents > 0 ? [{ name: 'Duties & import taxes', amount: dutiesCents }] : []),
     ],
     shippingRates: [{ id: 'seller-shipping', displayName: 'Shipping', amount: shippingCents }],
   };
@@ -287,7 +289,8 @@ function ElementsExpressPay({ amountCents, shippingCents, quote, createIntent, o
           const tax = next.groups.reduce((sum, group) => sum + group.taxCents, 0);
           const tip = next.groups.reduce((sum, group) => sum + (group.tipCents ?? 0), 0);
           elements.update({ amount: Math.max(MIN_CARD_CHARGE_CENTS_CLIENT, next.amountCents) });
-          event.resolve(sheetLines(next.amountCents, ship, tax, tip));
+          const duties = quoteDutiesCents(next);
+          event.resolve(sheetLines(next.amountCents, ship, tax, tip, duties));
         }}
         onConfirm={async event => {
           if (!stripe || !elements) {

@@ -51,6 +51,8 @@ export {
   spreadDiscount, taxableAmounts, threadCashGroupCeilingCents, type CartRewardPlan,
 } from "./cartMath";
 import { emptyMysteryBoxVariants } from "../mysteryBox";
+import { resolveWithLiveRates } from "../intl/liveShippingRates";
+import { DutiesUnavailableError, dutiesForGroup } from "../intl/duties";
 
 export const CART_CHECKOUT_KIND = "cart_checkout";
 /** Sellers in one cart payment (bounded by what the order pipeline handles per webhook). */
@@ -158,6 +160,13 @@ export type PricedGroup = {
   processingFeeEstimateCents: number;
   /** "held" for a preorder drop (paid out per order when it ships), else "destination". */
   chargePlan: ChargePlan;
+  /**
+   * Intl #109: duties & import taxes for a DDP zone (0 unless
+   * DUTIES_AT_CHECKOUT_ENABLED). Charged on top of the total and passed
+   * through to the seller, like shipping.
+   */
+  dutiesCents: number;
+  dutiesQuoteId: string | null;
 };
 
 export async function priceCartGroup(input: {
@@ -233,6 +242,7 @@ export async function priceCartGroup(input: {
     stripeAccountId: users.stripeAccountId,
     stripeAccountStatus: users.stripeAccountStatus,
     shipFrom: users.sellerShipFromCountry,
+    shipFromPostal: users.sellerShipFromPostalCode,
   }).from(users).where(eq(users.clerkId, sellerId)).limit(1);
   if (!seller?.stripeAccountId || seller.stripeAccountStatus !== "active") {
     void notifySellerCheckoutBlocked(sellerId); // once a day: "A buyer couldn't pay you"
@@ -276,6 +286,7 @@ export async function priceCartGroup(input: {
   let shippingCents = 0;
   let shippingLineName = "Shipping";
   let processingDays: number | null = null;
+  let dutiesHandling: string | null = null;
   const zones = await db.select().from(shippingZones)
     .where(and(eq(shippingZones.sellerId, sellerId), eq(shippingZones.active, true)));
   if (zones.length > 0) {
@@ -284,19 +295,26 @@ export async function priceCartGroup(input: {
       if (zone.pricingModel !== "weight_tiered") continue;
       tiers.push(...await db.select().from(shippingZoneWeightTiers).where(eq(shippingZoneWeightTiers.zoneId, zone.id)));
     }
-    const resolved = resolveShippingForDestination({
+    // Intl #108: a 'calculated' zone takes a live carrier quote when
+    // SHIPPO_LIVE_RATES_ENABLED; otherwise (and on any failure) its flat rate.
+    const resolved = await resolveWithLiveRates(resolveShippingForDestination({
       zones: zones as unknown as ShippingZoneRow[],
       weightTiers: tiers,
       destinationCountry: input.shipping.country,
       sellerHomeCountry: seller.shipFrom ?? "US",
       subtotalCents: afterBundlesCents,
       weightGrams,
+    }), {
+      sellerId, zones: zones as unknown as ShippingZoneRow[], shipFromCountry: seller.shipFrom ?? "US",
+      destination: { country: input.shipping.country, postalCode: input.shipping.zip, city: input.shipping.city, state: input.shipping.state, street: input.shipping.street },
+      weightGrams, subtotalCents,
     });
     if (resolved.unavailable) {
       throw new CartCheckoutError(400, "NO_SHIPPING_TO_DESTINATION", "This seller doesn't ship to that address.");
     }
     shippingCents = resolved.shippingCents;
     shippingLineName = resolved.zoneName ? `Shipping (${resolved.zoneName})` : "Shipping";
+    dutiesHandling = resolved.dutiesHandling;
     const zone = zones.find((z) => z.name === resolved.zoneName) ?? zones.find((z) => z.zoneType === "domestic") ?? zones[0];
     processingDays = zone?.processingDays ?? null;
   } else {
@@ -326,6 +344,26 @@ export async function priceCartGroup(input: {
     : 0;
   const merchandiseDiscountCents = Math.max(0, Math.min(afterBundlesCents, discountCents - shippingDiscountCents));
 
+  // Intl #109: DDP duties (zero unless DUTIES_AT_CHECKOUT_ENABLED and the zone is DDP).
+  let duties = { dutiesCents: 0, quoteId: null as string | null };
+  try {
+    duties = await dutiesForGroup({
+      dutiesHandling,
+      shipFromCountry: seller.shipFrom ?? "US",
+      request: {
+        origin: { country: seller.shipFrom ?? "US", postalCode: seller.shipFromPostal ?? null },
+        destination: { country: input.shipping.country, postalCode: input.shipping.zip, city: input.shipping.city, state: input.shipping.state, street: input.shipping.street },
+        items: items.map((item) => ({ productId: item.productId, name: item.productName, unitPriceCents: item.priceCents, quantity: item.quantity })),
+        shippingCents,
+      },
+    });
+  } catch (error) {
+    if (error instanceof DutiesUnavailableError) {
+      throw new CartCheckoutError(409, "DUTIES_UNAVAILABLE", "Import duties couldn't be calculated for this address. Try again in a moment.");
+    }
+    throw error;
+  }
+
   const platformFeeBps = await resolveSellerPlatformFeeBps(sellerId);
   const fee = destinationApplicationFeeCents({
     merchandiseCents: Math.max(0, afterBundlesCents - discountCents),
@@ -353,9 +391,23 @@ export async function priceCartGroup(input: {
     platformFeeBps,
     processingFeeEstimateCents: fee.processingFeeEstimateCents,
     chargePlan,
+    dutiesCents: duties.dutiesCents,
+    dutiesQuoteId: duties.quoteId,
   };
 }
 
+/**
+ * What one seller group charges: subtotal + shipping − discount + sales tax
+ * + DDP duties (intl #109; 0 for every other checkout, so the total is
+ * exactly what it was before duties existed).
+ */
+export function groupChargeTotalCents(group: {
+  subtotalCents: number; shippingCents: number; discountCents: number; taxCents: number; dutiesCents?: number;
+}): number {
+  return group.subtotalCents + group.shippingCents - group.discountCents + group.taxCents + (group.dutiesCents ?? 0);
+}
+
+/** Spreads a discount across line amounts in proportion, exact to the cent (the last line takes the remainder). */
 /**
  * Stripe Tax for one seller group, on the seller's connected account (their
  * registrations, their liability). Throws CartCheckoutError TAX_UNAVAILABLE

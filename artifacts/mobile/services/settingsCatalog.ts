@@ -24,6 +24,8 @@ export interface SettingsCatalogItem {
   searchOnly?: boolean;
   /** Show `description` under the label (Instagram does this for Accounts Center only). */
   showDescription?: boolean;
+  /** Intl #107: only shown while the server's display-currency rates are on (FX_RATES_ENABLED). */
+  requiresFx?: boolean;
 }
 
 export interface SettingsCatalogGroup {
@@ -91,6 +93,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Friends', description: 'Your friends on Brandthread', aliases: ['friend', 'people'], icon: 'user-check', route: '/(buyer)/friends', audience: 'buyer' },
       { label: 'Groups', description: 'Community group chats you joined', aliases: ['community', 'group chats', 'groups'], icon: 'message-square', route: '/community', audience: 'buyer' },
       { label: 'Invite friends', description: 'Give $5, get $5 Thread Cash', aliases: ['invite', 'referral'], icon: 'gift', route: '/buyer-invite', audience: 'buyer' },
+      { label: 'Currency', description: 'See approximate prices in your currency', aliases: ['currency', 'euro', 'pound', 'exchange rate', 'convert', 'region'], icon: 'dollar-sign', route: '/currency', audience: 'buyer', requiresFx: true },
     ],
   },
   {
