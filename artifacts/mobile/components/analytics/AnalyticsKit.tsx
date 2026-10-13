@@ -337,7 +337,6 @@ export function AnalyticsBarChart({
           const y = levels.length === 1 ? gridHeight : gridHeight - (i / (levels.length - 1)) * (gridHeight - 4);
           return (
             <React.Fragment key={i}>
-              <Line x1={yLabelW} y1={y} x2={chartWidth} y2={y} stroke={colors.border} strokeWidth={1} />
               <SvgText x={yLabelW - 4} y={y + 4} textAnchor="end" fontSize={FS.xs} fontFamily={FONT.regular} fill={colors.subtle}>
                 {fmt(v)}
               </SvgText>

@@ -7,6 +7,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 
 export type SearchBrandRow = {
   id: string;
@@ -47,7 +48,7 @@ export function BrandRow({ brand, onPress }: { brand: SearchBrandRow; onPress: (
         <View style={{ flex: 1 }}>
           <View style={styles.nameRow}>
             <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{brand.name}</Text>
-            {brand.verified && <Icon name="check-circle" size={13} color={theme.text} style={{ marginTop: 1 }} />}
+            {brand.verified && <VerifiedBadge style={{ marginTop: 1 }} />}
           </View>
           <Text style={[styles.sub, { color: theme.muted }]} numberOfLines={1}>
             {brand.handle}{brand.followersLabel ? ` · ${brand.followersLabel}` : ''}

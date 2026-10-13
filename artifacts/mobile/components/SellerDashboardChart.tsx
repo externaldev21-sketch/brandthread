@@ -64,7 +64,6 @@ const AXIS_LABEL_COUNT: Record<SellerDashboardRange, number> = {
 // Evenly spaced horizontal gridlines drawn behind the empty state — a
 // genuinely-zero chart (a fresh store) reads as an intentional, correctly
 // laid-out chart with no data yet, not as a rendering glitch.
-const EMPTY_GRIDLINE_COUNT = 2;
 
 export function SellerDashboardChart({
   values,
@@ -256,15 +255,6 @@ export function SellerDashboardChart({
           )}
           {isEmpty && (
             <View pointerEvents="none" style={StyleSheet.absoluteFill} testID="seller-dashboard-chart-empty">
-              {Array.from({ length: EMPTY_GRIDLINE_COUNT }, (_, i) => (
-                <View
-                  key={`gridline-${i}`}
-                  style={[
-                    styles.emptyGridline,
-                    { top: ((i + 1) * chartHeight) / (EMPTY_GRIDLINE_COUNT + 1), backgroundColor: theme.borderSubtle },
-                  ]}
-                />
-              ))}
               <View style={[styles.emptyBaseline, { backgroundColor: theme.border }]} />
               <View style={styles.emptyMessageWrap}>
                 <Text style={[styles.emptyMessageText, { color: theme.muted }]}>
@@ -427,12 +417,6 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     borderWidth: 2,
-  },
-  emptyGridline: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: StyleSheet.hairlineWidth,
   },
   emptyBaseline: {
     position: 'absolute',

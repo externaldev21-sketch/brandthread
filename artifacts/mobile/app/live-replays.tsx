@@ -39,7 +39,7 @@ import { haptics, haptic } from '@/lib/haptics';
 
 
 const COLUMNS = 3;
-const GAP = 2;
+const GAP = 1;
 
 export default function LiveReplaysScreen() {
   const params = useLocalSearchParams<{ sellerId?: string }>();

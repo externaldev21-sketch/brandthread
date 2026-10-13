@@ -33,7 +33,7 @@ import { radius } from '@/constants/radii';
 
 import { minHitSlop } from '@/lib/hitSlop';
 
-const GAP = SP.xs;
+const GAP = 1;
 
 // Posts/Stories pills draw 35pt tall with a 1pt border (slop is measured from
 // the 33pt padding box on web); pad the touch area vertically to 44pt.
@@ -188,7 +188,7 @@ const makeStyles = (theme: { accent: string; accentDim: string }, CELL: number) 
   tabPillActive: { backgroundColor: theme.accentDim, borderColor: theme.accent },
   tabText: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   tabTextActive: { color: theme.accent },
-  grid: { paddingHorizontal: SP.md, paddingTop: SP.sm, gap: GAP, paddingBottom: 80 },
+  grid: { paddingTop: SP.sm, gap: GAP, paddingBottom: 80 },
   cell: { width: CELL, height: CELL, borderRadius: RADIUS.sm, overflow: 'hidden' },
   cellInner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xs },
   cellCaption: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, position: 'absolute', bottom: SP.xs, left: SP.xs, right: SP.xs },

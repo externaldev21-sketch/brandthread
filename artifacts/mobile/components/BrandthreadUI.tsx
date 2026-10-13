@@ -766,20 +766,21 @@ const STATUS_COLORS: Record<StatusVariant, { bg: string; fg: string }> = {
   purple:  { bg: 'transparent', fg: FG },
 };
 
-export function StatusBadge({ label, variant = 'neutral', small = false }: StatusBadgeProps) {
-  const { theme } = useAppTheme();
+export function StatusBadge({ label, variant = 'neutral' }: StatusBadgeProps) {
   const palette = useColors();
-  const c = variant === 'purple' ? { bg: theme.accentDim, fg: theme.accentLight } : variant === 'neutral' ? { bg: palette.accent, fg: palette.mutedForeground } : STATUS_COLORS[variant];
+  // Status is a plain word, not a pill: white for a state worth noticing,
+  // secondary for neutral, red only for a problem.
+  const color = variant === 'error' ? STATUS_COLORS.error.fg : variant === 'neutral' ? palette.mutedForeground : palette.foreground;
   return (
-    <View style={[stS.root, { backgroundColor: c.bg, paddingHorizontal: small ? 8 : 12, paddingVertical: small ? 2 : 4 }]}>
-      <Text style={[stS.label, { color: c.fg, fontSize: FS.xs }]}>{label}</Text>
+    <View style={stS.root}>
+      <Text style={[stS.label, { color, fontSize: FS.sm }]}>{label}</Text>
     </View>
   );
 }
 
 const stS = StyleSheet.create({
-  root:  { borderRadius: RADIUS.pill },
-  label: { fontFamily: FONT.bold, letterSpacing: 0.2 },
+  root:  { alignSelf: 'flex-start' },
+  label: { fontFamily: FONT.medium },
 });
 
 // ─── EmptyState ───────────────────────────────────────────────────────────────

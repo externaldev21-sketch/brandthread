@@ -18,6 +18,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { discoverBrands, type DiscoverBrand } from '@/services/discoverService';
 import { setSellerFollowing } from '@/services/socialService';
 import { SPACE } from './onboardingTokens';
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { FILL_ELEVATED, FONT, TEXT } from '@/lib/theme';
 
 export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerIds: string[]) => void } = {}) {
@@ -137,7 +138,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
             <View style={styles.rowText}>
               <View style={styles.nameRow}>
                 <Text numberOfLines={1} style={styles.name}>{brand.name}</Text>
-                {brand.verified && <Icon name="check-circle" size={13} color={theme.text} />}
+                {brand.verified && <VerifiedBadge />}
               </View>
               {brand.brandType ? <Text numberOfLines={1} style={styles.handle}>{brand.brandType}</Text> : null}
             </View>
