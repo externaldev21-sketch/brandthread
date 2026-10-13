@@ -2,6 +2,18 @@
 
 Version: 2026-09-23
 
+## The short version
+
+- This applies when you open a store, list products, run a drop or take payouts. You need to be 18 or older and finish Stripe Connect onboarding to get paid.
+- Brandthread’s fee is 5% of each marketplace order’s subtotal: item prices after discounts, not counting shipping or sales tax. Stripe charges its own processing fees.
+- When an order is refunded, we return our fee on the refunded part. Stripe doesn’t return its processing fee.
+- Drop money is held and released to you one order at a time when you add tracking. If a drop is cancelled or misses its fulfillment deadline, unshipped orders are refunded to buyers automatically.
+- You’re the seller of record. Accurate listings, shipping, customer service, your store’s return policy and taxes on your sales are on you.
+- No counterfeits, stolen designs, weapons, drugs, adult products, or payments taken off Brandthread.
+- You keep ownership of your designs, photos and listings. Questions: support@brandthread.app.
+
+This summary isn’t the agreement. The full text below is.
+
 ## Agreement
 
 This Seller Agreement applies to you when you open a store, list products, run a drop or accept payouts on Brandthread. It supplements our [Terms of Service](/terms), [Community Guidelines](/community-guidelines) and [Refund Policy](/refund-policy). If these documents conflict on a selling matter, this Seller Agreement applies. By opening a store or continuing to sell, you agree to it.
