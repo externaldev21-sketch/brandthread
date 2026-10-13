@@ -25,6 +25,8 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
+import { displayPriceInput, sanitizePriceInput } from '@/lib/priceInput';
+import { KeyboardStickyFooter } from '@/components/KeyboardStickyFooter';
 import {
   BrandthreadCard, PrimaryButton, SecondaryButton, TertiaryButton,
   StatusBadge, SectionHeader, HapticSwitch,
@@ -447,7 +449,7 @@ export default function DiscountsScreen() {
             onBack={() => setShowModal(false)}
           />
 
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ padding: SP.md, gap: SP.md, paddingBottom: 60 }}>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ padding: SP.md, gap: SP.md, paddingBottom: SP.lg }} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
 
             {/* Live summary card */}
             <View style={[s.summaryCard, { borderColor: theme.accent + '55' }]}>
@@ -529,8 +531,8 @@ export default function DiscountsScreen() {
                 <Text style={s.label}>Amount off ($)</Text>
                 <TextInput
                   style={s.input}
-                  value={fixedValue}
-                  onChangeText={setFixedValue}
+                  value={displayPriceInput(fixedValue)}
+                  onChangeText={t => setFixedValue(sanitizePriceInput(t))}
                   placeholder="10.00"
                   placeholderTextColor={MUTED}
                   keyboardType="decimal-pad"
@@ -586,8 +588,8 @@ export default function DiscountsScreen() {
               <Text style={s.label}>Minimum order ($) <Text style={{ color: MUTED, fontSize: FS.xs }}>(optional)</Text></Text>
               <TextInput
                 style={s.input}
-                value={minOrder}
-                onChangeText={setMinOrder}
+                value={displayPriceInput(minOrder)}
+                onChangeText={t => setMinOrder(sanitizePriceInput(t))}
                 placeholder="50.00"
                 placeholderTextColor={MUTED}
                 keyboardType="decimal-pad"
@@ -668,14 +670,14 @@ export default function DiscountsScreen() {
                 />
               )}
             </View>
-
+          </ScrollView>
+          <KeyboardStickyFooter testID="discount-save-footer">
             <PrimaryButton
               label={saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Code'}
               onPress={handleSave}
               disabled={saving}
-              style={{ marginTop: SP.sm }}
             />
-          </ScrollView>
+          </KeyboardStickyFooter>
         </SafeAreaProvider>
       </Modal>
 

@@ -58,6 +58,8 @@ export default function DisableTwoFactor() {
           placeholder="000000"
           autoComplete="one-time-code"
           textContentType="oneTimeCode"
+          keyboardType="number-pad"
+          maxLength={6}
           returnKeyType="done"
           onSubmitEditing={confirm}
           autoFocus

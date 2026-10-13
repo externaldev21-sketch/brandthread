@@ -14,6 +14,7 @@ import { returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusK
 import { FS, SP, RADIUS, FONT } from '@/lib/theme';
 import { dbStatusToOrderStatus } from '@/lib/orderStatusAdapter';
 import { parseDecimalToCents } from '@/lib/money';
+import { displayPriceInput, sanitizePriceInput } from '@/lib/priceInput';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { radius } from '@/constants/radii';
@@ -151,6 +152,9 @@ export default function ShippingScreen() {
 
   const [zoneSheetVisible, setZoneSheetVisible] = useState(false);
   const [zoneForm, setZoneForm] = useState<ZoneForm>(emptyZoneForm('country'));
+  /** The weight-tier rate being typed (index + raw text), so the field isn't
+   *  re-formatted from cents on every keystroke. */
+  const [tierRateDraft, setTierRateDraft] = useState<{ index: number; text: string } | null>(null);
   const [zoneSaving, setZoneSaving] = useState(false);
 
   function leaveSetupDestination() {
@@ -808,8 +812,8 @@ export default function ShippingScreen() {
             <>
               <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Flat rate</Text>
               <TextInput returnKeyType="done"
-                value={zoneForm.flatRate}
-                onChangeText={t => setZoneForm(f => ({ ...f, flatRate: t }))}
+                value={displayPriceInput(zoneForm.flatRate)}
+                onChangeText={t => setZoneForm(f => ({ ...f, flatRate: sanitizePriceInput(t) }))}
                 placeholder="$5.99"
                 keyboardType="decimal-pad"
                 placeholderTextColor={colors.mutedForeground}
@@ -843,8 +847,16 @@ export default function ShippingScreen() {
                   <View style={styles.tierField}>
                     <Text style={[styles.tierLabel, { color: colors.mutedForeground }]}>Rate</Text>
                     <TextInput returnKeyType="done"
-                      value={tier.rateCents ? (tier.rateCents / 100).toFixed(2) : ''}
-                      onChangeText={t => updateTier(i, { rateCents: parseDecimalToCents(t || '0') ?? 0 })}
+                      // What you type stays as typed while this field has focus
+                      // ("5" used to snap to "5.00" on the first keystroke);
+                      // it shows as cents again once you leave it.
+                      value={tierRateDraft?.index === i ? displayPriceInput(tierRateDraft.text) : (tier.rateCents ? (tier.rateCents / 100).toFixed(2) : '')}
+                      onChangeText={t => {
+                        const raw = sanitizePriceInput(t);
+                        setTierRateDraft({ index: i, text: raw });
+                        updateTier(i, { rateCents: parseDecimalToCents(raw || '0') ?? 0 });
+                      }}
+                      onBlur={() => setTierRateDraft(null)}
                       placeholder="$0.00"
                       placeholderTextColor={colors.mutedForeground}
                       keyboardType="decimal-pad"
@@ -865,8 +877,8 @@ export default function ShippingScreen() {
 
           <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Free shipping above (optional)</Text>
           <TextInput returnKeyType="done"
-            value={zoneForm.freeAbove}
-            onChangeText={t => setZoneForm(f => ({ ...f, freeAbove: t }))}
+            value={displayPriceInput(zoneForm.freeAbove)}
+            onChangeText={t => setZoneForm(f => ({ ...f, freeAbove: sanitizePriceInput(t) }))}
             placeholder="$75.00"
             keyboardType="decimal-pad"
             placeholderTextColor={colors.mutedForeground}

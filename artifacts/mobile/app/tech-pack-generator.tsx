@@ -273,19 +273,19 @@ export default function TechPackGeneratorScreen() {
         {step === 'info' && (
           <>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Step 1 · Product info</Text>
-            <Field label="Product name*" value={productName} onChangeText={setProductName} colors={colors} placeholder="Oversized Hoodie" />
-            <Field label="Brand name" value={brandName} onChangeText={setBrandName} colors={colors} placeholder="Your brand" />
+            <Field label="Product name" value={productName} onChangeText={setProductName} colors={colors} placeholder="Oversized Hoodie" />
+            <Field label="Brand name (optional)" value={brandName} onChangeText={setBrandName} colors={colors} placeholder="Your brand" />
             <View style={styles.row2}>
               <View style={{ flex: 1 }}>
-                <Field label="Category" value={category} onChangeText={setCategory} colors={colors} placeholder="Hoodie" />
+                <Field label="Category (optional)" value={category} onChangeText={setCategory} colors={colors} placeholder="Hoodie" />
               </View>
               <View style={{ flex: 1 }}>
-                <Field label="Season" value={season} onChangeText={setSeason} colors={colors} placeholder="FW26" />
+                <Field label="Season (optional)" value={season} onChangeText={setSeason} colors={colors} placeholder="FW26" />
               </View>
             </View>
-            <Field label="Style #" value={styleNumber} onChangeText={setStyleNumber} colors={colors} placeholder="HD-001" />
+            <Field label="Style # (optional)" value={styleNumber} onChangeText={setStyleNumber} colors={colors} placeholder="HD-001" />
             <Field
-              label="Description / notes"
+              label="Description / notes (optional)"
               value={description}
               onChangeText={setDescription}
               colors={colors}
