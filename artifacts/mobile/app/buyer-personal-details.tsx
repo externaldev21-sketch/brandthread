@@ -115,7 +115,7 @@ export default function BuyerPersonalDetails() {
     <View style={s.page}>
       <ScreenHeader title="Personal details" />
 
-      <ScrollView contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + (hasChanges ? 120 : 40) }}>
+      <ScrollView contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + (hasChanges ? 120 : 40) }} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
         <Text style={s.sectionDesc}>
           Keep your details up to date. Change your email and birthday in Login methods.
         </Text>

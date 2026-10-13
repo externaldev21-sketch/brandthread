@@ -21,6 +21,7 @@ import { radius as ControlRadius } from '@/constants/radii';
  *    Suggested people list, and the filter pill (a "coming soon" stub).
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { warmThreadOnPressIn } from '@/lib/conversationPrefetch';
 import { useScreenInteractive } from '@/lib/perf';
 import {
@@ -2016,6 +2017,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
         transparent
         onRequestClose={closeNoteCompose}
       >
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.composeBackdrop}>
           <Glass
             solid
@@ -2067,6 +2069,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
             />
           </Glass>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Snackbar

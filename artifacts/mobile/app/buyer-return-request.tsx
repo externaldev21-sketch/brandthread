@@ -343,6 +343,7 @@ export default function BuyerReturnRequestScreen() {
         bounces={false}
         overScrollMode="never"
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: insets.bottom + 120 }}
       >
         <Section title="Items">

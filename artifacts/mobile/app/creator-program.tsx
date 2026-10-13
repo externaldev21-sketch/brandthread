@@ -104,7 +104,7 @@ export default function CreatorProgramScreen() {
   return (
     <View style={[s.page, { backgroundColor: theme.background }]}>
       <ScreenHeader title="Creator program" />
-      <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 96 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 96 }]} showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
         <SegmentTabs<Tab>
           tabs={[{ key: 'overview', label: 'Overview' }, { key: 'payouts', label: 'Payouts' }]}
           value={tab}

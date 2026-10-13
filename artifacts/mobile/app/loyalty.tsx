@@ -140,7 +140,7 @@ export default function LoyaltyScreen() {
     <View style={s.root}>
       <ScreenHeader title="Rewards" />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
+      <ScrollView showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
 
         {/* Balance hero */}
         <View style={[s.heroCard, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>

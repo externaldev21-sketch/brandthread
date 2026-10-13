@@ -115,7 +115,7 @@ export default function BuyerProblemReportScreen() {
         onBack={() => goBackOr(router)}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: insets.bottom + 100 }}>
+      <ScrollView showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: insets.bottom + 100 }}>
         {/* Issue type */}
         <View style={s.card}>
           <Text style={s.sectionTitle}>What's the issue?</Text>

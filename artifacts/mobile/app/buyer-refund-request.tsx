@@ -215,7 +215,7 @@ export default function BuyerRefundRequestScreen() {
         title="Request refund"
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: insets.bottom + 100 }}>
+      <ScrollView showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: insets.bottom + 100 }}>
         {/* Max refund */}
         <View style={s.maxCard}>
           <Text style={s.maxLabel}>{route === 'cancel' ? 'Refund' : 'Maximum possible refund'}</Text>

@@ -8,8 +8,9 @@ import React, { useCallback, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, useWindowDimensions,
-  Modal, TextInput, ActivityIndicator, Share,
+  Modal, TextInput, ActivityIndicator, Share, Platform,
 } from 'react-native';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Icon } from '@/components/ui/Icon';
 import { haptics } from '@/lib/haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -263,6 +264,8 @@ export default function BuyerCollection() {
 
       <Modal transparent animationType="fade" visible={renameOpen} onRequestClose={() => setRenameOpen(false)}>
         <ModalSafeArea>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={{ flex: 1 }}>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={styles.backdrop} activeOpacity={1} onPress={() => setRenameOpen(false)} />
           <View style={styles.centerModal}>
             <View style={styles.renameCard}>
@@ -289,6 +292,8 @@ export default function BuyerCollection() {
               </View>
             </View>
           </View>
+            </View>
+          </KeyboardAvoidingView>
         </ModalSafeArea>
       </Modal>
     </View>

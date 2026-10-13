@@ -24,9 +24,10 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet,
   ActivityIndicator, Modal, TextInput, RefreshControl,
-  Linking,
+  Linking, Platform,
 } from 'react-native';
 import { CachedImage as Image } from '@/components/CachedImage';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -298,6 +299,8 @@ function ReviewSheet({
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <ModalSafeArea>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={{ flex: 1 }}>
       <TouchableOpacity
         style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' }}
         activeOpacity={1}
@@ -417,6 +420,8 @@ function ReviewSheet({
           </TouchableOpacity>
         </View>
       </SheetRise>
+          </View>
+        </KeyboardAvoidingView>
       </ModalSafeArea>
     </Modal>
   );
