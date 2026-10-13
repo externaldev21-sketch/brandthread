@@ -1,0 +1,16 @@
+# Refund: the buyer requests a refund on a delivered order.
+# ORDER_ID_TO_REFUND is a delivered order belonging to the signed-in buyer.
+appId: com.brandthread.mobile
+name: refund
+---
+- openLink: brandthread://buyer-refund-request?orderId=${ORDER_ID_TO_REFUND}
+- extendedWaitUntil:
+    visible: "Item damaged"
+    timeout: 20000
+- tapOn: "Item damaged"
+- scrollUntilVisible:
+    element: "Submit Refund Request"
+- tapOn: "Submit Refund Request"
+- extendedWaitUntil:
+    visible: "Refund Request Submitted"
+    timeout: 15000
