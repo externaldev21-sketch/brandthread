@@ -7,6 +7,7 @@
     "icon": "./assets/images/app-icons/monochrome.png",
     "scheme": "brandthread",
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#0A0A0B",
     "runtimeVersion": {
       "policy": "fingerprint"
     },
