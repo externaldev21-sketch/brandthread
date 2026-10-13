@@ -36,8 +36,9 @@ describe('payout schedule view helpers', () => {
   });
 
   it('formats the fee from the server constants', () => {
-    expect(instantFeeLabel({ feeBps: 100, minFeeCents: 50 })).toBe('1% fee, minimum $0.50');
-    expect(instantFeeLabel({ feeBps: 150, minFeeCents: 50 })).toBe('1.50% fee, minimum $0.50');
+    expect(instantFeeLabel({ feeBps: 150, minFeeCents: 50 })).toBe('1.5% fee, min $0.50');
+    expect(instantFeeLabel({ feeBps: 100, minFeeCents: 50 })).toBe('1% fee, min $0.50');
+    expect(instantFeeLabel({ feeBps: 125, minFeeCents: 50 })).toBe('1.25% fee, min $0.50');
   });
 
   it('drops empty optional breakdown rows but always shows Sales, fees and Net', () => {

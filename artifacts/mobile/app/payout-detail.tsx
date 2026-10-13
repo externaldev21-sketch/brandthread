@@ -48,7 +48,7 @@ function demoDetail(id: string): PayoutDetail {
   if (id.endsWith('manual')) {
     return {
       connected: true, breakdown: null,
-      payout: { ...payout, status: 'paid', automatic: false, method: 'instant', formatted: '$990.00', amount: 99_000, instantFee: line(990) },
+      payout: { ...payout, status: 'paid', automatic: false, method: 'instant', formatted: '$990.00', amount: 99_000, instantFee: line(1_485) },
     };
   }
   return { ...base, payout: { ...payout, status: 'paid' } };

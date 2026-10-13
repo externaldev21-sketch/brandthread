@@ -81,8 +81,9 @@ export function instantUnavailableReason(instant: PayoutScheduleInfo['instant'])
 }
 
 export function instantFeeLabel(instant: Pick<PayoutScheduleInfo['instant'], 'feeBps' | 'minFeeCents'>): string {
-  const pct = instant.feeBps % 100 === 0 ? String(instant.feeBps / 100) : (instant.feeBps / 100).toFixed(2);
-  return `${pct}% fee, minimum ${formatCents(instant.minFeeCents)}`;
+  // 150 bps -> "1.5", 125 -> "1.25", 100 -> "1" (no trailing zeros).
+  const pct = String(Number((instant.feeBps / 100).toFixed(2)));
+  return `${pct}% fee, min ${formatCents(instant.minFeeCents)}`;
 }
 
 export type BreakdownRow = { key: string; label: string; value: string; strong?: boolean };

@@ -37,10 +37,10 @@ const DEMO_INFO: PayoutScheduleInfo = {
     eligible: true,
     reason: null,
     destination: { id: 'card_demo', brand: 'Visa', last4: '4242', funding: 'debit' },
-    feeBps: 100,
+    feeBps: 150,
     minFeeCents: 50,
-    maxAmount: { amount: 182_409, formatted: '$1,824.09' },
-    quote: { amount: 182_409, fee: 1_824, feeFormatted: '$18.24', total: 184_233, withinBalance: true },
+    maxAmount: { amount: 181_527, formatted: '$1,815.27' },
+    quote: { amount: 181_527, fee: 2_723, feeFormatted: '$27.23', total: 184_250, withinBalance: true },
   },
   nextPayoutEstimate: { kind: 'scheduled', date: '2026-10-01T00:00:00.000Z', amount: 184_250, formatted: '$1,842.50' },
 };
