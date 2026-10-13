@@ -67,14 +67,26 @@ export function orderFeeColumnsFromApi(raw: any): OrderFeeColumns {
   };
 }
 
-/** "Platform fee (5%)" only when the recorded fee is exactly that rate on this order. */
+/**
+ * "Platform fee (5%)": the rate this order was actually charged (seller plans
+ * can differ from the public schedule), read back from the recorded fee. The
+ * percentage is shown only when it reproduces the recorded fee exactly on
+ * the commission base (merchandise after the seller's own promo; Thread Cash
+ * never lowers it). An estimate uses the schedule's rate.
+ */
 function platformFeeLabel(c: OrderFeeColumns, schedule: FeeSchedule | null, estimated: boolean): string {
-  if (!schedule) return 'Platform fee';
-  const bps = schedule.platformFeeBps;
+  if (estimated) return schedule ? `Platform fee (${bpsToPercentLabel(schedule.platformFeeBps)})` : 'Platform fee';
+  const fee = c.platformFeeCents;
+  if (fee <= 0) return 'Platform fee';
   const promo = Math.max(0, c.discountCents - c.threadCashAppliedCents);
-  const bases = [Math.max(0, c.subtotalCents - promo), c.subtotalCents];
-  const matches = estimated || bases.some((b) => Math.min(bpsOfCents(b, bps), c.totalCents) === c.platformFeeCents);
-  return matches ? `Platform fee (${bpsToPercentLabel(bps)})` : 'Platform fee';
+  const bases = [Math.max(0, c.subtotalCents - promo), c.subtotalCents].filter((b) => b > 0);
+  for (const base of bases) {
+    const bps = Math.round((fee * 10_000) / base);
+    if (bps > 0 && bps % 5 === 0 && Math.min(bpsOfCents(base, bps), c.totalCents) === fee) {
+      return `Platform fee (${bpsToPercentLabel(bps)})`;
+    }
+  }
+  return 'Platform fee';
 }
 
 export function buildOrderFeeBreakdown(c: OrderFeeColumns, schedule: FeeSchedule | null): OrderFeeBreakdown | null {

@@ -49,9 +49,11 @@ describe('buildOrderFeeBreakdown', () => {
     expect(b?.lines.at(-1)?.cents).toBe(8_180 - 9_000 + 500);
   });
 
-  it('omits the percentage when the recorded fee is not the schedule rate', () => {
-    const b = buildOrderFeeBreakdown(orderFeeColumnsFromApi({ ...paid, platformFeeCents: 300, sellerNetCents: 9_380 }), S);
-    expect(b?.lines[1].label).toBe('Platform fee');
+  it("shows the order's own rate (plan rates differ) and omits it when no clean rate reproduces the fee", () => {
+    expect(buildOrderFeeBreakdown(orderFeeColumnsFromApi({ ...paid, platformFeeCents: 300, sellerNetCents: 9_380 }), S)?.lines[1].label)
+      .toBe('Platform fee (3%)');
+    expect(buildOrderFeeBreakdown(orderFeeColumnsFromApi({ ...paid, platformFeeCents: 333, sellerNetCents: 9_347 }), S)?.lines[1].label)
+      .toBe('Platform fee');
   });
 
   it('falls back to a labelled estimate before the fees are recorded', () => {
@@ -69,8 +71,8 @@ describe('buildOrderFeeBreakdown', () => {
     expect(buildOrderFeeBreakdown(orderFeeColumnsFromApi({ ...paid, fundsState: null, platformFeeCents: 0, processingFeeCents: 0, processingFeeChargedCents: 0, sellerNetCents: 0 }), null)).toBeNull();
   });
 
-  it('still shows recorded fees without a schedule, without a percentage', () => {
+  it('still shows recorded fees and their rate without a schedule', () => {
     const b = buildOrderFeeBreakdown(orderFeeColumnsFromApi(paid), null);
-    expect(b?.lines[1].label).toBe('Platform fee');
+    expect(b?.lines[1].label).toBe('Platform fee (5%)');
   });
 });
