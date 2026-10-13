@@ -62,6 +62,7 @@ import productSeoRouter from "./product-seo";
 import cartDbRouter from "./cart-db";
 import notificationsFeedRouter from "./notifications-feed";
 import notificationPrefsRouter from "./notification-prefs";
+import smsPrefsRouter from "./notification-prefs-sms";
 import postsRouter from "./posts";
 import postCaptionsRouter from "./post-captions";
 import feedRouter from "./feed";
@@ -154,6 +155,7 @@ import packagePresetsRouter from "./package-presets";
 import webhooksShippoRouter from "./webhooks-shippo";
 import releaseTestControlRouter from "./release-test-control";
 import webhooksShopifyRouter from "./webhooks-shopify";
+import webhooksTwilioRouter from "./webhooks-twilio";
 import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
 import shopifyRouter from "./shopify";
 import sharePreviewRouter from "./share-preview";
@@ -196,6 +198,7 @@ router.use("/profile",         profileCoverRouter); // cover video (all account 
 router.use("/profile",         avatarVideoRouter);  // avatar video (moving profile picture), all account types
 router.use("/guest/checkout",  guestCheckoutRouter);
 router.use("/webhooks/resend-marketing", emailMarketingWebhookRouter);
+router.use("/webhooks/twilio", webhooksTwilioRouter); // inbound SMS keywords (STOP/START/HELP)
 router.use("/webhooks",        webhooksRouter);
 router.use("/webhooks/shippo", webhooksShippoRouter);
 router.use("/webhooks/shopify", webhooksShopifyRouter);
@@ -254,6 +257,7 @@ router.use("/product-variants", tc, productVariantsRouter);
 router.use("/catalog-public",   catalogPublicRouter);
 router.use("/seller-hub",      tc, sellerHubRouter);
 router.use("/push",            pushRouter);
+router.use("/notification-prefs/sms", smsPrefsRouter); // opt-in SMS order updates (Twilio)
 router.use("/notification-prefs", notificationPrefsRouter);
 router.use("/ai",              tc, aiSafetyGuard("ai-chat", { mode: "chat" }), aiRouter);
 
