@@ -1797,6 +1797,72 @@ router.get("/watched-videos", requireAuth, async (req, res) => {
   });
 });
 
+// ─── GET /api/posts/my-reposts ──────────────────────────────────────────────
+// Reposts on your own profile (polish #146, TikTok's Reposts tab): posts you
+// reposted, newest first, still visible to you. Cursor-paged like
+// /watched-videos.
+router.get("/my-reposts", requireAuth, async (req, res) => {
+  const viewerId = (req as any).clerkUserId as string;
+  const cursorValue = req.query.cursor;
+  let cursor: { timestamp: Date; postId: string } | null = null;
+  if (cursorValue !== undefined) {
+    try {
+      if (typeof cursorValue !== "string" || cursorValue.length === 0 || cursorValue.length > 256) throw new Error("bad");
+      const parsed = JSON.parse(Buffer.from(cursorValue, "base64url").toString("utf8")) as { timestamp?: unknown; postId?: unknown };
+      if (typeof parsed.timestamp !== "string" || typeof parsed.postId !== "string" || !UUID_RE.test(parsed.postId)) throw new Error("bad");
+      const timestamp = new Date(parsed.timestamp);
+      if (Number.isNaN(timestamp.getTime()) || timestamp.toISOString() !== parsed.timestamp) throw new Error("bad");
+      cursor = { timestamp, postId: parsed.postId };
+    } catch {
+      return res.status(400).json({ error: "Invalid cursor" });
+    }
+  }
+
+  const rows = await db.select({
+    postId: posts.id,
+    authorId: posts.userId,
+    authorName: sql<string>`COALESCE(${users.brandName}, ${users.displayName}, ${users.name}, 'Someone')`,
+    authorAccountType: users.accountType,
+    caption: posts.caption,
+    mediaType: posts.mediaType,
+    mediaUrl: posts.mediaUrl,
+    thumbnailUrl: posts.thumbnailUrl,
+    repostedAt: interactions.createdAt,
+  }).from(interactions)
+    .innerJoin(posts, eq(posts.id, interactions.postId))
+    .innerJoin(users, eq(users.clerkId, posts.userId))
+    .where(and(
+      eq(interactions.userId, viewerId),
+      eq(interactions.type, "repost"),
+      watchedPostAccessCondition(viewerId),
+      ...(cursor ? [
+        or(
+          lt(interactions.createdAt, cursor.timestamp),
+          and(eq(interactions.createdAt, cursor.timestamp), lt(posts.id, cursor.postId)),
+        ),
+      ] : []),
+    ))
+    .orderBy(desc(interactions.createdAt), desc(posts.id))
+    .limit(61);
+
+  const hasMore = rows.length > 60;
+  const page = hasMore ? rows.slice(0, 60) : rows;
+  const last = page[page.length - 1];
+  const nextCursor = hasMore && last
+    ? Buffer.from(JSON.stringify({ timestamp: last.repostedAt.toISOString(), postId: last.postId })).toString("base64url")
+    : null;
+  const resolveMedia = (url: string | null) =>
+    url && composedMediaPath(url) ? composedMediaUrl(req, composedMediaPath(url)!) : url;
+  return res.json({
+    items: page.map(({ mediaUrl, ...row }) => ({
+      ...row,
+      // Photo posts have no separate thumbnail: the photo is the cover.
+      thumbnailUrl: resolveMedia(row.thumbnailUrl ?? (row.mediaType === "video" ? null : mediaUrl)),
+    })),
+    nextCursor,
+  });
+});
+
 router.post("/:id/watched", requireAuth, async (req, res) => {
   const viewerId = (req as any).clerkUserId as string;
   const { id } = req.params;
