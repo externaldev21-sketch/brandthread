@@ -10,17 +10,21 @@ import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 're
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { discoverBrands, type DiscoverBrand } from '@/services/discoverService';
+import { discoverBrands, featuredBrands, type DiscoverBrand, type FeaturedBrand } from '@/services/discoverService';
 import { setSellerFollowing } from '@/services/socialService';
 import { PressableScale, Reveal, StepHeadline, StepSub } from './OnboardingUI';
 import { SPACE, TYPE } from './onboardingTokens';
 import { radius } from '@/constants/radii';
+import { FeaturedBrandsRail } from './FeaturedBrandsRail';
 
 export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerIds: string[]) => void } = {}) {
   const { theme } = useAppTheme();
   const styles = createStyles(theme);
 
   const [brands, setBrands] = useState<DiscoverBrand[]>([]);
+  // Dev's own brands with their real product photos, first (less-AI pass,
+  // item 54). Empty unless the server lists them — the step is then unchanged.
+  const [featured, setFeatured] = useState<FeaturedBrand[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [following, setFollowing] = useState<Record<string, boolean>>({});
@@ -30,6 +34,9 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
     let cancelled = false;
     setLoading(true);
     setLoadError(false);
+    featuredBrands()
+      .then((list) => { if (!cancelled) setFeatured(list); })
+      .catch(() => { /* optional rail — the rest of the step still works */ });
     discoverBrands(24)
       .then((list) => { if (!cancelled) setBrands(list); })
       .catch(() => { if (!cancelled) setLoadError(true); })
@@ -44,7 +51,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
     onLikedChange(Object.keys(following).filter((id) => following[id]));
   }, [following, onLikedChange]);
 
-  async function toggleFollow(brand: DiscoverBrand) {
+  async function toggleFollow(brand: { sellerId: string }) {
     const next = !following[brand.sellerId];
     Haptics.selectionAsync();
     // Optimistic — the follow API itself is the source of truth; on failure
@@ -62,7 +69,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
 
   async function followAll() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const toFollow = brands.filter((b) => !following[b.sellerId]);
+    const toFollow = [...featured, ...gridBrands].filter((b) => !following[b.sellerId]);
     setFollowing((prev) => {
       const next = { ...prev };
       toFollow.forEach((b) => { next[b.sellerId] = true; });
@@ -76,13 +83,16 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
   }
 
   const followedCount = Object.values(following).filter(Boolean).length;
+  const featuredIds = new Set(featured.map((b) => b.sellerId));
+  const gridBrands = brands.filter((b) => !featuredIds.has(b.sellerId));
+  const totalBrands = featured.length + gridBrands.length;
 
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       <StepHeadline>Follow a few{'\n'}brands to start.</StepHeadline>
       <StepSub>Your Thread gets better with every brand you follow. You can skip this for now.</StepSub>
 
-      {brands.length > 0 && (
+      {totalBrands > 0 && (
         <Reveal index={2}>
           <PressableScale
             testID="onboarding-brands-follow-all"
@@ -92,7 +102,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
           >
             <Feather name="plus" size={15} color={theme.text} />
             <Text style={[styles.followAllText, { color: theme.text }]}>
-              Follow all{followedCount > 0 ? ` (${followedCount}/${brands.length})` : ''}
+              Follow all{followedCount > 0 ? ` (${followedCount}/${totalBrands})` : ''}
             </Text>
           </PressableScale>
         </Reveal>
@@ -108,12 +118,19 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
         <Text style={styles.emptyText}>Couldn't load brands right now. You can follow brands anytime from Discover.</Text>
       )}
 
-      {!loading && !loadError && brands.length === 0 && (
+      <FeaturedBrandsRail
+        brands={featured}
+        following={following}
+        pending={pending}
+        onToggle={(brand) => { void toggleFollow(brand); }}
+      />
+
+      {!loading && !loadError && totalBrands === 0 && (
         <Text style={styles.emptyText}>No brands to show yet — check back soon.</Text>
       )}
 
       <View style={styles.grid}>
-        {brands.map((brand, i) => {
+        {gridBrands.map((brand, i) => {
           const isFollowing = !!following[brand.sellerId];
           const isPending = !!pending[brand.sellerId];
           return (
