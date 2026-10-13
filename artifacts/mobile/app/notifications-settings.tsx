@@ -40,6 +40,9 @@ import { QUIET_HOURS_PRESETS, quietHoursPresetFor } from '@/components/notificat
 
 import { TYPE_SCALE } from '@/constants/typography';
 
+import { QuietHoursRow, type QuietHoursPreset } from '@/components/notifications/QuietHoursRow';
+import { quietHoursBody } from '@/lib/deviceTimeZone';
+import { Card } from '@/components/ui/Card';
 import { SPACING } from '@/constants/spacing';
 import { getSaleAlertPrefs, rememberSaleAlertPrefs } from '@/lib/saleAlerts';
 import { playSaleSoundPreview } from '@/lib/saleSoundPreview';
@@ -126,7 +129,7 @@ export default function NotificationsSettingsScreen() {
     if (isSellerDevPreview()) return;
     try {
       await api.notificationPrefs.update({
-        quietHours: preset.start && preset.end ? { start: preset.start, end: preset.end } : null,
+        quietHours: quietHoursBody(preset.start, preset.end),
       });
     } catch {
       setQuietHours(prior);

@@ -2110,7 +2110,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           { method: 'DELETE', body: JSON.stringify({ token }) },
           getToken,
         ),
-      register:   (body: { token: string; platform?: string; accountIds?: string[] }) =>
+      register:   (body: { token: string; platform?: string; accountIds?: string[]; timezone?: string }) =>
         post<{ ok: boolean }>('/api/push/register', body),
       deregister: (token: string) =>
         request<{ ok: boolean }>(

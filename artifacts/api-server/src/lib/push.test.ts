@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildExpoPushMessages,
+  isValidTimeZone,
   isWithinQuietHours,
   normalizePushEventCategory,
   preferenceKey,
+  safePushImageUrl,
   unsentPushTokens,
 } from "./push";
 
@@ -95,5 +97,86 @@ describe("quiet hours", () => {
     // 23:30 UTC is 15:30 in America/Los_Angeles (UTC-8 in January) — well
     // outside a 22:00-07:00 LA-local quiet window.
     expect(isWithinQuietHours(at("23:30"), "22:00", "07:00", "America/Los_Angeles")).toBe(false);
+  });
+});
+describe("rich pushes, actions and badge", () => {
+  const IMAGE = "https://cdn.example.com/p/hoodie.jpg";
+
+  it("adds the product image as Expo richContent with mutableContent", () => {
+    const [message] = buildExpoPushMessages([{ token: "ExponentPushToken[a]" }], {
+      title: "New order!",
+      body: "Order #1042 for $48.00 is ready to review.",
+      data: { type: "new_order_received", targetType: "order", targetId: "ord-1" },
+      imageUrl: IMAGE,
+      badge: 3,
+      sound: "order_received.wav",
+      channelId: "orders",
+      categoryId: "new_order",
+    });
+    expect(message).toEqual({
+      to: "ExponentPushToken[a]",
+      title: "New order!",
+      body: "Order #1042 for $48.00 is ready to review.",
+      data: { type: "new_order_received", targetType: "order", targetId: "ord-1", imageUrl: IMAGE },
+      sound: "order_received.wav",
+      badge: 3,
+      channelId: "orders",
+      richContent: { image: IMAGE },
+      mutableContent: true,
+      categoryId: "new_order",
+    });
+  });
+
+  it("omits rich fields when there is no usable image", () => {
+    for (const imageUrl of [undefined, null, "", "http://cdn.example.com/a.jpg", "/objects/abc", "javascript:alert(1)"]) {
+      const [message] = buildExpoPushMessages([{ token: "t" }], { title: "t", body: "b", imageUrl });
+      expect(message.richContent).toBeUndefined();
+      expect(message.mutableContent).toBeUndefined();
+      expect(message.data).toEqual({});
+    }
+  });
+
+  it("does not mirror a very long signed URL into data (APNs 4 KB limit)", () => {
+    const long = `https://storage.example.com/obj?sig=${"a".repeat(1500)}`;
+    const [message] = buildExpoPushMessages([{ token: "t" }], { title: "t", body: "b", imageUrl: long });
+    expect(message.richContent).toEqual({ image: long });
+    expect(message.data).toEqual({});
+  });
+
+  it("accepts only absolute https image URLs", () => {
+    expect(safePushImageUrl(IMAGE)).toBe(IMAGE);
+    expect(safePushImageUrl("http://x.com/a.jpg")).toBeUndefined();
+    expect(safePushImageUrl("https://")).toBeUndefined();
+    expect(safePushImageUrl(`https://x.com/${"a".repeat(2100)}`)).toBeUndefined();
+  });
+
+  it("clamps the badge to a non-negative integer and leaves it unset otherwise", () => {
+    expect(buildExpoPushMessages([{ token: "t" }], { title: "t", body: "b", badge: 0 })[0].badge).toBe(0);
+    expect(buildExpoPushMessages([{ token: "t" }], { title: "t", body: "b", badge: -2 })[0].badge).toBe(0);
+    expect(buildExpoPushMessages([{ token: "t" }], { title: "t", body: "b" })[0].badge).toBeUndefined();
+    expect(buildExpoPushMessages([{ token: "t" }], { title: "t", body: "b" })[0].categoryId).toBeUndefined();
+  });
+
+  it("validates IANA time zones", () => {
+    expect(isValidTimeZone("America/Los_Angeles")).toBe(true);
+    expect(isValidTimeZone("UTC")).toBe(true);
+    expect(isValidTimeZone("Mars/Olympus")).toBe(false);
+    expect(isValidTimeZone(42)).toBe(false);
+    expect(isValidTimeZone("")).toBe(false);
+  });
+});
+
+describe("quiet hours 23:00-08:00 for a Los Angeles user", () => {
+  // January: America/Los_Angeles is UTC-8.
+  it("suppresses at 23:30 local and allows at 08:05 local", () => {
+    const at2330Local = new Date("2026-01-16T07:30:00Z");
+    const at0805Local = new Date("2026-01-16T16:05:00Z");
+    expect(isWithinQuietHours(at2330Local, "23:00", "08:00", "America/Los_Angeles")).toBe(true);
+    expect(isWithinQuietHours(at0805Local, "23:00", "08:00", "America/Los_Angeles")).toBe(false);
+    // Evaluated in UTC (the old behaviour, no device timezone sent), a
+    // 15:30 LA afternoon push was wrongly silenced.
+    const at1530Local = new Date("2026-01-15T23:30:00Z");
+    expect(isWithinQuietHours(at1530Local, "23:00", "08:00", "America/Los_Angeles")).toBe(false);
+    expect(isWithinQuietHours(at1530Local, "23:00", "08:00", "UTC")).toBe(true);
   });
 });

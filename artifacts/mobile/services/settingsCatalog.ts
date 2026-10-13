@@ -86,12 +86,11 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Drafts', description: 'Posts you started and haven’t shared', aliases: ['draft', 'unfinished'], icon: 'file-text', route: '/buyer-drafts', audience: 'buyer' },
       { label: 'Archive', description: 'Archived posts and stories', aliases: ['archived'], icon: 'archive', route: '/buyer-archive', audience: 'buyer' },
       { label: 'Your activity', description: 'Likes, comments, searches, and time spent', aliases: ['activity', 'history'], icon: 'activity', route: '/buyer-your-activity', audience: 'buyer' },
-      { label: 'Notifications', description: 'Manage push notification preferences', aliases: ['alerts', 'push'], icon: 'bell', route: '/push-notifications', audience: 'buyer' },
       { label: 'Highlights', description: 'Story highlights on your profile', aliases: ['highlight', 'stories'], icon: 'image', route: '/buyer-highlights-manager', audience: 'buyer' },
       { label: 'Following', description: 'Brands and creators you follow', aliases: ['following', 'brands'], icon: 'users', route: '/(buyer)/following', audience: 'buyer' },
       { label: 'Friends', description: 'Your friends on Brandthread', aliases: ['friend', 'people'], icon: 'user-check', route: '/(buyer)/friends', audience: 'buyer' },
       { label: 'Groups', description: 'Community group chats you joined', aliases: ['community', 'group chats', 'groups'], icon: 'message-square', route: '/community', audience: 'buyer' },
-      { label: 'Invite friends', description: 'Give $10, get $10 Thread Cash', aliases: ['invite', 'referral'], icon: 'gift', route: '/buyer-invite', audience: 'buyer' },
+      { label: 'Invite friends', description: 'Give $5, get $5 Thread Cash', aliases: ['invite', 'referral'], icon: 'gift', route: '/buyer-invite', audience: 'buyer' },
     ],
   },
   {

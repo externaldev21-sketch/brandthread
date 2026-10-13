@@ -1,8 +1,10 @@
 import { Router } from "express";
-import { db, pushTokens, callPushTokens } from "@workspace/db";
+import { db, pushTokens, callPushTokens, users } from "@workspace/db";
 import { and, eq, notInArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { cappedUnknown, jsonValue, looseBody, validateBody } from "../middlewares/bodySchemas";
+import { isValidTimeZone } from "../lib/push";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -40,9 +42,12 @@ export function accountsToKeep(callerId: string, signedInAccountIds: unknown): s
 // caller is kept — the previous hand-off behavior.
 router.post("/register", requireAuth, validateBody(registerPushBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { token, platform, accountIds } = req.body as { token: string; platform?: string; accountIds?: unknown };
+  const { token, platform, accountIds, timezone } = req.body as { token: string; platform?: string; accountIds?: unknown; timezone?: unknown };
 
   if (!token) return res.status(400).json({ error: "token is required" });
+  if (timezone !== undefined && !isValidTimeZone(timezone)) {
+    return res.status(400).json({ error: "timezone must be an IANA time zone" });
+  }
 
   const keep = accountsToKeep(userId, accountIds);
   await db.delete(pushTokens).where(and(eq(pushTokens.token, token), notInArray(pushTokens.userId, keep)));
@@ -60,6 +65,15 @@ router.post("/register", requireAuth, validateBody(registerPushBody), async (req
         updatedAt: new Date(),
       },
     });
+
+  if (timezone !== undefined) {
+    try {
+      await db.update(users).set({ quietHoursTimezone: timezone }).where(eq(users.clerkId, userId));
+    } catch (err) {
+      // The token is registered; a missed timezone refresh retries next launch.
+      logger.warn({ err }, "Could not store device timezone");
+    }
+  }
 
   return res.json({ ok: true });
 });

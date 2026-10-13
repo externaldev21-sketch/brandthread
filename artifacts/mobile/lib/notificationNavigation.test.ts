@@ -254,4 +254,24 @@ describe('notification response navigation', () => {
     expect(signal).toHaveBeenCalledTimes(1);
     expect(router.push).not.toHaveBeenCalled();
   });
+
+  it('routes the "Ship now" action on a new-order push to the fulfil screen for that order', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler({
+      actionIdentifier: 'ship_now',
+      ...targetResponse('ship-now-1', { targetType: 'order', targetId: 'ord 9', type: 'new_order_received' }),
+    });
+    expect(router.push).toHaveBeenCalledWith('/fulfill-order?orderId=ord%209');
+  });
+
+  it('a plain tap on the same new-order push still opens the order', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler({
+      actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+      ...targetResponse('tap-1', { targetType: 'order', targetId: 'ord-9', type: 'new_order_received' }),
+    });
+    expect(router.push).toHaveBeenCalledWith('/order-detail?id=ord-9');
+  });
 });

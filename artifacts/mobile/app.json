@@ -457,6 +457,7 @@
       "./plugins/with-voip-callkit",
       "expo-dev-client",
       "./plugins/with-siri-shortcuts",
+      "./plugins/with-rich-push-service",
       [
         "@stripe/stripe-react-native",
         {

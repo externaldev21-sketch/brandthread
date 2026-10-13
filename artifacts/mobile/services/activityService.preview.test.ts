@@ -16,6 +16,7 @@ const preview = vi.hoisted(() => ({
 
 vi.mock('@/lib/serviceConfig', () => ({ serviceRequest: vi.fn() }));
 vi.mock('@/services/socialService', () => ({ subscribeSocial: () => () => {} }));
+vi.mock('@/lib/notificationBadge', () => ({ setAppBadgeCount: vi.fn(), syncNotificationBadge: vi.fn() }));
 vi.mock('@/lib/previewActivity', () => ({
   isPreviewActivityEnabled: () => preview.enabled,
   isPreviewActivitySeedServed: () => preview.seedServed,

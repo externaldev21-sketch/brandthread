@@ -291,7 +291,7 @@ export default function BuyerNotifications() {
       setNotifs(data);
       setLoadError(false);
       setNotifFailed(false);
-      void syncNotificationBadge(data);
+      void syncNotificationBadge();
     } catch (_) {
       // Only a failed first load is an error state; a failed silent refresh
       // keeps whatever is already on screen.

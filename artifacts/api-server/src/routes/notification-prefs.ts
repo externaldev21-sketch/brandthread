@@ -25,6 +25,7 @@ import { cappedUnknown, jsonValue, looseBody, validateBody } from "../middleware
 import { preferenceKey } from "../lib/push";
 import { PAUSE_DURATIONS_MINUTES, PUSH_TYPE_PREF_PREFIX, isPushPaused, isValidValueFor, pushTypeDefByKey, pushTypeView } from "../lib/pushTypes";
 import { readSaleAlertPrefs, saleAlertPatch } from "../lib/saleAlerts";
+import { isValidTimeZone } from "../lib/push";
 
 const router = Router();
 
@@ -196,8 +197,8 @@ router.put("/", validateBody(updateNotificationPrefsBody), async (req, res) => {
       if (!bothUnset && (!isValidTimeOfDay(start) || !isValidTimeOfDay(end))) {
         return res.status(400).json({ error: "quietHours.start and quietHours.end must be \"HH:MM\" (or both null to disable)" });
       }
-      if (timezone !== undefined && typeof timezone !== "string") {
-        return res.status(400).json({ error: "quietHours.timezone must be a string" });
+      if (timezone !== undefined && !isValidTimeZone(timezone)) {
+        return res.status(400).json({ error: "quietHours.timezone must be an IANA time zone" });
       }
       quietHoursPatch = {
         start: bothUnset ? null : (start as string),

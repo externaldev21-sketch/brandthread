@@ -6,7 +6,12 @@ export type NotificationRouter = {
   push: (href: string) => void;
 };
 
+/** Category + action registered for seller new-order pushes (see notificationCategories.ts). */
+export const NEW_ORDER_CATEGORY_ID = 'new_order';
+export const SHIP_NOW_ACTION_ID = 'ship_now';
+
 type NotificationResponseIdentifier = {
+  actionIdentifier?: string;
   notification?: {
     request?: {
       identifier?: string;
@@ -174,9 +179,29 @@ export function createNotificationResponseHandler(
       handledResponseIds.add(responseId);
     }
 
-    const data = request?.content?.data as { accountId?: unknown; targetType?: unknown } | undefined;
-    if (data?.targetType === 'dm_call') {
-      signalIncomingCall();
+    const data = request?.content?.data as {
+      accountId?: unknown;
+      route?: unknown;
+      targetId?: unknown;
+      targetType?: unknown;
+      type?: unknown;
+      commentId?: unknown;
+      communityId?: unknown;
+    } | undefined;
+
+    if (data?.targetType === "dm_call") { signalIncomingCall(); return; }
+
+    // "Ship now" on a seller new-order push opens the same fulfil screen as
+    // the order's own "Fulfill order" button.
+    if (
+      (response as NotificationResponseIdentifier).actionIdentifier === SHIP_NOW_ACTION_ID
+      && data?.targetType === 'order' && typeof data.targetId === 'string' && data.targetId
+    ) {
+      router.push(`/fulfill-order?orderId=${encodeURIComponent(data.targetId)}`);
+      return;
+    }
+    if (data?.route === '/subscription') {
+      router.push('/subscription');
       return;
     }
     const href = notificationHref(data);

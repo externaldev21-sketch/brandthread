@@ -12,6 +12,7 @@ import {
   showPushPrePrompt,
   type PushPrePromptReason,
 } from './pushPrePrompt';
+import { deviceTimeZone } from './deviceTimeZone';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 const ONBOARDING_OWNER_KEY = 'onboarding_owner_id';
@@ -21,6 +22,7 @@ let prompting = false;
 
 type PushApi = {
   push: { register: (body: { token: string; platform?: string; accountIds?: string[] }) => Promise<unknown> };
+  push: { register: (body: { token: string; platform?: string; timezone?: string }) => Promise<unknown> };
 };
 
 let signedInAccountIds: string[] = [];
@@ -45,6 +47,9 @@ async function isOnboardedUser(userId: string): Promise<boolean> {
 async function registerToken(api: PushApi): Promise<void> {
   const token = await Notifications.getExpoPushTokenAsync();
   await api.push.register({ token: token.data, platform: Platform.OS, accountIds: signedInAccountIds });
+  // The device zone keeps quiet hours on local time (and follows travel).
+  const timezone = deviceTimeZone();
+  await api.push.register({ token: token.data, platform: 'expo', ...(timezone ? { timezone } : {}) });
 }
 
 /**

@@ -32,6 +32,7 @@ export interface PushPayload {
   kind?: "transactional" | "promotional";
   /** The user asked for this exact push (e.g. a per-drop "notify me"). */
   explicitRequest?: boolean;
+  imageUrl?: string | null;
   /** Expo delivery priority; 'high' wakes the device (incoming calls). Omitted = Expo default. */
   priority?: "default" | "normal" | "high";
   /** iOS interruption level; 'time-sensitive' breaks through Focus (incoming calls). */
@@ -152,6 +153,41 @@ export interface ExpoPushMessage {
   priority?: "default" | "normal" | "high";
   interruptionLevel?: "active" | "critical" | "passive" | "time-sensitive";
   categoryId?: string;
+  /** Expo push API: image shown in the expanded notification. */
+  richContent?: { image: string };
+  /** Expo push API (iOS): lets the Notification Service Extension attach the image. */
+  mutableContent?: boolean;
+  /** Expo push API: category id registered on the device (action buttons). */
+}
+
+const MAX_PUSH_IMAGE_URL_LENGTH = 2048;
+/**
+ * The image URL is also mirrored into `data.imageUrl` so the iOS service
+ * extension can always find it, but only when short enough that the doubled
+ * URL cannot push the APNs payload past its 4 KB limit.
+ */
+const MAX_MIRRORED_IMAGE_URL_LENGTH = 1024;
+
+/** Only absolute https image URLs are forwarded to the device. */
+export function safePushImageUrl(url: string | null | undefined): string | undefined {
+  if (typeof url !== "string" || !url || url.length > MAX_PUSH_IMAGE_URL_LENGTH) return undefined;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && parsed.hostname ? parsed.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** True for an IANA timezone the server's Intl implementation recognises. */
+export function isValidTimeZone(value: unknown): value is string {
+  if (typeof value !== "string" || !value || value.length > 64) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function preferenceKey(accountType: string | null, category: PushEventCategory): string | null {
@@ -213,6 +249,8 @@ export function buildExpoPushMessages(
   payload: PushPayload,
   accountHandle?: string | null,
 ): ExpoPushMessage[] {
+  const image = safePushImageUrl(payload.imageUrl);
+  const safeBadge = typeof payload.badge === "number" && Number.isFinite(payload.badge) ? Math.max(0, Math.floor(payload.badge)) : undefined;
   const categoryId = payload.categoryId ?? inferNotificationCategoryId(payload.data);
   return tokens.map((token) => {
     const labelled = accountLabelledContent(token, payload.title, accountHandle);
@@ -221,9 +259,10 @@ export function buildExpoPushMessages(
       title: labelled.title,
       ...(labelled.subtitle ? { subtitle: labelled.subtitle } : {}),
       body: payload.body,
-      data: withNotificationCategoryData(payload.data ?? {}, categoryId),
+      data: withNotificationCategoryData(image && image.length <= MAX_MIRRORED_IMAGE_URL_LENGTH ? {...(payload.data ?? {}), imageUrl: image} : payload.data ?? {}, categoryId),
       sound: payload.sound ?? "default",
-      badge: payload.badge,
+      badge: safeBadge,
+      ...(image ? {richContent: {image}, mutableContent: true} : {}),
       channelId: payload.channelId,
       ...(categoryId !== undefined ? { categoryId } : {}),
       ...(payload.priority ? { priority: payload.priority } : {}),

@@ -1507,6 +1507,7 @@ export async function handleCheckoutPaid(
             targetType: "order",
             targetImageUrl: productThumbnail(firstItem?.images),
             ...newOrderPushDelivery(sellerPrefs?.preferences),
+            pushCategoryId: "new_order",
           });
           // The buyer's side of the same event (guest checkouts have no feed).
           if (buyerId) {
