@@ -37,6 +37,5 @@ await shot('ours-new-this-week-full', '/new', { fullPage: true });
 // Product page as a crawler without JS sees it (the <noscript> body).
 await shot('ours-product-noscript', `/store/product/${PRODUCT}`, { javaScriptEnabled: false });
 // Same URL with JS: the noscript body never renders; the app boots as before.
-await shot('ours-product-js-early', `/store/product/${PRODUCT}`, { wait: 50 });
 await shot('ours-product-js-booted', `/store/product/${PRODUCT}`, { wait: 6000 });
 await browser.close();
