@@ -27,6 +27,7 @@ import {
   completeJson,
 } from "../lib/aiHelpers/provider";
 import { ImageAccessError, isValidObjectPath, loadOwnedImageDataUrl } from "../lib/aiHelpers/images";
+import { syncAndNotifyPostUserTags } from "../lib/postUserTags";
 import {
   SizeChartInputError,
   buildSizeChart,
@@ -367,6 +368,8 @@ router.post("/save", productRoleGate, rateLimit("mutation"), async (req, res): P
     await db.update(posts)
       .set({ caption: b.caption, ...(b.hashtags ? { hashtags: b.hashtags } : {}), updatedAt: new Date() })
       .where(and(eq(posts.id, b.postId), eq(posts.userId, ownerId)));
+    // People tags follow the caption's @handles (see lib/postUserTags.ts).
+    await syncAndNotifyPostUserTags({ id: post.id, userId: ownerId, caption: b.caption }, req.log);
     res.json({ saved: true, target: "post", postId: post.id });
   } catch (err) {
     handleFailure(req, res, err);

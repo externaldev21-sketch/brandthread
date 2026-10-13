@@ -17,7 +17,7 @@ export interface CommentMention {
 }
 
 /** Resolve the @handles in `body` into taggable people (capped, in body order). */
-export async function resolveCommentMentions(body: string, authorId: string): Promise<CommentMention[]> {
+export async function resolveCommentMentions(body: string, authorId: string, limit = MAX_COMMENT_MENTIONS): Promise<CommentMention[]> {
   const handles = extractMentions(body);
   if (handles.length === 0) return [];
   const [found, blockRows] = await Promise.all([
@@ -35,7 +35,7 @@ export async function resolveCommentMentions(body: string, authorId: string): Pr
   for (const handle of handles) {
     const user = byHandle.get(handle);
     if (!user || user.clerkId === authorId || blocked.has(user.clerkId) || taken.has(user.clerkId)) continue;
-    if (out.length >= MAX_COMMENT_MENTIONS) break;
+    if (out.length >= limit) break;
     taken.add(user.clerkId);
     out.push({ userId: user.clerkId, handle: user.username! });
   }

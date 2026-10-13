@@ -26,6 +26,7 @@ import { MAX_SLIDES_BY_SURFACE, isPostSurface, type PostSurface } from "../lib/p
 import { validateSlideOverlays } from "../lib/slideValidation";
 import { notifyPostLike, notifyPostShare, notifyRepost } from "../lib/activityEvents";
 import { MAX_DRAFTS_PER_USER, onPostPublished, scheduleWindowError } from "../lib/postPublish";
+import { syncAndNotifyPostUserTags, notifyPostUserTags } from "../lib/postUserTags";
 import { scheduleAutoCaptions } from "../lib/captions";
 import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
 import { rateLimit } from "../middlewares/rateLimit";
@@ -947,6 +948,8 @@ router.post("/", requireAuth, async (req, res) => {
   // not fail the post itself.
   await syncPostHashtags(post.id, post.hashtags ?? [], post.createdAt)
     .catch((err) => req.log.error({ err, postId: post.id }, "Could not index post hashtags"));
+  // People tags: the "Tag people" step writes @handles into the caption.
+  await syncAndNotifyPostUserTags(post, req.log);
   if (!captionHeld && screenHeld && heldVerdict) {
     await recordHeldMedia({
       targetType: post.mediaType === "video" ? "video" : "post",
@@ -1344,6 +1347,9 @@ router.patch("/:id", requireAuth, async (req, res) => {
     if (shouldBePublic) {
       await setComposedMediaVisibility(clerkId, nextMediaPaths, "public");
     }
+    // People tags follow the caption's @handles; tagged people hear once it's live.
+    if (updates.caption !== undefined) await syncAndNotifyPostUserTags(updated, req.log);
+    else await notifyPostUserTags(updated.id).catch(() => {});
     return res.json((await postDetails([updated], clerkId))[0]);
   } catch (err) {
     req.log.error({ err, clerkId, postId: id }, "Failed to update seller post");
