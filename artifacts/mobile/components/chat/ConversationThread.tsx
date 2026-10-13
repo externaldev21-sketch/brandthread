@@ -74,6 +74,7 @@ import {
   useAudioPlayerStatus,
 } from 'expo-audio';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { useChatDraft } from '@/hooks/useChatDraft';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import Composer from '@/components/ui/Composer';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
@@ -356,6 +357,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   const callLog = useCallLog(conv?.id ?? params.id ?? '');
   const [messages, setMessages] = useState<Message[]>(() => peekWarmThread(userId, params.id)?.messages ?? []);
   const [text, setText] = useState('');
+  useChatDraft(userId ? conv?.id ?? params.id : null, text, setText, userId ?? null);
   const { showUndo } = useUndoToast();
   const textInputRef = useRef<TextInput>(null);
   // Request-mode UI state (see the bottom RequestActionPanel below):

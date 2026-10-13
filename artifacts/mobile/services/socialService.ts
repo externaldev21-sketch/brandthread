@@ -73,6 +73,7 @@ function K(uid = _socialUserId) {
     requests:           `bt:social:${uid}:requests:v1`,
     conversations:      `bt:social:${uid}:convs:v1`,
     messages:           (id: string) => `bt:social:${uid}:msgs:${id}:v1`,
+    chatDraft:          (id: string) => `bt:social:${uid}:chat-draft:${id}:v1`,
     comments:           (postId: string) => `bt:social:${uid}:comments:${postId}:v1`,
     stories:            `bt:social:${uid}:stories:v1`,
     notifications:      `bt:social:${uid}:notifs:v1`,
@@ -1478,9 +1479,96 @@ export async function getMessages(conversationId: string, k: SocialKeys = K()): 
   const msgKey = k.messages(conversationId);
   const remote = await serviceRequest<Message[]>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`);
   if (!Array.isArray(remote)) throw new Error('Invalid messages response');
+  // Messages still sending or that failed to send exist only on this device
+  // (see sendMessageWithOutbox). A refresh must keep them on screen with
+  // their "Tap to retry" instead of silently dropping what the person wrote.
+  const unsent = (await load<Message[]>(msgKey, [])).filter(isUnsentLocalMessage);
+  const merged = unsent.length > 0 ? mergeUnsentMessages(remote, unsent) : remote;
   // An empty conversation is not a signal to substitute seeded messages.
-  if (_socialUserId === k.userId) await save(msgKey, remote);
-  return remote;
+  if (_socialUserId === k.userId) await save(msgKey, merged);
+  return merged;
+}
+
+/** A message this device is still sending, or failed to send (local id, never acknowledged by the server). */
+export function isUnsentLocalMessage(message: Message): boolean {
+  return message.id.startsWith(LOCAL_MESSAGE_ID_PREFIX) && (message.status === 'sending' || message.status === 'failed');
+}
+
+/** Server messages plus this device's unsent ones, in time order. Pure. */
+export function mergeUnsentMessages(remote: Message[], unsent: Message[]): Message[] {
+  const remoteIds = new Set(remote.map((m) => m.id));
+  return [...remote, ...unsent.filter((m) => !remoteIds.has(m.id))].sort((a, b) => a.ts - b.ts);
+}
+
+export const LOCAL_MESSAGE_ID_PREFIX = 'local-out-';
+
+/**
+ * Send with an outbox (offline polish #33): the message is on screen right
+ * away as "sending"; when the request fails it stays as "failed" with Tap to
+ * retry (retryMessage) instead of disappearing behind an alert. Survives a
+ * refresh and an app restart (it lives in this account's message cache).
+ */
+export async function sendMessageWithOutbox(
+  conversationId: string,
+  local: Message,
+): Promise<Message> {
+  const k = K();
+  const msgKey = k.messages(conversationId);
+  const pending: Message = { ...local, status: 'sending' };
+  if (_socialUserId === k.userId) {
+    const existing = await load<Message[]>(msgKey, []);
+    await save(msgKey, [...existing.filter((m) => m.id !== pending.id), pending]);
+  }
+  try {
+    const message = await serviceRequest<Message>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ text: pending.text, attachment: pending.attachment, replyToId: pending.replyToId }),
+    });
+    if (_socialUserId === k.userId) {
+      const current = await load<Message[]>(msgKey, []);
+      await save(msgKey, [...current.filter((m) => m.id !== pending.id && m.id !== message.id), message]);
+      const conversations = await load<Conversation[]>(k.conversations, []);
+      const preview = getMessagePreview(message.text, message.attachment);
+      await save(k.conversations, conversations.map((conversation) => conversation.id === conversationId
+        ? { ...conversation, lastMessage: preview, lastMessageTs: message.ts, updatedAt: iso() }
+        : conversation));
+      notify();
+    }
+    return message;
+  } catch (error) {
+    if (_socialUserId === k.userId) {
+      const current = await load<Message[]>(msgKey, []);
+      await save(msgKey, current.map((m) => (m.id === pending.id ? { ...m, status: 'failed' as const } : m)));
+      notify();
+    }
+    throw error;
+  }
+}
+
+/** Drop a never-acknowledged local message (the server rejected it outright). */
+export async function discardUnsentMessage(conversationId: string, messageId: string): Promise<void> {
+  const k = K();
+  const msgKey = k.messages(conversationId);
+  const current = await load<Message[]>(msgKey, []);
+  if (_socialUserId === k.userId) await save(msgKey, current.filter((m) => m.id !== messageId));
+}
+
+// ─── Chat drafts (offline polish #31) ────────────────────────────────────────
+// Unsent composer text per conversation, per account. Lives under this
+// account's social prefix, so clearSocialCache (sign-out / switch) drops it.
+
+export async function getChatDraft(conversationId: string, ownerId?: string): Promise<string> {
+  return load<string>(K(ownerId).chatDraft(conversationId), '');
+}
+
+export async function setChatDraft(conversationId: string, text: string, ownerId?: string): Promise<void> {
+  const key = K(ownerId).chatDraft(conversationId);
+  try {
+    if (text.trim()) await AsyncStorage.setItem(key, JSON.stringify(text));
+    else await AsyncStorage.removeItem(key);
+  } catch {
+    // Best-effort: a draft that didn't save just isn't restored.
+  }
 }
 export async function sendMessage(
   conversationId: string,
