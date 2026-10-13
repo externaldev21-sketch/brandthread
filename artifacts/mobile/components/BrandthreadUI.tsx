@@ -502,7 +502,7 @@ export function PrimaryButton({
         ) : (
           <>
             {icon && <Feather name={icon} size={ICON.sm} color={disabled ? palette.mutedForeground : foreground} />}
-            <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, disabled ? { color: palette.mutedForeground, fontSize: small ? FS.sm : FS.base, opacity: 0.5 } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]} numberOfLines={1}>{label}</Text>
+            <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, disabled ? { color: palette.mutedForeground, fontSize: small ? FS.sm : FS.base, opacity: 0.5 } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{label}</Text>
           </>
         )}
       </LinearGradient>
@@ -552,7 +552,7 @@ export function SecondaryButton({ label, onPress, icon, disabled, small, style, 
       style={[sbS.root, { height: h, borderColor: resolvedAccent + '55', backgroundColor: resolvedAccent + '14', opacity: disabled ? 0.5 : 1 }, style]}
     >
       {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
-      <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[sbS.label, { fontSize: small ? FS.sm : FS.base, color: resolvedAccent }]} numberOfLines={1}>{label}</Text>
+      <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[sbS.label, { fontSize: small ? FS.sm : FS.base, color: resolvedAccent }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{label}</Text>
     </PressableScale>
   );
 }

@@ -418,7 +418,7 @@ function PressableScaleRow({ children, onPress, onLongPress }: { children: React
   );
 }
 const rowStyles = StyleSheet.create({
-  wrap: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  wrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center' },
 });
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: ReturnType<typeof useColors>) => StyleSheet.create({
@@ -429,13 +429,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   row:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.border, gap: SPACING.sm },
   avatar48:        { width: 48, height: 48, borderRadius: RADII.avatar, alignItems: 'center', justifyContent: 'center' },
   avatar48Text:    { color: '#FFFFFF' }, // theme-exempt: initials on a per-user identity color
-  rowCenter:       { flex: 1, marginLeft: SPACING.sm, gap: 2 },
+  rowCenter:       { flex: 1, minWidth: 0, marginLeft: SPACING.sm, gap: 2 },
   rowName:         { color: palette.foreground },
   rowHandle:       { color: palette.mutedForeground },
   rowMutual:       { color: palette.mutedForeground },
   requestBtn:      { width: 96, flexShrink: 0 }, // Delete / Confirm: equal width
   sectionLabel:    { color: palette.mutedForeground, paddingHorizontal: SPACING.md, paddingTop: SPACING.md, paddingBottom: SPACING.xs },
-  rowActions:      { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
+  rowActions:      { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, flexShrink: 0 },
   requestedPill:   { paddingHorizontal: SPACING.sm, paddingVertical: 4, backgroundColor: palette.card, borderWidth: 1, borderRadius: RADII.pill },
   requestedPillText: {},
 });
