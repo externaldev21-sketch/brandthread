@@ -164,6 +164,7 @@ import { PayLaterLine } from '@/components/products/PayLaterLine';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { useAutoSelectSize } from '@/hooks/useAutoSelectSize';
+import { FriendsSavedLine } from '@/components/products/FriendsSavedLine';
 import { ApiError } from '@/lib/networkNotice';
 
 type ThemeAliases = {
@@ -1634,6 +1635,7 @@ export default function BuyerProductDetailScreen() {
           <PayLaterLine sellerId={product.sellerId} priceCents={variantPrice} />
           {/* Polish 91: real counts from other shoppers' bags, shown from 3. */}
           <InBagCount productId={product.id} />
+          <FriendsSavedLine productId={product.id} />
 
           {!sellerPreview && <LaunchCountdown productId={product.id} onLaunchingChange={setLaunching} />}
 

@@ -93,6 +93,9 @@ export const users = pgTable('users', {
   // "Show activity status" switch (off = hidden both ways, like Instagram).
   lastActiveAt:   timestamp('last_active_at', { withTimezone: true }),
   showActivityStatus: boolean('show_activity_status').notNull().default(true),
+  // "Saved by people you follow" on product pages (migration 270): off hides
+  // this person's saves from that line. Saves in a private collection never show.
+  showSavesToFollowers: boolean('show_saves_to_followers').notNull().default(true),
   // Buyer onboarding style picks (cold start for the For You ranking pipeline).
   buyerStyleInterests: jsonb('buyer_style_interests').$type<string[]>().notNull().default([]),
   // Brand onboarding fields (seller side)
