@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 
 /**
  * Animates from 0 up to `target` once, on first mount/activation, with an
- * ease-out curve — the "premium" count-up touch on the dashboard's hero
- * number and stat tiles. Returns `target` immediately when `active` is
+ * ease-out curve. Reserved for the seller's first-sale moment (Dev's less-AI
+ * pass, item 82): no other number in the app counts up. Returns `target` immediately when `active` is
  * false (e.g. while scrubbing the chart, where the number must track the
  * finger exactly, not animate).
  */

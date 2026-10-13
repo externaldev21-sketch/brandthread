@@ -8,14 +8,14 @@
 import { Animated, Platform } from 'react-native';
 import { Easing } from 'react-native-reanimated';
 
-/** Press feedback: shrink to ~0.96, every press-state animation used by a
+/** Press feedback: shrink to 0.97 (Dev's less-AI pass, item 76), every press-state animation used by a
  *  shared pressable/button/card/tile/row component. Never scales below 1 at
  *  rest — this is the resting (unpressed) scale, never overshot past 1.
  *  PRESS_DURATION_MS is kept only for the non-scale (opacity/highlight) half
  *  of a press — the scale itself now always animates on PRESS_SPRING below,
  *  never a plain timing, so it settles at the same physical rate touch-down
  *  and touch-up. */
-export const PRESS_SCALE = 0.96;
+export const PRESS_SCALE = 0.97;
 export const PRESS_DURATION_MS = 100;
 
 /** Critically damped (no overshoot) in both directions — this is the one
