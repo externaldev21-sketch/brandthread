@@ -168,6 +168,31 @@ export async function notifyBackInStock(input: {
 }
 
 /** Buyer-facing price drop alert for everyone who saved/wishlisted the product. */
+export interface PriceDropRow {
+  userId: string;
+  priceDropAlert: boolean;
+  lastNotifiedPriceCents: number | null;
+}
+
+/**
+ * Pure: who hears about a drop to `newPriceCents`. Everyone who saved the
+ * product gets the in-app row once per new low (a drop that isn't below the
+ * last price they were told about is skipped). `push` marks the buyers who
+ * turned on "Tell me if the price drops" for this item: that switch is the
+ * explicit, per-item request that lets this promotional push through
+ * (pushPolicy explicitRequest). Everyone else's push still needs the global
+ * promotional opt-in, exactly as before.
+ */
+export function priceDropRecipients(rows: PriceDropRow[], newPriceCents: number): { userId: string; push: boolean }[] {
+  const byUser = new Map<string, { userId: string; push: boolean }>();
+  for (const row of rows) {
+    if (row.lastNotifiedPriceCents != null && newPriceCents >= row.lastNotifiedPriceCents) continue;
+    const prev = byUser.get(row.userId);
+    byUser.set(row.userId, { userId: row.userId, push: (prev?.push ?? false) || row.priceDropAlert });
+  }
+  return [...byUser.values()];
+}
+
 export async function notifyPriceDrop(input: {
   productId: string;
   ownerId: string;
@@ -176,9 +201,26 @@ export async function notifyPriceDrop(input: {
   newPriceCents: number;
 }): Promise<void> {
   if (input.newPriceCents >= input.previousPriceCents) return;
-  const likers = await likersOf(input.productId);
+  const rows = await db
+    .select({
+      userId: savedItems.userId,
+      priceDropAlert: savedItems.priceDropAlert,
+      lastNotifiedPriceCents: savedItems.lastNotifiedPriceCents,
+    })
+    .from(savedItems)
+    .where(and(eq(savedItems.itemType, "product"), eq(savedItems.targetId, input.productId)));
+  const recipients = priceDropRecipients(rows, input.newPriceCents);
+  if (recipients.length === 0) return;
+  // Stamp first so a second edit racing this one can't notify the same low twice.
+  await db.update(savedItems)
+    .set({ lastNotifiedPriceCents: input.newPriceCents })
+    .where(and(
+      eq(savedItems.itemType, "product"),
+      eq(savedItems.targetId, input.productId),
+      inArray(savedItems.userId, recipients.map((r) => r.userId)),
+    ));
   const formatted = (input.newPriceCents / 100).toFixed(2);
-  await Promise.all(likers.map((userId) =>
+  await Promise.all(recipients.map(({ userId, push }) =>
     publishNotification({
       userId,
       category: "stock",
@@ -190,6 +232,7 @@ export async function notifyPriceDrop(input: {
       cta: "Shop now",
       analyticsOwnerId: input.ownerId,
       pushChannelId: "stock",
+      pushExplicitRequest: push,
     }).catch((err) => logger.warn({ err, userId, productId: input.productId }, "Price drop notification failed"))
   ));
 }

@@ -1,5 +1,5 @@
 export * from './productImports';
-import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, primaryKey, index, numeric, real, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, primaryKey, index, bigserial, numeric, real, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
 export * from './manufacturers';
 export * from './sizeCharts';
 export * from './freelancers';
@@ -1169,6 +1169,18 @@ export const savedCollections = pgTable('saved_collections', {
   userIdx: index('saved_collections_user_id_idx').on(table.userId, table.sortOrder),
 }));
 
+// ─── Product price history ────────────────────────────────────────────────────
+// One row per change of a product's lowest variant price. Written only by the
+// product_variants trigger in migration 271; read by the product page chart.
+export const productPriceHistory = pgTable('product_price_history', {
+  id:         bigserial('id', { mode: 'number' }).primaryKey(),
+  productId:  uuid('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+  priceCents: integer('price_cents').notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  productRecordedIdx: index('product_price_history_product_recorded_idx').on(table.productId, table.recordedAt),
+}));
+
 // ─── Saved / wishlisted items ─────────────────────────────────────────────────
 
 export const savedItems = pgTable('saved_items', {
@@ -1193,6 +1205,9 @@ export const savedItems = pgTable('saved_items', {
   // When the back-in-stock transition last fired — badge shows for a window after this.
   backInStockAt: timestamp('back_in_stock_at'),
   notifyOnPriceDrop:  boolean('notify_on_price_drop').notNull().default(true),
+  // "Tell me if the price drops" (migration 271) — the buyer's explicit,
+  // per-item opt-in for the price-drop push. Off by default.
+  priceDropAlert:     boolean('price_drop_alert').notNull().default(false),
   createdAt:    timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   collectionIdx: index('saved_items_collection_id_idx').on(table.collectionId),
