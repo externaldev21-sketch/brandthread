@@ -104,6 +104,7 @@ function sendNoRewardToday(res: any, error: ThreadCashError, balanceCents: numbe
 }
 import { CHECKOUT_PAUSED_ERROR, isThreadCashPaused, pausedRewardBody } from "../lib/threadCash/killSwitch";
 import { personProfileIds } from "../lib/accountProfiles";
+import weeklyQuestsRouter from "./thread-cash-weekly-quests";
 
 const router = Router();
 router.use(requireAuth);
@@ -718,5 +719,8 @@ router.post("/cash-out", requirePermission("payouts"), async (req, res) => {
     throw error;
   }
 });
+
+// ─── /api/thread-cash/weekly-quests ──────────────────────────────────────────
+router.use("/weekly-quests", weeklyQuestsRouter);
 
 export default router;

@@ -82,6 +82,8 @@ export const threadCashConfig = pgTable('thread_cash_config', {
   maxCheckInsPerDevicePerDay: integer('max_check_ins_per_device_per_day').notNull().default(1),
   updatedBy:           text('updated_by'),
   updatedAt:           timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  // Weekly quests reward (migration 533). NULL = the code default (50 cents).
+  weeklyQuestRewardCents: integer('weekly_quest_reward_cents').default(50),
 });
 
 // Anti-abuse for the active-time daily claim: the client reports cumulative

@@ -83,6 +83,7 @@ export type ThreadCashEntry = {
     | 'daily_checkin' | 'streak_bonus' | 'redemption' | 'checkout_spend'
     | 'refund_credit' | 'expiry' | 'admin_adjustment' | 'send_sent' | 'send_received'
     | 'send_cancelled' | 'send_expired' | 'redemption_cancelled' | 'referral'
+    | 'weekly_quests'
     // Seller-earned Thread Cash (not spendable at checkout, cashable to real
     // payout money — see app/thread-cash-history.tsx): 'live_gift' is
     // credited by the Live-gifting flow, 'send_received' doubles as a
