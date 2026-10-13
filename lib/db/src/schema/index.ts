@@ -229,6 +229,13 @@ export const users = pgTable('users', {
   quietHoursTimezone: text('quiet_hours_timezone').notNull().default('UTC'),
   // Settings → Notifications → Pause all (migration 281). Future = no pushes.
   pushPausedUntil: timestamp('push_paused_until'),
+  // Opt-in SMS order updates (migration 611). sms_phone is E.164 and only set
+  // after the buyer confirmed it with a one-time code; sms_order_updates is
+  // the explicit TCPA opt-in (default off). STOP replies clear it.
+  smsPhone:        text('sms_phone'),
+  smsOrderUpdates: boolean('sms_order_updates').notNull().default(false),
+  smsOptedInAt:    timestamp('sms_opted_in_at', { withTimezone: true }),
+  smsOptedOutAt:   timestamp('sms_opted_out_at', { withTimezone: true }),
   // A tombstone is retained after an account erasure request.  Keeping the
   // Clerk subject prevents a delayed client sync from creating a fresh profile.
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -2975,3 +2982,4 @@ export * from './reviewRequests';
 export * from './sellerLifecycle';
 export * from './mysteryBoxes';
 export * from './dropSmsWaitlist';
+export * from './sms';

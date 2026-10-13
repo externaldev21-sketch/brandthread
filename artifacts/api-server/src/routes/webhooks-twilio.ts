@@ -11,6 +11,7 @@
  * Request URL https://brandthread.app/api/webhooks/twilio/sms (HTTP POST).
  */
 import { Router, type Request } from "express";
+import { handleInboundSms, twiml } from "../lib/sms";
 import { applyInboundKeyword } from "../lib/dropSmsWaitlist";
 import { getSmsConfig, isValidTwilioSignature, normalizePhone } from "../lib/sms";
 import { CANONICAL_WEB_ORIGIN, getWebOrigin } from "../lib/webOrigin";
@@ -23,6 +24,7 @@ const EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>
 export function signatureUrlCandidates(req: Request): string[] {
   const path = req.originalUrl;
   const urls = new Set<string>([`${CANONICAL_WEB_ORIGIN}${path}`, `${getWebOrigin()}${path}`]);
+  if (process.env.PUBLIC_API_URL?.trim()) urls.add(`${process.env.PUBLIC_API_URL.trim().replace(/\/+$/, "")}${path}`);
   const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
   if (host) urls.add(`${req.protocol}://${host}${path}`);
   return [...urls];
@@ -45,6 +47,8 @@ router.post("/sms", async (req, res): Promise<void> => {
   if (from && body) {
     try {
       const outcome = await applyInboundKeyword(from, body);
+      const { reply } = await handleInboundSms(from, body);
+      if (reply) { res.type("text/xml").send(twiml(reply)); return; }
       if (outcome) logger.info({ outcome }, "Drop SMS waitlist keyword applied");
     } catch (err) {
       logger.error({ err }, "Failed to apply inbound SMS keyword");

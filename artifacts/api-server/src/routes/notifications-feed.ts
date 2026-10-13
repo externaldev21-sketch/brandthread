@@ -12,6 +12,7 @@
  * DELETE /api/buyer/notifications/:id           — delete one
  * POST   /api/internal/notifications            — publish a notification (server-to-user)
  */
+import { notifySmsForNotification, smsEnabled } from "../lib/sms";
 import { Router } from "express";
 import { isMirroredSellerType, mirrorSellerEmail } from "../lib/sellerLifecycle/mirror";
 import { db, notificationsFeed, conversationParticipants, users, blocks, activityMutes, follows } from "@workspace/db";
@@ -479,6 +480,11 @@ export async function publishNotification(n: PublishInput): Promise<void> {
   // New order / review / failed payout also reach the seller by email (own preference gate).
   if (isMirroredSellerType(n.type)) void mirrorSellerEmail(n);
   const pushCategory = n.pushCategory ?? normalizePushEventCategory(n.category);
+
+  // Opt-in SMS order updates (lib/sms.ts): shipped / out for delivery /
+  // delivered / refunded. Fire-and-forget, independent of the in-app and push
+  // switches, one text per (order, kind); a no-op unless Twilio is configured.
+  if (smsEnabled()) void notifySmsForNotification(n);
 
   // "See less" preferences (Activity "..." menu) — a muted type or a muted
   // actor keeps future matching events out of the recipient's unread feed,

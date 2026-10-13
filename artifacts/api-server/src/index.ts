@@ -30,6 +30,7 @@ import { startAccountPurgeJob } from "./jobs/accountPurge";
 import { startDataExportJob } from "./jobs/dataExportJob";
 import { startPushReceiptCleanupJob } from "./jobs/pushReceiptCleanup";
 import { startNotificationBatchFlushJob } from "./jobs/notificationBatchFlush";
+import { startSmsDeferredSendJob } from "./jobs/smsDeferredSend";
 import { startLiveRecordingFinalizeJob } from "./jobs/liveRecordingFinalize";
 import { startLiveViewersPresenceJob } from "./jobs/liveViewersPresence";
 import { startThreadCashExpiryJob } from "./jobs/threadCashExpiry";
@@ -131,6 +132,7 @@ const server = app.listen(port, (err) => {
   startDataExportJob();
   startPushReceiptCleanupJob();
   startNotificationBatchFlushJob();
+  startSmsDeferredSendJob();
   startLiveRecordingFinalizeJob();
   startLiveViewersPresenceJob();
   startThreadCashExpiryJob();

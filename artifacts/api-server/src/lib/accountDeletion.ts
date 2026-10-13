@@ -264,6 +264,8 @@ export async function purgeAccount(clerkUserId: string): Promise<boolean> {
     await cancelPendingThreadCashForAccount(tx, clerkUserId);
     // Recent searches (declared as Search History in the App Store privacy labels).
     await tx.execute(sql`DELETE FROM search_log WHERE user_id = ${clerkUserId}`);
+    await tx.execute(sql`DELETE FROM sms_messages WHERE user_id = ${clerkUserId}`);
+    await tx.execute(sql`DELETE FROM sms_phone_verifications WHERE user_id = ${clerkUserId}`);
     // Reports the person filed stay in the moderation record without
     // their identity; reports about their content keep the snapshot.
     await tx.execute(sql`UPDATE reports SET reporter_id = ${deletedSubject} WHERE reporter_id = ${clerkUserId}`);
@@ -321,6 +323,7 @@ export async function purgeAccount(clerkUserId: string): Promise<boolean> {
       stripeCustomerId: null, stripeAccountId: null, subscriptionId: null,
       stripeVerificationSessionId: null, notificationPreferences: {},
       termsAcceptedAt: null, termsVersion: null,
+      smsPhone: null, smsOrderUpdates: false,
       deletedAt: new Date(), updatedAt: new Date(),
     }).where(eq(users.clerkId, clerkUserId));
   });

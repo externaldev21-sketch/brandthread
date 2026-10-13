@@ -1590,6 +1590,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="notifications-settings" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="notification-settings-page" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="notification-channels" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="sms-order-updates" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="help"             options={{ headerShown: false }} />
         <Stack.Screen name="tech-pack-generator" options={{ headerShown: false }} />
         {/* Manufacturer Hub screens */}

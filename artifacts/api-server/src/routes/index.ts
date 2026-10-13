@@ -77,6 +77,7 @@ import productPageDetailsRouter from "./product-page-details";
 import cartDbRouter from "./cart-db";
 import notificationsFeedRouter from "./notifications-feed";
 import notificationPrefsRouter from "./notification-prefs";
+import smsPrefsRouter from "./notification-prefs-sms";
 import postsRouter from "./posts";
 import postCaptionsRouter from "./post-captions";
 import feedRouter from "./feed";
@@ -193,6 +194,7 @@ import releaseTestControlRouter from "./release-test-control";
 import webhooksShopifyRouter from "./webhooks-shopify";
 import uploadSessionsRouter from "./upload-sessions";
 import muxWebhookRouter from "./webhooks-mux";
+import webhooksTwilioRouter from "./webhooks-twilio";
 import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
 import shopifyRouter from "./shopify";
 import sharePreviewRouter from "./share-preview";
@@ -364,6 +366,7 @@ router.use("/catalog-public",   catalogPublicRouter);
 router.use("/seller-hub",      tc, featureGate("manufacturer_hub", { only: [{ method: "POST", path: "/quote-requests", when: (req) => req.body?.type !== "sample" }, { method: "POST", path: "/rfqs" }] }), sellerHubRouter); // quotes + RFQs: Growth+, sample requests: every plan
 router.use("/push",            pushRouter);
 router.use("/live-activities", liveActivitiesRouter); // iOS Live Activity APNs tokens; requireAuth per route, no team context
+router.use("/notification-prefs/sms", smsPrefsRouter); // opt-in SMS order updates (Twilio)
 router.use("/notification-prefs", notificationPrefsRouter);
 router.use("/ai",              tc, aiSafetyGuard("ai-chat", { mode: "chat" }), aiRouter);
 

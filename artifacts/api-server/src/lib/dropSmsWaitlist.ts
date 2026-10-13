@@ -9,7 +9,7 @@
 import { and, asc, eq, gt, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { db, drops, dropSmsBlasts, dropSmsWaitlist, products, users } from "@workspace/db";
 import { CANONICAL_WEB_ORIGIN } from "./webOrigin";
-import { getSmsConfig, sendSms } from "./sms";
+import { getSmsConfig, sendSms } from "./sms/index";
 
 export const HANDLE_RE = /^[A-Za-z0-9_]{3,30}$/;
 

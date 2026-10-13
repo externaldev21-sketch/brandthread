@@ -17,7 +17,7 @@ import { haptic } from '@/lib/haptics';
  *     Email and in-app
  * Everything is stored on the server (routes/notification-prefs.ts).
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -46,6 +46,7 @@ import { Card } from '@/components/ui/Card';
 import { SPACING } from '@/constants/spacing';
 import { getSaleAlertPrefs, rememberSaleAlertPrefs } from '@/lib/saleAlerts';
 import { playSaleSoundPreview } from '@/lib/saleSoundPreview';
+import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 
 import { FONT } from '@/lib/theme';
 
@@ -66,6 +67,7 @@ export default function NotificationsSettingsScreen() {
   const [quietHours, setQuietHours] = useState<{ start: string | null; end: string | null }>({ start: null, end: null });
   const [pauseSheet, setPauseSheet] = useState(false);
   const [sleepSheet, setSleepSheet] = useState(false);
+  const [sms, setSms] = useState<{available: boolean; enabled: boolean}>({available: false, enabled: false});
 
   const load = useCallback(() => {
     if (isSellerDevPreview()) return;
@@ -83,6 +85,13 @@ export default function NotificationsSettingsScreen() {
       .catch(() => { /* rows keep their defaults; each change goes to the server */ });
   }, [api]);
   useFocusEffect(load);
+
+  useFocusEffect(React.useCallback(() => {
+    if ((isBuyerDevPreview() || isSellerDevPreview()) && !isPreviewDemoMode()) return;
+    api.notificationPrefs.sms.get()
+      .then((data) => setSms({ available: data.available, enabled: data.enabled }))
+      .catch(() => setSms({ available: false, enabled: false }));
+  }, [api]));
 
   const pausedLabel = pausedUntilLabel(pausedUntil);
   // "Pause all" is on while a pause is running, and also for an account that
@@ -167,6 +176,7 @@ export default function NotificationsSettingsScreen() {
             testID={`notifications-page-${page.id}`}
           />
         ))}
+        {role === "buyer" && sms.available ? <ListRow testID="sms-settings-row" icon="message-square" title="Text messages" subtitle="Order updates" value={sms.enabled ? "On" : "Off"} chevron onPress={() => router.push("/sms-order-updates" as never)} /> : null}
 
         <Text accessibilityRole="header" style={[styles.sectionTitle, styles.sectionGap, { color: colors.foreground }]}>Other notification types</Text>
         <ListRow
