@@ -4,6 +4,8 @@
  * GET    /api/posts/:postId/comments                       — list (signed-out allowed)
  * GET    /api/posts/:postId/comments/:commentId/replies    — more replies for a root (`after` cursor)
  * POST   /api/posts/:postId/comments                       — add a comment or reply
+ *                                                            (optional `media`: a photo from
+ *                                                            POST /api/comment-media/upload)
  * DELETE /api/posts/:postId/comments/:commentId            — author or post owner
  * POST   /api/posts/:postId/comments/:commentId/like       — { liked: boolean }
  * POST   /api/posts/:postId/comments/:commentId/pin        — post owner pins (replaces any other pin)
@@ -23,7 +25,7 @@
  */
 import { Router } from "express";
 import { and, asc, count, desc, eq, gt, inArray, lt, notInArray, or, sql } from "drizzle-orm";
-import { db, postCommentLikes, postComments, posts } from "@workspace/db";
+import { db, postCommentLikes, postCommentMedia, postComments, posts } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
@@ -31,6 +33,10 @@ import { publicPostCondition } from "../lib/postVisibility";
 import { notifyCommentActivity, notifyCommentLike, notifyCommentPinned } from "../lib/activityEvents";
 import { mentionsForComments, recordCommentMentions, resolveCommentMentions, type CommentMention } from "../lib/commentMentions";
 import { recordPostSignal } from "../lib/ranking/signals";
+import {
+  findAttachableMedia, isHeldUpload, mediaForComments, parseCommentMediaInput, toMediaView, type CommentMediaView,
+} from "../lib/commentMedia";
+import { recordHeldMedia } from "../lib/mediaModerationStore";
 import {
   authorInGoodStanding,
   blockRelation,
@@ -44,6 +50,8 @@ import {
 } from "../lib/safety";
 
 const router = Router();
+
+class MediaAlreadyUsedError extends Error {}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const MAX_COMMENT_LENGTH = 1000;
@@ -71,6 +79,8 @@ export interface CommentView {
   creatorLiked: boolean;
   /** Verified @mentions, resolved server-side. */
   mentions: CommentMention[];
+  /** Photo reply attached to this comment, if any. */
+  media: CommentMediaView | null;
   replies: CommentView[];
   /** Roots only: true when more replies exist beyond the inline page. */
   hasMoreReplies?: boolean;
@@ -197,7 +207,7 @@ router.get("/:postId/comments", async (req, res) => {
     });
 
     const ids = shown.map((c) => c.id);
-    const [likeRows, myLikeRows, profiles, totalRows, creatorLikeRows, mentionsByComment] = await Promise.all([
+    const [likeRows, myLikeRows, profiles, totalRows, creatorLikeRows, mentionsByComment, mediaByComment] = await Promise.all([
       ids.length ? db.select({ commentId: postCommentLikes.commentId, n: count() })
         .from(postCommentLikes).where(inArray(postCommentLikes.commentId, ids))
         .groupBy(postCommentLikes.commentId) : Promise.resolve([]),
@@ -220,6 +230,7 @@ router.get("/:postId/comments", async (req, res) => {
         .where(and(inArray(postCommentLikes.commentId, ids), eq(postCommentLikes.userId, post.userId)))
         : Promise.resolve([]),
       mentionsForComments(ids),
+      mediaForComments(ids),
     ]);
     const creatorLiked = new Set(creatorLikeRows.map((row) => row.commentId));
     const likes = new Map(likeRows.map((row) => [row.commentId, Number(row.n)]));
@@ -243,6 +254,7 @@ router.get("/:postId/comments", async (req, res) => {
       pinned: comment.pinnedAt != null,
       creatorLiked: creatorLiked.has(comment.id),
       mentions: (mentionsByComment.get(comment.id) ?? []).filter((m) => !blocked.has(m.userId)),
+      media: mediaByComment.get(comment.id) ?? null,
       replies: [],
     });
 
@@ -324,7 +336,7 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
       && (c.authorId === viewerId || !matchesMutedWords(c.body, muted)));
 
     const ids = shown.map((c) => c.id);
-    const [likeRows, myLikeRows, profiles, mentionsByComment] = await Promise.all([
+    const [likeRows, myLikeRows, profiles, mentionsByComment, mediaByComment] = await Promise.all([
       ids.length ? db.select({ commentId: postCommentLikes.commentId, n: count() })
         .from(postCommentLikes).where(inArray(postCommentLikes.commentId, ids))
         .groupBy(postCommentLikes.commentId) : Promise.resolve([]),
@@ -334,6 +346,7 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
         : Promise.resolve([]),
       profilesById(shown.map((c) => c.authorId)),
       mentionsForComments(ids),
+      mediaForComments(ids),
     ]);
     const likes = new Map(likeRows.map((row) => [row.commentId, Number(row.n)]));
     const mine = new Set(myLikeRows.map((row) => row.commentId));
@@ -360,6 +373,7 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
       pinned: false,
       creatorLiked: creatorLikedIds.has(comment.id),
       mentions: (mentionsByComment.get(comment.id) ?? []).filter((m) => !blocked.has(m.userId)),
+      media: mediaByComment.get(comment.id) ?? null,
       replies: [],
     }));
     return res.json({
@@ -378,9 +392,14 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
   const postId = String(req.params.postId);
   if (!UUID_RE.test(postId)) return res.status(404).json({ error: "Post not found" });
 
-  const { body: rawBody, parentId: rawParentId } = (req.body ?? {}) as { body?: unknown; parentId?: unknown };
+  const { body: rawBody, parentId: rawParentId, media: rawMedia } = (req.body ?? {}) as {
+    body?: unknown; parentId?: unknown; media?: unknown;
+  };
   const body = typeof rawBody === "string" ? rawBody.trim() : "";
-  if (!body) return res.status(400).json({ error: "Write something before posting.", code: "VALIDATION_ERROR" });
+  const mediaInput = parseCommentMediaInput(rawMedia);
+  if (!mediaInput.ok) return res.status(400).json({ error: mediaInput.error, code: "VALIDATION_ERROR" });
+  // A photo reply may have no text.
+  if (!body && !mediaInput.ref) return res.status(400).json({ error: "Write something before posting.", code: "VALIDATION_ERROR" });
   if (body.length > MAX_COMMENT_LENGTH) {
     return res.status(400).json({ error: `Comments can be up to ${MAX_COMMENT_LENGTH} characters.`, code: "VALIDATION_ERROR" });
   }
@@ -420,7 +439,12 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
       parentAuthorId = parent.authorId;
     }
 
-    const decision = evaluateContent(body, "public");
+    const media = mediaInput.ref ? await findAttachableMedia(mediaInput.ref, authorId) : null;
+    if (mediaInput.ref && !media) {
+      return res.status(400).json({ error: "That photo is no longer available. Add it again.", code: "MEDIA_NOT_FOUND" });
+    }
+
+    const decision = body ? evaluateContent(body, "public") : ({ action: "allow" } as const);
     if (decision.action === "reject") {
       return res.status(422).json({
         error: `${decision.reason} Please review the Community Guidelines.`,
@@ -429,20 +453,42 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
       });
     }
 
-    const held = decision.action === "hold";
-    const [created] = await db.insert(postComments).values({
-      postId,
-      authorId,
-      parentId,
-      body,
-      moderationStatus: held ? "held" : "visible",
-      moderationReason: held ? decision.category : null,
-    }).returning();
+    const textHeld = decision.action === "hold";
+    // A photo the upload screening flagged holds the comment, like a held post.
+    const mediaHeld = !!media && isHeldUpload(media);
+    const held = textHeld || mediaHeld;
+    const created = await db.transaction(async (tx) => {
+      const [row] = await tx.insert(postComments).values({
+        postId,
+        authorId,
+        parentId,
+        body,
+        moderationStatus: held ? "held" : "visible",
+        moderationReason: textHeld
+          ? decision.category
+          : mediaHeld ? `media:${(media!.moderationCategories ?? []).join(",")}`.slice(0, 200) : null,
+      }).returning();
+      if (media) {
+        // comment_id IS NULL guards against the same upload being attached twice.
+        const attached = await tx.update(postCommentMedia)
+          .set({ commentId: row.id, attachedAt: new Date() })
+          .where(and(eq(postCommentMedia.id, media.id), sql`${postCommentMedia.commentId} IS NULL`))
+          .returning({ id: postCommentMedia.id });
+        if (attached.length === 0) throw new MediaAlreadyUsedError();
+      }
+      return row;
+    }).catch((err) => {
+      if (err instanceof MediaAlreadyUsedError) return null;
+      throw err;
+    });
+    if (!created) {
+      return res.status(400).json({ error: "That photo is no longer available. Add it again.", code: "MEDIA_NOT_FOUND" });
+    }
 
     const mentions = await resolveCommentMentions(body, authorId);
     await recordCommentMentions(created.id, mentions);
 
-    if (held) {
+    if (textHeld) {
       await enqueueAutoFilterReport({
         targetType: "comment",
         targetId: created.id,
@@ -451,13 +497,31 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
         category: decision.category,
         label: "Comment",
       });
+    } else if (mediaHeld && media) {
+      await recordHeldMedia({
+        targetType: "comment",
+        targetId: created.id,
+        ownerId: authorId,
+        verdict: {
+          verdict: "hold",
+          categories: media.moderationCategories ?? [],
+          scores: {},
+          maxScore: 0,
+          framesChecked: 1,
+          provider: "upload-screening",
+          ...(media.unverified ? { unverified: true } : {}),
+        },
+        refs: [media.url],
+        excerpt: body,
+        label: "Comment",
+      });
     }
 
     // Held comments are invisible to everyone but their author, so nobody
     // else is told about them until a moderator approves.
     if (!held) {
       void notifyCommentActivity({
-        postId, commentId: created.id, authorId, body, parentAuthorId,
+        postId, commentId: created.id, authorId, body: body || "Photo", parentAuthorId,
         mentionedUserIds: mentions.map((m) => m.userId),
       });
       void recordPostSignal(authorId, postId, "comment");
@@ -479,6 +543,7 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
       pinned: false,
       creatorLiked: false,
       mentions,
+      media: media ? toMediaView(media) : null,
       replies: [],
     };
     return res.status(201).json({
