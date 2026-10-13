@@ -11,8 +11,10 @@ import {
   matchesCustomerSearch,
   publicCustomer,
   sellerCustomerOrders,
+  superfans,
   topCustomers,
 } from "../lib/sellerCustomers";
+import { grantSuperfansEarlyAccess, superfansEarlyAccessStatus } from "../lib/superfansEarlyAccess";
 
 // ─── Startup migration — add tags + notes columns ────────────────────────────
 (async () => {
@@ -27,19 +29,26 @@ import {
 const router = Router();
 router.use(requireAuth);
 
-// GET /api/customers[?search=][&top=20]
+// GET /api/customers[?search=][&top=20][&segment=superfans]
 // Customers derived from the seller's orders (lifetime spend net of refunds,
 // order count, last order), merged with the hand-entered rows that carry tags
 // and notes — see lib/sellerCustomers.ts. Newest order first; `top=N` returns
-// the N biggest lifetime spenders instead.
+// the N biggest lifetime spenders instead; `segment=superfans` returns the
+// top 1% of signed-in buyers by spend (orders break ties).
 router.get("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   try {
     const term = normalizeSearchTerm(req.query.search);
     let list = await listSellerCustomers(ownerId);
+    // Superfans are ranked over the whole list (already in rank order), then
+    // searched within.
+    const isSuperfans = req.query.segment === "superfans";
+    if (isSuperfans) list = superfans(list, ownerId);
     if (term) list = list.filter((c) => matchesCustomerSearch(c, term));
     const top = Number.parseInt(String(req.query.top ?? ""), 10);
-    if (Number.isFinite(top) && top > 0) {
+    if (isSuperfans) {
+      // keep rank order
+    } else if (Number.isFinite(top) && top > 0) {
       list = topCustomers(list, Math.min(top, 100));
     } else {
       list.sort((a, b) => (b.lastOrderAt ?? b.createdAt).localeCompare(a.lastOrderAt ?? a.createdAt));
@@ -48,6 +57,36 @@ router.get("/", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to list customers");
     res.status(500).json({ error: "Failed to load customers" });
+  }
+});
+
+// GET /api/customers/superfans/early-access
+// The seller's next drop (earliest draft/active drop releasing in the future)
+// and how many current superfans already hold early access to it.
+router.get("/superfans/early-access", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  try {
+    res.json(await superfansEarlyAccessStatus(ownerId));
+  } catch (err) {
+    req.log.error({ err }, "Failed to load superfans early access");
+    res.status(500).json({ error: "Failed to load early access" });
+  }
+});
+
+// POST /api/customers/superfans/early-access
+// One tap: every current superfan gets early access to the next drop.
+// Idempotent — buyers who already have it are counted in `alreadyHad`.
+router.post("/superfans/early-access", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const grantedBy = ((req as any).actorClerkId as string | undefined) ?? ownerId;
+  try {
+    const result = await grantSuperfansEarlyAccess({ ownerId, grantedBy });
+    if (!result.ok) { res.status(result.status).json({ error: result.error, code: result.code }); return; }
+    const { ok: _ok, ...body } = result;
+    res.json(body);
+  } catch (err) {
+    req.log.error({ err }, "Failed to grant superfans early access");
+    res.status(500).json({ error: "Failed to give early access" });
   }
 });
 
