@@ -1301,7 +1301,7 @@ export default function ActivityCenterScreen() {
           renderItem={renderItem}
           extraData={dotIds}
           renderSectionHeader={renderSectionHeader}
-          stickySectionHeadersEnabled={false}
+          stickySectionHeadersEnabled
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           onEndReached={() => { void loadMore(); }}
@@ -1419,6 +1419,9 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingHorizontal: SP.md,
     paddingTop: 20,
     paddingBottom: SP.sm,
+    // Day headers stick while their day scrolls under them (S5 #95), so they
+    // need the page colour behind them, never see-through.
+    backgroundColor: theme.background,
   },
   sectionTitle: {
     color: theme.text,

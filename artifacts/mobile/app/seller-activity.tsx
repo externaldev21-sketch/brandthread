@@ -430,7 +430,7 @@ export default function SellerActivityScreen() {
           renderItem={renderItem}
           extraData={dotIds}
           renderSectionHeader={renderSectionHeader}
-          stickySectionHeadersEnabled={false}
+          stickySectionHeadersEnabled
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           onEndReached={() => { void loadMore(); }}
