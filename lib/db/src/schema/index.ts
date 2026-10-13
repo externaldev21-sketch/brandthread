@@ -2627,5 +2627,6 @@ export * from './storyStickers';
 export * from './ranking';
 export * from './comments';
 export * from './hashtags';
+export * from './fits';
 export * from './captions';
 export * from './places';
