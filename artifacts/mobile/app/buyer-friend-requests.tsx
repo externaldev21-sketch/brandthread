@@ -411,13 +411,18 @@ export default function BuyerFriendRequestsScreen() {
 // A row's tap area (open profile) built on the shared press-scale feel, kept
 // separate from the row's trailing action buttons so they don't nest presses.
 function PressableScaleRow({ children, onPress, onLongPress }: { children: React.ReactNode; onPress: () => void; onLongPress?: () => void }) {
+  // PressableScale puts object styles on its inner view; the cell gives the
+  // outer pressable the flex so long names shrink and the actions stay on screen.
   return (
-    <PressableScale onPress={onPress} onLongPress={onLongPress} style={rowStyles.wrap}>
-      {children}
-    </PressableScale>
+    <View style={rowStyles.cell}>
+      <PressableScale onPress={onPress} onLongPress={onLongPress} style={rowStyles.wrap}>
+        {children}
+      </PressableScale>
+    </View>
   );
 }
 const rowStyles = StyleSheet.create({
+  cell: { flex: 1, minWidth: 0 },
   wrap: { flex: 1, flexDirection: 'row', alignItems: 'center' },
 });
 
