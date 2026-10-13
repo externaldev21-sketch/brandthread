@@ -17,8 +17,7 @@ import { Snackbar } from '@/components/ui/Snackbar';
 import { LoadingSkeleton, PressableScale, PrimaryButton, SearchBar } from '@/components/BrandthreadUI';
 import { EmptyState } from '@/components/layout';
 import { useApi } from '@/lib/api';
-import { isPreviewDemoMode } from '@/lib/devPreview';
-import { DEMO_TAX_REGISTRATIONS, useScreenToast, useTaxPreview } from '@/lib/taxScreens';
+import { DEMO_TAX_REGISTRATIONS, useScreenToast, useTaxDemo, useTaxPreview } from '@/lib/taxScreens';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   filterRegistrations, headOfficeLine, registrationStatusLabel, takePendingTaxToast,
@@ -32,8 +31,7 @@ export default function TaxRegionsScreen() {
   const api = useApi();
   const tabBarMetrics = useTabBarMetrics(2);
   const isPreview = useTaxPreview();
-  // Read on first render: the router drops `&demo=1` from the URL right after.
-  const [demo] = useState(() => isPreviewDemoMode());
+  const demo = useTaxDemo();
   const toast = useScreenToast();
 
   const [info, setInfo] = useState<TaxRegistrationsInfo | null>(null);

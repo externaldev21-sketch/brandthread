@@ -4,10 +4,21 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@clerk/expo';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { useLocalSearchParams } from 'expo-router';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import type { TaxRegistrationsInfo } from '@/lib/taxRegistrationsView';
 
 const TOAST_MS = 2500;
+
+/**
+ * `&demo=1` on the preview, from the URL or the route params (client-side
+ * navigation can drop it from one of them). Read on every render, so a
+ * screen's load re-runs if it shows up after the first render.
+ */
+export function useTaxDemo(): boolean {
+  const params = useLocalSearchParams<{ demo?: string }>();
+  return isPreviewDemoMode() || (isSellerDevPreview() && params.demo === '1');
+}
 
 /** Only with &demo=1 on the signed-out web preview. */
 export const DEMO_TAX_REGISTRATIONS: TaxRegistrationsInfo = {

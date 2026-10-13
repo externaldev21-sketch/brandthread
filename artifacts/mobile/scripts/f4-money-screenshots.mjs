@@ -175,14 +175,14 @@ async function run() {
     await overflowCheck(page, 'taxes-duties');
 
     if (MODE === 'after') {
-      await go(page, '/tax-regions');
+      await openScreen(page, activity, server.origin, 'seller', '/tax-regions', { extraQuery: '&demo=1' });
       await waitFor(page, '/tax-regions', () => page.getByTestId('tax-regions-head-office'));
       await waitForQuietNetwork(activity, 900, 15_000);
       await page.waitForTimeout(800);
       await shot(page, '03-tax-regions');
       await overflowCheck(page, 'tax-regions');
 
-      await go(page, '/tax-region-add');
+      await openScreen(page, activity, server.origin, 'seller', '/tax-region-add', { extraQuery: '&demo=1' });
       await waitFor(page, '/tax-region-add', () => page.getByTestId('tax-region-option-US-FL'));
       await page.waitForTimeout(800);
       await shot(page, '04-add-region');
@@ -192,7 +192,7 @@ async function run() {
       await page.waitForTimeout(400);
       await shot(page, '05-add-region-selected');
       await overflowCheck(page, 'add-region');
-      await go(page, '/tax-head-office');
+      await openScreen(page, activity, server.origin, 'seller', '/tax-head-office', { extraQuery: '&demo=1' });
       await waitFor(page, '/tax-head-office', () => page.getByText('Street address', { exact: true }));
       await waitForQuietNetwork(activity, 900, 15_000);
       await page.waitForTimeout(800);

@@ -16,9 +16,8 @@ import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollV
 import { FormInput, LoadingSkeleton, PrimaryButton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
-import { isPreviewDemoMode } from '@/lib/devPreview';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { DEMO_TAX_REGISTRATIONS, useTaxPreview } from '@/lib/taxScreens';
+import { DEMO_TAX_REGISTRATIONS, useTaxDemo, useTaxPreview } from '@/lib/taxScreens';
 import {
   draftFromHeadOffice, headOfficeErrors, headOfficeFromDraft, setPendingTaxToast, type HeadOfficeDraft,
 } from '@/lib/taxRegistrationsView';
@@ -30,8 +29,7 @@ export default function TaxHeadOfficeScreen() {
   const api = useApi();
   const tabBarMetrics = useTabBarMetrics(2);
   const isPreview = useTaxPreview();
-  // Read on first render: the router drops `&demo=1` from the URL right after.
-  const [demo] = useState(() => isPreviewDemoMode());
+  const demo = useTaxDemo();
   const params = useLocalSearchParams<{ enable?: string }>();
   const enabling = params.enable === '1';
 

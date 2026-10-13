@@ -17,9 +17,8 @@ import { LoadingSkeleton, PressableScale, PrimaryButton, SearchBar } from '@/com
 import { EmptyState } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
-import { isPreviewDemoMode } from '@/lib/devPreview';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { DEMO_TAX_REGISTRATIONS, useTaxPreview } from '@/lib/taxScreens';
+import { DEMO_TAX_REGISTRATIONS, useTaxDemo, useTaxPreview } from '@/lib/taxScreens';
 import {
   addableRegions, setPendingTaxToast, type TaxRegion, type TaxRegistrationsInfo,
 } from '@/lib/taxRegistrationsView';
@@ -31,8 +30,7 @@ export default function TaxRegionAddScreen() {
   const api = useApi();
   const tabBarMetrics = useTabBarMetrics(2);
   const isPreview = useTaxPreview();
-  // Read on first render: the router drops `&demo=1` from the URL right after.
-  const [demo] = useState(() => isPreviewDemoMode());
+  const demo = useTaxDemo();
 
   const [info, setInfo] = useState<TaxRegistrationsInfo | null>(null);
   const [loading, setLoading] = useState(true);
