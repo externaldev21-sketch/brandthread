@@ -428,14 +428,35 @@ describe("buying a gift card", () => {
     expect((await call(app.base, "GET", `/api/gift-cards/store/${off.seller}`, "anon")).body.smsDelivery).toBe(false);
     expect(off.confirmed.textedTo).toBeNull();
     expect(off.confirmed.code).toBeTruthy();
-    expect(off.row.deliveredAt).toBeNull();
+    expect(off.row.deliveryChannel).toBe("buyer"); // handed to the buyer to send from Messages
+    expect(off.row.codeHash).toBe(hashGiftCardCode(off.confirmed.code));
 
     sms.enabled = true;
     sms.ok = false;
     const refused = await buyForPhone("smsfail");
     expect(refused.confirmed.textedTo).toBeNull();
-    expect(refused.row.deliveredAt).toBeNull();
+    expect(refused.confirmed.code).toBeTruthy();
+    expect(refused.row.deliveryChannel).toBe("buyer");
     expect(sms.sent).toHaveLength(0);
+  });
+
+  it("when the webhook activates an untexted phone card first, the buyer still gets a working code, once", async () => {
+    const seller = await sellingStore("smsrace");
+    const buyer = await seedBuyer("smsrace");
+    const res = await call(app.base, "POST", "/api/gift-cards/purchase", buyer, {
+      sellerId: seller, amountCents: 2_500, recipientPhone: "4155552671", clientIdempotencyKey: uid("sms"),
+    });
+    const intent = fake.state.paymentIntents.get(res.body.paymentIntentId);
+    intent.status = "succeeded";
+    await handleGiftCardPaymentSucceeded(intent); // its code goes nowhere
+    const first = await call(app.base, "POST", `/api/gift-cards/purchase/${res.body.giftCardId}/confirm`, buyer, {});
+    expect(first.body.code).toMatch(/^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/);
+    const [row] = await db.select().from(giftCards).where(eq(giftCards.id, res.body.giftCardId));
+    expect(row.codeHash).toBe(hashGiftCardCode(first.body.code));
+    const again = await call(app.base, "POST", `/api/gift-cards/purchase/${res.body.giftCardId}/confirm`, buyer, {});
+    expect(again.body.code).toBeNull();
+    const claimer = await seedBuyer("smsclaim");
+    expect((await call(app.base, "POST", "/api/gift-cards/claim", claimer, { code: first.body.code })).status).toBe(200);
   });
 
   it("emails as before when the buyer gives an email, even with SMS configured", async () => {

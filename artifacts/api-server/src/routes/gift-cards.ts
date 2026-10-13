@@ -108,7 +108,7 @@ router.post("/purchase/:id/confirm", async (req, res) => {
       // Shown once, to the buyer who just paid, so they can also share it themselves.
       code: result.code,
       // Last 4 of the recipient's phone when the server already texted the card.
-      textedTo: result.card.recipientPhone && result.card.deliveredAt ? phoneLast4(result.card.recipientPhone) : null,
+      textedTo: result.card.deliveryChannel === "sms" ? phoneLast4(result.card.recipientPhone) : null,
     });
   } catch (error) {
     if (fail(res, error)) return;
