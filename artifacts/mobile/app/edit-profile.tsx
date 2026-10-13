@@ -25,6 +25,7 @@ import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
 import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
+import { useLiveUsernameCheck } from '@/hooks/useLiveUsernameCheck';
 import { Avatar } from '@/components/ui/Avatar';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
@@ -99,6 +100,7 @@ export default function EditProfileScreen() {
 
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'ok' | 'taken' | 'invalid'>('idle');
   const [usernameError, setUsernameError] = useState('');
+  const liveUsername = useLiveUsernameCheck(fields.username, initial.username, checkUsernameAvailability);
 
   // Never overwrite the seller's real profile with placeholder defaults —
   // fields start empty and Save stays disabled until a real profile loads.
@@ -204,6 +206,7 @@ export default function EditProfileScreen() {
     }
     try {
       const result = await api.auth.checkUsername(u);
+      if (liveUsername.current !== u) return result.available; // the field moved on; a newer check owns the status
       if (result.available) { setUsernameStatus('ok'); setUsernameError(''); return true; }
       if (result.code === 'USERNAME_COOLDOWN' && result.nextChangeAt) {
         setUsernameStatus('invalid'); setUsernameError(formatHandleCooldown(result.nextChangeAt));

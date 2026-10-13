@@ -165,6 +165,7 @@ export default function SellerProfileScreen() {
   const [followers, setFollowers] = useState<number | null>(null);
   const [following, setFollowing] = useState<number | null>(null);
   const [likes, setLikes] = useState<number | null>(null);
+  const [pronouns, setPronouns] = useState<string | null>(null);
   const [followPending, setFollowPending] = useState(false);
   const [rating, setRating] = useState<{ avgRating: number; totalCount: number } | null>(null);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
@@ -268,6 +269,7 @@ export default function SellerProfileScreen() {
         setFollowers(Number(social.value.followersCount ?? 0));
         setFollowing(Number(social.value.followingCount ?? 0));
         if (typeof social.value.likesCount === 'number') setLikes(social.value.likesCount);
+        setPronouns(social.value.pronouns ?? null);
       }
     });
     return () => { active = false; };
@@ -690,6 +692,7 @@ export default function SellerProfileScreen() {
           avatarUrl: seller?.avatarUrl,
           verified: seller?.verified,
           roleLabel: 'Seller',
+          pronouns,
         }}
         avatar={{ ring: !!seller?.verified, liveHostId: canonicalSellerId ?? routeSellerId ?? null }}
         // A cover video, when set, leads the hero for every viewer (muted,

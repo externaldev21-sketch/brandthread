@@ -70,6 +70,7 @@ type RemoteProfile = {
   userId?: string;
   name: string; username: string | null; displayName: string | null;
   bio: string | null; avatarUrl?: string | null;
+  pronouns?: string | null;
   followersCount: number; followingCount: number; likesCount?: number;
   isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
   iBlockedThem: boolean;
@@ -479,6 +480,7 @@ export default function BuyerOtherProfileScreen() {
           initials: displayInitials,
           avatarUrl: profile?.avatarUrl ?? null,
           roleLabel: 'Buyer',
+          pronouns: profile?.pronouns ?? null,
         }}
         avatar={storyIds.length > 0
           ? { ring: true, onPress: openStories, accessibilityLabel: `View ${displayName}'s story`, liveHostId: canonicalUserId }

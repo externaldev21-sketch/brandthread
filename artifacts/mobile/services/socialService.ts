@@ -198,14 +198,29 @@ export async function updateMyProfile(updates: Partial<BuyerSocialProfile>, k: S
   const next = { ...current, ...updates };
   await save(k.profile, next);
   notify();
+  if (updates.pronouns !== undefined) await syncPronouns(updates.pronouns, k);
   return next;
+}
+
+/** Pronouns live on the account (users.pronouns) so other people see them;
+ *  the local profile above stays the cache. A failed sync keeps the cache. */
+async function syncPronouns(pronouns: string, k: SocialKeys): Promise<void> {
+  if (isBuyerDevPreview() || k.userId === 'anon') return;
+  try {
+    await serviceRequest('/api/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify({ pronouns: pronouns.trim().slice(0, 40) }),
+    });
+  } catch {
+    // Offline or signed out: the device copy still shows on this phone.
+  }
 }
 
 /** Hydrate the local buyer surface from the provisioned authenticated account.
  * This profile is intentionally user-scoped and never receives demo identity
  * values. It also repairs old locally seeded "Jordan" profiles on first sign-in. */
 export async function hydrateMyProfileFromAccount(
-  identity: { userId: string; name: string; username?: string | null; bio?: string | null },
+  identity: { userId: string; name: string; username?: string | null; bio?: string | null; pronouns?: string | null },
   k: SocialKeys = K(),
 ): Promise<BuyerSocialProfile> {
   if (identity.userId !== k.userId) {
@@ -222,6 +237,7 @@ export async function hydrateMyProfileFromAccount(
     name: name || (isLegacyDemo ? '' : current.name),
     username: username || (isLegacyDemo ? '' : current.username),
     bio: identity.bio?.trim() || (isLegacyDemo ? '' : current.bio),
+    pronouns: identity.pronouns?.trim() || current.pronouns || '',
     avatarInitials: name ? initialsFor(name) : (isLegacyDemo ? '' : current.avatarInitials),
   };
   await save(k.profile, next);

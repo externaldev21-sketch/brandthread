@@ -964,6 +964,8 @@ export interface LocalUserProfile {
   deletionCancelled?: boolean;
   /** Derived age band (the date of birth is never stored). null = not asked yet. */
   ageBand?: 'under_13' | '13_17' | '18_plus' | null;
+  /** Optional pronouns shown next to the name (users.pronouns). */
+  pronouns?: string | null;
 }
 
 export interface ShopifyImportJob {
@@ -2812,6 +2814,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<{
           userId: string; name: string; username: string | null;
           displayName: string | null; bio: string | null; avatarUrl: string | null;
+          pronouns?: string | null;
           accountType: string; initials: string; color: string; handle: string;
           followersCount: number; followingCount: number; postsCount: number; likesCount?: number;
           isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
