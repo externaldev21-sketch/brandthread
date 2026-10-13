@@ -52,7 +52,8 @@ import { DiscoverSafetyMenu } from '@/components/discover/DiscoverSafetyMenu';
 import { DiscoverBrandCard } from '@/components/discover/DiscoverBrandCard';
 import { DiscoverFeaturedRail } from '@/components/discover/DiscoverFeaturedRail';
 import { DiscoverPersonCard } from '@/components/discover/DiscoverPersonCard';
-import { DiscoverDropRow } from '@/components/discover/DiscoverDropRow';
+import { DiscoverDropCalendarItem } from '@/components/discover/DiscoverDropCalendarItem';
+import { buildDropCalendarItems } from '@/lib/dropCalendar';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { useDiscoveryShelves } from '@/hooks/useDiscoveryShelves';
 import { getFriendSuggestions, muteUser } from '@/services/socialService';
@@ -405,12 +406,12 @@ export default function DiscoverScreen() {
       {filter === 'drops' && (
         <FlatList
           ref={listRef as never}
-          data={drops}
-          keyExtractor={(d) => d.id}
+          data={buildDropCalendarItems(drops)}
+          keyExtractor={(d) => d.key}
           contentContainerStyle={{ paddingTop: SP.md, paddingBottom: barInset + SP.md }}
           ListHeaderComponent={header}
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-          renderItem={({ item }) => <DiscoverDropRow drop={item} />}
+          renderItem={({ item }) => <DiscoverDropCalendarItem item={item} />}
           ListEmptyComponent={dropsLoading ? (
             <ResponsiveContainer style={{ paddingHorizontal: SP.md }}>
               <ListSkeleton rows={4} />

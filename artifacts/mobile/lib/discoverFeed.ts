@@ -19,6 +19,7 @@
  *     lib/previewDiscover.ts fixtures so the grid never looks empty in
  *     ?bt_preview=buyer. Never active outside the dev/preview gate.
  */
+import { mapPublicDropRow, mergeDiscoverDrops } from '@/lib/dropCalendar';
 import { getBlockedUsers, getMutedUsers } from '@/services/socialService';
 import { isPreviewCatalogEnabled } from '@/lib/previewCatalog';
 import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
@@ -285,19 +286,17 @@ export async function composeDiscoverPeople({ getFriendSuggestions }: { getFrien
 
 export async function composeDiscoverDrops({ api }: { api: any }): Promise<DiscoverDrop[]> {
   let drops: DiscoverDrop[] = [];
-  try {
-    const rows = await api.publicDrops.list('upcoming');
-    drops = (Array.isArray(rows) ? rows : []).map((r: any) => ({
-      id: r.id,
-      name: r.name ?? r.title ?? 'Drop',
-      brandName: r.brandName ?? r.sellerDisplayName ?? 'Brand',
-      imageUri: r.imageUri ?? (r.images ?? [])[0],
-      releaseAt: r.releaseAt ?? null,
-      live: !!r.live,
-    }));
-  } catch {
-    // Preview backfill below.
-  }
+  // Live + upcoming for the drops calendar; either section failing keeps the other.
+  const [liveRes, upcomingRes] = await Promise.allSettled([
+    api.publicDrops.list('live'),
+    api.publicDrops.list('upcoming'),
+  ]);
+  const rowsOf = (r: PromiseSettledResult<any>): any[] => (r.status === 'fulfilled' && Array.isArray(r.value) ? r.value : []);
+  drops = mergeDiscoverDrops(
+    rowsOf(liveRes).map((r) => mapPublicDropRow(r, true)),
+    rowsOf(upcomingRes).map((r) => mapPublicDropRow(r, false)),
+  );
+  // Preview backfill below.
   if (drops.length === 0 && isPreviewCatalogEnabled()) drops = getPreviewDrops();
   return drops;
 }
