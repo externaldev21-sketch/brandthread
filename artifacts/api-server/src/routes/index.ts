@@ -163,11 +163,13 @@ import sellerAffiliateRouter from "./seller-affiliate";
 import growthRouter from "./growth";
 import sellerPushBroadcastsRouter from "./seller-push-broadcasts";
 import { sellerGiveawaysRouter, publicGiveawaysRouter } from "./giveaways";
+import appInstallsRouter from "./app-installs";
 
 const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use("/app/installs",    appInstallsRouter); // first-launch install ping (admin funnel), works signed out
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
