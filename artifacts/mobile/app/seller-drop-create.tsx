@@ -620,6 +620,14 @@ export default function SellerDropCreate() {
                 <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }}>Preview</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                style={[styles.secondaryBtn, { borderColor: theme.border }]}
+                onPress={() => router.push((`/drop-waitlist?dropId=${encodeURIComponent(dropId)}`) as never)}
+                testID="drop-waitlist-entry"
+              >
+                <Feather name="message-square" size={16} color={theme.text} />
+                <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }}>Waitlist & countdown</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[styles.secondaryBtn, { borderColor: '#FF3B30' }]}
                 onPress={handleCancelDrop}
                 disabled={cancelling}

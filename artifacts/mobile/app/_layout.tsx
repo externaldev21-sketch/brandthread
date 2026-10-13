@@ -1596,6 +1596,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="giveaway" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drop-create"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drop-preview"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="drop-waitlist"            options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-highlights-manager"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-highlight-stories"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-report"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
