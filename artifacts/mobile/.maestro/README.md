@@ -32,7 +32,7 @@ Run one flow: `maestro test .maestro/flows/refund.yaml -e ORDER_ID_TO_REFUND=<id
 
 ## CI
 
-`.github/workflows/maestro.yml` runs the suite on Maestro Cloud when started
+`docs/ci/maestro.yml` (stored disabled, like the repo's other workflows: copy it to `.github/workflows/` to turn it on) runs the suite on Maestro Cloud when started
 by hand (Actions → **Maestro e2e** → Run workflow) with a link to a simulator
 `.app` zip or an `.apk`. It does nothing until the repository has:
 
