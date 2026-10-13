@@ -8,8 +8,10 @@
  *   POST   /api/product-launches/:productId/alert   notify me at launch
  *   DELETE /api/product-launches/:productId/alert   stop
  * Seller (auth, manager):
- *   GET    /api/product-launches                    my launches with notify-me counts
- *   PUT    /api/product-launches/:productId         schedule / reschedule
+ *   GET    /api/product-launches                    my launches with notify-me counts + readiness summary
+ *   GET    /api/product-launches/best-time?tz=      when my followers are active (weekday x hour, k-anonymous)
+ *   GET    /api/product-launches/:productId/checklist  launch readiness checklist for one product
+ *   PUT    /api/product-launches/:productId         schedule / reschedule (409 LAUNCH_NOT_READY on hard blockers)
  *   DELETE /api/product-launches/:productId         cancel the launch (product becomes purchasable)
  */
 import { Router } from "express";
@@ -18,6 +20,8 @@ import { db, productLaunchAlerts, productLaunches, products } from "@workspace/d
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { isProductLive, validateLaunchAt } from "../lib/productLaunch";
+import { loadFollowerActivity, loadProductLaunchReadiness } from "../lib/productLaunchReadiness";
+import { isValidTimezone } from "../lib/awaySchedule";
 
 const router = Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -44,7 +48,10 @@ router.get("/", requireAuth, teamContext(), async (req, res) => {
     .innerJoin(products, eq(products.id, productLaunches.productId))
     .where(and(eq(products.ownerId, ownerId), isNull(products.deletedAt)))
     .orderBy(asc(productLaunches.launchAt));
-  res.json(rows.map((r) => ({
+  const readiness = await loadProductLaunchReadiness(ownerId, rows.filter((r) => !r.launchedAt).map((r) => r.productId));
+  res.json(rows.map((r) => {
+    const c = readiness.get(r.productId);
+    return {
     productId: r.productId,
     name: r.name,
     imageUrl: Array.isArray(r.images) ? (r.images[0] ?? null) : null,
@@ -53,7 +60,25 @@ router.get("/", requireAuth, teamContext(), async (req, res) => {
     launchedAt: r.launchedAt ? r.launchedAt.toISOString() : null,
     notifyFollowers: r.notifyFollowers,
     alertCount: r.alertCount,
-  })));
+    readiness: c ? { readyCount: c.readyCount, total: c.total, blockers: c.blockers } : null,
+  };
+  }));
+});
+
+// ── Seller insights ───────────────────────────────────────────────────────────
+
+router.get("/best-time", requireAuth, teamContext(), async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const tz = typeof req.query.tz === "string" && isValidTimezone(req.query.tz) ? req.query.tz : "UTC";
+  res.json(await loadFollowerActivity(ownerId, tz));
+});
+
+router.get("/:productId/checklist", requireAuth, teamContext(), async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  if (!isUuid(req.params.productId)) { badId(res); return; }
+  const checklist = (await loadProductLaunchReadiness(ownerId, [req.params.productId])).get(req.params.productId);
+  if (!checklist) { res.status(404).json({ error: "Product not found" }); return; }
+  res.json(checklist);
 });
 
 // ── Public state ──────────────────────────────────────────────────────────────
@@ -145,6 +170,11 @@ router.put("/:productId", requireAuth, teamContext(), requireRole("manager"), as
   }
 
   const notifyFollowers = rawNotify ?? false;
+  const readiness = (await loadProductLaunchReadiness(ownerId, [productId], { launchAt, notifyFollowers })).get(productId);
+  if (readiness && !readiness.canSchedule) {
+    res.status(409).json({ error: "Finish the required steps before scheduling this launch.", code: "LAUNCH_NOT_READY", blockers: readiness.blockers });
+    return;
+  }
   await db
     .insert(productLaunches)
     .values({ productId, launchAt, notifyFollowers })

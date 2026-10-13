@@ -48,6 +48,10 @@ const filled = (value: unknown): boolean =>
 const hasSocial = (links: Record<string, unknown> | null): boolean =>
   !!links && (filled(links.instagram) || filled(links.tiktok));
 
+/** Payouts count as connected only once the Stripe Connect account is active. */
+export const isPayoutsActive = (stripeAccountStatus: string | null): boolean =>
+  stripeAccountStatus === "active";
+
 export function deriveLaunchChecklist(input: LaunchChecklistInput): LaunchChecklist {
   const done: Record<LaunchStepId, boolean> = {
     name_handle: filled(input.brandName) && filled(input.username),
@@ -57,7 +61,7 @@ export function deriveLaunchChecklist(input: LaunchChecklistInput): LaunchCheckl
     first_product: input.productCount > 0,
     preview: input.storePreviewedAt != null,
     publish: input.storePublished,
-    payouts: input.stripeAccountStatus === "active",
+    payouts: isPayoutsActive(input.stripeAccountStatus),
   };
   const steps = LAUNCH_STEP_IDS.map((id) => ({ id, done: done[id] }));
   const doneCount = steps.filter((s) => s.done).length;
