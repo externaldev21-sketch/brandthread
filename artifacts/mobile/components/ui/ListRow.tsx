@@ -26,8 +26,10 @@ export interface ListRowProps {
   /** Renders a round Avatar (photo or initials) in place of `icon`, for people rows. */
   avatar?: { uri?: string | null; name?: string };
   title: string;
+  /** How many lines `title` may wrap to before truncating. Defaults to 2 so long titles and large Dynamic Type sizes wrap instead of cutting off. */
+  titleNumberOfLines?: number;
   subtitle?: string;
-  /** How many lines `subtitle` may wrap to before truncating. Defaults to 1. */
+  /** How many lines `subtitle` may wrap to before truncating. Defaults to 2 so long subtitles and large Dynamic Type sizes wrap instead of cutting off. */
   subtitleNumberOfLines?: number;
   value?: string;
   chevron?: boolean;
@@ -42,7 +44,7 @@ export interface ListRowProps {
 }
 
 export function ListRow({
-  icon, iconColor, avatar, title, subtitle, subtitleNumberOfLines = 1, value, chevron, toggle, right, onPress, disabled, destructive, style, testID,
+  icon, iconColor, avatar, title, titleNumberOfLines = 2, subtitle, subtitleNumberOfLines = 2, value, chevron, toggle, right, onPress, disabled, destructive, style, testID,
 }: ListRowProps) {
   const palette = useColors();
   // Rows get a subtle background highlight instead of a scale — a whole row
@@ -63,7 +65,7 @@ export function ListRow({
         </View>
       )}
       <View style={styles.body}>
-        <Text style={[TYPE_SCALE.body, { fontFamily: FONT.medium, color: titleColor }]} numberOfLines={1} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{title}</Text>
+        <Text style={[TYPE_SCALE.body, { fontFamily: FONT.medium, color: titleColor }]} numberOfLines={titleNumberOfLines} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{title}</Text>
         {subtitle && <Text style={[TYPE_SCALE.footnote, { color: palette.mutedForeground, marginTop: 2 }]} numberOfLines={subtitleNumberOfLines} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{subtitle}</Text>}
       </View>
       {right}
