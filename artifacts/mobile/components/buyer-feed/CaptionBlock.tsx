@@ -28,6 +28,7 @@ import { TranslationLink, useCaptionTranslation } from '@/components/translation
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 import { CaptionSpans } from '@/components/social/CaptionText';
 import { crispPx } from '@/lib/crispPixel';
+import { SoundMarquee } from '@/components/buyer-feed/SoundMarquee';
 
 export interface RepostFriend {
   userId: string;
@@ -54,6 +55,8 @@ export function CaptionBlock({
   onHeightChange,
   topSlot,
   sponsored,
+  soundActive = false,
+  reduceMotion = false,
 }: {
   creator: string;
   verified: boolean;
@@ -87,10 +90,15 @@ export function CaptionBlock({
   topSlot?: React.ReactNode;
   /** Paid promotion (admin-approved boost) served in For You: shows the "Sponsored" label beside the brand name. */
   sponsored?: boolean;
+  /** This page is the one playing: a sound label too long to fit scrolls. */
+  soundActive?: boolean;
+  reduceMotion?: boolean;
 }) {
-  const handleLayout = onHeightChange
-    ? (e: LayoutChangeEvent) => onHeightChange(e.nativeEvent.layout.height)
-    : undefined;
+  const [blockWidth, setBlockWidth] = React.useState(0);
+  const handleLayout = (e: LayoutChangeEvent) => {
+    setBlockWidth(e.nativeEvent.layout.width);
+    onHeightChange?.(e.nativeEvent.layout.height);
+  };
   // Pads each control's real tap area up to 44x44 without changing its
   // visual footprint — see useHitAreaBoost's doc comment. `soundHit` and
   // `repostHit` apply to controls with a painted pill background, so their
@@ -205,7 +213,14 @@ export function CaptionBlock({
       >
         <View style={styles.soundRow}>
           <Icon name="music" size={12} color={`${ON_DARK}E6`} style={styles.iconTextShadow} />
-          <Text style={styles.soundText} numberOfLines={1} ellipsizeMode="tail">{sound}</Text>
+          <SoundMarquee
+            text={sound}
+            active={soundActive}
+            reduceMotion={reduceMotion}
+            textStyle={styles.soundText}
+            // Pill padding (9 + 9), the note glyph (12) and its gap (6).
+            maxWidth={Math.max(0, blockWidth - 36)}
+          />
         </View>
       </TouchableOpacity>
     </Animated.View>
