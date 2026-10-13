@@ -30,7 +30,8 @@ const RATES = { USD: 1, AUD: 1.5021, CAD: 1.3712, CHF: 0.8047, EUR: 0.9187, GBP:
 
 const INTL_ZONE = {
   id: 'zone_intl', sellerId: 'seller', name: 'International', zoneType: 'rest_of_world', countries: [],
-  pricingModel: 'calculated', flatRateCents: 2500, freeAboveCents: null, processingDays: 3, carrierLabel: null,
+  // dev's server never stores 'calculated', so the `before` shot edits the same zone as flat-rate.
+  pricingModel: TAG === 'before' ? 'flat' : 'calculated', flatRateCents: 2500, freeAboveCents: null, processingDays: 3, carrierLabel: null,
   shipsInternationally: true, dutiesHandling: 'ddp', active: true, sortOrder: 1, weightTiers: [],
 };
 const DOMESTIC_ZONE = {
@@ -73,8 +74,8 @@ async function json(context, origin, pattern, body) {
 }
 
 async function setupCommon(context, origin, { currency = 'EUR' } = {}) {
-  await json(context, origin, /\/api\/fx\/rates/, { enabled: true, available: true, base: 'USD', date: '2026-10-12', rates: RATES, fetchedAt: '2026-10-13T00:00:00Z' });
-  await json(context, origin, /\/api\/fx\/display-currency/, (req) => (req.method() === 'PATCH' ? JSON.parse(req.postData() || '{}') : { displayCurrency: currency }));
+  await json(context, origin, /\/fx\/rates/, { enabled: true, available: true, base: 'USD', date: '2026-10-12', rates: RATES, fetchedAt: '2026-10-13T00:00:00Z' });
+  await json(context, origin, /\/fx\/display-currency/, (req) => (req.method() === 'PATCH' ? JSON.parse(req.postData() || '{}') : { displayCurrency: currency }));
   if (currency) await context.addInitScript((code) => { localStorage.setItem('display_currency:v1', code); }, currency);
 }
 
@@ -82,7 +83,8 @@ async function go(page, activity, origin, role, target, extraQuery = '&demo=1', 
   await openScreen(page, activity, origin, role, target, { extraQuery });
   for (let attempt = 0; attempt < 3; attempt++) {
     await page.waitForTimeout(1500);
-    if (!readyTestId || await page.getByTestId(readyTestId).first().isVisible().catch(() => false)) break;
+    const onTarget = await page.evaluate((p) => location.pathname === p, target.split('?')[0]);
+    if (onTarget && (!readyTestId || await page.getByTestId(readyTestId).first().isVisible().catch(() => false))) break;
     await page.evaluate((url) => {
       history.pushState(history.state, '', url);
       window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
@@ -142,33 +144,36 @@ const SHOTS = {
     await scrollTo(page, 'checkout-price-breakdown');
     await page.waitForTimeout(600);
   } },
-  'shipping-zone-editor': { role: 'seller', run: async ({ context, page, activity, origin }) => {
-    await json(context, origin, /\/api\/shipping-zones\/settings/, { shipFromCountry: 'US', liveRatesAvailable: true, shipFromPostalCode: '10001', dutiesAtCheckout: true });
-    await json(context, origin, /\/api\/shipping-zones(\?|$)/, [DOMESTIC_ZONE, INTL_ZONE]);
-    await go(page, activity, origin, 'seller', '/shipping');
+  // The signed-out seller preview blocks every API call (lib/api.ts
+  // rejectSellerPreviewApiRequest), so seller screens are opened in the
+  // buyer preview session, where the fake API answers.
+  'shipping-zone-editor': { role: 'buyer', run: async ({ context, page, activity, origin }) => {
+    await json(context, origin, /\/shipping-zones\/settings/, { shipFromCountry: 'US', liveRatesAvailable: true, shipFromPostalCode: '10001', dutiesAtCheckout: true });
+    await json(context, origin, /\/shipping-zones(\?|$)/, [DOMESTIC_ZONE, INTL_ZONE]);
+    await go(page, activity, origin, 'buyer', '/shipping');
     const edits = page.getByText('Edit', { exact: true });
     await edits.nth(1).click().catch(async () => { await edits.first().click(); });
     await page.waitForTimeout(900);
     await page.getByText('Pricing', { exact: true }).first().evaluate((el) => el.scrollIntoView({ block: 'start' })).catch(() => {});
     await page.waitForTimeout(500);
   } },
-  'shipping-zone-duties': { role: 'seller', run: async ({ context, page, activity, origin }) => {
-    await json(context, origin, /\/api\/shipping-zones\/settings/, { shipFromCountry: 'US', liveRatesAvailable: true, shipFromPostalCode: '10001', dutiesAtCheckout: true });
-    await json(context, origin, /\/api\/shipping-zones(\?|$)/, [DOMESTIC_ZONE, INTL_ZONE]);
-    await go(page, activity, origin, 'seller', '/shipping');
+  'shipping-zone-duties': { role: 'buyer', run: async ({ context, page, activity, origin }) => {
+    await json(context, origin, /\/shipping-zones\/settings/, { shipFromCountry: 'US', liveRatesAvailable: true, shipFromPostalCode: '10001', dutiesAtCheckout: true });
+    await json(context, origin, /\/shipping-zones(\?|$)/, [DOMESTIC_ZONE, INTL_ZONE]);
+    await go(page, activity, origin, 'buyer', '/shipping');
     const edits = page.getByText('Edit', { exact: true });
     await edits.nth(1).click().catch(async () => { await edits.first().click(); });
     await page.waitForTimeout(900);
     await page.getByText('Duties & customs', { exact: true }).first().evaluate((el) => el.scrollIntoView({ block: 'center' })).catch(() => {});
     await page.waitForTimeout(500);
   } },
-  'taxes-duties': { role: 'seller', run: async ({ context, page, activity, origin }) => {
-    await json(context, origin, /\/api\/taxes\/status/, {
+  'taxes-duties': { role: 'buyer', run: async ({ context, page, activity, origin }) => {
+    await json(context, origin, /\/taxes\/status/, {
       stripeTaxEnabled: false, provider: 'stripe_tax', providerConfigured: true, providerStatus: 'configured',
       automaticTaxAtCheckout: true, complianceNote: '', chargeShippingTax: false, chargeVat: false, collectDuties: false,
       dutiesAtCheckout: true, dutiesProvider: 'zonos',
     });
-    await go(page, activity, origin, 'seller', '/taxes-duties');
+    await go(page, activity, origin, 'buyer', '/taxes-duties');
     await page.getByText('International duties', { exact: true }).first().evaluate((el) => el.scrollIntoView({ block: 'center' })).catch(() => {});
     await page.waitForTimeout(500);
   } },
@@ -190,6 +195,7 @@ async function main() {
         console.log(`wrote ${file}`);
       } catch (error) {
         console.warn(`skipped ${TAG}-${name}: ${String(error.message).split('\n')[0]}`);
+        if (process.env.F7_DEBUG_DIR) await page.screenshot({ path: path.join(process.env.F7_DEBUG_DIR, `fail-${TAG}-${name}.png`) }).catch(() => {});
       } finally {
         await context.close();
       }
