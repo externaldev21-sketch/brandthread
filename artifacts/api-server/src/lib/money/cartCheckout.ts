@@ -35,6 +35,7 @@ import { effectiveUnitPrice } from "../pricing/salesRuntime";
 import { CheckoutPlanError, resolveChargePlan } from "./checkoutPlan";
 import { destinationApplicationFeeCents } from "./fees";
 import { resolveSellerPlatformFeeBps } from "../planPerks";
+import { loadSellerTaxPolicy, type SellerTaxPolicy } from "./sellerTaxPolicy";
 
 export const CART_CHECKOUT_KIND = "cart_checkout";
 /** Stripe's minimum USD card charge. */
@@ -321,14 +322,21 @@ export function spreadDiscount(lineAmounts: number[], discountCents: number): nu
  * registrations, their liability). Throws CartCheckoutError TAX_UNAVAILABLE
  * when Stripe Tax can't calculate for this seller; the app then uses hosted
  * Checkout instead of charging without tax.
+ *
+ * Honours the seller's Taxes and duties settings (lib/money/sellerTaxPolicy.ts):
+ * automatic tax off means no tax and no Stripe call; tax on shipping off
+ * leaves shipping out of the calculation.
  */
 export async function calculateGroupTax(
   stripeClient: Pick<Stripe, "tax">,
   group: PricedGroup,
   shipping: CartShipping,
+  policy?: SellerTaxPolicy,
 ): Promise<{ taxCents: number; calculationId: string | null }> {
+  const taxPolicy = policy ?? await loadSellerTaxPolicy(group.sellerId);
+  if (!taxPolicy.collectTax) return { taxCents: 0, calculationId: null };
   const lineAmounts = spreadDiscount(group.items.map((i) => i.priceCents * i.quantity), group.merchandiseDiscountCents);
-  const taxableShipping = Math.max(0, group.shippingCents - group.shippingDiscountCents);
+  const taxableShipping = taxPolicy.taxShipping ? Math.max(0, group.shippingCents - group.shippingDiscountCents) : 0;
   if (lineAmounts.every((amount) => amount <= 0) && taxableShipping <= 0) return { taxCents: 0, calculationId: null };
   try {
     const calculation = await stripeClient.tax.calculations.create({

@@ -41,7 +41,7 @@ vi.mock("../../../middlewares/requireAuth", () => ({
   },
 }));
 
-import { db, checkoutSessions, orders, productVariants, shippingRates } from "@workspace/db";
+import { db, checkoutSessions, orders, productVariants, sellerTaxConfig, shippingRates } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { fake } from "./fakeStripe";
 import { logger } from "../../logger";
@@ -110,10 +110,17 @@ function body(groups: Array<{ items: Array<{ variantId: string; productId: strin
   };
 }
 
-/** Two sellers, one buyer, one product each (stock 5), $12 flat shipping at seller A. */
-async function seedCart(tag: string) {
+/**
+ * Two sellers, one buyer, one product each (stock 5), $12 flat shipping at
+ * seller A. Both sellers collect tax, shipping included (Taxes and duties),
+ * unless `tax` says otherwise.
+ */
+async function seedCart(tag: string, tax: { enabled: boolean; shipping: boolean } = { enabled: true, shipping: true }) {
   const sellerA = await seedSeller(`${tag}-a`);
   const sellerB = await seedSeller(`${tag}-b`);
+  await db.insert(sellerTaxConfig).values([sellerA, sellerB].map((sellerId) => ({
+    sellerId, stripeTaxEnabled: tax.enabled, chargeShippingTax: tax.shipping,
+  })));
   const buyer = await seedBuyer(tag);
   const productA = await seedProduct(sellerA, { priceCents: 5_000, stock: 5 });
   const productB = await seedProduct(sellerB, { priceCents: 2_500, stock: 5 });
@@ -241,6 +248,24 @@ describe("POST /api/buyer/checkout/payment-intent", () => {
     expect([one.status, two.status].sort()).toEqual([200, 409]);
     expect([one.body.code, two.body.code]).toContain("OUT_OF_STOCK");
     expect(await stockOf(product.variantId)).toBe(0);
+  });
+
+  it("collects no tax and calls no Stripe Tax when the sellers turned automatic tax off", async () => {
+    const cart = await seedCart("no-tax", { enabled: false, shipping: true });
+    const res = await call(app.base, "POST", "/api/buyer/checkout/payment-intent", cart.buyer, body(cart.groups));
+    expect(res.status).toBe(200);
+    expect(res.body.groups.map((g: any) => g.taxCents)).toEqual([0, 0]);
+    expect(res.body.amountCents).toBe(10_000 + 1_200 + 2_500);
+    expect(fake.state.taxCalculations).toHaveLength(0);
+  });
+
+  it("leaves shipping out of the taxable amount unless the seller charges tax on shipping", async () => {
+    const cart = await seedCart("no-ship-tax", { enabled: true, shipping: false });
+    const res = await call(app.base, "POST", "/api/buyer/checkout/payment-intent", cart.buyer, body(cart.groups));
+    expect(res.status).toBe(200);
+    const sellerACalc = fake.state.taxCalculations.find((c) => c.options.stripeAccount.includes("no_ship_tax_a"));
+    expect(sellerACalc?.params.shipping_cost).toBeUndefined();
+    expect(res.body.groups[0]).toMatchObject({ shippingCents: 1_200, taxCents: Math.round(10_000 * 0.08) });
   });
 
   it("sends the app to hosted Checkout when Stripe Tax can't calculate", async () => {

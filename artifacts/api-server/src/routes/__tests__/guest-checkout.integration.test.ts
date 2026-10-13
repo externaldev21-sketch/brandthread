@@ -3,7 +3,7 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
-import { db, checkoutSessions, products, productVariants, users } from "@workspace/db";
+import { db, checkoutSessions, products, productVariants, sellerTaxConfig, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 process.env.SESSION_SECRET ||= "guest-checkout-integration-test-secret";
@@ -71,6 +71,7 @@ beforeAll(async () => {
     stripeAccountId: `acct_guest_${suffix}`,
     stripeAccountStatus: "active",
   }).returning();
+  await db.insert(sellerTaxConfig).values({ sellerId, stripeTaxEnabled: true });
   const [product] = await db.insert(products).values({
     ownerId: seller.clerkId,
     name: "Guest checkout test product",
@@ -99,6 +100,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await db.delete(checkoutSessions).where(eq(checkoutSessions.guestEmail, guestEmail));
   await db.delete(products).where(eq(products.id, productId));
+  await db.delete(sellerTaxConfig).where(eq(sellerTaxConfig.sellerId, sellerId));
   await db.delete(users).where(eq(users.clerkId, sellerId));
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
@@ -163,6 +165,28 @@ describe("guest checkout", () => {
       allowed_countries: ["US"],
     });
     expect(fakeStripe.creates[0].params.line_items[0].price_data.tax_behavior).toBe("exclusive");
+  });
+
+  it("collects no tax when the seller turned automatic tax off", async () => {
+    await db.update(sellerTaxConfig).set({ stripeTaxEnabled: false }).where(eq(sellerTaxConfig.sellerId, sellerId));
+    try {
+      const result = await post("/api/guest/checkout/session", {
+        items: [{ productId, variantId, quantity: 1 }],
+        contactEmail: guestEmail,
+        contactPhone: "+1 503 555 0100",
+        shippingAddress: {
+          name: "Guest Buyer", street: "123 Test Street", city: "Portland", state: "OR", zip: "97205", country: "US",
+          phone: "+1 503 555 0100",
+        },
+        successUrl: "https://brandthread.test/success",
+        cancelUrl: "https://brandthread.test/cancel",
+        clientIdempotencyKey: `guest-tax-off-${suffix}`,
+      });
+      expect(result.status).toBe(201);
+      expect(fakeStripe.creates[fakeStripe.creates.length - 1].params.automatic_tax).toEqual({ enabled: false });
+    } finally {
+      await db.update(sellerTaxConfig).set({ stripeTaxEnabled: true }).where(eq(sellerTaxConfig.sellerId, sellerId));
+    }
   });
 
   it("rejects a soft-deleted product before creating a Stripe session", async () => {

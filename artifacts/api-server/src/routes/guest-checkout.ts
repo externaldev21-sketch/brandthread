@@ -14,6 +14,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { mapStripeError, requireStripe } from "../lib/stripe";
 import { resolveSellerPlatformFeeBps } from "../lib/planPerks";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
+import { hostedAutomaticTax, loadSellerTaxPolicy, shippingLineTaxCode } from "../lib/money/sellerTaxPolicy";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { z } from "@workspace/api-zod";
@@ -241,11 +242,14 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       shippingCents = !rate || (rate.freeAboveCents != null && subtotalCents >= rate.freeAboveCents) ? 0 : rate.flatRateCents;
       shippingLineName = rate?.name ?? "Shipping";
     }
+    // The seller's Taxes and duties settings (lib/money/sellerTaxPolicy.ts).
+    const taxPolicy = await loadSellerTaxPolicy(sellerId);
+    const shippingTaxCode = shippingLineTaxCode(taxPolicy);
     if (shippingCents) lineItems.push({ price_data: {
       currency: "usd",
       unit_amount: shippingCents,
       tax_behavior: "exclusive",
-      product_data: { name: shippingLineName },
+      product_data: { name: shippingLineName, ...(shippingTaxCode ? { tax_code: shippingTaxCode } : {}) },
     }, quantity: 1 });
     const platformFeeBps = await resolveSellerPlatformFeeBps(sellerId);
     const money = paymentIntentMoney({
@@ -297,10 +301,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: lineItems,
-      automatic_tax: {
-        enabled: true,
-        liability: { type: "account", account: seller.stripeAccountId },
-      },
+      automatic_tax: hostedAutomaticTax(taxPolicy, seller.stripeAccountId),
       shipping_address_collection: { allowed_countries: [shippingAddressValue.country] },
       success_url: successUrl, cancel_url: cancelUrl,
       customer_email: email,

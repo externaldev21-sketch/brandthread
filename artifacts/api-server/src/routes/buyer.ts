@@ -18,6 +18,7 @@ import { resolveSellerPlatformFeeBps } from "../lib/planPerks";
 import { buildBuyerDelivery, deliveryColumns, loadBuyerDelivery } from "../lib/delivery/buyerView";
 import { recordDelivery } from "../lib/delivery/deliveryState";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
+import { hostedAutomaticTax, loadSellerTaxPolicy, shippingLineTaxCode } from "../lib/money/sellerTaxPolicy";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { refundOrder, RefundError } from "../lib/money/refunds";
 import { notifyBuyerOrderCancelled, notifySellerOrderCancelledByBuyer } from "../lib/orderNotifications";
@@ -915,13 +916,17 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         : configuredShippingRate.flatRateCents;
       shippingLineName = configuredShippingRate?.name ?? "Shipping";
     }
+    // The seller's Taxes and duties settings decide whether Stripe Tax runs
+    // and whether shipping is taxed (lib/money/sellerTaxPolicy.ts).
+    const taxPolicy = await loadSellerTaxPolicy(sellerId);
+    const shippingTaxCode = shippingLineTaxCode(taxPolicy);
     if (shippingCents > 0) {
       lineItems.push({
         price_data: {
           currency: "usd",
           unit_amount: shippingCents,
           tax_behavior: "exclusive",
-          product_data: { name: shippingLineName },
+          product_data: { name: shippingLineName, ...(shippingTaxCode ? { tax_code: shippingTaxCode } : {}) },
         },
         quantity: 1,
       });
@@ -1169,11 +1174,9 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         line_items: lineItems,
         // Stripe remains the final authority for tax. This replaces the old
         // client-side state-rate table and keeps the charged tax aligned with
-        // the seller's Stripe Tax configuration.
-        automatic_tax: {
-          enabled: true,
-          liability: { type: "account", account: seller.stripeAccountId },
-        },
+        // the seller's Stripe Tax configuration. Off when the seller turned
+        // automatic tax off on Taxes and duties.
+        automatic_tax: hostedAutomaticTax(taxPolicy, seller.stripeAccountId),
         shipping_address_collection: {
           allowed_countries: [validatedShipping?.country ?? "US"],
         },

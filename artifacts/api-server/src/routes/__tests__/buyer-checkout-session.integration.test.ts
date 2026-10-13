@@ -10,7 +10,7 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
-import { db, checkoutSessions, drops, productVariants, products, users } from "@workspace/db";
+import { db, checkoutSessions, drops, productVariants, products, sellerTaxConfig, shippingRates, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const TEST_SUFFIX = crypto.randomBytes(6).toString("hex");
@@ -206,6 +206,8 @@ beforeEach(async () => {
     stripeAccountId: SELLER_ACCOUNT_ID,
     stripeAccountStatus: "active",
   });
+  // The seller turned automatic tax on (Taxes and duties).
+  await db.insert(sellerTaxConfig).values({ sellerId: SELLER_ID, stripeTaxEnabled: true });
   await seedProduct();
 });
 
@@ -218,6 +220,8 @@ afterEach(async () => {
   productId = "";
   variantId = "";
 
+  await db.delete(sellerTaxConfig).where(eq(sellerTaxConfig.sellerId, SELLER_ID));
+  await db.delete(shippingRates).where(eq(shippingRates.sellerId, SELLER_ID));
   await db.delete(users).where(eq(users.clerkId, SELLER_ID));
   await db.delete(users).where(eq(users.clerkId, BUYER_ID));
 });
@@ -371,6 +375,37 @@ describe("POST /api/buyer/checkout/session", () => {
       platformFeeCents: 250,
       processingFeeEstimateCents: 175,
     });
+  });
+
+  it("collects no tax when the seller turned automatic tax off", async () => {
+    await db.update(sellerTaxConfig).set({ stripeTaxEnabled: false }).where(eq(sellerTaxConfig.sellerId, SELLER_ID));
+    const result = await postCheckout(checkoutBody());
+    expect(result.status).toBe(200);
+    expect(fakeStripe.sessionCreates[0].params.automatic_tax).toEqual({ enabled: false });
+  });
+
+  it("collects no tax for a seller who never set up taxes", async () => {
+    await db.delete(sellerTaxConfig).where(eq(sellerTaxConfig.sellerId, SELLER_ID));
+    const result = await postCheckout(checkoutBody());
+    expect(result.status).toBe(200);
+    expect(fakeStripe.sessionCreates[0].params.automatic_tax).toEqual({ enabled: false });
+  });
+
+  it("marks shipping nontaxable unless the seller charges tax on shipping", async () => {
+    await db.insert(shippingRates).values({ id: crypto.randomUUID(), sellerId: SELLER_ID, name: "Standard", flatRateCents: 700, active: true });
+    const off = await postCheckout(checkoutBody());
+    expect(off.status).toBe(200);
+    const shippingOff = fakeStripe.sessionCreates[0].params.line_items.find((l: any) => l.price_data.product_data.name === "Standard");
+    expect(shippingOff.price_data.product_data.tax_code).toBe("txcd_00000000");
+
+    await db.delete(checkoutSessions).where(eq(checkoutSessions.buyerId, BUYER_ID));
+    await db.update(sellerTaxConfig).set({ chargeShippingTax: true }).where(eq(sellerTaxConfig.sellerId, SELLER_ID));
+    const on = await postCheckout(checkoutBody());
+    expect(on.status).toBe(200);
+    const shippingOn = fakeStripe.sessionCreates[1].params.line_items.find((l: any) => l.price_data.product_data.name === "Standard");
+    expect(shippingOn.price_data.product_data.tax_code).toBe("txcd_92010001");
+    // Goods keep the seller's default tax code.
+    expect(fakeStripe.sessionCreates[1].params.line_items[0].price_data.product_data.tax_code).toBeUndefined();
   });
 
   it("holds a preorder on the platform instead of paying the seller directly", async () => {
