@@ -16,6 +16,7 @@ import commerceRouter from "./commerce";
 import insightsRouter from "./insights";
 import growthRouter from "./growth";
 import accessRouter from "./access";
+import killSwitchesRouter from "./killSwitches";
 
 const router = Router();
 router.use(requireAuth);
@@ -34,5 +35,6 @@ router.use(commerceRouter);
 router.use(insightsRouter);
 router.use(growthRouter);
 router.use("/access", accessRouter); // invite-only launch waitlist
+router.use(killSwitchesRouter); // Live / Payments / AI kill switches
 
 export default router;

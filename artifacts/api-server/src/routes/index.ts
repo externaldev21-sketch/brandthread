@@ -163,11 +163,13 @@ import sellerAffiliateRouter from "./seller-affiliate";
 import growthRouter from "./growth";
 import sellerPushBroadcastsRouter from "./seller-push-broadcasts";
 import { sellerGiveawaysRouter, publicGiveawaysRouter } from "./giveaways";
+import { killSwitchGate } from "../lib/killSwitches";
 
 const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use(killSwitchGate); // Live / Payments / AI kill switches (Admin → Kill switches); write entry points only
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
