@@ -24,6 +24,8 @@ import { StatusBadge, PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { Product } from '@/services/productTypes';
 import { formatCents, integerPercent } from '@/lib/money';
+import { SalesFlagBadge } from '@/components/products/SalesFlagBadge';
+import type { SalesFlag } from '@/lib/productSalesFlags';
 
 export function getCategoryColors(category: string, theme: AppThemePreset): readonly [string, string] {
   if (category === 'T-shirt' || category === 'Sweatshirt') return [theme.accent, theme.secondary];
@@ -56,12 +58,14 @@ interface ProductCardProps {
    *  specifically (not the rest of the card) — same nested-pressable-inside-
    *  the-card pattern already used by the "more" button below. */
   onEditStock: (product: Product) => void;
+  /** Best seller / slow mover over the last 30 days (GET /api/products/sales-flags). */
+  salesFlag?: SalesFlag | null;
 }
 
 // Memoized with stable handlers so a recycled card only re-renders when its
 // own product changes, not on every search keystroke or stats refresh.
 export const ProductCard = React.memo(function ProductCard({
-  product, width, onPress, onPressIn, onMore, onQuickArchive, onQuickDelete, onEditStock,
+  product, width, onPress, onPressIn, onMore, onQuickArchive, onQuickDelete, onEditStock, salesFlag,
 }: ProductCardProps) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
@@ -201,6 +205,7 @@ export const ProductCard = React.memo(function ProductCard({
                 <Text style={[s.stock, { color: stockColor }]}>{stockLabel}</Text>
               </PressableScale>
             )}
+            <SalesFlagBadge flag={salesFlag} />
           </View>
         </View>
       </Swipeable>

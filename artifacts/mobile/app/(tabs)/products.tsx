@@ -35,6 +35,8 @@ import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_PRODUCTS_GESTURE } from '@/lib/firstRunTips/content';
+import { previewSalesFlags, type SalesFlagMap } from '@/lib/productSalesFlags';
+import { getProductSalesFlags } from '@/services/productSalesFlagsService';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -459,6 +461,7 @@ export default function ProductsScreen() {
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [salesFlags, setSalesFlags] = useState<SalesFlagMap>({});
 
   const showPreviewOnlyFeedback = useCallback(() => {
     Alert.alert('Sign in required', 'Sign in to manage products.');
@@ -513,6 +516,7 @@ export default function ProductsScreen() {
           || product.category.toLowerCase().includes(query)),
       );
       setProducts(filtered);
+      setSalesFlags(previewSalesFlags(allProducts));
       setStats(getPreviewProductStats(allProducts));
       setLoading(false);
       return;
@@ -532,6 +536,7 @@ export default function ProductsScreen() {
         return;
       }
       setProducts(Array.isArray(result) ? result : []);
+      getProductSalesFlags().then(setSalesFlags, () => {});
       await loadStats();
     } catch {
       setProducts([]);
@@ -750,9 +755,10 @@ export default function ProductsScreen() {
         onQuickArchive={handleQuickArchive}
         onQuickDelete={handleDelete}
         onEditStock={openStockEditor}
+        salesFlag={salesFlags[item.id]}
       />
     </View>
-  ), [openProduct, onProductPressIn, openActionSheet, openStockEditor, cardWidth, gridGap]);
+  ), [openProduct, onProductPressIn, openActionSheet, openStockEditor, cardWidth, gridGap, salesFlags]);
 
   const keyExtractor = useCallback((item: Product) => item.id, []);
 
@@ -870,6 +876,7 @@ export default function ProductsScreen() {
           data={sortedProducts}
           keyExtractor={keyExtractor}
           renderItem={renderProduct}
+          extraData={salesFlags}
           numColumns={gridColumns}
           key={`cols-${gridColumns}`}
           ListHeaderComponent={ListHeader}

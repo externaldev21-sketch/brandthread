@@ -107,11 +107,16 @@ router.get("/products", async (req, res) => {
   const limit = Math.min(MAX_BULK_PRODUCTS, Math.max(1, Number.parseInt(String(req.query.limit ?? MAX_BULK_PRODUCTS), 10) || MAX_BULK_PRODUCTS));
   const offset = Math.max(0, Number.parseInt(String(req.query.offset ?? 0), 10) || 0);
   const escaped = q.replace(/[\\%_]/g, (c) => `\\${c}`);
+  // A "collection" is a product category or tag name, matched case-insensitively
+  // — the same definition collection sales use (lib/pricing/sales.ts
+  // saleAppliesTo; names listed by GET /api/sales/collections).
+  const collection = typeof req.query.collection === "string" ? req.query.collection.trim().toLowerCase().slice(0, 120) : "";
 
   const where = and(
     eq(products.ownerId, ownerId),
     isNull(products.deletedAt),
     status === "all" ? undefined : eq(products.status, status),
+    collection ? sql`(lower(trim(${products.category})) = ${collection} or exists (select 1 from json_array_elements_text(${products.tags}) t where lower(trim(t)) = ${collection}))` : undefined,
     q ? or(ilike(products.name, `%${escaped}%`), sql`exists (select 1 from ${productVariants} v where v.product_id = ${products.id} and v.sku ilike ${`%${escaped}%`})`) : undefined,
   );
 

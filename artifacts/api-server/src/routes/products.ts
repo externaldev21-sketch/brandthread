@@ -14,6 +14,7 @@ import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
 import { afterStockChange } from "../lib/stockRules";
 import { normalizeUploadedImage } from "../lib/productImageResize";
+import { salesFlagsForSeller } from "../lib/productSalesFlagsQuery";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -263,6 +264,19 @@ router.post("/", requireRole("manager"), async (req, res) => {
   if (product.status === "active") void notifyNewProduct({ productId: product.id });
 
   res.status(201).json(product);
+});
+
+// GET /api/products/sales-flags — { [productId]: "best_seller" | "slow_mover" }
+// for the Products list badges; unflagged products are omitted. Rules live in
+// lib/productSalesFlags.ts. Registered before /:id so it is not read as an id.
+router.get("/sales-flags", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  try {
+    res.json(await salesFlagsForSeller(ownerId));
+  } catch (err) {
+    req.log.error({ err }, "Failed to load product sales flags");
+    res.status(500).json({ error: "Could not load sales flags" });
+  }
 });
 
 // GET /api/products/:id
