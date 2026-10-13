@@ -101,6 +101,19 @@ function subscribe(listener: () => void) {
 
 const getSnapshot = () => offline;
 
+/**
+ * Non-React subscription to the same connectivity flag, for app-wide syncing
+ * (TanStack Query's onlineManager, replaying queued offline actions).
+ * Fires with the new value whenever it flips. Returns an unsubscribe.
+ */
+export function subscribeConnectivity(listener: (isOffline: boolean) => void): () => void {
+  return subscribe(() => listener(offline));
+}
+
+export function isOfflineNow(): boolean {
+  return offline;
+}
+
 export function useIsOffline(): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }

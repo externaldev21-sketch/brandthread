@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = new Map<string, string>();
+vi.mock('expo-constants', () => ({ default: { expoConfig: { version: '1.0.0' } } }));
+
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
     getItem: vi.fn(async (key: string) => store.get(key) ?? null),
@@ -39,8 +41,8 @@ describe('feedPostsCache: per-account scoping', () => {
   it('persists to AsyncStorage under a scoped key, not a shared device-wide one', () => {
     initFeedPostsCache('user-a');
     setCachedFeedPosts('for-you', [{ id: 'post-1' }]);
-    expect(store.has('bt_feed_posts_cache_v1_user-a:for-you')).toBe(true);
-    expect(store.has('bt_feed_posts_cache_v1_for-you')).toBe(false);
+    expect(store.has('bt_feed_posts_cache_v1_1@1.0.0:user-a:for-you')).toBe(true);
+    expect(store.has('bt_feed_posts_cache_v1_1@1.0.0:for-you')).toBe(false);
   });
 
   it('ignores an empty/non-array write (nothing worth caching)', () => {
@@ -66,12 +68,12 @@ describe('feedPostsCache: blocking purges the blocked author', () => {
     await purgeAuthorFromFeedPostsCache('blocked');
     expect(getCachedFeedPosts('for-you')).toEqual([{ id: '2', sellerId: 'ok' }]);
     expect(getCachedFeedPosts('following')).toEqual([]);
-    const onDisk = JSON.parse(store.get('bt_feed_posts_cache_v1_user-a:for-you') ?? '[]');
+    const onDisk = JSON.parse(store.get('bt_feed_posts_cache_v1_1@1.0.0:user-a:for-you') ?? '[]');
     expect(onDisk).toEqual([{ id: '2', sellerId: 'ok' }]);
   });
 
   it('cleans a disk-only cache that has not been hydrated this session', async () => {
-    store.set('bt_feed_posts_cache_v1_user-a:for-you', JSON.stringify([{ id: '1', sellerId: 'blocked' }, { id: '2', sellerId: 'ok' }]));
+    store.set('bt_feed_posts_cache_v1_1@1.0.0:user-a:for-you', JSON.stringify([{ id: '1', sellerId: 'blocked' }, { id: '2', sellerId: 'ok' }]));
     await purgeAuthorFromFeedPostsCache('blocked');
     expect(await hydrateFeedPostsCache('for-you')).toEqual([{ id: '2', sellerId: 'ok' }]);
   });

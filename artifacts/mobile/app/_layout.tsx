@@ -63,6 +63,10 @@ import { initOrderService } from '@/services/orderService';
 import { initAnalyticsService } from '@/services/analyticsService';
 import { initTabDataCache } from '@/lib/tabDataCache';
 import { initFeedPostsCache } from '@/lib/feedPostsCache';
+import { initEngagementRetryQueue } from '@/lib/engagementRetryQueue';
+import { clearUserLocalData } from '@/lib/userLocalData';
+import { startOfflineSync } from '@/lib/offlineSync';
+import { cacheStamp } from '@/lib/cacheVersion';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { initBuyerProfile } from '@/lib/buyerProfile';
 import { WebAppShell } from '@/components/web/WebAppShell';
@@ -554,6 +558,9 @@ if (Platform.OS !== 'web') {
 }
 
 SplashScreen.preventAutoHideAsync();
+
+// Queries pause/resume with connectivity; queued offline taps replay on reconnect.
+startOfflineSync();
 
 // Paint the native root window the same dark default as app.json's splash
 // background (#0A0A0B) immediately at module load — before RuntimeThemeShell
@@ -1067,6 +1074,9 @@ function ServiceConfigurer() {
       // must be dropped explicitly or the previous account's plan tier would
       // gate features for the next signed-in account.
       invalidatePlanCache();
+      // Explicit sign-out (not a switch): the person is leaving, so their
+      // cached orders/inbox/profile/feed and queued offline taps go too.
+      if (newUserId === null) clearUserLocalData(oldUserId).catch(() => {});
     }
     prevUserIdRef.current = newUserId;
     // The shared TanStack queryClient (lib/queryClient.ts) and the two
@@ -1081,6 +1091,7 @@ function ServiceConfigurer() {
     setQueryKeyScope(newUserId);
     initTabDataCache(newUserId);
     initFeedPostsCache(newUserId);
+    initEngagementRetryQueue(newUserId);
     initSocialService(newUserId);
     initCartService(newUserId);
     initDesignService(newUserId);
@@ -1737,7 +1748,7 @@ function RootLayout() {
       <ErrorBoundary>
         <PersistQueryClientProvider
           client={queryClient}
-          persistOptions={{ persister: queryPersister, maxAge: 24 * 60 * 60_000 }}
+          persistOptions={{ persister: queryPersister, maxAge: 24 * 60 * 60_000, buster: cacheStamp() }}
         >
           <GestureHandlerRootView style={{ flex: 1 }}>
           <KeyboardProvider>
