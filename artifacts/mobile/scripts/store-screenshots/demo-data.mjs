@@ -1360,10 +1360,25 @@ export function respond({ method, path, query, role, options = {} }) {
     : [];
   if (p === '/finance/balance') return options.fresh
     ? { available: { amount: 0, currency: 'usd', formatted: '$0.00' }, pending: { amount: 0, currency: 'usd', formatted: '$0.00' }, connected: false, payoutsEnabled: false, bankConnected: false, processingCashout: null }
-    : { available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' }, pending: { amount: 62740, currency: 'usd', formatted: '$627.40' }, connected: true, payoutsEnabled: true, bankConnected: true, processingCashout: null };
+    : { available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' }, pending: { amount: 62740, currency: 'usd', formatted: '$627.40' }, inTransit: { amount: 41230, currency: 'usd', formatted: '$412.30' }, connected: true, payoutsEnabled: true, bankConnected: true, processingCashout: null };
   if (p === '/finance/payouts') return { payouts: options.fresh ? [] : [
     { id: 'po_demo_1', arrivalDate: DEMO_NOW, formatted: '$412.30', status: 'paid', destination: { last4: '4242' } },
   ] };
+  if (p === '/finance/payouts/po_demo_1') {
+    const iso = new Date(DEMO_NOW).toISOString();
+    const m = (amount) => ({ amount, formatted: `${amount < 0 ? '-' : ''}$${(Math.abs(amount) / 100).toFixed(2)}` });
+    return {
+      connected: true,
+      payout: { id: 'po_demo_1', amount: 41230, currency: 'usd', formatted: '$412.30', status: 'paid', method: 'standard', automatic: true,
+        arrivalDate: iso, created: iso, failureCode: null, failureMessage: null, destination: { last4: '4242', brand: null }, instantFee: null },
+      breakdown: { lines: { sales: m(45900), platformFee: m(-2295), stripeFee: m(-1375), refunds: m(-1000), disputes: m(0), holds: m(0), adjustments: m(0) },
+        net: m(41230), reconciled: true, remainder: m(0), transactionCount: 4, truncated: false },
+      orders: [
+        { orderId: 'demo-order-1', orderNumber: 'BT-10421', buyerName: 'Maya Chen', total: 28900, fee: 0, net: 26010, createdAt: iso },
+        { orderId: 'demo-order-2', orderNumber: 'BT-10418', total: 16000, fee: 0, net: 15220, createdAt: iso },
+      ],
+    };
+  }
   if (p === '/finance/summary') {
     const zero = { amount: 0, formatted: '$0.00' };
     return {

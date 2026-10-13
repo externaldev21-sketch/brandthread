@@ -18,6 +18,7 @@ import { hasPayoutsAccess, isManagerRole } from '@/lib/roleError';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { breakdownRows, fmtDate, payoutStatusLabel, type PayoutDetail } from '@/lib/payoutScheduleView';
+import { PayoutOrdersSection } from '@/components/payouts/PayoutOrdersSection';
 
 const line = (amount: number) => ({
   amount,
@@ -34,6 +35,10 @@ function demoDetail(id: string): PayoutDetail {
       },
       net: line(101_610), reconciled: true, remainder: line(0), transactionCount: 9, truncated: false,
     },
+    orders: [
+      { orderId: 'preview-seller-order-01', orderNumber: 'BT-20311', total: 64_000, fee: 0, net: 57_390, createdAt: '2026-09-24T15:00:00.000Z' },
+      { orderId: 'preview-seller-order-02', orderNumber: 'BT-20312', total: 50_200, fee: 0, net: 44_220, createdAt: '2026-09-23T18:30:00.000Z' },
+    ],
   };
   const payout = {
     id, amount: 101_610, formatted: '$1,016.10', method: 'standard', automatic: true,
@@ -188,6 +193,7 @@ export default function PayoutDetailScreen() {
                     <Row key={row.key} styles={styles} label={row.label} value={row.value} first={index === 0} strong={row.strong} />
                   ))}
                 </View>
+                <PayoutOrdersSection orders={detail?.orders} />
               </>
             ) : (
               <Text style={styles.note} testID="payout-detail-manual-note">

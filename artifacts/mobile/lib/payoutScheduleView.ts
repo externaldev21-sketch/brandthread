@@ -54,6 +54,18 @@ export type PayoutDetail = {
     transactionCount: number;
     truncated: boolean;
   };
+  /** Orders behind this payout's transactions (absent on older servers). */
+  orders?: PayoutOrder[];
+};
+
+export type PayoutOrder = {
+  orderId: string;
+  orderNumber: string;
+  buyerName?: string;
+  total: number;
+  fee: number;
+  net: number;
+  createdAt: string;
 };
 
 export function cap(word: string): string {
