@@ -182,6 +182,8 @@ export type QuoteGroup = {
   giftCardCents?: number;
   totalCents: number;
   processingDays: number | null;
+  /** Intl #109: DDP duties & import taxes, inside totalCents; present only when above zero. */
+  dutiesCents?: number;
 };
 
 /** paymentMethodTypes: what the server will offer for this cart (card, plus klarna / afterpay_clearpay when every seller opted in). */

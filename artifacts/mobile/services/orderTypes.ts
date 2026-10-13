@@ -236,7 +236,7 @@ export interface PaymentSummary {
   discountTotalCents: number;
   shippingTotalCents: number;
   taxTotalCents: number;
-  /** Item 109: DDP duties & import taxes collected at checkout. */
+  /** Intl #109: DDP duties & import taxes collected at checkout. */
   dutiesCents?: number;
   totalCents: number;
   amountPaidCents: number;

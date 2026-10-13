@@ -2642,7 +2642,7 @@ export * from './hashtags';
 export * from './captions';
 export * from './places';
 
-// ─── FX reference rates (item 107, migration 625) ────────────────────────────
+// ─── FX reference rates (intl #107, migration 625) ────────────────────────────
 // Display-only conversion of USD prices. Cached from an ECB-based feed.
 export const fxRates = pgTable('fx_rates', {
   baseCurrency: text('base_currency').notNull(),

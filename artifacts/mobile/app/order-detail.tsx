@@ -274,7 +274,7 @@ export function adaptApiOrder(raw: any): Order {
        discountTotalCents:      Math.max(0, raw.discountAmountCents ?? 0),
        shippingTotalCents:      shippingCents,
        taxTotalCents:           0,
-       // Item 109: DDP duties collected at checkout, passed through in the payout.
+       // Intl #109: DDP duties collected at checkout, passed through in the payout.
        dutiesCents:             Math.max(0, raw.dutiesCents ?? 0),
        totalCents,
       // Payment was received for active/shipped/delivered; held in limbo for refund_pending

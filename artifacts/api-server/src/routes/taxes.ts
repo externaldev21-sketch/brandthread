@@ -77,7 +77,7 @@ router.get("/status", async (req, res) => {
       automaticTaxAtCheckout: true,
       complianceNote: "Stripe calculates tax when an applicable registration and destination are configured. This setting is not a nexus determination or filing registration.",
       collectDuties:       config.collectDuties,
-      // Item 109: present only while DUTIES_AT_CHECKOUT_ENABLED (with a Zonos key).
+      // Intl #109: present only while DUTIES_AT_CHECKOUT_ENABLED (with a Zonos key).
       ...(dutiesAtCheckoutEnabled() ? { dutiesAtCheckout: true, dutiesProvider: "zonos" } : {}),
       chargeShippingTax:   config.chargeShippingTax,
       chargeVat:           config.chargeVat,

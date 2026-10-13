@@ -121,7 +121,7 @@ type GroupBreakdown = {
   giftCardCents: number;
   totalCents: number;
   processingDays: number | null;
-  /** Item 109: DDP duties & import taxes; present only when above zero. */
+  /** Intl #109: DDP duties & import taxes; present only when above zero. */
   dutiesCents?: number;
 };
 
@@ -164,7 +164,7 @@ async function priceCart(
     }
     sellers.add(pricedGroup.sellerId);
     const tax = await calculateGroupTax(stripe, pricedGroup, shipping);
-    // Duties (item 109) are 0 unless the seller's zone is DDP and the flag is on.
+    // Duties (intl #109) are 0 unless the seller's zone is DDP and the flag is on.
     const fullTotalCents = groupChargeTotalCents({ ...pricedGroup, taxCents: tax.taxCents });
     // A store gift card covers part of THIS seller's group only.
     const gift = group.giftCard

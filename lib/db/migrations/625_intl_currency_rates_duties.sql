@@ -1,4 +1,4 @@
--- 625: International selling (items 107-109).
+-- 625: International selling (intl #107–#109).
 -- 107: display-only currency. fx_rates caches the daily ECB reference rates
 --      (base USD) so a server restart doesn't refetch; users.display_currency
 --      remembers the buyer's choice across devices. Charges stay in USD.

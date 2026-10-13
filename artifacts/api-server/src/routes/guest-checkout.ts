@@ -224,7 +224,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
         const rows = await db.select().from(shippingZoneWeightTiers).where(eq(shippingZoneWeightTiers.zoneId, z.id));
         weightTierRows.push(...rows);
       }
-      // Item 108: live carrier quote for a 'calculated' zone when SHIPPO_LIVE_RATES_ENABLED (flat rate otherwise).
+      // Intl #108: live carrier quote for a 'calculated' zone when SHIPPO_LIVE_RATES_ENABLED (flat rate otherwise).
       const resolved = await resolveWithLiveRates(resolveShippingForDestination({
         zones: zoneRows as unknown as ShippingZoneRow[],
         weightTiers: weightTierRows,

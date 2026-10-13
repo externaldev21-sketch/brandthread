@@ -1,5 +1,5 @@
 /**
- * Item 109: duties & import taxes at checkout (DDP).
+ * Intl #109: duties & import taxes at checkout (DDP).
  *
  * When the seller's shipping zone for the buyer's country is DDP ("duties
  * prepaid"), checkout quotes the destination's duties, import taxes (VAT/GST

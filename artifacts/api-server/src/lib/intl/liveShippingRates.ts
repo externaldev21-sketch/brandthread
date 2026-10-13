@@ -1,5 +1,5 @@
 /**
- * Item 108: live carrier rates for international shipping zones.
+ * Intl #108: live carrier rates for international shipping zones.
  *
  * A seller can price an international zone as 'calculated': checkout asks
  * Shippo (the connector already used to buy labels, lib/shippo.ts) for real

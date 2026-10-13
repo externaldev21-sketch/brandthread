@@ -142,7 +142,7 @@ export type PricedGroup = {
   platformFeeBps: number;
   processingFeeEstimateCents: number;
   /**
-   * Item 109: duties & import taxes for a DDP zone (0 unless
+   * Intl #109: duties & import taxes for a DDP zone (0 unless
    * DUTIES_AT_CHECKOUT_ENABLED). Charged on top of the total and passed
    * through to the seller, like shipping.
    */
@@ -245,7 +245,7 @@ export async function priceCartGroup(input: {
       if (zone.pricingModel !== "weight_tiered") continue;
       tiers.push(...await db.select().from(shippingZoneWeightTiers).where(eq(shippingZoneWeightTiers.zoneId, zone.id)));
     }
-    // Item 108: a 'calculated' zone takes a live carrier quote when
+    // Intl #108: a 'calculated' zone takes a live carrier quote when
     // SHIPPO_LIVE_RATES_ENABLED; otherwise (and on any failure) its flat rate.
     const resolved = await resolveWithLiveRates(resolveShippingForDestination({
       zones: zones as unknown as ShippingZoneRow[],
@@ -294,7 +294,7 @@ export async function priceCartGroup(input: {
     : 0;
   const merchandiseDiscountCents = Math.max(0, Math.min(subtotalCents, discountCents - shippingDiscountCents));
 
-  // Item 109: DDP duties (zero unless DUTIES_AT_CHECKOUT_ENABLED and the zone is DDP).
+  // Intl #109: DDP duties (zero unless DUTIES_AT_CHECKOUT_ENABLED and the zone is DDP).
   let duties = { dutiesCents: 0, quoteId: null as string | null };
   try {
     duties = await dutiesForGroup({

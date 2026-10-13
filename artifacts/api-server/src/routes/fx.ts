@@ -1,5 +1,5 @@
 /**
- * Item 107: display currency.
+ * Intl #107: display currency.
  *
  * GET   /api/fx/rates            public: USD reference rates for "≈" display lines
  *                                ({ enabled: false } when FX_RATES_ENABLED is off)

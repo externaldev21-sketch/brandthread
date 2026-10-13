@@ -57,6 +57,7 @@ import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_CART_STEPS } from '@/lib/firstRunTips/content';
+import { ApproxPrice } from '@/components/intl/ApproxPrice';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -607,6 +608,8 @@ function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrde
         <Text style={sum.totalLabel}>Total</Text>
         <Text style={sum.totalValue}>{fmtPrice(total)}</Text>
       </View>
+      {/* Intl #107: approximate total in the buyer's display currency (nothing when USD / off). */}
+      <ApproxPrice cents={total} style={{ textAlign: 'right', marginTop: 2 }} testID="cart-approx-total" />
       <Text style={sum.note}>Shipping and tax are estimated. Final amount calculated at checkout.</Text>
       {hasPreOrder && (
         <View style={sum.preOrderNote}>

@@ -492,7 +492,7 @@ export function adaptOrderDetail(row: any): BuyerOrderView {
       // Item 109: the buyer orders API now returns these (additive); older
       // responses leave them undefined, which keeps the old receipt.
       taxTotalCents:     row.taxCents ?? 0,
-      // Item 109: DDP duties & import taxes (0 / absent on every other order).
+      // Intl #109: DDP duties & import taxes (0 / absent on every other order).
       dutiesCents:       Math.max(0, row.dutiesCents ?? 0),
       totalCents:        row.totalCents ?? 0,
       discountCents:     Math.max(0, (row.discountAmountCents ?? 0) - (row.threadCashAppliedCents ?? 0)),

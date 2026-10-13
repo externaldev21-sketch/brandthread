@@ -24,7 +24,7 @@ const router = Router();
 
 const ZONE_TYPES = new Set(["domestic", "country", "rest_of_world"]);
 const PRICING_MODELS = new Set(["flat", "weight_tiered"]);
-/** Item 108: 'calculated' (live carrier rates) is accepted only while SHIPPO_LIVE_RATES_ENABLED. */
+/** Intl #108: 'calculated' (live carrier rates) is accepted only while SHIPPO_LIVE_RATES_ENABLED. */
 function pricingModelAllowed(model: string): boolean {
   return PRICING_MODELS.has(model) || (model === CALCULATED_PRICING_MODEL && liveRatesEnabled());
 }
@@ -81,7 +81,7 @@ router.get("/resolve", async (req, res) => {
     subtotalCents: subtotal,
     weightGrams: weight,
   }), {
-    // Item 108: only a 'calculated' zone with the flag on (and a postalCode) gets a live quote.
+    // Intl #108: only a 'calculated' zone with the flag on (and a postalCode) gets a live quote.
     sellerId: String(sellerId), zones: zoneRows as unknown as ShippingZoneRow[], shipFromCountry: seller?.country ?? "US",
     destination: { country: String(country), postalCode: typeof postalCode === "string" ? postalCode : null },
     weightGrams: weight, subtotalCents: subtotal,
@@ -102,7 +102,7 @@ router.get("/settings", requireRole("staff"), async (req, res) => {
   const duties = dutiesAtCheckoutEnabled();
   res.json({
     shipFromCountry: seller?.country ?? "US",
-    // Items 108/109: present only while their flags are on, so the editor's
+    // Intl #108/#109: present only while their flags are on, so the editor's
     // extra option and copy stay hidden otherwise.
     ...(live ? { liveRatesAvailable: true, shipFromPostalCode: seller?.postal ?? null } : {}),
     ...(duties ? { dutiesAtCheckout: true } : {}),
@@ -112,7 +112,7 @@ router.get("/settings", requireRole("staff"), async (req, res) => {
 // PATCH /api/shipping-zones/settings — update the seller's ship-from country
 router.patch("/settings", requireRole("staff"), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
-  // Item 108: the ship-from postal code (for live carrier rates) can be saved on its own.
+  // Intl #108: the ship-from postal code (for live carrier rates) can be saved on its own.
   const rawPostal = req.body?.shipFromPostalCode;
   if (rawPostal !== undefined && req.body?.shipFromCountry === undefined) {
     const postal = typeof rawPostal === "string" ? rawPostal.trim().toUpperCase() : "";

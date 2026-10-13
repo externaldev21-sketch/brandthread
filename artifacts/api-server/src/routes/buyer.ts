@@ -890,7 +890,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         const rows = await db.select().from(shippingZoneWeightTiers).where(eq(shippingZoneWeightTiers.zoneId, z.id));
         weightTierRows.push(...rows);
       }
-      // Item 108: live carrier quote for a 'calculated' zone when SHIPPO_LIVE_RATES_ENABLED (flat rate otherwise).
+      // Intl #108: live carrier quote for a 'calculated' zone when SHIPPO_LIVE_RATES_ENABLED (flat rate otherwise).
       const resolved = await resolveWithLiveRates(resolveShippingForDestination({
         zones: sellerZoneRows as unknown as ShippingZoneRow[],
         weightTiers: weightTierRows,
@@ -1385,7 +1385,7 @@ router.get("/orders", async (req, res) => {
         shippingAddress:         orders.shippingAddress,
         stripePaymentIntentId:   orders.stripePaymentIntentId,
         taxCents:                orders.taxCents,
-        dutiesCents:             orders.dutiesCents, // item 109 (0 unless a DDP duties line was charged)
+        dutiesCents:             orders.dutiesCents, // intl #109 (0 unless a DDP duties line was charged)
         discountAmountCents:     orders.discountAmountCents,
         threadCashAppliedCents:  orders.threadCashAppliedCents,
         cancellationReason:      orders.cancellationReason,
@@ -1427,7 +1427,7 @@ router.get("/orders/:id", async (req, res) => {
         shippingAddress:         orders.shippingAddress,
         stripePaymentIntentId:   orders.stripePaymentIntentId,
         taxCents:                orders.taxCents,
-        dutiesCents:             orders.dutiesCents, // item 109 (0 unless a DDP duties line was charged)
+        dutiesCents:             orders.dutiesCents, // intl #109 (0 unless a DDP duties line was charged)
         discountAmountCents:     orders.discountAmountCents,
         threadCashAppliedCents:  orders.threadCashAppliedCents,
         cancellationReason:      orders.cancellationReason,

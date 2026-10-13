@@ -1,5 +1,5 @@
 /**
- * Item 107: display-only currency conversion.
+ * Intl #107: display-only currency conversion.
  *
  * Every charge, payout and stored amount stays in USD. These rates only let
  * the app show "≈ €42.10" under a USD price. They come from a free, keyless

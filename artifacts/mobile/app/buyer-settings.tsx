@@ -16,6 +16,8 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { SectionHeader } from '@/components/BrandthreadUI';
 import { Card, ListRow } from '@/components/ui';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useApi } from '@/lib/api';
+import { useDisplayCurrency } from '@/lib/displayCurrency';
 
 export default function BuyerSettingsScreen() {
   const colors = useColors();
@@ -31,10 +33,19 @@ export default function BuyerSettingsScreen() {
   const profileName = user?.fullName || user?.username || 'Your Brandthread profile';
   const profileInitials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join('').toUpperCase() || 'BT';
 
+  // Intl #107: the Currency row exists only while the server serves rates.
+  const fx = useDisplayCurrency(useApi());
+  const catalog = useMemo(
+    () => (fx.enabled
+      ? BUYER_SETTINGS_CATALOG
+      : BUYER_SETTINGS_CATALOG.map((group) => ({ ...group, items: group.items.filter((item) => !item.requiresFx) }))),
+    [fx.enabled],
+  );
+
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return BUYER_SETTINGS_CATALOG;
-    return BUYER_SETTINGS_CATALOG
+    if (!q) return catalog;
+    return catalog
       .map((group) => ({
         ...group,
         items: group.items.filter((item) =>
@@ -42,7 +53,7 @@ export default function BuyerSettingsScreen() {
         ),
       }))
       .filter((group) => group.items.length > 0);
-  }, [query]);
+  }, [query, catalog]);
 
   async function handleItem(item: SettingsCatalogItem) {
     if (item.soon) return;
@@ -99,7 +110,7 @@ export default function BuyerSettingsScreen() {
                     title={item.label}
                     subtitle={item.description}
                     destructive={item.destructive}
-                    value={item.soon ? 'Soon' : undefined}
+                    value={item.soon ? 'Soon' : item.requiresFx ? fx.currency : undefined}
                     chevron={!item.soon}
                     onPress={item.soon ? undefined : () => handleItem(item)}
                     disabled={item.soon}
