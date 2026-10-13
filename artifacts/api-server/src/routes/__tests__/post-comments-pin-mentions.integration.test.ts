@@ -213,3 +213,46 @@ describe("comment mentions", () => {
     expect(notes(extras[5], "mention")).toHaveLength(0);
   });
 });
+
+describe("comment sorting", () => {
+  it("Top ranks by likes, replies and creator likes; Newest keeps time order; pinned leads both", async () => {
+    const [p] = await db.insert(posts).values({
+      userId: owner, mediaUrl: `https://cdn.test/${suffix}-sort.jpg`, mediaType: "image", postStatus: "published",
+    }).returning({ id: posts.id });
+    const sortPost = p.id;
+    const add = async (who: string, text: string, parentId?: string) => {
+      const r = await call(`/api/posts/${sortPost}/comments`, who, "POST", { body: text, parentId });
+      expect(r.status).toBe(201);
+      return r.body.comment.id as string;
+    };
+    try {
+      const quiet = await add(alice, "first and quiet");
+      const liked = await add(bob, "two likes");
+      const talked = await add(carol, "one reply");
+      const creatorFav = await add(alice, "creator liked");
+      const newest = await add(bob, "brand new");
+      await db.insert(postCommentLikes).values([
+        { commentId: liked, userId: alice }, { commentId: liked, userId: carol },
+        { commentId: creatorFav, userId: owner },
+      ]);
+      await add(alice, "a reply", talked);
+      await add(bob, "another reply", talked);
+      const pinRes = await call(`/api/posts/${sortPost}/comments/${quiet}/pin`, owner, "POST");
+      expect(pinRes.status).toBe(200);
+
+      const top = await call(`/api/posts/${sortPost}/comments?sort=top`, null);
+      expect(top.status).toBe(200);
+      expect(top.body.sort).toBe("top");
+      // pinned first, then: creator like (5+1) > replies (2*2) > 2 likes > nothing.
+      expect(top.body.comments.map((c: any) => c.id)).toEqual([quiet, creatorFav, talked, liked, newest]);
+
+      const latest = await call(`/api/posts/${sortPost}/comments?sort=newest`, null);
+      expect(latest.body.comments.map((c: any) => c.id)).toEqual([quiet, newest, creatorFav, talked, liked]);
+
+      expect((await call(`/api/posts/${sortPost}/comments?sort=hot`, null)).status).toBe(400);
+      expect((await call(`/api/posts/${sortPost}/comments?sort=top&before=2026-01-01`, null)).status).toBe(400);
+    } finally {
+      await db.delete(posts).where(eq(posts.id, sortPost));
+    }
+  });
+});
