@@ -37,8 +37,11 @@ describe('useSheetTransition open path never gets stuck offscreen', () => {
     // previously broke instantly.
     expect(bottomSheet).not.toMatch(/translateY\.(set|value)\(?\s*=?\s*0\)?;/);
     expect(bottomSheet).toContain('translateY.set(toRest());');
-    expect(bottomSheet).toContain("withSpring(0, { ...SHEET_SPRING, velocity })");
-    expect(bottomSheet).toContain("withTiming(0, { duration: 150, easing: SHEET_EASING })");
+    expect(bottomSheet).toContain("withSpring(openY, { ...SHEET_SPRING, velocity })");
+    expect(bottomSheet).toContain("withTiming(openY, { duration: 150, easing: SHEET_EASING })");
+    // Fit-to-content sheets still rest at zero; the existing filter sheet
+    // must open at its half detent on the same spring engine.
+    expect(bottomSheet).toContain("const openY = detents && (detents.initial ?? 'half') === 'half' ? halfOffset : 0;");
   });
 
   it('the backdrop is derived from the sheet position, so it fades in sync on open, close and mid-drag', () => {
