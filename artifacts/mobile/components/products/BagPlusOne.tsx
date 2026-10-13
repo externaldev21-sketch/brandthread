@@ -29,7 +29,7 @@ export function BagPlusOne({ trigger, quantity, reduceMotion }: { trigger: numbe
       importantForAccessibility="no"
       style={[styles.text, {
         opacity: progress.interpolate({ inputRange: [0, 0.15, 0.7, 1], outputRange: [0, 1, 1, 0] }),
-        transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [6, -18] }) }],
+        transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [10, -4] }) }],
       }]}
     >
       +{quantity}
@@ -39,7 +39,9 @@ export function BagPlusOne({ trigger, quantity, reduceMotion }: { trigger: numbe
 
 const styles = StyleSheet.create({
   text: {
-    position: 'absolute', top: -14, right: -6,
+    // Under the bag icon, rising into it: above the badge would sit under the
+    // status bar, and on the badge it is white on white.
+    position: 'absolute', top: 48, left: 0, right: 0, textAlign: 'center',
     color: '#FFFFFF', // theme-exempt: same fixed white as the bag icon over the photo
     fontFamily: FONT.bold, fontSize: 13,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 3, // theme-exempt: legibility over the photo

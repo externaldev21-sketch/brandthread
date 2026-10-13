@@ -135,11 +135,11 @@ const SHOTS = {
     target: PDP, rich: true,
     act: async (page) => {
       const cdp = await page.context().newCDPSession(page);
-      const point = { x: 230, y: 330 };
+      const point = { x: 146, y: 262 };
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
       await page.waitForTimeout(450);
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 236, y: 336 }] });
-      await page.waitForTimeout(250);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 148, y: 264 }] });
+      await page.waitForTimeout(1200);
       page.__endTouch = () => cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     },
   },
@@ -148,14 +148,21 @@ const SHOTS = {
     act: async (page) => {
       await page.getByTestId('option-opt_color-color_Ember').click();
       await page.getByTestId('option-opt_size-size_M').click();
-      await page.getByTestId('product-add-to-cart').click();
-      await page.getByTestId('bag-plus-one').waitFor({ timeout: 8000 });
-      await page.waitForTimeout(220);
       await page.evaluate(() => { const sc = [...document.querySelectorAll('div')].filter((d) => d.scrollHeight > d.clientHeight + 4 && getComputedStyle(d).overflowY !== 'visible').sort((a, b) => b.scrollHeight - a.scrollHeight)[0]; if (sc) sc.scrollTop = 0; });
+      await page.waitForTimeout(400);
+      await page.getByTestId('product-add-to-cart').click();
+      // Capture at the +1's peak (it fades out within 0.7s).
+      await page.waitForFunction(() => {
+        const el = document.querySelector('[data-testid="bag-plus-one"]');
+        return !!el && Number(getComputedStyle(el).opacity) > 0.85;
+      }, null, { timeout: 10_000, polling: 'raf' });
     },
   },
   'pdp-video-first': { target: PDP, rich: true, video: true },
   'seller-details': { target: `/product-page-details?productId=${base.id}`, role: 'seller', seller: true, extra: '&demo=1' },
+  // The seller preview never calls the API, so this one opens outside it to
+  // show the real screen filled from GET /api/product-page-details/:id.
+  'seller-details-api': { target: `/product-page-details?productId=${base.id}`, role: 'buyer', seller: true, full: true },
   'seller-details-empty': { target: `/product-page-details?productId=${base.id}`, role: 'seller', seller: true },
   'bag': { target: '/(buyer)/cart', full: true },
 };
