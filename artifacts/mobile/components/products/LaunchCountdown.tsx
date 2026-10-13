@@ -1,13 +1,19 @@
 /**
- * Countdown + "Notify me" for a product with a scheduled launch. Fetches its
- * own data from the public launch endpoint and renders nothing when the
- * product has no pending launch. Signed-out viewers see the countdown; only
- * the Notify me toggle needs an account, and it sends them to sign in rather
- * than calling a protected API.
+ * Drop lobby for a product with a scheduled launch (Nike SNKRS upcoming
+ * product page, 1:1): "Available 10/16 at 10:00 AM", a quiet countdown, how
+ * many people have notifications on, and Notify me.
+ *
+ * Fetches its own data from the public launch endpoint and renders nothing
+ * when the product has no pending launch. The clock is the server's (skew
+ * corrected), and the last tick is scheduled for the launch instant itself,
+ * so the page's Buy button switches on at that exact second without a
+ * reload. The server still enforces the launch time at checkout.
+ *
+ * Signed-out viewers see the lobby; only Notify me needs an account, and it
+ * sends them to sign in rather than calling a protected API.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-
+import { ActivityIndicator, AppState, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useAuth } from '@clerk/expo';
@@ -21,10 +27,10 @@ import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 
 import { useColors } from '@/hooks/useColors';
-
+import { hapticToggle } from '@/lib/haptics';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
-
 import { PressableScale } from '@/components/BrandthreadUI';
+import { countdownText, lobbyDateLabel, msUntilNextTick, notifyCountLabel } from '@/lib/dropLobby';
 
 export function splitCountdown(ms: number): { days: number; hours: number; minutes: number; seconds: number } {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -42,6 +48,8 @@ function launchLabel(iso: string): string {
   const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   return `Drops ${date} at ${time}`;
 }
+/** How often the notifications-on count refreshes while the lobby is on screen. */
+const COUNT_REFRESH_MS = 30_000;
 
 export function LaunchCountdown({
   productId,
@@ -56,6 +64,7 @@ export function LaunchCountdown({
   const router = useRouter();
   const { isSignedIn } = useAuth();
   const [launchAt, setLaunchAt] = useState<string | null>(null);
+  const [notifyCount, setNotifyCount] = useState(0);
   const [skewMs, setSkewMs] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [subscribed, setSubscribed] = useState(false);
@@ -68,7 +77,9 @@ export function LaunchCountdown({
     api.productLaunches.state(productId)
       .then((s) => {
         setSkewMs(new Date(s.serverNow).getTime() - Date.now());
+        setNow(Date.now());
         setLaunchAt(s.launching ? s.launchAt : null);
+        setNotifyCount(s.launching ? Math.max(0, s.notifyCount ?? 0) : 0);
         onChange.current?.(!!s.launching);
       })
       .catch(() => { setLaunchAt(null); onChange.current?.(false); });
@@ -87,71 +98,102 @@ export function LaunchCountdown({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId, isSignedIn, !!launchAt]);
 
-  const remaining = launchAt ? new Date(launchAt).getTime() - (now + skewMs) : 0;
-  const expired = !!launchAt && remaining <= 0;
+  const launchMs = launchAt ? new Date(launchAt).getTime() : 0;
+  const remaining = launchAt ? launchMs - (now + skewMs) : 0;
+  const opened = !!launchAt && remaining <= 0;
 
+  // One tick per second, aligned to the server's second boundary, with the
+  // final tick landing on the launch instant rather than up to 1s after it.
   useEffect(() => {
-    if (!launchAt) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [launchAt]);
+    if (!launchAt || opened) return;
+    const id = setTimeout(() => setNow(Date.now()), msUntilNextTick(Date.now() + skewMs, launchMs));
+    return () => clearTimeout(id);
+  }, [launchAt, launchMs, now, opened, skewMs]);
 
-  // The moment the clock passes launch time, ask the server whether it is live.
-  useEffect(() => { if (expired) load(); }, [expired, load]);
+  // The second the clock reaches launch time, switch Buy on here, then ask
+  // the server to confirm (it re-arms the lobby if this device was early).
+  useEffect(() => {
+    if (!opened) return;
+    onChange.current?.(false);
+    load();
+  }, [opened, load]);
+
+  // Real count, refreshed while visible. Returning to the app re-syncs the
+  // clock too, since timers don't run in the background.
+  useEffect(() => {
+    if (!launchAt || opened) return;
+    const id = setInterval(load, COUNT_REFRESH_MS);
+    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') load(); });
+    return () => { clearInterval(id); sub.remove(); };
+  }, [launchAt, opened, load]);
 
   async function toggle() {
     if (!productId || busy) return;
     if (!isSignedIn) { router.push('/sign-in' as never); return; }
+    hapticToggle();
     setBusy(true);
     const next = !subscribed;
     setSubscribed(next);
+    setNotifyCount((c) => Math.max(0, c + (next ? 1 : -1)));
     try {
       if (next) await api.productLaunches.alertOn(productId);
       else await api.productLaunches.alertOff(productId);
     } catch {
       setSubscribed(!next);
+      setNotifyCount((c) => Math.max(0, c + (next ? -1 : 1)));
     } finally {
       setBusy(false);
     }
   }
 
-  if (!launchAt || expired) return null;
-  const t = splitCountdown(remaining);
-  const cells: Array<[number, string]> = [[t.days, 'days'], [t.hours, 'hrs'], [t.minutes, 'min'], [t.seconds, 'sec']];
+  if (!launchAt || opened) return null;
+  const countLabel = notifyCountLabel(notifyCount);
 
   return (
-    <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]} testID="launch-countdown">
-      <Text style={[s.label, { color: colors.foreground }]}>{launchLabel(launchAt)}</Text>
-      <View style={s.cells} accessibilityLabel={`${t.days} days ${t.hours} hours ${t.minutes} minutes left`}>
-        {cells.map(([value, unit]) => (
-          <View key={unit} style={[s.cell, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[s.value, { color: colors.foreground }]}>{String(value).padStart(2, '0')}</Text>
-            <Text style={[s.unit, { color: colors.mutedForeground }]}>{unit}</Text>
-          </View>
-        ))}
-      </View>
+    <View style={s.wrap} testID="launch-countdown">
+      <Text style={[s.date, { color: colors.foreground }]}>{lobbyDateLabel(launchAt)}</Text>
+      <Text
+        style={[s.countdown, { color: colors.mutedForeground }]}
+        accessibilityLabel={countdownText(remaining, true)}
+        testID="launch-countdown-clock"
+      >
+        {countdownText(remaining)}
+      </Text>
+      {countLabel ? (
+        <Text style={[s.count, { color: colors.mutedForeground }]} testID="launch-notify-count">{countLabel}</Text>
+      ) : null}
       <PressableScale
         onPress={toggle}
         style={[
           s.btn,
           subscribed
-            ? { backgroundColor: 'transparent', borderColor: colors.foreground }
-            : { backgroundColor: colors.primary, borderColor: colors.primary },
+            ? { backgroundColor: 'transparent', borderColor: colors.border }
+            : { backgroundColor: colors.foreground, borderColor: colors.foreground },
         ]}
         accessibilityRole="button"
         accessibilityState={{ selected: subscribed }}
+<<<<<<< HEAD
         accessibilityLabel={subscribed ? "You'll be notified when it drops. Tap to turn off" : 'Notify me when it drops'}
+=======
+        accessibilityLabel={subscribed ? "Notifications on. Tap to turn off" : 'Notify me'}
+>>>>>>> origin/pr1017
         testID="launch-notify-me"
       >
         {busy ? (
-          <ActivityIndicator size="small" color={subscribed ? colors.foreground : colors.primaryForeground} />
+          <ActivityIndicator size="small" color={subscribed ? colors.foreground : colors.background} />
         ) : (
+<<<<<<< HEAD
           <>
             <Icon name={subscribed ? 'check' : 'bell'} size={ICON.sm} color={subscribed ? colors.foreground : colors.primaryForeground} />
             <Text style={[s.btnText, { color: subscribed ? colors.foreground : colors.primaryForeground }]}>
               {subscribed ? "You'll be notified" : 'Notify me'}
             </Text>
           </>
+=======
+          <Text style={[s.btnText, { color: subscribed ? colors.foreground : colors.background }]}>
+            {subscribed ? 'Notifications on' : 'Notify me'}
+          </Text>
+>>>>>>> origin/pr1017
         )}
       </PressableScale>
     </View>
@@ -159,12 +201,10 @@ export function LaunchCountdown({
 }
 
 const s = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md, gap: SP.sm, marginBottom: SP.md },
-  label: { fontFamily: FONT.bold, fontSize: FS.md },
-  cells: { flexDirection: 'row', gap: SP.sm },
-  cell: { flex: 1, borderWidth: 1, borderRadius: RADIUS.sm, alignItems: 'center', paddingVertical: SP.sm },
-  value: { fontFamily: FONT.bold, fontSize: FS.xl, fontVariant: ['tabular-nums'] },
-  unit: { fontFamily: FONT.medium, fontSize: FS.xs },
-  btn: { minHeight: 48, borderRadius: RADIUS.md, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
+  wrap: { gap: SP.xs, marginBottom: SP.md },
+  date: { fontFamily: FONT.semibold, fontSize: FS.md },
+  countdown: { fontFamily: FONT.medium, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
+  count: { fontFamily: FONT.regular, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
+  btn: { marginTop: SP.sm, minHeight: 48, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   btnText: { fontFamily: FONT.semibold, fontSize: FS.sm },
 });

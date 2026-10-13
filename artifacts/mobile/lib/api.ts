@@ -4265,7 +4265,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     productLaunches: {
       /** Public: is this product waiting on a launch time? */
       state:       (productId: string) =>
-        get<{ launching: boolean; launchAt: string | null; serverNow: string }>(`/api/product-launches/${encodeURIComponent(productId)}`),
+        get<{ launching: boolean; launchAt: string | null; notifyCount?: number; serverNow: string }>(`/api/product-launches/${encodeURIComponent(productId)}`),
       alertStatus: (productId: string) =>
         get<{ subscribed: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}/alert`),
       alertOn:     (productId: string) =>
