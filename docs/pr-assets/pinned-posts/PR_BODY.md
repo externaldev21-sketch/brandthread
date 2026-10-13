@@ -19,9 +19,10 @@ Also: NYT Cooking's Instagram profile, which shows the pinned-tile glyph: https:
 | Reference (Instagram) | Ours |
 |---|---|
 | ![](reference/ig-grid-before.jpg) | — |
-| ![](reference/ig-post-menu-pin.jpg) | ![](ours/02-post-viewer-pin-action.png) |
+| (Instagram post header with •••) | ![](ours/02-post-viewer-more-button.png) |
+| ![](reference/ig-post-menu-pin.jpg) | ![](ours/03-owner-sheet-pin.png) |
 | ![](reference/ig-grid-pinned.jpg) | ![](ours/01-profile-grid-pinned-first.png) |
-| — | ![](ours/03-post-viewer-pinned-toast.png) ![](ours/04-post-viewer-replaced-oldest.png) |
+| — | ![](ours/04-post-viewer-pinned-toast.png) ![](ours/05-owner-sheet-unpin.png) |
 
 ## What's new
 
@@ -48,6 +49,7 @@ Also: NYT Cooking's Instagram profile, which shows the pinned-tile glyph: https:
   - `routes/posts.ts` `GET /mine`: changed `orderBy`, plus `pinnedAt` added to each row.
 
 ### Mobile
+- `components/social/PostOwnerSheet.tsx`: the owner's post ••• sheet, built on `BottomSheet`, with an Instagram-style "Pin to your profile" / "Unpin from profile" row.
 - `services/postPinService.ts`:
   - `pinPost`, `unpinPost`, `getMyPins`.
   - `pinPostWithReplacePrompt`, which asks to replace the oldest pin when at the limit. It uses `Alert` on native and `window.confirm` on web, because react-native-web's `Alert` does nothing.
@@ -64,7 +66,11 @@ Also: NYT Cooking's Instagram profile, which shows the pinned-tile glyph: https:
   - It only appears for published posts and sits just before Delete, which is Instagram's order.
   - Shows a Snackbar toast: "Post pinned to your profile" or "Post unpinned".
   - The content library list is now pinned-first, because it reads `/api/posts/mine`.
-- `app/buyer-post-viewer.tsx` (the owner's post viewer): one new outlined button, **"Pin to your profile"** / **"Unpin from profile"** (pushpin icon), placed above "Delete post" and styled like the existing "Edit captions" button. Same Snackbar toast.
+- `app/buyer-post-viewer.tsx` (the owner's post viewer), following Instagram's post ••• sheet:
+  - The owner gets one extra header icon button: ••• (Feather `more-horizontal`, accessibilityLabel "More options"). It goes next to the existing Share button through ScreenHeader's existing `actions` prop, so it has the same size and style.
+  - Before: header actions were `[Share]`. After: `[Share, •••]` for the owner; unchanged for everyone else.
+  - ••• opens the new `components/social/PostOwnerSheet.tsx`. It is built on the existing `components/ui/BottomSheet` and has one grouped row with a pushpin line icon (MaterialCommunityIcons `pin-outline` / `pin-off-outline`) and "Pin to your profile" / "Unpin from profile", Instagram's row style.
+  - A Snackbar toast confirms the change. Nothing else on the screen changes.
 - Profile screens (`(tabs)/profile.tsx`, `(buyer)/profile.tsx`, `seller-profile.tsx`, `buyer-other-profile.tsx`): **no code changes.** They show the new order because the server returns it, and the badge comes from the tile component.
 
 ## Feature flags / env keys
