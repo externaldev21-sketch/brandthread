@@ -25,6 +25,7 @@ import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant }
 import { matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
 import { blockedUserIds, isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
+import { notHiddenFromViewer } from "../lib/ranking/notInterested";
 import {
   paginationMetadata,
   parsePagination,
@@ -1724,6 +1725,8 @@ router.get("/posts", async (req, res) => {
         ownerId ? undefined : eq(posts.surface, "thread"),
         publicPostCondition(),
         notBlockedWith(viewerId, posts.userId),
+        // For You only: honour the viewer's "Not interested" hides (post or creator).
+        ownerId ? undefined : notHiddenFromViewer(viewerId, posts.id, posts.userId),
       ))
       .orderBy(desc(posts.createdAt), asc(posts.id))
       .limit(lim)

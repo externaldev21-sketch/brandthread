@@ -315,7 +315,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/buyer-feed/CaptionBlock.tsx',
   'components/buyer-feed/FeedTopBar.tsx',
   'components/buyer-feed/HeartBurstParticles.tsx',
-  'components/buyer-feed/LongPressMenu.tsx',
   'components/buyer-feed/RightActionRail.tsx',
   'components/buyer-feed/ShopSideTab.tsx',
   'components/calls/CallAvatarCircle.tsx',

@@ -655,6 +655,8 @@ export const posts = pgTable('posts', {
     allowComments: boolean;
     allowReposts: boolean;
     showLikeCount: boolean;
+    /** Lets viewers save the video to their camera roll. Missing = allowed. */
+    allowDownloads?: boolean;
   }>().notNull().default({
     isPublic: true,
     allowComments: true,
