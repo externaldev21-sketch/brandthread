@@ -14,8 +14,8 @@ function block(start: string) {
 
 describe('buyer tab bar compact <-> regular resize', () => {
   it('rides the pill spring on the UI thread, started from the press-in target', () => {
-    expect(bar).toContain('() => indicatorTarget.value === 0');
-    expect(bar).toContain('withSpring(nowCompact ? 1 : 0, INDICATOR_SPRING)');
+    expect(bar).toContain('compact: indicatorTarget.value === 0 && !onProfile.value');
+    expect(bar).toContain('progress.set(reducedMotion ? nextMode : withSpring(nextMode, INDICATOR_SPRING))');
     // No time-based timing: a held-up frame made it jump straight to its end.
     expect(bar).not.toContain('BAR_MODE_TIMING');
   });
@@ -28,7 +28,18 @@ describe('buyer tab bar compact <-> regular resize', () => {
     }
   });
 
+  it('starts every direction from a press-in, including Home <-> Profile', () => {
+    expect(bar).toContain('onPressIn={() => pressSlot(index)}');
+    expect(bar).toContain('onPressIn={pressProfile}');
+    expect(bar).toMatch(/const pressProfile = React\.useCallback\(\(\) => \{[^}]*onProfile\.set\(true\);/);
+  });
+
+  it('keeps the pill on the capsule\'s curve with a transform-only correction', () => {
+    expect(bar).toContain('pillCorrectionStyle');
+    expect(block('const pillCorrectionStyle')).toContain('translateX: correction');
+  });
+
   it('still snaps instantly under Reduce Motion', () => {
-    expect(bar).toContain('progress.set(reducedMotion ? (nowCompact ? 1 : 0) :');
+    expect(bar).toContain('progress.set(reducedMotion ? nextMode :');
   });
 });
