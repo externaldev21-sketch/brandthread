@@ -5,7 +5,8 @@
 import PDFDocument from "pdfkit";
 import type { Statement } from "./statement";
 
-function money(cents: number, currency: string): string {
+/** Signed money string used by every Brandthread PDF ($1,234.56 / 12.00 EUR). */
+export function money(cents: number, currency: string): string {
   const sym = currency.toLowerCase() === "usd" ? "$" : "";
   const abs = Math.abs(cents);
   const whole = String(Math.floor(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -14,9 +15,9 @@ function money(cents: number, currency: string): string {
   return `${cents < 0 ? "-" : ""}${body}${cur}`;
 }
 
-const INK = "#000000";
-const MUTED = "#6b6b6b";
-const RULE = "#cfcfcf";
+export const INK = "#000000";
+export const MUTED = "#6b6b6b";
+export const RULE = "#cfcfcf";
 
 export function renderStatementPdf(s: Statement, opts: { sellerName?: string; generatedAt?: Date } = {}): Promise<Buffer> {
   return new Promise((resolve, reject) => {

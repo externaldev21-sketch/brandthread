@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -7,6 +7,8 @@ import { AppThemePreset, useAppTheme } from '@/contexts/AppThemeContext';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { Button } from '@/components/ui/Button';
+import { saveDownloadedFile } from '@/lib/fileDownload';
 import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { EmptyState } from '@/components/layout';
 import { RoleLockedView } from '@/components/RoleLockedView';
@@ -96,6 +98,29 @@ export default function PayoutDetailScreen() {
 
   const goBack = () => goBackOr(router, '/payouts' as never);
 
+  const [downloading, setDownloading] = useState(false);
+  async function downloadPdf() {
+    if (!payoutId || downloading) return;
+    if (isPreview) {
+      Alert.alert('Sign in to download', 'Payout statements are available once you are signed in.');
+      return;
+    }
+    setDownloading(true);
+    try {
+      const bytes = await api.finance.payoutStatementPdf(payoutId);
+      await saveDownloadedFile(bytes, {
+        name: `brandthread-payout-${payoutId}.pdf`,
+        mime: 'application/pdf',
+        uti: 'com.adobe.pdf',
+        dialogTitle: 'Payout statement',
+      });
+    } catch {
+      Alert.alert('Download failed', 'Could not download this payout statement. Check your connection and try again.');
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   if (!isPreview && isLoadingRole) {
     return (
       <View style={styles.root}>
@@ -169,6 +194,17 @@ export default function PayoutDetailScreen() {
                 This was a manual payout. It draws from your whole balance, so individual sales are not listed.
               </Text>
             )}
+
+            <Button
+              label="Download PDF"
+              icon="file-text"
+              fullWidth
+              loading={downloading}
+              disabled={downloading}
+              onPress={() => void downloadPdf()}
+              style={styles.download}
+              testID="payout-detail-download-pdf"
+            />
           </>
         )}
       </ScrollView>
@@ -204,6 +240,7 @@ const createStyles = (theme: AppThemePreset) => {
     rowLabel: { color: muted, fontSize: FS.sm, fontFamily: FONT.regular },
     rowValue: { color: text, fontSize: FS.sm, fontFamily: FONT.medium, flexShrink: 1, textAlign: 'right' },
     rowStrong: { color: text, fontFamily: FONT.semibold, fontSize: FS.base },
+    download: { marginTop: SP.sm },
     note: { color: muted, fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', paddingHorizontal: SP.md },
   });
 };

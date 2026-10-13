@@ -11,6 +11,7 @@
  * GET  /payout-schedule         current schedule, instant eligibility + fee quote, next payout
  * PATCH /payout-schedule        set daily | weekly(+anchor) | manual
  * GET  /payouts/:id             per-payout breakdown (sales, fees, refunds, holds)
+ * GET  /payouts/:id/statement.pdf  the same payout as a PDF statement
  * GET  /summary                 held vs releasing vs available vs paid out
  * GET  /recoveries              lost-chargeback recoveries the seller owes (and their history)
  *
@@ -25,7 +26,7 @@ import {
   users, orderFundReservations, sellerCashoutAttempts, drops, orders, orderReleases,
   ledgerPostings, ledgerTransactions,
 } from "@workspace/db";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requirePermission, requirePayoutsRead, teamContext } from "../middlewares/requireRole";
 import { stripe } from "../lib/stripe";
@@ -54,6 +55,9 @@ const PAYOUTS_ON_HOLD = {
 import { heldOrderTimingRows, payoutHoldRule } from "../lib/delivery/payoutTiming";
 import { checkFirstPayout, IDENTITY_REQUIRED_MESSAGE } from "../lib/money/firstPayoutGate";
 import { requireSellerTwoFactor } from "../lib/security/sellerTwoFactor";
+import {
+  buildPayoutStatementModel, renderPayoutStatementPdf, type PayoutStatementTxn,
+} from "../lib/money/payoutStatementPdf";
 
 const router = Router();
 router.use(requireAuth);
@@ -1264,64 +1268,90 @@ router.patch("/payout-schedule", requirePermission("payouts"), validateInput({ b
 const PAYOUT_ID = /^po_[A-Za-z0-9]{6,64}$/;
 const BREAKDOWN_PAGE_LIMIT = 5; // x100 balance transactions per payout
 
+type PayoutLoad =
+  | { kind: "invalid" }
+  | { kind: "not_connected" }
+  | { kind: "not_found" }
+  | {
+      kind: "ok";
+      accountId: string;
+      payout: any;
+      automatic: boolean;
+      transactions: any[];
+      truncated: boolean;
+      breakdown: ReturnType<typeof buildPayoutBreakdown> | null;
+      instantFee: number;
+    };
+
+/**
+ * Loads one payout of the signed-in seller with the balance transactions
+ * Stripe attributes to it. Shared by the JSON detail and its PDF statement so
+ * both apply exactly the same ownership rule.
+ */
+async function loadPayout(sellerId: string, payoutId: string): Promise<PayoutLoad> {
+  if (!PAYOUT_ID.test(payoutId)) return { kind: "invalid" };
+  const accountId = await getStripeAccount(sellerId);
+  if (!stripe || !accountId) return { kind: "not_connected" };
+  // Retrieving with the connected-account header means a payout that does
+  // not belong to this seller simply does not exist for them.
+  let payout: any;
+  try {
+    payout = await stripe.payouts.retrieve(
+      payoutId,
+      { expand: ["destination", "balance_transaction"] },
+      { stripeAccount: accountId },
+    );
+  } catch (providerError: any) {
+    if (Number(providerError?.statusCode ?? providerError?.status) === 404) return { kind: "not_found" };
+    throw providerError;
+  }
+
+  // Stripe only attributes balance transactions to automatic payouts.
+  const automatic = payout.automatic === true;
+  const transactions: any[] = [];
+  let truncated = false;
+  if (automatic) {
+    let startingAfter: string | undefined;
+    for (let page = 0; page < BREAKDOWN_PAGE_LIMIT; page += 1) {
+      const result = await stripe.balanceTransactions.list(
+        { payout: payoutId, limit: 100, ...(startingAfter ? { starting_after: startingAfter } : {}) },
+        { stripeAccount: accountId },
+      );
+      transactions.push(...result.data);
+      if (!result.has_more) break;
+      startingAfter = result.data[result.data.length - 1]?.id;
+      if (page === BREAKDOWN_PAGE_LIMIT - 1) truncated = true;
+    }
+  }
+  const breakdown = automatic
+    ? buildPayoutBreakdown({ payoutAmountCents: payout.amount, transactions })
+    : null;
+  if (breakdown) assertBreakdownReconciles(breakdown);
+
+  const instantFee = payout.method === "instant" && typeof payout.balance_transaction === "object"
+    ? Math.max(0, Number(payout.balance_transaction?.fee ?? 0))
+    : 0;
+  return { kind: "ok", accountId, payout, automatic, transactions, truncated, breakdown, instantFee };
+}
+
 router.get("/payouts/:id", requirePayoutsRead(), async (req, res) => {
   const sellerId = getSellerId(req);
   const payoutId = String(req.params.id);
   try {
-    if (!PAYOUT_ID.test(payoutId)) {
+    const loaded = await loadPayout(sellerId, payoutId);
+    if (loaded.kind === "invalid") {
       res.status(400).json({ error: "Invalid payout id", code: "INVALID_PAYOUT_ID" });
       return;
     }
-    const accountId = await getStripeAccount(sellerId);
-    if (!stripe || !accountId) {
+    if (loaded.kind === "not_connected") {
       res.json({ connected: false, payout: null, breakdown: null });
       return;
     }
-    // Retrieving with the connected-account header means a payout that does
-    // not belong to this seller simply does not exist for them.
-    let payout: any;
-    try {
-      payout = await stripe.payouts.retrieve(
-        payoutId,
-        { expand: ["destination", "balance_transaction"] },
-        { stripeAccount: accountId },
-      );
-    } catch (providerError: any) {
-      if (Number(providerError?.statusCode ?? providerError?.status) === 404) {
-        res.status(404).json({ error: "Payout not found", code: "PAYOUT_NOT_FOUND" });
-        return;
-      }
-      throw providerError;
+    if (loaded.kind === "not_found") {
+      res.status(404).json({ error: "Payout not found", code: "PAYOUT_NOT_FOUND" });
+      return;
     }
-    // A live read is the newest status there is; keep seller_payouts current.
-    await upsertPayoutFromApi(payout, accountId, sellerId)
-      .catch((err) => req.log.warn({ err, payoutId }, "Could not store retrieved payout"));
-
-    // Stripe only attributes balance transactions to automatic payouts.
-    const automatic = payout.automatic === true;
-    const transactions: any[] = [];
-    let truncated = false;
-    if (automatic) {
-      let startingAfter: string | undefined;
-      for (let page = 0; page < BREAKDOWN_PAGE_LIMIT; page += 1) {
-        const result = await stripe.balanceTransactions.list(
-          { payout: payoutId, limit: 100, ...(startingAfter ? { starting_after: startingAfter } : {}) },
-          { stripeAccount: accountId },
-        );
-        transactions.push(...result.data);
-        if (!result.has_more) break;
-        startingAfter = result.data[result.data.length - 1]?.id;
-        if (page === BREAKDOWN_PAGE_LIMIT - 1) truncated = true;
-      }
-    }
-    const breakdown = automatic
-      ? buildPayoutBreakdown({ payoutAmountCents: payout.amount, transactions })
-      : null;
-    if (breakdown) assertBreakdownReconciles(breakdown);
-
-    const instantFee = payout.method === "instant" && typeof payout.balance_transaction === "object"
-      ? Math.max(0, Number(payout.balance_transaction?.fee ?? 0))
-      : 0;
+    const { payout, automatic, breakdown, truncated, instantFee } = loaded;
     const destination = typeof payout.destination === "object" && payout.destination ? payout.destination : null;
     const money = (cents: number) => ({ amount: cents, formatted: formatCents(cents, payout.currency) });
     res.json({
@@ -1359,6 +1389,94 @@ router.get("/payouts/:id", requirePayoutsRead(), async (req, res) => {
   } catch (err: any) {
     req.log.error({ err }, "Failed to load payout breakdown");
     res.status(err.status ?? 500).json({ error: err.message ?? "Failed to load payout" });
+  }
+});
+
+// ─── GET /api/finance/payouts/:id/statement.pdf — per-payout statement ───────
+
+async function orderNumbersForSources(sellerId: string, sources: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (sources.length === 0) return map;
+  try {
+    const rows = await db
+      .select({ n: orders.orderNumber, c: orders.stripeChargeId, t: orders.stripeTransferId })
+      .from(orders)
+      .where(and(eq(orders.ownerId, sellerId), or(inArray(orders.stripeChargeId, sources), inArray(orders.stripeTransferId, sources))));
+    for (const r of rows) {
+      if (r.c) map.set(r.c, r.n);
+      if (r.t) map.set(r.t, r.n);
+    }
+  } catch { /* labels are best effort; amounts never depend on them */ }
+  return map;
+}
+
+async function storeNameOf(sellerId: string): Promise<string | undefined> {
+  try {
+    const [u] = await db.select({ n: users.brandName }).from(users).where(eq(users.clerkId, sellerId)).limit(1);
+    return u?.n ?? undefined;
+  } catch { return undefined; }
+}
+
+router.get("/payouts/:id/statement.pdf", requirePayoutsRead(), async (req, res) => {
+  const sellerId = getSellerId(req);
+  const payoutId = String(req.params.id);
+  try {
+    const loaded = await loadPayout(sellerId, payoutId);
+    if (loaded.kind === "invalid") {
+      res.status(400).json({ error: "Invalid payout id", code: "INVALID_PAYOUT_ID" });
+      return;
+    }
+    if (loaded.kind === "not_connected") {
+      res.status(409).json({ error: "Connect a payout account to download statements.", code: "STRIPE_NOT_CONNECTED" });
+      return;
+    }
+    if (loaded.kind === "not_found") {
+      res.status(404).json({ error: "Payout not found", code: "PAYOUT_NOT_FOUND" });
+      return;
+    }
+    const { payout, automatic, breakdown, truncated, instantFee, transactions } = loaded;
+    const txns: PayoutStatementTxn[] = transactions.map((t: any) => ({
+      id: String(t.id),
+      created: Number(t.created),
+      type: String(t.type ?? ""),
+      description: t.description ?? null,
+      amount: t.amount,
+      fee: t.fee,
+      net: t.net,
+      source: typeof t.source === "string" ? t.source : t.source?.id ?? null,
+    }));
+    const sources = Array.from(new Set(txns.map((t) => t.source).filter((s): s is string => !!s)));
+    const destination = typeof payout.destination === "object" && payout.destination ? payout.destination : null;
+    const model = buildPayoutStatementModel({
+      payout: {
+        id: payout.id,
+        amountCents: payout.amount,
+        currency: payout.currency,
+        status: payout.status,
+        method: payout.method ?? "standard",
+        automatic,
+        arrivalDate: new Date(payout.arrival_date * 1000),
+        created: new Date(payout.created * 1000),
+        destination: destination
+          ? { last4: destination.last4 ?? null, brand: destination.brand ?? destination.bank_name ?? null }
+          : null,
+        instantFeeCents: instantFee > 0 ? instantFee : null,
+      },
+      breakdown,
+      transactions: txns,
+      orderNumbersBySource: await orderNumbersForSources(sellerId, sources),
+      truncated,
+      storeName: await storeNameOf(sellerId),
+    });
+    const pdf = await renderPayoutStatementPdf(model);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${model.fileName}"`);
+    res.setHeader("Content-Length", String(pdf.length));
+    res.end(pdf);
+  } catch (err: any) {
+    req.log.error({ err }, "Failed to render payout statement");
+    res.status(500).json({ error: "Failed to generate payout statement" });
   }
 });
 
