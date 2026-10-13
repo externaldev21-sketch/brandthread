@@ -1,6 +1,8 @@
 /**
  * Seller-facing drops list — the seller's own drops (api.drops.list()),
- * with a "+ New drop" entry to seller-drop-create.tsx.
+ * with a "+ New drop" entry to seller-drop-create.tsx. Each upcoming drop
+ * also has a "Waitlist" row to seller-drop-hype.tsx (notify-me signups
+ * over time, seller-only).
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -15,6 +17,10 @@ import { EmptyState } from '@/components/layout';
 import { SectionError } from '@/components/InlineFeedback';
 import { StatusBadge } from '@/components/BrandthreadUI';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { isUpcomingDrop } from '@/lib/dropHype';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { previewSellerDrops } from '@/lib/previewSellerDrops';
+import { hapticLight } from '@/lib/haptics';
 
 type DropStatusVariant = 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple';
 
@@ -46,8 +52,16 @@ export default function SellerDrops() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  const sellerPreview = isSellerDevPreview();
+
   const load = useCallback(async () => {
     setError(null);
+    if (sellerPreview) {
+      // The signed-out seller preview never calls the API.
+      setRows(previewSellerDrops(isPreviewDemoMode() ? 'demo' : 'fresh'));
+      setLoading(false);
+      return;
+    }
     try {
       const data: any = await api.drops.list();
       setRows(Array.isArray(data) ? data : []);
@@ -56,7 +70,7 @@ export default function SellerDrops() {
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, sellerPreview]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -64,6 +78,11 @@ export default function SellerDrops() {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     load().finally(() => setRefreshing(false));
+  }
+
+  function openWaitlist(id: string) {
+    hapticLight();
+    router.push((`/seller-drop-hype?dropId=${encodeURIComponent(id)}`) as never);
   }
 
   function openDrop(id: string) {
@@ -106,23 +125,41 @@ export default function SellerDrops() {
             </TouchableOpacity>
           </View>
         ) : (
-          rows.map(row => (
-            <TouchableOpacity
-              key={row.id}
-              style={[styles.row, { borderColor: theme.border, backgroundColor: theme.card }]}
-              onPress={() => openDrop(row.id)}
-              activeOpacity={0.8}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }} numberOfLines={1}>{row.name}</Text>
-                <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 3 }}>
-                  {row.releaseAt ? new Date(row.releaseAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No launch date set'}
-                </Text>
+          rows.map(row => {
+            const upcoming = isUpcomingDrop(row);
+            return (
+              <View key={row.id} style={[styles.card, { borderColor: theme.border, backgroundColor: theme.card }]}>
+                <TouchableOpacity
+                  style={styles.row}
+                  onPress={() => openDrop(row.id)}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }} numberOfLines={1}>{row.name}</Text>
+                    <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 3 }}>
+                      {row.releaseAt ? new Date(row.releaseAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No launch date set'}
+                    </Text>
+                  </View>
+                  <StatusBadge label={row.status.toUpperCase()} variant={statusVariant(row.status)} small />
+                  <Feather name="chevron-right" size={18} color={theme.muted} />
+                </TouchableOpacity>
+                {upcoming && (
+                  <TouchableOpacity
+                    style={[styles.row, styles.subRow, { borderTopColor: theme.border }]}
+                    onPress={() => openWaitlist(row.id)}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Waitlist for ${row.name}`}
+                    testID={`seller-drop-waitlist-${row.id}`}
+                  >
+                    <Feather name="users" size={15} color={theme.muted} />
+                    <Text style={{ flex: 1, color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm }}>Waitlist</Text>
+                    <Feather name="chevron-right" size={18} color={theme.muted} />
+                  </TouchableOpacity>
+                )}
               </View>
-              <StatusBadge label={row.status.toUpperCase()} variant={statusVariant(row.status)} small />
-              <Feather name="chevron-right" size={18} color={theme.muted} />
-            </TouchableOpacity>
-          ))
+            );
+          })
         )}
       </ScrollView>
     </View>
@@ -132,6 +169,8 @@ export default function SellerDrops() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   newBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: RADIUS.sm, padding: 13 },
+  card: { borderWidth: 1, borderRadius: RADIUS.sm, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13 },
+  subRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 11 },
   emptyCta: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 12, borderRadius: RADIUS.md },
 });
