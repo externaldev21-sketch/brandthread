@@ -32,6 +32,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/hooks/useApi';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { hasPlayedOrderConfetti, markOrderConfettiPlayed } from '@/lib/orderConfetti';
+import { hapticSuccess } from '@/lib/haptics';
 import { formatCents } from '@/lib/money';
 import type { CheckoutSession } from '@/services/cartTypes';
 import { FONT, FS, SP } from '@/lib/theme';
@@ -39,7 +40,6 @@ import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { Hairline } from './CheckoutPrimitives';
 import { groupDeliveryWindow } from './OrderSummarySection';
-import { OrderConfetti } from './OrderConfetti';
 import { useCheckoutT } from './CheckoutLanguage';
 import { crispPx } from '@/lib/crispPixel';
 
@@ -192,7 +192,6 @@ export function OrderConfirmation({
   const singleSeller = session.deliveryGroups.length === 1 ? firstGroup : null;
   const brandAvatarUri = firstGroup?.items[0]?.sellerAvatarUri;
 
-  const [confettiPlay, setConfettiPlay] = useState(false);
 
   useEffect(() => {
     // A completed purchase is a meaningful, server-backed moment — exactly
@@ -207,9 +206,11 @@ export function OrderConfirmation({
     // replay the celebration).
     if (finalizing) return;
     let alive = true;
+    // Item 148: no confetti — the success check below is the signal. The
+    // once-per-order guard now only gates the success haptic.
     hasPlayedOrderConfetti(session.id).then((already) => {
       if (!alive || already) return;
-      setConfettiPlay(true);
+      hapticSuccess();
       void markOrderConfettiPlayed(session.id);
     });
     return () => { alive = false; };
@@ -238,8 +239,6 @@ export function OrderConfirmation({
 
   return (
     <View testID="checkout-confirmation">
-      <OrderConfetti play={confettiPlay} />
-
       <View style={styles.hero}>
         {finalizing ? (
           <View style={[styles.pending, { borderColor: theme.border }]}>

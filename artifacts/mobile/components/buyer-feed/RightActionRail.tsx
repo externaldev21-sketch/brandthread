@@ -24,7 +24,7 @@ import { Icon } from '@/components/ui/Icon';
 import { EngagementButton } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
 import { haptics, hapticFollow } from '@/lib/haptics';
-import { FONT, FS, GOLD, ON_DARK } from '@/lib/theme';
+import { FONT, FS, ON_DARK } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
@@ -229,7 +229,10 @@ export function RightActionRail({
           count={formatCount(engagement?.likes ?? 0)}
           value={engagement?.likes ?? 0}
           active={engagement?.liked ?? false}
-          activeColor="#EF4444"
+          // Item 145: LIVE is the app's only red. Liked/unliked reads as
+          // outline → solid white (iconFillTransition), not white → red.
+          activeColor={ON_DARK}
+          iconFillTransition
           inactiveColor={ON_DARK}
           accessibilityLabel={`${engagement?.liked ? 'Unlike' : 'Like'}, ${engagement?.likes ?? 0} likes`}
           accessibilityState={{ checked: engagement?.liked ?? false }}
@@ -284,7 +287,9 @@ export function RightActionRail({
         // Plain count, no roll: only like counts animate (polish #69).
         count={formatCount(engagement?.saves ?? saves)}
         active={engagement?.saved ?? false}
-        activeColor={GOLD}
+        // Monochrome like the heart: outline → solid white, no gold.
+        activeColor={ON_DARK}
+        iconFillTransition
         inactiveColor={ON_DARK}
         accessibilityLabel={`${engagement?.saved ? 'Unsave' : 'Save'}, ${engagement?.saves ?? saves} saves`}
         accessibilityState={{ checked: engagement?.saved ?? false }}

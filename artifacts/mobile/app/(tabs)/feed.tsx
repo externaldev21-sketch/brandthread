@@ -1656,6 +1656,8 @@ function SpotlightPageImpl({
       Animated.timing(heartBurstScale, { toValue: 1, duration: 80, easing: Easing.out(Easing.quad), useNativeDriver: true }),
     ]).start();
     Animated.timing(heartBurst, { toValue: 0, duration: 200, delay: 450, useNativeDriver: true }).start();
+    // Item 148: the big heart is the "liked" signal; the particle spray that
+    // used to play around it was decoration and is gone.
   }
 
   /** The one pop every rail toggle (like, repost, save) shares: 1 -> 1.15
