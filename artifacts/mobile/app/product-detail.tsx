@@ -28,6 +28,7 @@ import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/pro
 import { reportNetworkError } from '@/lib/networkNotice';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
+import { ChipRow } from '@/components/ui/ChipRow';
 function useThemeAliases() {
   const { theme } = useAppTheme();
   return {
@@ -78,7 +79,6 @@ export default function ProductDetailScreen() {
   const [analyticsError, setAnalyticsError] = useState(false);
   const [analyticsRetry, setAnalyticsRetry] = useState(0);
 
-  const tabScrollRef = useRef<ScrollView>(null);
 
   const loadProduct = useCallback(async () => {
     const { isSellerDevPreview, isPreviewDemoMode } = await import('@/lib/devPreview');
@@ -254,11 +254,11 @@ export default function ProductDetailScreen() {
 
       {/* ── Tab Bar ── */}
       <View style={s.tabBarWrap}>
-        <ScrollView
-          ref={tabScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
+        <ChipRow
           contentContainerStyle={s.tabBarContent}
+          selectedIndex={TABS.findIndex(tab => tab.key === activeTab)}
+          hapticOnSelect={false}
+          gap={0}
         >
           {TABS.map((tab, idx) => {
             const active = activeTab === tab.key;
@@ -278,7 +278,7 @@ export default function ProductDetailScreen() {
               </PressableScale>
             );
           })}
-        </ScrollView>
+        </ChipRow>
       </View>
 
       {/* ── Tab Content ── */}

@@ -32,6 +32,7 @@ import { canReorderStatus } from '@/lib/reorderSummary';
 import { RetryRow } from '@/components/ui/RetryRow';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 
+import { ChipRow } from '@/components/ui/ChipRow';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string): string {
@@ -422,21 +423,22 @@ export default function BuyerOrdersScreen() {
           own edge, painting a solid black block over the last chip instead
           of fading it — same antipattern the tab-bar glass zone replaced
           for Activity, see app/activity-center.tsx's history). */}
-      <FlatList
-        horizontal
-        style={{ flexGrow: 0 }}
-        data={FILTER_CHIPS}
-        keyExtractor={i => i.key}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: centeredPadding, gap: 8, paddingBottom: SP.sm }}
-        renderItem={({ item }) => (
+      <ChipRow
+        selectedIndex={FILTER_CHIPS.findIndex(i => i.key === filter)}
+        hapticOnSelect={false}
+        inset={centeredPadding}
+        gap={8}
+        contentContainerStyle={{ paddingBottom: SP.sm }}
+      >
+        {FILTER_CHIPS.map(item => (
           <FilterChip
+            key={item.key}
             label={item.label}
             active={filter === item.key}
             onPress={() => setFilter(item.key)}
           />
-        )}
-      />
+        ))}
+      </ChipRow>
 
       {visibleLoading ? (
         <View style={{ paddingHorizontal: centeredPadding, paddingTop: SP.sm }}>

@@ -46,6 +46,7 @@ import {
 } from '@/services/manufacturerTypes';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
+import { ChipRow } from '@/components/ui/ChipRow';
 // ─── Tab config ───────────────────────────────────────────────────────────────
 
 type Tab = 'discover' | 'my_manufacturers' | 'quotes' | 'samples' | 'production' | 'messages';
@@ -203,10 +204,11 @@ export default function ManufacturerHub() {
           the edge fade stays as a safety net for narrower devices/larger
           text sizes rather than silently clipping the last tab again. */}
       <View style={s.tabBarWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
+        <ChipRow
           contentContainerStyle={s.tabBarContent}
+          selectedIndex={TABS.findIndex(tab => tab.key === activeTab)}
+          hapticOnSelect={false}
+          gap={0}
         >
           {TABS.map(tab => (
             <TouchableOpacity
@@ -228,7 +230,7 @@ export default function ManufacturerHub() {
               {activeTab === tab.key && <View style={s.tabUnderline} />}
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </ChipRow>
         <LinearGradient
           colors={[`${theme.surface}00`, theme.surface]}
           start={{ x: 0, y: 0 }}
@@ -542,12 +544,14 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           </TouchableOpacity>
         </View>
 
-        {/* Category chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.categoryRow}>
+        {/* Category chips — the header sits inside two 16pt gutters (grid +
+            intro), so the row bleeds 32 to reach the screen edge while the
+            first chip stays aligned with the rest of the page. */}
+        <ChipRow contentContainerStyle={s.categoryRow} selectedIndex={CATEGORY_CHIPS.indexOf(filters.category as string)} hapticOnSelect={false} bleed={SP.md * 2} inset={SP.md * 2} gap={SP.sm}>
           {CATEGORY_CHIPS.map((category) => (
             <FilterChip key={category} label={category} active={filters.category === category} onPress={() => toggleCategory(category)} />
           ))}
-        </ScrollView>
+        </ChipRow>
 
         {/* Alibaba Hub Home rails: Verified manufacturers / Fast
             customization / Low MOQ / Top-rated — same card, different sort. */}

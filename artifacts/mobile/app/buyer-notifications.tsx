@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { ErrorState } from '@/components/ui/ErrorState';
 import {
-  View, Text, FlatList, ScrollView,
+  View, Text, FlatList,
   Alert, StyleSheet,
 } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
@@ -31,6 +31,7 @@ import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { syncNotificationBadge } from '@/lib/notificationBadge';
 import { useUser } from '@clerk/expo';
 
+import { ChipRow } from '@/components/ui/ChipRow';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function timeAgo(iso: string): string {
@@ -484,9 +485,7 @@ export default function BuyerNotifications() {
 
       {/* CATEGORY PILLS */}
       <View style={styles.pillsRow}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
+        <ChipRow
           bounces={false}
           overScrollMode="never"
           directionalLockEnabled
@@ -506,6 +505,7 @@ export default function BuyerNotifications() {
             filterOffset.current = event.nativeEvent.contentOffset.x;
             updateFilterEdges();
           }}
+          selectedIndex={PILLS.findIndex(pill => pill.value === selectedCategory)} hapticOnSelect={false}
         >
           {PILLS.map(pill => {
             const active = selectedCategory === pill.value;
@@ -518,7 +518,7 @@ export default function BuyerNotifications() {
               />
             );
           })}
-        </ScrollView>
+        </ChipRow>
         {filterEdges.left && (
           <View pointerEvents="none" style={[styles.pillsEdge, styles.pillsEdgeLeft]}>
             <LinearGradient

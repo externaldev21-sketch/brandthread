@@ -20,6 +20,7 @@ import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { radius } from '@/constants/radii';
 
+import { ChipRow } from '@/components/ui/ChipRow';
 type Colors = ReturnType<typeof useColors>;
 
 // ─── Header ─────────────────────────────────────────────────────────────────
@@ -134,29 +135,40 @@ export function PillTabs<T extends string>({
 }) {
   const colors = useColors();
   const s = useMemo(() => pillTabStyles(colors), [colors]);
-  const content = (
-    <View style={{ flexDirection: 'row', gap: SP.xs, flexWrap: scroll ? 'nowrap' : 'wrap' }}>
-      {options.map(opt => {
-        const active = opt.key === value;
-        return (
-          <TouchableOpacity
-            key={opt.key}
-            onPress={() => { Haptics.selectionAsync(); onChange(opt.key); }}
-            style={[s.pill, active && s.pillActive]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: active }}
-          >
-            <Text style={[s.pillText, active && s.pillTextActive]}>{opt.label}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-  if (!scroll) return <View style={{ marginBottom: SP.md }}>{content}</View>;
+  const pills = options.map(opt => {
+    const active = opt.key === value;
+    return (
+      <TouchableOpacity
+        key={opt.key}
+        onPress={() => { Haptics.selectionAsync(); onChange(opt.key); }}
+        style={[s.pill, active && s.pillActive]}
+        accessibilityRole="button"
+        accessibilityState={{ selected: active }}
+      >
+        <Text style={[s.pillText, active && s.pillTextActive]}>{opt.label}</Text>
+      </TouchableOpacity>
+    );
+  });
+  if (!scroll) {
+    return (
+      <View style={{ marginBottom: SP.md }}>
+        <View style={{ flexDirection: 'row', gap: SP.xs, flexWrap: 'wrap' }}>{pills}</View>
+      </View>
+    );
+  }
+  // Every caller sits inside 16pt of padding (screen gutter or a padded
+  // Card), so the row bleeds out to that edge and keeps a 16pt inset.
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SP.md }} contentContainerStyle={{ paddingRight: SP.md }}>
-      {content}
-    </ScrollView>
+    <ChipRow
+      selectedIndex={options.findIndex(opt => opt.key === value)}
+      hapticOnSelect={false}
+      bleed={SP.md}
+      inset={SP.md}
+      gap={SP.xs}
+      style={{ marginBottom: SP.md }}
+    >
+      {pills}
+    </ChipRow>
   );
 }
 const pillTabStyles = (colors: Colors) => StyleSheet.create({

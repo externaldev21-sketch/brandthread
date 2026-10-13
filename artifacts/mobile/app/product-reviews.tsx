@@ -5,7 +5,7 @@
  * screens on Mobbin.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Pressable } from 'react-native';
 import { useReviewActions } from '@/lib/useReviewActions';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
@@ -23,6 +23,7 @@ import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { fitChipText, isVerifiedReview } from '@/lib/reviewDisplay';
 import { radius } from '@/constants/radii';
 
+import { ChipRow } from '@/components/ui/ChipRow';
 type StarFilter = 5 | 4 | 3 | 2 | 1 | null;
 
 export default function ProductReviewsScreen() {
@@ -92,7 +93,7 @@ export default function ProductReviewsScreen() {
         <ErrorState message="Couldn't load reviews." onRetry={() => { void load(); }} style={{ flex: 1 }} />
       ) : (
         <>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
+          <ChipRow contentContainerStyle={s.chipsRow} selectedIndex={starFilter != null ? 6 - starFilter : sizeFilter != null ? 6 + sizes.indexOf(sizeFilter) : photosOnly ? 0 : undefined}>
             <Chip label="With photos" active={photosOnly} onPress={() => setPhotosOnly(v => !v)} accent={theme.accent} />
             {([5, 4, 3, 2, 1] as const).map(star => (
               <Chip
@@ -112,7 +113,7 @@ export default function ProductReviewsScreen() {
                 accent={theme.accent}
               />
             ))}
-          </ScrollView>
+          </ChipRow>
 
           <FlatList
             {...LONG_LIST_TUNING}

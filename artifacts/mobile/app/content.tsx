@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import {
-  ScrollView, FlatList, View, Text, TouchableOpacity, StyleSheet,
+  FlatList, View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -20,6 +20,7 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { radius } from '@/constants/radii';
 
+import { ChipRow } from '@/components/ui/ChipRow';
 type FilterTab = 'all' | ContentStatus;
 
 // Only types that create-post.tsx actually supports today. See docs/polish/punch-list.md
@@ -380,11 +381,13 @@ export default function ContentScreen() {
           </View>
 
           {/* Filter tabs */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
+          <ChipRow
             style={s.filterScroll}
             contentContainerStyle={s.filterRow}
+            selectedIndex={VALID_TABS.indexOf(tab)}
+            hapticOnSelect={false}
+            bleed={SP.md}
+            gap={SP.xs}
           >
             {VALID_TABS.map(t => (
               <TouchableOpacity
@@ -408,7 +411,7 @@ export default function ContentScreen() {
                 </Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </ChipRow>
 
         </View>
       </>

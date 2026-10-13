@@ -36,6 +36,7 @@ import {
 } from '@/services/storeTypes';
 import { radius } from '@/constants/radii';
 
+import { ChipRow } from '@/components/ui/ChipRow';
 type EditorMode = 'sections' | 'branding' | 'header' | 'footer' | 'product_page' | 'collection_page';
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';
 
@@ -1210,10 +1211,10 @@ export default function StoreEditor() {
       />
 
       {/* Tab Bar */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
+      <ChipRow
         contentContainerStyle={styles.tabBar}
+        selectedIndex={TABS.findIndex(tab => tab.value === mode)}
+        hapticOnSelect={false}
       >
         {TABS.map(tab => (
           <TouchableOpacity
@@ -1227,7 +1228,7 @@ export default function StoreEditor() {
             {mode === tab.value && <View style={styles.tabUnderline} />}
           </TouchableOpacity>
         ))}
-      </ScrollView>
+      </ChipRow>
 
       {/* Tab Content */}
       <View style={{ flex: 1 }}>
