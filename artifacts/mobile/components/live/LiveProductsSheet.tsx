@@ -10,13 +10,13 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
-import { formatCents } from '@/lib/money';
 import { TABULAR_NUMS } from '@/constants/typography';
 import type { LiveProduct } from '@/lib/live/types';
 import { LIVE_RED } from './LiveAvatarRing';
 import { Button } from '@/components/ui/Button';
 import { describeLiveCode, type LiveCode } from '@/lib/live/liveCommerce';
 import { radius } from '@/constants/radii';
+import { formatMoney } from '@/lib/format';
 
 export function LiveProductsSheet({
   visible, hostName, products, pinnedProductId, onBuy, onClose, codes = [], appliedCode = null, onApplyCode,
@@ -59,7 +59,7 @@ export function LiveProductsSheet({
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={[styles.name, { color: theme.text }]}>{c.code}</Text>
                       <Text style={[styles.sub, { color: theme.muted }]}>
-                        {describeLiveCode(c)}{c.minOrderCents > 0 ? ` over ${formatCents(c.minOrderCents)}` : ''}
+                        {describeLiveCode(c)}{c.minOrderCents > 0 ? ` over ${formatMoney(c.minOrderCents)}` : ''}
                       </Text>
                     </View>
                     <Button
@@ -91,7 +91,7 @@ export function LiveProductsSheet({
                     </View>
                   )}
                   <Text style={[styles.name, { color: theme.text }]} numberOfLines={2}>{p.name}</Text>
-                  <Text style={[styles.price, { color: theme.text }, TABULAR_NUMS]}>{formatCents(p.priceCents)}</Text>
+                  <Text style={[styles.price, { color: theme.text }, TABULAR_NUMS]}>{formatMoney(p.priceCents)}</Text>
                 </View>
                 <Pressable
                   onPress={() => onBuy(p.productId)}

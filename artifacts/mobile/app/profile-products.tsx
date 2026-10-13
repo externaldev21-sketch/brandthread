@@ -20,7 +20,6 @@ import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import { CachedImage } from '@/components/CachedImage';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { productDetailHref } from '@/lib/profileNavigation';
 import { getSellerShopPage, type ShopProduct } from '@/services/profileService';
@@ -28,6 +27,7 @@ import { InteractionLayer, ProfileButton, ProfileGlassButton } from '@/component
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { formatMoney } from '@/lib/format';
 
 const GAP = SP.sm;
 
@@ -120,7 +120,7 @@ export default function ProfileProductsScreen() {
         <PressableScale
           onPress={() => openProduct(item)}
           accessibilityRole="button"
-          accessibilityLabel={`${item.name}, ${formatCents(item.priceCents)}, ${stock.label}`}
+          accessibilityLabel={`${item.name}, ${formatMoney(item.priceCents)}, ${stock.label}`}
           testID={`profile-product-${item.id}`}
           style={styles.card}
         >
@@ -136,7 +136,7 @@ export default function ProfileProductsScreen() {
               </View>
               <View style={styles.info}>
                 <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
-                <Text style={styles.price}>{formatCents(item.priceCents)}</Text>
+                <Text style={styles.price}>{formatMoney(item.priceCents)}</Text>
                 <Text style={[styles.stock, { color: stockColor }]}>{stock.label}</Text>
               </View>
               <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.md} theme={theme} />

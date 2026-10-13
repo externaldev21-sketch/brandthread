@@ -17,7 +17,6 @@ import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
 import { LinearGradient } from 'expo-linear-gradient';
-import { formatCents } from '@/lib/money';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { isSellerDevPreview, isPreviewDemoMode, isPreviewFreshMode } from '@/lib/devPreview';
@@ -805,8 +804,8 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
       {mfg.unitPriceMinCents > 0 && (
         <Text style={card.priceRange} numberOfLines={1}>
           {mfg.unitPriceMinCents === mfg.unitPriceMaxCents
-            ? formatCents(mfg.unitPriceMinCents)
-            : `${formatCents(mfg.unitPriceMinCents)} – ${formatCents(mfg.unitPriceMaxCents)}`} <Text style={card.priceUnit}>/ unit</Text>
+            ? formatMoney(mfg.unitPriceMinCents)
+            : `${formatMoney(mfg.unitPriceMinCents)} – ${formatMoney(mfg.unitPriceMaxCents)}`} <Text style={card.priceUnit}>/ unit</Text>
         </Text>
       )}
       <Text style={card.moqLine} numberOfLines={1}>Min. order: {mfg.moq > 0 ? `${mfg.moq.toLocaleString('en-US')} pieces` : 'Contact for MOQ'}</Text>
@@ -1208,7 +1207,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   useFocusEffect(useCallback(() => { setLoading(true); load(); }, []));
 
   const handleAccept = (quote: Quote) => {
-    Alert.alert('Accept Quote', `Accept this quote for ${formatCents(quote.unitPriceCents)}/unit?`, [
+    Alert.alert('Accept Quote', `Accept this quote for ${formatMoney(quote.unitPriceCents)}/unit?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Accept', onPress: () => acceptQuote(quote.id).then(load)
         .catch(() => Alert.alert('Quote update failed', 'Could not accept this quote. Refresh and try again.')) },
@@ -1335,7 +1334,7 @@ function QuoteRequestCard({ req, manufacturerName, onView, onWithdraw }: { req: 
         <StatusBadge label={req.status.replace(/_/g, ' ')} variant={quoteRequestStatusVariant(req.status)} small />
       </View>
       {!!manufacturerName && <Text style={qc.mfgName}>{manufacturerName}</Text>}
-      <Text style={qc.details}>Qty: {req.quantity}{req.targetUnitPriceCents ? ` · Target: ${formatCents(req.targetUnitPriceCents)}/unit` : ''}</Text>
+      <Text style={qc.details}>Qty: {req.quantity}{req.targetUnitPriceCents ? ` · Target: ${formatMoney(req.targetUnitPriceCents)}/unit` : ''}</Text>
       {req.submittedAt && <Text style={qc.date}>Submitted: {fmtDate(req.submittedAt)}</Text>}
       <View style={qc.actionRow}>
         <Button label="View" variant="secondary" size="compact" onPress={onView} />
@@ -1360,7 +1359,7 @@ function QuoteReceivedCard({ quote, manufacturerName, canCompare, onAccept, onDe
         <StatusBadge label="Quote received" variant="success" small />
       </View>
       {!!manufacturerName && <Text style={qc.mfgName}>{manufacturerName}</Text>}
-      <Text style={qc.details}>Unit: {formatCents(quote.unitPriceCents)} · Total: ~{formatCents(quote.totalEstimateCents)}</Text>
+      <Text style={qc.details}>Unit: {formatMoney(quote.unitPriceCents)} · Total: ~{formatMoney(quote.totalEstimateCents)}</Text>
       {quote.validUntil && <Text style={qc.date}>Expires: {fmtDate(quote.validUntil)}</Text>}
       <View style={[qc.actionRow, { flexWrap: 'wrap' }]}>
         <Button label="Accept" variant="primary" size="compact" onPress={onAccept} />
@@ -1454,7 +1453,7 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
             {item.estimatedCompletionDate && (
               <Text style={smpCard.date}>Est: {fmtDate(item.estimatedCompletionDate)}</Text>
             )}
-            <Text style={smpCard.details}>Type: {item.type.replace(/_/g, ' ')} · Cost: {formatCents(item.costCents)}</Text>
+            <Text style={smpCard.details}>Type: {item.type.replace(/_/g, ' ')} · Cost: {formatMoney(item.costCents)}</Text>
             <View style={smpCard.actionRow}>
               <Button
                 label={item.status === 'pending_payment' || item.status === 'awaiting_payment' ? 'Review & pay' : 'Track'}

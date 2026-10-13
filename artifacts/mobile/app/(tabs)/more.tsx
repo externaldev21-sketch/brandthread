@@ -24,8 +24,8 @@ import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, SecondaryButton, NavigationCard, StatusBadge } from '@/components/BrandthreadUI';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
-import { formatCents } from '@/lib/money';
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { formatMoney } from '@/lib/format';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -282,7 +282,7 @@ export default function MoreScreen() {
                         ? unreadMessages
                         : item.badge;
                     const description = item.label === 'Payouts' && threadCash.balanceCents != null
-                      ? `${item.desc} · ${formatCents(threadCash.balanceCents)} Thread Cash`
+                      ? `${item.desc} · ${formatMoney(threadCash.balanceCents)} Thread Cash`
                       : item.desc;
                     return (
                       <NavigationCard

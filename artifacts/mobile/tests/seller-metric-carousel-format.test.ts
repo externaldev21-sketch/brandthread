@@ -4,8 +4,8 @@ import { computeMetricChange } from '@/lib/sellerMetricChange';
 
 describe('formatCentsCompact', () => {
   it('shows the exact amount under $1,000, never truncated', () => {
-    expect(formatCentsCompact(0)).toBe('$0.00');
-    expect(formatCentsCompact(84200)).toBe('$842.00');
+    expect(formatCentsCompact(0)).toBe('$0');
+    expect(formatCentsCompact(84200)).toBe('$842');
     expect(formatCentsCompact(99999)).toBe('$999.99');
   });
 

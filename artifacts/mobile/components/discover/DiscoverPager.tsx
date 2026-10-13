@@ -43,7 +43,6 @@ import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useApi } from '@/lib/api';
-import { formatCents } from '@/lib/money';
 import { FONT, GRID_MAX_WIDTH, SP } from '@/lib/theme';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
@@ -66,6 +65,7 @@ import {
 } from '@/lib/cartFlight';
 import { BuyNowFlow } from '@/components/buy-now/BuyNowFlow';
 import { VariantPickerSheet } from '@/components/buy-now/VariantPickerSheet';
+import { formatMoney } from '@/lib/format';
 
 // ─── Contract types (mirrors lib/api.ts discover.feed exactly) ────────────────
 
@@ -566,9 +566,9 @@ function DiscoverCard({
       <Text style={styles.productName} numberOfLines={2}>{item.productName}</Text>
 
       <View style={styles.priceRow}>
-        <Text style={[styles.price, TABULAR_NUMS]}>{formatCents(item.priceCents)}</Text>
+        <Text style={[styles.price, TABULAR_NUMS]}>{formatMoney(item.priceCents)}</Text>
         {hasDiscount && (
-          <Text style={[styles.comparePrice, TABULAR_NUMS]}>{formatCents(item.compareAtPriceCents!)}</Text>
+          <Text style={[styles.comparePrice, TABULAR_NUMS]}>{formatMoney(item.compareAtPriceCents!)}</Text>
         )}
       </View>
 

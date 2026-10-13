@@ -13,8 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useApi } from '@/lib/api';
-import { fmtDate } from '@/lib/format';
-import { formatCents } from '@/lib/money';
+import { fmtDate, formatMoney } from '@/lib/format';
 import { getCustomerAnalytics, getFilterState } from '@/services/analyticsService';
 import { CustomerAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -152,7 +151,7 @@ export default function AnalyticsCustomersScreen() {
                   </Text>
                 </View>
                 <View style={s.customerSpend}>
-                  <Text style={s.customerSpendValue}>{formatCents(customer.totalCents)}</Text>
+                  <Text style={s.customerSpendValue}>{formatMoney(customer.totalCents)}</Text>
                   {customer.customerId ? <Feather name="chevron-right" size={16} color={colors.mutedForeground} /> : null}
                 </View>
               </>
@@ -197,7 +196,7 @@ export default function AnalyticsCustomersScreen() {
               <Text style={[s.cohortCell, { color: retColor(colors, c.month1RetentionPct) }]}>{c.month1RetentionPct > 0 ? `${c.month1RetentionPct}%` : '—'}</Text>
               <Text style={[s.cohortCell, { color: retColor(colors, c.month2RetentionPct) }]}>{c.month2RetentionPct > 0 ? `${c.month2RetentionPct}%` : '—'}</Text>
               <Text style={[s.cohortCell, { color: retColor(colors, c.month3RetentionPct) }]}>{c.month3RetentionPct > 0 ? `${c.month3RetentionPct}%` : '—'}</Text>
-              <Text style={[s.cohortCell, { color: colors.warning }]}>{formatCents(c.avgLtvCents)}</Text>
+              <Text style={[s.cohortCell, { color: colors.warning }]}>{formatMoney(c.avgLtvCents)}</Text>
             </View>
           ))}
         </View>

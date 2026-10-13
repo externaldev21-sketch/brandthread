@@ -54,7 +54,6 @@ import { FeedSkeleton, PressableScale } from '@/components/BrandthreadUI';
 import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
-import { formatCents } from '@/lib/money';
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
 import { remoteVideoUri, withVideoCaching } from '@/lib/videoPreload';
 import { useFeedVideoPreload } from '@/hooks/useFeedVideoPreload';
@@ -101,6 +100,7 @@ import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { formatMoney } from '@/lib/format';
 
 /**
  * Scopes the feed player to one creator's videos (profile grid tap) or to the
@@ -281,7 +281,7 @@ function BuyerHighDemandPage({ pageWidth, pageHeight, bottomClearance = 100, top
                   <View style={{ alignItems: 'flex-end', gap: 4 }}>
                     {item.commerce.currentPriceCents != null && (
                       <Text style={[hdStyles.price, isUrgent && { color: theme.accent }]}>
-                        {formatCents(item.commerce.currentPriceCents)}
+                        {formatMoney(item.commerce.currentPriceCents)}
                       </Text>
                     )}
                     {isUrgent && (
@@ -1922,7 +1922,7 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
       ? `${post.sound.soundTitle} · ${post.sound.artist}`
       : `Original Sound · ${post.authorHandle.slice(1)}`,
     productName: tag?.productName ?? 'Shop Now',
-    productPrice: tag ? formatCents(tag.priceCents) : '',
+    productPrice: tag ? formatMoney(tag.priceCents) : '',
     productOriginalPrice: null,
     accentColor: post.authorColor,
     likes: post.likesCount,

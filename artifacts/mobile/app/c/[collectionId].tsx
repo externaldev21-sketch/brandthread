@@ -19,9 +19,9 @@ import {
 } from '@/lib/theme';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { ResponsiveContainer } from '@/components/layout';
-import { formatCents } from '@/lib/money';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { radius } from '@/constants/radii';
+import { formatMoney } from '@/lib/format';
 
 const { width: W } = Dimensions.get('window');
 const GAP = SP.sm;
@@ -159,7 +159,7 @@ export default function PublicCollectionScreen() {
                   </View>
                 )}
                 <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
-                {item.priceCents != null ? <Text style={styles.tilePrice}>{formatCents(item.priceCents)}</Text> : null}
+                {item.priceCents != null ? <Text style={styles.tilePrice}>{formatMoney(item.priceCents)}</Text> : null}
               </View>
             )}
           />

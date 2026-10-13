@@ -23,7 +23,8 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { StatusBadge, PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { Product } from '@/services/productTypes';
-import { formatCents, integerPercent } from '@/lib/money';
+import { integerPercent } from '@/lib/money';
+import { formatMoney } from '@/lib/format';
 
 export function getCategoryColors(category: string, theme: AppThemePreset): readonly [string, string] {
   if (category === 'T-shirt' || category === 'Sweatshirt') return [theme.accent, theme.secondary];
@@ -126,7 +127,7 @@ export const ProductCard = React.memo(function ProductCard({
               onPress={() => onPress(product)}
               onPressIn={onPressIn ? () => onPressIn(product) : undefined}
               activeScale={0.98}
-              accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatCents(price)}`}
+              accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatMoney(price)}`}
             >
             <View style={{ height: imageHeight, width: '100%' }}>
             {coverUri ? (
@@ -182,9 +183,9 @@ export const ProductCard = React.memo(function ProductCard({
             </Text>
 
             <View style={s.priceRow}>
-              <Text style={[s.price, { color: theme.text }]}>{formatCents(price)}</Text>
+              <Text style={[s.price, { color: theme.text }]}>{formatMoney(price)}</Text>
               {compare && compare > price && (
-                <Text style={[s.compare, { color: theme.subtle }]}>{formatCents(compare)}</Text>
+                <Text style={[s.compare, { color: theme.subtle }]}>{formatMoney(compare)}</Text>
               )}
               {discountPct !== null && (
                 <Text style={[s.discount, { color: theme.error }]}>-{discountPct}%</Text>

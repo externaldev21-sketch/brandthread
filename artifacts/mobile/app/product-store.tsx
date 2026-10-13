@@ -22,9 +22,10 @@ import { getProduct } from '@/services/productService';
 import { Product, ProductVariant, OptionValue } from '@/services/productTypes';
 import { useApi } from '@/lib/api';
 import { calcPricing } from '@/lib/productUtils';
-import { formatCents, integerPercent } from '@/lib/money';
+import { integerPercent } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { buildProductUrl } from '@/lib/shareLinks';
+import { formatMoney } from '@/lib/format';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const GALLERY_H = 380;
@@ -387,9 +388,9 @@ export default function ProductStoreScreen() {
 
           {/* Price row */}
           <View style={s.priceRow}>
-            <Text style={s.retailPrice}>{formatCents(effectivePrice)}</Text>
+            <Text style={s.retailPrice}>{formatMoney(effectivePrice)}</Text>
             {isOnSale && effectiveCompare && (
-              <Text style={s.comparePrice}>{formatCents(effectiveCompare)}</Text>
+              <Text style={s.comparePrice}>{formatMoney(effectiveCompare)}</Text>
             )}
             {discountPct !== undefined && (
               <View style={s.discountBadge}>
@@ -430,7 +431,7 @@ export default function ProductStoreScreen() {
             {selectedVariant && selectedVariant.priceCents !== undefined && (
               <View style={s.variantOverride}>
                 <Text style={s.variantOverrideLabel}>
-                  {selectedVariant.title}: {formatCents(selectedVariant.priceCents)}
+                  {selectedVariant.title}: {formatMoney(selectedVariant.priceCents)}
                   {'  '}
                   <Text style={s.variantStock}>
                     ({selectedVariant.inventoryQuantity} in stock)

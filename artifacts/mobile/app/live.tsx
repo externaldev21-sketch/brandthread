@@ -31,7 +31,6 @@ import { CachedImage } from '@/components/CachedImage';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { FONT, FS } from '@/lib/theme';
-import { formatCents } from '@/lib/money';
 import { hapticLight } from '@/lib/haptics';
 import { profileHref } from '@/lib/profileNavigation';
 import { useApi } from '@/lib/api';
@@ -58,6 +57,7 @@ import { a11yHidden } from '@/lib/a11yHidden';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { LIVE_VIEWER_GESTURE } from '@/lib/firstRunTips/content';
 import { radius } from '@/constants/radii';
+import { formatMoney } from '@/lib/format';
 
 /** Same preference key as the Threads feed, so sound on/off carries over. */
 const SOUND_PREF_KEY = 'bt:feed-sound-on:v1';
@@ -357,7 +357,7 @@ export default function LiveScreen() {
   const handleGiftSent = useCallback(async (stream: LiveStream, amountCents: number) => {
     setGiftFor(null);
     try {
-      await pager.sendChat(`sent ${formatCents(amountCents)} Thread Cash`);
+      await pager.sendChat(`sent ${formatMoney(amountCents)} Thread Cash`);
     } catch {
       // The transfer already went through — a failed chat post isn't worth
       // surfacing as an error on top of a successful gift.

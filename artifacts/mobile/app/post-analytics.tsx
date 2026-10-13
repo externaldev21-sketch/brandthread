@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useColors } from '@/hooks/useColors';
 import { FS, FONT } from '@/lib/theme';
+import { formatMoney } from '@/lib/format';
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 
@@ -35,7 +36,7 @@ function formatNumber(n: number): string {
 }
 
 function formatRevenue(n: number): string {
-  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatMoney(Math.round(n * 100));
 }
 
 function formatPeakHour(hour: number): string {
@@ -243,7 +244,7 @@ export default function PostAnalyticsScreen() {
           />
           <AnalyticsRow
             label="Attributed revenue"
-            value={formatRevenue(metrics.conversions.revenueCents / 100)}
+            value={formatMoney(metrics.conversions.revenueCents)}
             detail="From non-cancelled attributed orders"
           />
           <AnalyticsRow

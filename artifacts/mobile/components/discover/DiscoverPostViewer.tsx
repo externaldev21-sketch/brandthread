@@ -16,12 +16,12 @@ import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui/IconButton';
 import FollowButton from '@/components/social/FollowButton';
-import { formatCents } from '@/lib/money';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, SP, ON_DARK } from '@/lib/theme';
 import { radius } from '@/constants/radii';
 import { hapticLight, hapticPrimaryAction } from '@/lib/haptics';
 import type { DiscoverPost } from '@/lib/discoverFeed';
+import { formatMoney } from '@/lib/format';
 
 const { height: WINDOW_HEIGHT } = Dimensions.get('window');
 
@@ -107,7 +107,7 @@ function ViewerPage({
           >
             <Feather name="shopping-bag" size={14} color="#000000" />
             <Text style={styles.shopPillText}>
-              Shop the look{post.productTags!.length > 1 ? ` · ${post.productTags!.length}` : ` · ${formatCents(post.productTags![0].priceCents)}`}
+              Shop the look{post.productTags!.length > 1 ? ` · ${post.productTags!.length}` : ` · ${formatMoney(post.productTags![0].priceCents)}`}
             </Text>
           </Pressable>
         )}

@@ -45,7 +45,7 @@ import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, ICON, SHADOW_SM,
 } from '@/lib/theme';
-import { divideCents, formatCents } from '@/lib/money';
+import { divideCents } from '@/lib/money';
 import {
   BOOST_BUDGET_STEPS,
   BOOST_BUDGET_MIN_CENTS,
@@ -60,6 +60,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { radius } from '@/constants/radii';
+import { formatMoney } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -908,7 +909,7 @@ export default function BoostScreen() {
         </View>
         <View style={s.summaryDivider} />
         <View style={s.summaryItem}>
-          <Text style={s.summaryValue}>{formatCents(summary.spentCentsThisMonth)}</Text>
+          <Text style={s.summaryValue}>{formatMoney(summary.spentCentsThisMonth)}</Text>
           <Text style={s.summaryLabel}>Spent this month</Text>
         </View>
         <View style={s.summaryDivider} />
@@ -946,7 +947,7 @@ export default function BoostScreen() {
                 </Text>
               </View>
               <Text style={s.historyMeta}>
-                {formatCents(b.budgetCents)} · {b.durationDays}d
+                {formatMoney(b.budgetCents)} · {b.durationDays}d
               </Text>
             </View>
 
@@ -1105,12 +1106,12 @@ export default function BoostScreen() {
           <View style={s.sliderCard}>
             <View style={s.sliderCardHeader}>
               <Text style={s.sliderCardLabel}>Budget</Text>
-              <Text style={s.sliderCardValue}>{formatCents(budgetCents)}</Text>
+              <Text style={s.sliderCardValue}>{formatMoney(budgetCents)}</Text>
             </View>
             <BudgetStepSlider value={budgetCents} onChange={setBudgetCents} />
             <View style={s.sliderCardFooter}>
-              <Text style={s.sliderCardHint}>{formatCents(BOOST_BUDGET_MIN_CENTS)}</Text>
-              <Text style={s.sliderCardHint}>{formatCents(BOOST_BUDGET_MAX_CENTS)}</Text>
+              <Text style={s.sliderCardHint}>{formatMoney(BOOST_BUDGET_MIN_CENTS)}</Text>
+              <Text style={s.sliderCardHint}>{formatMoney(BOOST_BUDGET_MAX_CENTS)}</Text>
             </View>
           </View>
 
@@ -1144,7 +1145,7 @@ export default function BoostScreen() {
               {reach.low.toLocaleString()}–{reach.high.toLocaleString()} people
             </Text>
             <Text style={s.reachDailyBudget}>
-              {formatCents(dailyCents)}/day · {formatCents(budgetCents)} total
+              {formatMoney(dailyCents)}/day · {formatMoney(budgetCents)} total
             </Text>
             <Text style={s.reachDisclaimer}>
               Estimated reach is a planning aid based on your budget and is not a guarantee
@@ -1161,14 +1162,14 @@ export default function BoostScreen() {
             disabled={isLoading}
             activeOpacity={0.85}
             accessibilityRole="button"
-            accessibilityLabel={`Boost post · ${formatCents(budgetCents)}`}
+            accessibilityLabel={`Boost post · ${formatMoney(budgetCents)}`}
             testID="boost-pay-btn"
           >
             {isLoading ? (
               <ActivityIndicator color="#000" size="small" />
             ) : (
               <>
-                <Text style={s.primaryBtnText}>Boost post · {formatCents(budgetCents)}</Text>
+                <Text style={s.primaryBtnText}>Boost post · {formatMoney(budgetCents)}</Text>
                 <Feather name="zap" size={ICON.sm} color="#000" />
               </>
             )}
@@ -1208,7 +1209,7 @@ export default function BoostScreen() {
             <View style={[s.sliderCard, { marginTop: SP.lg, width: '100%' }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.sm }}>
                 <Text style={s.sliderCardLabel}>Budget</Text>
-                <Text style={s.sliderCardValue}>{formatCents(b.budgetCents)}</Text>
+                <Text style={s.sliderCardValue}>{formatMoney(b.budgetCents)}</Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.sm }}>
                 <Text style={s.sliderCardLabel}>Duration</Text>

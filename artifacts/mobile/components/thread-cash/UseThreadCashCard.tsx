@@ -18,10 +18,10 @@ import { randomUUID } from 'expo-crypto';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useApi } from '@/lib/api';
-import { formatCents } from '@/lib/money';
 import type { CheckoutThreadCashRedemption } from '@/services/cartTypes';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { ThreadCashBillIcon } from './ThreadCashBill';
+import { formatMoney } from '@/lib/format';
 
 export function UseThreadCashCard({
   maxDiscountCents,
@@ -129,8 +129,8 @@ export function UseThreadCashCard({
           {isDisabled
             ? disabledReason
             : redemption
-              ? `−${formatCents(redemption.discountCents)} applied`
-              : `${formatCents(balanceCents)} available`}
+              ? `−${formatMoney(redemption.discountCents)} applied`
+              : `${formatMoney(balanceCents)} available`}
         </Text>
       </View>
       {applying ? (

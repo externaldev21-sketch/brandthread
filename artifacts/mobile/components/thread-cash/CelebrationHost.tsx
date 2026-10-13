@@ -30,8 +30,8 @@ import Animated, {
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticSuccess } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { formatCents } from '@/lib/money';
 import { ThreadCashBillIcon, THREAD_CASH_GREEN_DEEP, THREAD_CASH_GREEN_MID } from './ThreadCashBill';
+import { formatMoney } from '@/lib/format';
 
 export type CelebrateThreadCashPayload = {
   /** Cents received. */
@@ -237,11 +237,11 @@ function BurstToast({ event, onDone }: { event: CelebrationEvent; onDone: () => 
         { top: topInset(insets.top), backgroundColor: theme.card, borderColor: theme.border },
       ]}
       accessibilityLiveRegion="polite"
-      accessibilityLabel={`Received ${formatCents(event.amount)} Thread Cash from ${event.from}`}
+      accessibilityLabel={`Received ${formatMoney(event.amount)} Thread Cash from ${event.from}`}
     >
       <ThreadCashBillIcon size={22} />
       <Text style={[styles.toastText, { color: theme.text }]} numberOfLines={1}>
-        +{formatCents(event.amount)} Thread Cash{' '}
+        +{formatMoney(event.amount)} Thread Cash{' '}
         <Text style={{ color: theme.muted, fontFamily: FONT.regular }}>from {event.from}</Text>
       </Text>
     </Animated.View>

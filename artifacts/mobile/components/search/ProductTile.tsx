@@ -1,7 +1,6 @@
 import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
 import { SaveHeart } from '@/components/SaveHeart';
 import { hapticPrimaryAction } from '@/lib/haptics';
@@ -10,6 +9,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+import { formatMoney } from '@/lib/format';
 
 // Fixed 4:5 aspect ratio for every card so the grid never has uneven row
 // heights — no per-image aspect-ratio measurement.
@@ -60,7 +60,7 @@ export function ProductTile({ item, accent: _accent, onPress, width }: {
           )}
           {typeof item.priceCents === 'number' && (
             <View style={styles.priceChip}>
-              <Text style={styles.priceText}>{formatCents(item.priceCents)}</Text>
+              <Text style={styles.priceText}>{formatMoney(item.priceCents)}</Text>
             </View>
           )}
         </View>

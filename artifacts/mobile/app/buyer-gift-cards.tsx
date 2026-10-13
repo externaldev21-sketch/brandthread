@@ -15,6 +15,7 @@ import { GiftCardFace } from '@/components/giftCards/GiftCardFace';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { formatCents } from '@/lib/money';
+import { formatMoney } from '@/lib/format';
 import { FONT, FS, SP } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
@@ -94,13 +95,13 @@ export default function BuyerGiftCardsScreen() {
         <GiftCardFace
           compact
           storeName={card.storeName ?? 'Gift card'}
-          amountText={formatCents(card.role === 'owner' ? card.balanceCents : card.initialCents)}
+          amountText={formatMoney(card.role === 'owner' ? card.balanceCents : card.initialCents)}
           caption={`${giftCardMask(card)} · ${card.role === 'owner' ? giftCardStatusLabel(card) : `Sent to ${card.recipientName || card.recipientEmail || 'a friend'}`}`}
         />
       </PressableScale>
       {openId === card.id ? (
         <View style={s.history}>
-          {card.role === 'owner' ? <Text style={s.fine}>Works only at {card.storeName}. {formatCents(card.initialCents)} to start.</Text> : null}
+          {card.role === 'owner' ? <Text style={s.fine}>Works only at {card.storeName}. {formatMoney(card.initialCents)} to start.</Text> : null}
           {history.map(entry => (
             <View key={entry.id} style={s.historyRow}>
               <View style={{ flex: 1 }}>
