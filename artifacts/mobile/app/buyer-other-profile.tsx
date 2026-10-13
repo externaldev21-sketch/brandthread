@@ -70,13 +70,13 @@ type RemoteProfile = {
   userId?: string;
   name: string; username: string | null; displayName: string | null;
   bio: string | null; avatarUrl?: string | null;
+  pronouns?: string | null;
   followersCount: number; followingCount: number; likesCount?: number;
   isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
   iBlockedThem: boolean;
   postsCount: number;
   /** Private account: a follow request from me is pending / the account is private. */
   followRequested?: boolean; isPrivate?: boolean;
-  pronouns?: string | null;
 };
 
 export default function BuyerOtherProfileScreen() {

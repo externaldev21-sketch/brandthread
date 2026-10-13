@@ -2814,12 +2814,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<{
           userId: string; name: string; username: string | null;
           displayName: string | null; bio: string | null; avatarUrl: string | null;
+          pronouns?: string | null;
           accountType: string; initials: string; color: string; handle: string;
           followersCount: number; followingCount: number; postsCount: number; likesCount?: number;
           isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
           iBlockedThem: boolean;
           isPrivate?: boolean; followRequested?: boolean; contentHidden?: boolean;
-          pronouns?: string | null;
         }>(`/api/social/profile/${encodeURIComponent(userId)}`),
       /** Posts where someone tagged this profile (the profile "Tagged" tab). */
       tagged: (userId: string, limit = 30, offset = 0) =>
