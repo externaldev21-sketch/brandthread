@@ -28,6 +28,7 @@ import type {
   LiveChatMessage, LiveHost, LiveProduct, LiveStream, LiveStreamProvider, SuggestedCreator,
 } from './types';
 import { orderLiveStreams } from './liveOrdering';
+import type { LiveActivityItem } from '@/services/liveShoppingService';
 import {
   fetchUpcomingLives, pinnedProductIdFromRow, setScheduledLiveReminder,
 } from './liveCommerce';
@@ -105,6 +106,11 @@ function chatFromRow(row: Row): LiveChatMessage {
   };
 }
 
+/** A purchase / gift row as a chat event (ChatRow renders these as a pill). */
+export function activityToChat(a: LiveActivityItem): LiveChatMessage {
+  return { id: a.id, username: a.name, text: a.text, at: Date.parse(a.at) || Date.now(), kind: a.kind };
+}
+
 const get = <T,>(path: string) => serviceRequest<T>(path, {}, false);
 const post = <T,>(path: string, body: unknown = {}) =>
   serviceRequest<T>(path, { method: 'POST', body: JSON.stringify(body) }, false);
@@ -160,17 +166,28 @@ export function createApiLiveProvider(): LiveStreamProvider {
 
     subscribe(streamId, listener) {
       let since = new Date().toISOString();
+      // "Just bought" + gift rows (routes/live-shopping.ts), polled alongside chat.
+      let activitySince = since;
+      const seenActivity = new Set<string>();
       let stopped = false;
       let lastPinned: string | null | undefined;
       let lastLikes: number | undefined;
       const id = encodeURIComponent(streamId);
       async function poll() {
         try {
-          const [comments, detail] = await Promise.all([
+          const [comments, detail, activity] = await Promise.all([
             get<{ comments: Row[] }>(`/api/live/${id}/comments?since=${encodeURIComponent(since)}`),
             get<{ stream: Row }>(`/api/live/${id}`),
+            get<{ activity: LiveActivityItem[] }>(`/api/live/${id}/activity?since=${encodeURIComponent(activitySince)}`)
+              .catch(() => ({ activity: [] as LiveActivityItem[] })),
           ]);
           if (stopped) return;
+          const events = (activity.activity ?? []).filter(a => !seenActivity.has(a.id));
+          if (events.length) {
+            for (const a of events) seenActivity.add(a.id);
+            activitySince = events[events.length - 1].at;
+            listener({ type: 'chat', streamId, messages: events.map(activityToChat) });
+          }
           const fresh = (comments.comments ?? []).slice().reverse().map(chatFromRow);
           if (fresh.length) {
             since = new Date(fresh[fresh.length - 1].at).toISOString();

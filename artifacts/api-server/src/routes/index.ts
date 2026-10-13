@@ -530,6 +530,8 @@ import liveCohostRouter from "./live-cohost";
 router.use("/live",                      tc, liveModerationRouter);
 router.use("/live",                      tc, liveCohostRouter);
 router.use("/live",                      tc, liveCommerceRouter); // Pin / live codes / scheduled — before liveRouter so /scheduled/* never hits /:id
+import liveShoppingRouter from "./live-shopping";
+router.use("/live",                      tc, liveShoppingRouter); // Live bag (co-host products) + "just bought"/gift activity
 router.use("/live",                      tc, liveRouter);
 import liveReplaysRouter from "./live-replays";
 import liveTipsRouter from "./live-tips";

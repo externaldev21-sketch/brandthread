@@ -105,6 +105,8 @@ function sendNoRewardToday(res: any, error: ThreadCashError, balanceCents: numbe
 import { CHECKOUT_PAUSED_ERROR, isThreadCashPaused, pausedRewardBody } from "../lib/threadCash/killSwitch";
 import { personProfileIds } from "../lib/accountProfiles";
 import weeklyQuestsRouter from "./thread-cash-weekly-quests";
+import { publicBuyerName } from "../lib/liveShopping";
+import { giftText } from "../lib/livePurchases";
 
 const router = Router();
 router.use(requireAuth);
@@ -575,6 +577,25 @@ router.post("/send", async (req, res) => {
 // gated on mutual follow, never sits pending a claim, unlike /send). The
 // seller's credit lands with source 'live_gift' and the funding the buyer
 // spent: only a paid part is cashable (cashOut.ts); promo stays promo.
+/** "<name> sent $5 Thread Cash" in the live's chat (host + viewers). Never throws. */
+async function announceLiveGift(streamId: string, buyerId: string, gift: { giftId: string; grossCents: number }): Promise<void> {
+  try {
+    const rows = await db.execute(sql`SELECT display_name, name, username FROM users WHERE clerk_id = ${buyerId} LIMIT 1`);
+    const u = rows.rows[0] as any;
+    broadcastToRoom(streamId, {
+      type: "gift",
+      gift: {
+        id: `gift-${gift.giftId}`,
+        kind: "gift",
+        name: publicBuyerName({ displayName: u?.display_name ?? u?.name, username: u?.username }),
+        text: giftText(gift.grossCents),
+        amountCents: gift.grossCents,
+        at: new Date().toISOString(),
+      },
+    });
+  } catch { /* the gift itself already went through */ }
+}
+
 router.post("/live-gift", liveTipsGate(), async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
   const { streamId, amountCents: rawAmount } = req.body ?? {};
@@ -610,19 +631,11 @@ router.post("/live-gift", liveTipsGate(), async (req, res) => {
       return;
     }
     const gift = await sendLiveGift(buyerId, sellerId, streamId, amountCents, idempotencyKey);
-    void notifyThreadCashReceived({ transferId: gift.giftId, fromUserId: buyerId, toUserId: sellerId, amountCents });
-    // Announce it in the room — server-confirmed, unlike a chat line any
-    // viewer could type — so the host and every viewer see the gift land.
-    void db.execute(sql`SELECT display_name, brand_name, username FROM users WHERE clerk_id = ${buyerId} LIMIT 1`)
-      .then((r) => {
-        const u = r.rows[0] as { display_name?: string; brand_name?: string; username?: string } | undefined;
-        broadcastToRoom(streamId, {
-          type: "gift",
-          gift: { fromUserId: buyerId, displayName: u?.display_name || u?.username || "Viewer", amountCents },
-        });
-      })
-      .catch(() => {});
-    res.json({ ok: true, giftId: gift.giftId });
+    if (gift.created) {
+      void notifyThreadCashReceived({ transferId: gift.giftId, fromUserId: buyerId, toUserId: sellerId, amountCents: gift.netCents });
+      void announceLiveGift(streamId, buyerId, gift);
+    }
+    res.json({ ok: true, giftId: gift.giftId, netCents: gift.netCents, feeCents: gift.feeCents });
   } catch (error) {
     if (error instanceof ThreadCashError) {
       res.status(error.status).json({ error: error.message, code: error.code });

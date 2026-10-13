@@ -72,6 +72,8 @@ import {
   firstOrderDiscountForGroup, isFirstOrderDiscountEligible, reserveFirstOrderDiscount,
 } from "../lib/firstOrderDiscount";
 import { giftColumns, giftSchema, moderateGift } from "../lib/giftOptions";
+import { recordLiveCheckout } from "../lib/livePurchases";
+
 
 /** Refuses any request that carries card data, before auth, parsing or logging touch it. */
 export function rejectCardData(req: Request, res: Response, next: NextFunction): void {
@@ -664,6 +666,15 @@ export function createCheckoutIntentRouter(mode: CheckoutIntentMode): Router {
       throw error;
     }
 
+    // Keep the existing reward/stock reservation lifecycle; live metadata
+    // is linked only after every seller group has a durable checkout row.
+    for (const [index, row] of rows.entries()) {
+      const source = body.groups[index];
+      await recordLiveCheckout({
+        checkoutSessionId: row.id, streamId: source?.liveStreamId,
+        buyerId: payer.buyerId, sellerId: row.sellerId,
+      });
+    }
     const releaseAll = async () => {
       await db.transaction(async (tx) => {
         for (const row of rows) {

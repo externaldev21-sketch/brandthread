@@ -52,6 +52,9 @@ export interface LiveProduct {
   imageUri?: string | null;
   sizes?: string[];
   remainingUnits?: number | null;
+  /** A co-host's product in the host's live: bought from the co-host's store. */
+  sellerId?: string;
+  sellerName?: string;
 }
 
 export interface LiveChatMessage {
@@ -62,7 +65,7 @@ export interface LiveChatMessage {
   /** Epoch ms. */
   at: number;
   /** Host / system messages render slightly differently. */
-  kind?: 'chat' | 'host' | 'join' | 'purchase';
+  kind?: 'chat' | 'host' | 'join' | 'purchase' | 'gift';
 }
 
 export interface LiveViewerAvatar {

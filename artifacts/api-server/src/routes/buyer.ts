@@ -65,6 +65,7 @@ import { priceGroupBundles } from "../lib/money/bundleLoader";
 import { CHECKOUT_PAUSED_ERROR, isThreadCashPaused } from "../lib/threadCash/killSwitch";
 import { emptyMysteryBoxVariants } from "../lib/mysteryBox";
 import { giftColumns, giftResponse, giftSchema, moderateGift } from "../lib/giftOptions";
+import { recordLiveCheckout } from "../lib/livePurchases";
 
 import { liveStreamIdFromItems, resolveLiveAttribution } from "../lib/liveAttribution";
 const router = Router();
@@ -1299,6 +1300,9 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     if (!checkoutRecord) throw new Error("Could not create checkout record");
     const csId = checkoutRecord.id;
     checkoutRecordId = csId;
+    await recordLiveCheckout({
+      checkoutSessionId: csId, streamId: typeof liveStreamId === "string" ? liveStreamId : null, buyerId, sellerId,
+    });
 
     if (loyaltyReservation) {
       await bindLoyaltyRedemptionToCheckout(

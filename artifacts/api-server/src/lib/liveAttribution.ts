@@ -22,6 +22,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { broadcastToRoom } from "../ws/liveHub";
 import { logger } from "./logger";
+import { claimLivePurchase } from "./livePurchases";
 
 /** How long after a live (or a co-host's time on stage) ends a purchase still counts. */
 export const LIVE_ATTRIBUTION_GRACE_MS = 30 * 60 * 1000;
@@ -139,7 +140,7 @@ export function liveStreamIdFromItems(items: unknown): string | null {
 export async function announceLivePurchase(orderId: string): Promise<void> {
   try {
     const [row] = await db.execute(sql`
-      SELECT o.source_live_stream_id AS stream_id, o.owner_id, o.buyer_id,
+      SELECT o.source_live_stream_id AS stream_id, o.owner_id, o.buyer_id, o.stripe_checkout_session_id AS checkout_session_id,
              COALESCE(NULLIF(split_part(trim(COALESCE(NULLIF(u.display_name, ''), u.name, '')), ' ', 1), ''), 'Someone') AS first_name,
              (SELECT oi.product_name FROM order_items oi WHERE oi.order_id = o.id ORDER BY oi.price_cents * oi.quantity DESC LIMIT 1) AS product_name,
              (SELECT COALESCE(SUM(oi.quantity), 0)::int FROM order_items oi WHERE oi.order_id = o.id) AS units
@@ -148,10 +149,19 @@ export async function announceLivePurchase(orderId: string): Promise<void> {
       LIMIT 1
     `).then((r) => r.rows as any[]);
     if (!row?.stream_id) return;
+    // Preserve the authoritative attribution gate and one room broadcaster,
+    // while using the new durable activity claim for polling and deduplication.
+    const [link] = row.checkout_session_id ? (await db.execute(sql`
+      SELECT id FROM live_stream_orders WHERE checkout_session_id = ${row.checkout_session_id}::uuid
+    `)).rows : [];
+    const activity = link ? await claimLivePurchase(String(row.checkout_session_id), orderId) : null;
+    if (link && !activity) return;
     broadcastToRoom(String(row.stream_id), {
       type: "purchase",
       purchase: {
-        id: orderId,
+        id: activity?.id ?? orderId,
+        name: String(row.first_name),
+        text: activity?.text ?? `just bought ${row.product_name ? String(row.product_name) : "an item"}`,
         buyerFirstName: String(row.first_name),
         productName: row.product_name ? String(row.product_name) : "an item",
         units: Number(row.units) || 1,

@@ -106,12 +106,13 @@ export const PREVIEW_CHAT_USERS = [
  * Scripted chat lines. `{product}` is replaced with the pinned product's
  * name and `{brand}` with the host's name when the line is played.
  */
-export const PREVIEW_CHAT_SCRIPT: Array<{ text: string; kind?: 'chat' | 'join' | 'purchase' | 'host' }> = [
+export const PREVIEW_CHAT_SCRIPT: Array<{ text: string; kind?: 'chat' | 'join' | 'purchase' | 'host' | 'gift' }> = [
   { text: 'joined', kind: 'join' },
   { text: 'obsessed with the {product} 😍' },
   { text: 'what size is the model wearing?' },
   { text: 'does it run true to size?' },
   { text: 'just bought the {product}!', kind: 'purchase' },
+  { text: 'sent $5 Thread Cash', kind: 'gift' },
   { text: 'the drape on this is unreal' },
   { text: 'can you show the back?' },
   { text: 'Model is 5\'10" in a size S — true to size.', kind: 'host' },
@@ -156,4 +157,12 @@ export function tickViewerCount(current: number, base: number, rand: () => numbe
   const up = rand() < 0.56;
   const next = up ? current + magnitude : current - magnitude;
   return Math.max(1, Math.max(Math.round(base * 0.4), next));
+}
+
+/** Demo-mode (`&demo=1`) flash deal for the bag sheet: 15% off, ending in ~9 minutes. */
+export function previewFlashDeals(now: number) {
+  return [{
+    id: 'preview-flash-1', code: 'LIVE15', type: 'percentage' as const, value: 15, minOrderCents: 0,
+    expiresAt: new Date(now + 9 * 60_000 + 41_000).toISOString(),
+  }];
 }

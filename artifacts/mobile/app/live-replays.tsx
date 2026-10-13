@@ -142,6 +142,8 @@ export default function LiveReplaysScreen() {
           renderItem={({ item }) => {
             const duration = formatReplayDuration(item.durationSeconds);
             const hidden = item.visibility === 'hidden';
+            // Owner-only: replays leave the profile 7 days after the live.
+            const expired = (item as LiveReplay & { expired?: boolean }).expired === true;
             return (
               <View style={styles.cell}>
                 <Pressable
@@ -158,6 +160,7 @@ export default function LiveReplaysScreen() {
                     <View style={styles.thumbFallback}><Icon name="play" size={22} color={theme.muted} /></View>
                   )}
                   {duration ? <Text style={styles.duration}>{duration}</Text> : null}
+                  {expired ? <Text style={styles.expired}>Expired</Text> : null}
                   {hidden ? (
                     <View style={styles.lock} accessibilityLabel="Hidden from visitors">
                       <Icon name="lock" size={12} color={theme.text} />
@@ -196,6 +199,11 @@ function makeStyles(theme: ReturnType<typeof useAppTheme>['theme'], tile: number
     thumbFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     duration: {
       position: 'absolute', right: 6, bottom: 6,
+      fontFamily: FONT.semibold, fontSize: FS.xs, color: theme.text,
+      backgroundColor: theme.background, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, overflow: 'hidden',
+    },
+    expired: {
+      position: 'absolute', left: 6, bottom: 6,
       fontFamily: FONT.semibold, fontSize: FS.xs, color: theme.text,
       backgroundColor: theme.background, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, overflow: 'hidden',
     },

@@ -22,6 +22,11 @@ import { useApi, type LiveReplay } from '@/lib/api';
 import { formatReplayDate, formatReplayDuration } from '@/lib/liveReplayFormat';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FONT, FS, SP } from '@/lib/theme';
+import { ReplayProductsRow, type ReplayProduct } from '@/components/live/ReplayProductsRow';
+import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
+
+/** The replay API also returns the live's products (7-day shoppable window). */
+type ShoppableReplay = LiveReplay & { products?: ReplayProduct[]; expired?: boolean };
 
 function ReplayVideo({ uri }: { uri: string }) {
   const player = useVideoPlayer(uri, (p) => { p.loop = false; });
@@ -39,7 +44,8 @@ export default function LiveReplayScreen() {
   const api = useApi();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [replay, setReplay] = useState<LiveReplay | null>(null);
+  const [replay, setReplay] = useState<ShoppableReplay | null>(null);
+  const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<'missing' | 'network' | null>(null);
   const [busy, setBusy] = useState(false);
@@ -102,6 +108,16 @@ export default function LiveReplayScreen() {
   const duration = formatReplayDuration(replay?.durationSeconds);
   const date = formatReplayDate(replay?.endedAt ?? replay?.startedAt);
   const hidden = replay?.visibility === 'hidden';
+  const products = replay?.products ?? [];
+  const openProduct = useCallback((index: number) => {
+    if (!replay) return;
+    setShopSelection({
+      postId: `replay-${replay.streamId}`,
+      postSellerId: replay.sellerId,
+      tags: products.map(p => ({ productId: p.productId, productName: p.name, priceCents: p.priceCents, imageUri: p.imageUri ?? undefined })),
+      activeTagIndex: index,
+    });
+  }, [products, replay]);
 
   return (
     <View style={styles.root} testID="live-replay-screen">
@@ -119,7 +135,8 @@ export default function LiveReplayScreen() {
           <View style={styles.stage}><ReplayVideo uri={replay.replayUrl} /></View>
           <View style={styles.meta}>
             <Text style={styles.title} numberOfLines={2}>{replay.title}</Text>
-            <Text style={styles.sub}>{[date, duration, hidden ? 'Hidden from visitors' : null].filter(Boolean).join(', ')}</Text>
+            <Text style={styles.sub}>{[date, duration, replay.expired ? 'Expired' : null, hidden ? 'Hidden from visitors' : null].filter(Boolean).join(' · ')}</Text>
+            <ReplayProductsRow products={products} onBuy={openProduct} />
             {replay.isOwner ? (
               <View style={styles.actions}>
                 <View style={styles.actionCell}><Button
@@ -146,6 +163,7 @@ export default function LiveReplayScreen() {
         </>
       )}
       <Snackbar visible={!!notice} message={notice} onDismiss={() => setNotice('')} />
+      {shopSelection && <ShopProductSheet selection={shopSelection} onClose={() => setShopSelection(null)} reduceMotion={null} />}
     </View>
   );
 }

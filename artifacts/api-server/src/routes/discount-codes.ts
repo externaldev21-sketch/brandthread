@@ -10,6 +10,7 @@ import { requirePermission } from "../middlewares/requireRole";
 import { validateDiscountCode, DiscountValidationError } from "../lib/discounts";
 import { parseInstant, parseTimeZone } from "../lib/scheduleWindow";
 import crypto from "crypto";
+import { flashDealExpiry } from "../lib/liveShopping";
 
 const router = Router();
 router.use(requireAuth);
@@ -209,6 +210,7 @@ router.post("/", requirePermission("marketing"), validateInput({ body: createDis
       minQuantity,
       liveStreamId,
       scheduleTimeZone,
+      durationMinutes,
     } = req.body as {
       scheduleTimeZone?: string | null;
       firstOrderOnly?: boolean;
@@ -227,6 +229,8 @@ router.post("/", requirePermission("marketing"), validateInput({ body: createDis
       startsAt?: string | null;
       expiresAt?: string | null;
       liveStreamId?: string | null;
+      /** Live flash deal: the code expires this many minutes from now (lib/liveShopping.ts). */
+      durationMinutes?: number | null;
     };
 
     if (!VALID_TYPES.includes(type as any)) {
@@ -302,6 +306,21 @@ router.post("/", requirePermission("marketing"), validateInput({ body: createDis
       scopedLiveStreamId = stream.id;
     }
 
+    // Live flash deal: the server, never the client clock, sets the expiry.
+    let flashExpiresAt: Date | null = null;
+    if (durationMinutes != null) {
+      if (!scopedLiveStreamId) {
+        res.status(400).json({ error: "durationMinutes is only for live codes" });
+        return;
+      }
+      try {
+        flashExpiresAt = flashDealExpiry(durationMinutes);
+      } catch (e: any) {
+        res.status(400).json({ error: e.message });
+        return;
+      }
+    }
+
     // Auto-generate a code if the seller didn't type one; retry on collision.
     let normalizedCode = code?.trim() ? code.trim().toUpperCase() : "";
     if (!normalizedCode) {
@@ -352,7 +371,7 @@ router.post("/", requirePermission("marketing"), validateInput({ body: createDis
         maxUsesPerCustomer: maxUsesPerCustomer ?? null,
         minQuantity: minQuantity ?? 0,
         startsAt: schedule.values.startsAt ?? null,
-        expiresAt: schedule.values.expiresAt ?? null,
+        expiresAt: flashExpiresAt ?? schedule.values.expiresAt ?? null,
         scheduleTimeZone: schedule.values.scheduleTimeZone ?? null,
         active: true,
         liveStreamId: scopedLiveStreamId,

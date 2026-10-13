@@ -1411,6 +1411,8 @@ export async function handleCheckoutPaid(
       logger.warn({ err, orderId: createdOrderId }, "Low-stock alert after order failed"),
     );
   }
+  // The canonical, server-validated announcement runs below after live
+  // attribution is resolved; don't broadcast the same purchase twice.
 
   // ── Issue Stripe refund for oversold orders ───────────────────────────────
   if (oversoldItems.length > 0) {

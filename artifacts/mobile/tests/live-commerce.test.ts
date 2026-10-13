@@ -56,7 +56,7 @@ describe('live checkout context', () => {
     expect(getLiveCheckoutContext('s1')?.code).toBeNull();
     clearLiveCheckoutContext();
   });
-  it('payment groups carry liveStreamId only with a code and a matching live', () => {
+  it('payment groups carry liveStreamId only for a matching live', () => {
     const session: any = {
       deliveryGroups: [{ sellerId: 's1', items: [{ variantId: 'v', productId: 'p', quantity: 1 }] }],
       discounts: [{ code: 'LIVE15', isValid: true }],
@@ -64,7 +64,10 @@ describe('live checkout context', () => {
     expect(paymentGroups(session)[0]).not.toHaveProperty('liveStreamId');
     setLiveCheckoutContext({ streamId: 'st1', sellerId: 's1' });
     expect(paymentGroups(session)[0]).toMatchObject({ discountCode: 'LIVE15', liveStreamId: 'st1' });
-    expect(paymentGroups({ ...session, discounts: [] })[0]).not.toHaveProperty('liveStreamId');
+    // Without a code the stream id still rides along so the paid order can be
+    // announced in the live ("just bought"); the code is simply absent.
+    expect(paymentGroups({ ...session, discounts: [] })[0]).toMatchObject({ liveStreamId: 'st1' });
+    expect(paymentGroups({ ...session, discounts: [] })[0]).not.toHaveProperty('discountCode');
     clearLiveCheckoutContext();
   });
 });

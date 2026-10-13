@@ -1,3 +1,4 @@
+import { roomAnnouncement } from '@/lib/live/roomAnnouncement';
 import * as Haptics from 'expo-haptics';
 /**
  * Seller Live — active broadcast screen.
@@ -242,19 +243,11 @@ function SellerLiveNativeScreen() {
       setStreamEndedBy('server');
     } else if (event.type === 'cohosts') {
       setCohosts(Array.isArray(event.cohosts) ? event.cohosts : []);
-    } else if (event.type === 'purchase') {
-      purchaseToasts.push(event.purchase);
-    } else if (event.type === 'gift') {
-      // A viewer's Thread Cash gift, announced by the server (not typed by
-      // anyone), shown in the chat for the host and every viewer.
-      const amount = `$${(event.gift.amountCents / 100).toFixed(2)}`;
-      setComments(prev => [...prev, {
-        id: `gift-${Date.now()}-${event.gift.fromUserId}`,
-        user_id: event.gift.fromUserId,
-        display_name: event.gift.displayName,
-        message: `sent ${amount} Thread Cash`,
-        created_at: new Date().toISOString(),
-      }].slice(-80));
+    } else if (event.type === 'purchase' || event.type === 'gift') {
+      if (event.type === 'purchase' && 'buyerFirstName' in event.purchase) purchaseToasts.push(event.purchase);
+      // "Ana just bought …" / "Ana sent $5 Thread Cash" in the host's chat (no user_id: not moderatable).
+      const a = roomAnnouncement(event.type === 'purchase' ? event.purchase : event.gift);
+      setComments(prev => prev.some(c => c.id === a.id) ? prev : [...prev, { id: a.id, display_name: a.name, message: a.text, created_at: a.at }].slice(-80));
       setTimeout(() => commentsRef.current?.scrollToEnd({ animated: true }), 100);
     } else {
       mod.handleEvent(event);

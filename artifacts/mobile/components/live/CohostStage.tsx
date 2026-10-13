@@ -22,6 +22,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { CohostProductsSheet } from './CohostProductsSheet';
 
 const AgoraModule = loadAgoraModule();
 
@@ -50,6 +51,8 @@ export function CohostStage({ streamId, creds, onDone }: Props) {
   const [viewerCount, setViewerCount] = useState(0);
   const [comments, setComments] = useState<Array<{ id: string; display_name: string; message: string }>>([]);
   const [leaving, setLeaving] = useState(false);
+  // Co-host bag: add your own products to the host's live.
+  const [productsOpen, setProductsOpen] = useState(false);
   const engineRef = useRef<any>(null);
   const doneRef = useRef(false);
 
@@ -155,7 +158,10 @@ export function CohostStage({ streamId, creds, onDone }: Props) {
             <Text style={s.countText}>{viewerCount.toLocaleString()}</Text>
           </View>
         </View>
-        <Button label="Leave" variant="destructive" size="compact" onPress={() => void leave()} loading={leaving} />
+        <View style={s.topRight}>
+          <Button label="Products" variant="secondary" size="compact" icon="shopping-bag" onPress={() => setProductsOpen(true)} testID="cohost-products" />
+          <Button label="Leave" variant="destructive" size="compact" onPress={() => void leave()} loading={leaving} />
+        </View>
       </View>
 
       <View style={[s.chat, { paddingBottom: insets.bottom + SP.md }]} pointerEvents="none">
@@ -168,6 +174,7 @@ export function CohostStage({ streamId, creds, onDone }: Props) {
         </ScrollView>
       </View>
       {leaving && <ActivityIndicator style={StyleSheet.absoluteFill} color={theme.text} />}
+      <CohostProductsSheet streamId={streamId} myId={user?.id} visible={productsOpen} onClose={() => setProductsOpen(false)} />
     </View>
   );
 }
@@ -181,6 +188,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md,
   },
   topLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  topRight: { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
   livePill: {
     flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.pill,
     paddingHorizontal: 10, paddingVertical: 5, backgroundColor: LIVE_RED,

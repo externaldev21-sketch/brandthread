@@ -1,6 +1,7 @@
 import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
 
-import { hapticSuccessAction, haptics, haptic } from '@/lib/haptics';
+import { hapticSuccessAction, haptics, haptic, hapticLight } from '@/lib/haptics';
+import { roomAnnouncement } from '@/lib/live/roomAnnouncement';
 
 /**
  * Buyer Live — viewer screen for an active live stream.
@@ -67,6 +68,9 @@ import { useLiveModeration } from '@/lib/live/useLiveModeration';
 import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
 
 import { radius } from '@/constants/radii';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
+import { fetchLiveBag } from '@/services/liveShoppingService';
 
 import { LiveCohostSplit } from '@/components/live/LiveCohostSplit';
 
@@ -78,7 +82,11 @@ import { formatMoney } from '@/lib/format';
 // ─── Agora SDK (native-only) ──────────────────────────────────────────────────
 const AgoraModule = loadAgoraModule();
 
-interface Comment { id: string; user_id?: string; display_name: string; message: string; created_at: string; }
+interface Comment {
+  id: string; user_id?: string; display_name: string; message: string; created_at: string;
+  /** Server-announced "just bought" / gift rows (first name or handle only). */
+  kind?: 'purchase' | 'gift';
+}
 interface ProductTag { productId: string; productName: string; priceCents: number; highlighted?: boolean; }
 
 export default function BuyerLiveScreen() {
@@ -171,6 +179,16 @@ function BuyerLiveNativeScreen() {
   const hostUidRef = useRef<number | null>(null);
   // Social proof: "<first name> bought <product>" from this live.
   const purchaseToasts = useLivePurchaseToasts();
+  const liveTipsEnabled = useFeatureFlag('live_tips');
+  const [giftOpen, setGiftOpen] = useState(false);
+  // Products an on-stage co-host added to this live (bought from their store).
+  const [cohostTags, setCohostTags] = useState<ProductTag[]>([]);
+  const refreshBag = React.useCallback(() => {
+    if (!params.streamId) return;
+    fetchLiveBag(params.streamId)
+      .then(bag => setCohostTags(bag.filter(b => !b.fromHost).map(b => ({ productId: b.productId, productName: b.productName, priceCents: b.priceCents }))))
+      .catch(() => {});
+  }, [params.streamId]);
 
   const engineRef       = useRef<any>(null);
   const scrollRef       = useRef<ScrollView>(null);
@@ -226,22 +244,17 @@ function BuyerLiveNativeScreen() {
     } else if (event.type === 'ended') {
       setReplayStatus(event.replayStatus ?? null);
       setEnded(true);
-    } else if (event.type === 'purchase') {
-      purchaseToasts.push(event.purchase);
-    } else if (event.type === 'gift') {
-      // A viewer's Thread Cash gift, announced by the server (not typed by
-      // anyone), shown in the chat for the host and every viewer.
-      const amount = `$${(event.gift.amountCents / 100).toFixed(2)}`;
-      setComments(prev => [...prev, {
-        id: `gift-${Date.now()}-${event.gift.fromUserId}`,
-        user_id: event.gift.fromUserId,
-        display_name: event.gift.displayName,
-        message: `sent ${amount} Thread Cash`,
-        created_at: new Date().toISOString(),
+    } else if (event.type === 'purchase' || event.type === 'gift') {
+      if (event.type === 'purchase' && 'buyerFirstName' in event.purchase) purchaseToasts.push(event.purchase);
+      const a = roomAnnouncement(event.type === 'purchase' ? event.purchase : event.gift);
+      setComments(prev => prev.some(c => c.id === a.id) ? prev : [...prev, {
+        id: a.id, display_name: a.name, message: a.text, created_at: a.at, kind: event.type,
       }].slice(-80));
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+      commentsScroll.requestScrollToEnd();
+    } else if (event.type === 'bag') {
+      refreshBag();
     }
-  }, [user?.id, mod.handleEvent, commentsScroll.requestScrollToEnd]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, mod.handleEvent, refreshBag, commentsScroll.requestScrollToEnd]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startFallbackPolling = React.useCallback((active: boolean) => {
     if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
@@ -263,6 +276,7 @@ function BuyerLiveNativeScreen() {
     onConnected: () => {
       void poll();
       mod.refresh();
+      refreshBag();
       (api as any).liveCohost.list(params.streamId).then((r: any) => setCohosts(r?.cohosts ?? [])).catch(() => {});
     },
     onFallback: startFallbackPolling,
@@ -631,6 +645,16 @@ function BuyerLiveNativeScreen() {
             <Icon name="eye" size={13} color="#fff" />
             <Text style={s.viewerText}>{viewerCount.toLocaleString()}</Text>
           </View>
+          {liveTipsEnabled && stream?.seller_id ? (
+            <IconButton
+              name="gift"
+              onPress={() => { hapticLight(); setGiftOpen(true); }}
+              variant="plain"
+              color="#fff"
+              accessibilityLabel="Send Thread Cash to the host"
+              testID="buyer-live-gift"
+            />
+          ) : null}
           <IconButton
             name="share"
             onPress={shareStream}
@@ -664,10 +688,10 @@ function BuyerLiveNativeScreen() {
       <LivePurchaseToast purchase={purchaseToasts.current} top={headerTopInset + 96} />
 
       {/* Product tags strip */}
-      {productTags.length > 0 && (
+      {productTags.length + cohostTags.length > 0 && (
         <View style={s.productStrip}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.productStripInner}>
-            {productTags.map(tag => (
+            {[...productTags, ...cohostTags.filter(c => !productTags.some(t => t.productId === c.productId))].map(tag => (
               <PressableScale
                 key={tag.productId}
                 onPress={() => { haptic('sheet'); openPurchase(tag); }}
@@ -709,6 +733,7 @@ function BuyerLiveNativeScreen() {
               delayLongPress={350}
               accessibilityHint="Long press to report or block"
             >
+              {c.kind ? <Icon name={c.kind === 'gift' ? 'gift' : 'shopping-bag'} size={12} color={FG} style={s.commentIcon} /> : null}
               <Text style={s.commentName}>{c.display_name} </Text>
               <Text style={s.commentMsg}>{c.message}</Text>
             </PressableScale>
@@ -813,6 +838,19 @@ function BuyerLiveNativeScreen() {
         </KeyboardAvoidingView>
       )}
 
+      {liveTipsEnabled && giftOpen && stream?.seller_id ? (
+        <LiveThreadCashSheet
+          visible
+          brandName={stream?.brand_name ?? stream?.seller_name ?? 'the host'}
+          recipientId={stream.seller_id}
+          streamId={params.streamId}
+          onClose={() => setGiftOpen(false)}
+          // The server announces the gift to the room (a `gift` event).
+          onSent={() => setGiftOpen(false)}
+          onSendFailed={message => { setGiftOpen(false); setOrderSnackbar(message); }}
+        />
+      ) : null}
+
       <Snackbar
         visible={!!orderSnackbar}
         message={orderSnackbar}
@@ -854,6 +892,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   commentRow:       { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 8, paddingVertical: 3 },
   commentName:      { color: '#fff', fontFamily: FONT.bold, fontSize: 12 },
   commentMsg:       { color: FG, fontFamily: FONT.regular, fontSize: 12 },
+  commentIcon:      { marginRight: 5, marginTop: 1 },
   purchaseSheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 30,
     backgroundColor: BG, borderTopLeftRadius: RADIUS.xl,

@@ -164,7 +164,7 @@ function ChatRow({ msg, opacity }: { msg: LiveChatMessage; opacity: number }) {
   const translateY = enter.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
   const animatedStyle = [styles.chatRow, { opacity: Animated.multiply(enter, opacity), transform: [{ translateY }] }];
 
-  if (msg.kind === 'join' || msg.kind === 'purchase') {
+  if (msg.kind === 'join' || msg.kind === 'purchase' || msg.kind === 'gift') {
     return (
       <Animated.View style={animatedStyle}>
         <View style={styles.eventPill}>
@@ -177,7 +177,7 @@ function ChatRow({ msg, opacity }: { msg: LiveChatMessage; opacity: number }) {
           <Text style={styles.eventPillText} numberOfLines={1}>
             {msg.kind === 'purchase' ? '🛍️ ' : ''}
             <Text style={styles.chatUserMuted}>{msg.username}</Text>
-            {msg.kind === 'purchase' ? ` ${msg.text}` : ' joined'}
+            {msg.kind === 'purchase' || msg.kind === 'gift' ? ` ${msg.text}` : ' joined'}
           </Text>
         </View>
       </Animated.View>

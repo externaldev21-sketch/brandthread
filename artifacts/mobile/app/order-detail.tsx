@@ -53,6 +53,7 @@ const FulfillSheet = React.lazy(async () => ({
 }));
 import { RefundSheet } from '@/components/orders/RefundSheet';
 import { sharePackingSlip } from '@/lib/packingSlip';
+import { PackingSlipSheet } from '@/components/orders/PackingSlipSheet';
 import {
   applyFulfillLocally, applyRefundLocally, linesToFulfill, orderTitle, refundableCentsOf, shipmentGroups,
   submitFulfillRequest, type FulfillRequest,
@@ -142,7 +143,7 @@ export function adaptApiOrder(raw: any): Order {
     productId:        typeof item.productId === 'string' ? item.productId : '',
     productName:      item.productName,
     variant:          item.variantLabel ?? '',
-    sku:              undefined,
+    sku:              typeof item.sku === 'string' && item.sku ? item.sku : undefined,
     // Signed product thumbnail from the API (item 55); undefined keeps the
     // icon fallback for lines whose product is gone or has no photo.
     imageUri:         item.imageUri ?? item.imageUrl ?? undefined,
@@ -629,6 +630,7 @@ function DeliveryStatusSheet({ visible, order, onClose, onSave }: {
  * As a pushed route both are unset and it reads `?id=` as before.
  */
 export default function OrderDetailScreen({ orderId, embedded = false }: { orderId?: string; embedded?: boolean } = {}) {
+  const [showPackingSlip, setShowPackingSlip] = useState(false);
   const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   const params = useLocalSearchParams<{ id: string; tab?: string; refund?: string }>();
@@ -926,7 +928,7 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
 
   function printPackingSlip() {
     if (!order) return;
-    sharePackingSlip(order).catch(() => Alert.alert('Couldn’t create the packing slip', 'Try again.'));
+    setShowPackingSlip(true);
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -1374,6 +1376,7 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
       />
       </React.Suspense>}
 
+      {order && showPackingSlip ? <PackingSlipSheet visible orders={[order]} onClose={() => setShowPackingSlip(false)} /> : null}
       <RefundSheet
         visible={refundOpen}
         orderNumber={order.orderNumber}

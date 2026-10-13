@@ -15,6 +15,9 @@ import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { describeLiveCode, type LiveCode } from '@/lib/live/liveCommerce';
+import { FLASH_DEAL_DURATIONS, dealRemainingMs, formatDealCountdown } from '@/lib/live/flashDeal';
+import { useNowTick } from '@/lib/live/useNowTick';
+import { LIVE_RED } from './LiveAvatarRing';
 
 const PERCENTS = [10, 15, 20, 25];
 const LIMITS: Array<{ label: string; value: number | null }> = [
@@ -30,6 +33,8 @@ export function LiveCodesHostSheet({ streamId, onClose }: { streamId: string; on
   const api = useApi() as any;
   const [percent, setPercent] = useState(15);
   const [limit, setLimit] = useState<number | null>(null);
+  // Flash deal: the server sets expires_at from this (5/10/15 min).
+  const [durationMinutes, setDurationMinutes] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [codes, setCodes] = useState<Array<LiveCode & { usesCount?: number; status?: string }>>([]);
@@ -42,6 +47,7 @@ export function LiveCodesHostSheet({ streamId, onClose }: { streamId: string; on
   }, [api, streamId]);
 
   useEffect(() => { void load(); }, [load]);
+  const now = useNowTick(codes.some(c => !!c.expiresAt));
 
   async function create() {
     if (saving) return;
@@ -50,6 +56,7 @@ export function LiveCodesHostSheet({ streamId, onClose }: { streamId: string; on
     try {
       await api.discountCodes.create({
         type: 'percentage', value: percent, maxUses: limit, liveStreamId: streamId,
+        ...(durationMinutes ? { durationMinutes } : {}),
       });
       await load();
     } catch (e: any) {
@@ -81,22 +88,37 @@ export function LiveCodesHostSheet({ streamId, onClose }: { streamId: string; on
           ))}
         </View>
 
+        <Text style={[styles.label, { color: theme.muted }]}>Timer</Text>
+        <View style={styles.chips}>
+          {FLASH_DEAL_DURATIONS.map(d => (
+            <Chip key={d.label} label={d.label} selected={durationMinutes === d.minutes} onPress={() => setDurationMinutes(d.minutes)} />
+          ))}
+        </View>
+
         {error ? <Text style={[styles.error, { color: theme.text }]}>{error}</Text> : null}
         <Button label="Create live code" onPress={create} loading={saving} fullWidth />
 
         {codes.length > 0 && (
           <ScrollView style={styles.list} contentContainerStyle={{ gap: SP.sm }}>
-            {codes.map(c => (
-              <View key={c.id} style={[styles.codeRow, { borderColor: theme.border }]}>
-                <Icon name="tag" size={16} color={theme.text} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.code, { color: theme.text }]}>{c.code}</Text>
-                  <Text style={[styles.meta, { color: theme.muted }]}>
-                    {describeLiveCode({ type: c.type, value: Number(c.value) })} · {c.usesCount ?? 0} used
-                  </Text>
+            {codes.map(c => {
+              const left = dealRemainingMs(c.expiresAt, now);
+              return (
+                <View key={c.id} style={[styles.codeRow, { borderColor: theme.border }]}>
+                  <Icon name="tag" size={16} color={theme.text} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.code, { color: theme.text }]}>{c.code}</Text>
+                    <Text style={[styles.meta, { color: theme.muted }]}>
+                      {describeLiveCode({ type: c.type, value: Number(c.value) })} · {c.usesCount ?? 0} used
+                    </Text>
+                  </View>
+                  {left !== null && (
+                    left > 0
+                      ? <Text style={[styles.timer, { color: LIVE_RED }]} accessibilityLabel={`Ends in ${formatDealCountdown(left)}`}>{formatDealCountdown(left)}</Text>
+                      : <Text style={[styles.meta, { color: theme.muted }]}>Ended</Text>
+                  )}
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </ScrollView>
         )}
       </View>
@@ -116,4 +138,5 @@ const styles = StyleSheet.create({
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, borderWidth: 1, borderRadius: RADIUS.md, padding: SP.sm },
   code: { fontFamily: FONT.semibold, fontSize: FS.sm },
   meta: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
+  timer: { fontFamily: FONT.bold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
 });
