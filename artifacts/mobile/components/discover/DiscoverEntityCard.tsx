@@ -18,6 +18,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import FollowButton, { type FollowState } from '@/components/social/FollowButton';
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 
 export function DiscoverEntityCard({
   id,
@@ -64,7 +65,7 @@ export function DiscoverEntityCard({
         )}
         <View style={styles.nameRow}>
           <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{name}</Text>
-          {verified && <Feather name="check-circle" size={14} color={ON_DARK} />}
+          {verified && <VerifiedBadge onMedia />}
         </View>
         <Text style={[styles.subline, { color: theme.muted }]} numberOfLines={1}>{subline ?? ' '}</Text>
       </PressableScale>

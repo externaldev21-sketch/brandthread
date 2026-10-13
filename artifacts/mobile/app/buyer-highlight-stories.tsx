@@ -24,7 +24,7 @@ import { useApi, type HighlightPickerStory } from '@/lib/api';
 import { isPreviewDemoMode } from '@/lib/devPreview';
 import { previewHighlightPickerStories } from '@/lib/previewHighlights';
 
-const GAP = 2;
+const GAP = 1;
 const COLUMNS = 3;
 
 function dayLabel(ms: number): string {

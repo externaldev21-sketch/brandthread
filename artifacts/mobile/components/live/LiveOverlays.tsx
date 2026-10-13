@@ -21,6 +21,7 @@ import Composer from '@/components/ui/Composer';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { LIVE_RED } from './LiveAvatarRing';
 import { radius } from '@/constants/radii';
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 
 const ND = Platform.OS !== 'web';
 /** One consistent rail-icon treatment (point 4): every icon the same size on
@@ -65,7 +66,7 @@ export function LiveHostPill({
           <View style={styles.hostText}>
             <View style={styles.hostNameRow}>
               <Text style={styles.hostName} numberOfLines={1}>{host.name}</Text>
-              {host.verified && <Feather name="check-circle" size={12} color="#fff" style={{ marginLeft: 3 }} />}
+              {host.verified && <VerifiedBadge onMedia style={{ marginLeft: 3 }} />}
             </View>
             <View style={styles.hostMetaRow}>
               <View style={styles.liveBadge}><Text style={styles.liveBadgeText}>LIVE</Text></View>
