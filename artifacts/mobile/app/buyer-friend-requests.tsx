@@ -255,14 +255,8 @@ export default function BuyerFriendRequestsScreen() {
               </View>
             </PressableScaleRow>
             <View style={s.rowActions}>
-              <Button label="Dismiss" variant="secondary" size="small" onPress={() => handleDismiss(row)} />
-              <Button
-                label="Follow"
-                variant="primary"
-                size="small"
-                loading={actionId === row.userId}
-                onPress={() => handleFollowBack(row)}
-              />
+              <View style={s.requestBtn}><Button label="Dismiss" variant="secondary" size="small" fullWidth style={{ paddingHorizontal: 12 }} onPress={() => handleDismiss(row)} /></View>
+              <View style={s.requestBtn}><Button label="Follow" variant="primary" size="small" fullWidth style={{ paddingHorizontal: 12 }} loading={actionId === row.userId} onPress={() => handleFollowBack(row)} /></View>
             </View>
           </View>
         )}
