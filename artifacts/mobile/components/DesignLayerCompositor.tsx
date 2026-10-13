@@ -8,10 +8,12 @@
  * Composition semantics match design-canvas.tsx's renderLayerInSvg exactly
  * because both now import from lib/layerRenderer.ts.
  *
- * Curves adjustment: applied via SVG feColorMatrix type="matrix" using the
- * shared curvesToColorMatrixString helper.  All four channels (gamma, red,
- * green, blue) produce real channel-specific colour effects visible in both
- * editor and gallery.
+ * Adjustments (HSB, Curves, Colour Balance, Gradient Map, Gaussian/Motion
+ * Blur, Sharpen, Chromatic Aberration, Bloom): applied as the SAME SVG
+ * filter stages the editor renders, built by the one shared
+ * buildAdjustmentStages (components/design-studio/layerFilterChain.tsx) —
+ * so a thumbnail, preview or export carries exactly the canvas's filter
+ * chain rather than a subset of it.
  *
  * Liquify displacement: applied as an additional translate from netLiquifyDisplacement,
  * factoring in momentum.  Values come from layer.adjustments.liquify or
@@ -24,7 +26,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, {
   G, Path, Rect, Circle, Defs, Mask as SvgMask, Text as SvgText,
-  Image as SvgImage, Filter, FeColorMatrix,
+  Image as SvgImage, Filter,
 } from 'react-native-svg';
 import {
   CARD, FG, RADIUS,
@@ -34,8 +36,9 @@ import type {
   DesignDrawingLayer, DesignImageLayer, DesignShapeLayer, DesignTextLayer,
   BlendModeKind,
 } from '@/services/designTypes';
-import { buildLayerTransform, curvesToColorMatrixString, isIdentityCurves } from '@/lib/layerRenderer';
-import type { CurvesAdjustment } from '@/lib/adjustmentsModel';
+import { buildLayerTransform } from '@/lib/layerRenderer';
+import type { DesignLayerAdjustments } from '@/lib/adjustmentsModel';
+import { buildAdjustmentStages, safeSvgId } from '@/components/design-studio/layerFilterChain';
 
 // ─── Supported blend modes in react-native-svg ────────────────────────────────
 
@@ -48,30 +51,31 @@ function blendModeStyle(bm: BlendModeKind | string | undefined): object | undefi
   return { mixBlendMode: bm };
 }
 
-// ─── Curves filter element ────────────────────────────────────────────────────
+// ─── Adjustments filter element ───────────────────────────────────────────────
 
 /**
- * Render a <Defs><Filter><FeColorMatrix …></Filter></Defs> element for the
- * given curves adjustment.  Returns [filterId, defsElement].
+ * Render a <Defs><Filter>…stages…</Filter></Defs> element carrying every
+ * adjustment stage the editor would render for this layer (HSB, Curves and
+ * all effects), via the shared buildAdjustmentStages. Returns undefined when
+ * no stage would change a pixel, so an unadjusted layer renders with no
+ * filter at all (full speed, no no-op filter).
  *
- * Uses feColorMatrix type="matrix" with the 20-value matrix from
- * curvesToColorMatrixString.  This is supported in react-native-svg ≥ 13 /
- * Expo SDK ≥ 50.
- *
- * Falls back gracefully: if the adjustment is identity we return undefined so
- * no filter element is emitted and the layer renders at full speed.
+ * The filter region is padded (-20% / 140%) exactly as in the editor so blur
+ * and motion/chromatic offsets have room to bleed instead of being clipped
+ * at the layer's bounding box.
  */
-function buildCurvesFilter(
+export function buildAdjustmentsFilter(
   layerId: string,
-  adj: CurvesAdjustment,
+  adjustments: DesignLayerAdjustments | undefined,
+  xScale: number,
 ): { filterId: string; filterEl: React.ReactNode } | undefined {
-  if (isIdentityCurves(adj)) return undefined;
-  const filterId = `cf_${layerId.replace(/[^a-zA-Z0-9]/g, '_')}`;
-  const matrixValues = curvesToColorMatrixString(adj);
+  const { stages } = buildAdjustmentStages(adjustments, xScale);
+  if (stages.length === 0) return undefined;
+  const filterId = `cf_${safeSvgId(layerId)}`;
   const filterEl = (
     <Defs key={`defs_${filterId}`}>
-      <Filter id={filterId} x="0%" y="0%" width="100%" height="100%">
-        <FeColorMatrix type="matrix" values={matrixValues} />
+      <Filter id={filterId} x="-20%" y="-20%" width="140%" height="140%">
+        {stages}
       </Filter>
     </Defs>
   );
@@ -101,9 +105,8 @@ export function renderLayer(
   // Stable transform: affine → liquify → rotation → flip (via shared helper)
   const transformAttr = buildLayerTransform(t, xScale, yScale);
 
-  // Curves adjustment filter (feColorMatrix)
-  const curvesAdj = layer.adjustments?.curves;
-  const curvesFilter = curvesAdj ? buildCurvesFilter(layer.id, curvesAdj) : undefined;
+  // Adjustments filter: the same stage chain the editor renders.
+  const curvesFilter = buildAdjustmentsFilter(layer.id, layer.adjustments, xScale);
   const filterRef: string | undefined = curvesFilter ? `url(#${curvesFilter.filterId})` : undefined;
 
   // ── Drawing layer ──────────────────────────────────────────────────────────
