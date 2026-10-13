@@ -36,14 +36,12 @@ describe('seller home dashboard data contract', () => {
     expect(source).toContain("range !== 'all' && periodLabel");
   });
 
-  it('never shows the delta line before the animated hero number has caught up to it', () => {
-    // Reported bug: the hero read $0.00 while the delta line (computed
-    // instantly from metricAggregate, not animated) already showed a real
-    // "+$162.57 (16.4%)" — they can only ever disagree while the hero's
-    // count-up animation is still catching up to the same metricAggregate
-    // value the delta was computed from.
-    expect(source).toContain('const heroSettled = heroDisplay === Math.round(activeValue)');
-    expect(source).toContain('deltaLine && scrubIndex === null && heroSettled');
+  it('the hero number and its delta always agree (no count-up on the hero)', () => {
+    // Reported bug: the hero read $0.00 while the delta line already showed
+    // a real "+$162.57 (16.4%)" during the hero's count-up. The count-up is
+    // gone (less-AI pass, item 82), so the hero is the aggregate itself.
+    expect(source).toContain('const heroDisplay = Math.round(activeValue);');
+    expect(source).not.toContain('useCountUp(');
   });
 
   it('the hero, delta and chart all read the same range-scoped data — no separate period source', () => {

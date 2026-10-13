@@ -30,7 +30,7 @@ import Reanimated, {
   Easing as ReanimatedEasing, useAnimatedStyle, useSharedValue, withSequence, withTiming,
 } from 'react-native-reanimated';
 import type { FeatherNames } from '@/lib/featherNames';
-import { TickingCount } from '@/components/ui/TickingCount';
+import { formatCount } from '@/lib/engagementUtils';
 import { IconFillTransition } from '@/components/ui/IconFillTransition';
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 import { useColors } from '@/hooks/useColors';
@@ -183,13 +183,10 @@ export interface EngagementButtonProps {
    *  space; omit the prop entirely only when this button has no count
    *  concept at all. Ignored when `value` is also passed — see below. */
   count?: string;
-  /** Raw (unformatted) count. When present, the count renders through
-   *  TickingCount instead of a plain Text — a Reanimated odometer-style
-   *  roll plays whenever this changes (e.g. a like/save toggling the
-   *  count by ±1), instead of an instant text swap. `count` is still
-   *  required for accessibility/layout purposes but its string is not
-   *  displayed directly in this case (TickingCount formats `value` itself
-   *  so it can diff the previous/next display strings). */
+  /** Raw (unformatted) count. When present it is formatted with
+   *  formatCount and shown as plain text that changes the instant the
+   *  action is taken — no rolling digits (count-up motion is reserved for
+   *  the first-sale moment). */
   value?: number;
   /** Whether the button is in the "active" (liked/saved/reposted/following) state */
   active?: boolean;
@@ -219,12 +216,10 @@ export interface EngagementButtonProps {
   translateYAnim?: Animated.Value;
   /** testID for automated tests */
   testID?: string;
-  /** Plays a Reanimated 0.85 -> 1.1 -> 1 squash/overshoot/settle spring on
-   *  the icon once per accepted press (i.e. once per actual like action,
-   *  not on every press-down/press-up — this is separate from any general
-   *  press-feedback scale a wrapping Pressable might apply). Scoped to the
-   *  like button; this specific overshoot is a deliberate exception to the
-   *  app's general no-bounce rule, not a violation of it.
+  /** Plays one 1 -> 1.15 -> 1 pop on the icon when a press turns the
+   *  button ON (like), and nothing when it turns it off (unlike) — the
+   *  pop says "this happened", so it only plays for the positive action.
+   *  Separate from any press-feedback scale a wrapping Pressable applies.
    *  Mobbin reference: Instagram, "Liking a post" flow —
    *  https://mobbin.com/flows/44abedc0-7d76-410b-9db0-5f1f4be27414 */
   tapSpring?: boolean;
@@ -234,9 +229,8 @@ export interface EngagementButtonProps {
   iconFillTransition?: boolean;
 }
 
-const LIKE_SPRING_DOWN_MS = 70;
-const LIKE_SPRING_UP_MS = 110;
-const LIKE_SPRING_SETTLE_MS = 130;
+const LIKE_POP_UP_MS = 90;
+const LIKE_POP_SETTLE_MS = 90;
 
 /**
  * Self-contained rail button with:
@@ -332,14 +326,13 @@ export function EngagementButton({
     // Fires once per accepted press — before awaiting the async action, so
     // it reads as instant/optimistic like the rest of the rail's tap
     // feedback — never on the underlying Pressable's own down/up events.
-    if (tapSpring) {
+    if (tapSpring && !active) {
       likeSpringScale.value = withSequence(
-        withTiming(0.85, { duration: LIKE_SPRING_DOWN_MS, easing: ReanimatedEasing.in(ReanimatedEasing.quad) }),
-        withTiming(1.1, { duration: LIKE_SPRING_UP_MS, easing: ReanimatedEasing.out(ReanimatedEasing.quad) }),
+        withTiming(1.15, { duration: LIKE_POP_UP_MS, easing: ReanimatedEasing.out(ReanimatedEasing.quad) }),
         // Snaps to exactly 1 once the settle leg reports finished — guards
         // against the sub-percent residual a JS-driven, rAF-stepped easing
         // curve can otherwise leave behind at rest (seen on web).
-        withTiming(1, { duration: LIKE_SPRING_SETTLE_MS, easing: ReanimatedEasing.out(ReanimatedEasing.cubic) }, (finished) => {
+        withTiming(1, { duration: LIKE_POP_SETTLE_MS, easing: ReanimatedEasing.out(ReanimatedEasing.cubic) }, (finished) => {
           'worklet';
           if (finished) likeSpringScale.value = 1;
         }),
@@ -351,7 +344,7 @@ export function EngagementButton({
       inflight.current = false;
       setPending(false);
     }
-  }, [onPress, tapSpring, likeSpringScale]);
+  }, [onPress, tapSpring, active, likeSpringScale]);
 
   const displayIcon = active && activeIcon ? activeIcon : icon;
   const iconColor = active ? activeColor : inactiveColor;
@@ -407,7 +400,7 @@ export function EngagementButton({
         iconNode
       )}
       {value !== undefined ? (
-        <TickingCount value={value} style={[ebStyles.count, { color: '#FFFFFF' }]} />
+        <Text style={[ebStyles.count, { color: '#FFFFFF' }]}>{formatCount(value)}</Text>
       ) : count !== undefined && (
         <Text style={[ebStyles.count, { color: '#FFFFFF' }]}>{count}</Text>
       )}

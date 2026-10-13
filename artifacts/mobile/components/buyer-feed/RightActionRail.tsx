@@ -43,7 +43,7 @@ export function RightActionRail({
   creator, hostId, avatarColor, avatarUri, initials, accentColor,
   engagement, commentsCount, shares, saves,
   onOpenCreator, onFollow, onLike, onOpenComments, onRepost, onSave, onShare,
-  heartScale, likeRing, repostSpin, repostScale, saveDrop, saveScale,
+  heartScale, repostScale, saveScale,
   style, testIdBase, reduceMotion,
 }: {
   creator: string;
@@ -69,10 +69,7 @@ export function RightActionRail({
   onSave: () => Promise<void> | void;
   onShare: () => void;
   heartScale: Animated.Value;
-  likeRing: Animated.Value;
-  repostSpin: Animated.Value;
   repostScale: Animated.Value;
-  saveDrop: Animated.Value;
   saveScale: Animated.Value;
   style?: any;
   testIdBase: string;
@@ -219,16 +216,6 @@ export function RightActionRail({
       </View>
 
       <View style={styles.likeWrap} pointerEvents="box-none">
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.likeRing,
-            {
-              opacity: likeRing.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.55, 0] }),
-              transform: [{ scale: likeRing.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.9] }) }],
-            },
-          ]}
-        />
         <EngagementButton
           icon="heart"
           solidIcon="heart"
@@ -278,7 +265,6 @@ export function RightActionRail({
         accessibilityLabel={`${engagement?.reposted ? 'Undo repost' : 'Repost'}, ${engagement?.reposts ?? 0} reposts`}
         accessibilityState={{ checked: engagement?.reposted ?? false }}
         style={styles.actionContent}
-        rotateAnim={repostSpin}
         scaleAnim={repostScale}
         onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onRepost(); }}
         hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
@@ -297,7 +283,6 @@ export function RightActionRail({
         accessibilityLabel={`${engagement?.saved ? 'Unsave' : 'Save'}, ${engagement?.saves ?? saves} saves`}
         accessibilityState={{ checked: engagement?.saved ?? false }}
         style={styles.actionContent}
-        translateYAnim={saveDrop}
         scaleAnim={saveScale}
         onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onSave(); }}
         hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
@@ -373,10 +358,6 @@ const styles = StyleSheet.create({
   btn: { minWidth: 38, alignItems: 'center', gap: 3 },
   actionContent: { width: 38, alignItems: 'center', gap: 3 },
   likeWrap: { width: 38, alignItems: 'center', justifyContent: 'center' },
-  likeRing: {
-    position: 'absolute', top: 2, width: 34, height: 34, borderRadius: RADII.pill,
-    borderWidth: 2, borderColor: '#EF4444',
-  },
   // 12pt semibold, pure white, one shared shadow — identical to
   // EngagementButton's own `count` style (components/EngagementButton.tsx)
   // so like/repost/save (EngagementButton-driven) and comment/share (plain,

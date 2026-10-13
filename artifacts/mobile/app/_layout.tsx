@@ -1531,8 +1531,8 @@ const AppStack = React.memo(function AppStack() {
             results. A sibling of (buyer), so BuyerTabBar never mounts over
             it — the floating bar is hidden automatically. */}
         <Stack.Screen name="buyer-search"            options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="buyer-story-viewer"      options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="story-mention-viewer"    options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="buyer-story-viewer"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="story-mention-viewer"    options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="story-mentions"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-story-create"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1557,7 +1557,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="live-moderation"    options={{ headerShown: false, animation: 'ios_from_right', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="live-cohost"        options={{ headerShown: false, animation: 'ios_from_right', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="live-cohost-invite" options={{ headerShown: false, animation: 'ios_from_right', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="live-feed"       options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="live-feed"       options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
 
         <Stack.Screen name="buyer-muted"               options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-restricted"          options={{ headerShown: false, animation: 'ios_from_right' }} />

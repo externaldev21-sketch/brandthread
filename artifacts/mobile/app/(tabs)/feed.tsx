@@ -4,7 +4,7 @@ import { UploadProgressPill } from '@/components/feed/UploadProgressPill';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Animated, TextInput, Modal, Pressable, PanResponder,
-  AccessibilityInfo, ScrollView, RefreshControl, ActivityIndicator,
+  AccessibilityInfo, ScrollView, RefreshControl, ActivityIndicator, Easing,
   useWindowDimensions,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
@@ -95,7 +95,6 @@ import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadExactCreatorVideoReplay, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
-import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
@@ -144,6 +143,8 @@ const TOP_TABS_ROW_HEIGHT = 34;
 // end card — see the `canLoopFeed`/`displayItems` comment below.
 const FEED_LOOP_REPEAT = 6;
 const CAPTION_BOTTOM_GAP = 10;
+/** Double-tap heart glyph size (pt). */
+const HEART_BURST_SIZE = 110;
 
 // ─── Buyer demand page — sentinel and type guard ──────────────────────────────
 // The sentinel is the first element in displayItems when buyerMode=true.
@@ -1491,24 +1492,16 @@ function SpotlightPageImpl({
   const [menuOpen, setMenuOpen] = useState(false);
   const { showToast } = useFeedToast();
   const heartBurst = useRef(new Animated.Value(0)).current;
-  // Separate from `heartBurst` (which now only drives opacity/fade): the
-  // scale pop needs its own 0.8 -> 1.1 -> 1 sequence, not a value
-  // interpolated off the fade's own progress.
-  const heartBurstScale = useRef(new Animated.Value(0.8)).current;
-  // Counter, not boolean: bumping it on every double-tap (even in rapid
-  // succession) gives HeartBurstParticles a fresh value to key its
-  // Reanimated replay off, the same way a changing `key` would remount it
-  // but without paying for an unmount/remount each time.
-  const [heartBurstTrigger, setHeartBurstTrigger] = useState(0);
+  // Separate from `heartBurst` (which only drives opacity/fade): the scale
+  // pop needs its own sequence, not a value interpolated off the fade.
+  const heartBurstScale = useRef(new Animated.Value(0.6)).current;
+  /** Where the double-tap heart appears: the second tap's point inside the
+   *  page (TikTok / Instagram Reels), not a fixed spot. */
+  const [heartBurstPoint, setHeartBurstPoint] = useState<{ x: number; y: number } | null>(null);
+  const lastPressPoint = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const heartScale = useRef(new Animated.Value(1)).current;
-  /** Ring that flashes out from behind the rail heart on like — a second,
-   * smaller echo of the double-tap burst so a single tap on the rail icon
-   * gets its own moment instead of only the icon itself popping. */
-  const likeRing = useRef(new Animated.Value(0)).current;
   const speedPillOpacity = useRef(new Animated.Value(0)).current;
-  const repostSpin = useRef(new Animated.Value(0)).current;
   const repostScale = useRef(new Animated.Value(1)).current;
-  const saveDrop = useRef(new Animated.Value(0)).current;
   const saveScale = useRef(new Animated.Value(1)).current;
   const lastTap = useRef(0);
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1540,46 +1533,30 @@ function SpotlightPageImpl({
     if (holdTimer.current) clearTimeout(holdTimer.current);
   }, []);
 
-  function burstHeart() {
+  /** Double-tap heart: appears where the second tap landed, pops once
+   *  (0.6 -> 1.1 -> 1), holds, fades. No particles, no second burst. */
+  function burstHeart(point: { x: number; y: number }) {
+    setHeartBurstPoint(point);
+    heartBurst.stopAnimation();
+    heartBurstScale.stopAnimation();
     heartBurst.setValue(1);
-    heartBurstScale.setValue(0.8);
+    heartBurstScale.setValue(0.6);
     Animated.sequence([
-      Animated.spring(heartBurstScale, { toValue: 1.1, useNativeDriver: true, speed: 30, bounciness: 6 }),
-      Animated.spring(heartBurstScale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 0 }),
+      Animated.timing(heartBurstScale, { toValue: 1.1, duration: 120, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(heartBurstScale, { toValue: 1, duration: 80, easing: Easing.out(Easing.quad), useNativeDriver: true }),
     ]).start();
-    Animated.timing(heartBurst, { toValue: 0, duration: 550, delay: 350, useNativeDriver: true }).start();
-    setHeartBurstTrigger(t => t + 1);
+    Animated.timing(heartBurst, { toValue: 0, duration: 200, delay: 450, useNativeDriver: true }).start();
   }
 
-  // 1 -> 1.15 -> 1 over 180ms total (was a 1.35 spring — stronger overshoot
-  // than this motion pass calls for), timing not spring so the 180ms is
-  // exact rather than however long that spring happened to settle in.
-  function bumpHeart() {
+  /** The one pop every rail toggle (like, repost, save) shares: 1 -> 1.15
+   *  -> 1 over 180ms, played once when the action turns ON (never on undo).
+   *  No ring, spin or drop on top of it. */
+  function popOnce(value: Animated.Value) {
+    value.stopAnimation();
+    value.setValue(1);
     Animated.sequence([
-      Animated.timing(heartScale, { toValue: 1.15, duration: 90, useNativeDriver: true }),
-      Animated.timing(heartScale, { toValue: 1, duration: 90, useNativeDriver: true }),
-    ]).start();
-    likeRing.setValue(0);
-    Animated.timing(likeRing, { toValue: 1, duration: 480, useNativeDriver: true }).start();
-  }
-
-  /** Arrows spin a full turn with a pop of scale — repost toggled either way. */
-  function spinRepost() {
-    repostSpin.setValue(0);
-    Animated.timing(repostSpin, { toValue: 1, duration: 420, useNativeDriver: true }).start();
-    Animated.sequence([
-      Animated.spring(repostScale, { toValue: 1.3, useNativeDriver: true, speed: 40 }),
-      Animated.spring(repostScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
-    ]).start();
-  }
-
-  /** Bookmark lifts, pops gold, then drops/settles — save toggled either way. */
-  function dropSave() {
-    saveDrop.setValue(0);
-    Animated.timing(saveDrop, { toValue: 1, duration: 360, useNativeDriver: true }).start();
-    Animated.sequence([
-      Animated.spring(saveScale, { toValue: 1.4, useNativeDriver: true, speed: 40 }),
-      Animated.spring(saveScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
+      Animated.timing(value, { toValue: 1.15, duration: 90, useNativeDriver: true }),
+      Animated.timing(value, { toValue: 1, duration: 90, useNativeDriver: true }),
     ]).start();
   }
 
@@ -1589,8 +1566,10 @@ function SpotlightPageImpl({
       lastTap.current = 0;
       if (pauseTimer.current) { clearTimeout(pauseTimer.current); pauseTimer.current = null; }
       onDoubleTapLike(item.id);
-      bumpHeart();
-      burstHeart();
+      // The rail heart only pops when this double-tap actually turns the
+      // like on — a double-tap on an already-liked post changes nothing.
+      if (!engagement?.liked) popOnce(heartScale);
+      burstHeart(lastPressPoint.current);
       // Medium tier, not the "light" tier the rail's own like tap uses
       // (hapticLight/hapticToggle, lib/haptics.ts) — double-tap-to-like is a
       // bigger, more deliberate gesture with a full-screen burst to match,
@@ -1610,9 +1589,10 @@ function SpotlightPageImpl({
    * "2x" pill; holding anywhere else pauses. Releasing restores 1x / plays.
    * A quick tap (release before the hold threshold) falls through to the
    * existing single/double-tap handling above. */
-  function handlePressIn(evt: { nativeEvent: { locationX: number } }) {
+  function handlePressIn(evt: { nativeEvent: { locationX: number; locationY: number } }) {
     holdTriggered.current = false;
     const x = evt.nativeEvent.locationX;
+    lastPressPoint.current = { x, y: evt.nativeEvent.locationY };
     holdTimer.current = setTimeout(() => {
       holdTriggered.current = true;
       // A tap already queued for "toggle pause" must not also fire once the hold resolves.
@@ -1699,14 +1679,15 @@ function SpotlightPageImpl({
           )}
           <Animated.View
             pointerEvents="none"
-            style={[styles.heartBurst, {
+            style={[styles.heartBurst, heartBurstPoint
+              ? { left: heartBurstPoint.x - HEART_BURST_SIZE / 2, top: heartBurstPoint.y - HEART_BURST_SIZE / 2 }
+              : styles.heartBurstHidden, {
               opacity: heartBurst,
               transform: [{ scale: heartBurstScale }],
             }]}
           >
-            <Feather name="heart" size={110} color={ON_DARK} />
+            <Feather name="heart" size={HEART_BURST_SIZE} color={ON_DARK} />
           </Animated.View>
-          <HeartBurstParticles trigger={heartBurstTrigger} />
           {item.contentType === 'video' && (
             <Animated.View
               pointerEvents="none"
@@ -1758,16 +1739,13 @@ function SpotlightPageImpl({
         saves={item.saves}
         onOpenCreator={() => { onOpenCreator(item); }}
         onFollow={() => onFollow(item.id)}
-        onLike={async () => { bumpHeart(); await onLike(item.id); }}
+        onLike={async () => { await onLike(item.id); }}
         onOpenComments={() => onOpenComments(item.id)}
-        onRepost={async () => { spinRepost(); await onRepost(item.id); }}
-        onSave={async () => { dropSave(); await onSave(item.id); }}
+        onRepost={async () => { if (!engagement?.reposted) popOnce(repostScale); await onRepost(item.id); }}
+        onSave={async () => { if (!engagement?.saved) popOnce(saveScale); await onSave(item.id); }}
         onShare={() => setShareOpen(true)}
         heartScale={heartScale}
-        likeRing={likeRing}
-        repostSpin={repostSpin}
         repostScale={repostScale}
-        saveDrop={saveDrop}
         saveScale={saveScale}
         testIdBase={item.id}
         reduceMotion={reduceMotion}
@@ -3619,7 +3597,8 @@ const styles = StyleSheet.create({
 
   pauseOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   mediaPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#17131D' },
-  heartBurst: { position: 'absolute', top: '38%', left: '50%', marginLeft: -55, marginTop: -55 },
+  heartBurst: { position: 'absolute', width: HEART_BURST_SIZE, height: HEART_BURST_SIZE },
+  heartBurstHidden: { left: -9999, top: -9999 },
   mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
   videoFill: { width: '100%', height: '100%' },
   letterboxBackdrop: { opacity: 0.55 },
