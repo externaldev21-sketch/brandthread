@@ -27,7 +27,7 @@ import { eq, and, desc, inArray, sql, or, ilike } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { moderateMessage } from "../lib/contentModerator";
-import { blockRelation, publishingRestriction } from "../lib/safety";
+import { blockRelation, oneToOneNotBlockedWith, publishingRestriction } from "../lib/safety";
 import { publishNotification } from "./notifications-feed";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { maybeSendAwayAutoReply } from "../lib/awayAutoReply";
@@ -256,7 +256,11 @@ router.get("/", async (req, res) => {
     .select({ conversationId: conversationParticipants.conversationId })
     .from(conversationParticipants)
     .innerJoin(conversations, eq(conversations.id, conversationParticipants.conversationId))
-    .where(eq(conversationParticipants.userId, userId))
+    .where(and(
+      eq(conversationParticipants.userId, userId),
+      // Blocked either way: the 1:1 thread leaves both inboxes (Instagram).
+      oneToOneNotBlockedWith(userId, conversations.id, conversations.type),
+    ))
     .orderBy(desc(conversations.updatedAt))
     .limit(limit)
     .offset(offset);
