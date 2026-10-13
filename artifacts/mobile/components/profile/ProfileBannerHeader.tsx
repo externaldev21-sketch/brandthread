@@ -17,7 +17,6 @@
  */
 import React, { useEffect, useState } from 'react';
 import { AppState, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
-import { useSuppressStatusBarMask } from '@/components/layout/ScreenChrome';
 import { CachedImage } from '@/components/CachedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -214,7 +213,6 @@ export function ProfileBannerHeader({
   avatarSide?: 'left' | 'right';
   testID?: string;
 }) {
-  useSuppressStatusBarMask(coversTop);
   return (
     <View style={[styles.root, { height }]} testID={testID}>
       {coversTop ? <StatusBar barStyle="light-content" /> : null}

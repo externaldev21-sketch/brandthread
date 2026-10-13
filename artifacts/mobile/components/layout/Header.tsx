@@ -82,8 +82,9 @@ export function Header({
   /**
    * Pushed-screen (showBack) header only. Defaults to 'none' — Dev's
    * app-wide rule: bare back arrow + title, no divider line under the
-   * header. 'default' (scroll-driven `theme.border` hairline) and 'subtle'
-   * (fixed 6%-white line) remain as explicit opt-ins.
+   * header. Kept only so existing call sites still type-check: no value
+   * draws a line any more (Dev: nothing at the top of any screen; enforced
+   * by scripts/lint/no-top-chrome-hairline.mjs).
    */
   dividerVariant?: 'default' | 'subtle' | 'none';
 }) {
@@ -135,9 +136,6 @@ export function Header({
   const largeOpacity = largeTitle
     ? y.interpolate({ inputRange: [0, COLLAPSE_DISTANCE - 8], outputRange: [1, 0], extrapolate: 'clamp' })
     : 0;
-  const borderOpacity = largeTitle
-    ? y.interpolate({ inputRange: [0, COLLAPSE_DISTANCE], outputRange: [0, 1], extrapolate: 'clamp' })
-    : 1;
 
   const handleBack = onBack ?? (() => goBackOr(router));
   const compactTopPad = headerTopInset;
@@ -200,12 +198,6 @@ export function Header({
       )}
 
       {belowTitle && <View style={styles.belowTitle}>{belowTitle}</View>}
-
-      {dividerVariant === 'none' ? null : dividerVariant === 'subtle' ? (
-        <View style={[styles.hairline, { backgroundColor: '#FFFFFF', opacity: 0.06 }]} />
-      ) : (
-        <Animated.View style={[styles.hairline, { backgroundColor: theme.border, opacity: borderOpacity }]} />
-      )}
     </View>
   );
 }
@@ -310,9 +302,5 @@ const styles = StyleSheet.create({
   belowTitle: {
     paddingHorizontal: GUTTER,
     paddingBottom: SP.md,
-  },
-  hairline: {
-    height: StyleSheet.hairlineWidth,
-    width: '100%',
   },
 });

@@ -711,7 +711,6 @@ const sc = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    borderBottomWidth: 1, borderBottomColor: BORDER,
     minHeight: COMP.headerH,
   },
   headerBtn: {

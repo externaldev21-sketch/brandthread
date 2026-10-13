@@ -105,7 +105,7 @@ import ForceUpdateGate from '@/components/ForceUpdateGate';
 import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
 import AiConsentSheet from '@/components/AiConsentSheet';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
-import { StatusBarMask, useSceneBottomClearance } from '@/components/layout/ScreenChrome';
+import { StatusBarScrollEdge, useSceneBottomClearance } from '@/components/layout/ScreenChrome';
 import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 import { FONT, MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
@@ -1441,7 +1441,7 @@ function RootLayoutNav() {
           <AppStack />
         </View>
       </Pressable>
-      <StatusBarMask />
+      <StatusBarScrollEdge />
       <SellerBarGate />
       <AuthGate />
       <ServiceConfigurer />

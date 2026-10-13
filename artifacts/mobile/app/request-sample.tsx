@@ -202,7 +202,7 @@ function Chip({ label, active, onPress, color }: { label: string; active: boolea
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 14 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
   backButton: { width: COMP.minTouchTarget, minHeight: COMP.minTouchTarget, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: colors.text, fontSize: 16, fontFamily: FONT.bold, textAlign: 'center' },
   headerSub: { color: colors.mutedForeground, fontSize: 12, fontFamily: FONT.regular, textAlign: 'center' },

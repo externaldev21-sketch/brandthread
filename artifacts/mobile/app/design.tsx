@@ -804,7 +804,7 @@ const sh = StyleSheet.create({
   overlay:  { ...StyleSheet.absoluteFill, backgroundColor: OVERLAY },
   sheet:    { position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '90%', backgroundColor: SURFACE, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, borderTopWidth: 1, borderColor: BORDER },
   handle:   { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER_ACTIVE, alignSelf: 'center', marginTop: SP.sm, marginBottom: SP.xs, opacity: 0.3 },
-  header:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.lg, paddingBottom: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE },
+  header:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.lg, paddingBottom: SP.sm },
   cancelBtn: { minWidth: 60, minHeight: COMP.iconBtn, justifyContent: 'center' },
   cancelTxt: { fontFamily: FONT.regular, fontSize: FS.base, color: MUTED },
   title:    { flex: 1, textAlign: 'center', fontFamily: FONT.semibold, fontSize: FS.base, color: FG },

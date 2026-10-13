@@ -456,8 +456,6 @@ function makeStyles(theme: AppThemePreset) {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
   },
   backBtn: {
     width: COMP.iconBtn,

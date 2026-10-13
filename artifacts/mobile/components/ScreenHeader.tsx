@@ -43,7 +43,8 @@ interface ScreenHeaderProps {
   /** Scroll distance over which the large title fully collapses. */
   collapseDistance?: number;
   onBack?: () => void;
-  /** Off by default; explicitly opt in only when content needs a hard edge. */
+  /** No longer draws anything: Dev's rule is no line at the top of any screen
+   *  (scripts/lint/no-top-chrome-hairline.mjs). Kept so call sites type-check. */
   divider?: boolean;
   /** Override the spoken back label when the route changes between a list and an inline form. */
   backAccessibilityLabel?: string;
@@ -57,7 +58,7 @@ interface ScreenHeaderProps {
    * itself, only which icon a screen that already has one shows.
    */
   variant?: 'push' | 'modal';
-  /** Compatibility alias for divider={false}; hides the hairline under the header. */
+  /** Compatibility alias for divider={false}; also draws nothing now. */
   hideDivider?: boolean;
   /**
    * Collapse the title into the bar on scroll (iOS large-title behaviour),
@@ -107,7 +108,7 @@ export function ScreenHeader({
   const closeOrBack = () => (onBack ? onBack() : goBackOr(router));
 
   return (
-    <View testID="screen-header" style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }, (!divider || hideDivider) ? styles.noDivider : null]}>
+    <View testID="screen-header" style={[styles.wrap, { paddingTop: topPad }]}>
       <View style={styles.container}>
         {variant === 'push' && (
           showBack ? (
@@ -201,9 +202,7 @@ export function ScreenHeader({
 
 const styles = StyleSheet.create({
   wrap: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  noDivider: { borderBottomWidth: 0 },
   container: {
     flexDirection: 'row',
     // Center the title with the back/close button on the same row. The

@@ -5821,7 +5821,6 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: SURFACE,
-    borderBottomWidth: 1, borderBottomColor: BORDER,
     paddingHorizontal: SP.sm, paddingBottom: SP.xs, gap: SP.xs,
   },
   topGroup:    { flexDirection: 'row', alignItems: 'center', gap: 2 },

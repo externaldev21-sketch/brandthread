@@ -578,7 +578,7 @@ const createStyles = (theme: AppThemePreset) => {
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   accessLoading:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: border },
+  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { flex: 1, textAlign: 'center', color: text, fontSize: FS.lg, fontFamily: FONT.semibold },
   balanceHero:  { marginHorizontal: SP.md, marginTop: SP.md, marginBottom: SP.lg },
