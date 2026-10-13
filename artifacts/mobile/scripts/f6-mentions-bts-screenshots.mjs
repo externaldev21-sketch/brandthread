@@ -166,24 +166,6 @@ async function composerFlow(_browser, origin, images) {
   }
 }
 
-async function studioFlow(browser, origin, images) {
-  console.log('\n== studio ==');
-  const { context, page, activity } = await openContext(browser, { device, role: 'seller', origin, images });
-  try {
-    await openReliably(page, activity, origin, 'seller', '/studio');
-    await page.getByText('Behind the Scenes').first().waitFor({ timeout: 20_000 });
-    await page.getByText('Behind the Scenes').first().scrollIntoViewIfNeeded();
-    await page.mouse.wheel(0, 120);
-    await waitForImages(page);
-    await shot(page, 'studio-behind-the-scenes-entry');
-  } catch (error) {
-    console.error(`  x studio: ${String(error?.message ?? error).split('\n')[0]}`);
-    await shot(page, 'FAILED-studio').catch(() => {});
-  } finally {
-    await context.close();
-  }
-}
-
 async function main() {
   if (!process.argv.includes('--skip-build')) buildPreviewWeb();
   const { origin, close } = await serveBuild(DEFAULT_BUILD_DIR);
@@ -192,7 +174,6 @@ async function main() {
     const images = await ensureDemoImages(browser, path.join(MOBILE_ROOT, '.store-screenshots', 'images'));
     await feedFlow(browser, origin, images);
     await composerFlow(browser, origin, images);
-    await studioFlow(browser, origin, images);
   } finally {
     await browser.close();
     close();

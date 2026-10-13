@@ -5,7 +5,7 @@
 Covers F6 items **86** (clickable product mentions in captions) and **78** (seller "Studio" behind-the-scenes posts).
 
 - **86 Product mentions.** A seller can link product names in a caption to their own products. In the feed, the linked name is bold, and tapping it opens the existing Shop product sheet straight on that product.
-- **78 Behind the scenes.** A seller can mark a Thread or post as "Behind the scenes", using one switch in the composer's More options. The feed then shows a text-only "Behind the scenes" line between the brand name and the caption. Studio has a new "Behind the Scenes" card that opens the composer with the switch already on. `GET /api/posts?label=bts&sellerId=…` lists a seller's BTS posts for a future profile filter. No profile screens were changed.
+- **78 Behind the scenes.** A seller can mark a Thread or post as "Behind the scenes", using one switch in the composer's More options. The feed then shows a text-only "Behind the scenes" line between the brand name and the caption. The composer also accepts `?bts=1` to open with the switch on, ready for a Studio entry point (see Suggestions for Dev). `GET /api/posts?label=bts&sellerId=…` lists a seller's BTS posts for a future profile filter. No profile screens were changed.
 
 What already existed and was extended rather than rebuilt:
 - `CaptionSpans` / `CaptionText` (#hashtag linking) can now also link product mentions. Without mentions the output is the same as before.
@@ -24,7 +24,7 @@ One app for every flow here: **TikTok** (iOS). The feed is TikTok-style, and so 
 | Caption: linked tokens rendered bold inline | [screen](https://mobbin.com/screens/fabe6f09-2925-4afe-9d42-2ed0091e0f43) <br>![](reference/tiktok-caption-linked-tokens.webp) | ![](ours/01-feed-bts-label-and-product-mention.png) |
 | Label line under the creator name ("Commission paid") | [screen](https://mobbin.com/screens/f33fee80-53e2-4935-9d77-872575f09037) <br>![](reference/tiktok-label-under-name.webp) | ![](ours/01-feed-bts-label-and-product-mention.png) |
 | Tap mention → product | (TikTok Shop opens the product page) | ![](ours/02-feed-tap-mention-opens-product-sheet.png) |
-| BTS switch / Studio entry | (no Mobbin counterpart; the switch sits with the existing More options toggles) | ![](ours/06-composer-behind-the-scenes-switch.png) ![](ours/07-studio-behind-the-scenes-entry.png) |
+| BTS switch | (no Mobbin counterpart; the switch sits with the existing More options toggles) | ![](ours/06-composer-behind-the-scenes-switch.png) |
 
 The reference images are Mobbin's preview renders. The proxy blocked downloading the full-resolution `image_url`.
 
@@ -54,7 +54,6 @@ The reference images are Mobbin's preview renders. The proxy blocked downloading
   - `?bts=1` starts with the switch on.
   - Editing a post prefills its mentions and BTS state.
   - The edit-save path also syncs them.
-- `app/(tabs)/studio.tsx`: a "Behind the Scenes" tool card was appended at the end of the tools grid. It opens `/create-post?mode=thread&bts=1`.
 
 ## Touches existing UI
 
@@ -67,7 +66,6 @@ The reference images are Mobbin's preview renders. The proxy blocked downloading
 | `app/create-post.tsx` | Reads the `bts` param, prefills on edit, and adds one `syncPostExtras` call on the edit-save path. |
 | `lib/createPost/publish.ts`, `lib/createPost/types.ts` | Adds one `syncPostExtras` call after create/update, plus two optional `PostDetails` fields. |
 | `services/socialService.ts` | Adds two optional `SellerThreadPost` fields, mapped in `mapOwnedApiPost` and `mapApiPostToSellerThreadPost`. |
-| `app/(tabs)/studio.tsx` | Appends one tool card at the end of the grid, using the same themed accent as "Create Content". The Studio header and menu are untouched. Because of the extra card, the last grid row now holds a single card. |
 
 ## Feature flags / env keys
 
@@ -99,5 +97,5 @@ None. No third-party service, no key, and no paid API are involved. In the signe
 - **Web gallery bug (pre-existing, not changed here):** `lib/createPost/useDeviceMedia.ts` `requestAccess()` sets `permission='denied'` on web, because `getMediaLibrary()` is null there. The web gallery therefore always shows "Allow access" and never shows the files picked through the hidden input. `create-flow-verify.mjs` likely hits this too. The screenshot script works around it with the fake camera. That area is owned by the create-flow session.
 - A `$` typing trigger in the caption, like the `@` suggestions, would be a nice follow-up. I kept the composer change to one row because other sessions own the create flow.
 - The BTS profile filter (`GET /api/posts?label=bts&sellerId=`) is ready, but nothing calls it yet. Profile screens were deliberately left alone.
-- Studio grid: the new card makes the tool count odd, so the last row has one card. Move the card to a different position, or pair it with a future tool, if that matters.
+- **Studio entry point (not added):** a "Behind the Scenes" tool card in the Studio grid that opens `/create-post?mode=thread&bts=1` was built and then pulled out of this PR. Appending it made the grid's last row a single card, and the Studio screen is owned by other sessions. If you want it, it is a ~15-line addition to `STUDIO_TOOLS` in `app/(tabs)/studio.tsx`; the composer already supports `?bts=1`.
 - Other places where captions render (`buyer-post-viewer`, the quote and RFQ screens) don't pass mentions yet. They mostly show buyer posts, which can't carry mentions.
