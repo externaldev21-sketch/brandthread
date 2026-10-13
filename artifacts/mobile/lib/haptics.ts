@@ -115,13 +115,13 @@ function fire(kind: HapticKind): Promise<void> {
 }
 
 /** Plays `kind` if the switch is on and this action hasn't had its haptic yet. Never rejects. */
-export function play(kind: HapticKind): Promise<void> {
+export function play(kind: HapticKind, nativeAction?: () => Promise<void>): Promise<void> {
   const now = Date.now();
   if (!shouldPlay(kind, now)) return Promise.resolve();
   lastPlayedAt = now;
   lastKind = kind;
   try {
-    return Promise.resolve(fire(kind)).catch(() => {});
+    return Promise.resolve(nativeAction ? nativeAction() : fire(kind)).catch(() => {});
   } catch {
     return Promise.resolve();
   }

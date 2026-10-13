@@ -66,6 +66,8 @@ export interface BuyerSettingsState {
   theme: 'system' | 'dark' | 'light';
   reduceMotion: boolean;
   captions: boolean;
+  /** Settings → Accessibility → "Disable haptic feedback". See lib/hapticsPreference.ts. */
+  disableHaptics: boolean;
 }
 
 export const DEFAULT_BUYER_SETTINGS: BuyerSettingsState = {
@@ -111,6 +113,7 @@ export const DEFAULT_BUYER_SETTINGS: BuyerSettingsState = {
   theme: 'system',
   reduceMotion: false,
   captions: true,
+  disableHaptics: false,
 };
 
 type Key = keyof BuyerSettingsState;

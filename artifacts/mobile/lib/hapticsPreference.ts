@@ -9,6 +9,10 @@ import { isHapticsEnabled, setHapticsEnabled, subscribeHapticsEnabled } from '@/
 
 export const HAPTICS_ENABLED_KEY = 'bt:haptics:enabled';
 
+/** Compatibility with the older inverse preference; there is only one gate. */
+export const isHapticsDisabled = () => !isHapticsEnabled();
+export const setHapticsDisabled = (disabled: boolean) => setHapticsEnabled(!disabled);
+
 let hydration: Promise<void> | null = null;
 
 /** Reads the stored switch once per launch. Safe to call repeatedly. */

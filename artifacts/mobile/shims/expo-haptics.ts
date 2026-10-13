@@ -6,6 +6,7 @@
  * Everything else (enums, Android haptics) is the real module.
  */
 import type { ImpactFeedbackStyle, NotificationFeedbackType } from 'expo-haptics';
+import * as RealHaptics from 'expo-haptics';
 import { kindForImpactStyle, kindForNotificationType, play } from '@/lib/haptics';
 
 export * from 'expo-haptics';
@@ -20,4 +21,10 @@ export function notificationAsync(type?: NotificationFeedbackType): Promise<void
 
 export function selectionAsync(): Promise<void> {
   return play('selection');
+}
+
+export function performAndroidHapticsAsync(
+  ...args: Parameters<typeof RealHaptics.performAndroidHapticsAsync>
+): Promise<void> {
+  return play('light', () => RealHaptics.performAndroidHapticsAsync(...args));
 }
