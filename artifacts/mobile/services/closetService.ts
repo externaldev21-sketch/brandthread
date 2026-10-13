@@ -7,6 +7,7 @@
  * preview data is ever returned for a real account.
  */
 import { serviceRequest } from '@/lib/serviceConfig';
+import type { PieceEdition } from '@/lib/editions';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { NAVIGATION_ISOLATION_TEST } from '@/lib/buildFlags';
 
@@ -23,6 +24,8 @@ export interface ClosetPiece {
   imageUrl: string | null;
   orderedAt: string;
   deliveredAt: string;
+  /** Set when the product is a limited numbered run (shown in the Closet only). */
+  edition?: PieceEdition | null;
 }
 
 export interface ClosetOutfit {

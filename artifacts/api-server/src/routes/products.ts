@@ -1,3 +1,4 @@
+import { validateEditionSize } from "../lib/editions";
 import express, { Router } from "express";
 import { db, products, productVariants } from "@workspace/db";
 import { eq, desc, sql, and, isNull, gt, ne } from "drizzle-orm";
@@ -151,9 +152,15 @@ router.post("/", requireRole("manager"), async (req, res) => {
     isPreOrder, preOrderClosingDate, preOrderEstShipDate, dropId,
     // A photo of the seller's own size chart.
     sizeChartImageUrl,
+    // Limited numbered run ("No. 014 of 200"); null/absent = not numbered.
+    editionSize,
   } = req.body;
   if (!name || typeof name !== "string" || name.trim() === "") {
     res.status(400).json({ error: "name required" }); return;
+  }
+  {
+    const problem = validateEditionSize(editionSize, 0);
+    if (problem) { res.status(problem.status).json({ error: problem.error, code: problem.code }); return; }
   }
   {
     // A pre-order must carry the ship date the seller promises the buyer.
@@ -230,6 +237,7 @@ router.post("/", requireRole("manager"), async (req, res) => {
         ...(preOrderEstShipDate ? { preOrderEstShipDate: new Date(preOrderEstShipDate) } : {}),
         ...(dropId !== undefined && { dropId: dropId ?? null }),
         ...(sizeChartImageUrl !== undefined && { sizeChartImageUrl: sizeChartImageUrl ?? null }),
+        ...(typeof editionSize === "number" && { editionSize }),
       })
       .returning();
 
@@ -291,7 +299,15 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
     // Product-level strike-through price applied to every variant that costs
     // less than it (null clears). Per-variant control: PATCH /:id/variants/:variantId.
     compareAtPriceCents,
+    // Limited numbered run; null turns it off (only before any piece is numbered).
+    editionSize,
   } = req.body;
+  if (editionSize !== undefined) {
+    const [stored] = await db.select({ issued: products.editionIssued })
+      .from(products).where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId))).limit(1);
+    const problem = validateEditionSize(editionSize, stored?.issued ?? 0);
+    if (problem) { res.status(problem.status).json({ error: problem.error, code: problem.code }); return; }
+  }
   if (compareAtPriceCents !== undefined && compareAtPriceCents !== null &&
       (!Number.isInteger(compareAtPriceCents) || compareAtPriceCents <= 0)) {
     res.status(400).json({ error: "compareAtPriceCents must be a positive integer or null" }); return;
@@ -328,6 +344,7 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       // Size chart (pass null to clear)
       ...(sizeChart              !== undefined && { sizeChart: sizeChart ?? null }),
       ...(sizeChartImageUrl      !== undefined && { sizeChartImageUrl: sizeChartImageUrl ?? null }),
+      ...(editionSize            !== undefined && { editionSize: editionSize ?? null }),
       updatedAt: new Date(),
   };
 

@@ -290,6 +290,9 @@ export const products = pgTable('products', {
   // A photo of the seller's own size chart — distinct from the structured
   // table data above. Optional; shown to buyers as a "Size guide" link.
   sizeChartImageUrl:     text('size_chart_image_url'),
+  // ── Numbered run (migration 263): null = not numbered ─────────────────────
+  editionSize:           integer('edition_size'),
+  editionIssued:         integer('edition_issued').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -575,6 +578,8 @@ export const orderItems = pgTable('order_items', {
   trackingStatus: text('tracking_status'),
   refundedAt: timestamp('refunded_at', { withTimezone: true }),
   refundedCents: integer('refunded_cents').notNull().default(0),
+  // Numbered run: the first number on this line (quantity numbers in a row).
+  editionNumber: integer('edition_number'),
 }, (table) => ({
   orderIdx: index('order_items_order_id_idx').on(table.orderId),
   variantIdx: index('order_items_variant_id_idx').on(table.variantId),
