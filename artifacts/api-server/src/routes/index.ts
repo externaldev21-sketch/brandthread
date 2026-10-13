@@ -69,6 +69,7 @@ import reportsRouter from "./reports";
 import postCommentsRouter from "./post-comments";
 import moderationRouter from "./moderation";
 import safetyRouter from "./safety";
+import hiddenWordsRouter from "./hidden-words";
 import socialRouter from "./social";
 import storyMentionsRouter from "./story-mentions";
 import closeFriendsRouter from "./close-friends";
@@ -310,6 +311,7 @@ router.use("/feed",                      feedRouter); // buyer-scoped (For You r
 router.use("/reports",                   reportsRouter);
 router.use("/moderation",                auditModerationActions, moderationRouter);
 router.use("/admin",                     adminRouter); // platform admin dashboard API (users.role = admin)
+router.use("/safety/hidden-words",       hiddenWordsRouter); // creator's own comment filter
 router.use("/safety",                    safetyRouter);
 router.use("/social/contacts",           socialContactsRouter);
 router.use("/social",                    socialRouter);

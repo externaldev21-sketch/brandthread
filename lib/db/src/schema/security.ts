@@ -168,3 +168,15 @@ export const dataExportJobs = pgTable("data_export_jobs", {
   statusIdx: index("data_export_jobs_status_idx").on(table.status, table.requestedAt),
   tokenHashUniq: uniqueIndex("data_export_jobs_token_hash_uniq").on(table.downloadTokenHash).where(sql`download_token_hash IS NOT NULL`),
 }));
+
+/**
+ * Hidden Words (feature 71, migration 524): a creator's own list of words and
+ * phrases. A comment on their posts that contains one is hidden from everyone
+ * but its author (post_comments.hidden_by_owner).
+ */
+export const commentFilters = pgTable("comment_filters", {
+  userId: text("user_id").primaryKey(),
+  hideCustom: integer("hide_custom").notNull().default(1),
+  words: jsonb("words").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

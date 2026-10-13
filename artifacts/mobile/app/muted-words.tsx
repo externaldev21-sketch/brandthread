@@ -10,7 +10,7 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -18,6 +18,7 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ListRow } from '@/components/ui';
 import { apiErrorMessage } from '@/lib/safety';
 import {
   addGuestMutedWord, GUEST_MUTED_WORD_LIMIT, readGuestMutedWords, removeGuestMutedWord,
@@ -34,6 +35,7 @@ export default function MutedWordsScreen() {
   const insets = useSafeAreaInsets();
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const api = useApi();
+  const router = useRouter();
   const inputRef = useRef<TextInput>(null);
   const loadGeneration = useRef(0);
   const loadedFor = useRef<string | null>(null);
@@ -154,6 +156,18 @@ export default function MutedWordsScreen() {
             ? 'Posts in your feed and comments with these words are hidden on this device. Nobody is notified.'
             : 'Comments and posts that contain these words are hidden from you everywhere on Brandthread. Nobody is notified.'}
         </Text>
+
+        {!guestMode && authLoaded ? (
+          <ListRow
+            icon="eye-off"
+            title="Hidden Words"
+            subtitle="Hide comments on your own posts"
+            chevron
+            onPress={() => router.push('/hidden-words' as never)}
+            testID="muted-words-hidden-words"
+            style={{ marginBottom: SP.sm }}
+          />
+        ) : null}
 
         <View style={[s.inputShell, (!canEdit || atLimit) && { opacity: 0.5 }]}>
           <Feather name="plus" size={18} color={theme.muted} />
