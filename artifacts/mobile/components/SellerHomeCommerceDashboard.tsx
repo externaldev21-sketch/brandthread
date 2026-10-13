@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useIsFocused } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -80,6 +80,8 @@ import { SellerDashboardTopProducts } from '@/components/SellerDashboardTopProdu
 import { SellerDashboardTrafficSources } from '@/components/SellerDashboardTrafficSources';
 import { SellerDashboardRecentOrders } from '@/components/SellerDashboardRecentOrders';
 import { SellerDashboardSetupCard } from '@/components/SellerDashboardSetupCard';
+import { SellerLiveMap } from '@/components/SellerLiveMap';
+import { useSellerLiveMap } from '@/hooks/useSellerLiveMap';
 import {
   BG,
   FG,
@@ -275,6 +277,13 @@ export default function SellerHomeCommerceDashboard({
   }), []);
 
   const data = selectSellerHomeAnalytics(snapshot, analyticsUserId, range);
+
+  // Live map: realtime only while this screen is focused (socket closes on blur).
+  const screenFocused = useIsFocused();
+  const liveMap = useSellerLiveMap({
+    enabled: screenFocused && !!userId,
+    preview: sellerPreview ? (isPreviewDemoMode() ? 'demo' : 'fresh') : null,
+  });
 
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
   const [celebrationVisible, setCelebrationVisible] = useState(false);
@@ -843,6 +852,11 @@ export default function SellerHomeCommerceDashboard({
                   <SellerDashboardStatGrid tiles={tiles} activeKey={metric} onSelect={(key) => setMetric(key as MetricKey)} theme={theme} />
                 </View>
               )}
+
+              {/* ── Live map: today's order cities, pings on a new order ── */}
+              <View style={styles.section}>
+                <SellerLiveMap data={liveMap.data} ping={liveMap.ping} theme={theme} />
+              </View>
 
               {/* ── Balance / withdraw ───────────────────────────────────── */}
               {currentRole === 'owner' && (

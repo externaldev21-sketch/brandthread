@@ -30,6 +30,7 @@ import { startEmailCampaignJob } from "./jobs/emailCampaigns";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
+import { attachSellerWebSocket } from "./ws/sellerHub";
 import { startCommunityPushJob } from "./lib/communityPush";
 import { startScheduledPostPublisherJob } from "./jobs/scheduledPostPublisher";
 import { pool } from "@workspace/db";
@@ -65,6 +66,8 @@ const server = app.listen(port, (err) => {
   attachLiveWebSocket(server);
   // Community chat realtime channel (/ws/community), same HTTP server.
   attachCommunityWebSocket(server);
+  // Seller dashboard channel (/ws/seller): Live map order_city pings.
+  attachSellerWebSocket(server);
 
   // Ensure Stripe webhook endpoint includes all required event types
   // (especially customer.subscription.* for live seller subscription updates)
