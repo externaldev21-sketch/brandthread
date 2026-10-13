@@ -182,12 +182,14 @@ export default function BuyerCollection() {
             <CachedImage source={{ uri: item.image }} style={styles.tileImage} />
           ) : (
             <View style={[styles.tileImage, styles.tilePlaceholder, { backgroundColor: item.accentColor || theme.accentDim }]}>
-              <Feather name="shopping-bag" size={22} color={theme.accent} />
+              <Feather name={item.type === 'post' ? 'image' : 'shopping-bag'} size={22} color={theme.accent} />
             </View>
           )}
         </View>
         <View style={styles.tileInfo}>
-          {item.brand ? <Text style={styles.tileBrand} numberOfLines={1}>{item.brand}</Text> : null}
+          {item.brand || (item.type === 'post' && item.subtitle) ? (
+            <Text style={styles.tileBrand} numberOfLines={1}>{item.brand || item.subtitle}</Text>
+          ) : null}
           <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
           {item.priceCents != null ? <Text style={styles.tilePrice}>{formatCents(item.priceCents)}</Text> : null}
         </View>

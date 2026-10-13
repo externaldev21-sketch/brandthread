@@ -8,7 +8,7 @@ import { useRouter, useSegments } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Snackbar } from '@/components/ui/Snackbar';
-import { SaveToCollectionSheet } from '@/components/SaveToCollectionSheet';
+import { SaveToCollectionSheet, type SaveToCollectionItem } from '@/components/SaveToCollectionSheet';
 import { useSavedProductsSync } from '@/hooks/useSavedProduct';
 import { registerSaveHeartHost, type SaveHeartToast } from '@/lib/saved/saveHeartBus';
 import { savedProducts } from '@/lib/saved/savedProducts';
@@ -27,6 +27,8 @@ export function SaveHeartHost() {
   const [toast, setToast] = useState<SaveHeartToast | null>(null);
   const [sheetDraft, setSheetDraft] = useState<SavedProductDraft | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  /** Non-product item (a saved post) the sheet is filing, with its thumbnail. */
+  const [sheetItem, setSheetItem] = useState<{ item: SaveToCollectionItem; thumbnailUri?: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearTimer = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } };
@@ -43,6 +45,7 @@ export function SaveHeartHost() {
     } else {
       clearTimer();
       setToast(null);
+      setSheetItem(null);
       setSheetDraft(event.draft);
       setSheetOpen(true);
     }
@@ -56,8 +59,15 @@ export function SaveHeartHost() {
     setToast(null);
     if (!action) return;
     if (action.kind === 'collection') {
+      setSheetItem(null);
       setSheetDraft(action.draft);
       setSheetOpen(true);
+    } else if (action.kind === 'save-to-collection') {
+      setSheetDraft(null);
+      setSheetItem({ item: action.item, thumbnailUri: action.thumbnailUri });
+      setSheetOpen(true);
+    } else if (action.kind === 'view-collection') {
+      router.push(`/buyer-collection?collectionId=${encodeURIComponent(action.collectionId)}` as never);
     } else {
       router.push('/sign-in' as never);
     }
@@ -76,6 +86,7 @@ export function SaveHeartHost() {
         bottomOffset={bottomOffset}
         visible={!!toast}
         message={toast?.message ?? ''}
+        thumbnailUri={toast?.thumbnailUri}
         actionLabel={toast?.actionLabel}
         onAction={toast?.action ? onToastAction : undefined}
       />
@@ -87,11 +98,21 @@ export function SaveHeartHost() {
           title: sheetDraft.title,
           subtitle: sheetDraft.brand,
           priceCents: sheetDraft.priceCents,
-        } : null}
+        } : sheetItem?.item ?? null}
         onClose={() => setSheetOpen(false)}
-        onSaved={(collectionId) => {
-          if (sheetDraft) savedProducts.markSaved(sheetDraft.productId);
-          showToast({ message: collectionId ? 'Saved to collection' : 'Saved' });
+        onSaved={(collectionId, collectionName) => {
+          if (sheetDraft) {
+            savedProducts.markSaved(sheetDraft.productId);
+            showToast({ message: collectionId ? 'Saved to collection' : 'Saved' });
+            return;
+          }
+          // Saved posts: Instagram's "Saved to <collection> · View" bar.
+          showToast(collectionId ? {
+            message: collectionName ? `Saved to ${collectionName}` : 'Saved to collection',
+            thumbnailUri: sheetItem?.thumbnailUri,
+            actionLabel: 'View',
+            action: { kind: 'view-collection', collectionId },
+          } : { message: 'Saved', thumbnailUri: sheetItem?.thumbnailUri });
         }}
       />
     </>

@@ -77,6 +77,8 @@ import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
 import { getCachedFeedPosts, hydrateFeedPostsCache, setCachedFeedPosts } from '@/lib/feedPostsCache';
 import { useCommentCountDelta } from '@/lib/commentCountBus';
+import { emitSaveHeartEvent } from '@/lib/saved/saveHeartBus';
+import { savedPostToast } from '@/lib/saved/savedPostToast';
 import type { BuyerProduct } from '@/services/cartTypes';
 import { getCart } from '@/services/cartService';
 import {
@@ -2742,6 +2744,8 @@ export default function FeedScreen({
           const item = itemsById.get(id);
           const title = item?.caption?.trim() || `${item?.creator ?? 'Post'}'s post`;
           await _api.buyer.saved.save({ type: 'post', targetId: id, title, subtitle: item?.creator, accentColor: item?.accentColor });
+          // Instagram: "Saved · Save to collection" bar → "Save to…" sheet.
+          emitSaveHeartEvent({ type: 'toast', toast: savedPostToast({ ...item, id }) });
         } else {
           await _api.buyer.saved.remove(id);
         }
