@@ -16,7 +16,8 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 import { hapticLight } from '@/lib/haptics';
 
 export const FOUNDING_SELLER_LIMIT = 100;
@@ -79,7 +80,7 @@ function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     chip: {
       flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
-      borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 4,
+      borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 4,
       borderColor: theme.border, backgroundColor: theme.cardGlass,
     },
     chipText: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14, color: theme.text },
