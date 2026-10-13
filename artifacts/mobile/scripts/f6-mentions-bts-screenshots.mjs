@@ -20,7 +20,7 @@ import {
   waitForImages, waitForQuietNetwork, DEFAULT_BUILD_DIR, MOBILE_ROOT,
 } from './store-screenshots/harness.mjs';
 import { ensureDemoImages } from './store-screenshots/demo-images.mjs';
-import { respond } from './store-screenshots/demo-data.mjs';
+import { SELLER_USER, respond } from './store-screenshots/demo-data.mjs';
 
 const OUTPUT_DIR = path.resolve(MOBILE_ROOT, '..', '..', 'docs', 'pr-assets', 'mentions-bts', 'ours');
 const PHOTO = path.join(MOBILE_ROOT, 'assets', 'images', 'products', 'leather-ankle-boots.jpg');
@@ -64,7 +64,7 @@ function withMentions(list) {
 
 async function routeFeed(page, origin, role) {
   for (const p of ['/api/posts/feed', '/api/public/posts']) {
-    await page.route(`https://api.brandthread.test${p}**`, async (route) => {
+    await page.route(new RegExp(`^https://api\\.brandthread\\.test/api(/v1)?${p.replace('/api', '')}(\\?|$)`), async (route) => {
       const request = route.request();
       if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors(origin) });
       const url = new URL(request.url());
@@ -72,6 +72,15 @@ async function routeFeed(page, origin, role) {
       return route.fulfill({ status: 200, headers: cors(origin), contentType: 'application/json', body: JSON.stringify(body ?? []) });
     });
   }
+  // The Threads tab reads the For You ranking; serve the same demo posts there.
+  await page.route(/^https:\/\/api\.brandthread\.test\/api(\/v1)?\/feed\/for-you(\?|$)/, async (route) => {
+    const request = route.request();
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors(origin) });
+    const posts = withMentions(respond({ method: 'GET', path: '/api/posts/feed', query: new URLSearchParams(), role }) ?? []);
+    const offset = Number(new URL(request.url()).searchParams.get('offset') ?? 0);
+    const items = offset > 0 ? [] : posts.map((p) => ({ type: 'post', ...p, score: 1 }));
+    return route.fulfill({ status: 200, headers: cors(origin), contentType: 'application/json', body: JSON.stringify({ items, nextOffset: null }) });
+  });
 }
 
 async function openReliably(page, activity, origin, role, target, extraQuery = '') {
@@ -93,7 +102,10 @@ async function feedFlow(browser, origin, images) {
     await openReliably(page, activity, origin, 'buyer', '/feed');
     const guide = page.getByText('Tap to keep watching');
     if (await guide.count()) await guide.first().click().catch(() => {});
-    await page.getByTestId('post-label').first().waitFor({ timeout: 20_000 });
+    // Index 0 of the buyer pager is the High Demand page; the demo post is the next page.
+    await page.getByTestId('post-label').first().waitFor({ state: 'attached', timeout: 20_000 });
+    await page.getByTestId('post-label').first().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1500);
     await waitForQuietNetwork(activity);
     await waitForImages(page);
     await shot(page, 'feed-bts-label-and-product-mention');
@@ -110,19 +122,23 @@ async function feedFlow(browser, origin, images) {
   }
 }
 
-async function composerFlow(browser, origin, images) {
+async function composerFlow(_browser, origin, images) {
+  const { chromium } = await import('playwright');
+  const browser = await chromium.launch({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
   console.log('\n== seller composer ==');
   const { context, page, activity } = await openContext(browser, { device, role: 'seller', origin, images });
   page.on('pageerror', (err) => console.log(`    (page error: ${err.message.split('\n')[0]})`));
   try {
-    await openReliably(page, activity, origin, 'seller', '/create-post?mode=thread&bts=1', '&demo=1');
-    await page.getByTestId('gallery-picker').waitFor({ timeout: 25_000 });
-    await page.locator('[data-testid="gallery-file-input"]').setInputFiles([PHOTO]);
-    await page.waitForTimeout(1200);
-    await page.locator('[data-testid^="gallery-tile-"]').first().click();
-    await page.getByTestId('gallery-next').click();
-    await page.getByTestId('slide-editor').waitFor({ timeout: 15_000 });
-    await page.getByTestId('edit-next').click();
+    // The web gallery has no media-library access here, so the photo comes from
+    // the (fake) camera: Photo chip -> shutter -> edit -> post screen.
+    await context.grantPermissions(['camera', 'microphone'], { origin }).catch(() => {});
+    await openReliably(page, activity, origin, 'seller', '/create-post?mode=thread&bts=1&capture=1', '&demo=1');
+    await page.getByTestId('create-camera-shutter').waitFor({ timeout: 25_000 });
+    await page.getByText('Photo', { exact: true }).first().click();
+    await page.waitForTimeout(2500);
+    await page.getByTestId('create-camera-shutter').click();
+    await page.waitForTimeout(2500);
+    if (await page.getByTestId('edit-next').count()) await page.getByTestId('edit-next').first().click();
     await page.getByTestId('post-screen').waitFor({ timeout: 15_000 });
     await page.getByTestId('caption-input').fill('Fitting day in the studio. Wearing the');
     await page.getByTestId('caption-input').press('End');
@@ -146,6 +162,7 @@ async function composerFlow(browser, origin, images) {
     await shot(page, 'FAILED-composer').catch(() => {});
   } finally {
     await context.close();
+    await browser.close();
   }
 }
 

@@ -365,16 +365,15 @@ interface SpotlightItem {
 }
 type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
 
-/** A caption product mention opens the same Shop sheet as a product tag; the mentioned product joins the sheet's tag list when it isn't tagged. */
+/** A caption product mention opens the same Shop sheet as a product tag, scoped to just the mentioned product (straight to its detail). */
 function mentionShopTarget(item: SpotlightItem, mention: PostProductMention): [SpotlightItem, SpotlightProductTag] {
-  const existing = item.productTags?.find((t) => t.productId === mention.productId);
-  const tag: SpotlightProductTag = existing ?? {
+  const tag: SpotlightProductTag = item.productTags?.find((t) => t.productId === mention.productId) ?? {
     productId: mention.productId,
     productName: mention.name ?? mention.label,
     priceCents: mention.priceCents ?? 0,
     imageUri: mention.imageUri,
   };
-  return [existing ? item : { ...item, productTags: [...(item.productTags ?? []), tag] }, tag];
+  return [{ ...item, productTags: [tag] }, tag];
 }
 
 const SOUND_PREF_KEY = 'bt:feed-sound-on:v1';
