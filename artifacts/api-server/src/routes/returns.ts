@@ -2,7 +2,9 @@ import express, { Router } from "express";
 import { db, returns, orders, orderItems, users } from "@workspace/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { orderGrossCents, refundOrder, RefundError } from "../lib/money/refunds";
+import {
+  orderGrossCents, refundMethodForResolution, refundOrderAsChosen, RefundError, threadCashRefundsEnabled,
+} from "../lib/money/refunds";
 import crypto from "crypto";
 import { reversePurchasePointsOnce } from "./loyalty";
 import { sendReturnStatusEmail } from "../lib/brandthreadEmail";
@@ -158,6 +160,16 @@ async function notifyReturnStatus(returnId: string, status: "pending" | "approve
 
 // ─── BUYER ENDPOINTS ──────────────────────────────────────────────────────────
 
+const RESOLUTIONS = new Set(["refund", "exchange", "store_credit", "replacement", "thread_cash"]);
+
+// GET /refund-options — how the buyer can take a refund (items 113/114):
+// back to the original payment, as Thread Cash (only while Thread Cash can be
+// spent at checkout), or as store credit for this seller.
+router.get("/refund-options", async (_req, res) => {
+  const threadCash = await threadCashRefundsEnabled();
+  res.json({ methods: ["original", ...(threadCash ? ["thread_cash"] : []), "store_credit"] });
+});
+
 // POST / — buyer creates a return request
 router.post("/", async (req, res) => {
   try {
@@ -166,10 +178,16 @@ router.post("/", async (req, res) => {
       orderId?: string;
       reason?: string;
       notes?: string;
-      resolutionRequested?: "refund" | "exchange" | "store_credit" | "replacement";
+      resolutionRequested?: "refund" | "exchange" | "store_credit" | "replacement" | "thread_cash";
       evidenceUrls?: unknown;
       requestedItems?: unknown;
     };
+    if (resolutionRequested !== undefined && !RESOLUTIONS.has(resolutionRequested)) {
+      return res.status(400).json({ error: "resolutionRequested is not a valid option" });
+    }
+    if (resolutionRequested === "thread_cash" && !(await threadCashRefundsEnabled())) {
+      return res.status(400).json({ error: "Refunds to Thread Cash aren't available right now", code: "THREAD_CASH_REFUNDS_OFF" });
+    }
 
     // 1. Validate required fields
     if (!orderId || !reason) {
@@ -501,8 +519,10 @@ router.patch("/:id/status", async (req, res) => {
       try {
         // The refund service caps the amount at what is still refundable,
         // pulls the seller's share back, returns the proportional 5% fee and
-        // posts the ledger — exactly once for this return.
-        await refundOrder({
+        // posts the ledger — exactly once for this return. It pays out the
+        // way the buyer asked: card, Thread Cash or store credit.
+        await refundOrderAsChosen({
+          method: refundMethodForResolution(returnRow.resolutionRequested),
           orderId: returnRow.orderId,
           amountCents: bodyRefundAmount,
           reason: "return_approved",

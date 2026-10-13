@@ -713,7 +713,7 @@ async function settleNonCardRefund(input: {
       threadCashEntryId = credit.entryId;
     } else {
       const [contact] = rows<{ email: string | null; name: string | null }>(await tx.execute(sql`
-        SELECT COALESCE(u.email, o.guest_email, o.contact_email) AS email,
+        SELECT COALESCE(u.email, o.guest_email) AS email,
                COALESCE(u.display_name, u.name) AS name
         FROM orders o LEFT JOIN users u ON u.clerk_id = o.buyer_id
         WHERE o.id = ${locked.id}::uuid
@@ -754,6 +754,32 @@ async function settleNonCardRefund(input: {
       .catch((err) => logger.error({ err, cardId: row.id, refundId: refund.id }, "Store credit email failed"));
   }
   return outcome.result;
+}
+
+/** What a return's requested resolution pays out as (returns.resolution_requested). */
+export function refundMethodForResolution(resolution: string | null | undefined): RefundMethod {
+  if (resolution === "thread_cash") return "thread_cash";
+  if (resolution === "store_credit") return "store_credit";
+  return "original";
+}
+
+/**
+ * refundOrder with the buyer's chosen method, except that when Thread Cash
+ * can't be used for this order (switched off since the buyer asked, guest
+ * order, frozen account, nothing to claw back from) the buyer is refunded to
+ * their card instead — never left without a refund. Nothing is recorded when
+ * those checks refuse, so the same idempotency key is free for the card.
+ */
+export async function refundOrderAsChosen(options: RefundOptions): Promise<RefundResult> {
+  try {
+    return await refundOrder(options);
+  } catch (error) {
+    if (options.method === "thread_cash" && error instanceof RefundError && error.code.startsWith("THREAD_CASH_")) {
+      logger.warn({ orderId: options.orderId, code: error.code }, "Thread Cash refund unavailable; refunding to the original payment");
+      return refundOrder({ ...options, method: "original" });
+    }
+    throw error;
+  }
 }
 
 async function failRefund(
