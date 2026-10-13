@@ -2,6 +2,15 @@
 
 Version: 2026-09-23
 
+## The short version
+
+- Brandthread, Inc. runs the Brandthread apps and brandthread.app. Sellers who fill your orders use your order details to ship and support them.
+- We collect what you give us, like your account, orders, posts, messages and uploads, plus device and log data. Stripe handles card and bank details, and we never get the full numbers.
+- We don’t sell your personal information, and we don’t track you across other companies’ apps.
+- Public comments, captions, live chat and direct messages are checked automatically for slurs, threats and scams.
+- You can download your data in Settings → Download my data and delete your account in Settings → Delete account. Order, payment and tax records the law requires are kept, with your name, email and address removed.
+- Privacy questions and requests: privacy@brandthread.app.
+
 ## Who we are
 
 Brandthread is operated by Brandthread, Inc. This policy covers the Brandthread apps, brandthread.app and related services. Sellers who fulfill your orders may also use your order details under their own policies to ship, support and account for your purchase.
