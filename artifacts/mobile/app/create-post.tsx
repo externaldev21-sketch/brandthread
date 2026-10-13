@@ -33,6 +33,7 @@ import { PostPicker } from '@/components/create-post/PostPicker';
 import { CarouselEditor } from '@/components/create-post/CarouselEditor';
 import { VideoEditor } from '@/components/create-post/VideoEditor';
 import { PostScreen, type PublishState } from '@/components/create-post/PostScreen';
+import { attachThreadPoll } from '@/lib/createPost/attachPoll';
 
 type Step = 'capture' | 'gallery' | 'edit' | 'post';
 
@@ -225,7 +226,7 @@ export default function CreatePostScreen() {
           input: { mode: postMode, media, details, isDraft: asDraft },
           onProgress: (fraction, phaseStep) => setPublishState({ phase: 'running', fraction, step: phaseStep, draft: asDraft }),
           signal: abort.current,
-        });
+        }).then((post) => attachThreadPoll(post, postMode === 'thread' ? details.poll : null));
         if (asDraft) await run(); else await completeSetupTaskAfter('first_post', run);
       } else {
         return;

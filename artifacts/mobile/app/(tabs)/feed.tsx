@@ -97,6 +97,7 @@ import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
 import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
+import { PollCard } from '@/components/social/PollCard';
 import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 import { a11yHidden } from '@/lib/a11yHidden';
@@ -1833,6 +1834,7 @@ function SpotlightPageImpl({
         onToggleCaptionExpanded={() => setCaptionExpanded(v => !v)}
         onOpenCreator={() => onOpenCreator(item)}
         onHeightChange={setCaptionBlockHeight}
+        belowCaptionSlot={<PollCard postId={item.id} variant="overlay" />}
         topSlot={!!item.productTags?.length && (
           <ShopTagPill
             tag={item.productTags[0]}

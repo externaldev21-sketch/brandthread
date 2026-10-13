@@ -27,6 +27,8 @@ import { activeToken, CAPTION_MAX, replaceToken, tokenizeCaption } from '@/lib/c
 import type { MediaDraft, PostDetails, PublishInput } from '@/lib/createPost/types';
 import { CP, CreateHeader, PillButton, SubPage, tap } from '@/components/create-post/ui';
 import { formatCents } from '@/lib/money';
+import { PollPage } from '@/components/create-post/PollPage';
+import { formatPollLength } from '@/lib/postPolls';
 
 const MAX_PRODUCT_TAGS = 5;
 const isPreview = () => isSellerDevPreview() || isBuyerDevPreview();
@@ -386,7 +388,7 @@ export function PostScreen({
   const [confirmExit, setConfirmExit] = useState(false);
   const input = useRef<TextInput>(null);
   const [cursor, setCursor] = useState(details.caption.length);
-  const [page, setPage] = useState<null | 'products' | 'visibility' | 'options' | 'schedule' | 'cover' | 'people'>(null);
+  const [page, setPage] = useState<null | 'products' | 'visibility' | 'options' | 'schedule' | 'cover' | 'people' | 'poll'>(null);
   const [people, setPeople] = useState<MentionPerson[]>([]);
   const noun = mode === 'thread' ? 'thread' : 'post';
   const token = activeToken(details.caption, cursor);
@@ -492,6 +494,9 @@ export function PostScreen({
             onPress={() => setPage('visibility')}
             testID="row-visibility"
           />
+          {mode === 'thread' && !editing ? (
+            <OptionRow icon="list" label="Poll" value={details.poll ? `${details.poll.options.length} choices · ${formatPollLength(details.poll.durationMinutes)}` : undefined} onPress={() => setPage('poll')} testID="row-poll" />
+          ) : null}
           <OptionRow icon="more-horizontal" label="More options" value="Comments, reposts, like count" onPress={() => setPage('options')} testID="row-options" />
           {isSeller ? (
             <OptionRow icon="calendar" label="Schedule" value={scheduled ? scheduled.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Post now'} onPress={() => setPage('schedule')} testID="row-schedule" />
@@ -510,6 +515,7 @@ export function PostScreen({
         </View>
       </KeyboardAvoidingView>
 
+      {page === 'poll' ? <PollPage value={details.poll ?? null} onChange={(poll) => onDetails({ ...details, poll })} onBack={() => setPage(null)} /> : null}
       {page === 'people' ? <TagPeoplePage caption={details.caption} onCaption={(caption) => onDetails({ ...details, caption })} onBack={() => setPage(null)} /> : null}
       {confirmExit ? <DiscardPage onSave={() => { setConfirmExit(false); onSubmit(true); }} onDiscard={() => { setConfirmExit(false); onDiscard(); }} onKeep={() => setConfirmExit(false)} /> : null}
       {page === 'products' ? <ProductsPage tags={details.productTags} onChange={(productTags) => onDetails({ ...details, productTags })} onBack={() => setPage(null)} /> : null}
