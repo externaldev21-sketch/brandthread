@@ -5,10 +5,10 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FS } from '@/lib/theme';
+import { FS, FONT } from '@/lib/theme';
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import { radius } from '@/constants/radii';
 
@@ -62,7 +62,6 @@ export default function BrandScreen() {
   const [selectedLogo, setSelectedLogo] = useState<number | null>(null);
 
   async function handleGenerateLogo() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLogoGenerating(true);
     setSelectedLogo(null);
     setLogoImages([]);
@@ -96,12 +95,11 @@ export default function BrandScreen() {
   const completionPct = Math.round((doneCount / totalCount) * 100);
 
   function toggleCheck(i: number) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.selection();
     setChecklist(prev => prev.map((v, idx) => idx === i ? !v : v));
   }
 
   function handleGenerateNames() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsGenerating(true);
     setTimeout(() => {
       setSuggestedNames(generateBrandNames(5));
@@ -166,7 +164,7 @@ export default function BrandScreen() {
               style={[styles.namePill, { backgroundColor: colors.secondary, borderColor: colors.border }]}
               activeOpacity={0.7}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                haptics.selection();
                 setNameInput(name);
               }}
             >
@@ -192,7 +190,7 @@ export default function BrandScreen() {
           {LOGO_STYLES.map((s) => (
             <TouchableOpacity
               key={s}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setLogoStyle(s); }}
+              onPress={() => { haptics.selection(); setLogoStyle(s); }}
               activeOpacity={0.7}
               style={[styles.styleChip, {
                 backgroundColor: logoStyle === s ? colors.primary : colors.secondary,
@@ -228,7 +226,7 @@ export default function BrandScreen() {
                   <TouchableOpacity
                     key={i}
                     activeOpacity={0.85}
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedLogo(i); }}
+                    onPress={() => { haptics.selection(); setSelectedLogo(i); }}
                     style={[styles.logoCard, { backgroundColor: colors.card, borderColor: isSelected ? colors.primary : colors.border, borderWidth: isSelected ? 2 : 1 }]}
                   >
                     <Image
@@ -250,7 +248,7 @@ export default function BrandScreen() {
               <TouchableOpacity
                 style={[styles.generateBtn, { backgroundColor: theme.accentDim, marginTop: 8 }]}
                 activeOpacity={0.8}
-                onPress={() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)}
+                onPress={() => {}}
               >
                 <Feather name="download" size={15} color={colors.success} />
                 <Text style={[styles.generateText, { color: colors.success }]}>Use this logo</Text>
@@ -309,43 +307,43 @@ export default function BrandScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
-  backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
-  pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 20 },
+  backText: { fontSize: 15, fontFamily: FONT.medium },
+  pageTitle: { fontSize: 28, fontFamily: FONT.bold, marginBottom: 4 },
+  pageSubtitle: { fontSize: 13, fontFamily: FONT.regular, marginBottom: 20 },
   profileCard: { flexDirection: 'row', alignItems: 'center', gap: 16, borderRadius: 16, padding: 20, borderWidth: 1, marginBottom: 20 },
   logoCircle: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  logoText: { fontSize: 20, fontFamily: 'Inter_700Bold' },
-  brandName: { fontSize: 18, fontFamily: 'Inter_700Bold' },
-  brandStyle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  logoText: { fontSize: 20, fontFamily: FONT.bold },
+  brandName: { fontSize: 18, fontFamily: FONT.bold },
+  brandStyle: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   completeBadge: { marginLeft: 'auto', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
-  completeText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  completeText: { fontSize: 14, fontFamily: FONT.bold },
   card: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 16 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  cardTitle: { flex: 1, fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  cardTitle: { flex: 1, fontSize: 15, fontFamily: FONT.semibold },
   aiBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  aiText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold' },
-  input: { borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular', marginBottom: 10 },
+  aiText: { fontSize: FS.xs, fontFamily: FONT.bold },
+  input: { borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: FONT.regular, marginBottom: 10 },
   generateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, padding: 13 },
-  generateText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  generateText: { fontSize: 14, fontFamily: FONT.semibold },
   suggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   namePill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1 },
-  namePillText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  namePillText: { fontSize: 13, fontFamily: FONT.medium },
   styleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   styleChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1 },
-  styleText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
-  subLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
+  styleText: { fontSize: 12, fontFamily: FONT.medium },
+  subLabel: { fontSize: 11, fontFamily: FONT.medium, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
   logoGrid: { flexDirection: 'row', gap: 10 },
   logoCard: { flex: 1, borderRadius: 14, overflow: 'hidden', position: 'relative' },
   logoImage: { width: '100%', aspectRatio: 1, borderRadius: 12 },
   logoCheckBadge: { position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   checkRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, gap: 12 },
   checkBox: { width: 24, height: 24, borderRadius: 6, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  checkLabel: { fontSize: 14, fontFamily: 'Inter_400Regular' },
-  checklistProgress: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  checkLabel: { fontSize: 14, fontFamily: FONT.regular },
+  checklistProgress: { fontSize: 13, fontFamily: FONT.medium },
   domainRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 10 },
-  domainText: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  domainText: { flex: 1, fontSize: 14, fontFamily: FONT.regular },
   availBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  availText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  availText: { fontSize: 11, fontFamily: FONT.semibold },
   connectBtn: { borderRadius: 10, padding: 13, alignItems: 'center' },
-  connectText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  connectText: { fontSize: 14, fontFamily: FONT.semibold },
 });

@@ -18,7 +18,7 @@ import { CachedImage } from '@/components/CachedImage';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { Chip } from '@/components/ui/Chip';
 import { Snackbar } from '@/components/ui/Snackbar';
-import { hapticPrimaryAction, hapticSuccessAction, hapticSelection, hapticDestructiveConfirm, hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
@@ -47,7 +47,6 @@ import Composer from '@/components/ui/Composer';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
-import { showActionSheet } from '@/components/ui/ActionSheet';
 import { useAuth } from '@clerk/expo';
 import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSafety';
@@ -93,6 +92,7 @@ import {
   sameSenderClose, groupCornerRadii, lastOwnMessageId, messagePreviewText,
 } from '@/lib/chatGrouping';
 import { radius } from '@/constants/radii';
+import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
 
 /** Well-known clerkId of the official Brandthread Agent account — matches
  *  the preview seed (lib/previewInboxData.ts) and the api-server system
@@ -794,7 +794,7 @@ export default function BuyerConversationScreen() {
   async function handleQuickToggleDisappearing() {
     if (!conv) return;
     const next = !conv.disappearingEnabled;
-    hapticToggle();
+    haptics.selection();
     try {
       if (isPreviewConversationId(conv.id)) {
         const localMsg: Message = {
@@ -827,12 +827,11 @@ export default function BuyerConversationScreen() {
 
   async function handleAcceptRequest() {
     if (!conv || requestActionLoading) return;
-    hapticPrimaryAction();
     setRequestActionLoading(true);
     const previousConv = conv;
     try {
       await acceptConversationRequest(conv.id, api);
-      hapticSuccessAction();
+      haptics.success();
       setConv({ ...previousConv, isRequest: false });
       // Composer takes the bottom panel's place the instant isRequestMode
       // flips false (see the render below) — hand it the keyboard right
@@ -849,7 +848,7 @@ export default function BuyerConversationScreen() {
 
   function handleDeleteRequest() {
     if (!conv) return;
-    hapticDestructiveConfirm();
+    haptics.warning();
     const conversationId = conv.id;
     const name = displayName;
     scheduleDeleteConversationRequest(conversationId, api);
@@ -872,7 +871,7 @@ export default function BuyerConversationScreen() {
       confirmLabel: 'Block',
     });
     if (!confirmed) return;
-    hapticDestructiveConfirm();
+    haptics.warning();
     try {
       await blockConversationRequestUser(conv.id, participant);
       goBackOr(router);
@@ -975,7 +974,6 @@ export default function BuyerConversationScreen() {
   // like a photo/video attachment does. See docs/dm-flows.md.
   async function handleVoiceRecorded(result: { uri: string; durationSec: number; waveform: number[] }) {
     if (!conv) return;
-    hapticSuccessAction();
     const attachment: MessageAttachment = {
       type: 'voice',
       uri: result.uri,
@@ -1063,7 +1061,7 @@ export default function BuyerConversationScreen() {
     // (long-press menu, double-tap-like, and the existing-chip re-tap below)
     // refuses to fire while the request is still pending.
     if (!conv || isRequestMode) return;
-    hapticSelection();
+    haptics.light();
     const prevMessages = messages;
     const { next } = applyOptimisticReaction(msg.reactions, myId, MY_NAME, type);
     setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, reactions: next } : m)));
@@ -1079,7 +1077,6 @@ export default function BuyerConversationScreen() {
   }
 
   function triggerDoubleTapLike(msg: Message, pageX: number, pageY: number) {
-    hapticSuccessAction();
     setLikeBurst({ key: Date.now(), x: pageX, y: pageY });
     void handleReact(msg, 'like');
   }
@@ -1356,7 +1353,6 @@ export default function BuyerConversationScreen() {
   }
 
   function sendQuickReply(reply: AgentQuickReply) {
-    hapticSelection();
     void sendToAgent(reply.value);
   }
 
@@ -1476,14 +1472,12 @@ export default function BuyerConversationScreen() {
 
   // ── Header options ──────────────────────────────────────────────────────────
 
-  function openOptions() {
+  function openOptions(event?: unknown) {
     if (!participant) return;
-    // Alert.alert() with a button array is a silent no-op on web (see
-    // components/ui/ActionSheet.tsx's header comment) — this left the
-    // header "..." menu completely dead in the web preview. showActionSheet
-    // takes the identical { text, onPress, style }[] shape and renders a
-    // real themed bottom sheet on every platform.
-    showActionSheet('Options', undefined, [
+    // The header ⋯ pull-down (UIMenu style, lib/contextMenu.ts) — works on
+    // every platform including web, where Alert.alert is a no-op.
+    const icons = ['archive', messaging.blockedByMe ? 'user-check' : 'slash', 'flag'] as const;
+    openPullDownMenu(event, menuItemsFromButtons([
       {
         text: 'Archive conversation',
         onPress: async () => {
@@ -1522,6 +1516,7 @@ export default function BuyerConversationScreen() {
           },
       {
         text: `Report ${participant.name}`,
+        style: 'destructive' as const,
         onPress: () => {
           router.push(reportHref({
             targetType: 'profile',
@@ -1533,7 +1528,7 @@ export default function BuyerConversationScreen() {
         },
       },
       { text: 'Cancel', style: 'cancel' },
-    ]);
+    ]).map((item, i) => ({ ...item, icon: icons[i] })));
   }
 
   // ── Message long press → reaction bar + actions sheet ───────────────────────
@@ -1562,7 +1557,7 @@ export default function BuyerConversationScreen() {
   /** Measures the long-pressed bubble's window position, then opens the
    *  Glass reaction overlay anchored to it. */
   function openReactionOverlay(msg: Message) {
-    hapticSelection();
+    haptics.rigid();
     const node = bubbleAnchorRefs.current[msg.id];
     if (!node) { setActiveSheetMsg(msg); return; }
     node.measureInWindow((x, y, width, height) => {
@@ -1579,7 +1574,6 @@ export default function BuyerConversationScreen() {
   function sheetCopy() {
     if (activeSheetMsg) {
       Clipboard.setStringAsync(activeSheetMsg.text);
-      hapticPrimaryAction();
       setCopiedToast(true);
       setTimeout(() => setCopiedToast(false), 2000);
     }
@@ -1589,7 +1583,7 @@ export default function BuyerConversationScreen() {
   function sheetDelete() {
     const msg = activeSheetMsg;
     closeMessageSheet();
-    hapticDestructiveConfirm();
+    haptics.warning();
     if (!conv || !msg) return;
     // A seeded preview conversation has no real backend record to delete
     // against — just drop it from local state instead of 401-ing.
@@ -2163,7 +2157,7 @@ export default function BuyerConversationScreen() {
       <View style={[s.headerWrap, { paddingTop: headerTopPad + SP.xs, paddingRight: SP.md + insets.right }]}>
         <View style={s.headerLeftGroup}>
           <PressableScale rippleEnabled={false}
-            onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
+            onPress={() => { goBackOr(router); }}
             style={s.roundBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             testID="conversation-back"
@@ -2185,7 +2179,7 @@ export default function BuyerConversationScreen() {
               style={s.headerCenter}
               activeOpacity={participant ? 0.7 : 1}
               disabled={!participant}
-              onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+              onPress={() => { openChatDetails(); }}
               testID="conversation-header-name"
               accessibilityRole="button"
               accessibilityLabel={`${displayName} — chat details`}
@@ -2236,7 +2230,7 @@ export default function BuyerConversationScreen() {
           {conv && !isAgentConv && (
             <PressableScale rippleEnabled={false}
               style={s.roundBtn}
-              onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
+              onPress={() => { handleStartCall('voice'); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID="conversation-call-voice"
               accessibilityRole="button"
@@ -2248,7 +2242,7 @@ export default function BuyerConversationScreen() {
           {conv && !isAgentConv && (
             <PressableScale rippleEnabled={false}
               style={s.roundBtn}
-              onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
+              onPress={() => { handleStartCall('video'); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID="conversation-call-video"
               accessibilityRole="button"
@@ -2259,7 +2253,7 @@ export default function BuyerConversationScreen() {
           )}
           <PressableScale rippleEnabled={false}
             style={s.roundBtn}
-            onPress={() => { hapticPrimaryAction(); openOptions(); }}
+            onPress={(event) => { openOptions(event); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             testID="conversation-options"
             accessibilityRole="button"
@@ -2291,7 +2285,6 @@ export default function BuyerConversationScreen() {
             rippleEnabled={false}
             style={s.requestProfilePill}
             onPress={() => {
-              hapticPrimaryAction();
               if (participant) router.push(('/seller-profile?id=' + encodeURIComponent(participant.userId)) as never);
             }}
             accessibilityRole="button"
@@ -2443,7 +2436,7 @@ export default function BuyerConversationScreen() {
             testID="conversation"
             value={text}
             onChangeText={handleChangeText}
-            onSend={() => { hapticPrimaryAction(); handleSend(); }}
+            onSend={() => { handleSend(); }}
             canSend={canSend}
             placeholder="Message…"
             inputRef={textInputRef}
@@ -2452,7 +2445,7 @@ export default function BuyerConversationScreen() {
             leftAccessory={
               <PressableScale rippleEnabled={false}
                 bounce={false}
-                onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
+                onPress={() => { setShowMediaSheet(true); }}
                 style={s.attachCircleBtn}
                 disabled={isUploading || isSending}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -2865,7 +2858,7 @@ export default function BuyerConversationScreen() {
           if (!sellerUserId) return;
           try {
             await api.social.follow(sellerUserId);
-            hapticSuccessAction();
+            haptics.light();
             setThreadCashMutual(null);
             const status = await api.social.status(sellerUserId);
             setThreadCashMutual(status.isMutual);

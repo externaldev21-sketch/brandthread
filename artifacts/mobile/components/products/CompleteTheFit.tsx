@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { BottomSheet } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
@@ -116,10 +116,9 @@ export function CompleteTheFit({ productId }: { productId: string }) {
 
   const add = useCallback(async (item: RailItem, variant: BuyerProductVariant) => {
     if (!item.product) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const result = await addToCart({ product: item.product, variant, quantity: 1 });
     if (result.success) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.light();
       setMessage(null);
       setAddedId(item.id);
       setTimeout(() => setAddedId((cur) => (cur === item.id ? null : cur)), 2000);
@@ -213,7 +212,7 @@ export function CompleteTheFit({ productId }: { productId: string }) {
 
 const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   divider: { height: 1, backgroundColor: c.border, marginVertical: SP.md },
-  header: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
+  header: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.mutedForeground, marginBottom: SP.sm },
   card: { width: 140 },
   thumb: { width: 140, height: 180, backgroundColor: c.card, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SP.sm },
   thumbEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center' },

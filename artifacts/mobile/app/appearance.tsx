@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-nati
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -27,16 +27,14 @@ export default function AppearanceScreen() {
 
   async function chooseTheme(id: AppThemeId) {
     if (id === theme.id) return;
-    Haptics.selectionAsync();
+    haptics.selection();
     await selectTheme(id);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
   async function chooseIcon(nextPreference: AppIconPreference) {
     if (nextPreference === preference) return;
-    await Haptics.selectionAsync();
+    haptics.selection();
     await selectIcon(nextPreference);
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
   function toggleFollowTheme(follow: boolean) {

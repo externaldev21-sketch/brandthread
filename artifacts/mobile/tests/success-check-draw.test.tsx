@@ -52,7 +52,7 @@ vi.mock('react-native-svg', () => ({
 }));
 
 vi.mock('@expo/vector-icons', () => ({ Feather: nativeComponent('Feather') }));
-vi.mock('@/lib/haptics', () => ({ hapticSuccessAction: vi.fn() }));
+vi.mock('@/lib/haptics', () => ({ hapticSuccessAction: vi.fn(), haptics: { selection: vi.fn(), light: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn(), rigid: vi.fn() } }));
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({ theme: { accent: '#F7F7FA', onAccent: '#0A0A0B' } }),
 }));

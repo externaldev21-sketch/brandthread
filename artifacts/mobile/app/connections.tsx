@@ -29,7 +29,6 @@ import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useUser } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
@@ -40,7 +39,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { OptionSheet } from '@/components/ui/OptionSheet';
-import { hapticDestructiveConfirm } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { profileHref } from '@/lib/profileNavigation';
 import { InteractionLayer, ProfileChip } from '@/components/profile/ProfileControls';
@@ -206,7 +205,7 @@ export default function ConnectionsScreen() {
     const setList = tab === 'followers' ? setFollowers : setFollowing;
     setFollowPending((prev) => new Set(prev).add(row.id));
     setList((prev) => prev.map((u) => (u.id === row.id ? { ...u, isFollowing: true } : u)));
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     try {
       if (row.accountType === 'seller') await setSellerFollowing(row.id, true);
       else if ((await api.social.follow(row.id))?.status === 'requested') {
@@ -225,7 +224,7 @@ export default function ConnectionsScreen() {
     const setList = tab === 'followers' ? setFollowers : setFollowing;
     setFollowPending((prev) => new Set(prev).add(row.id));
     setList((prev) => prev.map((u) => (u.id === row.id ? { ...u, isFollowing: false } : u)));
-    hapticDestructiveConfirm();
+    haptics.light();
     try {
       if (row.accountType === 'seller') await setSellerFollowing(row.id, false);
       else await api.social.unfollow(row.id);
@@ -256,7 +255,7 @@ export default function ConnectionsScreen() {
   const handleConfirmRemove = useCallback(async () => {
     const row = removeTarget;
     if (!row) return;
-    hapticDestructiveConfirm();
+    haptics.warning();
     setRemoving(true);
     try {
       await removeFollower(row.id);
@@ -294,7 +293,6 @@ export default function ConnectionsScreen() {
           accessibilityLabel={`Open ${item.name}'s profile`}
           testID={`connection-row-${item.id}`}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push(connectionHref(item) as never);
           }}
         >

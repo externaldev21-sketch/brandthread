@@ -34,7 +34,7 @@ describe('seller-inbox.tsx: search', () => {
 describe('seller-inbox.tsx: swipe actions', () => {
   it('uses the same shared InboxSwipeRow component as the buyer inbox, not a duplicate', () => {
     expect(src).toContain("import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';");
-    expect(src).toContain('<InboxSwipeRow rowId={item.id} actions={swipeActions}>');
+    expect(src).toContain('<InboxSwipeRow rowId={item.id} actions={swipeActions}');
   });
 
   it('offers mark-read, pin/unpin, mute and delete, matching the buyer inbox’s action set', () => {

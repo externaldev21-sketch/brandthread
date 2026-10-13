@@ -7,7 +7,7 @@
  * optionally block the owner -> done.
  */
 import { useState } from 'react';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import {
   REPORT_REASONS, apiErrorMessage, buildReportPayload, reportNoteError, TARGET_LABELS,
@@ -52,7 +52,7 @@ export function useReportFlow({ targetType, targetId, ownerId }: ReportFlowInput
   }
 
   function chooseReason(id: ReportReasonId) {
-    Haptics.selectionAsync();
+    haptics.selection();
     setReason(id);
     setError(null);
     setStep('details');
@@ -81,11 +81,11 @@ export function useReportFlow({ targetType, targetId, ownerId }: ReportFlowInput
           // confirmation step.
         }
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       setStep('done');
     } catch (err) {
       setError(apiErrorMessage(err, 'We couldn’t send your report. Check your connection and try again.'));
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.error();
     } finally {
       setSubmitting(false);
     }
@@ -97,7 +97,7 @@ export function useReportFlow({ targetType, targetId, ownerId }: ReportFlowInput
     try {
       await api.social.block(ownerId);
       setBlocked(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
     } catch (err) {
       setError(apiErrorMessage(err, 'We couldn’t block this account. Try again.'));
     } finally {

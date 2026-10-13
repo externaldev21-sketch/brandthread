@@ -11,7 +11,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { Snackbar } from '@/components/ui/Snackbar';
@@ -58,12 +58,11 @@ export function useReorderFlow(options: { aboveTabBar?: boolean } = {}) {
     if (busyRef.current) return;
     busyRef.current = true;
     setBusyOrderId(orderId);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
       const result = await reorderFromOrder(orderId, api);
       setOutcome(result);
       showMessage(summarizeReorder(result));
-      if (result.addedUnits > 0) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      if (result.addedUnits > 0) haptics.light();
       if (reorderNeedsReview(result)) setSheetOpen(true);
     } catch {
       setOutcome(null);

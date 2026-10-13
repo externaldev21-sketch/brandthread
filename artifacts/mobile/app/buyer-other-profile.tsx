@@ -26,7 +26,7 @@ import { FONT, FS, SP, RADIUS, OVERLAY } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
 import { GiveawayProfileCard } from '@/components/GiveawayProfileCard';
-import { hapticLight, hapticSelection, hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { muteUser, restrictUser, createOrGetConversation } from '@/services/socialService';
 import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
@@ -199,7 +199,6 @@ export default function BuyerOtherProfileScreen() {
 
   const openStories = () => {
     if (storyIds.length === 0) return;
-    hapticLight();
     router.push({
       pathname: '/buyer-story-viewer' as any,
       params: { storyId: storyIds[0], allStoryIds: storyIds.join(',') },
@@ -216,7 +215,7 @@ export default function BuyerOtherProfileScreen() {
       setProfile(prev => prev ? { ...prev, followRequested: false } : prev);
       try {
         await api.social.unfollow(canonicalUserId);
-        hapticLight();
+        haptics.light();
       } catch {
         setProfile(prev => prev ? { ...prev, followRequested: true } : prev);
         Alert.alert("Couldn't cancel request", 'Try again.');
@@ -247,7 +246,7 @@ export default function BuyerOtherProfileScreen() {
           followRequested: true,
           followersCount: typeof result.followersCount === 'number' ? result.followersCount : Math.max(0, prev.followersCount - 1),
         } : prev);
-        hapticLight();
+        haptics.light();
         return;
       }
       if (!wasFollowing) void requestContextualPushPermission(currentUserId, api);
@@ -264,7 +263,7 @@ export default function BuyerOtherProfileScreen() {
       });
       // Becoming (or ceasing to be) friends changes which posts are visible.
       void videos.reload();
-      hapticLight();
+      haptics.light();
     } catch {
       setProfile(prev => prev ? (optimisticRequest ? { ...prev, followRequested: false } : {
         ...prev,
@@ -313,18 +312,18 @@ export default function BuyerOtherProfileScreen() {
       .then((result) => { if (result === 'copied') setSnackbar('Profile link copied'); })
       .catch(() => {});
   };
-  const handleMute     = async () => { setMoreSheetOpen(false); await muteUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); };
-  const handleRestrict = async () => { setMoreSheetOpen(false); await restrictUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); };
+  const handleMute     = async () => { setMoreSheetOpen(false); await muteUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); haptics.success(); };
+  const handleRestrict = async () => { setMoreSheetOpen(false); await restrictUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); haptics.success(); };
   const handleBlock = async () => {
     setMoreSheetOpen(false);
     const subject = { userId: canonicalUserId, name: displayName };
     if (iBlockedThem) {
       if (await confirmUnblock(subject, api.social.unblock)) {
-        hapticSuccess();
+        haptics.success();
         await loadProfile();
       }
     } else if (await confirmBlock(subject, api.social.block)) {
-      hapticSuccess();
+      haptics.success();
       goBackOr(router);
     }
   };
@@ -340,7 +339,6 @@ export default function BuyerOtherProfileScreen() {
   };
 
   const openVideo = useCallback((item: ProfileGridItem) => {
-    hapticSelection();
     router.push(profileVideosHref({ source: 'creator', id: canonicalUserId, startPostId: item.id, title: displayName }) as never);
   }, [canonicalUserId, displayName, router]);
 
@@ -356,7 +354,6 @@ export default function BuyerOtherProfileScreen() {
   const openTagged = useCallback((item: ProfileGridItem) => {
     const entry = tagged.items.find((candidate) => candidate.id === item.id);
     if (!entry) return;
-    hapticSelection();
     router.push(taggedItemHref(entry) as never);
   }, [router, tagged.items]);
   const renderTile = useCallback(({ item, index }: { item: ProfileGridItem; index: number }) => (
@@ -463,7 +460,7 @@ export default function BuyerOtherProfileScreen() {
           disabled={storyIds.length === 0}
           accessibilityLabel={storyIds.length > 0 ? `View ${displayName}'s story` : 'No active stories'}
         />
-        <ProfileButton label="More" icon="more-horizontal" onPress={() => { hapticSelection(); setMoreSheetOpen(true); }} accessibilityLabel="More options" />
+        <ProfileButton label="More" icon="more-horizontal" onPress={() => setMoreSheetOpen(true)} accessibilityLabel="More options" />
       </View>
       <GiveawayProfileCard sellerId={canonicalUserId} enabled={canonicalReady && !iBlockedThem && !previewAsVisitor} />
     </>
@@ -496,7 +493,7 @@ export default function BuyerOtherProfileScreen() {
         topRight={(
           <ProfileGlassButton
             icon="more-horizontal"
-            onPress={() => { hapticSelection(); setMoreSheetOpen(true); }}
+            onPress={() => setMoreSheetOpen(true)}
             accessibilityLabel="Profile options"
             testID="buyer-other-profile-more"
           />
@@ -507,7 +504,6 @@ export default function BuyerOtherProfileScreen() {
             <ProfileStoriesRow
               items={highlights.map((h) => ({ id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor, imageUri: h.coverUrl ?? null }))}
               onPressItem={(item) => {
-                hapticLight();
                 router.push({ pathname: '/buyer-story-viewer' as any, params: { highlightId: item.id } });
               }}
             />
@@ -520,7 +516,7 @@ export default function BuyerOtherProfileScreen() {
         tabs={{
           items: CONTENT_TAB_ITEMS,
           active: activeTab,
-          onChange: (key) => { hapticSelection(); setActiveTab(key === 'Tagged' ? 'Tagged' : 'Posts'); },
+          onChange: (key) => setActiveTab(key === 'Tagged' ? 'Tagged' : 'Posts'),
         }}
         data={gridItems}
         renderItem={renderTile}

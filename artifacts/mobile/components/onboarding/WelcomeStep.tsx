@@ -17,7 +17,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -112,7 +111,7 @@ export function WelcomeStep({
             accessibilityLabel="Get started"
             label="Get started"
             haptic={false}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onGetStarted(); }}
+            onPress={() => { onGetStarted(); }}
           />
           <PillButton
             testID="onboarding-welcome-sign-in"
@@ -120,7 +119,7 @@ export function WelcomeStep({
             label="I already have an account"
             variant="secondary"
             haptic={false}
-            onPress={() => { Haptics.selectionAsync(); onSignIn(); }}
+            onPress={() => { onSignIn(); }}
           />
           {onBrowse ? (
             <PillButton
@@ -129,7 +128,7 @@ export function WelcomeStep({
               label="Browse as a guest"
               variant="ghost"
               haptic={false}
-              onPress={() => { Haptics.selectionAsync(); onBrowse(); }}
+              onPress={() => { onBrowse(); }}
             />
           ) : null}
         </Reveal>

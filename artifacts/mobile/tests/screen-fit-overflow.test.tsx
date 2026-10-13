@@ -91,7 +91,7 @@ vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({ theme: { accentLight: '#fff', accent: '#fff' } }),
   getOnAccentTextStyle: () => ({}),
 }));
-vi.mock('@/lib/haptics', () => ({ hapticLight: vi.fn(), hapticMedium: vi.fn(), hapticSelection: vi.fn() }));
+vi.mock('@/lib/haptics', () => ({ hapticLight: vi.fn(), hapticMedium: vi.fn(), hapticSelection: vi.fn(), haptics: { selection: vi.fn(), light: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn(), rigid: vi.fn() } }));
 vi.mock('@/components/KeyboardAwareScrollViewCompat', () => ({ KeyboardAwareScrollViewCompat: nativeComponent('KeyboardAwareScrollViewCompat') }));
 vi.mock('@/lib/undoRecovery', () => ({ undoExpiresAt: () => 0 }));
 

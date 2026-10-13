@@ -32,7 +32,6 @@ import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProd
 import { Snackbar } from '@/components/ui/Snackbar';
 import { FONT, FS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
-import { hapticLight } from '@/lib/haptics';
 import { profileHref } from '@/lib/profileNavigation';
 import { useApi } from '@/lib/api';
 import { confirmBlock, reportHref } from '@/lib/safety';
@@ -303,7 +302,6 @@ export default function LiveScreen() {
   }, [streams.length, activeIndex, pageHeight]);
 
   const close = useCallback(() => {
-    hapticLight();
     goBackOr(router, '/(buyer)');
   }, [router]);
 
@@ -323,7 +321,6 @@ export default function LiveScreen() {
   }, []);
 
   const gift = useCallback((stream: LiveStream) => {
-    hapticLight();
     setGiftFor(stream);
   }, []);
 
@@ -334,7 +331,6 @@ export default function LiveScreen() {
   // is exactly why buyer-live.tsx's equivalent menu silently does nothing in
   // the web preview — a real Modal-based sheet instead.
   const openStreamOptions = useCallback((stream: LiveStream) => {
-    hapticLight();
     setOptionsFor(stream);
   }, []);
 

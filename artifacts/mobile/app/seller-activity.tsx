@@ -30,7 +30,7 @@ import { ActivityRowView, SkeletonRows, makeStyles } from '@/app/activity-center
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
-import { hapticDestructiveConfirm, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import {
   ACTIVITY_PAGE_SIZE,
   ACTIVITY_UNDO_MS,
@@ -294,7 +294,6 @@ export default function SellerActivityScreen() {
     setFollowOverrides((prev) => ({ ...prev, [userId]: next }));
     try {
       await setSellerFollowing(userId, next);
-      if (next) hapticSuccessAction();
     } catch {
       setFollowOverrides((prev) => ({ ...prev, [userId]: !next }));
       Alert.alert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
@@ -312,7 +311,7 @@ export default function SellerActivityScreen() {
     if (!userId) return;
     tracker.markNow(row.ids.filter((id) => !readIdsRef.current.has(id)));
     if (!currentlyFollowing) {
-      hapticPrimaryAction();
+      haptics.light();
       void setFollowingPerson(userId, true);
       return;
     }
@@ -345,7 +344,7 @@ export default function SellerActivityScreen() {
         text: 'Block',
         style: 'destructive',
         onPress: () => {
-          hapticDestructiveConfirm();
+          haptics.warning();
           void blockUser({ userId: actor.id!, name: actor.name, handle: '', initials: actor.initials, color: actor.color ?? '#3F3F46' })
             .then(() => {
               setItems((prev) => prev.filter((item) => item.actorId !== actor.id));

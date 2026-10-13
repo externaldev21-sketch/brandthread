@@ -19,7 +19,7 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
 import { useApi } from '@/lib/api';
 import { reportNetworkError } from '@/lib/networkNotice';
@@ -54,6 +54,7 @@ import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
+import { anchorFromEvent, type MenuAnchor } from '@/lib/contextMenu';
 import { ProfileProductTile } from '@/components/profile/ProfileProductTile';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { PREVIEW_SELLER_IDENTITY, previewSellerBrandName } from '@/lib/previewIdentity';
@@ -163,6 +164,7 @@ export default function ProfileScreen() {
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
   const caps = profileCapabilities('seller', 'owner');
   const [brandNameInput, setBrandNameInput] = useState('');
   const [bioInput, setBioInput] = useState('');
@@ -405,12 +407,10 @@ export default function ProfileScreen() {
   }, [loadPage]);
 
   function nav(route: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(route as never);
   }
 
   function openProfileEditor() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setBrandNameInput(profile?.brandName ?? profile?.displayName ?? '');
     setBioInput(profile?.bio ?? '');
     setProfileEditorVisible(true);
@@ -453,7 +453,7 @@ export default function ProfileScreen() {
         },
       }));
       setProfileEditorVisible(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       void loadProfile();
     } catch (error) {
       reportNetworkError(error, saveProfileDetails);
@@ -480,7 +480,6 @@ export default function ProfileScreen() {
   const handleTilePress = useCallback((item: ProfileGridItem) => {
     const post = sellerPosts.find(candidate => candidate.id === item.id);
     if (!post || !userId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const isLive = !post.isDraft && !(post.scheduledAt && new Date(post.scheduledAt).getTime() > Date.now());
     // Published posts play in the feed player; drafts and scheduled posts open the editor.
     if (isLive && post.surface === 'profile') {
@@ -494,7 +493,6 @@ export default function ProfileScreen() {
   }, [brandTitle, router, sellerPosts, userId]);
 
   const handleShopTilePress = useCallback((item: ProfileGridItem) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(productDetailHref(item.id, { isOwner: true }) as never);
   }, [router]);
 
@@ -502,7 +500,6 @@ export default function ProfileScreen() {
   // ?tab=draft) is the destination behind the Instagram-style Drafts tile —
   // no need for a second, in-page filter control.
   const handleDraftsTilePress = useCallback(() => {
-    Haptics.selectionAsync();
     router.push('/content?tab=draft' as never);
   }, [router]);
 
@@ -568,7 +565,7 @@ export default function ProfileScreen() {
   const accountSwitcher = (
     <ProfileAccountSwitcher
       label={brandTitle}
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAccountSwitcherOpen(true); }}
+      onPress={() => { setAccountSwitcherOpen(true); }}
       overMedia={coverFlow.hasCover}
       accessibilityLabel="Switch account"
       testID="profile-account-switcher"
@@ -631,7 +628,6 @@ export default function ProfileScreen() {
           ring: myStoryIds.length > 0,
           onPressStoryBadge: () => nav('/create-post'),
           onPress: () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             if (myStoryIds.length > 0) {
               router.push({
                 pathname: '/buyer-story-viewer' as any,
@@ -657,7 +653,6 @@ export default function ProfileScreen() {
             <ProfileTopBarIcon
               name="share-2"
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setShareSheetVisible(true);
               }}
               accessibilityLabel="Share profile"
@@ -666,7 +661,7 @@ export default function ProfileScreen() {
             />
             <ProfileTopBarIcon
               name="more-horizontal"
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMenuOpen(true); }}
+              onPress={(event) => { setMenuAnchor(anchorFromEvent(event)); setMenuOpen(true); }}
               accessibilityLabel="More options"
               testID="seller-profile-more"
             />
@@ -717,7 +712,6 @@ export default function ProfileScreen() {
           items: CONTENT_TAB_ITEMS,
           active: activeTab,
           onChange: (key) => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setActiveTab((CONTENT_TABS as readonly string[]).includes(key) ? key as ContentTab : 'Posts');
           },
         }}
@@ -762,6 +756,7 @@ export default function ProfileScreen() {
 
       <ProfileMenuSheet
         visible={menuOpen}
+        anchor={menuAnchor}
         title={brandTitle}
         onClose={() => setMenuOpen(false)}
         items={[

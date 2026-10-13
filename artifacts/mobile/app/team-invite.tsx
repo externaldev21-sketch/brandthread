@@ -12,9 +12,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@clerk/expo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
+import { FONT } from '@/lib/theme';
 
 export const PENDING_INVITE_KEY = 'bt:pendingTeamInvite';
 
@@ -71,14 +71,12 @@ export default function TeamInviteScreen() {
   }, [token]);
 
   const goToAuth = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     // Stash the token so the AuthGate brings the user back after sign-in + onboarding.
     await AsyncStorage.setItem(PENDING_INVITE_KEY, String(token));
     router.replace('/splash' as never);
   };
 
   const acceptInvite = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setAccepting(true);
     try {
       await api.team.accept(String(token));
@@ -91,7 +89,6 @@ export default function TeamInviteScreen() {
   };
 
   const goToDashboard = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     // Team members work in the seller dashboard.
     await AsyncStorage.setItem('user_role', 'seller');
     router.replace('/(tabs)/' as never);
@@ -162,7 +159,7 @@ export default function TeamInviteScreen() {
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Join {brand}</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
-              You've been invited to join the team as <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>{roleLabel}</Text>
+              You've been invited to join the team as <Text style={{ color: colors.foreground, fontFamily: FONT.semibold }}>{roleLabel}</Text>
               {ROLE_DESC[invite?.role] ? ` — ${ROLE_DESC[invite.role].toLowerCase()}` : ''}.
             </Text>
             <View style={[styles.inviteMeta, { borderColor: colors.border }]}>
@@ -198,10 +195,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: 24 },
   card: { borderRadius: 18, borderWidth: 1, padding: 24, alignItems: 'center' },
   icon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  title: { fontSize: 20, fontFamily: 'Inter_700Bold', textAlign: 'center' },
-  sub: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  title: { fontSize: 20, fontFamily: FONT.bold, textAlign: 'center' },
+  sub: { fontSize: 14, fontFamily: FONT.regular, textAlign: 'center', marginTop: 8, lineHeight: 20 },
   inviteMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginTop: 16 },
   btn: { borderRadius: 12, paddingHorizontal: 20, paddingVertical: 13, marginTop: 18, alignSelf: 'stretch', alignItems: 'center' },
-  btnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  hint: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 10, textAlign: 'center' },
+  btnText: { fontSize: 14, fontFamily: FONT.semibold },
+  hint: { fontSize: 12, fontFamily: FONT.regular, marginTop: 10, textAlign: 'center' },
 });

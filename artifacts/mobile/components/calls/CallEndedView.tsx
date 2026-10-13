@@ -11,7 +11,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCallSession } from '@/lib/calls/CallSessionContext';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
@@ -43,7 +43,7 @@ export function CallEndedView() {
   function rate(value: 'good' | 'not-good') {
     if (rating) return;
     setRating(value);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    haptics.selection();
   }
 
   return (

@@ -77,6 +77,7 @@ vi.mock('@/lib/haptics', () => ({
   hapticLight: vi.fn(),
   hapticMedium: vi.fn(),
   hapticSelection: vi.fn(),
+  haptics: { selection: vi.fn(), light: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn(), rigid: vi.fn() },
 }));
 vi.mock('@/components/KeyboardAwareScrollViewCompat', () => ({
   KeyboardAwareScrollViewCompat: nativeComponent('KeyboardAwareScrollViewCompat'),

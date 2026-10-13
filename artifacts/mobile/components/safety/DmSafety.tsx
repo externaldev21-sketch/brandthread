@@ -12,6 +12,7 @@ import { FONT, FS, SP } from '@/lib/theme';
 import { confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { radius } from '@/constants/radii';
+import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
 
 export interface DmCounterpart {
   userId: string;
@@ -36,15 +37,17 @@ export function openConversationOptions(params: {
   messaging: DmMessagingState;
   onChange: (next: DmMessagingState) => void;
   extraOptions?: Array<{ text: string; onPress: () => void }>;
+  /** The ⋯ press event, so the pull-down anchors to the button. */
+  event?: unknown;
 }) {
-  const { router, social, counterpart, messaging, onChange, extraOptions = [] } = params;
-  // Alert.alert() with a button array is a silent no-op on web — this left
-  // the seller conversation header's "..." menu completely dead in the web
-  // preview. See components/ui/ActionSheet.tsx's header comment.
-  showActionSheet(counterpart.name, undefined, [
+  const { router, social, counterpart, messaging, onChange, extraOptions = [], event } = params;
+  // The header ⋯ pull-down (UIMenu style, lib/contextMenu.ts) — works on
+  // every platform including web, where Alert.alert is a no-op.
+  const items = menuItemsFromButtons([
     ...extraOptions,
     {
       text: `Report ${counterpart.name}`,
+      style: 'destructive' as const,
       onPress: () => router.push(reportHref({
         targetType: 'profile',
         targetId: counterpart.userId,
@@ -69,6 +72,8 @@ export function openConversationOptions(params: {
         },
     { text: 'Cancel', style: 'cancel' as const },
   ]);
+  const icons = [...extraOptions.map(() => undefined), 'flag', messaging.blockedByMe ? 'user-check' : 'slash'] as const;
+  openPullDownMenu(event, items.map((item, i) => ({ ...item, icon: icons[i] })), { title: counterpart.name });
 }
 
 /** Long-press menu for someone else's message. */

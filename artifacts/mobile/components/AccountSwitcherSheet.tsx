@@ -31,7 +31,7 @@ import { Alert, View, Text, StyleSheet, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth, useClerk, useSessionList } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { ListRow } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
@@ -122,7 +122,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
 
   async function handleSwitch(account: AccountRow) {
     if (account.current || switchingId || loggingOutId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.selection();
     if (isPreview) {
       // No real second session in preview — just flip the local role so the
       // rest of the app (buyer vs seller routing) follows immediately.
@@ -145,7 +145,6 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
 
   async function handleLogOut(account: AccountRow) {
     if (isPreview || switchingId || loggingOutId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(
       `Log out @${account.handle.replace(/^@/, '')}?`,
       account.current
@@ -175,7 +174,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
 
   function handleAddAccountPress() {
     if (atCap) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      haptics.warning();
       Alert.alert('Account limit reached', MAX_ACCOUNTS_MESSAGE);
       return;
     }
@@ -183,14 +182,12 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
   }
 
   function handleLogIntoExisting() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setShowAddAccount(false);
     onClose();
     router.push('/sign-in?addAccount=1' as never);
   }
 
   function handleCreateNew() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setShowAddAccount(false);
     onClose();
     // Starts the real signup flow at step 1 (the Buyer/Seller choice) with a

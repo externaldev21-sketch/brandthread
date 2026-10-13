@@ -29,7 +29,7 @@ export function SellerDashboardSetupCard({
 }) {
   return (
     <View
-      style={[styles.card, { backgroundColor: theme.card, borderColor: theme.borderSubtle }]}
+      style={[styles.card, { backgroundColor: theme.card }]}
       testID="seller-dashboard-setup-card"
     >
       <PressableScale
@@ -51,10 +51,10 @@ export function SellerDashboardSetupCard({
 
 const styles = StyleSheet.create({
   card: {
-    padding: SP.md,
+    // No border, so no side inset either: the copy lines up with the page gutter.
+    paddingVertical: SP.md,
     paddingTop: SP.sm,
     borderRadius: RADIUS.lg,
-    borderWidth: 1,
     alignItems: 'flex-start',
     gap: SP.xs,
   },

@@ -7,7 +7,7 @@ import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useApi } from '@/lib/api';
@@ -174,13 +174,11 @@ export default function StoreGenerateScreen() {
 
   const handleContinue = () => {
     if (step < TOTAL_STEPS) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setStep(s => s + 1);
     }
   };
 
   const handleGenerate = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await saveDraftAnswers(answers);
     router.push('/store-generating' as never);
   };
@@ -202,7 +200,7 @@ export default function StoreGenerateScreen() {
             <TouchableOpacity
               key={value}
               onPress={() => {
-                Haptics.selectionAsync();
+                haptics.selection();
                 const newSecondary = (answers.secondaryStyles ?? []).filter(s => s !== value);
                 updateAnswers({ primaryStyle: value, secondaryStyles: newSecondary });
               }}
@@ -233,7 +231,7 @@ export default function StoreGenerateScreen() {
                 <TouchableOpacity
                   key={value}
                   onPress={() => {
-                    Haptics.selectionAsync();
+                    haptics.selection();
                     const current = answers.secondaryStyles ?? [];
                     if (isSelected) {
                       updateAnswers({ secondaryStyles: current.filter(s => s !== value) });
@@ -267,7 +265,7 @@ export default function StoreGenerateScreen() {
             <TouchableOpacity
               key={value}
               onPress={() => {
-                Haptics.selectionAsync();
+                haptics.selection();
                 const current = answers.moods ?? [];
                 updateAnswers({
                   moods: isSelected ? current.filter(m => m !== value) : [...current, value],
@@ -309,7 +307,7 @@ export default function StoreGenerateScreen() {
               <TouchableOpacity
                 key={preset.label}
                 onPress={() => {
-                  Haptics.selectionAsync();
+                  haptics.selection();
                   setColorPresetIdx(idx);
                   updateAnswers({ colors: preset.colors });
                 }}
@@ -404,7 +402,7 @@ export default function StoreGenerateScreen() {
             key={value}
             style={[st.typoCard, isSelected && st.typoCardSelected]}
             onPress={() => {
-              Haptics.selectionAsync();
+              haptics.selection();
               updateAnswers({ typography: value });
             }}
           >
@@ -441,7 +439,7 @@ export default function StoreGenerateScreen() {
             <TouchableOpacity
               key={value}
               onPress={() => {
-                Haptics.selectionAsync();
+                haptics.selection();
                 const addl = (answers.additionalSections ?? []).filter(s => s !== value);
                 updateAnswers({ homepagePriority: value, additionalSections: addl });
               }}
@@ -474,7 +472,7 @@ export default function StoreGenerateScreen() {
                 <TouchableOpacity
                   key={value}
                   onPress={() => {
-                    Haptics.selectionAsync();
+                    haptics.selection();
                     const current = answers.additionalSections ?? [];
                     updateAnswers({
                       additionalSections: isSelected
@@ -521,7 +519,6 @@ export default function StoreGenerateScreen() {
             disabled={!!aiToolLoading}
             onPress={async () => {
               if (!answers.brandStory?.trim()) { Alert.alert('Add your brand story first', 'Write some text below, then use AI to refine it.'); return; }
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setAiToolLoading(tool);
               setAiSuggestion(null);
               try {
@@ -586,7 +583,7 @@ export default function StoreGenerateScreen() {
             <TouchableOpacity
               key={value}
               onPress={() => {
-                Haptics.selectionAsync();
+                haptics.selection();
                 const current = answers.targetCustomers ?? [];
                 updateAnswers({
                   targetCustomers: isSelected
@@ -664,7 +661,7 @@ export default function StoreGenerateScreen() {
               <TouchableOpacity
                 key={value}
                 onPress={() => {
-                  Haptics.selectionAsync();
+                  haptics.selection();
                   if (value === 'none') {
                     updateAnswers({ existingContent: isSelected ? [] : ['none'] });
                   } else {
@@ -701,7 +698,7 @@ export default function StoreGenerateScreen() {
                           const existing = answers.contentUploads?.[value] ?? [];
                           updateAnswers({ contentUploads: { ...(answers.contentUploads ?? {}), [value]: [...existing, remoteUri] } });
                         }
-                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        haptics.success();
                       } catch {
                         Alert.alert("Couldn't upload photo", 'Try again.');
                       } finally {

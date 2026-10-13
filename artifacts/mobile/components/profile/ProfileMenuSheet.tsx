@@ -5,15 +5,18 @@
  * in by the caller from `profileCapabilities`, so this component has no
  * opinion about who may see what.
  *
- * A real sheet (not Alert.alert) so the buttons also work on web.
+ * Shown as the ⋯ pull-down menu (lib/contextMenu.ts, UIMenu style) anchored
+ * at `anchor`; the bottom sheet below is only the fallback when the menu
+ * host isn't mounted. A real menu (not Alert.alert) so it also works on web.
  */
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { hasMenuHost, openPullDownMenuAt, type MenuAnchor } from '@/lib/contextMenu';
 
 export interface ProfileMenuItem {
   key: string;
@@ -24,19 +27,30 @@ export interface ProfileMenuItem {
 }
 
 export function ProfileMenuSheet({
-  visible, title, items, onClose, testID = 'profile-menu-sheet',
+  visible, title, items, onClose, anchor = null, testID = 'profile-menu-sheet',
 }: {
   visible: boolean;
   title?: string;
   items: ProfileMenuItem[];
   onClose: () => void;
+  /** Where the ⋯ button was tapped (see `anchorFromEvent`). */
+  anchor?: MenuAnchor | null;
   testID?: string;
 }) {
+  const asPullDown = hasMenuHost();
+  useEffect(() => {
+    if (!visible || !asPullDown) return;
+    openPullDownMenuAt(anchor, items.map((item) => ({
+      key: item.key, label: item.label, icon: item.icon, destructive: item.destructive, onPress: item.onPress,
+    })), { title });
+    onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible && !asPullDown} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.root} testID={testID}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close menu" />
         <View style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }]}>

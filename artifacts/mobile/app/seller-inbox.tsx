@@ -17,7 +17,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState, ListSkeleton } from '@/components/layout';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { showActionSheet } from '@/components/ui/ActionSheet';
-import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { subscribeConversationReadFailure } from '@/lib/conversationReadEvents';
@@ -41,6 +41,7 @@ import { BLOCK_EXPLAINER } from '@/lib/safety';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
 import { radius } from '@/constants/radii';
+import { openContextMenu } from '@/lib/contextMenu';
 
 interface Participant {
   userId: string; name: string; handle: string;
@@ -330,7 +331,6 @@ export default function SellerInboxScreen() {
   }
 
   function openConversation(conversationId: string) {
-    hapticPrimaryAction();
     // Keep the inbox truthful while the conversation screen completes its
     // server-side mark-as-read request and avoid an inflated header total.
     const openedConversation = convs.find((conversation) => conversation.id === conversationId);
@@ -356,12 +356,29 @@ export default function SellerInboxScreen() {
   // openRequestConversation), the buyer who sent a pending request shouldn't
   // see a read receipt until the seller actually accepts it.
   function openRequestConversation(conversationId: string) {
-    hapticPrimaryAction();
     router.push(('/seller-conversation?id=' + encodeURIComponent(conversationId)) as never);
   }
 
+  // Long-press a conversation: the long-press preview menu (Instagram) — the
+  // thread's last message previewed over a blurred inbox, actions under it.
   function longPressConversation(c: ConvView) {
-    hapticDestructiveConfirm();
+    const other = otherParticipant(c);
+    const opened = other ? openContextMenu({
+      preview: {
+        title: other.name || other.handle,
+        subtitle: other.name ? other.handle : undefined,
+        avatarUri: other.avatarUri,
+        body: c.lastMessage || ' ',
+      },
+      onPreviewPress: () => openConversation(c.id),
+      items: [
+        ...(c.unreadCount > 0 ? [{ key: 'read', label: 'Mark as read', icon: 'check-circle' as const, onPress: () => { void swipeMarkReadConversation(c); } }] : []),
+        { key: 'pin', label: c.isPinned ? 'Unpin' : 'Pin', icon: 'bookmark', onPress: () => { void swipePinConversation(c); } },
+        { key: 'mute', label: 'Mute', icon: 'bell-off', onPress: () => { void swipeMuteConversation(c); } },
+        { key: 'archive', label: 'Archive', icon: 'archive', destructive: true, onPress: () => { void swipeArchiveConversation(c); } },
+      ],
+    }) : false;
+    if (opened) return;
     showActionSheet('Options', undefined, [
       { text: 'Archive', onPress: () => swipeArchiveConversation(c), style: 'destructive' },
       { text: 'Cancel', style: 'cancel' },
@@ -431,7 +448,6 @@ export default function SellerInboxScreen() {
           horizontalPad={SP.md}
           minHeight={88}
           onPress={() => {
-            hapticPrimaryAction();
             router.push(('/community-chat?id=' + encodeURIComponent(row.community.id)) as never);
           }}
           onToggleMute={() => toggleCommunityMute(row.community)}
@@ -450,7 +466,7 @@ export default function SellerInboxScreen() {
   // (a row tap opens the thread; Block/Delete are the only per-row actions).
   function deleteRequestConversation(c: ConvView) {
     const other = otherParticipant(c);
-    hapticDestructiveConfirm();
+    haptics.warning();
     scheduleDeleteSellerConversationRequest(c.id, api, () => {
       setConvs((current) => current.filter((row) => row.id !== c.id));
     });
@@ -463,7 +479,7 @@ export default function SellerInboxScreen() {
 
   function deleteAllRequests() {
     if (requestConvs.length === 0) return;
-    hapticDestructiveConfirm();
+    haptics.warning();
     const ids = requestConvs.map((c) => c.id);
     ids.forEach((id) => scheduleDeleteSellerConversationRequest(id, api, () => {
       setConvs((current) => current.filter((row) => row.id !== id));
@@ -484,7 +500,7 @@ export default function SellerInboxScreen() {
       confirmLabel: 'Block',
     });
     if (!confirmed) return;
-    hapticDestructiveConfirm();
+    haptics.warning();
     try {
       await blockSellerConversationRequestUser(c.id, other);
       setConvs((current) => current.filter((row) => row.id !== c.id));
@@ -520,15 +536,6 @@ export default function SellerInboxScreen() {
           : `Pin conversation with ${other.name || other.handle || 'buyer'}`,
       },
       {
-        key: 'mute',
-        label: 'Mute',
-        icon: 'bell-off',
-        color: theme.cardElevated,
-        textColor: theme.muted,
-        onPress: () => swipeMuteConversation(item),
-        accessibilityLabel: `Mute ${other.name || other.handle || 'buyer'}`,
-      },
-      {
         key: 'delete',
         label: 'Delete',
         icon: 'trash-2',
@@ -540,7 +547,17 @@ export default function SellerInboxScreen() {
     ];
 
     return (
-      <InboxSwipeRow rowId={item.id} actions={swipeActions}>
+      <InboxSwipeRow rowId={item.id} actions={swipeActions} leadingActions={[
+        {
+        key: 'mute',
+        label: 'Mute',
+        icon: 'bell-off',
+        color: theme.cardElevated,
+        textColor: theme.muted,
+        onPress: () => swipeMuteConversation(item),
+        accessibilityLabel: `Mute ${other.name || other.handle || 'buyer'}`,
+        },
+      ]}>
         <PressableScale
           testID={`seller-conversation-${item.id}`}
           style={[s.row, { backgroundColor: theme.background }]}

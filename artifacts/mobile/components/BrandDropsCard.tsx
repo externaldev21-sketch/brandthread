@@ -12,7 +12,6 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -68,7 +67,6 @@ export function BrandDropsCard({ sellerId, sellerName }: BrandDropsCardProps) {
   if (!drop) return null;
 
   function handlePress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push((`/buyer-drop-detail?dropId=${encodeURIComponent(drop!.id)}&dropName=${encodeURIComponent(drop!.name)}`) as never);
   }
 

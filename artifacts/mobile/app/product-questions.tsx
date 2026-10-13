@@ -11,7 +11,7 @@ import { View, Text, StyleSheet, FlatList, TextInput, ActivityIndicator, Keyboar
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
@@ -70,7 +70,7 @@ export default function ProductQuestionsScreen() {
       setDraft('');
       setComposing(false);
       setToast('Question posted');
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
     } catch (err: any) {
       let message = 'Couldn’t post your question. Try again.';
       try {

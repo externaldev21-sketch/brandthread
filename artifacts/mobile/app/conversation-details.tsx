@@ -29,7 +29,7 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { ThemePickerSheet } from '@/components/chat/ThemePickerSheet';
 import { ThemePreviewScreen } from '@/components/chat/ThemePreviewScreen';
 import { CONVERSATION_THEMES, getConversationTheme } from '@/lib/conversationThemes';
-import { hapticPrimaryAction, hapticSelection, hapticToggle, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { reportHref, confirmBlock, confirmUnblock, apiErrorMessage } from '@/lib/safety';
 import { useApi } from '@/lib/api';
 import {
@@ -114,7 +114,6 @@ export default function ConversationDetailsScreen() {
 
   function openProfile() {
     if (!params.participantUserId) return;
-    hapticPrimaryAction();
     const qs = new URLSearchParams({
       userId: params.participantUserId,
       name: params.participantName ?? '',
@@ -126,13 +125,12 @@ export default function ConversationDetailsScreen() {
   }
 
   function openSearch() {
-    hapticPrimaryAction();
     router.push(('/conversation-search?id=' + encodeURIComponent(params.id) + '&role=' + (params.role ?? 'buyer')) as never);
   }
 
   async function applyMute(minutes: number | null) {
     setMuteVisible(false);
-    hapticToggle();
+    haptics.selection();
     setBusy(true);
     try {
       if (isPreview) {
@@ -166,7 +164,7 @@ export default function ConversationDetailsScreen() {
         await setConversationTheme(params.id, nextThemeId);
       }
       setThemeId(nextThemeId);
-      hapticSuccessAction();
+      haptics.success();
       setPreviewThemeId(null);
       setThemePickerVisible(false);
     } catch (e) {
@@ -177,7 +175,7 @@ export default function ConversationDetailsScreen() {
   }
 
   async function toggleDisappearing(next: boolean) {
-    hapticToggle();
+    haptics.selection();
     setDisappearing(next);
     try {
       if (isPreview) {
@@ -198,7 +196,6 @@ export default function ConversationDetailsScreen() {
   }
 
   function openNicknames() {
-    hapticPrimaryAction();
     const qs = new URLSearchParams({
       id: params.id,
       role: params.role ?? 'buyer',
@@ -210,7 +207,6 @@ export default function ConversationDetailsScreen() {
   }
 
   function openPrivacySafety() {
-    hapticPrimaryAction();
     const qs = new URLSearchParams({
       id: params.id,
       participantUserId: params.participantUserId ?? '',
@@ -220,12 +216,10 @@ export default function ConversationDetailsScreen() {
   }
 
   function openCreateGroup() {
-    hapticPrimaryAction();
     router.push(('/conversation-group-create?role=' + (params.role ?? 'buyer')) as never);
   }
 
   function reportConversation() {
-    hapticSelection();
     if (!params.participantUserId) return;
     router.push(reportHref({
       targetType: 'profile',
@@ -260,7 +254,7 @@ export default function ConversationDetailsScreen() {
     <View style={[s.root, { backgroundColor: theme.background }]}>
       <View style={[s.header, { paddingTop: headerTopPad + SP.xs }]}>
         <PressableScale rippleEnabled={false}
-          onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
+          onPress={() => { goBackOr(router); }}
           style={s.roundBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           testID="chat-details-back"
@@ -294,7 +288,7 @@ export default function ConversationDetailsScreen() {
               icon={isMuted ? 'bell-off' : 'bell'}
               label={isMuted ? 'Unmute' : 'Mute'}
               theme={theme}
-              onPress={() => { hapticPrimaryAction(); isMuted ? applyMute(null) : setMuteVisible(true); }}
+              onPress={() => { isMuted ? applyMute(null) : setMuteVisible(true); }}
               testID="chat-details-action-mute"
             />
             <ActionButton icon="more-horizontal" label="Options" theme={theme} onPress={openOptions} testID="chat-details-action-options" />
@@ -307,7 +301,7 @@ export default function ConversationDetailsScreen() {
             title="Theme"
             subtitle={getConversationTheme(themeId)?.name ?? 'Default'}
             pill="New"
-            onPress={() => { hapticSelection(); setThemePickerVisible(true); }}
+            onPress={() => { setThemePickerVisible(true); }}
             testID="chat-details-row-theme"
           />
           <ListRow

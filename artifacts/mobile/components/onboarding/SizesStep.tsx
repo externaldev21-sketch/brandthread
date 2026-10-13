@@ -8,12 +8,13 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SURVEY_SIZE_CATEGORIES, toggleSize, type OnboardingSurvey } from '@/lib/onboardingSurvey';
 import type { SizeCategory } from '@/lib/sizeRecommendation';
 import { PressableScale, Reveal, StepHeadline, StepSub } from './OnboardingUI';
 import { RADIUS, SPACE, TYPE } from './onboardingTokens';
+import { FONT } from '@/lib/theme';
 
 interface Props {
   sizes: OnboardingSurvey['sizes'];
@@ -25,7 +26,7 @@ export function SizesStep({ sizes, onChange }: Props) {
   const styles = createStyles(theme);
 
   function pick(key: SizeCategory, value: string) {
-    Haptics.selectionAsync();
+    haptics.selection();
     onChange(toggleSize(sizes, key, value));
   }
 
@@ -65,7 +66,7 @@ export function SizesStep({ sizes, onChange }: Props) {
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   scroll: { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xxl },
   section: { marginTop: SPACE.lg },
-  sectionTitle: { ...TYPE.label, color: theme.text, fontFamily: 'Inter_600SemiBold', marginBottom: SPACE.sm },
+  sectionTitle: { ...TYPE.label, color: theme.text, fontFamily: FONT.semibold, marginBottom: SPACE.sm },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.xs },
   cell: { width: '31.5%' },
   chip: {
@@ -73,5 +74,5 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
   },
-  chipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
+  chipText: { fontSize: 15, fontFamily: FONT.medium, color: theme.muted },
 });

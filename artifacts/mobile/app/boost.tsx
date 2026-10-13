@@ -32,7 +32,7 @@ import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useApi } from '@/hooks/useApi';
 import { useRevenueCat } from '@/lib/revenueCat';
@@ -200,7 +200,6 @@ function SnapSlider({
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder:  () => true,
-    onPanResponderGrant:          () => { Haptics.selectionAsync(); },
     onPanResponderMove:           (_e, g) => {
       onChange(snap(value + (g.dx / widthRef.current) * (max - min)));
     },
@@ -248,7 +247,6 @@ function BudgetStepSlider({
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder:  () => true,
-    onPanResponderGrant:          () => { Haptics.selectionAsync(); },
     onPanResponderMove:           (_e, g) => {
       const currentIdx = steps.indexOf(value as typeof steps[number]);
       const startX = currentIdx === -1
@@ -270,7 +268,7 @@ function BudgetStepSlider({
       onTouchEnd={(e) => {
         const idx = indexFromX(e.nativeEvent.locationX);
         onChange(steps[idx]);
-        Haptics.selectionAsync();
+        haptics.selection();
       }}
       accessible
       accessibilityRole="adjustable"
@@ -648,7 +646,7 @@ export default function BoostScreen() {
       if (boost.status === 'active' || boost.status === 'in_review') {
         setActiveBoost(boost);
         setSucceeded(true);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        haptics.success();
         loadHistory();
         boostsRef.current.summary().then((s) => setSummary(s)).catch(() => {});
       } else if (boost.status === 'pending_payment') {
@@ -685,11 +683,10 @@ export default function BoostScreen() {
   function goBack() {
     if (step === 0) { goBackOr(router); return; }
     setStep((s) => (s - 1) as 0 | 1 | 2);
-    Haptics.selectionAsync();
   }
 
   function selectTarget(target: BoostTarget) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.selection();
     setSelectedTarget(target);
     setStep(1);
   }
@@ -714,8 +711,6 @@ export default function BoostScreen() {
       );
       return;
     }
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     // Native store purchases are sold in fixed budget tiers; the price on the
     // button follows the tier that will actually be bought.
@@ -836,7 +831,7 @@ export default function BoostScreen() {
           setPausingId(boost.id);
           try {
             await boostsRef.current.update(boost.id, { status: newStatus as 'paused' | 'cancelled' });
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            haptics.success();
             setExisting((prev) =>
               prev.map((b) => b.id === boost.id ? { ...b, status: newStatus } : b),
             );

@@ -8,7 +8,7 @@ const dashboard = readFileSync(resolve(process.cwd(), 'components/SellerHomeComm
  * Dev: on the same row as the "Dashboard" title, show the seller's real
  * public store URL (using the one existing URL builder, not a new one) plus
  * a small copy icon. Tapping either copies to the clipboard instantly with
- * a light haptic; the icon swaps to a checkmark for ~1.2s — no toast, no
+ * no haptic (the checkmark is the feedback); the icon swaps to a checkmark for ~1.2s — no toast, no
  * wording. Truncates the middle if long, never wraps. Shows even before the
  * store is published.
  */
@@ -24,9 +24,9 @@ describe('Dashboard: store URL + copy icon row next to the title', () => {
     expect(fetchBlock).not.toContain('storeIsLive');
   });
 
-  it('copying fires a light haptic, writes to the clipboard, and flips a checkmark for ~1.2s — no toast', () => {
+  it('copying writes to the clipboard and flips a checkmark for ~1.2s — no toast, no haptic (copy is not in the haptics map)', () => {
     const fnBody = dashboard.slice(dashboard.indexOf('const handleCopyStoreUrl = useCallback'), dashboard.indexOf('}, [storeUrl]);'));
-    expect(fnBody).toContain('Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)');
+    expect(fnBody).not.toContain('haptics.');
     expect(fnBody).toContain('Clipboard.setStringAsync(storeUrl)');
     expect(fnBody).toContain('navigator?.clipboard?.writeText?.(storeUrl)');
     expect(fnBody).toContain('setStoreUrlCopied(true)');

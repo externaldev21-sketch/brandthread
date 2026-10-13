@@ -7,7 +7,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
-import { hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 import { radius } from '@/constants/radii';
@@ -42,13 +42,13 @@ export function QuantityStepper({
   const sm = size === 'sm';
 
   const step = (delta: number) => {
-    hapticToggle();
+    haptics.selection();
     onChange(Math.min(max, Math.max(min, value + delta)));
   };
 
   const decrement = () => {
     if (removeMode) {
-      hapticToggle();
+      haptics.selection();
       onRemoveAtMin?.();
       return;
     }

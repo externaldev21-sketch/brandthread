@@ -15,7 +15,7 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { CONVERSATION_THEMES } from '@/lib/conversationThemes';
-import { hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 
 export function ThemePickerSheet({
   visible, theme, currentThemeId, bottomInset, onClose, onPickTheme, onPickDefault,
@@ -44,7 +44,7 @@ export function ThemePickerSheet({
           ListHeaderComponent={(
             <PressableScale rippleEnabled={false}
               style={s.tileWrap}
-              onPress={() => { hapticSelection(); onPickDefault(); }}
+              onPress={() => { haptics.selection(); onPickDefault(); }}
               testID="theme-tile-default"
             >
               <View style={[s.tile, { backgroundColor: theme.background, borderColor: theme.border, borderWidth: StyleSheet.hairlineWidth }]}>
@@ -56,7 +56,7 @@ export function ThemePickerSheet({
           renderItem={({ item }) => (
             <PressableScale rippleEnabled={false}
               style={s.tileWrap}
-              onPress={() => { hapticSelection(); onPickTheme(item.id); }}
+              onPress={() => { haptics.selection(); onPickTheme(item.id); }}
               testID={`theme-tile-${item.id}`}
             >
               <View style={[s.tile, { backgroundColor: item.swatch }]}>

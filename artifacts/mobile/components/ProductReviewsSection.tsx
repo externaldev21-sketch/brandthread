@@ -29,7 +29,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { StarRating } from '@/components/StarRating';
 import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, BORDER_SUBTLE, FG, MUTED, SUBTLE, CARD_ELEVATED } from '@/lib/theme';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { applyHelpfulToggle, fitChipText, isVerifiedReview } from '@/lib/reviewDisplay';
 
 export interface ReviewItem {
@@ -144,7 +144,7 @@ export function ProductReviewsSection({
   const toggleHelpful = (review: ReviewItem) => {
     const current = helpful[review.id] ?? { helpfulCount: review.helpfulCount ?? 0, viewerHelpful: !!review.viewerHelpful };
     const next = applyHelpfulToggle(current);
-    void Haptics.selectionAsync();
+    haptics.light();
     setHelpful(prev => ({ ...prev, [review.id]: next }));
     // Seeded preview data has no server rows; everything else persists.
     if (seed) return;
@@ -297,7 +297,7 @@ export function ProductReviewsSection({
 const s = StyleSheet.create({
   wrap: { paddingHorizontal: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: BORDER_SUBTLE, marginBottom: 8 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  title: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG, textTransform: 'uppercase', letterSpacing: 0.8 },
+  title: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG, },
   seeAll: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
   summaryRow: { flexDirection: 'row', gap: 20, marginBottom: 16, alignItems: 'center' },
   avgBlock: { alignItems: 'flex-start', gap: 3 },
@@ -339,7 +339,7 @@ const replyS = StyleSheet.create({
 
 const fitS = StyleSheet.create({
   wrap: { marginBottom: 18 },
-  label: { fontSize: FS.meta, fontFamily: FONT.bold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
+  label: { fontSize: FS.meta, fontFamily: FONT.bold, color: MUTED, marginBottom: 2 },
   value: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 8 },
   track: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   dot: { flex: 1, height: 4, borderRadius: 2 },

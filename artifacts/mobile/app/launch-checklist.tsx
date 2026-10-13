@@ -14,7 +14,6 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
-import { hapticLight } from '@/lib/haptics';
 import { LAUNCH_STEP_META, nextLaunchStep, type LaunchStepId } from '@/lib/launchChecklist';
 import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 
@@ -66,7 +65,7 @@ export default function LaunchChecklistScreen() {
               return (
                 <View key={step.id} style={[s.row, i > 0 && s.rowDivider]}>
                   <PressableScale
-                    onPress={() => { hapticLight(); setOpen(expanded ? null : step.id); }}
+                    onPress={() => setOpen(expanded ? null : step.id)}
                     accessibilityLabel={`${meta.title}${step.done ? ', done' : ''}`}
                     accessibilityState={{ expanded }}
                     style={s.rowHead}

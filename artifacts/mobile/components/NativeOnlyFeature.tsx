@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { FONT } from '@/lib/theme';
 
 interface NativeOnlyFeatureProps {
   title: string;
@@ -81,7 +82,7 @@ const styles = StyleSheet.create({
     maxWidth: 560,
     fontSize: 26,
     lineHeight: 32,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: FONT.bold,
     textAlign: 'center',
     marginBottom: 10,
   },
@@ -89,7 +90,7 @@ const styles = StyleSheet.create({
     maxWidth: 560,
     fontSize: 15,
     lineHeight: 22,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: FONT.regular,
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -100,12 +101,12 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 15,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: FONT.bold,
   },
   hint: {
     marginTop: 14,
     fontSize: 12,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: FONT.regular,
     textAlign: 'center',
   },
 });

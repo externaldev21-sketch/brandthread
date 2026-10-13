@@ -39,7 +39,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { randomUUID } from 'expo-crypto';
 import { useAuth } from '@clerk/expo';
@@ -99,6 +99,7 @@ import { FONT, FS, SP } from '@/lib/theme';
 import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_CHECKOUT_STEPS } from '@/lib/firstRunTips/content';
+import { syncOrderActivities } from '@/lib/nativeSystem';
 
 /**
  * A fully verified order reference returned from the server after payment.
@@ -522,6 +523,20 @@ export default function BuyerCheckoutScreen() {
       };
     }
     setVerifiedOrders(confirmed);
+    // Lock Screen order tracker at "Ordered", like Uber Eats after checkout
+    // (iOS dev/TestFlight builds with the nativeSurfaces flag only).
+    const paidAt = new Date().toISOString();
+    syncOrderActivities((status?.orders ?? []).map((order) => {
+      const group = base.deliveryGroups.find((g) => g.sellerId === order.sellerId);
+      return {
+        id: order.orderId,
+        orderNumber: order.orderNumber,
+        sellerName: group?.sellerName ?? '',
+        status: 'processing',
+        paidAt,
+        lineItems: group?.items.map((item) => ({ imageUri: item.imageUri ?? null })),
+      };
+    }));
     setPendingSessionIds(status?.complete ? [] : [`${PI_PREFIX}${started.paymentIntentId}`]);
     void trackAndRelayConversionEvent(
       'Purchase',
@@ -532,7 +547,7 @@ export default function BuyerCheckoutScreen() {
     await saveAddressIfAsked(who);
     startedRef.current = null;
     await persist({ ...base, paidGroups, step: 'confirmation' }, who);
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     setPlacing(false);
   };
 
@@ -830,7 +845,7 @@ export default function BuyerCheckoutScreen() {
       }
       await saveAddressIfAsked({ address, contact });
       await persist({ ...current, paidGroups, step: 'confirmation' });
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
     } catch {
       showError({ title: 'Couldn’t start secure checkout', message: 'Something went wrong reaching Stripe. Check your connection and try again — you haven’t been charged.' });
     }
@@ -902,7 +917,7 @@ export default function BuyerCheckoutScreen() {
     setPendingSessionIds(remaining);
     await persist({ ...current, paidGroups, step: 'confirmation' });
     if (!remaining.length) {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       await removeCartItems(current.deliveryGroups.flatMap(group => group.items.map(item => item.id)));
     }
     setPlacing(false);
