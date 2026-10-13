@@ -135,6 +135,10 @@ export function createFakeOnboardingApi() {
     if (p === '/auth/username/check' && get) {
       return { status: 200, body: { available: true } };
     }
+    // The sign-up step checks the handle and email before a session exists.
+    if ((p === '/public/username-check' || p === '/public/email-check') && get) {
+      return { status: 200, body: { available: true } };
+    }
     if (p === '/onboarding-sample/logo' && method === 'POST') {
       return { status: 200, body: { b64_json: TINY_PNG_BASE64 } };
     }

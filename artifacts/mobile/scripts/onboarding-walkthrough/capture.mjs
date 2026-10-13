@@ -145,6 +145,9 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByLabel('Password', { exact: true }).fill(id.password);
       await page.getByLabel('Confirm password', { exact: true }).fill(id.password);
       await page.getByTestId('onboarding-username-input').fill(id.username);
+      // Sign-up now also asks for a date of birth and the terms checkbox.
+      await page.getByTestId('onboarding-dob-input').fill('01151995');
+      await page.getByTestId('legal-consent-checkbox').click();
       await page.getByTestId('legal-consent-line').waitFor({ timeout: 5_000 });
       await shot('sign-up-form');
       await page.getByRole('button', { name: 'Create account', exact: true }).click();
@@ -173,7 +176,16 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
     });
 
     await report.step('brands to follow', async () => {
+      // Steps added since (e.g. sizes) sit between style and brands: continue
+      // past them until Brands to follow shows.
+      for (let i = 0; i < 3; i++) {
+        if (await page.getByText('Follow a few', { exact: false }).isVisible().catch(() => false)) break;
+        await page.waitForTimeout(1200);
+        if (await page.getByText('Follow a few', { exact: false }).isVisible().catch(() => false)) break;
+        await page.getByRole('button', { name: /^(Continue|Skip|Skip for now)$/ }).first().click().catch(() => {});
+      }
       await page.getByText('Follow a few', { exact: false }).waitFor({ timeout: 10_000 });
+      await page.waitForTimeout(1500);
       await shot('brands-to-follow');
       await page.getByRole('button', { name: 'Continue', exact: true }).click();
     });
@@ -262,6 +274,9 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByLabel('Password', { exact: true }).fill(id.password);
       await page.getByLabel('Confirm password', { exact: true }).fill(id.password);
       await page.getByTestId('onboarding-username-input').fill(id.username);
+      // Sign-up now also asks for a date of birth and the terms checkbox.
+      await page.getByTestId('onboarding-dob-input').fill('01151995');
+      await page.getByTestId('legal-consent-checkbox').click();
       await page.getByTestId('legal-consent-line').waitFor({ timeout: 5_000 });
       await shot('sign-up-form');
       await page.getByRole('button', { name: 'Create account', exact: true }).click();

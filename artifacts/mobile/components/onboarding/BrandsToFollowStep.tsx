@@ -241,8 +241,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   cardName: { flexShrink: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.text },
   // Featured brands — Grailed's "Curate your Feed" card: three of the
   // brand's own product photos (4:5), name, product count, Follow.
-  featuredRail: { marginBottom: SPACE.md },
-  featuredRailContent: { gap: 10 },
+  featuredRail: { flexGrow: 0, marginBottom: SPACE.md },
+  featuredRailContent: { gap: 10, alignItems: 'flex-start' },
   featuredCard: {
     width: FEATURED_CARD_WIDTH, backgroundColor: theme.card, borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, overflow: 'hidden',
