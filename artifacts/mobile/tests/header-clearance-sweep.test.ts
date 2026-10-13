@@ -8,6 +8,8 @@ vi.mock('@/hooks/useHeaderTopInset', () => ({ useHeaderTopInset: () => 54 }));
 vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({ useTabBarClearance: () => 98 }));
 vi.mock('@/lib/tabBarVisibility', () => ({ useTabBarHiddenByScreen: () => false }));
 vi.mock('react-native', () => ({ StyleSheet: { create: (s: unknown) => s }, View: 'View' }));
+vi.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
+vi.mock('@/lib/backgroundPalette', () => ({ hexToRgba: (h: string, a: number) => `${h}/${a}` }));
 
 import { isImmersiveTopRoute } from '@/components/layout/ScreenChrome';
 import { EMPTY_STATE_ICONS } from '@/components/layout/emptyStateIcons';
@@ -49,13 +51,19 @@ describe('headers: bare back arrow + title — no subtitle, no divider', () => {
   });
 });
 
-describe('nothing under the notch: one solid status-bar mask over every non-immersive screen', () => {
-  it('is rendered once above the root stack, in the screen background colour', () => {
+describe('status bar: a scroll-edge fade, never a solid strip', () => {
+  it('renders one fade above the root stack, and no solid mask anywhere', () => {
     const layout = read('app/_layout.tsx');
-    expect(layout).toContain('<StatusBarMask />');
+    expect(layout).toContain('<StatusBarScrollEdge />');
+    expect(layout).not.toContain('StatusBarMask');
     const chrome = read('components/layout/ScreenChrome.tsx');
-    expect(chrome).toContain('backgroundColor: theme.background');
-    expect(chrome).toContain('testID="status-bar-mask"');
+    expect(chrome).toContain('testID="status-bar-scroll-edge"');
+    expect(chrome).toContain('pointerEvents="none"');
+    expect(chrome).toContain('<LinearGradient');
+    expect(chrome).not.toContain('testID="status-bar-mask"');
+    // A solid strip in the screen colour is what showed as a black bar on
+    // pull-down and cut header borders into a line under the clock.
+    expect(chrome).not.toMatch(/backgroundColor: theme\.background/);
   });
 
   it('skips only genuinely immersive media / pre-shell routes', () => {
@@ -64,7 +72,7 @@ describe('nothing under the notch: one solid status-bar mask over every non-imme
     expect(isImmersiveTopRoute(['(buyer)', 'feed'])).toBe(true);
     expect(isImmersiveTopRoute(['(tabs)', 'feed'])).toBe(true);
     expect(isImmersiveTopRoute(['sign-in'])).toBe(true);
-    // Ordinary app screens are always masked.
+    // Ordinary app screens always get the fade.
     expect(isImmersiveTopRoute(['(tabs)', 'profile'])).toBe(false);
     expect(isImmersiveTopRoute(['(tabs)'])).toBe(false);
     expect(isImmersiveTopRoute(['(tabs)', 'analytics'])).toBe(false);

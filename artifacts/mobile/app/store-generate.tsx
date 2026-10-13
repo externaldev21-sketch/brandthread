@@ -1029,8 +1029,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SP.md,
     paddingBottom: SP.sm,
     backgroundColor: SURFACE,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
   },
   saveExitBtn: { paddingHorizontal: SP.sm, paddingVertical: SP.xs },
   saveExitText: { fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT },

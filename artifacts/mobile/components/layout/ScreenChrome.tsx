@@ -2,15 +2,23 @@
  * App-wide "screen chrome" guards — the two layout rules Dev set for every
  * screen, enforced once here instead of per screen:
  *
- *  1. Nothing ever renders under the notch / Dynamic Island / status bar.
- *     <StatusBarMask /> is a solid strip (the screen's own background, no
- *     translucency) pinned over the top safe inset, above every stack
- *     scene. Scroll content that moves up the screen now disappears under
- *     the strip instead of sliding under the status bar (Dev's seller-
- *     profile screenshot: avatar / "+" badge / stats under the island).
- *     Genuinely immersive full-bleed media screens (camera, live, story and
- *     post viewers, the video feeds) and the auth/onboarding flow keep
- *     their edge-to-edge media — see isImmersiveTopRoute().
+ *  1. The status bar stays readable without a hard edge. There is no solid
+ *     strip pinned under the status bar any more: on a pull-down/overscroll
+ *     the screen's own content and background stretch and bounce like any
+ *     native iOS screen, and when content scrolls up under the clock
+ *     <StatusBarScrollEdge /> fades it out, a short gradient from the screen
+ *     background to transparent (the iOS scroll-edge effect). It never takes
+ *     touches and never draws a line. At rest and during a pull-down it sits
+ *     over the screen's own background, so it is invisible. Genuinely
+ *     immersive full-bleed media screens (camera, live, story and post
+ *     viewers, the video feeds) and the auth/onboarding flow get no fade —
+ *     see isImmersiveTopRoute(). Sticky headers keep their own background
+ *     through the safe area (they pad by useHeaderTopInset()).
+ *
+ *     It replaced <StatusBarMask />, a solid strip in the screen colour.
+ *     Its hard bottom edge showed as a black bar on pull-down and, at the
+ *     right scroll offset, cut a header's 1px border down to a thin line
+ *     under the clock (Dev's Discover report).
  *
  *  2. Nothing ever sits under or behind the floating tab bar.
  *     useTabBarClearance() (components/buyer-nav/buyerTabBarMetrics.ts) is
@@ -23,17 +31,19 @@
  *     ends above the bar without touching each of those screens.
  */
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useSegments } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useTabBarHiddenByScreen } from '@/lib/tabBarVisibility';
+import { hexToRgba } from '@/lib/backgroundPalette';
 
 /** Root-stack routes whose content is deliberately edge-to-edge media
  *  (camera, live, story/post viewers) or that run before there is an app
- *  shell at all (boot, auth, onboarding). The status-bar mask stays off
+ *  shell at all (boot, auth, onboarding). The scroll-edge fade stays off
  *  there. Everything else gets it. */
 const IMMERSIVE_TOP_ROOT_SEGMENTS = new Set([
   // Boot / auth / onboarding
@@ -60,30 +70,43 @@ export function isImmersiveTopRoute(segments: readonly string[]): boolean {
   return false;
 }
 
-/** Height of the masked strip: the same top inset every header pads by
+/** Height of the fade: the same top inset every header pads by
  *  (useHeaderTopInset — the real safe-area top on device, the simulated
- *  notch on the web preview), so a header's own content always starts
- *  exactly at the strip's bottom edge and is never covered. */
-export function useStatusBarMaskHeight(): number {
+ *  notch on the web preview, already rounded to whole device pixels), so
+ *  it covers exactly the status bar and ends where a header's own content
+ *  begins. */
+export function useStatusBarScrollEdgeHeight(): number {
   return useHeaderTopInset();
 }
 
+/** Opaque enough at the very top for the clock and battery to stay
+ *  readable over scrolling content, clear by the bottom of the status bar. */
+const FADE_STOPS = [1, 0.8, 0] as const;
+const FADE_LOCATIONS = [0, 0.6, 1] as const;
+
+function fadeColors(background: string): [string, string, string] {
+  if (!/^#[0-9a-f]{6}$/i.test(background)) return [background, background, 'transparent'];
+  return [hexToRgba(background, FADE_STOPS[0]), hexToRgba(background, FADE_STOPS[1]), hexToRgba(background, FADE_STOPS[2])];
+}
+
 /**
- * The solid status-bar strip. Rendered once, above the root stack, in
- * app/_layout.tsx. pointerEvents "auto" on purpose: nothing under the
- * status bar should be tappable either.
+ * The status-bar scroll-edge fade. Rendered once, above the root stack, in
+ * app/_layout.tsx. pointerEvents "none": it is purely visual.
  */
-export function StatusBarMask() {
+export function StatusBarScrollEdge() {
   const { theme } = useAppTheme();
   const segments = useSegments() as string[];
-  const height = useStatusBarMaskHeight();
+  const height = useStatusBarScrollEdgeHeight();
   if (height <= 0 || isImmersiveTopRoute(segments)) return null;
   return (
-    <View
-      testID="status-bar-mask"
+    <LinearGradient
+      testID="status-bar-scroll-edge"
+      pointerEvents="none"
       accessible={false}
       importantForAccessibility="no-hide-descendants"
-      style={[styles.mask, { height, backgroundColor: theme.background }]}
+      colors={fadeColors(theme.background)}
+      locations={[...FADE_LOCATIONS]}
+      style={[styles.fade, { height }]}
     />
   );
 }
@@ -103,14 +126,13 @@ export function useSceneBottomClearance(active: boolean): number {
 }
 
 const styles = StyleSheet.create({
-  mask: {
+  fade: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    // Above every stack scene and its in-screen overlays; below the app's
-    // own top banners, sheets and the Studio page (all Modals / later
-    // siblings with higher zIndex).
+    // Above every stack scene; below the app's own top banners, sheets and
+    // the Studio page (all Modals / later siblings with higher zIndex).
     zIndex: 900,
     elevation: 900,
   },

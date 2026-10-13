@@ -256,7 +256,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const SUCCESS_DIM = `${SUCCESS}20`;
   return StyleSheet.create({
   root:       { flex: 1, backgroundColor: 'transparent' },
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
+  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   headerBack: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle:{ fontSize: FS.md, fontFamily: FONT.bold, color: FG },
 
