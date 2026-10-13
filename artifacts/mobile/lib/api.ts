@@ -53,6 +53,7 @@ export interface HighlightPickerStory {
   visibility: 'public' | 'friends' | 'close_friends'; createdAt: number; live: boolean;
 }
 import type { BulkPriceRequest, BulkPriceResult, BulkProductList, ProductSeoDetail, ProductSeoInput } from '@/lib/productBulk';
+import type { AccountStatus, MyReport } from '@/lib/accountStatus';
 
 import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
@@ -1590,6 +1591,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         eventType: 'receipt' | 'open' | 'tap';
         occurredAt?: string;
       }) => post<{ ok: boolean; recorded: boolean }>('/api/notifications/events', body),
+    },
+    /** Your standing, strikes (of 3) and the reports you filed. */
+    accountStatus: {
+      get: () => get<AccountStatus>('/api/account-status'),
+      myReports: () => get<{ reports: MyReport[] }>('/api/account-status/reports'),
     },
     notificationPrefs: {
       get: () =>
