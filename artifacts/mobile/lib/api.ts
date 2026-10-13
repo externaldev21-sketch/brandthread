@@ -640,6 +640,23 @@ export interface PublicPairedProduct {
 }
 export interface ProductVideoInfo { videoUrl: string; posterUrl: string | null; durationMs: number | null }
 
+/** Seller-set product page fields (migration 270). */
+export interface ProductPageDetailsInput {
+  modelHeightCm: number | null;
+  modelSizeWorn: string | null;
+  fabric: string | null;
+  care: string | null;
+  origin: string | null;
+  colorImages: Record<string, string> | null;
+}
+export interface ProductPageDetailsEditor {
+  productId: string;
+  productName: string;
+  images: string[];
+  colors: string[];
+  details: ProductPageDetailsInput & { colorImages: Record<string, string> };
+}
+
 /** Like uploadVideo, but reports upload progress (0–1) via XHR. */
 async function uploadVideoWithProgress<T = any>(
   path: string,
@@ -3405,6 +3422,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Public (works signed out). */
       publicGet: (productId: string) =>
         get<{ video: ProductVideoInfo | null }>(`/api/product-videos/public/${encodeURIComponent(productId)}`),
+    },
+    /** Product page details (polish 87, 88, 91, 93, 94). */
+    productPageDetails: {
+      get: (productId: string) =>
+        freshGet<ProductPageDetailsEditor>(`/api/product-page-details/${encodeURIComponent(productId)}`),
+      save: (productId: string, body: Partial<ProductPageDetailsInput>) =>
+        put<ProductPageDetailsEditor>(`/api/product-page-details/${encodeURIComponent(productId)}`, body),
+      /** Public (works signed out). `count` is null below 3 shoppers. */
+      inBags: (productId: string) =>
+        get<{ count: number | null }>(`/api/product-page-details/public/${encodeURIComponent(productId)}/in-bags`),
     },
     /** Variant option axes, matrix generation, bulk variant edits and stock rules. */
     productVariants: {

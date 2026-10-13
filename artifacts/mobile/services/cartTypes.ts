@@ -446,7 +446,8 @@ export interface BuyerProduct {
 export interface BuyerProductOption {
   id: string;
   name: string;   // "Size", "Color", "Material"
-  values: { id: string; label: string; colorHex?: string }[];
+  // imageUri: the seller's photo for this colour (polish 93).
+  values: { id: string; label: string; colorHex?: string; imageUri?: string }[];
 }
 
 export interface BuyerProductVariant {

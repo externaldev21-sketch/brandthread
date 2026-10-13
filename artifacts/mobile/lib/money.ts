@@ -28,9 +28,38 @@ export function parseDecimalToCents(value: string): number | null {
   return Number.isSafeInteger(cents) ? cents : null;
 }
 
-/** Format integer cents only; formatting is deliberately a UI-boundary operation. */
-export function formatCents(cents: number, currency = 'USD'): string {
+const currencyFormatters = new Map<string, Intl.NumberFormat | null>();
+
+function currencyFormatter(currency: string, locale?: string): Intl.NumberFormat | null {
+  const key = `${locale ?? ''}|${currency}`;
+  if (!currencyFormatters.has(key)) {
+    try {
+      currencyFormatters.set(key, new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    } catch {
+      currencyFormatters.set(key, null);
+    }
+  }
+  return currencyFormatters.get(key) ?? null;
+}
+
+/**
+ * Format integer cents only; formatting is deliberately a UI-boundary operation.
+ *
+ * Polish 106: the number follows the device locale ("$98.00" in the US,
+ * "98,00 $" in Germany, "US$98.00" in Canada). The currency itself is the
+ * one the price is charged in; nothing is converted. Falls back to the
+ * fixed en-US style if Intl is unavailable. `locale` is for tests.
+ */
+export function formatCents(cents: number, currency = 'USD', locale?: string): string {
   assertCents(cents);
+  const formatter = currencyFormatter(currency.toUpperCase(), locale);
+  if (formatter) {
+    try {
+      return formatter.format(cents / 100);
+    } catch {
+      // fall through to the fixed format
+    }
+  }
   const sign = cents < 0 ? '-' : '';
   const absolute = Math.abs(cents);
   const whole = Math.floor(absolute / 100).toLocaleString('en-US');
