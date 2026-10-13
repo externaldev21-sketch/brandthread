@@ -30,6 +30,7 @@ import { SellerThreadCashCard } from '@/components/thread-cash/SellerThreadCashC
 import { CashOutSheet } from '@/components/thread-cash/CashOutSheet';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
 import { formatCents } from '@/lib/money';
+import { HelpLink } from '@/components/help/HelpLink';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
 
@@ -280,6 +281,7 @@ function PayoutsScreenContent() {
           <Text style={styles.balanceHeroAmount}>{availFmt}</Text>
         )}
         <Text style={styles.balanceHeroSub}>{loadError ? '—' : `Next payout ${nextDate}`}</Text>
+        <HelpLink article="payouts" style={{ marginTop: SP.xs }} />
         <View style={styles.balanceDivider} />
         <View style={styles.balancePendingRow}>
           <Text style={styles.balancePendingLabel}>Pending</Text>

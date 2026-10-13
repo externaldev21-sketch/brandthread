@@ -37,6 +37,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
 import { radius } from '@/constants/radii';
+import { HelpLink } from '@/components/help/HelpLink';
 
 interface SellerProductRow {
   id: string;
@@ -519,6 +520,7 @@ export default function SellerDropCreate() {
             <Text style={[styles.hint, { color: theme.muted }]}>
               This is the wall-clock time in the timezone above — buyers see it converted to their own countdown.
             </Text>
+            <HelpLink article="drops-schedule" />
           </View>
 
           <View style={styles.field}>
