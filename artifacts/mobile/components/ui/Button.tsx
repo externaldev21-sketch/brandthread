@@ -52,6 +52,8 @@ export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive'
 export type ButtonSize = 'default' | 'small' | 'compact';
 
 export interface ButtonProps {
+  /** Explicit surface contrast, when a product surface requires a fixed monochrome CTA. */
+  colors?: { background: string; foreground: string };
   label: string;
   /**
    * Takes the underlying GestureResponderEvent optionally — most callers
@@ -96,7 +98,7 @@ function usePressScale() {
 }
 
 export function Button({
-  label, onPress, variant = 'primary', size = 'default', icon,
+  label, onPress, variant = 'primary', size = 'default', icon, colors,
   loading = false, disabled = false, fullWidth = false, style, accessibilityHint, accessibilityLabel, testID,
 }: ButtonProps) {
   const { theme } = useAppTheme();
@@ -122,6 +124,7 @@ export function Button({
   };
 
   const variantStyle = ((): { bg: string; fg: string; border?: string } => {
+    if (colors) return { bg: colors.background, fg: colors.foreground };
     switch (variant) {
       // Disabled keeps these colours; the whole control drops to
       // DISABLED_OPACITY below. Destructive is red text only, no red fill.

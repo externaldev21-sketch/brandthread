@@ -35,6 +35,8 @@ import { FreeShippingStrip } from '@/components/cart/FreeShippingStrip';
 import { refreshFreeShippingThresholds, freeShippingLabel } from '@/lib/freeShipping';
 
 import { VariantPickerSheet } from '@/components/buy-now/VariantPickerSheet';
+import { bagProduct, bagCanChooseOptions } from '@/lib/cart/bagProduct';
+import { getBuyerProduct } from '@/services/cartService';
 
 import { BAG_BAR_HEIGHT, BagCheckoutBar, BagColumns, BagEmpty, BagHeader, BagItemRow, BagTotals, toNewArrivals, type BagLineBusy, type NewArrival } from '@/components/bag/BagParts';
 
@@ -153,6 +155,7 @@ const makeSavedItemStyles = (theme: AppThemePreset) => StyleSheet.create({
 
 export default function CartScreen() {
   const [editMode, setEditMode] = useState(false);
+  const [bagProducts, setBagProducts] = useState<Record<string, BuyerProduct>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [removingSelected, setRemovingSelected] = useState(false);
   async function handleRemoveSelected() {
@@ -285,6 +288,21 @@ export default function CartScreen() {
   }, [sellerIdsKey]);
 
   const hasPreOrder = cart.items.some(i => i.isPreOrder);
+  const editingProduct = useMemo(
+    () => editingItem ? bagProduct(editingItem, bagProducts[editingItem.productId]) : undefined,
+    [editingItem, bagProducts],
+  );
+  const bagProductIds = [...new Set(cart.items.map(i => i.productId))].sort().join('|');
+  useEffect(() => {
+    let active = true;
+    setBagProducts({});
+    const ids = bagProductIds ? bagProductIds.split('|') : [];
+    void Promise.all(ids.map(async id => [id, await getBuyerProduct(id).catch(() => null)] as const))
+      .then(entries => {
+        if (active) setBagProducts(Object.fromEntries(entries.filter((entry): entry is readonly [string, BuyerProduct] => entry[1] !== null)));
+      });
+    return () => { active = false; };
+  }, [bagProductIds, cartOwnerId]);
   // Real shipping per seller group (the rate checkout will charge).
   const groupsKey = groups.map(g => `${g.sellerId}:${g.subtotalCents}`).join('|');
   useEffect(() => {
@@ -312,10 +330,6 @@ export default function CartScreen() {
 
   const selectedItems = cart.items.filter(i => selectedIds.has(i.id));
   const allSelected = cart.items.length > 0 && selectedItems.length === cart.items.length;
-  const selectedSummary = calculateCartSummary(selectedItems);
-  // The pinned block shows the subtotal (Nike Bag); the full breakdown with
-  // rewards is in the Order summary above.
-  const selectedSubtotal = selectedSummary.subtotalCents;
 
   function toggleSelect(itemId: string) {
     setSelectedIds(prev => {
@@ -601,8 +615,8 @@ export default function CartScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <BagHeader topInset={headerTopInset} onClose={closeBag} rightElement={hasItems ? (
-        <TouchableOpacity onPress={() => setEditMode(v => !v)} accessibilityRole="button" accessibilityLabel={editMode ? 'Done editing cart' : 'Edit cart'}>
-          <Text style={{ color: theme.text }}>{editMode ? 'Done' : 'Edit'}</Text>
+        <TouchableOpacity style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'flex-end' }} onPress={() => setEditMode(v => !v)} accessibilityRole="button" accessibilityLabel={editMode ? 'Done editing cart' : 'Edit cart'}>
+          <Text style={{ color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm }}>{editMode ? 'Done' : 'Edit'}</Text>
         </TouchableOpacity>
       ) : undefined} />
 
@@ -652,6 +666,7 @@ export default function CartScreen() {
                   <BagItemRow
                     key={item.id}
                     item={item}
+                    canChangeOptions={bagCanChooseOptions(item, bagProducts[item.productId])}
                     busy={pendingByItemId[item.id]}
                     onOpen={() => push({ pathname: '/thread-product-detail' as any, params: { productId: item.productId, src: 'cart' } } as never)}
                     onChangeSize={() => handleEditVariant(item)}
@@ -751,11 +766,11 @@ export default function CartScreen() {
           {hasItems && (
             <BagCheckoutBar
               totalCents={displayedTotal}
-              subtotalCents={selectedSubtotal}
+              subtotalCents={summary.subtotalCents}
               bottomInset={insets.bottom}
               busy={validating}
-              disabled={selectedItems.length === 0 || validating}
-              onCheckout={() => { void startCheckout(selectedItems); }}
+              disabled={!hasItems}
+              onCheckout={() => { void startCheckout(cart.items); }}
             />
           )}
         </>
@@ -764,7 +779,9 @@ export default function CartScreen() {
       {editingItem && (
         <VariantPickerSheet
           productId={editingItem.productId}
+          initialProduct={editingProduct}
           initialVariantId={editingItem.variantId}
+          initialVariantTitle={editingItem.variantTitle}
           initialQuantity={editingItem.quantity}
           confirmVerb="Update"
           onClose={() => setEditingItem(null)}

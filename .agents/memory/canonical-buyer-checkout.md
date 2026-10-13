@@ -14,3 +14,9 @@ The first successful purchase must collect first name, last name, email, phone, 
 **Why:** The user explicitly requires a complete first-purchase identity and a faster repeat checkout without sacrificing payment-data security.
 
 Thread commerce actions stay distinct: Add to cart mutates the cart and updates its badge; Buy now must not touch the cart and instead creates a direct-purchase session before opening the full canonical checkout. Product descriptions appear before variant and quantity choices.
+
+Bag option changes preserve the requested quantity. If a different size or color has less stock, keep the quantity visible and require the buyer to reduce it explicitly before applying the change; never silently reset it.
+
+**Why:** A size change can otherwise remove units and change the order amount without the buyer choosing either change.
+
+**How to apply:** In the shared options picker, keep quantity independent of option selection, explain insufficient stock, and block confirmation until the buyer chooses a valid quantity. Checkout must still validate live stock and prices.

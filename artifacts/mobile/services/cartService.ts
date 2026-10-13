@@ -512,12 +512,14 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
     }
     cart.items[existingIdx] = {
       ...existing,
+      productSnapshot: product,
       quantity: newQty,
       maxQuantity: variant.inventoryQuantity > 0 ? variant.inventoryQuantity : existing.maxQuantity,
       ...(attribution?.sourceLiveStreamId ? { sourceLiveStreamId: attribution.sourceLiveStreamId } : {}),
     };
   } else {
     const item: CartItem = {
+      productSnapshot: product,
       id: uid(),
       productId: product.id,
       variantId: variant.id,
@@ -689,6 +691,7 @@ export async function replaceCartItemVariant(
   } else {
     cart.items[index] = {
       ...current,
+      productSnapshot: product,
       productId: product.id,
       variantId: variant.id,
       productName: product.name,

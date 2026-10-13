@@ -69,10 +69,11 @@ function isVariantComboAvailable(
 }
 
 export function VariantPickerSheet({
-  productId, initialProduct, initialVariantId, initialQuantity, confirmVerb = 'Add to bag', onClose, onConfirm,
+  productId, initialProduct, initialVariantId, initialVariantTitle, initialQuantity, confirmVerb = 'Add to bag', onClose, onConfirm,
 }: {
   productId: string;
   initialProduct?: BuyerProduct;
+  initialVariantTitle?: string;
   /** Editing an existing line (the bag): start on its current variant… */
   initialVariantId?: string;
   /** …and quantity. */
@@ -128,6 +129,16 @@ export function VariantPickerSheet({
   }, [productId, initialVariantId]);
 
   useEffect(() => { if (!initialProduct) load(); }, [initialProduct, load]);
+  useEffect(() => {
+    if (!initialProduct) return;
+    setProduct(initialProduct);
+    setLoading(false);
+    setError('');
+    const current = initialProduct.variants.find(v => v.id === initialVariantId)
+      ?? initialProduct.variants.find(v => !!initialVariantTitle && v.title === initialVariantTitle)
+      ?? (initialProduct.variants.length === 1 ? initialProduct.variants[0] : undefined);
+    setSelections(current ? Object.fromEntries(current.optionValues.map(ov => [ov.optionId, ov.valueId])) : {});
+  }, [initialProduct, initialVariantId, initialVariantTitle]);
 
   // "Your size" preselected once (lib/autoSelectSize.ts), as on the product page.
   useAutoSelectSize({
@@ -178,7 +189,8 @@ export function VariantPickerSheet({
   const variant = product ? findVariant(product, selections) : null;
   const allSelected = !product || product.options.length === 0 || Object.keys(selections).length === product.options.length;
   const price = variant?.priceCents ?? product?.priceCents ?? 0;
-  const maxQty = variant ? Math.max(1, variant.inventoryQuantity) : 10;
+  const maxQty = product?.isPreOrder ? 99 : variant ? Math.max(1, variant.inventoryQuantity) : 10;
+  const exceedsStock = !!variant && !product?.isPreOrder && quantity > variant.inventoryQuantity;
   const lowStock = !!variant && variant.isAvailable && variant.inventoryQuantity > 0 && variant.inventoryQuantity <= 5;
 
   // Opens on the shared sheet curve; a drag down on the grabber dismisses.
@@ -186,7 +198,7 @@ export function VariantPickerSheet({
 
   async function handleConfirm() {
     if (!product) return;
-    if (!allSelected || !variant || !variant.isAvailable) {
+    if (!allSelected || !variant || !variant.isAvailable || exceedsStock) {
       setTouched(true);
       haptics.warning();
       return;
@@ -204,9 +216,10 @@ export function VariantPickerSheet({
     : !allSelected ? 'Select options'
     : !variant ? 'Unavailable combination'
     : !variant.isAvailable ? 'Out of stock'
+    : exceedsStock ? 'Reduce quantity'
     : `${confirmVerb} · ${formatCents(price * quantity)}`;
 
-  const ctaDisabled = allSelected && (!variant || !variant.isAvailable);
+  const ctaDisabled = allSelected && (!variant || !variant.isAvailable || exceedsStock);
 
   return (
     <Sheet
@@ -243,6 +256,9 @@ export function VariantPickerSheet({
             </View>
           </View>
 
+          {product.options.length === 0 && variant?.title && variant.title !== 'Default' && (
+            <Text style={s.optionLabel}>Option: {variant.title}</Text>
+          )}
           {product.options.map((option: BuyerProductOption) => {
             const isColor = option.name.toLowerCase() === 'color';
             const showRequired = touched && !selections[option.id];
@@ -309,8 +325,6 @@ export function VariantPickerSheet({
                           }
                           setSelections(prev => {
                             const updated = { ...prev, [option.id]: val.id };
-                            const nextVariant = findVariant(product, updated);
-                            if (nextVariant && quantity > nextVariant.inventoryQuantity) setQuantity(1);
                             return updated;
                           });
                         }}
@@ -327,6 +341,11 @@ export function VariantPickerSheet({
             <View style={{ flex: 1 }} />
             <QuantityStepper value={quantity} onChange={setQuantity} min={1} max={maxQty} disabled={!variant} />
           </View>
+          {exceedsStock && (
+            <Text style={s.optionLabel} accessibilityRole="alert">
+              Choose {variant!.inventoryQuantity} or fewer for this option.
+            </Text>
+          )}
         </>
       ) : null}
       <Snackbar visible={!!toast} message={toast ?? ''} topOffset={SP.md} />

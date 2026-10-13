@@ -47,8 +47,10 @@ export function BagHeader({ topInset, onClose, rightElement }: { topInset: numbe
       >
         <Text style={s.closeText}>Close</Text>
       </Pressable>
-      <Text style={s.title} accessibilityRole="header">Bag</Text>
-      {rightElement}
+      <View style={s.titleRow}>
+        <Text style={s.title} accessibilityRole="header">Bag</Text>
+        <View style={s.headerAction}>{rightElement}</View>
+      </View>
     </View>
   );
 }
@@ -72,10 +74,11 @@ export function BagColumns({ count }: { count: number }) {
 export type BagLineBusy = 'qty_dec' | 'qty_inc' | 'remove' | 'save' | undefined;
 
 export function BagItemRow({
-  item, busy, onOpen, onChangeSize, onQtyDec, onQtyInc, onMoveToSaves, onRemove,
+  item, busy, canChangeOptions = true, onOpen, onChangeSize, onQtyDec, onQtyInc, onMoveToSaves, onRemove,
 }: {
   item: CartItem;
   busy: BagLineBusy;
+  canChangeOptions?: boolean;
   onOpen: () => void;
   onChangeSize: () => void;
   onQtyDec: () => void;
@@ -106,15 +109,15 @@ export function BagItemRow({
           {!!item.variantTitle && item.variantTitle !== 'Default' && (
             <Pressable
               onPress={onChangeSize}
-              disabled={rowBusy}
+              disabled={rowBusy || !canChangeOptions}
               hitSlop={8}
               style={s.sizeBtn}
-              accessibilityRole="button"
+              accessibilityRole={canChangeOptions ? 'button' : undefined}
               accessibilityLabel={`Change size. Current: ${item.variantTitle}`}
               testID={`cart-size-${item.id}`}
             >
               <Text style={s.meta}>{item.variantTitle}</Text>
-              <Icon name="chevron-down" size={17} color={theme.muted} />
+              {canChangeOptions && <Icon name="chevron-down" size={17} color={theme.muted} />}
             </Pressable>
           )}
           {item.isPreOrder && <Text style={s.meta}>Pre-order</Text>}
@@ -141,6 +144,7 @@ export function BagItemRow({
         </View>
         <View style={s.priceCol}>
           <Text style={s.price}>{fmt(lineTotal)}</Text>
+          {item.quantity > 1 && <Text style={s.meta}>{fmt(item.priceCents)} each</Text>}
           {compare !== null && <Text style={s.compare}>{fmt(compare)}</Text>}
         </View>
       </View>
@@ -225,6 +229,7 @@ export function BagCheckoutBar({
       <View style={s.barButton}>
         <Button
           label="Checkout"
+          colors={{ background: '#FFFFFF', foreground: '#000000' }}
           onPress={onCheckout}
           loading={busy}
           disabled={disabled}
@@ -337,6 +342,8 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   closeBtn: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
   closeText: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text },
   title: { fontFamily: FONT.bold, fontSize: 32, lineHeight: 38, color: theme.text, marginTop: SP.xs },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.md },
+  headerAction: { minHeight: 44, justifyContent: 'center', flexShrink: 0 },
 
   columns: { flexDirection: 'row', alignItems: 'center', paddingVertical: SP.sm },
   columnLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted },

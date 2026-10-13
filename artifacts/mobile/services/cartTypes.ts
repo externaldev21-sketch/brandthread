@@ -7,6 +7,8 @@ import type { CartBundleSnapshot } from '@/lib/bundleCart';
 // ─── Cart ─────────────────────────────────────────────────────────────────────
 
 export interface CartItem {
+  /** Catalog snapshot for offline/options editing; checkout still validates live prices/stock. */
+  productSnapshot?: BuyerProduct;
   id: string;                // cart line ID
   productId: string;
   variantId: string;
