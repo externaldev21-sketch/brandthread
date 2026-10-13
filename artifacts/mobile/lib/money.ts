@@ -28,14 +28,35 @@ export function parseDecimalToCents(value: string): number | null {
   return Number.isSafeInteger(cents) ? cents : null;
 }
 
-/** Format integer cents only; formatting is deliberately a UI-boundary operation. */
-export function formatCents(cents: number, currency = 'USD'): string {
+/**
+ * Format integer minor units (cents) only; formatting is deliberately a
+ * UI-boundary operation.
+ *
+ * USD with no explicit locale keeps the app's long-standing "$1,234.56"
+ * output byte-for-byte. Any other currency, or an explicit `locale`, goes
+ * through Intl so the symbol position, spacing and separators follow that
+ * locale's rules (polish #70) — e.g. "12,50 €" in de-DE, "€12.50" in en-IE,
+ * "¥1,250" for JPY (zero minor digits).
+ */
+export function formatCents(cents: number, currency = 'USD', locale?: string): string {
   assertCents(cents);
   const sign = cents < 0 ? '-' : '';
   const absolute = Math.abs(cents);
-  const whole = Math.floor(absolute / 100).toLocaleString('en-US');
-  const fraction = String(absolute % 100).padStart(2, '0');
-  return currency === 'USD' ? `${sign}$${whole}.${fraction}` : `${sign}${currency} ${whole}.${fraction}`;
+  if (currency === 'USD' && !locale) {
+    const whole = Math.floor(absolute / 100).toLocaleString('en-US');
+    const fraction = String(absolute % 100).padStart(2, '0');
+    return `${sign}$${whole}.${fraction}`;
+  }
+  try {
+    const fmt = new Intl.NumberFormat(locale ?? 'en-US', { style: 'currency', currency });
+    const digits = fmt.resolvedOptions().maximumFractionDigits ?? 2;
+    return fmt.format(cents / 10 ** digits);
+  } catch {
+    // Unknown currency code or locale: the old plain fallback.
+    const whole = Math.floor(absolute / 100).toLocaleString('en-US');
+    const fraction = String(absolute % 100).padStart(2, '0');
+    return `${sign}${currency} ${whole}.${fraction}`;
+  }
 }
 
 /** Calculate a basis-point share of cents with an explicit rounding policy. */
