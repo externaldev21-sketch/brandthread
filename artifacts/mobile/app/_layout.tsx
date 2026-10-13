@@ -62,6 +62,7 @@ import { initProductService } from '@/services/productService';
 import { initOrderService } from '@/services/orderService';
 import { initAnalyticsService } from '@/services/analyticsService';
 import { initTabDataCache } from '@/lib/tabDataCache';
+import { clearSiriSalesSnapshot } from '@/lib/siriSalesSnapshot';
 import { initFeedPostsCache } from '@/lib/feedPostsCache';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { initBuyerProfile } from '@/lib/buyerProfile';
@@ -1067,6 +1068,8 @@ function ServiceConfigurer() {
       // must be dropped explicitly or the previous account's plan tier would
       // gate features for the next signed-in account.
       invalidatePlanCache();
+      // Siri's "Sales today" answer belongs to the previous account.
+      clearSiriSalesSnapshot();
     }
     prevUserIdRef.current = newUserId;
     // The shared TanStack queryClient (lib/queryClient.ts) and the two

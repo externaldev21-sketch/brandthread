@@ -58,6 +58,7 @@ import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
   CommunityMessage, CommunityMessagesPage, CommunityReaction, CreateCommunityInput, UpdateCommunityInput,
 } from '@/lib/communities/types';
+import { saveSiriSalesSnapshot } from '@/lib/siriSalesSnapshot';
 
 function communityQuery(params: { q?: string; offset?: number }): string {
   const q = new URLSearchParams();
@@ -1419,7 +1420,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           buckets: Array<{ bucket: string; totalCents: number; netCents: number; orderCount: number; visitorCount: number }>;
           // `tz` is minutes east of UTC (-Date#getTimezoneOffset()) so day/hour
           // buckets land on the seller's local calendar day, not the server's.
-        }>(`/api/analytics/home?range=${range}&tz=${-new Date().getTimezoneOffset()}`),
+        }>(`/api/analytics/home?range=${range}&tz=${-new Date().getTimezoneOffset()}`).then((home) => {
+          // Feeds the "Sales today" Siri Shortcut (lib/siriSalesSnapshot.ts).
+          if (range === 'today') saveSiriSalesSnapshot(home);
+          return home;
+        }),
       revenue:    (period: string) => get(`/api/analytics/revenue?period=${period}`),
       products:   () => get<any[]>('/api/analytics/products'),
       /** Top customers by spend + repeat-buyer stats — derived from real orders */
