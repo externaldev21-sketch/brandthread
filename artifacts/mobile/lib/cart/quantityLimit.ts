@@ -42,6 +42,18 @@ export function stepQuantity(value: number, delta: 1 | -1, min: number, max: num
   return next === value ? { kind: 'none' } : { kind: 'change', next };
 }
 
+/** The bag row already shows its own low-stock badge at or below this stock. */
+export const LOW_STOCK_BADGE_MAX = 3;
+
+/**
+ * Whether the stepper's "Only N left" note should appear after + at the limit:
+ * only for a known stock above the badge threshold, so the row never repeats
+ * the badge's own "Only N left" (at ≤3 the tap still gives its haptic).
+ */
+export function showsLimitNote(stockLimit: number | null): stockLimit is number {
+  return stockLimit !== null && stockLimit > LOW_STOCK_BADGE_MAX;
+}
+
 /** Inline note under the stepper after + is pressed at the limit. */
 export function stockLimitNote(max: number): string {
   return `Only ${max} left`;

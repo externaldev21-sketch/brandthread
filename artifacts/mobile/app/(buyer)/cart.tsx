@@ -61,7 +61,7 @@ import { GroupShippingLine } from '@/components/cart/GroupShippingLine';
 import { StockLimitNote } from '@/components/cart/StockLimitNote';
 import { useBagShippingRates } from '@/hooks/useBagShippingRates';
 import { bagShippingTotal } from '@/lib/cart/bagShipping';
-import { knownStockLimit, stepperMax } from '@/lib/cart/quantityLimit';
+import { knownStockLimit, showsLimitNote, stepperMax } from '@/lib/cart/quantityLimit';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -119,7 +119,7 @@ function QuantityControl({
         testID={testID}
       />
       {busy && <ActivityIndicator size="small" color={theme.text} style={{ marginLeft: 2 }} />}
-      {!busy && stockLimit !== null && limitNoteAt === value && (
+      {!busy && showsLimitNote(stockLimit) && limitNoteAt === value && (
         <StockLimitNote max={stockLimit} testID={testID ? `${testID}-limit-note` : undefined} />
       )}
     </View>

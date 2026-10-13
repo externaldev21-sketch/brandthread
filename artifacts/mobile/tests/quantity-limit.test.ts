@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  UNKNOWN_STOCK_CAP, clampQuantity, knownStockLimit, stepQuantity, stepperMax, stockLimitNote,
+  UNKNOWN_STOCK_CAP, clampQuantity, showsLimitNote, knownStockLimit, stepQuantity, stepperMax, stockLimitNote,
 } from '@/lib/cart/quantityLimit';
 
 describe('knownStockLimit / stepperMax', () => {
@@ -45,5 +45,15 @@ describe('stepQuantity', () => {
 describe('stockLimitNote', () => {
   it('reads "Only N left"', () => {
     expect(stockLimitNote(2)).toBe('Only 2 left');
+  });
+});
+
+describe('showsLimitNote', () => {
+  it('shows above the low-stock badge threshold only (no duplicate "Only N left")', () => {
+    expect(showsLimitNote(5)).toBe(true);
+    expect(showsLimitNote(4)).toBe(true);
+    expect(showsLimitNote(3)).toBe(false);
+    expect(showsLimitNote(1)).toBe(false);
+    expect(showsLimitNote(null)).toBe(false);
   });
 });
