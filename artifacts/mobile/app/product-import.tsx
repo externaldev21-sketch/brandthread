@@ -20,6 +20,7 @@ import { Header } from '@/components/layout';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { ProductImportPreview } from '@/components/products/ProductImportPreview';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
+import { fmtRelativeDay } from '@/lib/format';
 
 function methodIcon(method: string): keyof typeof Feather.glyphMap {
   if (method === 'CSV') return 'file-text';
@@ -368,7 +369,7 @@ export default function ProductImportScreen() {
                   {run.filename || (run.source === 'etsy_api' ? 'Etsy shop' : 'Pasted CSV')}
                 </Text>
                 <Text style={s.historyDate}>
-                  {run.created} new · {run.updated} updated{run.failed + run.skipped > 0 ? ` · ${run.failed + run.skipped} not imported` : ''} · {new Date(run.createdAt).toLocaleDateString()}
+                  {run.created} new · {run.updated} updated{run.failed + run.skipped > 0 ? ` · ${run.failed + run.skipped} not imported` : ''} · {fmtRelativeDay(run.createdAt)}
                 </Text>
               </View>
             </View>

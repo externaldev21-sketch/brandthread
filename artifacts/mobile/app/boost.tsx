@@ -60,7 +60,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { radius } from '@/constants/radii';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, fmtRelativeDay } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -883,7 +883,7 @@ export default function BoostScreen() {
           <Text style={s.targetBannerMeta}>
             {selectedTarget.mediaKind === 'video' ? 'Video' : `Slideshow · ${selectedTarget.imageCount ?? ''} images`}
             {' · '}
-            {new Date(selectedTarget.createdAt).toLocaleDateString()}
+            {fmtRelativeDay(selectedTarget.createdAt)}
           </Text>
         </View>
         <TouchableOpacity

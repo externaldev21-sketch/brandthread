@@ -14,7 +14,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, fmtRelativeDay } from '@/lib/format';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -94,7 +94,7 @@ export default function ThreadCashLedgerScreen() {
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={[styles.label, { color: theme.text }]} numberOfLines={1}>{ledgerLabel(row.source)}</Text>
           <Text style={[styles.sub, { color: theme.subtle }]} numberOfLines={1}>
-            {new Date(row.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+            {fmtRelativeDay(row.createdAt)}
             {row.expiresAt && (row.remainingCents ?? 0) > 0 ? ` · expires ${formatExpiryDate(row.expiresAt)}` : ''}
           </Text>
         </View>

@@ -22,6 +22,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { fitChipText, isVerifiedReview } from '@/lib/reviewDisplay';
 import { radius } from '@/constants/radii';
+import { fmtRelativeDay } from '@/lib/format';
 
 type StarFilter = 5 | 4 | 3 | 2 | 1 | null;
 
@@ -145,7 +146,7 @@ export default function ProductReviewsScreen() {
                     <StarRating rating={item.rating} size={12} />
                   </View>
                   <Text style={s.date}>
-                    {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {fmtRelativeDay(item.createdAt)}
                   </Text>
                 </View>
                 {fitChipText(item) && (

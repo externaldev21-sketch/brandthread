@@ -18,6 +18,7 @@ import { formatCents } from '@/lib/money';
 import { acceptQuote, declineQuote } from '@/services/manufacturerService';
 import { getRfq, type RfqDetail, type RfqQuote, type RfqQuoteStatus } from '@/services/manufacturerRfq';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { fmtDate } from '@/lib/format';
 
 const COL_WIDTH = 200;
 const LABEL_WIDTH = 120;
@@ -152,7 +153,7 @@ export default function RfqCompareScreen() {
                 <View style={[s.cell, isBest && s.cellBest]}><Text style={[s.cellText, isBest && s.cellTextBest]}>{formatCents(quote.quotedPriceCents ?? 0)}</Text></View>
                 <View style={s.cell}><Text style={s.cellText}>{quote.quantity ? `${quote.quantity.toLocaleString('en-US')} units` : '—'}</Text></View>
                 <View style={s.cell}><Text style={s.cellText}>{quote.quotedTurnaround ?? '—'}</Text></View>
-                <View style={s.cell}><Text style={s.cellText}>{quote.quoteValidUntil ? new Date(quote.quoteValidUntil).toLocaleDateString() : '—'}</Text></View>
+                <View style={s.cell}><Text style={s.cellText}>{quote.quoteValidUntil ? fmtDate(quote.quoteValidUntil) : '—'}</Text></View>
                 <View style={s.cell}><Text style={s.cellText} numberOfLines={2}>{quote.notes || '—'}</Text></View>
                 <View style={s.cell}><StatusBadge label={quote.status.replace(/_/g, ' ')} variant={statusVariant(quote.status)} small /></View>
 

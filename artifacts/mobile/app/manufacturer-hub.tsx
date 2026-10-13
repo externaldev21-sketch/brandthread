@@ -44,6 +44,7 @@ import {
   ProductionOrder, ManufacturerConversation, PRODUCTION_STAGES,
 } from '@/services/manufacturerTypes';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { fmtRelativeDay } from '@/lib/format';
 
 // ─── Tab config ───────────────────────────────────────────────────────────────
 
@@ -73,12 +74,7 @@ function fmtDate(iso?: string): string {
 
 function timeAgo(iso?: string): string {
   if (!iso) return '';
-  const diff = Date.now() - new Date(iso).getTime();
-  const h = Math.floor(diff / 3600000);
-  if (h < 1) return 'just now';
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
+  return fmtRelativeDay(iso);
 }
 
 function relStatusVariant(status: ManufacturerRelationship['status']): 'success' | 'info' | 'warning' | 'neutral' | 'purple' | 'error' {

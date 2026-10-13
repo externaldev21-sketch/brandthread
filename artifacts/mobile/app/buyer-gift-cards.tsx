@@ -15,7 +15,7 @@ import { GiftCardFace } from '@/components/giftCards/GiftCardFace';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { formatCents } from '@/lib/money';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, fmtRelativeDay } from '@/lib/format';
 import { FONT, FS, SP } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
@@ -106,7 +106,7 @@ export default function BuyerGiftCardsScreen() {
             <View key={entry.id} style={s.historyRow}>
               <View style={{ flex: 1 }}>
                 <Text style={s.historyLabel}>{HISTORY_LABEL[entry.type]}</Text>
-                <Text style={s.fine}>{new Date(entry.createdAt).toLocaleDateString()}</Text>
+                <Text style={s.fine}>{fmtRelativeDay(entry.createdAt)}</Text>
               </View>
               <Text style={s.historyAmount}>{entry.amountCents === 0 ? '' : `${entry.amountCents > 0 ? '+' : '−'}${formatCents(Math.abs(entry.amountCents))}`}</Text>
             </View>

@@ -26,7 +26,7 @@ import type { ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import { ThreadCashBill, ThreadCashBillStack, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, fmtRelativeDay } from '@/lib/format';
 
 function historyLabel(entry: ThreadCashEntry): string {
   switch (entry.source) {
@@ -313,7 +313,7 @@ export default function ThreadCashScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.historyLabel, { color: theme.text }]} numberOfLines={1}>{historyLabel(entry)}</Text>
                       <Text style={[styles.historyDate, { color: theme.subtle }]} numberOfLines={1}>
-                        {new Date(entry.createdAt).toLocaleDateString()}
+                        {fmtRelativeDay(entry.createdAt)}
                         {entry.note ? ` · “${entry.note}”` : ''}
                       </Text>
                     </View>

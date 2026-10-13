@@ -55,6 +55,7 @@ import {
 import { taggedPeople, mentionProfileHref, type TaggedPerson } from '@/lib/storyMentionSticker';
 import { reshareGradientFromBackground } from '@/lib/storyReshare';
 import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, prevUser as navPrevUser, classifyGesture } from '@/lib/storyViewerNav';
+import { fmtRelativeDay } from '@/lib/format';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -78,13 +79,7 @@ const PREVIEW_STORY_VIEWERS = [
 ];
 
 function timeAgo(ms: number): string {
-  const diff = Date.now() - ms;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  return fmtRelativeDay(ms);
 }
 
 function StorySlideVideo({ uri, paused }: { uri: string; paused: boolean }) {

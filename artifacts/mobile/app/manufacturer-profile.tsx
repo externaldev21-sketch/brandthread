@@ -38,7 +38,7 @@ import { getManufacturerProducts, lowestTierPriceCents, type ManufacturerProduct
 import { Manufacturer } from '@/services/manufacturerTypes';
 import { localTimeLabel } from '@workspace/manufacturer-flow';
 import { isSellerDevPreview } from '@/lib/devPreview';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, fmtRelativeDay } from '@/lib/format';
 
 // ─── Star Rating ──────────────────────────────────────────────────────────────
 
@@ -477,7 +477,7 @@ export default function ManufacturerProfileScreen() {
                     <Text style={s.reviewerName}>{review.sellerName}</Text>
                     <StarRating rating={review.rating} />
                   </View>
-                  <Text style={s.reviewDate}>{new Date(review.createdAt).toLocaleDateString()}</Text>
+                  <Text style={s.reviewDate}>{fmtRelativeDay(review.createdAt)}</Text>
                 </View>
                 {!!review.comment && <Text style={s.reviewComment}>{review.comment}</Text>}
                 <Text style={s.reviewBreakdown}>
