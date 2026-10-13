@@ -21,7 +21,7 @@ import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
-import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
 
 export function CashOutSheet({
@@ -70,10 +70,9 @@ export function CashOutSheet({
     if (!canSubmit) return;
     setConfirming(true);
     setError(null);
-    hapticLight();
     try {
       const result = await api.threadCash.cashOut({ threadCashCents: amountCents, idempotencyKey: randomUUID() });
-      hapticSuccess();
+      haptics.success();
       onCashedOut(result);
     } catch (err: any) {
       setError(err?.message ?? 'Could not cash out right now. Try again.');
@@ -105,7 +104,7 @@ export function CashOutSheet({
 
         <View style={[styles.inputRow, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}>
           <Text style={[styles.dollarSign, { color: theme.text }]}>$</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             value={amountText}
             onChangeText={setAmountText}
             placeholder="0.00"
@@ -116,7 +115,7 @@ export function CashOutSheet({
             accessibilityLabel="Amount to cash out"
           />
           <Pressable
-            onPress={() => { hapticLight(); setAmountText((balanceCents / 100).toFixed(2)); }}
+            onPress={() => setAmountText((balanceCents / 100).toFixed(2))}
             style={[styles.allChip, { borderColor: theme.border }]}
             accessibilityRole="button"
             accessibilityLabel="Cash out all"

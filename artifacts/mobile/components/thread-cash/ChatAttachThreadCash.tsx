@@ -26,7 +26,7 @@ import { useRouter } from 'expo-router';
 import { Button } from '@/components/ui/Button';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { SuccessCheck } from '@/components/ui/SuccessCheck';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { randomUUID } from 'expo-crypto';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -179,20 +179,19 @@ export function ThreadCashAttachButton({
   }
 
   function pickChip(dollars: number) {
-    void Haptics.selectionAsync();
+    haptics.selection();
     setSelectedChip(dollars);
     setCents(dollars * 100);
   }
 
   function pickCustom() {
-    void Haptics.selectionAsync();
+    haptics.selection();
     setSelectedChip('custom');
     setCents(0);
     setStep('keypad');
   }
 
   function pressKey(key: string) {
-    void Haptics.selectionAsync();
     if (key === '⌫') {
       setCents((c) => Math.floor(c / 10));
       return;
@@ -261,7 +260,7 @@ export function ThreadCashAttachButton({
       // until the confirmation moment finishes, not skipped: see the
       // 'sent' step effect below.
       const result: SentResult = { transferId, amountCents: cents, note: note.trim() || null };
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       setSentResult(result);
       setStep('sent');
     } catch (error: any) {
@@ -412,7 +411,7 @@ export function ThreadCashAttachButton({
                 </Text>
               </Text>
 
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={[styles.noteInput, { color: theme.text, backgroundColor: theme.cardElevated, borderColor: theme.border }]}
                 placeholder="Add a note"
                 placeholderTextColor={theme.subtle}
@@ -553,7 +552,7 @@ export function ThreadCashMessageCard({
     setBusy(true);
     try {
       await Promise.resolve(action());
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
     } catch (error: any) {
       Alert.alert('Something went wrong', error?.message ?? 'Please try again.');
     } finally {

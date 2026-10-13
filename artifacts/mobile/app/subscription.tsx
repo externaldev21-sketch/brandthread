@@ -19,7 +19,7 @@ import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -158,11 +158,8 @@ export default function SubscriptionScreen() {
     return () => subscription.remove();
   }, [api, applyStatus, isSellerPreview]);
 
-  function haptic() { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
-
   async function handleChangePlan(planId: string) {
     if (isSellerPreview) return;
-    haptic();
     // Only treat the current plan as "already selected" when there's an active subscription.
     // status:'none' means no paid plan yet — Starter must remain selectable.
     if (planId === selectedPlan && currentPlan.status !== 'none') return;
@@ -207,7 +204,6 @@ export default function SubscriptionScreen() {
 
   async function handleOpenPortal() {
     if (isSellerPreview) return;
-    haptic();
     try {
       const target = getBillingRecoveryTarget(currentPlan.effectiveProvider, managementURL);
       if (target === 'revenuecat') {
@@ -232,7 +228,6 @@ export default function SubscriptionScreen() {
 
   async function handleRestore() {
     if (isSellerPreview) return;
-    haptic();
     try {
       await restore();
       invalidatePlanCache();
@@ -289,7 +284,7 @@ export default function SubscriptionScreen() {
             key={t}
             testID={`seller-subscription-tab-${t}`}
             style={[styles.tab, activeTab === t && styles.tabActive]}
-            onPress={() => { haptic(); setActiveTab(t); }}
+            onPress={() => { haptics.selection(); setActiveTab(t); }}
           >
             <Text style={[styles.tabText, activeTab === t && styles.tabTextActive]}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -491,11 +486,11 @@ export default function SubscriptionScreen() {
                   Subscriptions renew automatically at the price shown unless you cancel at least 24 hours before the period ends. Manage or cancel in your App Store account settings.
                 </Text>
                 <View style={styles.legalLinksRow}>
-                  <Text style={styles.legalLink} onPress={() => { haptic(); router.push('/terms' as never); }}>
+                  <Text style={styles.legalLink} onPress={() => router.push('/terms' as never)}>
                     Terms of Use
                   </Text>
                   <Text style={styles.legalLinkDivider}>·</Text>
-                  <Text style={styles.legalLink} onPress={() => { haptic(); router.push('/privacy' as never); }}>
+                  <Text style={styles.legalLink} onPress={() => router.push('/privacy' as never)}>
                     Privacy Policy
                   </Text>
                 </View>

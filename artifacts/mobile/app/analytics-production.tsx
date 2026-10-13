@@ -12,7 +12,6 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProductionAnalytics, getFilterState } from '@/services/analyticsService';
 import { ProductionAnalytics, ManufacturerAnalyticsRow, AnalyticsFilterState } from '@/services/analyticsTypes';
@@ -31,7 +30,7 @@ function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
   const qcColor     = mfr.qualityIssueRate <= 2 ? colors.success : mfr.qualityIssueRate <= 4 ? colors.warning : colors.destructive;
   return (
     <TouchableOpacity
-      onPress={() => { Haptics.selectionAsync(); router.push(`/manufacturer-profile?id=${mfr.manufacturerId}` as never); }}
+      onPress={() => router.push(`/manufacturer-profile?id=${mfr.manufacturerId}` as never)}
       style={s.mfrCard}
       activeOpacity={0.8}
     >

@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
@@ -191,7 +191,7 @@ export default function ManufacturerHub() {
   );
 
   const handleTabPress = (tab: Tab) => {
-    Haptics.selectionAsync();
+    haptics.selection();
     setActiveTab(tab);
   };
 
@@ -423,7 +423,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
 
   const toggleSave = async (mfg: Manufacturer) => {
     if (savingIds.has(mfg.id)) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     setMutationError('');
     // Preview mode has no signed-in seller to persist a favorite for — the
     // heart still works, purely as local UI state, same as every other
@@ -633,7 +633,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           <Feather name="search" size={ICON.sm} color={theme.muted} />
         </TouchableOpacity>
         {searchActive && (
-          <TextInput
+          <TextInput returnKeyType="search"
             style={[s.searchInput, WEB_INPUT_RESET]}
             value={searchQuery}
             onChangeText={onSearch}

@@ -184,10 +184,10 @@ function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedI
       </CheckoutSection>
 
       <CheckoutSection title="Recipient" style={s.section}>
-        <CheckoutField label="Name" value={name} onChangeText={setName} placeholder="Enter name" maxLength={80} autoCapitalize="words" />
+        <CheckoutField label="Name" value={name} onChangeText={setName} placeholder="Enter name" maxLength={80} autoCapitalize="words" autoComplete="name" textContentType="name" />
         <CheckoutField
           label="Email" value={email} onChangeText={setEmail} placeholder="Enter email"
-          keyboardType="email-address" autoCapitalize="none" autoCorrect={false} testID="gift-card-email"
+          keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="emailAddress" testID="gift-card-email"
         />
         <CheckoutField
           label="Message" value={message} onChangeText={setMessage} placeholder="Enter gift message" maxLength={300}

@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { Header } from '@/components/layout';
 import { PrimaryButton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
@@ -107,7 +106,6 @@ export default function SizeChartTemplateEditScreen() {
 
   async function save() {
     if (!name.trim()) { Alert.alert('Name this size chart'); return; }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
     try {
       let templateId = id;
@@ -174,7 +172,7 @@ export default function SizeChartTemplateEditScreen() {
             contentContainerStyle={[s.content, { paddingBottom: tabBar.occupiedHeight + SP.xxl }]}
           >
             <Text style={s.label}>Name</Text>
-            <TextInput
+            <TextInput returnKeyType="done"
               style={s.input}
               value={name}
               onChangeText={setName}
@@ -219,9 +217,9 @@ export default function SizeChartTemplateEditScreen() {
                 </View>
                 {chart.rows.map((row, ri) => (
                   <View key={ri} style={[s.tr, ri % 2 === 1 && s.trAlt]}>
-                    <TextInput style={[s.td, s.tdSize, { width: SIZE_COL }]} value={row.size} onChangeText={(v) => setSizeLabel(ri, v)} maxLength={20} />
+                    <TextInput returnKeyType="done" style={[s.td, s.tdSize, { width: SIZE_COL }]} value={row.size} onChangeText={(v) => setSizeLabel(ri, v)} maxLength={20} />
                     {chart.columns.map((_, ci) => (
-                      <TextInput
+                      <TextInput returnKeyType="done"
                         key={ci}
                         style={[s.td, { width: CELL_COL }]}
                         value={row.values[ci] ?? ''}
@@ -240,11 +238,11 @@ export default function SizeChartTemplateEditScreen() {
             </ScrollView>
 
             <View style={s.addRow}>
-              <TextInput style={s.addInput} value={newSize} onChangeText={setNewSize} placeholder="Add a size, e.g. XXL" placeholderTextColor={colors.mutedForeground} onSubmitEditing={addSize} maxLength={20} />
+              <TextInput returnKeyType="done" style={s.addInput} value={newSize} onChangeText={setNewSize} placeholder="Add a size, e.g. XXL" placeholderTextColor={colors.mutedForeground} onSubmitEditing={addSize} maxLength={20} />
               <TouchableOpacity style={s.addBtn} onPress={addSize} accessibilityLabel="Add size"><Feather name="plus" size={ICON.sm} color={colors.foreground} /></TouchableOpacity>
             </View>
             <View style={s.addRow}>
-              <TextInput style={s.addInput} value={newColumn} onChangeText={setNewColumn} placeholder="Add a measurement, e.g. Shoulder" placeholderTextColor={colors.mutedForeground} onSubmitEditing={addColumn} maxLength={40} />
+              <TextInput returnKeyType="done" style={s.addInput} value={newColumn} onChangeText={setNewColumn} placeholder="Add a measurement, e.g. Shoulder" placeholderTextColor={colors.mutedForeground} onSubmitEditing={addColumn} maxLength={40} />
               <TouchableOpacity style={s.addBtn} onPress={addColumn} accessibilityLabel="Add measurement"><Feather name="plus" size={ICON.sm} color={colors.foreground} /></TouchableOpacity>
             </View>
 

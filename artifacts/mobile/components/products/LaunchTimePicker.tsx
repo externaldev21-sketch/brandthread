@@ -10,6 +10,8 @@ import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToHm, dateToYmd, hmToDate, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 
@@ -80,20 +82,41 @@ export function LaunchTimePicker({
         <Text style={[s.customText, { color: colors.mutedForeground }]}>Enter an exact date & time</Text>
       </TouchableOpacity>
       {showCustom && (
-        <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: 8 }}>
-          <TextInput
-            style={[s.input, { flex: 1.4, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }, WEB_INPUT_RESET]}
-            value={dateValue}
-            onChangeText={onDateChange}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors.mutedForeground}
+        <View style={{ marginTop: 8 }}>
+          <NativeDateTimeField
+            mode="date"
+            label="Date"
+            value={ymdToDate(dateValue)}
+            onChange={(d) => onDateChange(dateToYmd(d))}
+            minimumDate={startOfToday()}
+            divider
+            testID="launch-exact-date"
+            fallback={(
+              <View style={{ flexDirection: 'row', gap: SP.sm }}>
+                <TextInput
+                  style={[s.input, { flex: 1.4, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }, WEB_INPUT_RESET]}
+                  value={dateValue}
+                  onChangeText={onDateChange}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.mutedForeground}
+                />
+                <TextInput
+                  style={[s.input, { flex: 1, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }, WEB_INPUT_RESET]}
+                  value={timeValue}
+                  onChangeText={onTimeChange}
+                  placeholder="HH:MM"
+                  placeholderTextColor={colors.mutedForeground}
+                />
+              </View>
+            )}
           />
-          <TextInput
-            style={[s.input, { flex: 1, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }, WEB_INPUT_RESET]}
-            value={timeValue}
-            onChangeText={onTimeChange}
-            placeholder="HH:MM"
-            placeholderTextColor={colors.mutedForeground}
+          <NativeDateTimeField
+            mode="time"
+            label="Time"
+            value={hmToDate(timeValue)}
+            onChange={(d) => onTimeChange(dateToHm(d))}
+            testID="launch-exact-time"
+            fallback={null}
           />
         </View>
       )}

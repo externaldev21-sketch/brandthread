@@ -21,9 +21,16 @@ export const MAX_TRAVEL = 64;
 /** Pure gesture-claim decision. A tap has dx === dy === 0 (never claimed);
  *  a long-press never moves either. Only a clear, horizontal-dominant
  *  rightward drag claims the gesture. */
-export function shouldClaimSwipe(dx: number, dy: number, disabled = false): boolean {
+export function shouldClaimSwipe(dx: number, dy: number, disabled = false, startX?: number): boolean {
+  // A drag that starts at the left screen edge is the interactive back
+  // swipe — never steal it for a reply.
+  if (typeof startX === 'number' && startX < BACK_SWIPE_EDGE) return false;
   return !disabled && dx > 8 && Math.abs(dx) > Math.abs(dy) * 1.5;
 }
+
+/** Width (pt) of the left-edge strip that belongs to the navigator's
+ *  interactive back swipe (UIKit's screen-edge pan is ~20pt). */
+export const BACK_SWIPE_EDGE = 24;
 
 /** Pure translateX-with-resistance math for a given raw horizontal drag
  *  distance — negative drag (leftward) is ignored (swipe-right only). */

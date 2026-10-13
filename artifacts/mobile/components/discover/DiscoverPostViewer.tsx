@@ -20,7 +20,7 @@ import { formatCents } from '@/lib/money';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, SP, ON_DARK } from '@/lib/theme';
 import { radius } from '@/constants/radii';
-import { hapticLight, hapticPrimaryAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import type { DiscoverPost } from '@/lib/discoverFeed';
 
 const { height: WINDOW_HEIGHT } = Dimensions.get('window');
@@ -100,7 +100,7 @@ function ViewerPage({
         {!!post.caption && <Text style={styles.caption} numberOfLines={3}>{post.caption}</Text>}
         {hasTags && (
           <Pressable
-            onPress={() => { hapticPrimaryAction(); onOpenShopTheLook(post); }}
+            onPress={() => { onOpenShopTheLook(post); }}
             style={styles.shopPill}
             accessibilityRole="button"
             accessibilityLabel="Shop the look"
@@ -119,14 +119,14 @@ function ViewerPage({
           icon={liked ? 'heart' : 'heart'}
           active={liked}
           label={formatCompactCount(likesCount)}
-          onPress={() => { hapticLight(); setLiked(!liked); setLikesCount((c) => c + (liked ? -1 : 1)); }}
+          onPress={() => { haptics.light(); setLiked(!liked); setLikesCount((c) => c + (liked ? -1 : 1)); }}
         />
-        <ActionButton icon="message-circle" label={formatCompactCount(post.commentsCount)} onPress={() => hapticLight()} />
-        <ActionButton icon="send" label="Share" onPress={() => hapticLight()} />
+        <ActionButton icon="message-circle" label={formatCompactCount(post.commentsCount)} onPress={() => {}} />
+        <ActionButton icon="send" label="Share" onPress={() => {}} />
         <ActionButton
           icon="bookmark"
           active={saved}
-          onPress={() => { hapticLight(); setSaved(!saved); }}
+          onPress={() => { haptics.light(); setSaved(!saved); }}
         />
         <ActionButton icon="more-horizontal" onPress={() => onSafetyMenu(post)} />
       </View>

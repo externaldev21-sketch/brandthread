@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 
 import {
@@ -289,12 +289,10 @@ export default function QuoteRequestScreen() {
       Alert.alert('Choose a manufacturer', 'Pick who you want to send this quote request to.');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (step < totalSteps) setStep(s => s + 1);
   }
 
   function goBack() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (step > 1) setStep(s => s - 1);
   }
 
@@ -375,7 +373,7 @@ export default function QuoteRequestScreen() {
             return (
               <TouchableOpacity
                 key={mfg.id}
-                onPress={() => { setPickedManufacturerId(mfg.id); Haptics.selectionAsync(); }}
+                onPress={() => { setPickedManufacturerId(mfg.id); haptics.selection(); }}
                 style={[sc.radioCard, active && sc.radioCardActive]}
                 activeOpacity={0.8}
               >
@@ -422,7 +420,7 @@ export default function QuoteRequestScreen() {
           return (
             <TouchableOpacity
               key={src}
-              onPress={() => { setProductSource(src); Haptics.selectionAsync(); }}
+              onPress={() => { setProductSource(src); haptics.selection(); }}
               style={[sc.radioCard, active && sc.radioCardActive]}
               activeOpacity={0.8}
             >
@@ -438,7 +436,7 @@ export default function QuoteRequestScreen() {
         })}
 
         <FormInput
-          label="Product name *"
+          label="Product name"
           value={productName}
           onChange={setProductName}
           placeholder="e.g. Classic Heavyweight Hoodie"
@@ -452,11 +450,11 @@ export default function QuoteRequestScreen() {
       <View style={sc.stepContent}>
         <Text style={sc.stepHeadline}>Production details</Text>
 
-        <FormInput label="Quantity *" value={quantity} onChange={setQuantity}
+        <FormInput label="Quantity" value={quantity} onChange={setQuantity}
           placeholder="e.g. 500" keyboardType="numeric" />
 
-        <FormInput label="Target unit price ($)" value={targetUnitPrice} onChange={setTargetUnitPrice}
-          placeholder="e.g. 18.00" keyboardType="decimal-pad" />
+        <FormInput label="Target unit price" optional price value={targetUnitPrice} onChange={setTargetUnitPrice}
+          placeholder="e.g. 18.00" />
 
         <FormInput label="Needed by date (YYYY-MM-DD)" value={neededByDate} onChange={setNeededByDate}
           placeholder="e.g. 2025-06-01" />

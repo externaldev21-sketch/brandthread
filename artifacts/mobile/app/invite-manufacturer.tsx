@@ -16,7 +16,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, ICON, MUTED, ORANGE, RADIUS, SP, SUBTLE, SUCCESS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -66,7 +66,6 @@ export default function InviteManufacturerScreen() {
 
   async function handleCreate() {
     if (submitting || !validate()) return;
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSubmitting(true);
     try {
       const invitation = await createInvitation({
@@ -78,7 +77,7 @@ export default function InviteManufacturerScreen() {
       });
       setCreated(invitation);
       setCopied(false);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       void loadInvites();
     } catch (error) {
       const rejection = getEntitlementRejection(error);
@@ -98,7 +97,6 @@ export default function InviteManufacturerScreen() {
   async function copyLink(link: string) {
     await Clipboard.setStringAsync(link);
     setCopied(true);
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
   async function shareLink(invite: ManufacturerInvitation) {
@@ -161,12 +159,10 @@ export default function InviteManufacturerScreen() {
                 </View>
               </View>
               <View style={s.card}>
-                <FormInput label="Factory or company name *" value={companyName} onChange={(value: string) => { setCompanyName(value); setErrors((current) => ({ ...current, companyName: undefined })); }} placeholder="e.g. Saigon Knit Co." />
-                {errors.companyName ? <Text style={s.error}>{errors.companyName}</Text> : null}
-                <FormInput label="Contact name" value={contactName} onChange={setContactName} placeholder="Who you usually talk to" />
-                <FormInput label="Email (optional)" value={email} onChange={(value: string) => { setEmail(value); setErrors((current) => ({ ...current, email: undefined })); }} placeholder="production@factory.com" keyboardType="email-address" />
-                {errors.email ? <Text style={s.error}>{errors.email}</Text> : null}
-                <FormInput label="Note for yourself (optional)" value={notes} onChange={setNotes} placeholder="e.g. Makes our fleece hoodies" multiline />
+                <FormInput label="Factory or company name" value={companyName} onChange={(value: string) => { setCompanyName(value); setErrors((current) => ({ ...current, companyName: undefined })); }} placeholder="e.g. Saigon Knit Co." autoCapitalize="words" error={errors.companyName} validate={(v) => (v.trim() ? null : 'Add the factory or company name')} />
+                <FormInput label="Contact name" optional value={contactName} onChange={setContactName} placeholder="Who you usually talk to" autoCapitalize="words" />
+                <FormInput label="Email" optional value={email} onChange={(value: string) => { setEmail(value); setErrors((current) => ({ ...current, email: undefined })); }} placeholder="production@factory.com" keyboardType="email-address" error={errors.email} validate={(v) => (!v.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) ? null : 'Enter a full email, like name@factory.com')} />
+                <FormInput label="Note for yourself" optional value={notes} onChange={setNotes} placeholder="e.g. Makes our fleece hoodies" multiline />
                 <PrimaryButton label={submitting ? 'Creating link…' : 'Create private invite link'} icon="link" onPress={() => void handleCreate()} loading={submitting} disabled={submitting} />
               </View>
             </>

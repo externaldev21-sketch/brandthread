@@ -8,7 +8,6 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -59,7 +58,6 @@ export default function FulfillBatchScreen() {
   }, [api, ids]);
 
   async function handlePrintLabels() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setRunning('labels');
     const rows: RowResult[] = [];
     for (const order of orders) {
@@ -95,7 +93,6 @@ export default function FulfillBatchScreen() {
   }
 
   async function handleMarkShipped() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setRunning('ship');
     const rows: RowResult[] = [];
     for (const order of orders) {

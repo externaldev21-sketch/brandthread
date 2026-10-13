@@ -19,7 +19,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
@@ -34,6 +34,8 @@ import {
   BrandedLoadingState, HapticSwitch,} from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { formatCents, integerPercent, parseDecimalToCents } from '@/lib/money';
+import { displayPriceInput, sanitizePriceInput } from '@/lib/priceInput';
+import { KeyboardStickyFooter } from '@/components/KeyboardStickyFooter';
 import { radius } from '@/constants/radii';
 
 function centsToDecimalInput(cents: number | undefined): string {
@@ -106,7 +108,6 @@ export default function ProductBundleEditScreen() {
       Alert.alert('Save first', 'Save the bundle details before adding products.');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const item = await (api as any).bundles.addItem(bundleId, {
         productId: product.id,
@@ -126,7 +127,6 @@ export default function ProductBundleEditScreen() {
 
   async function removeItem(itemId: string) {
     if (!bundleId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await (api as any).bundles.removeItem(bundleId, itemId);
     setItems(prev => prev.filter(i => i.id !== itemId));
   }
@@ -141,7 +141,6 @@ export default function ProductBundleEditScreen() {
       return;
     }
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
     try {
       if (isNew) {
@@ -161,7 +160,7 @@ export default function ProductBundleEditScreen() {
           compareAtCents,
           status:           isActive ? 'active' : 'draft',
         });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        haptics.success();
         Alert.alert('Saved', 'Bundle updated successfully.');
       }
     } catch { Alert.alert('Error', 'Could not save bundle.'); }
@@ -195,14 +194,16 @@ export default function ProductBundleEditScreen() {
       />
 
       <ScrollView
-        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[s.content, { paddingBottom: SP.xl }]}
         showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
       >
         {/* Details */}
         <Text style={s.sectionTitle}>Bundle details</Text>
 
         <Text style={s.fieldLabel}>Name</Text>
-        <TextInput
+        <TextInput returnKeyType="done"
           style={s.input}
           value={name}
           onChangeText={setName}
@@ -224,10 +225,10 @@ export default function ProductBundleEditScreen() {
         <Text style={s.fieldLabel}>Bundle price</Text>
         <View style={s.priceRow}>
           <Text style={s.dollarSign}>$</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={[s.input, { flex: 1 }]}
-            value={priceStr}
-            onChangeText={setPriceStr}
+            value={displayPriceInput(priceStr)}
+            onChangeText={t => setPriceStr(sanitizePriceInput(t))}
             placeholder="0.00"
             placeholderTextColor={SUBTLE}
             keyboardType="decimal-pad"
@@ -263,7 +264,7 @@ export default function ProductBundleEditScreen() {
           <Text style={s.sectionTitle}>Products in bundle</Text>
           <TouchableOpacity
             style={s.addItemBtn}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPickerOpen(o => !o); }}
+            onPress={() => { setPickerOpen(o => !o); }}
             activeOpacity={0.7}
           >
             <Feather name="plus" size={14} color={PURPLE_LIGHT} />
@@ -320,14 +321,6 @@ export default function ProductBundleEditScreen() {
           </View>
         )}
 
-        {/* Actions */}
-        <PrimaryButton
-          label={saving ? 'Saving…' : isNew ? 'Create Bundle' : 'Save Changes'}
-          onPress={save}
-          loading={saving}
-          disabled={saving}
-          style={{ marginTop: SP.xl }}
-        />
         {!isNew && (
           <TouchableOpacity style={s.deleteBtn} onPress={deleteBundle} disabled={deleting} activeOpacity={0.7}>
             {deleting
@@ -337,6 +330,14 @@ export default function ProductBundleEditScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
+      <KeyboardStickyFooter testID="bundle-save-footer">
+        <PrimaryButton
+          label={saving ? 'Saving…' : isNew ? 'Create Bundle' : 'Save Changes'}
+          onPress={save}
+          loading={saving}
+          disabled={saving}
+        />
+      </KeyboardStickyFooter>
     </View>
   );
 }

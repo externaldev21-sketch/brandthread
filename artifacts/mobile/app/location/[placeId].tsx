@@ -21,7 +21,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi, type PlaceInfo, type PlacePostsPage } from '@/lib/api';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { formatCompactCount } from '@/lib/compactFormat';
-import { hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
@@ -132,7 +132,6 @@ export default function LocationScreen() {
   }, [api, placeId, sort, cursor, loadingMore, loading, preview]);
 
   const openPost = useCallback((item: ProfileGridItem) => {
-    hapticSelection();
     router.push(`/buyer-post-viewer?postId=${encodeURIComponent(item.id)}` as never);
   }, [router]);
 
@@ -160,7 +159,7 @@ export default function LocationScreen() {
             <TouchableOpacity
               key={key}
               style={styles.tab}
-              onPress={() => { if (!active) { hapticSelection(); setSort(key); } }}
+              onPress={() => { if (!active) { haptics.selection(); setSort(key); } }}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               accessibilityLabel={key === 'top' ? 'Top posts' : 'Recent posts'}

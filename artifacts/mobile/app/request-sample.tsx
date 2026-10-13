@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 import { COMP, FONT, ICON } from '@/lib/theme';
 import {
@@ -72,7 +72,7 @@ export default function RequestSampleScreen() {
         currentStep: 5,
       });
       await submitQuoteRequest(draft.id);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       Alert.alert(
         'Sample request sent',
         `Your request is now visible to ${manufacturer.name}.`,
@@ -94,7 +94,7 @@ export default function RequestSampleScreen() {
       <View style={styles.root}>
         <ScreenHeader
           title="Request Sample"
-          onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+          onBack={() => { goBackOr(router); }}
         />
         <EmptyState
           icon="alert-circle"
@@ -112,7 +112,7 @@ export default function RequestSampleScreen() {
     <View style={styles.root}>
       <ScreenHeader
         title="Request Sample"
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+        onBack={() => { goBackOr(router); }}
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Field label="Product type">
@@ -125,9 +125,9 @@ export default function RequestSampleScreen() {
             {QUANTITIES.map((item) => <Chip key={item} label={`${item}`} active={item === quantity} onPress={() => setQuantity(item)} color={colors.primary} />)}
           </View>
         </Field>
-        <Field label="Colorway"><TextInput accessibilityLabel="Colorway" accessibilityHint="Enter the requested sample color" value={colorway} onChangeText={setColorway} placeholder="e.g. Washed black" placeholderTextColor={colors.mutedForeground} style={styles.input} /></Field>
-        <Field label="Size"><TextInput accessibilityLabel="Size" accessibilityHint="Enter the requested sample size" value={size} onChangeText={setSize} placeholderTextColor={colors.mutedForeground} style={styles.input} /></Field>
-        <Field label="Reply contact"><TextInput accessibilityLabel="Reply contact" accessibilityHint="Enter an email address or WhatsApp number" value={contact} onChangeText={setContact} placeholder="Email or WhatsApp" placeholderTextColor={colors.mutedForeground} style={styles.input} autoCapitalize="none" /></Field>
+        <Field label="Colorway"><TextInput returnKeyType="done" accessibilityLabel="Colorway" accessibilityHint="Enter the requested sample color" value={colorway} onChangeText={setColorway} placeholder="e.g. Washed black" placeholderTextColor={colors.mutedForeground} style={styles.input} /></Field>
+        <Field label="Size"><TextInput returnKeyType="done" accessibilityLabel="Size" accessibilityHint="Enter the requested sample size" value={size} onChangeText={setSize} placeholderTextColor={colors.mutedForeground} style={styles.input} /></Field>
+        <Field label="Reply contact"><TextInput returnKeyType="done" accessibilityLabel="Reply contact" accessibilityHint="Enter an email address or WhatsApp number" value={contact} onChangeText={setContact} placeholder="Email or WhatsApp" placeholderTextColor={colors.mutedForeground} style={styles.input} autoCapitalize="none" /></Field>
         <Field label="Notes"><TextInput accessibilityLabel="Sample notes" accessibilityHint="Enter optional materials, construction, or deadline details" value={notes} onChangeText={setNotes} placeholder="Materials, construction, or deadlines" placeholderTextColor={colors.mutedForeground} style={[styles.input, styles.notes]} multiline /></Field>
       </ScrollView>
       <View style={[styles.bottom, { paddingBottom: insets.bottom + 12 }]}>

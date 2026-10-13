@@ -78,7 +78,7 @@ export default function SizeChartTemplateApplyScreen() {
         <View style={s.center}><ActivityIndicator color={colors.foreground} /></View>
       ) : (
         <>
-          <TextInput
+          <TextInput returnKeyType="search"
             style={s.search}
             value={query}
             onChangeText={setQuery}

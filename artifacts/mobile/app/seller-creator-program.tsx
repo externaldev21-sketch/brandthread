@@ -146,7 +146,7 @@ export default function SellerCreatorProgramScreen() {
 
             <SectionTitle>Invite a creator</SectionTitle>
             <View style={s.input}>
-              <TextInput
+              <TextInput returnKeyType="done"
                 value={username}
                 onChangeText={setUsername}
                 placeholder="Username"

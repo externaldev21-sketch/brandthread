@@ -20,6 +20,7 @@ export function Field({
         onChangeText={onChangeText}
         maxLength={max}
         multiline={multiline}
+        returnKeyType={multiline ? undefined : 'done'}
         placeholderTextColor={c.mutedForeground}
         accessibilityLabel={label}
         style={[
@@ -84,5 +85,5 @@ const st = StyleSheet.create({
   btnText: { fontFamily: FONT.bold, fontSize: FS.md },
   notice: { borderWidth: 1, borderRadius: RADIUS.md, padding: 14, marginBottom: SP.md },
   noticeText: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
-  heading: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: SP.lg, marginBottom: SP.sm },
+  heading: { fontFamily: FONT.semibold, fontSize: FS.xs, marginTop: SP.lg, marginBottom: SP.sm },
 });

@@ -19,7 +19,7 @@ import { pickAndUploadCommunityPhoto } from '@/lib/communities/pickPhoto';
 import { parseInviteCode } from '@/lib/communities/inviteLink';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { validateGroupDescription, validateGroupName } from '@/lib/communities/validation';
-import { hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
 
@@ -87,7 +87,7 @@ export default function CommunityCreateScreen() {
         requireApproval: form.visibility === 'private' ? form.requireApproval : false,
         iconUrl: photoUrl,
       });
-      hapticSuccess();
+      haptics.success();
       router.replace(`/community-chat?id=${encodeURIComponent(created.id)}` as never);
     } catch (e) {
       const info = describeCommunityError(e);

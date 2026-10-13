@@ -97,7 +97,7 @@ export default function StoreVersionsScreen() {
         {creating && (
           <BrandthreadCard style={vs.card}>
             <Text style={vs.fieldLabel}>Version Label</Text>
-            <TextInput
+            <TextInput returnKeyType="done"
               style={vs.input}
               value={newLabel}
               onChangeText={setNewLabel}

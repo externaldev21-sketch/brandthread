@@ -76,7 +76,7 @@ export default function SellerGiveawayDetail() {
                     onPress={() => run(`ship${w.id}`, () => api.sellerGiveaways.markShipped(g.id, w.id, !w.shippedAt))} />} />
                 {redrawFor === w.id ? (
                   <View style={{ gap: 8, paddingBottom: SP.sm }}>
-                    <TextInput value={reason} onChangeText={setReason} placeholder="Reason for redrawing" placeholderTextColor={c.mutedForeground}
+                    <TextInput returnKeyType="done" value={reason} onChangeText={setReason} placeholder="Reason for redrawing" placeholderTextColor={c.mutedForeground}
                       style={[styles.input, { color: c.foreground, borderColor: c.border }]} accessibilityLabel="Redraw reason" />
                     <Button label="Redraw this winner" variant="secondary" loading={busy === `redraw${w.id}`} disabled={reason.trim().length < 3}
                       onPress={() => run(`redraw${w.id}`, async () => { const r = await api.sellerGiveaways.redraw(g.id, w.id, reason.trim()); setRedrawFor(null); setReason(''); return r; })} />

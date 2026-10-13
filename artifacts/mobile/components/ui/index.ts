@@ -5,6 +5,11 @@
  *   import { Button, Card, Chip } from '@/components/ui';
  */
 export * from './Button';
+export * from './Icon';
+export * from './Input';
+export * from './EmptyState';
+export * from './GlassIconButton';
+export { SectionHeader } from '@/components/BrandthreadUI';
 export * from './IconButton';
 export * from './Chip';
 export * from './SegmentedControl';

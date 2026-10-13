@@ -76,7 +76,8 @@ async function run() {
     await shot(page, `${ROLE}-signup-dob-empty`);
     console.log('  overflow (empty):', JSON.stringify(await overflowReport(page)));
 
-    await dob.fill('01012020');
+    // The field is a native <input type="date"> on web (components/ui/NativeDateTimeField.tsx).
+    await dob.fill((await dob.getAttribute('type')) === 'date' ? '2020-01-01' : '01012020');
     await shot(page, `${ROLE}-signup-dob-typed`);
     console.log('  typed value:', await dob.inputValue());
     console.log('  overflow (typed):', JSON.stringify(await overflowReport(page)));
@@ -91,7 +92,7 @@ async function run() {
       await page.waitForTimeout(800);
       await dob.scrollIntoViewIfNeeded();
       await shot(page, 'seller-signup-dob-under13-error');
-      console.log('  error text:', await page.getByTestId('age-dob-error').first().innerText().catch(() => '(none)'));
+      console.log('  error text:', await page.getByTestId(/^(age-dob-error|age-dob-input-error|onboarding-dob-input-error)$/).first().innerText().catch(() => '(none)'));
       console.log('  overflow (error):', JSON.stringify(await overflowReport(page)));
     }
   } finally {

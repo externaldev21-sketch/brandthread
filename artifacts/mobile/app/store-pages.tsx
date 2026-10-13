@@ -9,7 +9,6 @@ import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -277,7 +276,7 @@ export default function StorePagesScreen() {
     <View style={styles.root}>
       <ScreenHeader
         title={mode === 'new' ? 'New Page' : 'Edit Page'}
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('list'); }}
+        onBack={() => setMode('list')}
       />
 
       <ScrollView
@@ -306,7 +305,7 @@ export default function StorePagesScreen() {
         {/* 2. Title */}
         <View style={styles.formSection}>
           <Text style={styles.fieldLabel}>Title</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={styles.textInput}
             value={form.title}
             onChangeText={(v) => setFormField('title', v)}
@@ -351,7 +350,7 @@ export default function StorePagesScreen() {
           {form.seoExpanded && (
             <>
               <Text style={styles.subLabel}>SEO Title</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={styles.textInput}
                 value={form.seoTitle}
                 onChangeText={(v) => setFormField('seoTitle', v)}
@@ -376,7 +375,7 @@ export default function StorePagesScreen() {
         {/* 5. URL Slug */}
         <View style={styles.formSection}>
           <Text style={styles.fieldLabel}>URL</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={styles.textInput}
             value={form.slug}
             onChangeText={(v) => setFormField('slug', v)}
@@ -402,7 +401,7 @@ export default function StorePagesScreen() {
           {form.status === 'scheduled' && (
             <>
               <Text style={[styles.subLabel, { marginTop: SP.sm }]}>Schedule Date</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 style={styles.textInput}
                 value={form.scheduledAt}
                 onChangeText={(v) => setFormField('scheduledAt', v)}

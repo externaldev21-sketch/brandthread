@@ -4,13 +4,14 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { isManagerRole, parseRoleError } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { formatCents } from '@/lib/money';
 import { useRevenueCat } from '@/lib/revenueCat';
+import { FONT } from '@/lib/theme';
 
 type BillFilter = 'all' | 'paid' | 'unpaid';
 
@@ -63,12 +64,7 @@ export default function BillingScreen() {
     };
   }, [api]);
 
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
-
   async function openBillingPortal() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       if (Platform.OS !== 'web') {
         if (!managementURL) throw new Error('Subscription management is not available yet.');
@@ -103,7 +99,6 @@ export default function BillingScreen() {
   }
 
   function exportBills() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
      const text = bills.map(b => `${b.date} — ${b.note}: ${formatCents(b.amountCents, b.currency)} (${b.status})`).join('\n');
     Share.share({ message: `Billing History\n\n${text}` });
   }
@@ -218,7 +213,7 @@ export default function BillingScreen() {
               {(['all', 'paid', 'unpaid'] as BillFilter[]).map((f) => (
                 <TouchableOpacity
                   key={f}
-                  onPress={() => { haptic(); setFilter(f); }}
+                  onPress={() => { haptics.selection(); setFilter(f); }}
                   style={[styles.filterTab, { backgroundColor: filter === f ? colors.card : 'transparent' }]}
                   activeOpacity={0.7}
                 >
@@ -270,31 +265,31 @@ const styles = StyleSheet.create({
   headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   section: { paddingHorizontal: 20, paddingVertical: 18 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  sectionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  linkText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', textDecorationLine: 'underline' },
+  sectionTitle: { fontSize: 15, fontFamily: FONT.semibold },
+  linkText: { fontSize: 13, fontFamily: FONT.semibold, textDecorationLine: 'underline' },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 4 },
-  price: { fontSize: 28, fontFamily: 'Inter_700Bold' },
-  priceSuffix: { fontSize: 13, fontFamily: 'Inter_400Regular' },
-  nextBillText: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 14 },
+  price: { fontSize: 28, fontFamily: FONT.bold },
+  priceSuffix: { fontSize: 13, fontFamily: FONT.regular },
+  nextBillText: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 14 },
   infoBox: { flexDirection: 'row', gap: 10, borderRadius: 12, padding: 14, marginBottom: 14 },
-  infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, marginBottom: 4 },
-  infoLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold', textDecorationLine: 'underline' },
+  infoText: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17, marginBottom: 4 },
+  infoLink: { fontSize: 12, fontFamily: FONT.semibold, textDecorationLine: 'underline' },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
   cardBrand: { width: 34, height: 24, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
-  cardText: { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium' },
+  cardText: { flex: 1, fontSize: 13, fontFamily: FONT.medium },
   noteBar: { paddingHorizontal: 20, paddingVertical: 14 },
-  noteText: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  noteText: { fontSize: 12, fontFamily: FONT.regular },
   filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
   filterTabs: { flexDirection: 'row', borderRadius: 10, padding: 3, flex: 1 },
   filterTab: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center' },
-  filterTabText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  filterTabText: { fontSize: 12, fontFamily: FONT.semibold },
   iconBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   emptyBills: { padding: 18, alignItems: 'center' },
   billRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, gap: 10 },
-  billId: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  billNote: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  billAmount: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  billId: { fontSize: 14, fontFamily: FONT.semibold },
+  billNote: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
+  billAmount: { fontSize: 14, fontFamily: FONT.semibold },
   statusPill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  statusText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  statusText: { fontSize: 11, fontFamily: FONT.semibold },
 });

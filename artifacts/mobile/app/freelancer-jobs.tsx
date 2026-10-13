@@ -11,7 +11,7 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi, type FreelancerJob } from '@/lib/api';
 import { serviceLabel, formatPrice, apiErrorMessage } from '@/lib/freelancer';
@@ -96,17 +96,17 @@ export default function FreelancerJobsScreen() {
     try {
       if (action === 'accept') {
         await api.freelancerJobs.accept(job.id);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        haptics.success();
       } else if (action === 'start') {
         await api.freelancerJobs.start(job.id);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        haptics.success();
       } else if (action === 'complete') {
         const r = await api.freelancerJobs.complete(job.id);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        haptics.success();
         Alert.alert('Payout sent', `${formatPrice(r.payout.amountCents)} is on its way to your bank account.`);
       } else if (action === 'cancel') {
         await api.freelancerJobs.cancel(job.id);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        haptics.warning();
       } else if (action === 'sync') {
         const r = await api.freelancerJobs.syncPayment(job.id);
         if (r.paymentStatus !== 'paid') {
@@ -118,7 +118,7 @@ export default function FreelancerJobsScreen() {
       }
       await load();
     } catch (e) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.error();
       Alert.alert('Action failed', apiErrorMessage(e));
     } finally {
       setBusyId(null);
@@ -253,7 +253,7 @@ export default function FreelancerJobsScreen() {
               ]}
               activeOpacity={0.8}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                haptics.selection();
                 setTab(t.key);
               }}
             >

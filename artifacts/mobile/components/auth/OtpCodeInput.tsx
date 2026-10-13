@@ -68,7 +68,7 @@ export function OtpCodeInput({
           <Text style={[styles.digit, { color: theme.text }]}>{digit}</Text>
         </View>
       ))}
-      <TextInput
+      <TextInput returnKeyType="done"
         ref={inputRef}
         value={value}
         onChangeText={handleChangeText}

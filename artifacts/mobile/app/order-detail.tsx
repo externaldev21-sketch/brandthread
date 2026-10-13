@@ -15,8 +15,10 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToYmd, ymdToDate } from '@/lib/dateTimeField';
 import { RADII, radius } from '@/constants/radii';
-import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { useFeeSchedule } from '@/hooks/useFeeSchedule';
@@ -606,7 +608,6 @@ export default function OrderDetailScreen() {
   );
 
   const retryUpdates = useCallback(() => {
-    hapticPrimaryAction();
     const generation = generationRef.current;
     consecutiveFailuresRef.current = 0;
     setUpdatesPaused(false);
@@ -619,20 +620,20 @@ export default function OrderDetailScreen() {
   // ── Actions ──────────────────────────────────────────────────────────────
 
   async function handleMarkProcessing() {
-    hapticSuccessAction();
     try { await api.orders.updateStatus(id, 'processing'); } catch (e: any) { writeFailed('Couldn’t update this order', e); return; }
+    haptics.success();
     load(generationRef.current);
   }
 
   async function handleMarkReadyToShip() {
-    hapticSuccessAction();
     try { await api.orders.updateStatus(id, 'fulfilled'); } catch (e: any) { writeFailed('Couldn’t update this order', e); return; }
+    haptics.success();
     load(generationRef.current);
   }
 
   async function handleMarkShipped() {
-    hapticSuccessAction();
     try { await api.orders.updateStatus(id, 'shipped'); } catch (e: any) { writeFailed('Couldn’t update this order', e); return; }
+    haptics.success();
     load(generationRef.current);
   }
 
@@ -649,7 +650,7 @@ export default function OrderDetailScreen() {
     setShippingItems(true);
     try {
       await api.orders.addItemsTracking(id, { itemIds, trackingNumber, ...(carrier ? { carrier } : {}) });
-      hapticSuccessAction();
+      haptics.success();
       setShowShipItems(false);
       load(generationRef.current);
     } catch (e: any) {
@@ -672,7 +673,6 @@ export default function OrderDetailScreen() {
       Alert.alert('No buyer account', 'This order has no linked Brandthread account to message.');
       return;
     }
-    hapticPrimaryAction();
     setMessagingBuyer(true);
     try {
       const profile = await api.auth.me();
@@ -715,7 +715,7 @@ export default function OrderDetailScreen() {
       Alert.alert('Select a reason', 'Please choose a cancellation reason.');
       return;
     }
-    hapticDestructiveConfirm();
+    haptics.warning();
     setCancelling(true);
     try {
       await api.orders.updateStatus(id, 'cancelled', {
@@ -870,7 +870,7 @@ export default function OrderDetailScreen() {
         {TABS.map(t => (
           <PressableScale
             key={t.key}
-            onPress={() => { hapticToggle(); setActiveTab(t.key); }}
+            onPress={() => { haptics.selection(); setActiveTab(t.key); }}
             style={[s.tabItem, activeTab === t.key && s.tabItemActive]}
             accessibilityRole="button"
             accessibilityState={{ selected: activeTab === t.key }}
@@ -903,7 +903,7 @@ export default function OrderDetailScreen() {
         <View style={s.cancelBanner}>
           <Feather name="check-circle" size={ICON.sm} color={FG} />
           <Text style={s.cancelBannerText}>Order cancelled successfully.</Text>
-          <PressableScale onPress={() => { hapticPrimaryAction(); setCancelConfirmed(false); }} accessibilityRole="button" accessibilityLabel="Dismiss">
+          <PressableScale onPress={() => { setCancelConfirmed(false); }} accessibilityRole="button" accessibilityLabel="Dismiss">
             <Feather name="x" size={ICON.sm} color={FG} />
           </PressableScale>
         </View>
@@ -936,7 +936,7 @@ export default function OrderDetailScreen() {
               {CANCELLATION_REASONS.map(r => (
                 <PressableScale
                   key={r.key}
-                  onPress={() => { hapticToggle(); setCancelReason(r.key); }}
+                  onPress={() => { haptics.selection(); setCancelReason(r.key); }}
                   style={[s.chip, cancelReason === r.key && s.chipActive]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: cancelReason === r.key }}
@@ -1172,8 +1172,8 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
             <SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" />
             {addingTracking && (
               <BrandthreadCard style={s.inlineForm}>
-                <TextInput style={s.inlineInput} value={trackingCarrier} onChangeText={setTrackingCarrier} placeholder="Carrier (USPS, UPS...)" placeholderTextColor={SUBTLE} />
-                <TextInput style={s.inlineInput} value={trackingNum} onChangeText={setTrackingNum} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
+                <TextInput returnKeyType="done" style={s.inlineInput} value={trackingCarrier} onChangeText={setTrackingCarrier} placeholder="Carrier (USPS, UPS...)" placeholderTextColor={SUBTLE} />
+                <TextInput returnKeyType="done" style={s.inlineInput} value={trackingNum} onChangeText={setTrackingNum} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
                 <PrimaryButton label="Save & Mark Shipped" onPress={handleAddTrackingAndShip} small />
               </BrandthreadCard>
             )}
@@ -1528,7 +1528,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                     <View key={option.key} style={s.trackingStatusCell}>
                       <PressableScale
                       onPress={() => {
-                        hapticToggle();
+                        haptics.selection();
                         setTrackingStatus(option.key);
                         setTrackingFormDirty(true);
                       }}
@@ -1549,19 +1549,18 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
               </View>
             ))}
           </View>
-          <Text style={s.estimatedDeliveryLabel}>Estimated delivery (optional)</Text>
-          <TextInput
-            style={s.inlineInput}
-            value={estimatedDelivery}
-            onChangeText={value => {
-              setEstimatedDelivery(value);
+          <NativeDateTimeField
+            mode="date"
+            label="Estimated delivery (optional)"
+            value={ymdToDate(estimatedDelivery)}
+            onChange={(d) => {
+              setEstimatedDelivery(dateToYmd(d));
               setTrackingFormDirty(true);
             }}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={SUBTLE}
-            autoCapitalize="none"
-            autoCorrect={false}
-            accessibilityLabel="Estimated delivery date"
+            onClear={() => {
+              setEstimatedDelivery('');
+              setTrackingFormDirty(true);
+            }}
             testID="estimated-delivery-input"
           />
           <PrimaryButton
@@ -1635,8 +1634,8 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
             {form.visible && (
               <BrandthreadCard style={s.inlineForm}>
                 <Text style={s.inlineFormTitle}>Add Tracking</Text>
-                <TextInput style={s.inlineInput} value={form.carrier} onChangeText={v => updateForm(group.id, 'carrier', v)} placeholder="Carrier (USPS, UPS, FedEx...)" placeholderTextColor={SUBTLE} />
-                <TextInput style={s.inlineInput} value={form.tracking} onChangeText={v => updateForm(group.id, 'tracking', v)} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
+                <TextInput returnKeyType="done" style={s.inlineInput} value={form.carrier} onChangeText={v => updateForm(group.id, 'carrier', v)} placeholder="Carrier (USPS, UPS, FedEx...)" placeholderTextColor={SUBTLE} />
+                <TextInput returnKeyType="done" style={s.inlineInput} value={form.tracking} onChangeText={v => updateForm(group.id, 'tracking', v)} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
                 <View style={s.actionCol}>
                   <SecondaryButton label="Cancel" onPress={() => toggleForm(group.id)} small />
                   <PrimaryButton label="Save" onPress={() => onAddTracking(group.id)} small />
@@ -1662,7 +1661,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                       <Text style={s.latestEvent}>{sh.trackingEvents[sh.trackingEvents.length - 1].description}</Text>
                     )}
                     <PressableScale
-                      onPress={() => { hapticPrimaryAction(); onShowTracking(sh.id); }}
+                      onPress={() => { onShowTracking(sh.id); }}
                       style={s.viewTrackingBtn}
                       accessibilityRole="button"
                       accessibilityLabel="View tracking"
@@ -1920,7 +1919,7 @@ function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNo
             <StatusBadge label={note.type.toUpperCase()} variant={noteTypeVariant(note.type)} />
             {note.isPinned && <Feather name="bookmark" size={ICON.xs} color={GOLD} />}
             <PressableScale
-              onPress={() => { hapticToggle(); onPinNote(note.id, note.isPinned); }}
+              onPress={() => { haptics.selection(); onPinNote(note.id, note.isPinned); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={{ marginLeft: 'auto' }}
               accessibilityRole="button"
@@ -1942,7 +1941,7 @@ function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNo
         {(['internal', 'customer', 'manufacturer'] as const).map(t => (
           <PressableScale
             key={t}
-            onPress={() => { hapticToggle(); setNoteType(t); }}
+            onPress={() => { haptics.selection(); setNoteType(t); }}
             style={[s.noteTypeChip, noteType === t && { borderColor: noteTypeColor(t), backgroundColor: noteTypeColor(t) + '22' }]}
             accessibilityRole="button"
             accessibilityState={{ selected: noteType === t }}
@@ -2093,7 +2092,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   trackingStatusOptionSelected: { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
   trackingStatusOptionText: { textAlign: 'center', fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   trackingStatusOptionTextSelected: { color: FG },
-  estimatedDeliveryLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginTop: SP.xs },
   groupHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
   groupTitle:       { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   manufacturerCard: { gap: SP.sm },

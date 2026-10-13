@@ -3,7 +3,7 @@
  * password / email / phone). Styling mirrors the existing "Add a password"
  * sheet in login-methods.tsx so the flows read as one family.
  */
-import React, { useMemo, useState } from 'react';
+import React, { forwardRef, useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, type TextInputProps } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,14 +33,14 @@ export function SecurityBody({ children }: { children: React.ReactNode }) {
   );
 }
 
-type FieldProps = Pick<TextInputProps, 'value' | 'placeholder' | 'keyboardType' | 'autoComplete' | 'textContentType' | 'maxLength' | 'onSubmitEditing' | 'returnKeyType' | 'autoFocus'> & {
+type FieldProps = Pick<TextInputProps, 'value' | 'placeholder' | 'keyboardType' | 'autoComplete' | 'textContentType' | 'maxLength' | 'onSubmitEditing' | 'returnKeyType' | 'autoFocus' | 'blurOnSubmit'> & {
   label: string;
   onChangeText: (value: string) => void;
   secure?: boolean;
   testID?: string;
 };
 
-export function SecurityField({ label, secure, testID, ...input }: FieldProps) {
+export const SecurityField = forwardRef<TextInput, FieldProps>(function SecurityField({ label, secure, testID, ...input }, ref) {
   const colors = useColors();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const [visible, setVisible] = useState(false);
@@ -49,6 +49,7 @@ export function SecurityField({ label, secure, testID, ...input }: FieldProps) {
       <Text style={s.label}>{label}</Text>
       <View style={s.inputRow}>
         <TextInput
+          ref={ref}
           testID={testID}
           style={s.input}
           placeholderTextColor={colors.subtle}
@@ -70,7 +71,7 @@ export function SecurityField({ label, secure, testID, ...input }: FieldProps) {
       </View>
     </View>
   );
-}
+});
 
 export function SecurityIntro({ children }: { children: React.ReactNode }) {
   const colors = useColors();

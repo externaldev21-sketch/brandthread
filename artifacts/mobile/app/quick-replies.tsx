@@ -18,7 +18,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/layout';
-import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { apiErrorMessage } from '@/lib/safety';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -58,9 +58,9 @@ export default function QuickRepliesScreen() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const openNew = () => { hapticLight(); setError(null); setDraft({ id: null, title: '', body: '', shortcut: '' }); };
+  const openNew = () => { setError(null); setDraft({ id: null, title: '', body: '', shortcut: '' }); };
   const openEdit = (r: SellerQuickReply) => {
-    hapticLight(); setError(null);
+    setError(null);
     setDraft({ id: r.id, title: r.title, body: r.body, shortcut: (r.shortcut ?? '').replace(/^\//, '') });
   };
 
@@ -85,7 +85,7 @@ export default function QuickRepliesScreen() {
           : await api.seller.quickReplies.create(payload);
         setItems((cur) => (draft.id ? cur.map((r) => (r.id === saved.id ? saved : r)) : [...cur, saved]));
       }
-      hapticSuccess();
+      haptics.success();
       setDraft(null);
     } catch (e) {
       setError(apiErrorMessage(e, 'Could not save this quick reply.'));
@@ -118,7 +118,7 @@ export default function QuickRepliesScreen() {
           <Text style={[styles.label, { color: colors.mutedForeground }]}>Shortcut</Text>
           <View style={[styles.shortcutRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.slash, { color: colors.mutedForeground }]}>/</Text>
-            <TextInput
+            <TextInput returnKeyType="done"
               style={[styles.shortcutInput, { color: colors.foreground }]}
               value={draft.shortcut}
               onChangeText={(v) => setDraft({ ...draft, shortcut: v.replace(/[^A-Za-z0-9_-]/g, '').slice(0, SHORTCUT_MAX) })}
@@ -131,7 +131,7 @@ export default function QuickRepliesScreen() {
           </View>
 
           <Text style={[styles.label, { color: colors.mutedForeground }]}>Title</Text>
-          <TextInput
+          <TextInput returnKeyType="done"
             style={inputStyle}
             value={draft.title}
             onChangeText={(v) => setDraft({ ...draft, title: v.slice(0, TITLE_MAX) })}

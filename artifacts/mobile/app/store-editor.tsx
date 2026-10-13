@@ -9,7 +9,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -35,6 +35,8 @@ import {
   TYPOGRAPHY_STYLES,
 } from '@/services/storeTypes';
 import { radius } from '@/constants/radii';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { isoToDate } from '@/lib/dateTimeField';
 
 type EditorMode = 'sections' | 'branding' | 'header' | 'footer' | 'product_page' | 'collection_page';
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';
@@ -62,7 +64,7 @@ function ChipGroup({
       {options.map(opt => (
         <TouchableOpacity
           key={opt}
-          onPress={() => { Haptics.selectionAsync(); onChange(opt); }}
+          onPress={() => { haptics.selection(); onChange(opt); }}
           style={[chipStyles.chip, value === opt && chipStyles.active]}
         >
           <Text style={[chipStyles.label, value === opt && chipStyles.activeLabel]}>
@@ -261,7 +263,6 @@ export default function StoreEditor() {
   }
 
   async function handleUndo() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const s = await undoLastAction();
     setStore(s);
     setUndoAvailable(s.undoStack.length > 0);
@@ -269,7 +270,6 @@ export default function StoreEditor() {
   }
 
   async function handleRedo() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const s = await redoLastAction();
     setStore(s);
     setUndoAvailable(s.undoStack.length > 0);
@@ -282,7 +282,6 @@ export default function StoreEditor() {
   }
 
   async function handleDuplicate(id: string) {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const s = await duplicateSection(id);
     setStore(s);
   }
@@ -324,12 +323,12 @@ export default function StoreEditor() {
   }
 
   async function handleSaveDraft() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSavingStatus('saving');
     try {
       const s = await saveDraft();
       setStore(s);
       setSavingStatus('saved');
+      haptics.success();
     } catch {
       setSavingStatus('failed');
     }
@@ -372,7 +371,6 @@ export default function StoreEditor() {
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponderCapture: (_e, g) => Math.abs(g.dy) > 4,
       onPanResponderGrant: () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         dragY.setValue(0);
         setDraggingId(id);
         dragStartIndex.current = displayOrder.indexOf(id);
@@ -537,7 +535,7 @@ export default function StoreEditor() {
             <>
               <FieldRow>
                 <FieldLabel>Drop Date</FieldLabel>
-                <StyledInput value={field('dropDate')} onChange={v => handleLocalChange('dropDate', v)} placeholder="2025-01-01T00:00:00Z" />
+                <NativeDateTimeField variant="pill" mode="datetime" label="Drop Date" value={isoToDate(field('dropDate'))} onChange={d => handleLocalChange('dropDate', d.toISOString())} testID="store-editor-drop-date" fallback={<StyledInput value={field('dropDate')} onChange={v => handleLocalChange('dropDate', v)} placeholder="2025-01-01T00:00:00Z" />} />
               </FieldRow>
               <FieldRow>
                 <FieldLabel>Style</FieldLabel>
@@ -845,10 +843,20 @@ export default function StoreEditor() {
             {ab.hasCountdown && (
               <FieldRow>
                 <FieldLabel>Countdown Date</FieldLabel>
-                <StyledInput
-                  value={ab.countdownDate ?? ''}
-                  onChange={v => handleThemeUpdate({ announcementBar: { ...ab, countdownDate: v } })}
-                  placeholder="2025-12-31T00:00:00Z"
+                <NativeDateTimeField
+                  variant="pill"
+                  mode="datetime"
+                  label="Countdown Date"
+                  value={isoToDate(ab.countdownDate)}
+                  onChange={d => handleThemeUpdate({ announcementBar: { ...ab, countdownDate: d.toISOString() } })}
+                  testID="store-editor-countdown-date"
+                  fallback={(
+                    <StyledInput
+                      value={ab.countdownDate ?? ''}
+                      onChange={v => handleThemeUpdate({ announcementBar: { ...ab, countdownDate: v } })}
+                      placeholder="2025-12-31T00:00:00Z"
+                    />
+                  )}
                 />
               </FieldRow>
             )}
@@ -1014,7 +1022,7 @@ export default function StoreEditor() {
             <View style={[sectionStyles.enabledDot, { backgroundColor: section.enabled ? SUCCESS : MUTED }]} />
             <View style={{ flex: 1 }}>
               {isInlineEditing ? (
-                <TextInput
+                <TextInput returnKeyType="done"
                   autoFocus
                   value={inlineHeadingDraft}
                   onChangeText={setInlineHeadingDraft}
@@ -1027,7 +1035,6 @@ export default function StoreEditor() {
               ) : (
                 <TouchableOpacity
                   onPress={() => {
-                    Haptics.selectionAsync();
                     setInlineHeadingDraft(section.settings.heading ?? '');
                     setInlineEditingId(section.id);
                   }}
@@ -1040,7 +1047,6 @@ export default function StoreEditor() {
           </View>
           <TouchableOpacity
             onPress={() => {
-              Haptics.selectionAsync();
               if (isActive) {
                 setActiveSection(null);
               } else {
@@ -1218,7 +1224,7 @@ export default function StoreEditor() {
         {TABS.map(tab => (
           <TouchableOpacity
             key={tab.value}
-            onPress={() => { Haptics.selectionAsync(); setMode(tab.value); }}
+            onPress={() => { haptics.selection(); setMode(tab.value); }}
             style={[styles.tab, mode === tab.value && styles.tabActive]}
           >
             <Text style={[styles.tabLabel, mode === tab.value && styles.tabLabelActive]}>

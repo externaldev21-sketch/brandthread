@@ -216,7 +216,7 @@ export default function MetaAdsManageScreen() {
             <Text style={[s.modalTitle, { color: colors.foreground }]}>Edit budget</Text>
             <View style={[s.budgetInputRow, { borderColor: colors.border, backgroundColor: colors.elevated }]}>
               <Text style={[s.modalTitle, { color: colors.mutedForeground }]}>$</Text>
-              <TextInput
+              <TextInput returnKeyType="done"
                 value={budgetInput}
                 onChangeText={setBudgetInput}
                 keyboardType="number-pad"

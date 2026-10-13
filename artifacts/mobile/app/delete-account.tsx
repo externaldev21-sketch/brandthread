@@ -11,7 +11,7 @@
  *    session is signed out, and signing back in within 30 days cancels it.
  *    The hard delete runs server-side after the grace period.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TextInput, StyleSheet, ActivityIndicator, Platform,
@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
@@ -60,6 +60,7 @@ export default function DeleteAccountScreen() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
+  const passwordRef = useRef<TextInput>(null);
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
@@ -109,14 +110,14 @@ export default function DeleteAccountScreen() {
     setDeleteError(null);
     try {
       const result = await api.auth.deleteAccount(usesCode ? { code: code.trim() } : { password });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       await clearAccountLifecycleState().catch(() => {});
       setScheduledFor(result.scheduledFor);
       setStep('done');
       // Every session was revoked server-side; clear the local one too.
       signOut().catch(() => {});
     } catch (err) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.error();
       if (apiErrorCode(err) === 'DELETION_BLOCKED') {
         const details = apiErrorDetails<{ blockers?: DeletionBlocker[] }>(err);
         setCheck((prev) => prev ? { ...prev, canDelete: false, blockers: details?.blockers ?? prev.blockers } : prev);
@@ -287,13 +288,17 @@ export default function DeleteAccountScreen() {
               placeholderTextColor={theme.subtle}
               autoCapitalize="characters"
               autoCorrect={false}
+              autoComplete="off"
+              returnKeyType={usesCode ? 'done' : 'next'}
+              blurOnSubmit={usesCode}
+              onSubmitEditing={usesCode ? undefined : () => passwordRef.current?.focus()}
               accessibilityLabel="Type DELETE to confirm"
             />
 
             {usesCode ? (
               <>
                 <Text style={s.fieldLabel}>Enter the 6-digit code we email you</Text>
-                <TextInput
+                <TextInput returnKeyType="done"
                   style={s.input}
                   value={code}
                   onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
@@ -315,6 +320,7 @@ export default function DeleteAccountScreen() {
               <>
                 <Text style={s.fieldLabel}>Enter your password to confirm it’s you</Text>
                 <TextInput
+                  ref={passwordRef}
                   style={[s.input, s.passwordInput]}
                   value={password}
                   onChangeText={setPassword}
@@ -325,13 +331,14 @@ export default function DeleteAccountScreen() {
                   autoCorrect={false}
                   autoComplete="current-password"
                   textContentType="password"
+                  returnKeyType="done"
                   accessibilityLabel="Password"
                 />
               </>
             )}
 
             <PressableScale
-              onPress={() => { Haptics.selectionAsync(); setAcknowledged((v) => !v); }}
+              onPress={() => { haptics.selection(); setAcknowledged((v) => !v); }}
               style={s.ackRow}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: acknowledged }}

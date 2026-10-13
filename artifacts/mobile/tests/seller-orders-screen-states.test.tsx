@@ -105,8 +105,8 @@ vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({
   useTabBarMetrics: () => ({ occupiedHeight: 0 }),
 }));
 
-vi.mock('@/components/SwipeActionRow', () => ({
-  default: nativeComponent('SwipeActionRow'),
+vi.mock('@/components/ui/SwipeRow', () => ({
+  default: nativeComponent('SwipeRow'),
 }));
 
 vi.mock('@/components/motion/SheetRise', () => ({

@@ -12,7 +12,6 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getMarketingAnalytics, getFilterState } from '@/services/analyticsService';
 import { MarketingAnalytics, CampaignAnalytics, InfluencerAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
@@ -49,7 +48,7 @@ function CampaignRow({ c }: { c: CampaignAnalytics }) {
   const typeIcon: keyof typeof Feather.glyphMap = c.type === 'email' ? 'mail' : c.type === 'sms' ? 'message-square' : c.type === 'push' ? 'bell' : 'zap';
   return (
     <TouchableOpacity
-      onPress={() => { Haptics.selectionAsync(); router.navigate('/(tabs)/marketing' as never); }}
+      onPress={() => { router.navigate('/(tabs)/marketing' as never); }}
       style={s.rowItem}
       activeOpacity={0.8}
     >
