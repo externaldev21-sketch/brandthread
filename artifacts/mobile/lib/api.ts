@@ -1601,6 +1601,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
           channels: Record<'push' | 'inApp' | 'email', Record<string, boolean>>;
+          saleSound?: boolean;
+          saleHaptic?: boolean;
         }>('/api/notification-prefs'),
       update: (body: {
         digest?: 'realtime' | 'daily';
@@ -1609,6 +1611,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         pushEnabled?: boolean;
         promotionalPush?: boolean;
         quietHours?: { start: string; end: string; timezone?: string } | null;
+        saleSound?: boolean;
+        saleHaptic?: boolean;
       }) =>
         put<{
           digest: 'realtime' | 'daily';
@@ -1618,6 +1622,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
           channels: Record<'push' | 'inApp' | 'email', Record<string, boolean>>;
+          saleSound?: boolean;
+          saleHaptic?: boolean;
         }>('/api/notification-prefs', body),
     },
     logo: {

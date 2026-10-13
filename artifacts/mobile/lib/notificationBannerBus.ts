@@ -10,6 +10,8 @@ export type BannerPayload = {
   body: string;
   category?: string;
   data?: Record<string, unknown>;
+  /** Which haptic the banner fires when it appears. Defaults to a light tap. */
+  haptic?: 'light' | 'success' | 'none';
 };
 
 type Listener = (payload: BannerPayload) => void;

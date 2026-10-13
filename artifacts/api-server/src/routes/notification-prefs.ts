@@ -16,6 +16,7 @@ import { db, users } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { channelView, parseChannelKey, channelPrefKey } from "../lib/notificationChannels";
+import { readSaleAlertPrefs, saleAlertPatch } from "../lib/saleAlerts";
 
 const router = Router();
 router.use(requireAuth);
@@ -94,6 +95,7 @@ router.get("/", async (req, res) => {
       },
       categories: { ...defaultsFor(row?.accountType), ...(row?.preferences ?? {}) },
       channels: channelView(row?.accountType, row?.preferences),
+      ...readSaleAlertPrefs(row?.preferences),
     });
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to fetch notification preferences");
@@ -104,7 +106,7 @@ router.get("/", async (req, res) => {
 // ── PUT /api/seller/notification-prefs ───────────────────────────────────────
 router.put("/", async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const { digest, categories, channels, pushEnabled, promotionalPush, quietHours } = req.body as {
+  const { digest, categories, channels, pushEnabled, promotionalPush, quietHours, saleSound, saleHaptic } = req.body as {
     digest?: string;
     categories?: Record<string, unknown>;
     /** { inApp?: { [type]: boolean }, email?: { [type]: boolean } } */
@@ -112,6 +114,9 @@ router.put("/", async (req, res) => {
     pushEnabled?: unknown;
     promotionalPush?: unknown;
     quietHours?: { start?: unknown; end?: unknown; timezone?: unknown } | null;
+    /** Seller new-order alert feel (lib/saleAlerts.ts). */
+    saleSound?: unknown;
+    saleHaptic?: unknown;
   };
   if (digest !== undefined && !VALID_DIGEST.includes(digest as DigestMode)) {
     res.status(400).json({ error: `digest must be one of: ${VALID_DIGEST.join(", ")}` });
@@ -129,6 +134,8 @@ router.put("/", async (req, res) => {
   if (promotionalPush !== undefined && typeof promotionalPush !== "boolean") {
     return res.status(400).json({ error: "promotionalPush must be a boolean" });
   }
+  const salePatch = saleAlertPatch({ saleSound, saleHaptic });
+  if (!salePatch.ok) return res.status(400).json({ error: salePatch.error });
   let quietHoursPatch: { start: string | null; end: string | null; timezone?: string } | undefined;
   if (quietHours !== undefined) {
     if (quietHours === null) {
@@ -149,8 +156,8 @@ router.put("/", async (req, res) => {
       };
     }
   }
-  if (digest === undefined && categories === undefined && channels === undefined && pushEnabled === undefined && promotionalPush === undefined && quietHoursPatch === undefined) {
-    return res.status(400).json({ error: "digest, categories, channels, pushEnabled, promotionalPush, or quietHours is required" });
+  if (digest === undefined && categories === undefined && channels === undefined && pushEnabled === undefined && promotionalPush === undefined && quietHoursPatch === undefined && Object.keys(salePatch.patch).length === 0) {
+    return res.status(400).json({ error: "digest, categories, channels, pushEnabled, promotionalPush, quietHours, saleSound, or saleHaptic is required" });
   }
 
   try {
@@ -182,7 +189,7 @@ router.put("/", async (req, res) => {
         patch[channelPrefKey(channelName, parsed.key)] = value;
       }
     }
-    const merged = { ...defaults, ...(current.preferences ?? {}), ...patch };
+    const merged = { ...defaults, ...(current.preferences ?? {}), ...patch, ...salePatch.patch };
 
     const updates: Record<string, unknown> = {
       notificationPreferences: merged,
@@ -228,6 +235,7 @@ router.put("/", async (req, res) => {
       },
       categories: merged,
       channels: channelView(current.accountType, merged),
+      ...readSaleAlertPrefs(merged),
     });
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to update notification preferences");

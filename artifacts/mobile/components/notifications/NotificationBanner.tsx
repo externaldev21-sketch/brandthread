@@ -54,7 +54,11 @@ export default function NotificationBanner() {
       if (dismissTimer.current) clearTimeout(dismissTimer.current);
       visibleRef.current = true;
       setPayload(next);
-      if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (Platform.OS !== 'web' && next.haptic !== 'none') {
+        void (next.haptic === 'success'
+          ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+          : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)).catch(() => {});
+      }
       translateY.setValue(-200);
       Animated.spring(translateY, {
         toValue: 0,
