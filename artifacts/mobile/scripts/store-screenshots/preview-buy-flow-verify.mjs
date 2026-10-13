@@ -171,11 +171,12 @@ async function run() {
     await page.waitForTimeout(260);
     await page.screenshot({ path: path.join(OUT, '05-add-to-cart-in-flight.png') });
     console.log('  ✓ 05-add-to-cart-in-flight');
-    await page.getByText('Added to your bag').waitFor({ timeout: 10_000 });
-    await page.waitForTimeout(900);
+    // Item 131: Add to cart reads "In bag ✓" for 2s (tap it to open the bag).
+    await page.getByTestId('product-view-cart').waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(300);
     results.badgeAfter = await page.getByTestId('product-cart-badge').innerText().catch(() => null);
-    await shot('06-added-sheet-and-badge');
-    await page.getByRole('button', { name: 'View bag' }).click();
+    await shot('06-in-bag-and-badge');
+    await page.getByTestId('product-view-cart').click();
     await page.getByRole('button', { name: 'Checkout' }).waitFor({ timeout: 30_000 });
     await page.waitForTimeout(1000);
     await shot('07-cart');
