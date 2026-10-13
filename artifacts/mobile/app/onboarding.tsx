@@ -95,9 +95,11 @@ import {
 } from '@/lib/onboardingFlow';
 import { BrandsToFollowStep } from '@/components/onboarding/BrandsToFollowStep';
 import { SizesStep } from '@/components/onboarding/SizesStep';
+import { FlippingProfileCard, ProfileBuildCard, type ProfileCardData } from '@/components/onboarding/ProfileBuildCard';
+import { useImageSourceSheet } from '@/components/profile/ImageSourceSheet';
 import { EMPTY_SURVEY, hasSurveyAnswers, sanitizeDraftSurvey, saveBuyerSurvey, type OnboardingSurvey } from '@/lib/onboardingSurvey';
 import { WelcomeStep } from '@/components/onboarding/WelcomeStep';
-import { Glow, ThreadDraw, ThreadLogoStitch, ThreadProgress, ThreadWeave } from '@/components/onboarding/ThreadLine';
+import { Glow, ThreadDraw, ThreadProgress, ThreadWeave } from '@/components/onboarding/ThreadLine';
 import {
   CodeCells,
   FloatingInput,
@@ -541,7 +543,7 @@ const createSn = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 // ─── Success screen ────────────────────────────────────────────────────────────
 // Finale: the thread that ran through every step sews the Brandthread mark,
 // then the real logo resolves over the stitching.
-function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { flow: Flow; firstName: string; brandName: string; onFinish: () => void; finishing?: boolean }) {
+function SuccessScreen({ flow, firstName, brandName, profile, onFinish, finishing }: { flow: Flow; firstName: string; brandName: string; profile: ProfileCardData; onFinish: () => void; finishing?: boolean }) {
   const { theme } = useAppTheme();
   const ss = createSs(theme);
   const insets  = useSafeAreaInsets();
@@ -566,11 +568,11 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
       />
 
       <View style={ss.body}>
+        {/* The card that filled in during sign-up flips once to "Your profile is ready". */}
         <View style={ss.hero}>
-          <ThreadLogoStitch
-            size={124}
-            color={theme.text}
-            onStitched={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }}
+          <FlippingProfileCard
+            data={profile}
+            onFlipped={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); }}
           />
         </View>
 
@@ -616,7 +618,7 @@ const createSs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   root:       { flex: 1, backgroundColor: theme.background, paddingHorizontal: SPACE.lg },
   wash:       { position: 'absolute', top: 0, left: 0, right: 0, height: '55%', opacity: 0.8 },
   body:       { flex: 1, justifyContent: 'center' },
-  hero:       { alignItems: 'center', marginBottom: SPACE.xl },
+  hero:       { alignSelf: 'stretch', marginBottom: SPACE.xl },
   brandBadge: { alignSelf: 'flex-start', borderRadius: RADIUS.pill, paddingHorizontal: 14, paddingVertical: 6, marginTop: SPACE.sm, borderWidth: 1 },
   brandBadgeText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   desc:       { ...TYPE.body, color: MUTED, marginTop: SPACE.sm, marginBottom: SPACE.lg },
@@ -1944,6 +1946,19 @@ export default function OnboardingScreen() {
   const [firstName, setFirstName]         = useState('');
   const [lastName, setLastName]           = useState('');
   const [username, setUsername]           = useState('');
+  // Profile photo picked on the Name step's live profile card; uploaded once
+  // the account exists (finishBuyer / finishSeller), never blocking finish.
+  const [photoUri, setPhotoUri]           = useState<{ uri: string; mimeType?: string | null } | null>(null);
+  const { open: openPhotoSheet, sheet: photoSheet } = useImageSourceSheet();
+  const pickProfilePhoto = useCallback(async () => {
+    const asset = await openPhotoSheet({ aspect: [1, 1], ...(photoUri ? { onRemove: () => setPhotoUri(null) } : {}) });
+    if (asset) setPhotoUri({ uri: asset.uri, mimeType: asset.mimeType });
+  }, [openPhotoSheet, photoUri]);
+  const profileCard: ProfileCardData = {
+    name: [firstName.trim(), lastName.trim()].filter(Boolean).join(' '),
+    handle: username,
+    photoUri: photoUri?.uri ?? null,
+  };
   // The username is chosen on the Auth step, before the Clerk account exists,
   // so the user-scoped draft (which needs user.id) can't persist it yet. Mirror
   // it into a device-scoped key immediately so a remount during/after email
@@ -2279,6 +2294,20 @@ export default function OnboardingScreen() {
     });
   }
 
+  /** Uploads the photo picked on the profile card. Best-effort: a failure never blocks finishing. */
+  async function uploadOnboardingPhoto(role: Flow): Promise<string | null> {
+    if (!photoUri) return null;
+    try {
+      const { profileImageUrl } = await api.auth.uploadAvatar(photoUri);
+      return profileImageUrl;
+    } catch (error) {
+      console.error(`[${role}-onboarding] profile photo upload failed`, {
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
   async function finishBuyer(retryAttempt = false) {
     if (finishing) return;
     setFinishing(true);
@@ -2303,6 +2332,7 @@ export default function OnboardingScreen() {
         expectedClerkId: profile.clerkId,
         ...(uname ? { username: uname } : {}),
       });
+      const avatarUrl = await uploadOnboardingPhoto('buyer');
       await hydrateMyProfileFromAccount({
         userId: profile.clerkId,
         name: updated.displayName || updated.name || name,
@@ -2313,6 +2343,7 @@ export default function OnboardingScreen() {
         ...DEFAULT_BUYER_PROFILE,
         name: updated.displayName || updated.name || name,
         username: updated.username ?? uname,
+        ...(avatarUrl ? { avatarUri: avatarUrl } : {}),
       });
       if (referralCode.trim()) {
         await api.referrals.apply(referralCode.trim(), profile.clerkId).catch((error) => {
@@ -2410,6 +2441,7 @@ export default function OnboardingScreen() {
         accountType: 'seller',
         expectedClerkId: profile.clerkId,
       });
+      await uploadOnboardingPhoto('seller');
       if (referralCode.trim()) {
         await api.referrals.apply(referralCode.trim(), profile.clerkId).catch((error) => {
           console.error('[seller-onboarding] referral save failed', {
@@ -2575,7 +2607,9 @@ export default function OnboardingScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
             <StepHeadline>What should{'\n'}we call you?</StepHeadline>
-            <StepSub>This is how your profile will appear.</StepSub>
+            <Reveal index={1} style={sm.profileCardWrap}>
+              <ProfileBuildCard data={profileCard} onPickPhoto={pickProfilePhoto} />
+            </Reveal>
             <Reveal index={2} style={sm.inputWrap}>
               <FloatingInput
                 ref={firstNameInputRef}
@@ -2639,7 +2673,7 @@ export default function OnboardingScreen() {
 
       // Step 6: Success
       if (step === BUYER_STEP_INDEX.SUCCESS) return (
-        <SuccessScreen flow="buyer" firstName={firstName} brandName="" onFinish={finishBuyer} finishing={finishing} />
+        <SuccessScreen flow="buyer" firstName={firstName} brandName="" profile={profileCard} onFinish={finishBuyer} finishing={finishing} />
       );
     }
 
@@ -2678,7 +2712,9 @@ export default function OnboardingScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
             <StepHeadline>What should{'\n'}we call you?</StepHeadline>
-            <StepSub>This is how your workspace will greet you.</StepSub>
+            <Reveal index={1} style={sm.profileCardWrap}>
+              <ProfileBuildCard data={profileCard} onPickPhoto={pickProfilePhoto} />
+            </Reveal>
             <Reveal index={2} style={sm.inputWrap}>
               <FloatingInput
                 ref={firstNameInputRef}
@@ -2812,7 +2848,7 @@ export default function OnboardingScreen() {
 
       // Step 9: Success
       if (step === SELLER_STEP_INDEX.SUCCESS) return (
-        <SuccessScreen flow="seller" firstName={firstName} brandName={brandName} onFinish={finishSeller} finishing={finishing} />
+        <SuccessScreen flow="seller" firstName={firstName} brandName={brandName} profile={profileCard} onFinish={finishSeller} finishing={finishing} />
       );
     }
 
@@ -2927,6 +2963,7 @@ export default function OnboardingScreen() {
       ]} testID={`onboarding-step-${flow ?? 'choose'}-${step}`} accessibilityLabel={`Onboarding ${flow ?? 'choose'} step ${step}`}>
         {renderStep()}
       </Animated.View>
+      {photoSheet}
       {deviceProbeEnabled && (
         <View pointerEvents="none" style={sm.deviceProbeMetric}>
           <View
@@ -2992,6 +3029,7 @@ const createSm = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   bootThread:{ width: 160 },
 
   scroll:    { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xxl },
+  profileCardWrap: { marginTop: SPACE.lg },
   inputWrap: { marginTop: SPACE.xl },
   chipGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.xs, marginTop: SPACE.xl, marginBottom: SPACE.md },
   radioList: { gap: SPACE.sm, marginTop: SPACE.xl },
