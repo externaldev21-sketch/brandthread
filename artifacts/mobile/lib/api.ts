@@ -34,6 +34,7 @@ import type {
 import { classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsError';
 import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
+import type { WeeklyQuestsClaimResult, WeeklyQuestsStatus } from '@/lib/weeklyQuests';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 import type { GiftCard, GiftCardHistoryEntry, GiftCardSettings, GiftCardStoreInfo } from '@/lib/giftCards';
 import type { MentionPerson, Story, StoryMentionItem, StoryStickerState } from '@/services/socialTypes';
@@ -4032,6 +4033,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Seller-only: converts earned Thread Cash into a real Stripe transfer to the payout balance. */
       cashOut: (body: { threadCashCents: number; idempotencyKey: string }) =>
         post<{ ok: boolean; threadCashCents: number; payoutCents: number; feeCents: number; transferId: string }>('/api/thread-cash/cash-out', body),
+      /** This week's quests (progress counted on the server), reward and week streak. */
+      weeklyQuests: () =>
+        get<WeeklyQuestsStatus>('/api/thread-cash/weekly-quests'),
+      /** Pays the weekly reward once every quest is complete. Idempotent per week. */
+      claimWeeklyQuests: () =>
+        post<WeeklyQuestsClaimResult>('/api/thread-cash/weekly-quests/claim', {}),
     },
     /** Public trending feed — no auth required. */
     publicTrending: {

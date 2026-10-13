@@ -27,12 +27,14 @@ import type { ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import { ThreadCashBill, ThreadCashBillStack, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { WeeklyQuestsSection } from '@/components/thread-cash/WeeklyQuestsSection';
 
 function historyLabel(entry: ThreadCashEntry): string {
   switch (entry.source) {
     case 'daily_checkin': return 'Daily check-in';
     case 'streak_bonus': return 'Streak bonus';
     case 'referral': return 'Referral';
+    case 'weekly_quests': return 'Weekly quests';
     case 'redemption': return 'Used at checkout';
     case 'checkout_spend': return 'Spent on an order';
     case 'refund_credit': return 'Returned from a refund';
@@ -56,6 +58,7 @@ function historyGlyph(
     case 'daily_checkin': return { icon: 'check-circle', color: theme.success };
     case 'streak_bonus': return { icon: 'zap', color: theme.accent };
     case 'referral': return { icon: 'users', color: theme.success };
+    case 'weekly_quests': return { icon: 'check-circle', color: theme.success };
     case 'redemption':
     case 'checkout_spend': return { icon: 'shopping-bag', color: theme.muted };
     case 'refund_credit':
@@ -282,6 +285,14 @@ export default function ThreadCashScreen() {
               Earn ${(((status?.config.dailyAmountCents ?? 10)) / 100).toFixed(2)} a day, ${(((status?.config.streakBonusCents ?? 100)) / 100).toFixed(2)} bonus every {streakBonusDays} days
             </Text>
           </BrandthreadCard>
+
+          {/* Weekly quests: buyers only; the protected API is skipped in the dev preview */}
+          {isSellerDevPreview() ? null : (
+            <WeeklyQuestsSection
+              previewMode={isBuyerDevPreview() ? (isPreviewDemoMode() ? 'demo' : 'fresh') : null}
+              onClaimed={() => void load()}
+            />
+          )}
 
           {/* History */}
           <Text style={[styles.sectionTitle, { color: theme.text }]}>History</Text>
