@@ -38,6 +38,7 @@ import { startOrderPostAttributionJob } from "./jobs/orderPostAttribution";
 import { startReviewRequestJob } from "./jobs/reviewRequest";
 import { startPayoutReviewJob } from "./jobs/payoutReview";
 import { startModerationAlertsJob } from "./jobs/moderationAlerts";
+import { startAdminReportsJob } from "./jobs/adminReports";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
@@ -135,6 +136,7 @@ const server = app.listen(port, (err) => {
   startEmailCampaignJob();
   startOrderPostAttributionJob();
   startReviewRequestJob();
+  startAdminReportsJob();
   startCommunityPushJob();
   startScheduledPostPublisherJob();
   startPayoutReviewJob();
