@@ -34,13 +34,15 @@ function useMinuteClock(enabled: boolean): number {
   return now;
 }
 
-export function DiscoverDropRow({ drop }: { drop: DiscoverDrop }) {
+/** `trailing` (e.g. the notify bell) sits inside the card, beside the tappable row, never nested in it. */
+export function DiscoverDropRow({ drop, trailing }: { drop: DiscoverDrop; trailing?: React.ReactNode }) {
   const router = useRouter();
   const { theme } = useAppTheme();
   const now = useMinuteClock(!drop.live && !!drop.releaseAt);
   const countdown = drop.live ? null : formatDropCountdown(drop.releaseAt, now);
   const date = formatDropDate(drop.releaseAt);
   return (
+<View>
     <PressableScale
       onPress={() => router.push(`/buyer-drop-detail?dropId=${encodeURIComponent(drop.id)}` as never)}
       accessibilityRole="button"
@@ -77,6 +79,9 @@ export function DiscoverDropRow({ drop }: { drop: DiscoverDrop }) {
         )}
       </View>
     </PressableScale>
+
+{trailing}
+</View>
   );
 }
 
