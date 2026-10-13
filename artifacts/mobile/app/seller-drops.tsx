@@ -34,6 +34,9 @@ interface SellerDropRow {
   status: string;
   releaseAt?: string | null;
   orderCount?: number;
+  /** Pre-order drops only (api-server lib/dropPreOrderProgress.ts). */
+  preOrderedUnits?: number | null;
+  totalUnits?: number | null;
 }
 
 export default function SellerDrops() {
@@ -118,6 +121,11 @@ export default function SellerDrops() {
                 <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 3 }}>
                   {row.releaseAt ? new Date(row.releaseAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No launch date set'}
                 </Text>
+                {row.totalUnits != null && row.preOrderedUnits != null ? (
+                  <Text style={{ color: theme.text, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 3 }} testID="drop-preorder-progress">
+                    {row.preOrderedUnits.toLocaleString()} pre-ordered of {row.totalUnits.toLocaleString()}
+                  </Text>
+                ) : null}
               </View>
               <StatusBadge label={row.status.toUpperCase()} variant={statusVariant(row.status)} small />
               <Feather name="chevron-right" size={18} color={theme.muted} />
