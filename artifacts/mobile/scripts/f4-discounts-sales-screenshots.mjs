@@ -86,8 +86,17 @@ async function toTop(page, text) {
   await page.waitForTimeout(400);
 }
 
-async function go(page, activity, origin, target, ready) {
-  await openScreen(page, activity, origin, 'seller', target);
+/**
+ * lib/api.ts refuses every request while `?bt_preview=seller` is in the URL
+ * (signed-out seller preview), so after the harness signs the demo seller in,
+ * the screen is opened with a neutral `bt_preview` value and no cached preview
+ * role: the app then talks to the fake API like a real signed-in seller.
+ */
+async function go(page, activity, origin, path, ready) {
+  const target = `${path}?bt_preview=signed-in`;
+  await openScreen(page, activity, origin, 'seller', target, {
+    beforeNavigate: () => page.evaluate(() => localStorage.removeItem('user_role')),
+  });
   for (let attempt = 0; attempt < 6; attempt++) {
     try { await ready().waitFor({ timeout: 12_000 }); break; } catch (error) {
       if (attempt === 5) throw error;
@@ -103,6 +112,7 @@ async function routes(context) {
     const request = route.request();
     if (request.method() === 'OPTIONS') return route.fallback();
     const p = new URL(request.url()).pathname.replace(/^\/api\/v1\//, '/api/');
+    if (process.env.F4_DEBUG) console.log('api', request.method(), p);
     if (p === '/api/discount-codes') return json(route, CODES);
     if (p === '/api/discount-codes/collections') return json(route, []);
     const uses = /^\/api\/discount-codes\/([^/]+)\/uses$/.exec(p);
@@ -117,6 +127,10 @@ async function discounts(browser, images, origin) {
   const device = { viewport: VIEWPORT, scale: 2, isMobile: true, userAgent: UA };
   const { context, page, activity } = await openContext(browser, { device, role: 'seller', origin, images });
   await routes(context);
+  if (process.env.F4_DEBUG) {
+    page.on('request', (r) => { if (!r.url().startsWith(origin)) console.log('req', r.method(), r.url().slice(0, 120)); });
+    page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log('console', m.text().slice(0, 200)); });
+  }
   await go(page, activity, origin, '/discounts', () => page.getByLabel('New discount'));
   await shot(page, '01-discounts-list');
   await overflowCheck(page, 'discounts-list');
@@ -146,17 +160,20 @@ async function discounts(browser, images, origin) {
     await page.waitForTimeout(1200);
     await page.getByPlaceholder('Search time zones').fill('new york');
     await shot(page, '06-time-zone-sheet');
-    await page.getByLabel(/close/i).last().click().catch(() => {});
+    await page.getByLabel('Close Time zone').click();
     await page.waitForTimeout(800);
-    await page.getByLabel(/close/i).last().click().catch(() => {});
-    await page.waitForTimeout(1200);
-    // Legacy date-only code opens at 12:00 AM on the saved date.
-    await page.getByLabel('Edit WELCOME15').click();
-    await page.waitForTimeout(1200);
-    await toTop(page, 'Active dates');
-    await shot(page, '07-discount-legacy-date-edit');
-    await page.getByLabel(/close/i).last().click().catch(() => {});
-    await page.waitForTimeout(1200);
+  }
+  await page.getByLabel(/^Close New Discount Code/).click();
+  await page.waitForTimeout(1200);
+  // A code saved before time pickers (date only): dev shows the typed date; after, 12:00 AM on that date.
+  await page.getByLabel('Edit WELCOME15').click();
+  await page.waitForTimeout(1200);
+  await toTop(page, 'Active dates');
+  await shot(page, '07-discount-legacy-date-edit');
+  await overflowCheck(page, 'legacy-edit');
+  await page.getByLabel(/^Close Edit Discount Code/).click();
+  await page.waitForTimeout(1200);
+  if (MODE === 'after') {
     await page.getByLabel('View redemptions for WELCOME15').click();
     await page.waitForTimeout(1500);
     await shot(page, '08-redemptions');

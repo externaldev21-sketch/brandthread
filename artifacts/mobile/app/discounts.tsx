@@ -113,7 +113,6 @@ function randomCode() {
   return out;
 }
 
-
 export default function DiscountsScreen() {
   const { theme } = useAppTheme();
   const { muted: MUTED, border: BORDER } = theme;
