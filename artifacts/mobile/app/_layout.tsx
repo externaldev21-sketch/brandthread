@@ -1578,6 +1578,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="buyer-close-friends"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-your-activity"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-recently-watched" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-reposts" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-archive"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-qr-code"              options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-settings-menu"        options={{ headerShown: false, animation: 'ios_from_right' }} />

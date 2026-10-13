@@ -980,6 +980,18 @@ export interface ShopifyImportJob {
   createdAt: string;
   updatedAt: string;
 }
+/** A post you reposted (Reposts grid, polish #146). */
+export interface MyRepost {
+  postId: string;
+  authorId: string;
+  authorName: string;
+  authorAccountType: 'buyer' | 'seller';
+  caption: string | null;
+  mediaType: string;
+  thumbnailUrl: string | null;
+  repostedAt: string;
+}
+
 export interface WatchedVideo {
   postId: string;
   authorId: string;
@@ -2667,6 +2679,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       watchedVideos: (cursor?: string) =>
         freshGet<{ items: WatchedVideo[]; nextCursor: string | null }>(
           `/api/posts/watched-videos${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+        ),
+      /** Posts I reposted, newest first (Reposts grid). */
+      myReposts: (cursor?: string) =>
+        freshGet<{ items: MyRepost[]; nextCursor: string | null }>(
+          `/api/posts/my-reposts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
         ),
       /** Caption tracks of a video post (503 CAPTIONS_UNAVAILABLE while the flag/AI keys are off). */
       captions: (id: string) =>

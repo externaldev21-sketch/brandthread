@@ -3,14 +3,15 @@
  * loaded from the social and saved-items services. No hard-coded numbers.
  */
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { FONT, ICON } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { getMyPosts, getSavedItems, getMyReposts } from '@/services/socialService';
+import { getMyPosts, getSavedItems } from '@/services/socialService';
+import { useApi } from '@/lib/api';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, ErrorState, ListRow, SkeletonBlock, SkeletonLine } from '@/components/ui';
@@ -42,10 +43,12 @@ export default function BuyerYourActivity() {
   const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api = useApi();
   const { userId } = useAuth();
   const [postCount, setPostCount] = useState(0);
   const [savedCount, setSavedCount] = useState(0);
   const [repostCount, setRepostCount] = useState(0);
+  const [moreReposts, setMoreReposts] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
@@ -67,10 +70,13 @@ export default function BuyerYourActivity() {
     }
     setLoadError(false);
     try {
-      const [posts, saved, reposts] = await Promise.all([getMyPosts(), getSavedItems(), getMyReposts()]);
+      // Reposts come from the server (#146): feed reposts never touched the
+      // old on-device list, so this count used to stay at 0.
+      const [posts, saved, reposts] = await Promise.all([getMyPosts(), getSavedItems(), api.posts.myReposts()]);
       setPostCount(posts.filter(p => !p.isDraft && !p.isArchived).length);
       setSavedCount(saved.length);
-      setRepostCount(reposts.length);
+      setRepostCount(reposts.items.length);
+      setMoreReposts(!!reposts.nextCursor);
     } catch (error) {
       // Don't show a false "0 across the board" empty state on a failed
       // fetch — surface a real error with a retry instead.
@@ -78,13 +84,13 @@ export default function BuyerYourActivity() {
     } finally {
       setLoaded(true);
     }
-  }, [userId]);
+  }, [userId, api]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   const activityItems = [
     { icon: 'image' as const, label: 'Posts', value: String(postCount), sub: 'Your profile', color: theme.accent },
     { icon: 'bookmark' as const, label: 'Saved items', value: String(savedCount), sub: 'Across all types', color: theme.accentLight },
-    { icon: 'repeat' as const, label: 'Reposts', value: String(repostCount), sub: 'To your profile', color: theme.warning },
+    { icon: 'repeat' as const, label: 'Reposts', value: `${repostCount}${moreReposts ? '+' : ''}`, sub: 'To your profile', color: theme.warning, href: '/buyer-reposts' },
   ];
 
   return (
@@ -107,14 +113,23 @@ export default function BuyerYourActivity() {
             {/* Interaction stats grid */}
             <Text style={s.groupLabel}>Content</Text>
             <View style={s.statsGrid}>
-              {activityItems.map(item => (
-                <Card key={item.label} style={s.statCard}>
-                  <Feather name={item.icon} size={ICON.md} color={item.color} />
-                  <Text style={s.statValue}>{item.value}</Text>
-                  <Text style={s.statLabel}>{item.label}</Text>
-                  <Text style={s.statSub}>{item.sub}</Text>
-                </Card>
-              ))}
+              {activityItems.map(item => {
+                const card = (
+                  <Card key={item.label} style={s.statCard}>
+                    <Feather name={item.icon} size={ICON.md} color={item.color} />
+                    <Text style={s.statValue}>{item.value}</Text>
+                    <Text style={s.statLabel}>{item.label}</Text>
+                    <Text style={s.statSub}>{item.sub}</Text>
+                  </Card>
+                );
+                // Reposts opens the grid of what you reposted (#146).
+                return 'href' in item && item.href ? (
+                  <Pressable key={item.label} style={s.statCardPress} onPress={() => router.push(item.href as never)}
+                    accessibilityRole="button" accessibilityLabel={`${item.label}, ${item.value}`} testID="your-activity-reposts">
+                    {card}
+                  </Pressable>
+                ) : card;
+              })}
             </View>
 
 
@@ -161,6 +176,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
   statCard: { flex: 1, minWidth: '45%', gap: 4 },
+  statCardPress: { flex: 1, minWidth: '45%', display: 'flex' },
   statValue: { ...TYPE_SCALE.title2, color: theme.text },
   statLabel: { ...TYPE_SCALE.footnote, fontFamily: FONT.medium, color: theme.text },
   statSub: { ...TYPE_SCALE.caption, color: theme.muted },
