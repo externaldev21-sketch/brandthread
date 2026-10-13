@@ -119,6 +119,7 @@ describe("drops.ts requires manager+ for money-moving mutations", () => {
       ["PATCH", "/api/drops/00000000-0000-4000-8000-000000000000"],
       ["POST", "/api/drops/00000000-0000-4000-8000-000000000000/cancel-preorders"],
       ["POST", "/api/drops/00000000-0000-4000-8000-000000000000/broadcast"],
+      ["POST", "/api/drops/00000000-0000-4000-8000-000000000000/sms-blast"],
     ] as const) {
       const result = await request(path, method);
       expect(result.status).toBe(403);

@@ -40,6 +40,33 @@ import type { MentionPerson, Story, StoryMentionItem, StoryStickerState } from '
 import type { LiveModerationState, LiveCohostCandidate, LiveCohostInvite, LiveCohostPerson } from '@/lib/live/moderationTypes';
 
 /** Server story highlight (GET /api/social/highlights/*). */
+/** GET /api/drops/:id/sms-blast — the seller's drop waitlist screen. */
+export interface DropSmsBlastPreview {
+  drop: {
+    id: string;
+    name: string;
+    status: string;
+    releaseAt: string | null;
+    heroImageUrl: string | null;
+    launchTimezone: string;
+  };
+  brandName: string;
+  handle: string | null;
+  publicUrl: string | null;
+  waitlistCount: number;
+  smsConfigured: boolean;
+  dropLive: boolean;
+  message: string;
+  blast: {
+    status: string;
+    recipientCount: number;
+    sentCount: number;
+    failedCount: number;
+    createdAt: string;
+    completedAt: string | null;
+  } | null;
+}
+
 export interface ServerHighlight {
   id: string; userId: string; title: string;
   coverUrl: string | null; coverEmoji: string | null; coverColor: string | null;
@@ -1382,6 +1409,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       broadcast: (dropId: string) =>
         post<{ ok: boolean; sent: number; errors: number; followers: number }>(
           `/api/drops/${encodeURIComponent(dropId)}/broadcast`, {}
+        ),
+      /** SMS waitlist for the drop's public page brandthread.app/@handle/drop: count, config, blast result. */
+      smsBlastPreview: (dropId: string) =>
+        get<DropSmsBlastPreview>(`/api/drops/${encodeURIComponent(dropId)}/sms-blast`),
+      /** Text "drop is live" to the waitlist. Once per drop; 503 SMS_NOT_CONFIGURED without Twilio. */
+      smsBlast: (dropId: string) =>
+        post<{ ok: boolean; recipients: number; sent: number; failed: number }>(
+          `/api/drops/${encodeURIComponent(dropId)}/sms-blast`, {}
         ),
       /** Schedule the follower broadcast for the drop's releaseAt. */
       scheduleBroadcast: (dropId: string, scheduledBroadcastAt: string) =>
