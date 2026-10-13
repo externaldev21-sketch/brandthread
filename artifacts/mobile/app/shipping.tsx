@@ -565,27 +565,31 @@ export default function ShippingScreen() {
                   <Text style={[styles.returnReason, { color: colors.foreground }]} accessibilityRole="alert">{returnRowError?.message}</Text>
                 ) : null}
                 <View style={styles.returnActionRow}>
+                  <View style={styles.returnActionCell}>
                   <Button
                     label="Decline"
                     variant="secondary"
                     size="small"
-                    style={{ flex: 1 }}
+                    fullWidth
                     disabled={approvingReturnId !== null}
                     onPress={() => router.push(`/return-detail?returnId=${encodeURIComponent(r.id)}&decline=1` as never)}
                     accessibilityLabel={`Decline return for order ${r.orderNumber ?? ''}`}
                     testID={`return-row-decline-${r.id}`}
                   />
+                  </View>
+                  <View style={styles.returnActionCell}>
                   <Button
                     label="Approve"
                     variant="primary"
                     size="small"
-                    style={{ flex: 1 }}
+                    fullWidth
                     loading={approvingReturnId === r.id}
                     disabled={approvingReturnId !== null}
                     onPress={() => { void approveReturnFromList(r); }}
                     accessibilityLabel={`Approve and refund the return for order ${r.orderNumber ?? ''}`}
                     testID={`return-row-approve-${r.id}`}
                   />
+                  </View>
                 </View>
               </View>
             ) : null}
@@ -1147,6 +1151,7 @@ const styles = StyleSheet.create({
   returnRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   returnActions: { paddingHorizontal: 14, paddingBottom: 14, gap: 8 },
   returnActionRow: { flexDirection: 'row', gap: 8 },
+  returnActionCell: { flex: 1 },
   returnInfo: { flex: 1, gap: 2 },
   returnId: { fontSize: 11, fontFamily: 'Inter_700Bold' },
   returnItem: { fontSize: 13, fontFamily: 'Inter_500Medium' },

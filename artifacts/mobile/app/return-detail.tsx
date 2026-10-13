@@ -327,16 +327,18 @@ export default function ReturnDetailScreen() {
                   testID="return-decline-reason"
                 />
                 <View style={s.row}>
-                  <Button label="Cancel" variant="secondary" style={{ flex: 1 }} onPress={() => { setShowDenyForm(false); setDenyReason(''); }} />
-                  <Button
+                  <View style={s.cell}><Button label="Cancel" variant="secondary" fullWidth onPress={() => { setShowDenyForm(false); setDenyReason(''); }} /></View>
+                  <View style={s.cell}>
+                    <Button
                     label="Decline return"
                     variant="primary"
-                    style={{ flex: 1 }}
+                    fullWidth
                     loading={acting === 'deny'}
                     disabled={!denyReason.trim() || acting !== null}
                     onPress={() => { void updateStatus('denied', denyReason.trim()); }}
                     testID="return-decline-submit"
                   />
+                  </View>
                 </View>
               </View>
             ) : (
@@ -371,16 +373,18 @@ export default function ReturnDetailScreen() {
                     </View>
                     <Text style={s.cardBody}>{`The cheapest label is charged to your balance. ${view.buyerName} gets it on this return, and the refund of ${formatCents(refundCents)} is issued on the carrier’s first scan.`}</Text>
                     <View style={s.row}>
-                      <Button label="Cancel" variant="secondary" style={{ flex: 1 }} disabled={buyingLabel} onPress={() => { setShowLabelForm(false); setActionError(null); }} />
-                      <Button
+                      <View style={s.cell}><Button label="Cancel" variant="secondary" fullWidth disabled={buyingLabel} onPress={() => { setShowLabelForm(false); setActionError(null); }} /></View>
+                      <View style={s.cell}>
+                        <Button
                         label="Buy label"
                         variant="primary"
-                        style={{ flex: 1 }}
+                        fullWidth
                         loading={buyingLabel}
                         disabled={buyingLabel || !!refundError}
                         onPress={() => { void sendReturnLabel(partialCents); }}
                         testID="return-label-submit"
                       />
+                      </View>
                     </View>
                   </View>
                 ) : (
@@ -555,6 +559,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   cardBody: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text, lineHeight: 20 },
   actions: { gap: SP.sm, marginTop: SP.md },
   row: { flexDirection: 'row', gap: SP.sm },
+  cell: { flex: 1 },
   fieldLabel: { fontFamily: FONT.semibold, fontSize: FS.xs + 1, color: theme.muted },
   input: {
     backgroundColor: theme.cardElevated, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border,

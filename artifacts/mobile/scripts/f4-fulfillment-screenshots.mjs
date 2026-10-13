@@ -191,6 +191,9 @@ async function fulfillFlow(browser, images, origin) {
   await shot(page, '04-label-rates');
   await overflowCheck(page, 'label-rates');
   if (MODE === 'after') {
+    await go(page, activity, origin, '/fulfill-order?orderId=ord_f4');
+    await waitFor(page, '/fulfill-order?orderId=ord_f4', () => page.getByText('Packing slip', { exact: true }));
+    await page.waitForTimeout(600);
     await page.getByText('Packing slip', { exact: true }).first().click();
     await page.waitForTimeout(900);
     await shot(page, '05-fulfill-packing-slip-sheet');
@@ -205,7 +208,7 @@ async function returnsFlow(browser, images, origin) {
   await waitForQuietNetwork(activity, 900, 15_000);
   const firstReturn = page.getByText('#NS-1046 · Amara Chen').first();
   await firstReturn.waitFor({ timeout: 10_000 }).catch(() => {});
-  await page.getByText('Ship From', { exact: true }).first().scrollIntoViewIfNeeded().catch(() => {});
+  await page.getByText('Returns & Exchanges', { exact: true }).first().evaluate((el) => el.scrollIntoView({ block: 'start' })).catch(() => {});
   await page.waitForTimeout(800);
   await shot(page, '06-returns-list');
   await overflowCheck(page, 'returns-list');
