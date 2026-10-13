@@ -21,7 +21,7 @@ import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { subscribeConversationReadFailure } from '@/lib/conversationReadEvents';
-import { markConversationRead, archiveConversation, muteUser, setConversationPinned } from '@/services/socialService';
+import { markConversationRead, archiveConversation, muteConversation, setConversationPinned } from '@/services/socialService';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import {
   isPreviewInboxEnabled, getSellerPreviewConversations,
@@ -55,6 +55,8 @@ interface ConvView {
   contextOrderNumber?: string; contextProductName?: string;
   updatedAt: string;
   isPinned?: boolean;
+  /** Present while this conversation is muted (server conversation view). */
+  mutedUntil?: string;
   isArchived?: boolean;
   // New every-role-pair DM/message-request routing: a buyer with no
   // follow-back and no real paid order now lands in the seller's Requests
@@ -399,16 +401,17 @@ export default function SellerInboxScreen() {
     }
   }
 
+  // Swipe > Mute (#165): mutes this conversation on the server (Chat
+  // details > Mute "Until I turn it back on"); swiping again unmutes.
   async function swipeMuteConversation(c: ConvView) {
-    const other = otherParticipant(c);
-    if (!other) return;
+    const wasMuted = !!c.mutedUntil;
+    setConvs((current) => current.map((row) => (row.id === c.id
+      ? { ...row, mutedUntil: wasMuted ? undefined : '9999-12-31T00:00:00.000Z' } : row)));
     try {
-      await muteUser({
-        userId: other.userId, name: other.name, handle: other.handle,
-        initials: other.initials, color: other.color,
-      });
+      await muteConversation(c.id, wasMuted ? null : -1);
     } catch {
-      Alert.alert('Couldn’t mute', 'Please try again.');
+      setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, mutedUntil: c.mutedUntil } : row)));
+      Alert.alert(wasMuted ? 'Couldn’t unmute' : 'Couldn’t mute', 'Please try again.');
     }
   }
 
@@ -521,12 +524,12 @@ export default function SellerInboxScreen() {
       },
       {
         key: 'mute',
-        label: 'Mute',
-        icon: 'bell-off',
+        label: item.mutedUntil ? 'Unmute' : 'Mute',
+        icon: item.mutedUntil ? 'bell' : 'bell-off',
         color: theme.cardElevated,
         textColor: theme.muted,
         onPress: () => swipeMuteConversation(item),
-        accessibilityLabel: `Mute ${other.name || other.handle || 'buyer'}`,
+        accessibilityLabel: `${item.mutedUntil ? 'Unmute' : 'Mute'} ${other.name || other.handle || 'buyer'}`,
       },
       {
         key: 'delete',

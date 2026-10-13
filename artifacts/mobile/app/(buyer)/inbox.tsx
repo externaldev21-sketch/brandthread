@@ -23,7 +23,7 @@ import {
   getConversations, markConversationRead, archiveConversation,
   subscribeSocial,
   searchProfiles, createOrGetConversation, muteUser, MY_USER_ID,
-  getFriendSuggestions, cacheStoriesForViewer, setConversationPinned,
+  getFriendSuggestions, cacheStoriesForViewer, setConversationPinned, muteConversation,
   getNotesForTray, postNote,
 } from '@/services/socialService';
 import type { Conversation, ProfileSearchResult, AccountType, Story, Note } from '@/services/socialTypes';
@@ -811,20 +811,34 @@ export default function InboxScreen() {
     await swipeArchiveConversation(conv);
   }
 
+  // Swipe > Mute (#165): mutes this conversation's notifications on the
+  // server (same as Chat details > Mute "Until I turn it back on"), not the
+  // person; swiping again unmutes. Optimistic, rolled back on failure.
   async function swipeMuteConversation(conv: Conversation) {
     const participant = getParticipant(conv);
     if (!participant) return;
+    const wasMuted = !!conv.mutedUntil;
+    const preview = isPreviewConversationId(conv.id);
+    setConversations(prev => prev.map(item =>
+      item.id === conv.id ? { ...item, mutedUntil: wasMuted ? undefined : '9999-12-31T00:00:00.000Z' } : item
+    ));
     try {
-      await muteUser({
-        userId: participant.userId,
-        name: participant.name,
-        handle: participant.handle,
-        initials: participant.initials,
-        color: participant.color,
-      });
-      showSnackbar(`Muted ${participant.name}`);
+      if (preview) {
+        // Seeded demo threads have no server row; the person-mute keeps
+        // the old behavior there.
+        await muteUser({
+          userId: participant.userId, name: participant.name, handle: participant.handle,
+          initials: participant.initials, color: participant.color,
+        });
+      } else {
+        await muteConversation(conv.id, wasMuted ? null : -1);
+      }
+      showSnackbar(wasMuted ? `Unmuted ${participant.name}` : `Muted ${participant.name}`);
     } catch {
-      Alert.alert('Couldn’t mute', 'Please try again.');
+      setConversations(prev => prev.map(item =>
+        item.id === conv.id ? { ...item, mutedUntil: conv.mutedUntil } : item
+      ));
+      Alert.alert(wasMuted ? 'Couldn’t unmute' : 'Couldn’t mute', 'Please try again.');
     }
   }
 
@@ -1119,12 +1133,12 @@ export default function InboxScreen() {
       }]),
       {
         key: 'mute',
-        label: 'Mute',
-        icon: 'bell-off',
+        label: conv.mutedUntil ? 'Unmute' : 'Mute',
+        icon: conv.mutedUntil ? 'bell' : 'bell-off',
         color: theme.cardElevated,
         textColor: theme.muted,
         onPress: () => swipeMuteConversation(conv),
-        accessibilityLabel: `Mute ${participant.name}`,
+        accessibilityLabel: `${conv.mutedUntil ? 'Unmute' : 'Mute'} ${participant.name}`,
       },
       {
         key: 'delete',
