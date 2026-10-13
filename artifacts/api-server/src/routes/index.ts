@@ -157,6 +157,8 @@ import webhooksShopifyRouter from "./webhooks-shopify";
 import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
 import shopifyRouter from "./shopify";
 import sharePreviewRouter from "./share-preview";
+import seoPublicRouter from "./seo-public";
+import wellKnownRouter from "./wellKnown";
 import affiliatePublicRouter from "./affiliate-public";
 import affiliateCreatorRouter from "./affiliate-creator";
 import sellerAffiliateRouter from "./seller-affiliate";
@@ -190,6 +192,10 @@ router.use("/products", (req, res, next) => {
 });
 router.use("/public",          publicRouter);
 router.use("/public",          sharePreviewRouter); // /posts/:id/share-preview, /stores/:slug/share-preview (OG data)
+router.use("/public",          seoPublicRouter); // /seo/products/:id, /new-this-week, /seo/sitemap/:kind, /invites/:code/share-preview
+// brandthread.app only routes /api/* here, so the web server (serve.js)
+// proxies /.well-known/* from this mirror of the root verification files.
+router.use("/public/well-known", wellKnownRouter);
 router.use("/public",          discoveryRouter); // /categories, /trending/products, /trending/brands
 router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark

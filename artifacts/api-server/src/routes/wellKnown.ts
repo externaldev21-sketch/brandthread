@@ -23,6 +23,7 @@ export const DEEP_LINK_PATHS = [
   "/p/*",
   "/tag/*",
   "/place/*",
+  "/invite/*",
   "/onboarding*",
   "/team-invite*",
 ];
@@ -34,6 +35,18 @@ function appleAppId(): string | null {
   return `${teamId}.${bundleId}`;
 }
 
+/**
+ * App Clip ("instant checkout without install"). Only advertised once the
+ * App Clip target exists and APP_CLIP_BUNDLE_ID is set (plus APPLE_TEAM_ID);
+ * until then the association file carries no `appclips` key at all.
+ */
+export function appClipAppId(): string | null {
+  const teamId = process.env.APPLE_TEAM_ID?.trim();
+  const clipBundleId = process.env.APP_CLIP_BUNDLE_ID?.trim();
+  if (!teamId || !clipBundleId) return null;
+  return `${teamId}.${clipBundleId}`;
+}
+
 function androidSha256Fingerprints(): string[] {
   const raw = process.env.ANDROID_SHA256_CERT_FINGERPRINTS?.trim();
   if (!raw) return [];
@@ -42,6 +55,7 @@ function androidSha256Fingerprints(): string[] {
 
 router.get("/apple-app-site-association", (_req, res) => {
   const appId = appleAppId();
+  const clipId = appClipAppId();
   res.setHeader("Content-Type", "application/json");
   res.json({
     applinks: {
@@ -50,6 +64,7 @@ router.get("/apple-app-site-association", (_req, res) => {
         ? [{ appID: appId, paths: DEEP_LINK_PATHS }]
         : [],
     },
+    ...(clipId ? { appclips: { apps: [clipId] } } : {}),
   });
 });
 
