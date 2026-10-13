@@ -128,7 +128,7 @@ const pillS = StyleSheet.create({
   },
   pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
   pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  pillCountText: { fontSize: 11, fontFamily: FONT.bold },
+  pillCountText: { fontSize: 11, fontFamily: FONT.bold, fontVariant: ['tabular-nums'] },
 });
 
 function timeAgo(ts?: number): string {

@@ -2599,7 +2599,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.sm, borderWidth: 1,
   },
-  reactionCount: { fontSize: 11, fontFamily: FONT.semibold },
+  reactionCount: { fontSize: 11, fontFamily: FONT.semibold, fontVariant: ['tabular-nums'] },
   // Seen receipt (Instagram DM "Seen just now" reference) — small muted
   // text under the sender's own last message.
   seenReceipt: {
@@ -2701,7 +2701,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginRight: SP.sm,
   },
   productName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  productPrice: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 },
+  productPrice: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2, fontVariant: ['tabular-nums'] },
   emptyState: { alignItems: 'center', paddingVertical: SP.xxl },
   emptyText: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm, textAlign: 'center', paddingHorizontal: SP.lg },
 
@@ -2728,7 +2728,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   orderMsgCardBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   buyerContextOrderMeta: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  buyerContextOrderTotal: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginLeft: SP.xs },
+  buyerContextOrderTotal: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginLeft: SP.xs, fontVariant: ['tabular-nums'] },
   buyerContextRetry: {
     marginTop: SP.sm, paddingVertical: SP.xs, paddingHorizontal: SP.md,
     borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER,

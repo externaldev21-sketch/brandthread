@@ -2043,7 +2043,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   lineItemSku:      { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
   lineItemRight:    { alignItems: 'flex-end' },
   lineItemQty:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  lineItemTotal:    { fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
+  lineItemTotal:    { fontSize: FS.sm, fontFamily: FONT.bold, color: FG, fontVariant: ['tabular-nums'] },
 
   // Customer
   customerHero:     { alignItems: 'center', gap: SP.sm },
@@ -2080,7 +2080,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   expectedRelease:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm },
   refundCard:       { gap: SP.xs, marginBottom: SP.xs },
   refundHeader:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', flexWrap: 'wrap' },
-  refundAmount:     { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginLeft: 'auto' },
+  refundAmount:     { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginLeft: 'auto', fontVariant: ['tabular-nums'] },
   refundDate:       { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
 
   // Fulfillment
@@ -2160,11 +2160,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   disputeCard:      { gap: SP.sm, marginBottom: SP.sm },
   disputeHeader:    { flexDirection: 'row', gap: SP.sm, alignItems: 'center', flexWrap: 'wrap' },
   disputeType:      { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, textTransform: 'capitalize' },
-  disputeAmount:    { fontSize: FS.base, fontFamily: FONT.bold, color: RED, marginLeft: 'auto' },
+  disputeAmount:    { fontSize: FS.base, fontFamily: FONT.bold, color: RED, marginLeft: 'auto', fontVariant: ['tabular-nums'] },
   disputeClaim:     { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
   disputeDeadlineRow:{ flexDirection: 'row', gap: SP.xs, alignItems: 'center' },
   disputeDeadline:  { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  disputeEvCount:   { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  disputeEvCount:   { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, fontVariant: ['tabular-nums'] },
   disputeActions:   { flexDirection: 'row', gap: SP.sm },
 
   // Modal

@@ -1590,6 +1590,7 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // end-call red, and Thread Cash green). Every other detail line stays
   // theme-text monochrome.
   cashAmount: {
+    fontVariant: ['tabular-nums'],
     color: THREAD_CASH_GREEN_MID,
     fontFamily: FONT.bold,
   },

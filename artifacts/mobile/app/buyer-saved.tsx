@@ -261,7 +261,7 @@ export default function BuyerSaved() {
           <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
           {isProduct && item.priceCents != null ? (
             <View style={styles.priceRow}>
-              <Text style={[styles.tilePrice, TABULAR_NUMS, item.priceDropped && { color: theme.success }]}>
+              <Text style={[styles.tilePrice, TABULAR_NUMS]}>
                 {formatCents(item.priceCents)}
               </Text>
               {item.priceDropped && item.oldPriceCents != null ? (
@@ -488,8 +488,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   tileTitle: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, color: theme.text },
   tileSubtitle: { ...TYPE_SCALE.caption, color: palette.mutedForeground },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING.xxs, marginTop: 1 },
-  tilePrice: { ...TYPE_SCALE.footnote, fontFamily: FONT.bold, color: theme.text },
-  tileOldPrice: { ...TYPE_SCALE.caption, color: theme.subtle, textDecorationLine: 'line-through' },
+  tilePrice: { ...TYPE_SCALE.footnote, fontFamily: FONT.bold, color: theme.text, fontVariant: ['tabular-nums'] },
+  tileOldPrice: { ...TYPE_SCALE.caption, color: theme.subtle, textDecorationLine: 'line-through', fontVariant: ['tabular-nums'] },
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: OVERLAY },
   actionsContent: { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs },
   actionsTitle: { ...TYPE_SCALE.headline, fontFamily: FONT.bold, color: theme.text, marginBottom: SPACING.xs, textAlign: 'center' },

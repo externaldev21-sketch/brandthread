@@ -149,7 +149,7 @@ const pillS = StyleSheet.create({
   },
   pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
   pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  pillCountText: { fontSize: 11, fontFamily: FONT.bold },
+  pillCountText: { fontSize: 11, fontFamily: FONT.bold, fontVariant: ['tabular-nums'] },
 });
 
 // ─── Compose sheet: unified "person" shape ────────────────────────────────────
@@ -2027,6 +2027,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     padding: SP.md, fontSize: FS.md, fontFamily: FONT.regular, textAlignVertical: 'top',
   },
   noteComposeCount: {
+    fontVariant: ['tabular-nums'],
     fontSize: FS.meta, fontFamily: FONT.medium, textAlign: 'right',
     marginTop: SP.xs, marginBottom: SP.md,
   },

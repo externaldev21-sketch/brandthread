@@ -2,6 +2,7 @@
  * Community (topic group chat) types — mirrors api-server routes/communities.ts.
  * See lib/communities/useCommunityClient.ts for how screens talk to it.
  */
+import { formatCompactCount } from '@/lib/compactFormat';
 
 export type CommunityKind = 'official' | 'user';
 export type CommunityVisibility = 'public' | 'private';
@@ -139,13 +140,10 @@ export class CommunityAuthRequiredError extends Error {
   }
 }
 
-/** Number shown next to a member count: 1,240 → "1.2K members". */
+/** Number shown next to a member count: 12,400 → "12.4K members". */
 export function formatMemberCount(n: number): string {
   const label = n === 1 ? 'member' : 'members';
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1).replace(/\.0$/, '')}M ${label}`;
-  if (n >= 10_000) return `${Math.round(n / 1000)}K ${label}`;
-  if (n >= 1_000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K ${label}`;
-  return `${n} ${label}`;
+  return `${formatCompactCount(n)} ${label}`;
 }
 
 /** Bold/badge counts in the tab bar ignore muted communities (their row still shows unread quietly). */

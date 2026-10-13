@@ -215,7 +215,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   totalRow: { backgroundColor: colors.elevated, paddingVertical: SP.md },
   lineLabel:{ fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground },
   estimateNote:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.subtle, marginTop: 1 },
-  lineAmount:{ fontSize: FS.base, fontFamily: FONT.semibold },
+  lineAmount:{ fontSize: FS.base, fontFamily: FONT.semibold, fontVariant: ['tabular-nums'] },
   payoutCard:{ backgroundColor: colors.elevated, borderRadius: RADIUS.lg, padding: SP.lg, borderWidth: 1, borderColor: colors.border, marginBottom: SP.lg },
   payoutLabel:{ fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground, marginBottom: 4 },
   payoutValue:{ fontSize: 36, fontFamily: FONT.bold, color: colors.foreground },

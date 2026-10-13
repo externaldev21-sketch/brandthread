@@ -589,7 +589,7 @@ const s = StyleSheet.create({
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill,
     paddingHorizontal: SP.sm, paddingVertical: 3, alignItems: 'center', justifyContent: 'center', marginTop: 2,
   },
-  refCountText: { fontFamily: FONT.bold, fontSize: FS.xs, color: FG },
+  refCountText: { fontFamily: FONT.bold, fontSize: FS.xs, color: FG, fontVariant: ['tabular-nums'] },
   uploadZone: {
     borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.xl, backgroundColor: CARD,
     height: 180, alignItems: 'center', justifyContent: 'center', gap: SP.sm, overflow: 'hidden',

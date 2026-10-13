@@ -404,8 +404,8 @@ const styles = StyleSheet.create({
   itemRow:        { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   itemName:       { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   itemVariant:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  itemUnitPrice:  { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-  itemSubtotal:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: CYAN, marginTop: SP.xs },
+  itemUnitPrice:  { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, fontVariant: ['tabular-nums'] },
+  itemSubtotal:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: CYAN, marginTop: SP.xs, fontVariant: ['tabular-nums'] },
   switchRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   switchLabel:    { fontSize: FS.sm, fontFamily: FONT.medium, color: FG, flex: 1 },
 });

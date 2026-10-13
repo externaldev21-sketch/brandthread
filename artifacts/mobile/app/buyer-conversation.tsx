@@ -3457,6 +3457,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingVertical: 2,
   },
   reactionCount: {
+    fontVariant: ['tabular-nums'],
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
   },

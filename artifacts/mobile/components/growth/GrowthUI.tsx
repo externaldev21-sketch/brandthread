@@ -107,5 +107,5 @@ const st = StyleSheet.create({
   tileValue: { fontSize: FS.lg, fontFamily: FONT.bold, marginTop: 2 },
   metric: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, gap: SP.md },
   metricLabel: { fontSize: FS.base, fontFamily: FONT.medium, flex: 1 },
-  metricValue: { fontSize: FS.base, fontFamily: FONT.semibold },
+  metricValue: { fontSize: FS.base, fontFamily: FONT.semibold, fontVariant: ['tabular-nums'] },
 });

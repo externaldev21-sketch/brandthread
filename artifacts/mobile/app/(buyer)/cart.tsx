@@ -205,7 +205,7 @@ function CartItemRow({
         <View style={ir.titleRow}>
           <Text style={ir.name} numberOfLines={3}>{item.productName}</Text>
           <View style={ir.priceBlock}>
-            <Text style={[ir.price, hasDiscount ? ir.priceDiscounted : undefined]}>{fmtPrice(lineTotal)}</Text>
+            <Text style={ir.price}>{fmtPrice(lineTotal)}</Text>
             {hasDiscount && (
               <Text style={ir.comparePrice}>{fmtPrice(item.compareAtPriceCents! * item.quantity)}</Text>
             )}
@@ -351,7 +351,6 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   priceBlock: { alignItems: 'flex-end' },
   comparePrice: { fontSize: FS.meta, ...TABULAR_NUMS, fontFamily: FONT.medium, color: theme.subtle, textDecorationLine: 'line-through' },
   price: { fontSize: FS.md, ...TABULAR_NUMS, fontFamily: FONT.bold, color: theme.text },
-  priceDiscounted: { color: theme.success },
   qtyRow: { flexDirection: 'row', alignItems: 'center', marginTop: SP.xs },
   // Grey 13pt text links, each a 44pt-tall target, left-aligned.
   textActions: { flexDirection: 'row', alignItems: 'center', marginTop: 2, marginLeft: -SP.xs },
@@ -524,7 +523,7 @@ const makeSellerGroupStyles = (theme: AppThemePreset) => StyleSheet.create({
   footer: { borderTopWidth: 1, borderTopColor: theme.borderSubtle, marginTop: SP.sm, paddingTop: SP.sm, gap: 4 },
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   footerText: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted },
-  groupSubtotal: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginTop: 4 },
+  groupSubtotal: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginTop: 4, fontVariant: ['tabular-nums'] },
   groupCheckout: { marginTop: SP.sm },
 });
 
@@ -576,7 +575,7 @@ const makeSavedItemStyles = (theme: AppThemePreset) => StyleSheet.create({
   img: { width: 56, height: 70, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   name: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   variant: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginBottom: 2 },
-  price: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
+  price: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4, fontVariant: ['tabular-nums'] },
   unavail: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.error, marginBottom: 4 },
   actions: { flexDirection: 'row', gap: SP.sm },
 });

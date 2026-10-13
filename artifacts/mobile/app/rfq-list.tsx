@@ -130,7 +130,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   countsRow: { flexDirection: 'row', gap: SP.sm, marginTop: SP.xs },
   countPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: theme.cardElevated, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4 },
   countPillActive: { backgroundColor: theme.accentDim },
-  countText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
+  countText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, fontVariant: ['tabular-nums'] },
   withdrawBtn: { alignSelf: 'flex-start', marginTop: SP.xs },
   withdrawText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.error },
   fabWrap: { padding: SP.md, borderTopWidth: 1, borderTopColor: theme.border, backgroundColor: theme.background },

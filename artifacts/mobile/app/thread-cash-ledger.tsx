@@ -199,6 +199,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   icon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   label: { fontFamily: FONT.medium, fontSize: FS.sm },
   sub: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
-  amount: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  amount: { fontFamily: FONT.semibold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
   more: { alignItems: 'center', justifyContent: 'center', height: 48, marginTop: SP.sm },
 });

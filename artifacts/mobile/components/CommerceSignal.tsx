@@ -479,6 +479,6 @@ const sig = StyleSheet.create({
     borderRadius: RADIUS.pill,
   },
   demandBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, letterSpacing: 0.3 },
-  price: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
+  price: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, fontVariant: ['tabular-nums'] },
   signalRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SP.xs },
 });

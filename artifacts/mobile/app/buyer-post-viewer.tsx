@@ -578,7 +578,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   timestamp: { paddingHorizontal: SP.md, paddingTop: SP.xs, fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
   engagementBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingTop: SP.md, gap: SP.sm },
   engageBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: SP.xs },
-  engageCount: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG },
+  engageCount: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG, fontVariant: ['tabular-nums'] },
   commentsSection: { paddingHorizontal: SP.md, marginTop: SP.md },
   commentsLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: MUTED, marginBottom: SP.sm },
   commentRow: { flexDirection: 'row', gap: 8, marginBottom: SP.sm },

@@ -229,7 +229,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   heroText: { flex: 1 },
   title: { ...TYPE_SCALE.title2, color: theme.text, fontFamily: FONT.bold },
   subtitle: { ...TYPE_SCALE.body, color: theme.muted, marginTop: 2 },
-  count: { ...TYPE_SCALE.body, color: theme.muted, marginTop: 2 },
+  count: { ...TYPE_SCALE.body, color: theme.muted, marginTop: 2, fontVariant: ['tabular-nums'] },
   tabs: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, marginBottom: PROFILE_GRID_GAP },
   tab: { flex: 1, alignItems: 'center', paddingTop: SPACING.sm },
   tabText: { ...TYPE_SCALE.body, paddingBottom: SPACING.sm },

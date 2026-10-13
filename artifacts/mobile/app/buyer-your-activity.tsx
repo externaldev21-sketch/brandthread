@@ -161,7 +161,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
   statCard: { flex: 1, minWidth: '45%', gap: 4 },
-  statValue: { ...TYPE_SCALE.title2, color: theme.text },
+  statValue: { ...TYPE_SCALE.title2, color: theme.text, fontVariant: ['tabular-nums'] },
   statLabel: { ...TYPE_SCALE.footnote, fontFamily: FONT.medium, color: theme.text },
   statSub: { ...TYPE_SCALE.caption, color: theme.muted },
   card: { paddingVertical: SPACING.xxs, paddingHorizontal: SPACING.md, overflow: 'hidden' },

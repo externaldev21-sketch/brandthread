@@ -71,9 +71,10 @@ describe('appendChat', () => {
 describe('formatting', () => {
   it('formats viewer counts compactly', () => {
     expect(formatViewerCount(987)).toBe('987');
-    expect(formatViewerCount(2430)).toBe('2.4K');
-    expect(formatViewerCount(123456)).toBe('123K');
-    expect(formatViewerCount(1_150_000)).toBe('1.2M');
+    expect(formatViewerCount(2430)).toBe('2,430');
+    expect(formatViewerCount(12_430)).toBe('12.4K');
+    expect(formatViewerCount(123456)).toBe('123.5K');
+    expect(formatViewerCount(1_160_000)).toBe('1.2M');
     expect(formatViewerCount(-4)).toBe('0');
   });
   it('labels upcoming lives relative to today', () => {

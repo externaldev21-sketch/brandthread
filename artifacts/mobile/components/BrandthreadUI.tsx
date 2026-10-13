@@ -733,7 +733,7 @@ const fcS = StyleSheet.create({
   activeLabel:  { fontFamily: FONT.semibold },
   count:        { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: RADIUS.pill, paddingHorizontal: 5, paddingVertical: 1 },
   activeCount:  {},
-  countText:    { fontSize: FS.xs, fontFamily: FONT.bold, color: MUTED },
+  countText:    { fontSize: FS.xs, fontFamily: FONT.bold, color: MUTED, fontVariant: ['tabular-nums'] },
   activeCountText: {},
 });
 

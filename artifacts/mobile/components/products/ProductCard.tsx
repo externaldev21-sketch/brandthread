@@ -283,6 +283,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     marginTop: 2,
   },
   price: {
+    fontVariant: ['tabular-nums'],
     fontFamily: FONT.bold,
     fontSize: FS.sm,
   },
@@ -292,6 +293,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   discount: {
+    fontVariant: ['tabular-nums'],
     fontFamily: FONT.bold,
     fontSize: FS.xs,
   },

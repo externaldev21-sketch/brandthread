@@ -322,7 +322,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   categoryCard: { width: '31%', flexGrow: 1, backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.sm, gap: 4, alignItems: 'flex-start' },
   categoryIconWrap: { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   categoryLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
-  categoryCount: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+  categoryCount: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, fontVariant: ['tabular-nums'] },
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
 

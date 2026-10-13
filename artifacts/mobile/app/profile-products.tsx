@@ -234,7 +234,7 @@ function makeStyles(theme: AppThemePreset) {
     headerCopy: { flex: 1, minWidth: 0 },
     eyebrow: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.6, textTransform: 'uppercase', color: theme.muted },
     title: { fontFamily: FONT.bold, fontSize: FS.xxl, lineHeight: 32, letterSpacing: -0.5, color: theme.text },
-    count: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted },
+    count: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted, fontVariant: ['tabular-nums'] },
     ownerRow: { flexDirection: 'row', gap: SP.sm },
     pad: { paddingHorizontal: SP.md },
     row: { gap: GAP, paddingHorizontal: SP.md, marginBottom: SP.md },
@@ -246,7 +246,7 @@ function makeStyles(theme: AppThemePreset) {
     soldOutVeil: { ...StyleSheet.absoluteFill, backgroundColor: `${theme.background}8C` },
     info: { paddingTop: SP.sm, paddingHorizontal: 2, gap: 3 },
     name: { fontFamily: FONT.semibold, fontSize: FS.sm, lineHeight: 18, color: theme.text },
-    price: { fontFamily: FONT.bold, fontSize: FS.sm, color: theme.text },
+    price: { fontFamily: FONT.bold, fontSize: FS.sm, color: theme.text, fontVariant: ['tabular-nums'] },
     stock: { fontFamily: FONT.medium, fontSize: FS.xs },
   });
 }

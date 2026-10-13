@@ -455,7 +455,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     flex: 1, borderRadius: RADIUS.md, borderWidth: 1,
     paddingVertical: SP.sm + 2, alignItems: 'center', gap: 2,
   },
-  statValue: { fontSize: FS.lg, fontFamily: FONT.bold },
+  statValue: { fontSize: FS.lg, fontFamily: FONT.bold, fontVariant: ['tabular-nums'] },
   statLabel: { fontSize: FS.xs, fontFamily: FONT.medium },
 
   // Sections
@@ -474,7 +474,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
 
   // Content library header + filters
   libraryHeaderRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: SP.sm },
-  libraryCount: { fontSize: FS.xs, fontFamily: FONT.regular },
+  libraryCount: { fontSize: FS.xs, fontFamily: FONT.regular, fontVariant: ['tabular-nums'] },
   filterScroll: { flexGrow: 0, marginBottom: SP.md },
   filterRow: { flexDirection: 'row', gap: SP.xs },
   filterTab: { borderRadius: radius.md, paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderWidth: 1, minHeight: 44, justifyContent: 'center' },

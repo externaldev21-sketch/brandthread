@@ -326,7 +326,7 @@ const s = StyleSheet.create({
   rejectBox:  { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', borderRadius: RADIUS.sm, borderWidth: 1, padding: SP.sm, marginTop: SP.sm },
   statRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: SP.md, marginTop: SP.sm },
   stat:       { minWidth: 72 },
-  statValue:  { fontSize: FS.sm, fontFamily: FONT.bold },
+  statValue:  { fontSize: FS.sm, fontFamily: FONT.bold, fontVariant: ['tabular-nums'] },
   statLabel:  { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 1 },
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginTop: SP.md },
   actionBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },

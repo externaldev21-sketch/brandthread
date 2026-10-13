@@ -772,7 +772,7 @@ const createStyles = (theme: { background: string; card: string; border: string;
 
     rateCard: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
     rateCarrier: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-    ratePrice: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
+    ratePrice: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, fontVariant: ['tabular-nums'] },
 
     successTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
     successCircle: { width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center' },

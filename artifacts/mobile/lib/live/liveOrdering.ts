@@ -3,6 +3,7 @@
  * can be unit tested directly.
  */
 import type { LiveChatMessage, LiveStream } from './types';
+import { formatCompactCount } from '@/lib/compactFormat';
 
 /**
  * Followed creators first, then by viewer count (desc), then earliest
@@ -65,16 +66,10 @@ export function appendChat(prev: readonly LiveChatMessage[], incoming: readonly 
   return merged.slice(-LIVE_CHAT_BUFFER);
 }
 
-/** Compact viewer count: 987, 1.2K, 12.4K, 1.1M. */
+/** Compact viewer count — the app-wide short-number rule: 987, 2,430, 12.4K, 1.2M. */
 export function formatViewerCount(n: number): string {
   if (!Number.isFinite(n) || n < 0) return '0';
-  if (n < 1000) return String(Math.round(n));
-  if (n < 1_000_000) {
-    const k = n / 1000;
-    return `${k >= 100 ? Math.round(k) : Math.round(k * 10) / 10}K`;
-  }
-  const m = n / 1_000_000;
-  return `${m >= 100 ? Math.round(m) : Math.round(m * 10) / 10}M`;
+  return formatCompactCount(Math.round(n));
 }
 
 /** "Today 7:00 PM" / "Tomorrow 11:30 AM" / "Sat 6:00 PM". */

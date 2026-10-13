@@ -22,6 +22,7 @@ import { ProLockedState } from '@/components/analytics/ProLockedState';
 import {
   AnalyticsBarChart, AnalyticsSkeleton, Card, CardDivider, SectionTitle,
 } from '@/components/analytics/AnalyticsKit';
+import { formatDollarsCompact } from '@/lib/compactFormat';
 
 type Advanced = Awaited<ReturnType<ReturnType<typeof useApi>['analytics']['advanced']>>;
 
@@ -59,10 +60,7 @@ function wantsLockedPreview(): boolean {
   }
 }
 
-function dollars(cents: number): string {
-  const d = cents / 100;
-  return d >= 1000 ? `$${(d / 1000).toFixed(1)}k` : `$${d.toFixed(0)}`;
-}
+const dollars = formatDollarsCompact;
 
 export default function AnalyticsAdvancedScreen() {
   const colors = useColors();
@@ -197,7 +195,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   content: { paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: 120 },
   statRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm, minHeight: 52, paddingHorizontal: SP.md },
   statLabel: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground },
-  statValue: { fontSize: FS.base, fontFamily: FONT.semibold, color: colors.foreground },
+  statValue: { fontSize: FS.base, fontFamily: FONT.semibold, color: colors.foreground, fontVariant: ['tabular-nums'] },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm + 2 },
   cell: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: colors.foreground, textAlign: 'right' },

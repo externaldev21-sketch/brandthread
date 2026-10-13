@@ -215,7 +215,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   rowText: { flex: 1 },
   name: { ...TYPE_SCALE.body, fontFamily: FONT.semibold },
   secondary: { ...TYPE_SCALE.footnote, marginTop: 1 },
-  count: { ...TYPE_SCALE.footnote },
+  count: { ...TYPE_SCALE.footnote, fontVariant: ['tabular-nums'] },
 });
 
 export default LocationPicker;

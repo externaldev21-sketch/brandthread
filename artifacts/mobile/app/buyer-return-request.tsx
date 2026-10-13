@@ -439,7 +439,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   itemName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   itemVariant: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
-  itemPrice: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
+  itemPrice: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, fontVariant: ['tabular-nums'] },
 
   fieldError: { fontSize: FS.xs + 1, fontFamily: FONT.medium, color: theme.text, marginTop: -SP.sm, marginBottom: SP.md },
 

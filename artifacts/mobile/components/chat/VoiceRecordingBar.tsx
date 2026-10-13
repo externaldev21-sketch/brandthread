@@ -113,7 +113,7 @@ const rs = StyleSheet.create({
   hint: { fontFamily: FONT.regular, fontSize: FS.xs },
   waveRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 2, overflow: 'hidden' },
   bar: { width: 2.5, borderRadius: 2 },
-  timer: { fontFamily: FONT.medium, fontSize: FS.xs, minWidth: 34, textAlign: 'right' },
+  timer: { fontFamily: FONT.medium, fontSize: FS.xs, minWidth: 34, textAlign: 'right', fontVariant: ['tabular-nums'] },
   sendBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   micGhost: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', opacity: 0.5 },
   webLockRow: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center', paddingTop: 6 },
