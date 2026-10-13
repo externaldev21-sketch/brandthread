@@ -232,8 +232,10 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
   const reducedMotion = useReducedMotion();
   // Owns the pill's position so a tab press can kick the glide immediately,
   // before the screen swap — see the hook's doc in TabBarParts.
-  const { x: indicatorX, target: indicatorTarget, opacity: indicatorOpacity, press: pressIndicator } =
-    useTabBarActiveIndex(activeIndex, reducedMotion);
+  const {
+    x: indicatorX, target: indicatorTarget, origin: indicatorOrigin, peakStretch: indicatorStretch,
+    opacity: indicatorOpacity, press: pressIndicator, afterGlide,
+  } = useTabBarActiveIndex(activeIndex, reducedMotion);
 
   const [newOrderCount, setNewOrderCount] = useState(() =>
     getSellerOrderBadgeCount(userId),
@@ -386,7 +388,15 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
         ]}
       >
         <TabBarGlass theme={theme} radius={radius.bar} />
-        <TabBarIndicator x={indicatorX} target={indicatorTarget} opacity={indicatorOpacity} metrics={metrics} theme={theme} />
+        <TabBarIndicator
+          x={indicatorX}
+          target={indicatorTarget}
+          origin={indicatorOrigin}
+          peakStretch={indicatorStretch}
+          opacity={indicatorOpacity}
+          metrics={metrics}
+          theme={theme}
+        />
 
         <View
           accessibilityRole="tablist"
@@ -411,8 +421,10 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
               // On a tab already, navigate() (not replace()) so the (tabs)
               // navigator sees a real focus change and runs its
               // transitionSpec — replace() swaps with no transition at all.
-              if (onPushedScreen && router.canGoBack()) router.dismissTo(tabDef.destination as never);
-              else router.navigate(tabDef.destination as never);
+              afterGlide(() => {
+                if (onPushedScreen && router.canGoBack()) router.dismissTo(tabDef.destination as never);
+                else router.navigate(tabDef.destination as never);
+              });
             };
 
             return (
