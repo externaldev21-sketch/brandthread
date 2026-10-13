@@ -174,7 +174,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'app/buyer-restricted.tsx',
   'app/buyer-return-request.tsx',
   'app/buyer-saved.tsx',
-  'app/buyer-search.tsx',
   'app/buyer-story-create.tsx',
   'app/buyer-story-viewer.tsx',
   'app/story-mention-viewer.tsx',

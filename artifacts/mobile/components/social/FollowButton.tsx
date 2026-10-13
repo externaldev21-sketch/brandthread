@@ -19,6 +19,8 @@ type Props = {
   onChange?: (next: FollowState, delta: 1 | -1) => void;
   disabled?: boolean;
   size?: 'default' | 'compact';
+  /** Runs before following/unfollowing; return false to stop (e.g. useSignInGate's requireSignIn for guests). */
+  guard?: () => boolean;
   style?: any;
 };
 
@@ -27,7 +29,7 @@ type Props = {
  * rolls back if the request fails — the network round trip never blocks the
  * UI. Wire `onChange` to update follower counts shown elsewhere on screen.
  */
-export default function FollowButton({ userId, initial, onChange, disabled, size = 'default', style }: Props) {
+export default function FollowButton({ userId, initial, onChange, disabled, size = 'default', style, guard }: Props) {
   const { theme } = useAppTheme();
   const api = useApi();
   const [state, setState] = useState<FollowState>(initial);
@@ -36,6 +38,7 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
 
   const handlePress = async () => {
     if (busy || disabled || userId.startsWith('u_')) return;
+    if (guard && !guard()) return;
     const wasFollowing = state.isFollowing;
     const optimistic: FollowState = wasFollowing
       ? { isFollowing: false, isFollowedBy: state.isFollowedBy, isMutual: false }

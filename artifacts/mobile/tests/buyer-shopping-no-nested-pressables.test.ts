@@ -29,7 +29,9 @@ const PRESSABLE_TAGS = ['Pressable', 'TouchableOpacity', 'TouchableHighlight'];
 // button, follow button, etc.) inside.
 const FILES_TO_CHECK = [
   'app/(buyer)/discover.tsx',
-  'app/buyer-search.tsx',
+  'components/discover/search/SearchEmptyState.tsx',
+  'components/discover/search/SearchSuggestions.tsx',
+  'components/discover/search/SearchResults.tsx',
   'app/buyer-saved.tsx',
   'app/buyer-product-detail.tsx',
   'app/seller-profile.tsx',

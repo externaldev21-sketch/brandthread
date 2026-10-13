@@ -30,7 +30,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, View } from 'react-native';
 import { BrandsYouMightLikeRow } from '@/components/discover/BrandsYouMightLikeRow';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useApi } from '@/hooks/useApi';
 import { SP } from '@/lib/theme';
@@ -38,6 +38,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useAuth } from '@clerk/expo';
 import { ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { DiscoverSearchHeader } from '@/components/discover/DiscoverSearchHeader';
+import { DiscoverSearchOverlay, type BarRect } from '@/components/discover/search/DiscoverSearchOverlay';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { ThemedRefreshControl } from '@/components/ui';
@@ -155,6 +156,33 @@ export default function DiscoverScreen() {
   const [viewer, setViewer] = useState<{ posts: DiscoverPost[]; startIndex: number } | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [safetyMenuPost, setSafetyMenuPost] = useState<DiscoverPost | null>(null);
+
+  // In-place search (TikTok-style): tapping the bar opens the search overlay
+  // over this screen, starting from the tapped bar's rect — no route push.
+  // `/buyer-search?q=` deep links land here as `?search=1&q=`.
+  const rootRef = useRef<View>(null);
+  const searchBarRef = useRef<View>(null);
+  const [search, setSearch] = useState<{ from: BarRect | null; q?: string } | null>(null);
+  const searchParams = useLocalSearchParams<{ search?: string; q?: string }>();
+
+  const openSearch = useCallback(() => {
+    const bar = searchBarRef.current;
+    const root = rootRef.current;
+    if (!bar || !root) { setSearch({ from: null }); return; }
+    bar.measureInWindow((x, y, width, height) => {
+      root.measureInWindow((rx, ry) => {
+        setSearch({ from: width > 0 ? { x: x - rx, y: y - ry, width, height } : null });
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (searchParams.search !== '1') return;
+    const q = typeof searchParams.q === 'string' && searchParams.q.trim() ? searchParams.q.trim() : undefined;
+    setSearch({ from: null, q });
+    router.setParams({ search: undefined, q: undefined } as never);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.search, searchParams.q]);
 
   const fetchJustDropped = useCallback(async () => {
     setJustDroppedLoading(true);
@@ -296,7 +324,9 @@ export default function DiscoverScreen() {
     <>
       <DiscoverSearchHeader
         title="Discover"
-        onSearchPress={() => router.push('/buyer-search' as never)}
+        onSearchPress={openSearch}
+        searchBarRef={searchBarRef}
+        searchBarHidden={!!search}
         onBellPress={isSignedIn ? () => router.push('/(buyer)/inbox' as never) : undefined}
       />
       <DiscoverFilterRow active={filter} onChange={setFilter} />
@@ -306,7 +336,7 @@ export default function DiscoverScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.background }}>
+    <View ref={rootRef} style={{ flex: 1, backgroundColor: theme.background }}>
       {filter === 'forYou' && (
         <DiscoverGrid
           ref={listRef}
@@ -474,6 +504,14 @@ export default function DiscoverScreen() {
         contentReady
         gesture={BUYER_DISCOVER_GESTURE}
       />
+      {search && (
+        <DiscoverSearchOverlay
+          key={search.q ?? 'search'}
+          from={search.from}
+          initialQuery={search.q}
+          onClosed={() => setSearch(null)}
+        />
+      )}
     </View>
   );
 }
