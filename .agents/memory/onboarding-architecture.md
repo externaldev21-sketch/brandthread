@@ -20,3 +20,9 @@ Onboarding completion is a final server-authoritative transition shared by buyer
 **Why:** Marking completion during an earlier sync can let a username collision, interrupted profile write, or app exit leave a partially configured account that skips onboarding on its next sign-in.
 
 **How to apply:** Keep generic identity sync idempotent but incomplete. Commit completion through the dedicated final operation, restore completed roles from the server on new devices, and use same-user local completion only to upgrade older installs.
+
+Onboarding welcome footage needs separate native and browser-compatible delivery. Keep a poster until an actual decoded frame appears, and let the poster stand when playback is unavailable.
+
+**Why:** Expo's web preview returned 200 and `video/mp4` for an H.264 clip but its browser reported no supported streams; the native fallback host did not serve that clip. A web-compatible encoding played, while native needed the clip available as an app asset.
+
+**How to apply:** Verify playback with decoded dimensions and advancing time, not merely an HTTP response or a screenshot. Keep the native asset small and preserve first-run access when offline or Reduce Motion is enabled.
