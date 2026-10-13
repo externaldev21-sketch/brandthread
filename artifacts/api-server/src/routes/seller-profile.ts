@@ -143,6 +143,7 @@ router.get("/profile", async (req, res): Promise<void> => {
         cancellationPolicy:  users.cancellationPolicy,
         subscriptionStatus:  users.subscriptionStatus,
         subscriptionPlanId:  users.subscriptionPlanId,
+        foundingSellerNumber: users.foundingSellerNumber,
       })
       .from(users)
       .where(eq(users.clerkId, clerkId)),

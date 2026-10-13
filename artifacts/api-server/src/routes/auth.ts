@@ -76,6 +76,7 @@ import { buildAccountDataExport } from "../lib/dataExport";
 import { decideUsernameChange, usernameNextChangeAt } from "../lib/usernameCooldown";
 import { hasRedeemedAccessCode, isInviteOnlyEnabled } from "../lib/access/inviteOnly";
 import { dbSignInDeps, recordSignIn } from "../lib/security/signInAlerts";
+import { assignFoundingSellerNumber } from "../lib/foundingSellers";
 
 const router = Router();
 
@@ -846,6 +847,9 @@ router.post(
         } as const;
       }
 
+      // Founding Seller badge: the first 100 sellers get #1..#100 (no-op once full).
+      if (accountType === "seller") await assignFoundingSellerNumber(tx, clerkUserId);
+
       const [updated] = await tx
         .update(users)
         .set({ onboardingComplete: true, updatedAt: new Date() })
@@ -1065,11 +1069,20 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
   }
 
   try {
-    const [updated] = await db
-      .update(users)
-      .set(updates)
-      .where(eq(users.clerkId, clerkId))
-      .returning();
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(users)
+        .set(updates)
+        .where(eq(users.clerkId, clerkId))
+        .returning();
+      // Switching to selling here (not via onboarding/complete) still counts
+      // toward the first 100 Founding Sellers.
+      if (row && updates.accountType === "seller" && row.foundingSellerNumber == null) {
+        const n = await assignFoundingSellerNumber(tx, clerkId);
+        if (n != null) return { ...row, foundingSellerNumber: n };
+      }
+      return row;
+    });
 
     if (!updated) {
       res.status(404).json({ error: "User not found" });

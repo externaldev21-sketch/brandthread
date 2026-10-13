@@ -1396,6 +1396,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
       policyRestricted: users.policyRestricted,
       brandType:       users.brandType,
       accountType:     users.accountType,
+      foundingSellerNumber: users.foundingSellerNumber,
       vacationMode:    users.vacationMode,
       vacationMessage: users.vacationMessage,
       username:        users.username,

@@ -49,6 +49,7 @@ import { reverseCommissionForOrder } from "../affiliate/service";
 import { restoreGiftCardsOnFullRefund } from "../giftCards/payout";
 import { notifyStockRestored } from "../stockNotifications";
 import { refundShortfallPosting } from "./sellerRecovery";
+import { reverseFirstOrderDiscountOnFullRefund } from "../firstOrderDiscount";
 
 export type RefundReason =
   | "buyer_cancelled" | "seller_cancelled" | "return_approved" | "drop_failed" | "oversold"
@@ -505,6 +506,7 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
     // A full refund also gives any gift card used on the order its balance back.
     if (fullyRefunded) {
       await restoreGiftCardsOnFullRefund(tx, stripeClient, { orderId: locked.id, sellerId, refundId: refund.id });
+      await reverseFirstOrderDiscountOnFullRefund(tx, stripeClient, { orderId: locked.id, sellerId, refundId: refund.id });
     }
     if (locked.drop_id) await maybeCompleteDrop(tx, locked.drop_id);
 

@@ -68,6 +68,9 @@ import { MAX_TIP_CENTS, checkTip, loadSellerCheckoutSettings } from "../lib/sell
 import { reserveDiscountCapacity } from "../lib/discounts";
 import { resolveLiveAttribution } from "../lib/liveAttribution";
 import { guestAccessToken, tokenHash } from "./guest-checkout";
+import {
+  firstOrderDiscountForGroup, isFirstOrderDiscountEligible, reserveFirstOrderDiscount,
+} from "../lib/firstOrderDiscount";
 
 /** Refuses any request that carries card data, before auth, parsing or logging touch it. */
 export function rejectCardData(req: Request, res: Response, next: NextFunction): void {
@@ -155,6 +158,8 @@ type GroupBreakdown = {
   taxCents: number;
   /** Covered by a store gift card; totalCents is what is left for the card payment. */
   giftCardCents: number;
+  /** Brandthread-funded first-order discount (also counted in discountCents). */
+  firstOrderDiscountCents: number;
   totalCents: number;
   processingDays: number | null;
 };
@@ -169,11 +174,12 @@ function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gi
       bundleDiscountCents: row.bundleDiscountCents ?? 0,
       bundles: (row.bundleLines ?? []).map(line => ({ bundleId: line.bundleId, name: line.name, copies: line.sets, discountCents: line.discountCents })),
       shippingCents: row.shippingCents ?? 0,
-      discountCents: row.discountCodeAmountCents ?? 0,
+      discountCents: (row.discountCodeAmountCents ?? 0) + (row.firstOrderDiscountCents ?? 0),
       loyaltyCents: row.loyaltyDiscountCents ?? 0,
       threadCashCents: row.threadCashDiscountCents ?? 0,
       taxCents: row.taxCents ?? 0,
       giftCardCents: gift.get(row.id) ?? 0,
+      firstOrderDiscountCents: row.firstOrderDiscountCents ?? 0,
       totalCents: row.amountTotalCents ?? 0,
       processingDays: null,
     };
@@ -185,6 +191,7 @@ type PricedCartGroup = PricedGroup & {
   giftCardId: string | null; giftCardCents: number;
   loyaltyCents: number; threadCashCents: number;
   tipCents: number; tippingEnabled: boolean; guestCheckoutOnly: boolean;
+  firstOrderDiscountCents: number;
 };
 
 /** Who is paying: a signed-in buyer, or a guest known only by email. */
@@ -202,6 +209,8 @@ async function priceGroups(
 ): Promise<PricedGroup[]> {
   const priced: PricedGroup[] = [];
   const sellers = new Set<string>();
+  // Brandthread-funded $5 off the buyer's first order: the first seller group
+  // with at least $10 of merchandise (lib/firstOrderDiscount.ts).
   for (const group of groups) {
     const pricedGroup = await priceCartGroup({
       buyerId: payer.buyerId, customerKey: customerKeyOf(payer), items: group.items,
@@ -232,12 +241,16 @@ async function finishPricing(
   shipping: CartShipping,
 ): Promise<PricedCartGroup[]> {
   const result: PricedCartGroup[] = [];
+  let firstOrderAvailable = await isFirstOrderDiscountEligible(payer.buyerId);
   for (let index = 0; index < priced.length; index++) {
     let group = priced[index];
     const loyaltyCents = plan.loyaltyCents[index] ?? 0;
     const threadCashCents = plan.threadCashCents[index] ?? 0;
     const tax = await calculateGroupTax(stripe, group, shipping, loyaltyCents + threadCashCents);
-    const fullTotalCents = group.subtotalCents - group.bundleDiscountCents + group.shippingCents - group.discountCents - loyaltyCents - threadCashCents + tax.taxCents;
+    const firstOrderDiscountCents = firstOrderAvailable && group.chargePlan.chargeModel === "transfer" && loyaltyCents === 0 && threadCashCents === 0
+      ? firstOrderDiscountForGroup(group.subtotalCents - group.bundleDiscountCents - group.discountCents) : 0;
+    if (firstOrderDiscountCents > 0) firstOrderAvailable = false;
+    const fullTotalCents = group.subtotalCents - group.bundleDiscountCents + group.shippingCents - group.discountCents - loyaltyCents - threadCashCents + tax.taxCents - firstOrderDiscountCents;
     const giftRef = groups[index]?.giftCard;
     // A store gift card covers part of THIS seller's group only.
     const gift = giftRef && payer.buyerId
@@ -252,6 +265,7 @@ async function finishPricing(
       calculationId: tax.calculationId,
       giftCardId: gift?.cardId ?? null,
       giftCardCents: gift?.cents ?? 0,
+      firstOrderDiscountCents,
       totalCents: fullTotalCents - (gift?.cents ?? 0),
       loyaltyCents,
       threadCashCents,
@@ -278,7 +292,7 @@ function breakdown(priced: PricedCartGroup[], rows?: Array<{ id: string }>): Gro
     checkoutSessionId: rows?.[index]?.id ?? "",
     subtotalCents: group.subtotalCents,
     shippingCents: group.shippingCents,
-    discountCents: group.discountCents,
+    discountCents: group.discountCents + group.firstOrderDiscountCents,
     bundleDiscountCents: group.bundleDiscountCents,
     bundles: group.bundleLines.map(line => ({ bundleId: line.bundleId, name: line.name, copies: line.sets, discountCents: line.discountCents })),
     tipCents: group.tipCents, tippingEnabled: group.tippingEnabled,
@@ -286,6 +300,7 @@ function breakdown(priced: PricedCartGroup[], rows?: Array<{ id: string }>): Gro
     threadCashCents: group.threadCashCents,
     taxCents: group.taxCents,
     giftCardCents: group.giftCardCents,
+    firstOrderDiscountCents: group.firstOrderDiscountCents,
     totalCents: group.totalCents,
     processingDays: group.processingDays,
   }));
@@ -596,11 +611,15 @@ export function createCheckoutIntentRouter(mode: CheckoutIntentMode): Router {
             ...(group.discountCodeId ? { discountCodeId: group.discountCodeId, discountCodeAmountCents: group.discountCents } : {}),
             ...(loyalty && group.loyaltyCents > 0 ? { loyaltyToken: loyalty.token, loyaltyDiscountCents: group.loyaltyCents } : {}),
             ...(threadCash && group.threadCashCents > 0 ? { threadCashToken: threadCash.token, threadCashDiscountCents: group.threadCashCents } : {}),
+            firstOrderDiscountCents: group.firstOrderDiscountCents,
             amountTotalCents: group.totalCents,
             shippingCents: group.shippingCents,
             taxCents: group.taxCents,
             stripeTaxCalculationId: group.calculationId,
           }).returning();
+          if (group.firstOrderDiscountCents > 0 && payer.buyerId && !(await reserveFirstOrderDiscount(tx, {
+            buyerId: payer.buyerId, checkoutSessionId: row.id, amountCents: group.firstOrderDiscountCents,
+          }))) throw new CartCheckoutError(409, "FIRST_ORDER_DISCOUNT_UNAVAILABLE", "Your first-order discount is already being used. Check your total and pay again.");
           await reserveStock(tx, row.id, group.items.map((item) => ({
             variantId: item.variantId, quantity: item.quantity, productName: item.productName,
           })));

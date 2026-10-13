@@ -10,6 +10,7 @@
  * routes (`/api/seller/*`, `/api/buyer/*`, `/api/thread-cash`, …) and must
  * never be spread into a public payload.
  */
+import { publicFoundingSellerNumber } from "./foundingSellers";
 
 /** Keys that must never appear anywhere in a profile payload served to a non-owner. */
 export const PRIVATE_PROFILE_KEYS = [
@@ -49,6 +50,8 @@ export function toPublicSellerProfile(seller: Row): Row {
     brandType: seller.brandType ?? null,
     accountType: seller.accountType,
     username: seller.username ?? null,
+    /** "Founding Seller #N" (1..100), or null. */
+    foundingSellerNumber: publicFoundingSellerNumber(seller.foundingSellerNumber),
   };
 }
 

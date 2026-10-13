@@ -112,6 +112,13 @@ export const LEDGER_ACCOUNTS = {
   affiliate_commission_reserve: "affiliate_commission_reserve",
   /** Affiliate commission transferred to a creator (party = creator). */
   affiliate_paid_out: "affiliate_paid_out",
+  /**
+   * Brandthread's cost of the first-order discount (a platform-funded $ off a
+   * buyer's first paid order): the supplemental transfer that tops the seller
+   * up to the full price — same shape as `thread_cash_seller_topup`, see
+   * lib/firstOrderDiscount.ts.
+   */
+  first_order_discount: "first_order_discount",
 } as const;
 export type LedgerAccount = keyof typeof LEDGER_ACCOUNTS;
 

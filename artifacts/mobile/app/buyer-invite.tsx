@@ -1,5 +1,5 @@
 /**
- * Invite friends — "Give $10. Get $10." Thread Cash referral screen.
+ * Invite friends — "Give $5. Get $5." Thread Cash referral screen.
  * Extends the original code/share/joined-list screen with the Thread Cash
  * reward, a how-it-works list, pending vs earned totals and per-friend status.
  * Layout reference (Mobbin): Cash App "$5 for you. $5 for a friend.", Klarna
@@ -50,12 +50,12 @@ type Stats = {
 const DEMO_INVITE: InviteData = {
   code: 'K7M2QP',
   link: 'https://brandthread.app/invite/K7M2QP',
-  shareText: 'Join Brandthread with my link and get $10 Thread Cash after your first order of $10 or more.',
+  shareText: 'Join Brandthread with my link and get $5 Thread Cash.',
 };
 const DEMO_STATS: Stats = {
-  total: 3, pointsEarned: 1500, clicks: 12, earnedCents: 1000, pendingCents: 2000,
+  total: 3, pointsEarned: 1500, clicks: 12, earnedCents: 500, pendingCents: 1000,
   referrals: [
-    { inviteeId: 'd1', name: 'Amara Chen', joinedAt: new Date(Date.now() - 2 * 864e5).toISOString(), status: 'rewarded', rewardCents: 1000 },
+    { inviteeId: 'd1', name: 'Amara Chen', joinedAt: new Date(Date.now() - 2 * 864e5).toISOString(), status: 'rewarded', rewardCents: 500 },
     { inviteeId: 'd2', name: 'Jordan Reyes', joinedAt: new Date(Date.now() - 4 * 864e5).toISOString(), status: 'pending' },
     { inviteeId: 'd3', name: 'Sam Patel', joinedAt: new Date(Date.now() - 6 * 864e5).toISOString(), status: 'pending' },
   ],
@@ -203,7 +203,7 @@ export default function BuyerInviteScreen() {
                     </View>
                     <Text style={[styles.joinedDate, rewarded && { color: theme.success }]}>
                       {rewarded
-                        ? `+${formatCents(r.rewardCents ?? 1000)}`
+                        ? `+${formatCents(r.rewardCents ?? 500)}`
                         : new Date(r.joinedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </Text>
                   </View>
