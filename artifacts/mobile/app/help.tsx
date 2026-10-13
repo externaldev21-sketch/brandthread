@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Linking, Alert, ActivityIndicator, Modal } from 'react-native';
 
 import { Icon, type IconName } from '@/components/ui/Icon';

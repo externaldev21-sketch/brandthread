@@ -30,6 +30,9 @@ vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(async () => {}), impactAsync: vi.fn(async () => {}), notificationAsync: vi.fn(async () => {}),
   ImpactFeedbackStyle: { Medium: 'medium' }, NotificationFeedbackType: { Warning: 'warning' },
 }));
+vi.mock('@/lib/haptics', () => ({
+  haptics: { selection: vi.fn(), warning: vi.fn(), success: vi.fn() },
+}));
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({ theme: { text: '#fff', subtle: '#999', accent: '#fff', onAccent: '#000', border: '#333', surface: '#111', card: '#18181b', cardElevated: '#18181b', accentLight: '#fff', warning: '#fc0', error: '#f88' } }),
 }));
@@ -97,6 +100,7 @@ function render(p: BuyerProduct = product) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  waitlist.check.mockResolvedValue({ joined: false });
   auth.isSignedIn = true;
   prefs.value = { sizes: {} };
   prefs.status = 'loaded';

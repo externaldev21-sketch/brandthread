@@ -69,7 +69,6 @@ const SELLER_DEFAULTS = {
   inventory_alerts: true,
   seller_announcements: true,
   /** Settings › Sounds & haptics › New order sound (see lib/push.ts resolvePushSound). */
-  new_order_sound: true,
   login_alerts: true,
 };
 

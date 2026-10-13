@@ -386,7 +386,9 @@ export default function AddProductScreen() {
   // ── Steps: Photos → Details → Price & sizes → Publish (lib/listingSteps.ts).
   // The sections below are unchanged; each step shows its own subset. ──
   const [step, setStep] = useState<ListingStep>(0);
-  const scrollRef = useRef<ScrollView>(null);
+  const [photoSlotCount, setPhotoSlotCount] = useState(3);
+  const visibleSlotCount = Math.min(10, Math.max(photoSlotCount, (draftData.media ?? []).length));
+  const canAddSlot = visibleSlotCount < 10;
   const { user } = useUser();
   // First-photo title/category prefill: tried once, and never over a value
   // the seller typed or picked themselves.
@@ -2557,15 +2559,15 @@ export default function AddProductScreen() {
             {renderVariants()}
           </FormSection>)}
 
-          <FormSection title="Inventory" testID="add-product-section-inventory">
+          {step === 2 && (<FormSection title="Inventory" testID="add-product-section-inventory">
             {renderInventory()}
-          </FormSection>
+          </FormSection>)}
 
           {step === 1 && (<FormSection title="Organization" testID="add-product-section-organization">
             {renderOrganization()}
           </FormSection>)}
 
-          {step === 2 && <>
+          {(step === 1 || step === 2) && <>
           <Text style={s.moreDetailsHeader} accessibilityRole="header">More details</Text>
           {/* The optional sections stay collapsible, grouped in one card. */}
           <View style={s.moreDetailsGroup}>

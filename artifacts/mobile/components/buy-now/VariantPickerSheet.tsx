@@ -162,7 +162,7 @@ export function VariantPickerSheet({
     if (!isSignedIn) { onClose(); goToSignIn(); return; }
     const joined = !!reminders[target.id];
     setReminderBusy(target.id);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    haptics.selection();
     try {
       if (joined) await api.waitlist.leave(product.id, target.id);
       else await api.waitlist.join(product.id, target.id);
@@ -263,11 +263,18 @@ export function VariantPickerSheet({
                     const selected = selections[option.id] === val.id;
                     const { [option.id]: _ignored, ...rest } = selections;
                     const available = isVariantComboAvailable(product, option.id, val.id, rest);
+                    const candidate = { ...rest, [option.id]: val.id };
+                    const reminderTarget = product.variants.find(v =>
+                      !v.isAvailable && Object.keys(candidate).every(id =>
+                        v.optionValues.some(ov => ov.optionId === id && ov.valueId === candidate[id])));
                     if (isColor && val.colorHex) {
                       return (
                         <TouchableOpacity
                           key={val.id}
-                          onPress={() => { if (available) { haptics.selection(); setSelections(prev => ({ ...prev, [option.id]: val.id })); } }}
+                          onPress={() => {
+                            if (available) { haptics.selection(); setSelections(prev => ({ ...prev, [option.id]: val.id })); }
+                            else if (reminderTarget) void toggleReminder(reminderTarget);
+                          }}
                           style={[s.colorSwatch, selected && s.colorSwatchSelected, !available && s.chipUnavail]}
                           accessibilityRole="radio"
                           accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}
@@ -289,11 +296,17 @@ export function VariantPickerSheet({
                         icon={available ? undefined : 'slash'}
                         iconColor={theme.subtle}
                         strikethrough={!available}
+                        trailingLabel={reminderTarget ? (reminders[reminderTarget.id] ? 'Reminder set' : 'Notify me') : undefined}
+                        pressableWhenDisabled={!!reminderTarget}
                         accessibilityRole="radio"
-                        accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', sold out'}`}
+                        accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', sold out. ' + (reminderTarget && reminders[reminderTarget.id] ? 'Reminder set' : 'Notify me')}`}
+                        accessibilityHint={reminderTarget ? (reminders[reminderTarget.id] ? 'Removes the restock reminder' : 'Sets a restock reminder') : undefined}
                         testID={`variant-chip-${val.id}`}
                         onPress={() => {
-                          if (!available) return;
+                          if (!available) {
+                            if (reminderTarget) void toggleReminder(reminderTarget);
+                            return;
+                          }
                           setSelections(prev => {
                             const updated = { ...prev, [option.id]: val.id };
                             const nextVariant = findVariant(product, updated);
@@ -316,7 +329,7 @@ export function VariantPickerSheet({
           </View>
         </>
       ) : null}
-      <Snackbar visible={!!toast} message={toast ?? ''} topOffset={insets.top + SP.md} />
+      <Snackbar visible={!!toast} message={toast ?? ''} topOffset={SP.md} />
     </Sheet>
   );
 }

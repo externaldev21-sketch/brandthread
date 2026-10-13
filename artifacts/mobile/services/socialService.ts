@@ -675,8 +675,6 @@ export interface SellerThreadPost {
   sponsoredBoostId?: string;
   visibility:        { isPublic?: boolean; allowComments: boolean; allowReposts: boolean; showLikeCount: boolean; allowDownloads?: boolean };
   scheduledAt:       string | null;
-  /** Pinned to the top of the author's profile grid (null/absent = not pinned). */
-  pinnedAt?:         string | null;
   publishedAt?:      string;
   createdAt:         string;
   updatedAt:         string;
@@ -1131,7 +1129,6 @@ export function mapApiPostToSellerThreadPost(p: FeedPostApiRow, idx: number): Se
     })),
     visibility:    p.visibility ?? { allowComments: true, allowReposts: true, showLikeCount: true },
     scheduledAt:   null,
-    pinnedAt:      typeof p.pinnedAt === 'string' ? p.pinnedAt : null,
     publishedAt:   p.createdAt ?? now,
     createdAt:     p.createdAt ?? now,
     updatedAt:     p.createdAt ?? now,

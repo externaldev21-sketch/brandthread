@@ -85,7 +85,7 @@ router.get("/:orderId/parcel-suggestion", requireRole("staff"), async (req, res)
 });
 
 // Newest active outbound label with a printable file, for "Print label" on order detail.
-router.get("/:orderId/printable", requireRole("staff"), async (req, res) => {
+router.get("/:orderId/printable", requireRole("staff"), validateInput({ params: orderParams }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const [label] = await db.select({
     id: shippingLabels.id, labelUrl: shippingLabels.labelUrl,

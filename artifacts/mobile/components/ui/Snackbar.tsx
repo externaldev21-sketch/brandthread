@@ -23,10 +23,11 @@ export interface SnackbarProps {
   topOffset?: number;
 }
 
-export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction, onDismiss }: SnackbarProps) {
+export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction, onDismiss, topOffset }: SnackbarProps) {
   if (!visible) return null;
   return (
     <TopToast
+      topOffset={topOffset}
       message={message}
       thumbnailUri={thumbnailUri}
       actionLabel={actionLabel}

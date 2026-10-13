@@ -42,6 +42,17 @@ vi.mock("../../middlewares/requireRole", () => ({
 }));
 
 vi.mock("../notifications-feed", () => ({ publishNotification: async () => undefined }));
+// This suite exercises payout/order linkage. Recovery and webhook-fed payout
+// persistence have their own database suites, and are shared balance dependencies.
+vi.mock("../../lib/money/sellerRecovery", () => ({
+  payoutPauseForRecovery: async () => ({ owedCents: 0, paused: false }),
+  listSellerRecoveries: async () => [],
+}));
+vi.mock("../../lib/money/sellerPayouts", () => ({
+  listSellerPayouts: async () => ({ data: [], has_more: false, source: "table" }),
+  paidToBankCents: async () => 0,
+  upsertPayoutFromApi: async () => null,
+}));
 
 vi.mock("drizzle-orm", () => {
   const fn = (...args: unknown[]) => args;

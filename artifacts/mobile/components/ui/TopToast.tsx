@@ -39,10 +39,11 @@ export interface TopToastProps {
   /** Override the auto-hide delay. */
   durationMs?: number;
   testID?: string;
+  topOffset?: number;
 }
 
 export function TopToast({
-  message, icon, thumbnailUri, actionLabel, onAction, onDismiss, durationMs, testID,
+  message, icon, thumbnailUri, actionLabel, onAction, onDismiss, durationMs, testID, topOffset,
 }: TopToastProps) {
   const insets = useSafeAreaInsets();
   const [hidden, setHidden] = useState(false);
@@ -88,7 +89,7 @@ export function TopToast({
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[styles.root, { top: insets.top + SP.sm, opacity: enter, transform: [{ translateY }] }]}
+      style={[styles.root, { top: topOffset ?? insets.top + SP.sm, opacity: enter, transform: [{ translateY }] }]}
       testID={testID ?? 'top-toast'}
     >
       <View

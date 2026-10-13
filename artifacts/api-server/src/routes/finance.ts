@@ -1352,6 +1352,7 @@ async function loadPayout(sellerId: string, payoutId: string): Promise<PayoutLoa
     ? Math.max(0, Number(payout.balance_transaction?.fee ?? 0))
     : 0;
   return { kind: "ok", accountId, payout, automatic, transactions, truncated, breakdown, instantFee };
+}
 /** The seller's orders behind a payout's balance transactions; [] on failure. */
 async function loadPayoutOrders(sellerId: string, transactions: PayoutTxnLike[], log: { warn: (...args: any[]) => void }) {
   try {
@@ -1402,6 +1403,8 @@ router.get("/payouts/:id", requirePayoutsRead(), async (req, res) => {
       return;
     }
     const { payout, automatic, breakdown, truncated, instantFee, transactions } = loaded;
+    await upsertPayoutFromApi(payout, loaded.accountId, sellerId)
+      .catch((err) => req.log.warn({ err, payoutId }, "Could not store retrieved payout"));
     const payoutOrders = automatic ? await loadPayoutOrders(sellerId, transactions, req.log) : [];
     const destination = typeof payout.destination === "object" && payout.destination ? payout.destination : null;
     const money = (cents: number) => ({ amount: cents, formatted: formatCents(cents, payout.currency) });

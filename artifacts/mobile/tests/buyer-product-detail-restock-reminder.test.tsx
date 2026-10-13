@@ -1,6 +1,28 @@
 import React from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+const { cacheClient } = vi.hoisted(() => ({
+  cacheClient: {
+    getQueryData: vi.fn(() => undefined),
+    fetchQuery: vi.fn(async ({ queryFn }: { queryFn: () => Promise<unknown> }) => queryFn()),
+    setQueryData: vi.fn(),
+    invalidateQueries: vi.fn(async () => {}),
+  },
+}));
+vi.mock('@tanstack/react-query', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@tanstack/react-query')>(),
+  useQueryClient: () => cacheClient,
+}));
+// Stock hint fetching is independent of the waitlist/selection behavior.
+vi.mock('@/lib/stockInfo', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/stockInfo')>(),
+  useStockInfo: () => null,
+}));
+// The bundled clip/player and its drop lookup are separate from stock options.
+vi.mock('@/components/products/GalleryVideoSlide', () => ({
+  GalleryVideoSlide: () => null,
+  useGalleryVideo: () => null,
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -92,6 +114,7 @@ vi.mock('react-native', () => {
   }
 
   return {
+    AppState: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
     ActivityIndicator: nativeComponent('ActivityIndicator'),
     Alert: { alert: alertMock },
     Animated: {
@@ -273,7 +296,8 @@ vi.mock('@/lib/money', () => ({
   formatCents: (cents: number) => `$${(cents / 100).toFixed(2)}`,
 }));
 
-vi.mock('@/lib/theme', () => ({
+vi.mock('@/lib/theme', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/theme')>(),
   BG: '#07070F',
   SCREEN_BG: 'transparent',
   SURFACE: '#111113',
@@ -334,6 +358,7 @@ vi.mock('@/lib/theme', () => ({
 }));
 
 vi.mock('@/services/cartService', () => ({
+  warmCart: vi.fn(async () => {}),
   addToCart: addToCartMock,
   createBuyNowSession: createBuyNowSessionMock,
   getCart: getCartMock,
@@ -393,7 +418,7 @@ function textContent(value: unknown): string {
 }
 
 const sizeChip = (r: ReactTestRenderer, label: string) =>
-  r.root.find((n: any) => n.type === 'Pressable' && n.props.testID === `option-opt_size-size_${label}`);
+  r.root.find((n: any) => n.type === 'Pressable' && n.props.testID === `size-sheet-option-${label}`);
 const notifyButton = (r: ReactTestRenderer) => r.root.findAll((n: any) => n.props?.testID === 'product-notify-me' && typeof n.props.onPress === 'function')[0];
 const snackbar = (r: ReactTestRenderer) => r.root.findByType('Snackbar' as never);
 
@@ -402,6 +427,10 @@ async function renderScreen(params: Record<string, string> = { productId: 'produ
   let renderer!: ReactTestRenderer;
   await act(async () => { renderer = create(<BuyerProductDetailScreen />); await flush(); });
   await act(async () => { await flush(); });
+  await act(async () => {
+    renderer.root.find((n: any) => n.props.testID === 'product-size-row').props.onPress();
+    await flush();
+  });
   return renderer;
 }
 

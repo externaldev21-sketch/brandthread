@@ -1404,7 +1404,7 @@ export default function BuyerProductDetailScreen() {
 
   async function handleLeaveWaitlist() {
     if (!product || !variant || !isSignedIn) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticToggle();
     setWaitlistLoading(true);
     try {
       await api.waitlist.leave(product.id, variant.id);
@@ -2057,14 +2057,20 @@ export default function BuyerProductDetailScreen() {
           visible={sizeSheetOpen}
           title={`${sizeOption.name}s`}
           cells={cells}
+          allowSoldOut={!product.isPreOrder}
+          restockLabel={waitlistJoined ? 'Reminder set' : 'Notify me when back in stock'}
+          onRestock={() => { void (waitlistJoined ? handleLeaveWaitlist() : handleJoinWaitlist()); }}
           selectedValueId={selections[sizeOption.id] ?? null}
           stockLine={stockLine?.kind === 'hidden' ? null : stockLine?.text ?? null}
           promiseLine={deliveryPromiseLine(!!product.isPreOrder)}
           checkoutLabel={product.isPreOrder ? 'Reserve' : 'Checkout'}
-          checkoutDisabled={product.isPreOrder ? reserved || launching : paymentUnavailable || launching || !allSelected}
+          checkoutDisabled={product.isPreOrder ? reserved || launching : paymentUnavailable || launching || !allSelected || !variant?.isAvailable}
           checkoutBusy={product.isPreOrder ? reserveLoading : buyingNow}
           addBusy={addingToCart}
-          onSelect={(valueId) => { haptic('select'); handleSelect(sizeOption.id, valueId); }}
+          onSelect={(valueId) => {
+            haptic('select');
+            handleSelect(sizeOption.id, valueId);
+          }}
           onCheckout={() => { setSizeSheetOpen(false); void (product.isPreOrder ? handleReserve() : handleBuyNow()); }}
           onAddToBag={() => { setSizeSheetOpen(false); void handleAddToCart(); }}
           onClose={() => setSizeSheetOpen(false)}

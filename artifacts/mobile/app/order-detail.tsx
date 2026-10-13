@@ -1,3 +1,5 @@
+import { TouchableOpacity } from 'react-native';
+import { FS } from '@/lib/theme';
 import { haptics } from '@/lib/haptics';
 import { useFeeSchedule } from '@/hooks/useFeeSchedule';
 import { quoteFromSchedule } from '@/lib/feeSchedule';
@@ -29,7 +31,6 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
-import { useFeeSchedule } from '@/hooks/useFeeSchedule';
 import { buildOrderFeeBreakdown, orderFeeColumnsFromApi } from '@/lib/orderFeeBreakdown';
 import { adaptReturnRow, itemsTotalCents, returnReasonLabel as returnRequestReasonLabel, statusLabel as returnRequestStatusLabel, type ReturnView } from '@/lib/returns';
 import { Order, CANCELLATION_REASONS, CancellationReason, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent } from '@/services/orderTypes';
@@ -440,11 +441,11 @@ function InfoRow({ label, value, valueColor, bold }: { label: string; value: str
 
 /** "Fees" row: the recorded fees for this order, else the schedule's estimate; hidden with neither. */
 function FeesRow({ payment: p }: { payment: Order['payment'] }) {
-  const { MUTED } = useThemeAliases();
   const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   const schedule = useFeeSchedule();
   const [open, setOpen] = useState(false);
+  const MUTED = theme.muted;
   const columns = p.fees ?? {
     totalCents: p.totalCents, subtotalCents: p.subtotalCents, discountCents: p.discountTotalCents,
     shippingCents: p.shippingTotalCents, platformFeeCents: p.platformFeeCents,
@@ -467,7 +468,7 @@ function FeesRow({ payment: p }: { payment: Order['payment'] }) {
         <View>
           <View style={s.feesLabelRow}>
             <Text style={s.infoLabel}>Fees</Text>
-            <Icon name={open ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={MUTED} />
+            <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
           </View>
           {b.estimated && <Text style={s.feesCaption}>Estimated</Text>}
         </View>
@@ -1112,6 +1113,8 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
         <View style={s.bannerWrap}>
           <SellerDeliveryBanner order={order} shipped={order.status === 'shipped' || order.status === 'delivered'} />
         </View>
+        <OrderGiftNote gift={order.gift} />
+        <PrintLabelButton orderId={order.id} />
 
         {pinnedNotes.map(note => (
           <View key={note.id} style={s.noticeRow}>

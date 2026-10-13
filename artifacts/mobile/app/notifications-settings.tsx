@@ -52,7 +52,7 @@ import { FONT } from '@/lib/theme';
 
 import { PAUSE_OPTIONS, pagesFor, pausedUntilLabel, type Role } from '@/lib/notificationSettingsModel';
 
-const SELLER_ROWS: NotifRow[] = [
+const SELLER_ROWS = [
   { key: 'new_orders',             icon: 'shopping-bag',   label: 'New orders',             description: 'A customer places an order' },
   { key: 'new_order_sound',        icon: 'volume-2',       label: 'New order sound',        description: 'Sound and vibration for each new order' },
   { key: 'production_milestones',  icon: 'package',        label: 'Production milestones',  description: 'Sampling and production' },

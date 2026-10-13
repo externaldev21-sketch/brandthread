@@ -666,6 +666,8 @@ export interface BuyerOrderItemApiRow {
 
 /** GET /api/buyer/orders(/:id) row (only the fields read here). */
 export interface BuyerOrderApiRow {
+  isGift?: boolean;
+  gift?: { to?: string | null; from?: string | null; message?: string | null } | null;
   buyerCancelDeadline?: string | null;
   id: string;
   orderNumber: string;

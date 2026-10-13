@@ -53,7 +53,7 @@ import { promotePendingRequestsOnFollow } from "../lib/conversationRouting";
 import { viewerCanSeeContent } from "../lib/privateAccount";
 import { afterBlockChange, afterFollowChange } from "../lib/relationshipCaches";
 import { cappedUnknown, jsonList, jsonValue, looseBody, optBoolish, validateBody } from "../middlewares/bodySchemas";
-import { pinnedAtIso, pinnedAtSql, pinnedFirst } from "../lib/postPins";
+import { pinnedAtIso, pinnedAtSql, pinnedFirst as pinnedFirstOrder } from "../lib/postPins";
 
 // Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
 // search endpoint so people search behaves consistently with product/brand
@@ -211,7 +211,7 @@ async function buildBuyerPosts(
       ...(postId ? [eq(posts.id, postId)] : []),
     ))
     // Pinned posts first, newest pin first (Pin to your profile; lib/postPins.ts).
-    .orderBy(pinnedFirst(posts.id), desc(posts.createdAt))
+    .orderBy(...(pinnedFirst ? [pinnedFirstOrder(posts.id), desc(posts.createdAt)] : [desc(posts.createdAt)]))
     .limit(limit)
     .offset(offset);
 

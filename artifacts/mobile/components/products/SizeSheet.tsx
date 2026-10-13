@@ -21,7 +21,7 @@ const CELL_W = 72;
 export function SizeSheet({
   visible, title, cells, selectedValueId, stockLine, promiseLine,
   checkoutLabel = 'Checkout', checkoutDisabled, checkoutBusy, addBusy,
-  onSelect, onCheckout, onAddToBag, onClose,
+  onSelect, onCheckout, onAddToBag, onClose, allowSoldOut = false, restockLabel, onRestock,
 }: {
   visible: boolean;
   /** e.g. "Sizes". */
@@ -36,6 +36,10 @@ export function SizeSheet({
   checkoutDisabled?: boolean;
   checkoutBusy?: boolean;
   addBusy?: boolean;
+  /** Sold-out choices can lead to the product's restock-reminder action. */
+  allowSoldOut?: boolean;
+  restockLabel?: string;
+  onRestock?: () => void;
   onSelect: (valueId: string) => void;
   onCheckout: () => void;
   onAddToBag: () => void;
@@ -70,12 +74,13 @@ export function SizeSheet({
           return (
             <Pressable
               key={cell.valueId}
-              onPress={() => { if (!soldOut) onSelect(cell.valueId); }}
-              disabled={soldOut}
+              onPress={() => { if (!soldOut || allowSoldOut) onSelect(cell.valueId); }}
+              disabled={soldOut && !allowSoldOut}
               style={s.cell}
               accessibilityRole="radio"
               accessibilityState={{ selected: isSelected, disabled: soldOut }}
-              accessibilityLabel={`${cell.label}, ${soldOut ? 'sold out' : formatCents(cell.priceCents!)}`}
+              accessibilityLabel={`${title.replace(/s$/, '')}, ${cell.label}, ${soldOut ? 'sold out' : formatCents(cell.priceCents!)}`}
+              accessibilityHint={soldOut && allowSoldOut ? 'Select to set a restock reminder' : undefined}
               testID={`size-sheet-option-${cell.label}`}
             >
               <Text style={[s.cellSize, isSelected ? s.selectedText : s.dimText]}>{cell.label}</Text>
@@ -93,7 +98,9 @@ export function SizeSheet({
       </ScrollView>
       <View style={s.rule} />
 
-      {selected && selected.priceCents !== null ? (
+      {selected?.priceCents === null && onRestock ? (
+        <Button label={restockLabel ?? 'Notify me'} onPress={onRestock} fullWidth testID="size-sheet-restock" />
+      ) : selected && selected.priceCents !== null ? (
         <View style={s.offer} testID="size-sheet-offer">
           <View style={s.offerPriceRow}>
             {selected.compareAtCents !== null && <Text style={[s.offerPrice, s.dimText, s.struck]}>{formatCents(selected.compareAtCents)}</Text>}

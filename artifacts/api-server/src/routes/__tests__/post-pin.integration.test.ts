@@ -72,7 +72,8 @@ beforeAll(async () => {
   ]);
   const app = express();
   app.use(express.json());
-  app.use("/api/posts", postsRouter);
+  const { default: postPinsRouter } = await import("../post-pins");
+  app.use("/api/posts", postPinsRouter, postsRouter);
   app.use("/api/public", profileMediaRouter);
   app.use("/api/social", socialRouter);
   await new Promise<void>((resolve) => { server = app.listen(0, "127.0.0.1", () => resolve()); });
@@ -89,19 +90,19 @@ afterAll(async () => {
 describe("POST/DELETE /api/posts/:id/pin", () => {
   it("only the owner can pin", async () => {
     expect((await call("POST", `/api/posts/${sellerPosts[0]}/pin`)).status).toBe(401);
-    expect((await call("POST", `/api/posts/${sellerPosts[0]}/pin`, buyer)).status).toBe(404);
+    expect((await call("POST", `/api/posts/${sellerPosts[0]}/pin`, buyer)).status).toBe(403);
   });
 
   it("refuses drafts", async () => {
     const res = await call("POST", `/api/posts/${draftId}/pin`, seller);
-    expect(res.status).toBe(409);
-    expect(res.body.code).toBe("POST_NOT_PINNABLE");
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("POST_NOT_PUBLISHED");
   });
 
   it("pins up to 3 (idempotent) and returns 409 with a clear message on the 4th", async () => {
     for (const id of sellerPosts.slice(0, 3)) {
       const res = await call("POST", `/api/posts/${id}/pin`, seller);
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(201);
       expect(res.body.pinnedAt).toBeTruthy();
       await new Promise((r) => setTimeout(r, 5));
     }
@@ -109,7 +110,7 @@ describe("POST/DELETE /api/posts/:id/pin", () => {
     expect(again.status).toBe(200);
     const fourth = await call("POST", `/api/posts/${sellerPosts[3]}/pin`, seller);
     expect(fourth.status).toBe(409);
-    expect(fourth.body).toMatchObject({ code: "PIN_LIMIT_REACHED", limit: 3 });
+    expect(fourth.body).toMatchObject({ code: "PIN_LIMIT", max: 3 });
     expect(fourth.body.error).toMatch(/up to 3/);
   });
 
@@ -126,15 +127,15 @@ describe("POST/DELETE /api/posts/:id/pin", () => {
   it("unpinning frees a slot and restores normal order", async () => {
     const del = await call("DELETE", `/api/posts/${sellerPosts[1]}/pin`, seller);
     expect(del.status).toBe(200);
-    expect(del.body.pinnedAt).toBeNull();
-    expect((await call("POST", `/api/posts/${sellerPosts[3]}/pin`, seller)).status).toBe(200);
+    expect(del.body.pinned).toBe(false);
+    expect((await call("POST", `/api/posts/${sellerPosts[3]}/pin`, seller)).status).toBe(201);
     const res = await call("GET", `/api/public/users/${seller}/videos?limit=10`, buyer);
     const ids = res.body.videos.map((v: any) => v.id);
     expect(ids).toEqual([sellerPosts[3], sellerPosts[2], sellerPosts[0], sellerPosts[4], sellerPosts[1]]);
   });
 
   it("orders a buyer's profile posts pinned first too", async () => {
-    expect((await call("POST", `/api/posts/${buyerPosts[0]}/pin`, buyer)).status).toBe(200);
+    expect((await call("POST", `/api/posts/${buyerPosts[0]}/pin`, buyer)).status).toBe(201);
     const res = await call("GET", `/api/social/profile/${buyer}/posts`, friend);
     expect(res.status).toBe(200);
     expect(res.body.map((p: any) => p.id)).toEqual([buyerPosts[0], buyerPosts[2], buyerPosts[1]]);

@@ -485,6 +485,11 @@ export function createCheckoutIntentRouter(mode: CheckoutIntentMode): Router {
 
   router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
     const body = req.body as z.infer<typeof createSchema>;
+    const giftCheck = moderateGift(body.gift);
+    if (!giftCheck.ok) {
+      res.status(422).json({ error: giftCheck.reason, code: "CONTENT_REJECTED" });
+      return;
+    }
     const payer = payerFor(req, body.contactEmail);
     const key = body.clientIdempotencyKey;
     const stripe = stripeFor(res);
@@ -595,6 +600,7 @@ export function createCheckoutIntentRouter(mode: CheckoutIntentMode): Router {
           const [row] = await tx.insert(checkoutSessions).values({
             ...(index === 0 ? { id: firstRowId } : {}),
             buyerId: payer.buyerId,
+            ...giftColumns(body.gift),
             ...(payer.buyerId ? {} : { guestEmail: payer.guestEmail, guestAccessTokenHash: tokenHash(guestToken!) }),
             sellerId: group.sellerId,
             bundleDiscountCents: group.bundleDiscountCents, bundleLines: group.bundleLines,
