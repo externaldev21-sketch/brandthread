@@ -10,7 +10,7 @@
  * local time zone, so this stays correct without depending on ICU/Intl.
  */
 
-export type SellerHomeTimeRange = 'live' | 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'all';
+export type SellerHomeTimeRange = 'live' | 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'all' | '7d' | '30d' | '90d';
 
 export const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
@@ -54,10 +54,10 @@ export function formatClockLabel(date: Date, includeMinutes: boolean): string {
 
 export function bucketLabel(value: string, range: SellerHomeTimeRange): string {
   const date = parseBucketTimestamp(value);
-  if (range === 'week') {
+  if (range === 'week' || range === '7d') {
     return WEEKDAY_LABELS[date.getDay()];
   }
-  if (range === 'month') {
+  if (range === 'month' || range === '30d' || range === '90d') {
     // "Mon D" (e.g. "Sep 1"), not a bare day number — a lone "1"/"15"/"30"
     // doesn't read as a date at all. Each label uses its OWN bucket's month
     // (not a single assumed month for the whole range), so a 30-day window
