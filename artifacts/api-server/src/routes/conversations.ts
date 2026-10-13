@@ -41,6 +41,8 @@ import {
 } from "../lib/dmAttachmentPolicy";
 import { IMMUTABLE_PUBLIC_CACHE_CONTROL, normalizeUploadedImage } from "../lib/productImageResize";
 
+import { loadPresence, presenceFor, type PresenceRow } from "../lib/presence";
+
 const router = Router();
 router.use(requireAuth);
 
@@ -73,6 +75,7 @@ function buildConversationView(
   parts: (typeof conversationParticipants.$inferSelect)[],
   myUserId: string,
   lastMessagePreview?: string,
+  presence?: ReadonlyMap<string, PresenceRow>,
 ) {
   const me = parts.find((p) => p.userId === myUserId);
   // The Brandthread Agent's conversation is pinned above every other thread
@@ -105,6 +108,13 @@ function buildConversationView(
       // Chat details > Nicknames: the CURRENT viewer's nickname for this
       // participant, if they've set one — never another viewer's.
       nickname:    nicknameMap[`${myUserId}:${p.userId}`] || undefined,
+      // Real profile photo for the inbox row / chat header avatar.
+      avatarUri:   presence?.get(p.userId)?.avatarUrl ?? undefined,
+      // Activity status (green dot / "Active now") — only when both people
+      // share it; never for the viewer themself.
+      ...(presence && p.userId !== myUserId
+        ? presenceFor(presence.get(myUserId), presence.get(p.userId))
+        : {}),
     })),
     // Chat details > Mute. Present only when actively muted (a past
     // mutedUntil behaves as unmuted on the client).
@@ -296,11 +306,14 @@ router.get("/", async (req, res) => {
     if (preview) previewByConversation.set(message.conversationId, preview);
   }
 
+  const presence = await loadPresence([userId, ...allParts.map((p) => p.userId)]).catch(() => undefined);
+
   return res.json(convs.map((c) => buildConversationView(
     c,
     partsByConv.get(c.id) ?? [],
     userId,
     previewByConversation.get(c.id),
+    presence,
   )));
 });
 
@@ -502,9 +515,14 @@ router.get("/:id", async (req, res) => {
 
   if (!conv) return res.status(404).json({ error: "Conversation not found" });
   const counterpart = parts.find((p) => p.userId !== userId);
-  const relation = counterpart ? await blockRelation(userId, counterpart.userId) : "none";
+  const [relation, presence] = await Promise.all([
+    counterpart ? blockRelation(userId, counterpart.userId) : Promise.resolve("none" as const),
+    loadPresence([userId, ...parts.map((p) => p.userId)]).catch(() => undefined),
+  ]);
+  // Blocked either way: no activity status.
+  const visiblePresence = relation === "none" ? presence : undefined;
   return res.json({
-    ...buildConversationView(conv, parts, userId),
+    ...buildConversationView(conv, parts, userId, undefined, visiblePresence),
     messaging: {
       // The composer is replaced with an unblock prompt / unavailable notice.
       blockedByMe: relation === "blocked_by_me" || relation === "mutual",

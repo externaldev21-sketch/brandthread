@@ -16,7 +16,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { useAuth, useUser } from '@clerk/expo';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FONT, FS, SP, RADIUS, SCREEN_BG, CONTENT_MAX_WIDTH } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, SCREEN_BG, CONTENT_MAX_WIDTH, ONLINE_GREEN } from '@/lib/theme';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
@@ -1148,18 +1148,19 @@ export default function InboxScreen() {
             rippleEnabled={NO_RIPPLE}
             testID={`inbox-conversation-${conv.id}`}
           >
-            {/* Avatar — Threads-style: no unread/online dot chrome on the
-                avatar itself, unread is conveyed by the name/preview weight
-                and the trailing dot instead (see below). The LIVE ring
-                (LiveHostRing) is the only badge that still lives here.
+            {/* Avatar — Instagram inbox row: 52pt photo, green dot at the
+                bottom-right while that person is active (only when both of
+                you share activity status). Unread lives in the preview
+                weight and the trailing dot. While they're streaming the
+                LIVE ring (LiveHostRing) shows instead of the green dot.
 
-                Every row's slot is a fixed 56x56 box (s.avatarContainer,
+                Every row's slot is a fixed 60x60 box (s.avatarContainer,
                 below) so the row layout never shifts based on live state.
-                The photo itself renders at 48x48, centered in that box —
+                The photo itself renders at 52x52, centered in that box —
                 for a live row this leaves exactly the 2pt ring + 2pt gap
                 LiveAvatarRing draws at its default ringWidth (2) and
-                ringGap={2} room to sit fully *inside* the 56 box:
-                ring outer edge = 48 + 2*ringGap(2) + 2*ringWidth(2) = 56.
+                ringGap={2} room to sit fully *inside* the 60 box:
+                ring outer edge = 52 + 2*ringGap(2) + 2*ringWidth(2) = 60.
                 Previously the ring was drawn *outside* a full 56x56 photo
                 (ring outer edge = 66), which is what bled past the row's
                 left edge on live rows (Atelier Noire, Maison Vela, Kuro
@@ -1172,7 +1173,7 @@ export default function InboxScreen() {
               ) : (
                 // LIVE ring while this person is streaming; tapping the
                 // ringed avatar opens their live instead of the thread.
-                <LiveHostRing hostId={participant.userId} hostName={participant.name} size={48} ringGap={2} pressToWatch>
+                <LiveHostRing hostId={participant.userId} hostName={participant.name} size={52} ringGap={2} pressToWatch>
                   {participant.avatarUri ? (
                     <Image source={{ uri: participant.avatarUri }} style={s.avatar48} testID={`inbox-avatar-image-${conv.id}`} />
                   ) : (
@@ -1182,6 +1183,13 @@ export default function InboxScreen() {
                   )}
                 </LiveHostRing>
               )}
+              {!conv.isOfficial && participant.isOnline ? (
+                <View
+                  style={[s.onlineDot, { backgroundColor: ONLINE_GREEN, borderColor: theme.background }]}
+                  testID={`inbox-online-${conv.id}`}
+                  accessibilityLabel="Active now"
+                />
+              ) : null}
             </View>
 
             {/* Center content — flex:1 + minWidth:0 (s.convCenter) so a long
@@ -1194,7 +1202,7 @@ export default function InboxScreen() {
             <View style={s.convCenter}>
               <View style={s.convNameRow}>
                 <Text
-                  style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.regular }]}
+                  style={[s.convName, { color: theme.text, fontFamily: FONT.semibold }]}
                   numberOfLines={1}
                 >
                   {participant.name}
@@ -1218,7 +1226,7 @@ export default function InboxScreen() {
                   attachmentType={conv.lastMessageType}
                   isFromMe={!!conv.lastMessageSenderId && conv.lastMessageSenderId === MY_USER_ID}
                   bold={isUnread}
-                  color={isUnread ? theme.text : theme.muted}
+                  color={isUnread ? theme.text : `${theme.text}99`}
                   orderNumber={conv.contextOrderNumber}
                 />
               )}
@@ -1311,7 +1319,7 @@ export default function InboxScreen() {
             <View style={s.convCenter}>
               <View style={s.convNameRow}>
                 <Text
-                  style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.regular }]}
+                  style={[s.convName, { color: theme.text, fontFamily: FONT.semibold }]}
                   numberOfLines={1}
                 >
                   {participant.name}
@@ -1322,7 +1330,7 @@ export default function InboxScreen() {
                 attachmentType={conv.lastMessageType}
                 isFromMe={false}
                 bold={isUnread}
-                color={isUnread ? theme.text : theme.muted}
+                color={isUnread ? theme.text : `${theme.text}99`}
               />
             </View>
 
@@ -2140,10 +2148,10 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     minHeight: 72,
   },
   // Fixed slot, every row: nothing (ring included) renders outside this
-  // 56x56 box, so the row's left edge never shifts based on live state.
+  // 60x60 box, so the row's left edge never shifts based on live state.
   avatarContainer: {
-    width: 56,
-    height: 56,
+    width: 60,
+    height: 60,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2155,14 +2163,25 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Live rows' photo — see the avatarContainer comment above for why this
-  // is 48 (not 56) inside the same 56x56 slot.
+  // The 52pt photo — see the avatarContainer comment above for why it sits
+  // inside a 60x60 slot.
   avatar48: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Active-now dot: 14pt with a 2pt page-coloured cutout, bottom-right of
+  // the 52pt photo (Instagram).
+  onlineDot: {
+    position: 'absolute',
+    right: 4,
+    bottom: 4,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
   },
   avatarInitials: {
     fontSize: FS.md,

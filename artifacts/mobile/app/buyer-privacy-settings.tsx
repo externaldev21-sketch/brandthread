@@ -59,12 +59,20 @@ export default function BuyerPrivacySettings() {
 
   useFocusEffect(
     useCallback(() => {
-      getPrivacySettings().then(setSettings);
-      // Load server-side DM privacy setting
-      api.privacy.get().then(({ dmPrivacy: p, isPrivate }) => {
-        setDmPrivacy(p);
-        if (typeof isPrivate === 'boolean') setServerPrivate(isPrivate);
-      }).catch(() => {});
+      // Activity status is server-backed (the green dot in Messages); the
+      // server value wins over the local copy once it loads.
+      Promise.all([
+        getPrivacySettings(),
+        api.privacy.get().catch(() => null),
+      ]).then(([local, server]) => {
+        if (server) {
+          setDmPrivacy(server.dmPrivacy);
+          if (typeof server.isPrivate === 'boolean') setServerPrivate(server.isPrivate);
+        }
+        setSettings(typeof server?.showActivityStatus === 'boolean'
+          ? { ...local, activityStatusVisible: server.showActivityStatus }
+          : local);
+      });
       api.followRequests.list(50, 0).then((rows) => setRequestCount(Array.isArray(rows) ? rows.length : 0)).catch(() => {});
     }, [])
   );
@@ -80,7 +88,7 @@ export default function BuyerPrivacySettings() {
       // Save local settings (stored in AsyncStorage)
       await updatePrivacySettings(settings);
       // Save server-side DM privacy setting
-      await api.privacy.update({ dmPrivacy });
+      await api.privacy.update({ dmPrivacy, showActivityStatus: settings.activityStatusVisible });
       setHasChanges(false);
       setSaveError(null);
     } catch {

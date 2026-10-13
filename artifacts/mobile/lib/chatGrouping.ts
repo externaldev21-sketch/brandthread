@@ -87,79 +87,36 @@ export function groupFlags(
 /** The rounded-corner radii for one bubble, IG-style: the corner touching
  *  an adjacent bubble in the same group (on the avatar-column side for a
  *  received bubble, the opposite side for a sent one) is tightened to
- *  `tight`; every outer/edge corner stays `full`. */
+ *  `tight`; every outer/edge corner stays `full`. With `tail`, the last
+ *  bubble of a group (or a lone bubble) also gets that radius on its
+ *  bottom corner on the sender's side — the small "tail" corner. */
 export function groupCornerRadii(
   isOwn: boolean,
   isFirstInGroup: boolean,
   isLastInGroup: boolean,
   full: number,
   tight = 6,
+  tail?: number,
 ): {
   borderTopLeftRadius: number;
   borderTopRightRadius: number;
   borderBottomRightRadius: number;
   borderBottomLeftRadius: number;
 } {
+  const tailCorner = tail !== undefined && isLastInGroup ? tail : null;
   return {
     borderTopLeftRadius: (!isOwn && !isFirstInGroup) ? tight : full,
     borderTopRightRadius: (isOwn && !isFirstInGroup) ? tight : full,
-    borderBottomRightRadius: (isOwn && !isLastInGroup) ? tight : full,
-    borderBottomLeftRadius: (!isOwn && !isLastInGroup) ? tight : full,
+    borderBottomRightRadius: isOwn ? (tailCorner ?? (!isLastInGroup ? tight : full)) : full,
+    borderBottomLeftRadius: !isOwn ? (tailCorner ?? (!isLastInGroup ? tight : full)) : full,
   };
 }
 
-export interface PreviewableMessage {
-  text?: string | null;
-  attachment?: { title?: string | null; type?: string | null } | null;
-}
-
-/** A short, human preview of a message's content — used both for the
- *  swipe-to-reply "Replying to …" banner (ReplyBanner) and the in-bubble
- *  quoted-reply strip. Falls back through the attachment's own title (e.g.
- *  "Photo", "Voice message") for an attachment-only original with no text,
- *  so a reply to a photo/voice/product card never renders a blank quote. */
-export function messagePreviewText(msg: PreviewableMessage): string {
-  const text = msg.text?.trim();
-  if (text) return text;
-  const title = msg.attachment?.title?.trim();
-  if (title) return title;
-  switch (msg.attachment?.type) {
-    case 'image': return 'Photo';
-    case 'video': return 'Video';
-    case 'voice': return 'Voice message';
-    case 'product': return 'Product';
-    case 'order': return 'Order';
-    case 'post': return 'Post';
-    default: return 'Message';
-  }
-}
-
-export interface SeenableMessage {
-  id: string;
-  fromId: string;
-  ts: number;
-  readAt?: string | null;
-}
-
-/** Real, honest granularity: the backend marks every one of the OTHER
- *  participant's unread messages `readAt` at once, the moment I open the
- *  conversation and it calls `PATCH /conversations/:id/read` (see
- *  artifacts/api-server/src/routes/conversations.ts). There's no
- *  per-message "they scrolled past this exact bubble" signal — so "Seen"
- *  means "read up through this point", shown only under the sender's own
- *  most recent message once it (and everything before it) has been read.
- *  This mirrors Instagram's own "Seen" receipt, which is also
- *  conversation-level, not scroll-position-level. */
-export function lastOwnMessageId(messages: SeenableMessage[], myId: string): string | null {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].fromId === myId) return messages[i].id;
-  }
-  return null;
-}
-
-/** Whether this particular bubble should show the "Seen" receipt: it must
- *  be my own most recent message in the thread, AND the other participant
- *  must have read it (readAt set). */
-export function isSeenReceipt(msg: SeenableMessage, myId: string, lastOwnId: string | null): boolean {
-  return msg.fromId === myId && msg.id === lastOwnId && !!msg.readAt;
-}
+/** Messages bubble spec (Instagram, reskinned): 18pt corners, a 4pt tail
+ *  corner on the last bubble of a group, white sent / #262628 received. */
+export const BUBBLE_RADIUS = 18;
+export const BUBBLE_TAIL_RADIUS = 4;
+export const SENT_BUBBLE = '#FFFFFF';
+export const SENT_BUBBLE_TEXT = '#000000';
+export const RECEIVED_BUBBLE = '#262628';
+export const RECEIVED_BUBBLE_TEXT = '#FFFFFF';

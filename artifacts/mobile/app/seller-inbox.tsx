@@ -10,7 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { FONT, FS, SP } from '@/lib/theme';
+import { FONT, FS, SP, ONLINE_GREEN } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale, SearchBar, useUndoToast } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -550,15 +550,30 @@ export default function SellerInboxScreen() {
           accessibilityRole="button"
           accessibilityLabel={`Open conversation with ${other.name || other.handle || 'buyer'}`}
         >
-          <View style={[s.avatar, { backgroundColor: other.color || theme.accent }]}>
-            <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
+          {/* Instagram inbox row: 52pt photo (initials when there's none),
+              green dot while they're active, semibold name, 60% preview,
+              time + unread dot in a trailing column. */}
+          <View style={s.avatarSlot}>
+            <View style={[s.avatar, { backgroundColor: other.color || theme.accent }]}>
+              {other.avatarUri ? (
+                <Image source={{ uri: other.avatarUri }} style={s.avatarImage} />
+              ) : (
+                <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
+              )}
+            </View>
+            {other.isOnline ? (
+              <View
+                style={s.onlineDot}
+                testID={`seller-online-${item.id}`}
+                accessibilityLabel="Active now"
+              />
+            ) : null}
           </View>
           <View style={s.rowCenter}>
             <View style={s.rowTop}>
-              <Text style={[s.name, { fontFamily: hasUnread ? FONT.bold : FONT.regular }]} numberOfLines={1}>
+              <Text style={s.name} numberOfLines={1}>
                 {other.name || other.handle || 'Buyer'}
               </Text>
-              <Text style={s.time}>{timeAgo(item.lastMessageTs)}</Text>
             </View>
             {item.contextOrderNumber ? (
               <Text style={s.context} numberOfLines={1}>
@@ -572,10 +587,13 @@ export default function SellerInboxScreen() {
               >
                 {previewText(item.lastMessage)}
               </Text>
-              {hasUnread && (
-                <View testID={`seller-unread-badge-${item.id}`} style={[s.unreadDot, { backgroundColor: theme.accent }]} />
-              )}
             </View>
+          </View>
+          <View style={s.trailing}>
+            <Text style={s.time}>{timeAgo(item.lastMessageTs)}</Text>
+            {hasUnread && (
+              <View testID={`seller-unread-badge-${item.id}`} style={[s.unreadDot, { backgroundColor: theme.accent }]} />
+            )}
           </View>
         </PressableScale>
       </InboxSwipeRow>
@@ -622,19 +640,20 @@ export default function SellerInboxScreen() {
           accessibilityRole="button"
           accessibilityLabel={`Open message request from ${other.name || other.handle || 'this buyer'}`}
         >
-          <View style={[s.avatar, { backgroundColor: other.color || theme.accent }]}>
-            {other.avatarUri ? (
-              <Image source={{ uri: other.avatarUri }} style={s.avatarImage} />
-            ) : (
-              <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
-            )}
+          <View style={s.avatarSlot}>
+            <View style={[s.avatar, { backgroundColor: other.color || theme.accent }]}>
+              {other.avatarUri ? (
+                <Image source={{ uri: other.avatarUri }} style={s.avatarImage} />
+              ) : (
+                <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
+              )}
+            </View>
           </View>
           <View style={s.rowCenter}>
             <View style={s.rowTop}>
-              <Text style={[s.name, { fontFamily: hasUnread ? FONT.bold : FONT.regular }]} numberOfLines={1}>
+              <Text style={s.name} numberOfLines={1}>
                 {other.name || other.handle || 'Buyer'}
               </Text>
-              <Text style={s.time}>{timeAgo(item.lastMessageTs)}</Text>
             </View>
             <View style={s.rowBottom}>
               <Text
@@ -643,10 +662,13 @@ export default function SellerInboxScreen() {
               >
                 {previewText(item.lastMessage)}
               </Text>
-              {hasUnread && (
-                <View testID={`seller-inbox-request-unread-${item.id}`} style={[s.unreadDot, { backgroundColor: theme.accent }]} />
-              )}
             </View>
+          </View>
+          <View style={s.trailing}>
+            <Text style={s.time}>{timeAgo(item.lastMessageTs)}</Text>
+            {hasUnread && (
+              <View testID={`seller-inbox-request-unread-${item.id}`} style={[s.unreadDot, { backgroundColor: theme.accent }]} />
+            )}
           </View>
         </PressableScale>
       </InboxSwipeRow>
@@ -811,25 +833,33 @@ const createStyles = (theme: AppThemePreset) => {
     paddingHorizontal: SP.md, paddingVertical: SP.md,
     minHeight: 88,
   },
+  avatarSlot: { marginRight: SP.md },
   avatar: {
-    width: 56, height: 56, borderRadius: 28,
-    alignItems: 'center', justifyContent: 'center', marginRight: SP.md,
+    width: 52, height: 52, borderRadius: 26,
+    alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
   },
-  avatarImage: { width: 56, height: 56 },
+  avatarImage: { width: 52, height: 52 },
+  // Active-now dot, same as the buyer inbox's.
+  onlineDot: {
+    position: 'absolute', right: 0, bottom: 0,
+    width: 14, height: 14, borderRadius: 7, borderWidth: 2,
+    backgroundColor: ONLINE_GREEN, borderColor: theme.background,
+  },
   avatarInitials: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
   rowCenter: { flex: 1 },
   rowTop: { flexDirection: 'row', alignItems: 'center' },
-  name: { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: theme.text },
-  time: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginLeft: SP.sm },
+  name: { flex: 1, fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
+  trailing: { alignItems: 'flex-end', justifyContent: 'center', gap: 6, marginLeft: SP.sm },
+  time: { fontSize: FS.sm, fontFamily: FONT.regular, color: `${theme.text}99` },
   context: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.accent, marginTop: 1 },
   rowBottom: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  preview: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
+  preview: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: `${theme.text}99` },
   // Threads/buyer-inbox-style trailing dot (matches
   // app/(buyer)/inbox.tsx's unreadDotTrailing) — was previously a numeric
   // count badge, a different visual convention from the buyer side's dot.
   unreadDot: {
-    width: 8, height: 8, borderRadius: 4, marginLeft: SP.sm,
+    width: 8, height: 8, borderRadius: 4,
   },
 
   // Requests tab — explainer line + "Delete all", above the request rows.

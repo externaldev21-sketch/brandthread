@@ -5,6 +5,7 @@ import { users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { getEffectiveEntitlement } from "../lib/nativeEntitlements";
 import { PLAN_CATALOGUE, type SellerPlanId } from "../lib/planCatalogue";
+import { touchPresence } from "../lib/presence";
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const { userId } = getAuth(req);
@@ -13,6 +14,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return;
   }
   (req as any).clerkUserId = userId;
+  // Activity status (Messages' green dot) — throttled, never blocks.
+  if (!process.env.VITEST) touchPresence(userId);
   next();
 }
 

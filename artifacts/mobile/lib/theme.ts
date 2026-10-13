@@ -97,6 +97,8 @@ export const CYAN_DIM      = ACCENT_DIM;
 export const SUCCESS        = '#10B981';   // completion, available, shipped
 export const SUCCESS_DIM    = 'rgba(16,185,129,0.15)';
 export const GREEN_BRIGHT   = '#39FF88';   // revenue highlight ONLY (not UI chrome)
+/** Messages' "active now" dot — iOS system green (dark), the same green as a switch's ON state. */
+export const ONLINE_GREEN   = '#30D158';
 /** @deprecated Use ACCENT. Kept for compatibility; info chrome is grayscale. */
 export const BLUE           = ACCENT;
 /** @deprecated Use ACCENT_DIM. Kept for compatibility; info chrome is grayscale. */
