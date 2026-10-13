@@ -32,7 +32,7 @@ import {
   publishingRestriction,
 } from "../lib/safety";
 import { actorFieldsFromProfile, notifyStoryLike, notifyStoryMention, notifyStoryReshare } from "../lib/activityEvents";
-import { viewerRelations, audienceAllows, viewerMayOpenAudience } from "../lib/storyAccess";
+import { viewerRelations, audienceAllows, viewerMayOpenAudience, followGateAllows, closeFriendOfAuthorIds } from "../lib/storyAccess";
 import { sanitizeStoryOverlays, withStickerState, StickerValidationError } from "../lib/storyStickers";
 import { MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
 import { isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs } from "../lib/mediaModerationStore";
@@ -1303,8 +1303,10 @@ router.get("/stories/user/:userId", async (req, res) => {
 
   if (authorId !== myId) {
     if ((await blockRelation(myId, authorId)) !== "none") { res.json([]); return; }
-    if (!(await isFollowing(myId, authorId))) { res.json([]); return; }
   }
+  const rel = await viewerRelations(myId, [authorId]);
+  // Followers, plus people on the author's Close Friends list (CF stories only).
+  if (authorId !== myId && !rel.following.has(authorId) && !rel.closeFriendOf.has(authorId)) { res.json([]); return; }
 
   const rows = await db.select().from(stories)
     .where(and(eq(stories.authorId, authorId), gt(stories.expiresAt, now), storyListedFor(myId)))
@@ -1312,8 +1314,8 @@ router.get("/stories/user/:userId", async (req, res) => {
 
   if (!rows.length) { res.json([]); return; }
 
-  const rel = await viewerRelations(myId, [authorId]);
-  const finalRows = rows.filter((r) => audienceAllows(r.privacyVisibility, authorId, myId, rel));
+  const finalRows = rows.filter((r) => followGateAllows(r.privacyVisibility, authorId, myId, rel)
+    && audienceAllows(r.privacyVisibility, authorId, myId, rel));
 
   if (!finalRows.length) { res.json([]); return; }
 
@@ -1337,7 +1339,8 @@ router.get("/stories/following", async (req, res) => {
 
   const followingRows = await db.select({ followingId: follows.followingId })
     .from(follows).where(eq(follows.followerId, myId));
-  const authorIds = Array.from(new Set([myId, ...followingRows.map((r) => r.followingId)]));
+  // + authors who put me on their Close Friends list (their CF stories only, below).
+  const authorIds = Array.from(new Set([myId, ...followingRows.map((r) => r.followingId), ...(await closeFriendOfAuthorIds(myId))]));
 
   const rows = await db.select().from(stories)
     .where(and(inArray(stories.authorId, authorIds), gt(stories.expiresAt, now), storyListedFor(myId)))
@@ -1355,7 +1358,8 @@ router.get("/stories/following", async (req, res) => {
   const visibleRows = rows.filter((r) => {
     if (r.authorId === myId) return true;
     if (blockedIds.has(r.authorId)) return false;
-    return audienceAllows(r.privacyVisibility, r.authorId, myId, rel);
+    return followGateAllows(r.privacyVisibility, r.authorId, myId, rel)
+      && audienceAllows(r.privacyVisibility, r.authorId, myId, rel);
   });
   if (!visibleRows.length) { res.json([]); return; }
 

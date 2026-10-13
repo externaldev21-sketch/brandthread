@@ -65,3 +65,23 @@ export async function viewerMayOpenAudience(
   if (authorId === viewerId || normalizeAudience(audience) === "public") return true;
   return audienceAllows(audience, authorId, viewerId, await viewerRelations(viewerId, [authorId]));
 }
+
+/**
+ * Follow gate for the story list/tray endpoints. Stories are for the
+ * author's followers, except that a Close Friends story also reaches the
+ * people on the author's list who don't follow them (e.g. a seller's top
+ * buyer added from "Suggested: your top buyers").
+ */
+export function followGateAllows(
+  audience: string | null | undefined, authorId: string, viewerId: string, rel: ViewerRelations,
+): boolean {
+  if (authorId === viewerId || rel.following.has(authorId)) return true;
+  return normalizeAudience(audience) === "close_friends" && rel.closeFriendOf.has(authorId);
+}
+
+/** Authors whose Close Friends list contains the viewer. */
+export async function closeFriendOfAuthorIds(viewerId: string): Promise<string[]> {
+  const rows = await db.select({ id: closeFriends.userId }).from(closeFriends)
+    .where(eq(closeFriends.friendId, viewerId));
+  return rows.map((r) => r.id);
+}
