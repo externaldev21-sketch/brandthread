@@ -17,6 +17,7 @@ import { parseItemIds, partialLabelItemError } from "../lib/partialLabel";
 import { shipItems } from "../lib/delivery/deliveryState";
 import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
 import { publishNotification } from "./notifications-feed";
+import { withOrderImage } from "../lib/orderItemImages";
 
 const router = Router();
 router.use(requireAuth);
@@ -117,12 +118,12 @@ async function shipLabelledItems(
     }
     void registerTrackingWithCarrier(orderId, carrier, trackingNumber);
     if (notify && result.buyerId) {
-      publishNotification({
+      withOrderImage(orderId, {
         userId: result.buyerId, category: "orders", pushCategory: "order", type: "order_shipped",
         title: "Part of your order has shipped!",
         body: `Order #${result.orderNumber} is on its way via ${carrier ?? "carrier"} — tracking: ${trackingNumber}`,
         targetId: orderId, targetType: "buyer_order",
-      }).catch(() => { /* non-critical */ });
+      }).then(publishNotification).catch(() => { /* non-critical */ });
     }
   } catch (err) {
     logger.error({ err, orderId }, "Could not mark a labelled parcel's items shipped");

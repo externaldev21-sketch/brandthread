@@ -129,6 +129,9 @@ export function adaptApiOrder(raw: any): Order {
     productName:      item.productName,
     variant:          item.variantLabel ?? '',
     sku:              undefined,
+    // Signed product thumbnail from the API (item 55); undefined keeps the
+    // icon fallback for lines whose product is gone or has no photo.
+    imageUri:         item.imageUri ?? item.imageUrl ?? undefined,
     quantity:         item.quantity,
     unitPriceCents:   item.priceCents ?? 0,
     discountAmountCents: 0,

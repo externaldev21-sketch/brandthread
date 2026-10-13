@@ -9,6 +9,9 @@ vi.mock("../routes/notifications-feed", () => ({
 vi.mock("./safety", () => ({
   profilesById: vi.fn(async (ids: string[]) => new Map(ids.filter((id) => profiles.has(id)).map((id) => [id, profiles.get(id)]))),
 }));
+vi.mock("./orderItemImages", () => ({
+  orderThumbnailPath: vi.fn(async (orderId: string) => (orderId === "o1" ? "/objects/uploads/tee" : null)),
+}));
 vi.mock("./activityEvents", () => ({
   actorFieldsFromProfile: (p: any) => ({ actorId: p.userId, actorName: p.name, actorInitials: "JR", actorColor: "#3F3F46" }),
 }));
@@ -18,6 +21,7 @@ import {
   notifyBuyerOrderCancelled,
   notifyBuyerOrderConfirmed,
   notifySellerOrderCancelledByBuyer,
+  notifySellerReturnRequested,
 } from "./orderNotifications";
 
 beforeEach(() => {
@@ -69,6 +73,21 @@ describe("order lifecycle notifications", () => {
     await notifySellerOrderCancelledByBuyer({ sellerId: "s1", buyerId: "b1", orderId: "o1", orderNumber: "BT-1", refundedCents: 0 });
     expect(published[0].title).toBe("A buyer cancelled order #BT-1");
     expect(published[0]).not.toHaveProperty("actorId");
+  });
+
+  it("shows the order's product thumbnail on cancel and return rows (item 55)", async () => {
+    await notifyBuyerOrderCancelled({ buyerId: "b1", orderId: "o1", orderNumber: "BT-1", refundedCents: 0, reason: "buyer_cancelled" });
+    await notifySellerOrderCancelledByBuyer({ sellerId: "s1", buyerId: "b1", orderId: "o1", orderNumber: "BT-1", refundedCents: 0 });
+    await notifySellerReturnRequested({ sellerId: "s1", buyerId: "b1", returnId: "r1", orderNumber: "BT-1", orderId: "o1" });
+    expect(published.map((n) => n.targetImageUrl)).toEqual([
+      "/objects/uploads/tee", "/objects/uploads/tee", "/objects/uploads/tee",
+    ]);
+  });
+
+  it("leaves the thumbnail empty when the order has no product image", async () => {
+    await notifyBuyerOrderCancelled({ buyerId: "b1", orderId: "o-none", orderNumber: "BT-2", refundedCents: 0, reason: "sold_out" });
+    await notifySellerReturnRequested({ sellerId: "s1", buyerId: "b1", returnId: "r1", orderNumber: "BT-2" });
+    expect(published.map((n) => n.targetImageUrl)).toEqual([null, null]);
   });
 
   it("never throws when publishing fails", async () => {

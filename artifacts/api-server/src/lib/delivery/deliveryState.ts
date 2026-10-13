@@ -22,6 +22,7 @@ import {
   notifyBuyerDelivered, notifyBuyerOutForDelivery,
 } from "./notifications";
 import { publishNotification } from "../../routes/notifications-feed";
+import { withOrderImage } from "../orderItemImages";
 
 // ─── At purchase ──────────────────────────────────────────────────────────────
 
@@ -268,7 +269,7 @@ export async function applyCarrierTracking(input: {
     await notifyBuyerOutForDelivery(before).catch(() => {});
   }
   if (changed && before.buyerId && (input.status === "exception" || input.status === "returned_to_sender")) {
-    await publishNotification({
+    await publishNotification(await withOrderImage(before.id, {
       userId: before.buyerId, category: "orders", pushCategory: "order",
       type: input.status === "exception" ? "order_exception" : "order_returned_to_sender",
       title: input.status === "exception" ? "Delivery problem with your order" : "Your package is being returned",
@@ -276,7 +277,7 @@ export async function applyCarrierTracking(input: {
         ? `Order #${before.orderNumber} has a delivery exception. Check the tracking details or contact the seller.`
         : `Order #${before.orderNumber} is being returned to the sender. Contact the seller for help.`,
       targetId: before.id, targetType: "buyer_order",
-    }).catch(() => {});
+    })).catch(() => {});
   }
   return { applied: true };
 }
