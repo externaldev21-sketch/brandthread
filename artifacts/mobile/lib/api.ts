@@ -625,6 +625,28 @@ async function uploadVideo<T = any>(
   await clearApiCache(await getCacheScope());
   return data;
 }
+export type MysteryRevealTiming = 'at_purchase' | 'on_delivery';
+export interface MysteryBoxPool {
+  isMysteryBox: boolean;
+  reveal: MysteryRevealTiming;
+  showOdds: boolean;
+  items: Array<{ variantId: string; weight: number }>;
+  catalog: Array<{
+    variantId: string; productId: string; name: string; image: string | null;
+    size: string | null; color: string | null; priceCents: number; stock: number; active: boolean;
+  }>;
+}
+export interface MysteryBoxSummary {
+  isMysteryBox: boolean;
+  itemCount?: number;
+  priceRange?: { minCents: number; maxCents: number } | null;
+  reveal?: MysteryRevealTiming;
+  odds?: Array<{ name: string; variantLabel: string | null; chanceBps: number }>;
+}
+export interface MysteryBoxRevealItem {
+  orderItemId: string; unitIndex: number; boxName: string; variantId: string | null;
+  productId: string | null; name: string | null; size: string | null; color: string | null; image: string | null;
+}
 export interface ProductPairing { id: string; name: string; image: string | null; active: boolean; position: number }
 export interface PublicPairedProduct {
   id: string;
@@ -3391,6 +3413,19 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Public (works signed out): active products only. */
       publicList: (productId: string) =>
         get<PublicPairedProduct[]>(`/api/product-pairings/public/${encodeURIComponent(productId)}`),
+    },
+    /** Mystery boxes — a product whose units resolve to one pool item when paid. */
+    mysteryBoxes: {
+      get: (productId: string) =>
+        freshGet<MysteryBoxPool>(`/api/mystery-boxes/${encodeURIComponent(productId)}`),
+      save: (productId: string, body: { enabled: boolean; reveal?: MysteryRevealTiming; showOdds?: boolean; items?: Array<{ variantId: string; weight?: number }> }) =>
+        put<MysteryBoxPool>(`/api/mystery-boxes/${encodeURIComponent(productId)}`, body),
+      /** Public (works signed out). */
+      summary: (productId: string) =>
+        get<MysteryBoxSummary>(`/api/mystery-boxes/public/${encodeURIComponent(productId)}`),
+      /** Buyer's own order: revealed items for 'at_purchase' boxes. */
+      reveals: (orderId: string) =>
+        freshGet<{ reveals: MysteryBoxRevealItem[] }>(`/api/buyer/mystery-boxes/orders/${encodeURIComponent(orderId)}`),
     },
     /** Product video — one short silent video per product. */
     productVideos: {

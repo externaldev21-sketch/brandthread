@@ -90,6 +90,7 @@ import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
 import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
 import { amountBucket, captureServerEvent } from "../lib/analytics";
+import { applyMysteryBoxPicks } from "../lib/mysteryBox";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -1136,6 +1137,12 @@ export async function handleCheckoutPaid(
     // transaction as the order and its items.
     if (oversoldItems.length === 0) {
       await stampDeliveryDeadlines(tx, order.id, successfulPaymentAt);
+    }
+
+    // Mystery boxes: pick each box unit's item and decrement its stock, in
+    // this transaction (savepoint; never fails the order — lib/mysteryBox.ts).
+    if (oversoldItems.length === 0) {
+      await applyMysteryBoxPicks(tx as any, order.id, ownerId);
     }
 
     // Step 6: stock was already reserved (decremented) above — either by the

@@ -1650,6 +1650,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="product-bundles"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-bundle-edit" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="product-pairings" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="mystery-box-edit" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-video" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-launches" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="waitlist-demand" options={{ headerShown: false, animation: 'ios_from_right' }} />

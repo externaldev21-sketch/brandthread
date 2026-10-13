@@ -54,6 +54,7 @@ import { LaunchCountdown } from '@/components/products/LaunchCountdown';
 import { PreOrderShipBy } from '@/components/products/PreOrderShipBy';
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
 import { CompleteTheFit } from '@/components/products/CompleteTheFit';
+import { MysteryBoxLabel } from '@/components/products/MysteryBoxLabel';
 import { ProductVideo } from '@/components/products/ProductVideo';
 import { ProductQuestionsSection } from '@/components/ProductQuestionsSection';
 import { SizeRecommendationBadge, RecommendedTag, useSizeBadgeModel } from '@/components/SizeRecommendationBadge';
@@ -1053,6 +1054,7 @@ export default function BuyerProductDetailScreen() {
               About this piece → returns → purchase protection (once) →
               you might also like → report links, small, at the very end. */}
           <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
+          <MysteryBoxLabel productId={product.id} />
           {/* Price */}
           <View style={s.priceRow}>
             <Text style={[s.price, hasDiscount ? s.priceSale : undefined]}>{formatCents(variantPrice)}</Text>
