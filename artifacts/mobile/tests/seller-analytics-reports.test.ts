@@ -149,9 +149,24 @@ describe('best time to post is removed', () => {
     }
     return out;
   };
+  // The scheduled-launch "Best time" suggestion (item 56) is a separate feature:
+  // it lives on /api/product-launches/best-time, not the removed analytics
+  // report, so its own files are the only allowed mentions.
+  const LAUNCH_BEST_TIME_FILES = [
+    'app/product-launches.tsx',
+    'components/products/BestTimeSuggestion.tsx',
+    'components/analytics/MostActiveTimesCard.tsx',
+    'lib/api.ts',
+    'lib/productLaunchChecklist.ts',
+    'scripts/f4-launch-screenshots.mjs',
+    '../api-server/src/lib/followerActivity.ts',
+    '../api-server/src/routes/product-launches.ts',
+    '../../lib/db/migrations/272_follower_activity_indexes.sql',
+  ].map(f => resolve(ROOT, f));
   it('nothing references it in the mobile app, the API or the database package', () => {
     const files = [...walk(ROOT), ...walk(resolve(ROOT, '../api-server/src')), ...walk(resolve(ROOT, '../../lib/db'))]
-      .filter(f => !/\.test\.tsx?$/.test(f)); // tests may assert the old route is gone
+      .filter(f => !/\.test\.tsx?$/.test(f)) // tests may assert the old route is gone
+      .filter(f => !LAUNCH_BEST_TIME_FILES.includes(f));
     const hits = files.filter(f => /best[-_ ]time|bestTime|BestTime/i.test(readFileSync(f, 'utf8')));
     expect(hits).toEqual([]);
     expect(existsSync(resolve(ROOT, 'app/analytics-best-time.tsx'))).toBe(false);
