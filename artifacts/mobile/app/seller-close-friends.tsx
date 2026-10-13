@@ -117,6 +117,7 @@ export default function SellerCloseFriends() {
         <SearchBar value={query} onChange={setQuery} placeholder="Search" />
       </View>
 
+      <View style={s.body}>
       {!data ? (
         loadFailed ? (
           <EmptyState icon="wifi-off" title="Couldn't load your list" description="Check your connection and try again." action={{ label: 'Retry', onPress: () => { void load(); } }} />
@@ -173,6 +174,7 @@ export default function SellerCloseFriends() {
           }}
         />
       )}
+      </View>
 
       <StickyBottomCTA label="Done" onPress={() => { void handleDone(); }} loading={saving} disabled={!data} testID="seller-cf-done" />
     </View>
@@ -181,6 +183,7 @@ export default function SellerCloseFriends() {
 
 const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
+  body: { flex: 1 },
   note: {
     ...TYPE_SCALE.footnote, color: colors.mutedForeground, textAlign: 'center',
     paddingHorizontal: SPACING.xl, paddingTop: SPACING.xxs,
