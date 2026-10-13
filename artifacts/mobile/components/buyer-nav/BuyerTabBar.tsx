@@ -259,7 +259,12 @@ export function BuyerTabBar({
   const openRoute = React.useCallback((routeName: string) => {
     const route = state.routes.find(candidate => candidate.name === routeName);
     const focused = activeRoute === routeName;
-    if (focused) return;
+    if (focused) {
+      // Re-tapping the active tab: let its screen jump back to the top
+      // (useScrollToTop listens for this event). Nothing else changes.
+      if (route) navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+      return;
+    }
     const event = route
       ? navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
       : null;

@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FontAwesome } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
-import { useRouter, useIsFocused } from 'expo-router';
+import { useRouter, useIsFocused, useScrollToTop } from 'expo-router';
 import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useAuth } from '@clerk/expo';
 import { ForYouEmptyShop } from '@/components/feed/ForYouEmptyShop';
@@ -2139,6 +2139,10 @@ export default function FeedScreen({
   const { scale: cartPulse, bump: bumpCart } = useCartBadgeBump(reduceMotion);
   const cartTargetRef = useRef<View>(null);
   const feedListRef = useRef<FlatList<FeedItem>>(null);
+  // Re-tapping the Home tab jumps back to the first post (iOS / Instagram).
+  // Only the re-tap — returning to the tab or closing comments keeps your
+  // place (see the SCROLL-RESET EXCEPTION note on the list below).
+  useScrollToTop(feedListRef);
 
   useEffect(() => {
     let active = true;
