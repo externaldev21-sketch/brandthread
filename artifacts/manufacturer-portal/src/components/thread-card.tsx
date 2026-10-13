@@ -24,9 +24,10 @@ export function ThreadCard({ thread }: { thread: MessageThread }) {
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="mb-1 flex items-start justify-between">
+          <div className="mb-1 flex items-start justify-between gap-2">
             <h3
-              className={`truncate pr-4 font-semibold ${thread.unreadCount ? "text-foreground" : "text-muted-foreground"}`}
+              title={thread.buyerName}
+              className={`min-w-0 truncate pr-4 font-semibold ${thread.unreadCount ? "text-foreground" : "text-muted-foreground"}`}
               data-testid={`text-buyer-${thread.id}`}
             >
               {thread.buyerName}
@@ -36,9 +37,9 @@ export function ThreadCard({ thread }: { thread: MessageThread }) {
             </span>
           </div>
           <div className="mb-1.5 flex items-center gap-2">
-            <span className="truncate text-sm font-medium">{thread.subject}</span>
+            <span className="min-w-0 truncate text-sm font-medium" title={thread.subject}>{thread.subject}</span>
             {thread.orderStatus && (
-              <span className="rounded border border-border bg-secondary px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <span className="shrink-0 whitespace-nowrap rounded border border-border bg-secondary px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                 {orderStatusLabel(thread.orderStatus)}
               </span>
             )}

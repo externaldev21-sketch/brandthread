@@ -66,7 +66,7 @@ function UserSheet({ clerkId, onClose }: { clerkId: string | null; onClose: () =
   const verify = useAdminMutation<{ verified: boolean }>("POST", `/users/${clerkId}/verify`, refresh);
   const row = (label: string, value: string) => (
     <div className="flex items-baseline justify-between gap-4 border-b border-border py-2.5 text-sm last:border-0">
-      <span className="text-muted-foreground">{label}</span><span className="text-right">{value}</span>
+      <span className="text-muted-foreground">{label}</span><span className="min-w-0 text-right [overflow-wrap:anywhere]">{value}</span>
     </div>
   );
   const isAdmin = u?.role === "admin";
@@ -74,7 +74,7 @@ function UserSheet({ clerkId, onClose }: { clerkId: string | null; onClose: () =
   return (
     <Sheet open={!!clerkId} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full overflow-y-auto border-border bg-popover sm:max-w-md">
-        <SheetHeader><SheetTitle>{u ? u.brandName || u.name : "Loading…"}</SheetTitle></SheetHeader>
+        <SheetHeader><SheetTitle className="break-words pr-6">{u ? u.brandName || u.name : "Loading…"}</SheetTitle></SheetHeader>
         {u && (
           <div className="px-4 pb-6">
             <div className="mb-4 flex flex-wrap gap-1.5">

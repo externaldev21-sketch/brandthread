@@ -55,20 +55,20 @@ export default function Sellers() {
       ) : sellers.length === 0 ? (
         <EmptyState icon={Store} title={search ? "No matching sellers" : "No sellers yet"} description={search ? "Try a different name." : "Sellers appear here when they message you or invite you to work with them."} />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {sellers.map((seller) => (
             <article key={seller.id} className="flex flex-col rounded-lg border border-border bg-card p-5" data-testid={`card-seller-${seller.id}`}>
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-secondary font-bold text-muted-foreground">{seller.name.substring(0, 2).toUpperCase()}</div>
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-secondary font-bold text-muted-foreground">{seller.name.substring(0, 2).toUpperCase()}</div>
                 <div className="min-w-0">
-                  <h2 className="truncate font-semibold">{seller.name}</h2>
+                  <h2 className="truncate font-semibold" title={seller.name}>{seller.name}</h2>
                   <p className="text-xs text-muted-foreground">{seller.lastActive ? `Last message ${formatDistanceToNow(new Date(seller.lastActive), { addSuffix: true })}` : "No messages yet"}</p>
                 </div>
               </div>
               <dl className="mt-5 grid grid-cols-3 gap-3 border-t border-border pt-4 text-sm">
                 <div><dt className="text-xs text-muted-foreground">Active</dt><dd className="mt-0.5 font-mono font-semibold">{seller.active}</dd></div>
                 <div><dt className="text-xs text-muted-foreground">Orders</dt><dd className="mt-0.5 font-mono font-semibold">{seller.total}</dd></div>
-                <div><dt className="text-xs text-muted-foreground">Paid value</dt><dd className="mt-0.5 font-mono font-semibold">{formatMoney(seller.paidValue)}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Paid value</dt><dd className="mt-0.5 font-mono font-semibold [overflow-wrap:anywhere]">{formatMoney(seller.paidValue)}</dd></div>
               </dl>
               {seller.threadId && (
                 <Link href={`/messages/${seller.threadId}`} className="mt-4 flex items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground" data-testid={`link-message-seller-${seller.id}`}>

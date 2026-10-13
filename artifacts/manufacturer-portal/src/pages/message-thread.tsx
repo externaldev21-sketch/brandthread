@@ -133,7 +133,7 @@ export default function MessageThread({ threadId }: { threadId: string }) {
 
   if (messagesQuery.isLoading || threadsQuery.isLoading) {
     return (
-      <div className="flex h-[calc(100vh-8rem)] flex-col rounded-lg border border-border bg-card" data-testid="status-thread-loading">
+      <div className="flex h-[calc(100vh-8.25rem-16px)] flex-col rounded-lg border border-border bg-card md:h-[calc(100vh-8rem)]" data-testid="status-thread-loading">
         <div className="flex h-16 items-center gap-3 border-b border-border px-6">
           <div className="h-10 w-10 animate-pulse rounded-full bg-secondary" />
           <div className="space-y-2"><div className="h-3 w-32 animate-pulse rounded bg-secondary" /><div className="h-3 w-20 animate-pulse rounded bg-secondary" /></div>
@@ -162,7 +162,7 @@ export default function MessageThread({ threadId }: { threadId: string }) {
   }
 
   return (
-    <div className="relative flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-lg border border-border bg-card animate-in fade-in duration-300">
+    <div className="relative flex h-[calc(100vh-8.25rem-16px)] flex-col overflow-hidden rounded-lg md:h-[calc(100vh-8rem)] border border-border bg-card animate-in fade-in duration-300">
       <div className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur-sm md:px-6">
         <Link href="/messages" className="-ml-2 rounded-full p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" aria-label="Back to inbox">
           <ArrowLeft className="h-5 w-5" />
@@ -172,8 +172,8 @@ export default function MessageThread({ threadId }: { threadId: string }) {
             {thread.buyerAvatar ? <img src={thread.buyerAvatar} alt="" className="h-full w-full object-cover" /> : thread.buyerName.substring(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold md:text-base" data-testid="text-thread-seller">{thread.buyerName}</h2>
-            <p className="truncate text-xs text-muted-foreground">
+            <h2 className="truncate text-sm font-semibold md:text-base" title={thread.buyerName} data-testid="text-thread-seller">{thread.buyerName}</h2>
+            <p className="truncate text-xs text-muted-foreground" title={thread.subject}>
               {thread.subject}{thread.orderStatus ? ` · ${orderStatusLabel(thread.orderStatus)}` : ""}
             </p>
           </div>
@@ -203,7 +203,7 @@ export default function MessageThread({ threadId }: { threadId: string }) {
                   <div key={msg.id} className="flex justify-center" data-testid={`system-message-${msg.id}`}>
                     <p className="flex max-w-lg items-start gap-2 rounded-full border border-border bg-secondary/40 px-4 py-1.5 text-center text-xs text-muted-foreground">
                       <Info className="mt-0.5 h-3 w-3 shrink-0" />
-                      <span>{msg.content}</span>
+                      <span className="min-w-0 break-words">{msg.content}</span>
                       <span className="shrink-0 font-mono opacity-70">{new Date(msg.sentAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
                     </p>
                   </div>
@@ -250,7 +250,7 @@ export default function MessageThread({ threadId }: { threadId: string }) {
                       </a>
                     ))}
                     {msg.content && !(autoCaption && (images.length || files.length)) && (
-                      <p className="whitespace-pre-wrap px-4 py-2.5">{msg.content}</p>
+                      <p className="whitespace-pre-wrap break-words px-4 py-2.5">{msg.content}</p>
                     )}
                   </div>
                   <span className="px-1 text-[10px] text-muted-foreground">{time}</span>
