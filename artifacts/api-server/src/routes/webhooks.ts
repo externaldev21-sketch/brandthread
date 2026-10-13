@@ -1404,6 +1404,7 @@ export async function handleCheckoutPaid(
     if (createdOrderId) {
       const [createdOrder] = await db
         .select({
+          id: orders.id,
           ownerId: orders.ownerId,
           orderNumber: orders.orderNumber,
           totalCents: orders.totalCents,
@@ -1427,14 +1428,19 @@ export async function handleCheckoutPaid(
           const buyerName = buyerProfile && !buyerProfile.deleted && !buyerProfile.suspended
             ? buyerProfile.name
             : shippingAddress?.name ?? null;
+          const [firstPaidOrder] = await db
+            .select({ id: orders.id })
+            .from(orders)
+            .where(and(eq(orders.ownerId, createdOrder.ownerId), sql`${orders.paidAt} IS NOT NULL`))
+            .orderBy(orders.createdAt, orders.id)
+            .limit(1);
           const copy = newOrderCopy({
             buyerName,
             productName: firstItem?.productName,
             itemCount: lineItems.length,
             orderNumber: createdOrder.orderNumber,
             totalCents: createdOrder.totalCents,
-            // Order numbers count up per seller from BT-00001 (step 3 above).
-            firstSale: createdOrder.orderNumber === "BT-00001",
+            firstSale: firstPaidOrder?.id === createdOrder.id,
           });
           const [sellerPrefs] = await db
             .select({ preferences: users.notificationPreferences })

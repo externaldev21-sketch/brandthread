@@ -25,6 +25,7 @@ import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableSc
 const SEARCH_DEBOUNCE_MS = 250;
 import { setPendingChatFocus } from '@/lib/chatFocus';
 import { formatDate } from '@/lib/chatGrouping';
+import { hapticPrimaryAction } from '@/lib/haptics';
 
 export default function ConversationSearchScreen() {
   const { theme } = useAppTheme();

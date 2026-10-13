@@ -1374,7 +1374,7 @@ function RootLayoutNav() {
     const subscription = Notifications.addNotificationResponseReceivedListener(
       handleNotificationResponse,
     );
-    void hydrateSaleAlertPrefs();
+    void hydrateSaleAlertPrefs(userId ?? null);
     const receiptSubscription = Notifications.addNotificationReceivedListener(
       (notification) => {
         void trackNotificationEvent(notification, 'receipt').catch(() => {});

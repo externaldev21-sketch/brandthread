@@ -95,7 +95,7 @@ export interface FollowMorphButtonProps {
   /** Additive: label type override so the button can match a surrounding button row. */
   labelStyle?: StyleProp<TextStyle>;
   /** Additive: icon shown before the label while following (e.g. "Friends"). */
-  followingIcon?: React.ComponentProps<typeof Feather>['name'];
+  followingIcon?: React.ComponentProps<typeof Icon>['name'];
 }
 
 /** Text/style cross-fades between "Follow" (solid) and "Following" (outline). */

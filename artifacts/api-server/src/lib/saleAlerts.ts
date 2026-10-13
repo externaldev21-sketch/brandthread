@@ -25,7 +25,7 @@ export function readSaleAlertPrefs(preferences: unknown): SaleAlertPrefs {
     ? (preferences as Record<string, unknown>)
     : {};
   return {
-    saleSound: prefs[SALE_SOUND_KEY] !== false,
+    saleSound: (prefs[SALE_SOUND_KEY] ?? prefs.new_order_sound) !== false,
     saleHaptic: prefs[SALE_HAPTIC_KEY] !== false,
   };
 }

@@ -61,7 +61,7 @@ import { shipsInLabel } from '@/lib/storeTrust';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { ListRow } from '@/components/ui/ListRow';
-import { haptics } from '@/lib/haptics';
+import { haptics, hapticSelection } from '@/lib/haptics';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import {
   ProfileButton, ProfileChip, ProfileGlassButton, type ProfileStat, type ProfileTab,
@@ -839,7 +839,7 @@ export default function SellerProfileScreen() {
         tabs={{
           items: CONTENT_TAB_ITEMS,
           active: activeTab,
-          onChange: (key) => { hapticLight(); tabPickedRef.current = true; setActiveTab(key === 'Shop' || key === 'Tagged' ? key : 'Posts'); },
+          onChange: (key) => { hapticSelection(); tabPickedRef.current = true; setActiveTab(key === 'Shop' || key === 'Tagged' ? key : 'Posts'); },
         }}
         data={gridData}
         renderItem={renderTile}

@@ -455,15 +455,6 @@ export const ActivityRowView = React.memo(function ActivityRowView({
         </View>
       </Pressable>
 
-      {/* Unread dot — inside the content area (not out in the 16pt screen
-          gutter), just ahead of the row's trailing pill/thumbnail. White
-          not blue: monochrome brand. */}
-      {unread ? (
-        <View style={showFollowControl || trailingThumb ? styles.unreadDotAnchor : styles.unreadDotTrailing} pointerEvents="none">
-          <View style={styles.unreadDot} testID={`activity-unread-dot-${row.key}`} />
-        </View>
-      ) : null}
-
       {showFollowControl ? (
         // The shared Follow pill (components/search/PersonRow) — same one the
         // grouped "New followers" list uses — as a sibling of `tapArea`, so

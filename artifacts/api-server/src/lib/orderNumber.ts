@@ -46,7 +46,7 @@ export async function generateOrderNumber(
 }
 
 /** `generateOrderNumber` against the orders table, inside the caller's transaction. */
-export function generateOrderNumberIn(tx: Executor): Promise<string> {
+export async function generateOrderNumberIn(tx: Executor): Promise<string> {
   // Serialize allocation until the caller inserts and commits the order.
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"order_number:global"}))`);
   return generateOrderNumber(async (candidate) => {

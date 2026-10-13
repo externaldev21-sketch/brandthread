@@ -1492,10 +1492,13 @@ async function postWithUploadProgress<T>(
   body: unknown,
   getToken: GetToken,
   onProgress: (fraction: number) => void,
+  getScope: GetCacheScope = () => 'anonymous',
 ): Promise<T> {
-  rejectSellerPreviewApiRequest();
+  const initiatingScope = await getScope();
+  await signedOutGate(versionApiPath(path), 'POST', getToken);
   const resolvedPath = versionApiPath(path);
   const token = await getCachedToken(getToken);
+  if (await getScope() !== initiatingScope) throw new Error('Account changed during upload.');
   if (!token && isSignedInOnlyPath(resolvedPath)) {
     throw new ApiError(401, JSON.stringify({ error: { message: 'Sign in required', code: 'auth_required' } }));
   }
@@ -1510,7 +1513,11 @@ async function postWithUploadProgress<T>(
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && event.total > 0) onProgress(Math.min(0.99, event.loaded / event.total));
     };
-    xhr.onload = () => {
+    xhr.onload = async () => {
+      if (await getScope() !== initiatingScope) {
+        reject(new Error('Account changed during upload.'));
+        return;
+      }
       if (xhr.status >= 200 && xhr.status < 300) {
         onProgress(1);
         try { resolve(JSON.parse(xhr.responseText) as T); } catch (error) { reject(error); }
@@ -1885,14 +1892,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           buckets: Array<{ bucket: string; totalCents: number; netCents: number; orderCount: number; visitorCount: number }>;
           // `tz` is minutes east of UTC (-Date#getTimezoneOffset()) so day/hour
           // buckets land on the seller's local calendar day, not the server's.
-        }>(`/api/analytics/home?range=${range}&tz=${-new Date().getTimezoneOffset()}`),
-      revenue:    (period: string) => get(`/api/analytics/revenue?period=${period}&tz=${-new Date().getTimezoneOffset()}`),
         }>(`/api/analytics/home?range=${range}&tz=${-new Date().getTimezoneOffset()}`).then((home) => {
-          // Feeds the "Sales today" Siri Shortcut (lib/siriSalesSnapshot.ts).
           if (range === 'today') saveSiriSalesSnapshot(home);
           return home;
         }),
-      revenue:    (period: string) => get(`/api/analytics/revenue?period=${period}`),
+      revenue: (period: string) => get(`/api/analytics/revenue?period=${period}&tz=${-new Date().getTimezoneOffset()}`),
       products:   () => get<any[]>('/api/analytics/products'),
       /** Top customers by spend + repeat-buyer stats — derived from real orders */
       customers:  (limit = 10) => get<{
@@ -2529,7 +2533,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         const blob = await readUploadBlob(prepared.uri, isImage ? 'selected photo' : 'selected video');
         if (uploadStrategy(blob.size) === 'single') {
           const body = { data: await blobToBase64(blob), mimeType, extension };
-          return onProgress ? postWithUploadProgress<{ url: string }>('/api/conversations/upload-media', body, getToken, onProgress) : post<{ url: string }>('/api/conversations/upload-media', body);
+          return onProgress ? postWithUploadProgress<{ url: string }>('/api/conversations/upload-media', body, getToken, onProgress, getCacheScope) : post<{ url: string }>('/api/conversations/upload-media', body);
         }
         const authHeaders = async (): Promise<Record<string, string>> => {
           const token = await getCachedToken(getToken);
@@ -2549,7 +2553,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       },
       /** Same upload, reporting progress 0–1 (for the in-bubble ring, #161). */
       uploadMediaWithProgress: (body: { data: string; mimeType: string; extension: string }, onProgress: (fraction: number) => void) =>
-        postWithUploadProgress<{ url: string }>('/api/conversations/upload-media', body, getToken, onProgress),
+        postWithUploadProgress<{ url: string }>('/api/conversations/upload-media', body, getToken, onProgress, getCacheScope),
       /** Set (or replace) my reaction on a message — one active reaction per user per message. */
       addReaction: (conversationId: string, messageId: string, reactionType: string) =>
         put<{ userId: string; userName: string; reactionType: string; createdAt: string }>(

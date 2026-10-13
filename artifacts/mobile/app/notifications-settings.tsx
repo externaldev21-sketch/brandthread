@@ -74,8 +74,6 @@ export default function NotificationsSettingsScreen() {
         setQuietHours({ start: data.quietHours?.start ?? null, end: data.quietHours?.end ?? null });
         if (data.role === 'seller') {
           const sale = { saleSound: data.saleSound ?? true, saleHaptic: data.saleHaptic ?? true };
-          setSaleSound(sale.saleSound);
-          setSaleHaptic(sale.saleHaptic);
           rememberSaleAlertPrefs(sale);
         }
       })

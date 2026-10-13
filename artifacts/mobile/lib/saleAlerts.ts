@@ -14,17 +14,28 @@ const DEFAULTS: SaleAlertPrefs = { saleSound: true, saleHaptic: true };
 
 let current: SaleAlertPrefs = DEFAULTS;
 let hydrated = false;
+let owner: string | null = null;
+let revision = 0;
 
 export function getSaleAlertPrefs(): SaleAlertPrefs {
   return current;
 }
 
-export async function hydrateSaleAlertPrefs(): Promise<SaleAlertPrefs> {
+export async function hydrateSaleAlertPrefs(nextOwner: string | null = null): Promise<SaleAlertPrefs> {
+  if (nextOwner !== owner) {
+    owner = nextOwner;
+    revision += 1;
+    current = DEFAULTS;
+    hydrated = false;
+  }
+  if (!owner) return current;
   if (hydrated) return current;
   hydrated = true;
+  const requestRevision = revision;
+  const key = `${STORAGE_KEY}:${owner}`;
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (raw) current = normalizeSaleAlertPrefs(JSON.parse(raw));
+    const raw = await AsyncStorage.getItem(key);
+    if (raw && requestRevision === revision) current = normalizeSaleAlertPrefs(JSON.parse(raw));
   } catch {
     // Keep the defaults: both alerts on.
   }
@@ -32,9 +43,10 @@ export async function hydrateSaleAlertPrefs(): Promise<SaleAlertPrefs> {
 }
 
 export function rememberSaleAlertPrefs(next: Partial<SaleAlertPrefs>): void {
+  revision += 1;
   current = normalizeSaleAlertPrefs({ ...current, ...next });
   hydrated = true;
-  void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(current)).catch(() => {});
+  if (owner) void AsyncStorage.setItem(`${STORAGE_KEY}:${owner}`, JSON.stringify(current)).catch(() => {});
 }
 
 export function normalizeSaleAlertPrefs(value: unknown): SaleAlertPrefs {

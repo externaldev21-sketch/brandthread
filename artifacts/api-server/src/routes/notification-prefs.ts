@@ -255,6 +255,7 @@ router.put("/", validateBody(updateNotificationPrefsBody), async (req, res) => {
         return res.status(400).json({ error: `Invalid notification category: ${key}` });
       }
       patch[key] = value;
+      if (key === "new_order_sound") patch.sale_sound = value;
     }
     for (const [channelName, map] of Object.entries(channels ?? {})) {
       if ((channelName !== "inApp" && channelName !== "email") || !map || typeof map !== "object" || Array.isArray(map)) {
@@ -268,6 +269,7 @@ router.put("/", validateBody(updateNotificationPrefsBody), async (req, res) => {
         patch[channelPrefKey(channelName, parsed.key)] = value;
       }
     }
+    if (typeof saleSound === "boolean") patch.new_order_sound = saleSound;
     const merged = { ...defaults, ...(current.preferences ?? {}), ...patch, ...salePatch.patch };
 
     const updates: Record<string, unknown> = {

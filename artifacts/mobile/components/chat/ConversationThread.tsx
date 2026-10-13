@@ -437,10 +437,10 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   function stageMediaUpload(placeholder: MessageAttachment, upload: (report: (fraction: number) => void) => Promise<MessageAttachment>) {
     const owner = userId;
     const thread = currentThreadIdRef.current;
-    if (owner !== currentUserIdRef.current) return;
+    if (owner !== currentUserRef.current) return;
     const token = ++mediaUploadTokenRef.current;
     const ticket = { promise: Promise.resolve<MessageAttachment | null>(null), messageId: null as string | null, fraction: 0 };
-    const current = () => currentUserIdRef.current === owner && currentThreadIdRef.current === thread;
+    const current = () => currentUserRef.current === owner && currentThreadIdRef.current === thread;
     pendingUploadRef.current = ticket;
     setSelectedAttachment(placeholder);
     setIsUploading(true);
@@ -1695,19 +1695,27 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       }]);
       listScroll.requestScrollToEnd();
       const completed = await ticket.promise;
-      if (currentUserIdRef.current !== owner || currentThreadIdRef.current !== threadId) return;
+      if (currentUserRef.current !== owner || currentThreadIdRef.current !== threadId) return;
       if (!completed) {
         setMessages(prev => prev.filter(msg => msg.id !== localId));
         setText(t); setReplyTo(replyingTo);
         Alert.alert('Upload failed', 'Your message was not sent. Choose the media again to retry.');
         return;
       }
-      await enqueueOutboxMessage(owner, threadId, {
-        text: t, attachment: completed,
-        replyToId: replyingTo && !isOutboxMessageId(replyingTo.id) ? replyingTo.id : undefined,
-        replyPreview: replyingTo?.text, replyToAuthorName: replyingTo?.fromName,
-      });
-      if (currentUserIdRef.current !== owner || currentThreadIdRef.current !== threadId) return;
+      try {
+        await enqueueOutboxMessage(owner, threadId, {
+          text: t, attachment: completed,
+          replyToId: replyingTo && !isOutboxMessageId(replyingTo.id) ? replyingTo.id : undefined,
+          replyPreview: replyingTo?.text, replyToAuthorName: replyingTo?.fromName,
+        });
+      } catch {
+        if (currentUserRef.current !== owner || currentThreadIdRef.current !== threadId) return;
+        setMessages(prev => prev.filter(msg => msg.id !== localId));
+        setText(t); setSelectedAttachment(completed); setReplyTo(replyingTo);
+        Alert.alert('Message not saved', 'Your message was not sent. Try again.');
+        return;
+      }
+      if (currentUserRef.current !== owner || currentThreadIdRef.current !== threadId) return;
       setMessages(prev => prev.filter(msg => msg.id !== localId));
       void flushOutboxNow();
       return;

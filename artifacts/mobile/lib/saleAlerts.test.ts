@@ -4,9 +4,29 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   default: { getItem: vi.fn(async () => null), setItem: vi.fn(async () => {}) },
 }));
 
-import { bannerHapticFor, getSaleAlertPrefs, normalizeSaleAlertPrefs, rememberSaleAlertPrefs } from './saleAlerts';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { bannerHapticFor, getSaleAlertPrefs, hydrateSaleAlertPrefs, normalizeSaleAlertPrefs, rememberSaleAlertPrefs } from './saleAlerts';
 
 describe('sale alerts', () => {
+  it('resets sale preferences when the active account changes or signs out', async () => {
+    await hydrateSaleAlertPrefs('scope-test-first');
+    rememberSaleAlertPrefs({ saleHaptic: false, saleSound: false });
+    await hydrateSaleAlertPrefs('scope-test-second');
+    expect(getSaleAlertPrefs()).toEqual({ saleHaptic: true, saleSound: true });
+    await hydrateSaleAlertPrefs(null);
+    expect(getSaleAlertPrefs()).toEqual({ saleHaptic: true, saleSound: true });
+  });
+
+  it('ignores a late storage read from the previous account', async () => {
+    let finish!: (value: string | null) => void;
+    vi.mocked(AsyncStorage.getItem).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const old = hydrateSaleAlertPrefs('scope-test-late');
+    await hydrateSaleAlertPrefs('scope-test-current');
+    finish(JSON.stringify({ saleHaptic: false, saleSound: false }));
+    await old;
+    expect(getSaleAlertPrefs()).toEqual({ saleHaptic: true, saleSound: true });
+    await hydrateSaleAlertPrefs(null);
+  });
   it('defaults both on', () => {
     expect(normalizeSaleAlertPrefs(null)).toEqual({ saleSound: true, saleHaptic: true });
     expect(normalizeSaleAlertPrefs({ saleSound: false })).toEqual({ saleSound: false, saleHaptic: true });

@@ -111,7 +111,6 @@ export function ProfileButton({
               : variant === 'outline'
                 ? { backgroundColor: 'transparent', borderColor: theme.border }
                 : { backgroundColor: theme.cardGlass, borderColor: theme.border },
-          disabled && styles.disabled,
         ]}
       >
         {(state) => (

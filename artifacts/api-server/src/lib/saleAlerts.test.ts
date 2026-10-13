@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { newOrderPushDelivery, readSaleAlertPrefs, saleAlertPatch } from "./saleAlerts";
 
 describe("sale alert preferences", () => {
+  it("keeps the existing audio-only order sound preference effective", () => {
+    expect(readSaleAlertPrefs({ new_order_sound: false }).saleSound).toBe(false);
+    expect(readSaleAlertPrefs({ sale_sound: true, new_order_sound: false }).saleSound).toBe(true);
+  });
   it("defaults both alerts on when nothing is stored", () => {
     expect(readSaleAlertPrefs(null)).toEqual({ saleSound: true, saleHaptic: true });
     expect(readSaleAlertPrefs({ new_orders: true })).toEqual({ saleSound: true, saleHaptic: true });
