@@ -57,8 +57,9 @@ describe('buildSellerActivitySections', () => {
     expect(sections[0]!.items[0]!.actorCount).toBe(2);
   });
 
-  it('folds old unread rows into Today and omits empty groups', () => {
+  it('puts unread rows in New and omits empty groups', () => {
     const sections = buildSellerActivitySections([item('a', 'post_like', 24 * 20, { isRead: false })], NOW);
-    expect(sections.map((s) => s.key)).toEqual(['today']);
+    expect(sections.map((s) => s.key)).toEqual(['new']);
+    expect(sections[0]!.title).toBe('New');
   });
 });

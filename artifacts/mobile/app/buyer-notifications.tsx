@@ -30,6 +30,7 @@ import { useApi } from '@/lib/api';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { syncNotificationBadge } from '@/lib/notificationBadge';
 import { useUser } from '@clerk/expo';
+import { groupByRecency, unreadRowTint } from '@/lib/activity';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -45,29 +46,12 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-type GroupSection = 'Today' | 'This Week' | 'Earlier';
+type GroupSection = string;
 
+// New / Today / This week / Earlier — the same sections as the Activity
+// Center (lib/activity.ts groupByRecency).
 function groupByDate(notifs: Notification[]): { section: GroupSection; items: Notification[] }[] {
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const weekStart = todayStart - 6 * 24 * 60 * 60 * 1000;
-
-  const today: Notification[] = [];
-  const week: Notification[] = [];
-  const earlier: Notification[] = [];
-
-  for (const n of notifs) {
-    const t = new Date(n.createdAt).getTime();
-    if (t >= todayStart) today.push(n);
-    else if (t >= weekStart) week.push(n);
-    else earlier.push(n);
-  }
-
-  const result: { section: GroupSection; items: Notification[] }[] = [];
-  if (today.length) result.push({ section: 'Today', items: today });
-  if (week.length) result.push({ section: 'This Week', items: week });
-  if (earlier.length) result.push({ section: 'Earlier', items: earlier });
-  return result;
+  return groupByRecency(notifs).map((group) => ({ section: group.title, items: group.items }));
 }
 
 function notifIcon(type: Notification['type']): string {
@@ -398,7 +382,7 @@ export default function BuyerNotifications() {
         <>
           {index > 0 && <ThreadDivider style={{ marginHorizontal: SPACING.md, marginBottom: SPACING.sm }} />}
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionHeaderText, { color: theme.muted }]}>{item.title.toUpperCase()}</Text>
+            <Text style={[styles.sectionHeaderText, { color: theme.text }]}>{item.title}</Text>
           </View>
         </>
       );
@@ -420,11 +404,8 @@ export default function BuyerNotifications() {
           style={[
             styles.notifRow,
             { backgroundColor: theme.background, borderBottomColor: theme.border },
-            !notif.isRead && {
-              backgroundColor: theme.card,
-              borderLeftWidth: 2,
-              borderLeftColor: theme.accent,
-            },
+            // Unread: a faint #FFFFFF08 lift, never bold or an accent bar.
+            !notif.isRead && { backgroundColor: unreadRowTint(theme.background) },
           ]}
           onPress={() => handleTap(notif)}
           onLongPress={() => handleLongPress(notif)}
@@ -448,7 +429,7 @@ export default function BuyerNotifications() {
             <Text
               style={[
                 styles.notifTitle,
-                { color: theme.text, fontFamily: notif.isRead ? FONT.medium : FONT.semibold },
+                { color: theme.text, fontFamily: FONT.medium },
               ]}
               numberOfLines={2}
             >
@@ -464,9 +445,7 @@ export default function BuyerNotifications() {
           </View>
 
           {/* Right */}
-          {!notif.isRead ? (
-            <View style={[styles.unreadDot, { backgroundColor: theme.accent }]} />
-          ) : notif.cta ? (
+          {notif.cta ? (
             <Feather name="chevron-right" size={ICON.sm} color={theme.subtle} />
           ) : null}
         </PressableScale>
@@ -659,11 +638,11 @@ const makeStyles = () => StyleSheet.create({
     paddingVertical: SPACING.xs,
     marginTop: SPACING.sm,
   },
+  // Instagram's section titles: sentence case, semibold, page text colour.
   sectionHeaderText: {
-    ...TYPE_SCALE.caption,
+    fontSize: 17,
+    lineHeight: 22,
     fontFamily: FONT.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
   },
   notifRow: {
     flexDirection: 'row',
@@ -713,12 +692,6 @@ const makeStyles = () => StyleSheet.create({
   notifCta: {
     ...TYPE_SCALE.caption,
     fontFamily: FONT.medium,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: SPACING.xxs,
   },
   sheetContent: {
     paddingHorizontal: SPACING.md,

@@ -64,7 +64,7 @@ export interface ActivityRow extends ActivityItem {
   extraCount: number;
 }
 
-export type ActivitySectionKey = 'new' | 'today' | 'this_week' | 'this_month' | 'earlier';
+export type ActivitySectionKey = 'new' | 'today' | 'this_week' | 'earlier';
 
 export interface ActivitySection<T = ActivityItem> {
   key: ActivitySectionKey;
@@ -114,7 +114,6 @@ const SECTION_TITLES: Record<ActivitySectionKey, string> = {
   new: 'New',
   today: 'Today',
   this_week: 'This week',
-  this_month: 'This month',
   earlier: 'Earlier',
 };
 
@@ -123,13 +122,14 @@ function startOfLocalDay(now: Date): number {
 }
 
 /**
- * Bucket items into New / Today / This week / This month / Earlier.
+ * Bucket items into New / Today / This week / Earlier (Instagram's
+ * Notifications sections, https://mobbin.com/flows/374133d6-fd99-418b-ae02-f92694ae4fe0).
  *
  * Unread items always land in "New", whatever their age. Read items are
  * bucketed by `createdAt` against local calendar days: "Today" since local
- * midnight, "This week" the six days before that, "This month" the rest of
- * the last 30 days, "Earlier" everything older. Input order is preserved
- * inside each section and empty sections are omitted.
+ * midnight, "This week" the six days before that, "Earlier" everything
+ * older. Input order is preserved inside each section and empty sections
+ * are omitted.
  */
 export function groupByRecency<T extends Pick<ActivityItem, 'isRead' | 'createdAt'>>(
   items: readonly T[],
@@ -137,9 +137,8 @@ export function groupByRecency<T extends Pick<ActivityItem, 'isRead' | 'createdA
 ): ActivitySection<T>[] {
   const todayStart = startOfLocalDay(now);
   const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).getTime();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29).getTime();
   const buckets: Record<ActivitySectionKey, T[]> = {
-    new: [], today: [], this_week: [], this_month: [], earlier: [],
+    new: [], today: [], this_week: [], earlier: [],
   };
 
   for (const item of items) {
@@ -150,7 +149,6 @@ export function groupByRecency<T extends Pick<ActivityItem, 'isRead' | 'createdA
     const at = new Date(item.createdAt).getTime();
     if (at >= todayStart) buckets.today.push(item);
     else if (at >= weekStart) buckets.this_week.push(item);
-    else if (at >= monthStart) buckets.this_month.push(item);
     else buckets.earlier.push(item);
   }
 
@@ -207,31 +205,42 @@ function sameActor(a: ActivityActor, b: ActivityActor): boolean {
 }
 
 /**
- * Merge consecutive repeat social events (same aggregation key) into single
- * rows carrying the distinct actors. Call once per section so a merged row
- * never spans New and read items. Non-aggregating types pass through as
- * single-item rows.
+ * Merge repeat social events (same aggregation key) into single rows
+ * carrying the distinct actors — every like on one post becomes "Jay and 12
+ * others liked your post", even when other events landed in between.
+ * Follows merge only when back to back.
+ * Each merged row sits where its newest event was. Call once per section
+ * so a merged row never spans New and read items. Non-aggregating types
+ * pass through as single-item rows.
  */
 export function aggregateActivity(items: readonly ActivityItem[]): ActivityRow[] {
   const rows: ActivityRow[] = [];
-  let currentKey: string | null = null;
+  const rowByKey = new Map<string, ActivityRow>();
 
   for (const item of items) {
     const key = aggregationKey(item);
+    // Follows only merge when back to back — Instagram keeps a lone
+    // follower as its own row with an inline "Follow back".
     const last = rows[rows.length - 1];
-    if (key && last && key === currentKey) {
-      last.ids.push(item.id);
-      last.isRead = last.isRead && item.isRead;
+    const existing = !key
+      ? undefined
+      : key === 'new_follower'
+        ? (last && last.type === 'new_follower' && rowByKey.get(key) === last ? last : undefined)
+        : rowByKey.get(key);
+    if (existing) {
+      existing.ids.push(item.id);
+      existing.isRead = existing.isRead && item.isRead;
       const actor = actorOf(item);
-      if (actor && !last.actors.some((existing) => sameActor(existing, actor))) {
-        last.actors.push(actor);
+      if (actor && !existing.actors.some((a) => sameActor(a, actor))) {
+        existing.actors.push(actor);
       }
-      last.actorCount = last.actors.length;
-      last.extraCount = Math.max(0, last.actorCount - 1);
+      existing.actorCount = existing.actors.length;
+      existing.extraCount = Math.max(0, existing.actorCount - 1);
       continue;
     }
-    rows.push(toRow(item));
-    currentKey = key;
+    const row = toRow(item);
+    rows.push(row);
+    if (key) rowByKey.set(key, row);
   }
   return rows;
 }
@@ -284,6 +293,11 @@ export function activityMessage(row: ActivityRow): MessagePart[] {
   if (first && row.actorCount > 1) {
     return [...actorNames(row), { text: ` · ${row.title}` }];
   }
+  // Order updates read as plain text ("Your order has shipped"), not a bold
+  // headline — the product photo beside it carries the row.
+  if (isOrderUpdateRow(row.type)) {
+    return [{ text: stripEmoji(row.title).replace(/!+$/, '') }];
+  }
   return [{ text: stripEmoji(row.title), bold: true }];
 }
 
@@ -318,6 +332,21 @@ export function activityDetail(row: ActivityRow): string | null {
   return body;
 }
 
+/**
+ * The unread-row background: #FFFFFF08 laid over `background`, blended to
+ * one opaque hex so a row stays solid (swipe actions sit behind it).
+ */
+export function unreadRowTint(background: string): string {
+  const hex = background.replace('#', '').slice(0, 6);
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return background;
+  const alpha = 0x08 / 0xff;
+  const mix = (i: number) => {
+    const c = parseInt(hex.slice(i, i + 2), 16);
+    return Math.round(c + (255 - c) * alpha).toString(16).padStart(2, '0');
+  };
+  return `#${mix(0)}${mix(2)}${mix(4)}`.toUpperCase();
+}
+
 // ─── Classification ───────────────────────────────────────────────────────────
 
 /** Mirrors the server's `filter=orders` definition in notifications-feed.ts. */
@@ -336,6 +365,14 @@ const BUYER_ORDER_TYPES = new Set([
   // Delivery guarantee (docs/payments/delivery-guarantee.md)
   'order_preparing', 'order_auto_refunded', 'order_refund_warning',
 ]);
+
+/** Order updates published to the SELLER about their own sales. */
+const SELLER_ORDER_TYPES = new Set(['new_order_received', 'order_cancelled_by_buyer', 'shopify_order_cancelled']);
+
+/** True for any order update row (buyer or seller side). */
+export function isOrderUpdateRow(type: string | undefined | null): boolean {
+  return !!type && (BUYER_ORDER_TYPES.has(type) || SELLER_ORDER_TYPES.has(type));
+}
 
 export function isBuyerOrderNotification(type: string | undefined | null): boolean {
   return !!type && BUYER_ORDER_TYPES.has(type);

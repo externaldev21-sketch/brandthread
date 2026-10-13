@@ -19,6 +19,8 @@ import {
   createDeferredDelete,
   ACTIVITY_UNDO_MS,
   groupByRecency,
+  isOrderUpdateRow,
+  unreadRowTint,
   groupedPeopleHref,
   groupedPeopleTitle,
   GROUPED_PEOPLE_MAX_IDS,
@@ -90,15 +92,14 @@ describe('groupByRecency', () => {
       NOW,
     );
 
-    expect(sections.map((s) => s.key)).toEqual(['today', 'this_week', 'this_month', 'earlier']);
-    expect(sections.map((s) => s.title)).toEqual(['Today', 'This week', 'This month', 'Earlier']);
+    expect(sections.map((s) => s.key)).toEqual(['today', 'this_week', 'earlier']);
+    expect(sections.map((s) => s.title)).toEqual(['Today', 'This week', 'Earlier']);
     expect(sections[0].items).toEqual([justAfterMidnight]);
     expect(sections[1].items).toEqual([lateYesterday, sixDaysAgo]);
-    expect(sections[2].items).toEqual([sevenDaysAgo, twentyNineDaysAgo]);
-    expect(sections[3].items).toEqual([thirtyDaysAgo]);
+    expect(sections[2].items).toEqual([sevenDaysAgo, twentyNineDaysAgo, thirtyDaysAgo]);
   });
 
-  it('omits empty sections and orders New, Today, This week, This month, Earlier', () => {
+  it('omits empty sections and orders New, Today, This week, Earlier', () => {
     const sections = groupByRecency([
       item({ createdAt: at(45) }),
       item({ isRead: false, createdAt: at(3) }),
@@ -136,15 +137,25 @@ describe('aggregateActivity', () => {
     expect(activityMessage(row).map((p) => p.text).join('')).toBe('Jay and Mina liked your post');
   });
 
-  it('does not merge different targets, different types, or non-consecutive runs', () => {
+  it('does not merge different targets or different types', () => {
     const rows = aggregateActivity([
       like('Jay', 'post1'),
       like('Mina', 'post2'),
       item({ type: 'post_comment', title: 'Ola commented on your post', actorName: 'Ola', targetId: 'post2' }),
-      like('Ola', 'post2'),
-      like('Kai', 'post1'),
     ]);
-    expect(rows.map((r) => r.ids.length)).toEqual([1, 1, 1, 1, 1]);
+    expect(rows.map((r) => r.ids.length)).toEqual([1, 1, 1]);
+  });
+
+  it('merges every like on one post even when other events land in between (Instagram)', () => {
+    const jay = like('Jay', 'post1');
+    const mina = like('Mina', 'post2');
+    const comment = item({ type: 'post_comment', title: 'Ola commented on your post', actorName: 'Ola', targetId: 'post2' });
+    const ola = like('Ola', 'post2');
+    const kai = like('Kai', 'post1');
+    const rows = aggregateActivity([jay, mina, comment, ola, kai]);
+    // The merged row sits where its newest event was.
+    expect(rows.map((r) => r.ids)).toEqual([[jay.id, kai.id], [mina.id, ola.id], [comment.id]]);
+    expect(activityMessage(rows[0]!).map((p) => p.text).join('')).toBe('Jay and Kai liked your post');
   });
 
   it('never merges orders or payments', () => {
@@ -268,7 +279,10 @@ describe('monochrome system titles', () => {
 
   it('is applied to system rows only, never to a person-led sentence', () => {
     const [system] = aggregateActivity([item({ type: 'order_shipped', category: 'orders', title: 'Your order has shipped! 🚚' })]);
-    expect(activityMessage(system)).toEqual([{ text: 'Your order has shipped!', bold: true }]);
+    // Order updates are plain text — no bold headline, no shouting "!".
+    expect(activityMessage(system)).toEqual([{ text: 'Your order has shipped' }]);
+    const [other] = aggregateActivity([item({ type: 'drop_live', category: 'drops', title: 'Drop is live 🔥' })]);
+    expect(activityMessage(other)).toEqual([{ text: 'Drop is live', bold: true }]);
     const [person] = aggregateActivity([like('Mia 🌸', 'post1')]);
     expect(activityMessage(person).map((p) => p.text).join('')).toBe('Mia 🌸 liked your post');
   });
@@ -652,3 +666,34 @@ describe('delete with undo', () => {
     expect(onFailed).toHaveBeenCalledWith(['n2']);
   });
 });
+
+describe('unreadRowTint', () => {
+  it('lays #FFFFFF08 over the page colour as one opaque hex', () => {
+    expect(unreadRowTint('#000000')).toBe('#080808');
+    expect(unreadRowTint('#171717')).toBe('#1E1E1E');
+  });
+
+  it('leaves non-hex colours alone', () => {
+    expect(unreadRowTint('black')).toBe('black');
+  });
+});
+
+describe('isOrderUpdateRow', () => {
+  it('covers buyer and seller order updates only', () => {
+    expect(isOrderUpdateRow('order_shipped')).toBe(true);
+    expect(isOrderUpdateRow('new_order_received')).toBe(true);
+    expect(isOrderUpdateRow('post_like')).toBe(false);
+    expect(isOrderUpdateRow(null)).toBe(false);
+  });
+});
+
+describe('aggregateActivity — follows stay separate unless back to back', () => {
+  it('keeps a lone follower as its own row when other events sit between', () => {
+    const follow = (name: string) => item({ type: 'new_follower', title: `${name} started following you`, actorName: name, actorId: `user_${name}`, targetId: `user_${name}`, cta: 'Follow back' });
+    const rows = aggregateActivity([follow('Jay'), like('Mina', 'post1'), follow('Ola'), follow('Kai')]);
+    expect(rows.map((r) => [r.type, r.actorCount])).toEqual([
+      ['new_follower', 1], ['post_like', 1], ['new_follower', 2],
+    ]);
+  });
+});
+
