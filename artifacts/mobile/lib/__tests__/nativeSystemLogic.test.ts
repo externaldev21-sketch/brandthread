@@ -7,8 +7,15 @@ import {
 const base: TrackableOrder = { id: 'o1', orderNumber: 'BT-1', sellerName: 'Northline', status: 'processing' };
 
 describe('orderActivityState (Uber Eats / Amazon stages)', () => {
-  it('has no activity before the order ships', () => {
+  it('has no activity before the order ships unless it was just placed', () => {
     expect(orderActivityState(base)).toBeNull();
+  });
+  it('shows Ordered for 8 hours after checkout, then nothing until it ships', () => {
+    const now = Date.parse('2026-10-13T12:00:00Z');
+    const placed = { ...base, paidAt: '2026-10-13T09:00:00Z' };
+    expect(orderActivityState(placed, now)).toEqual({ stage: 'ordered', statusText: 'Order placed', etaEpoch: null });
+    expect(orderActivityState({ ...base, paidAt: '2026-10-13T03:59:00Z' }, now)).toBeNull();
+    expect(orderActivityState({ ...placed, status: 'cancelled' }, now)).toBeNull();
   });
   it('shipped → Shipped with the ETA', () => {
     const s = orderActivityState({ ...base, status: 'shipped', estimatedDelivery: '2026-10-15' });

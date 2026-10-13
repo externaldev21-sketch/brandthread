@@ -5,6 +5,18 @@ const state = vi.hoisted(() => ({
   tokens: [] as Array<{ token: string }>,
   order: null as null | Record<string, unknown>,
   deactivated: [] as unknown[],
+  flag: true,
+  remoteStarts: [] as unknown[],
+}));
+
+vi.mock("../nativeSurfaces", () => ({ isNativeSurfacesEnabled: async () => state.flag }));
+
+vi.mock("../liveActivityRemoteStart", async (importActual) => ({
+  ...(await importActual<typeof import("../liveActivityRemoteStart")>()),
+  startOrderActivityRemotely: async (input: unknown) => {
+    state.remoteStarts.push(input);
+    return { started: 1, failed: 0 };
+  },
 }));
 
 vi.mock("@workspace/db", () => {
@@ -74,6 +86,8 @@ beforeEach(() => {
   state.tokens = [];
   state.order = null;
   state.deactivated = [];
+  state.flag = true;
+  state.remoteStarts = [];
   requests = [];
   respond = () => ({ status: 200, body: "" });
   __resetApnsJwtCacheForTests();
@@ -149,18 +163,19 @@ describe("buildOrderActivityPayload", () => {
     });
   });
 
-  it("omits an unknown ETA and only alerts for out-for-delivery and delivered", () => {
+  it("omits an unknown ETA and never alerts (the regular push already does)", () => {
     const ordered = buildOrderActivityPayload({ stage: "ordered", statusText: "Order confirmed", etaEpochSeconds: null, event: "update", nowSeconds: 1 });
     expect(ordered.aps["content-state"]).toEqual({ stage: "ordered", statusText: "Order confirmed" });
     expect(ordered.aps.alert).toBeUndefined();
 
     const out = buildOrderActivityPayload({ stage: "out_for_delivery", statusText: "Arriving today", etaEpochSeconds: null, event: "update", nowSeconds: 1 });
-    expect(out.aps.alert).toEqual({ title: "Out for delivery", body: "Arriving today" });
+    expect(out.aps.alert).toBeUndefined();
 
     const delivered = buildOrderActivityPayload({
       stage: "delivered", statusText: "Your order was delivered", etaEpochSeconds: null, event: "end", dismissalEpochSeconds: 100, nowSeconds: 1,
     });
-    expect(delivered.aps).toMatchObject({ event: "end", "dismissal-date": 100, alert: { title: "Delivered" } });
+    expect(delivered.aps).toMatchObject({ event: "end", "dismissal-date": 100 });
+    expect(delivered.aps.alert).toBeUndefined();
   });
 });
 
@@ -282,6 +297,38 @@ describe("notifyOrderLiveActivity", () => {
     expect(body.aps["dismissal-date"] - body.aps.timestamp).toBe(4 * 60 * 60);
     expect(body.aps["content-state"].stage).toBe("delivered");
     expect(body.aps["content-state"].etaEpoch).toBeUndefined();
+  });
+
+  it("does nothing while the nativeSurfaces flag is off", async () => {
+    configure();
+    state.flag = false;
+    state.tokens = [{ token: "t1" }];
+    expect(await notifyOrderLiveActivity("o1")).toEqual({ skipped: "flag_off" });
+    expect(requests).toHaveLength(0);
+  });
+
+  it("starts a fresh activity once every earlier one is past the 8-hour limit", async () => {
+    configure();
+    const nineHoursAgo = new Date(Date.now() - 9 * 60 * 60 * 1000);
+    state.tokens = [{ token: "t1", createdAt: nineHoursAgo } as { token: string }];
+    state.order = {
+      buyerId: "buyer_1", ownerId: "", orderNumber: "BT-4821",
+      status: "shipped", trackingStatus: "out_for_delivery", estimatedDelivery: null, deliveredAt: null, carrier: null,
+    };
+    expect(await notifyOrderLiveActivity("o1")).toEqual({ started: 1, failed: 0 });
+    expect(requests).toHaveLength(0); // no update sent to the expired activity
+    expect(state.remoteStarts[0]).toMatchObject({
+      buyerId: "buyer_1", orderId: "o1", orderNumber: "BT-4821", sellerName: "Your order",
+      state: { stage: "out_for_delivery", statusText: "Arriving today" },
+    });
+  });
+
+  it("keeps updating an activity younger than 8 hours", async () => {
+    configure();
+    state.tokens = [{ token: "t1", createdAt: new Date(Date.now() - 60 * 60 * 1000) } as { token: string }];
+    state.order = { buyerId: "b", ownerId: "", orderNumber: "1", status: "shipped", trackingStatus: "in_transit", estimatedDelivery: null, deliveredAt: null, carrier: null };
+    expect(await notifyOrderLiveActivity("o1")).toEqual({ sent: 1, failed: 0 });
+    expect(state.remoteStarts).toHaveLength(0);
   });
 
   it("skips orders nobody is tracking and never throws", async () => {

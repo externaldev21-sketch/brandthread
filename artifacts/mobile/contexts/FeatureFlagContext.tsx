@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
 import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
+import { setNativeSurfacesEnabled } from '@/lib/nativeSystem';
 
 export type FeatureFlagKey =
   | 'aiPhotoShoot'
@@ -16,7 +17,8 @@ export type FeatureFlagKey =
   | 'hostedCheckoutFallback'
   | 'live_tips'
   | 'autoCaptions'
-  | 'live_auctions';
+  | 'live_auctions'
+  | 'nativeSurfaces';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   aiPhotoShoot: true,
@@ -51,6 +53,10 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   // Live auctions for 1-of-1s (Whatnot-style). OFF until launch; the server
   // enforces it too (routes/live-auctions.ts, seeded OFF in migration 300).
   live_auctions: false,
+  // iOS Live Activities, widgets and the Watch sale ping (one switch for all
+  // of them). OFF until a dev-client / TestFlight build with the extensions
+  // is out: PUT /api/feature-flags/nativeSurfaces. Seeded by migration 275.
+  nativeSurfaces: false,
 };
 
 const STORAGE_KEY = 'bt:feature-flags:v1';
@@ -70,7 +76,13 @@ const FeatureFlagContext = createContext<FeatureFlagContextValue>({
 export function FeatureFlagProvider({ children }: PropsWithChildren) {
   const api = useApi();
   const { isSignedIn } = useAuth();
-  const [flags, setFlags] = useState<Record<string, boolean>>(DEFAULT_FLAGS);
+  const [flags, setFlagsState] = useState<Record<string, boolean>>(DEFAULT_FLAGS);
+  // The native-surfaces gate is read outside React (lib/nativeSystem.ts), so
+  // it's updated in the same step as the flags, before any screen effect.
+  const setFlags = (next: Record<string, boolean>) => {
+    setNativeSurfacesEnabled(next.nativeSurfaces === true);
+    setFlagsState(next);
+  };
 
   const refresh = async () => {
     if (!isSignedIn) return;

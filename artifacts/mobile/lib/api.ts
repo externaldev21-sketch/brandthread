@@ -1634,6 +1634,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ ok: boolean }>('/api/live-activities/tokens', body),
       removeToken: (token: string) =>
         del<{ ok: boolean }>(`/api/live-activities/tokens/${encodeURIComponent(token)}`),
+      registerStartToken: (token: string) =>
+        post<{ ok: boolean }>('/api/live-activities/start-tokens', { token }),
     },
     // ── Live replays + Live tips (PR: live-replays-profile-tips) ──────────────
     liveReplays: {

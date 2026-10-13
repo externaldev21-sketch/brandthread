@@ -8,6 +8,11 @@
  * module + widget extension from plugins/with-upload-live-activity.js). In
  * Expo Go, on web and on Android every export is a silent no-op: nothing
  * throws, nothing logs.
+ *
+ * Everything is also behind the one `nativeSurfaces` feature flag (seeded
+ * OFF, migration 275). FeatureFlagProvider calls setNativeSurfacesEnabled;
+ * while it's off every export below is a no-op too, except clearing the
+ * widgets.
  */
 import { Platform } from 'react-native';
 import { isExpoGo } from '@/lib/expoGoRuntime';
@@ -36,7 +41,7 @@ interface BrandthreadSystemModule {
   setQuickActions(items: { type: string; title: string; symbol: string }[]): void;
   takeInitialQuickAction(): string | null;
   addListener(event: 'onQuickAction', fn: (e: { type: string }) => void): Subscription;
-  addListener(event: 'onLiveActivityPushToken', fn: (e: { kind: 'order' | 'live'; targetId: string; token: string }) => void): Subscription;
+  addListener(event: 'onLiveActivityPushToken', fn: (e: { kind: 'order' | 'live' | 'order_start'; targetId: string; token: string }) => void): Subscription;
 }
 
 export interface LiveStats {
@@ -63,6 +68,22 @@ export function getSystemModule(): BrandthreadSystemModule | null {
   return cached;
 }
 
+let surfacesEnabled = false;
+
+/** Mirrors the `nativeSurfaces` feature flag (FeatureFlagContext). */
+export function setNativeSurfacesEnabled(enabled: boolean): void {
+  surfacesEnabled = enabled;
+}
+
+export function isNativeSurfacesEnabled(): boolean {
+  return surfacesEnabled;
+}
+
+/** The native module when it exists AND the flag is on. */
+function enabledModule(): BrandthreadSystemModule | null {
+  return surfacesEnabled ? getSystemModule() : null;
+}
+
 function quietly(run: () => unknown): void {
   try {
     const result = run();
@@ -84,7 +105,7 @@ function stateArg(state: OrderActivityState) {
  * ends it once delivered or cancelled. Call after orders load.
  */
 export function syncOrderActivities(orders: TrackableOrder[]): void {
-  const native = getSystemModule();
+  const native = enabledModule();
   if (!native) return;
   quietly(() => {
     if (!native.areLiveActivitiesEnabled()) return;
@@ -108,18 +129,18 @@ export function syncOrderActivities(orders: TrackableOrder[]): void {
 // ─── Live stream ──────────────────────────────────────────────────────────────
 
 export function startLiveStreamActivity(streamId: string, title: string, stats: LiveStats): void {
-  const native = getSystemModule();
+  const native = enabledModule();
   if (!native) return;
   quietly(() => native.areLiveActivitiesEnabled() && native.startLiveStreamActivity(streamId, title, stats));
 }
 
 export function updateLiveStreamActivity(streamId: string, stats: LiveStats): void {
-  const native = getSystemModule();
+  const native = enabledModule();
   if (native) quietly(() => native.updateLiveStreamActivity(streamId, stats));
 }
 
 export function endLiveStreamActivity(streamId: string, stats: LiveStats): void {
-  const native = getSystemModule();
+  const native = enabledModule();
   if (native) quietly(() => native.endLiveStreamActivity(streamId, { ...stats, isLive: false }));
 }
 
@@ -128,7 +149,7 @@ export function endLiveStreamActivity(streamId: string, stats: LiveStats): void 
 export function updateSellerTodayWidget(snapshot: {
   salesCents: number; ordersCount: number; toShipCount: number; currency?: string;
 }): void {
-  const native = getSystemModule();
+  const native = enabledModule();
   if (!native) return;
   quietly(() => native.setWidgetSnapshot(
     'sellerToday',
@@ -138,7 +159,7 @@ export function updateSellerTodayWidget(snapshot: {
 }
 
 export function updateBuyerCashWidget(snapshot: { balanceCents: number; streakDays: number; currency?: string }): void {
-  const native = getSystemModule();
+  const native = enabledModule();
   if (!native) return;
   quietly(() => native.setWidgetSnapshot(
     'buyerCash',
@@ -160,13 +181,15 @@ export function clearHomeWidgets(): void {
 export function setQuickActionsForRole(role: 'seller' | 'buyer' | null): void {
   const native = getSystemModule();
   if (!native) return;
-  quietly(() => native.setQuickActions(quickActionsFor(role).map(({ type, title, symbol }) => ({ type, title, symbol }))));
+  // Flag off: no shortcuts (also removes any set while it was on).
+  const items = surfacesEnabled ? quickActionsFor(role) : [];
+  quietly(() => native.setQuickActions(items.map(({ type, title, symbol }) => ({ type, title, symbol }))));
 }
 
 /** Calls `handler` for the shortcut the app was launched with and for every
  *  later one. Returns an unsubscribe function. */
 export function subscribeQuickActions(handler: (type: string) => void): () => void {
-  const native = getSystemModule();
+  const native = enabledModule();
   if (!native) return () => {};
   try {
     const initial = native.takeInitialQuickAction();
@@ -183,10 +206,16 @@ export function subscribeQuickActions(handler: (type: string) => void): () => vo
 /** Registers each activity's APNs token with the API so the server can
  *  update it while the app is closed. Returns an unsubscribe function. */
 export function subscribeLiveActivityTokens(): () => void {
-  const native = getSystemModule();
+  const native = enabledModule();
   if (!native) return () => {};
   try {
     const sub = native.addListener('onLiveActivityPushToken', (e) => {
+      if (e.kind === 'order_start') {
+        // iOS 17.2+: lets the server start the order tracker when the order
+        // ships, even with the app closed.
+        void api.liveActivities.registerStartToken(e.token).catch(() => {});
+        return;
+      }
       void api.liveActivities.registerToken({ kind: e.kind, targetId: e.targetId, token: e.token }).catch(() => {});
     });
     return () => sub.remove();

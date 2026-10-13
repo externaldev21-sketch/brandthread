@@ -32,10 +32,12 @@ vi.mock("@workspace/db", () => {
   const orders = { id: "orders.id", buyerId: "orders.buyerId" };
   const liveStreams = { id: "liveStreams.id", sellerId: "liveStreams.sellerId" };
   const liveActivityTokens = { token: "lat.token", userId: "lat.userId" };
+  const liveActivityStartTokens = { token: "last.token", userId: "last.userId" };
   return {
     orders,
     liveStreams,
     liveActivityTokens,
+    liveActivityStartTokens,
     db: {
       select: () => ({
         from: (table: unknown) => ({
@@ -167,5 +169,45 @@ describe("DELETE /api/live-activities/tokens/:token", () => {
     })).status).toBe(400);
     expect((await fetch(`${baseUrl}/api/live-activities/tokens/${TOKEN}`, { method: "DELETE" })).status).toBe(401);
     expect(state.updates).toHaveLength(0);
+  });
+});
+
+describe("push-to-start tokens", () => {
+  it("requires sign-in", async () => {
+    const res = await fetch(`${baseUrl}/api/live-activities/start-tokens`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: TOKEN }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects a token that isn't hex", async () => {
+    const res = await fetch(`${baseUrl}/api/live-activities/start-tokens`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-test-user": "user_1" },
+      body: JSON.stringify({ token: "not a token" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("stores the lower-cased token for the signed-in user", async () => {
+    const res = await fetch(`${baseUrl}/api/live-activities/start-tokens`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-test-user": "user_1" },
+      body: JSON.stringify({ token: TOKEN.toUpperCase() }),
+    });
+    expect(res.status).toBe(200);
+    expect(state.inserts.at(-1)).toMatchObject({
+      values: { userId: "user_1", token: TOKEN },
+      conflictSet: { userId: "user_1", active: true },
+    });
+  });
+
+  it("deactivates only the caller's token", async () => {
+    const res = await fetch(`${baseUrl}/api/live-activities/start-tokens/${TOKEN}`, {
+      method: "DELETE", headers: { "x-test-user": "user_1" },
+    });
+    expect(res.status).toBe(200);
+    expect(state.updates.at(-1)?.values).toMatchObject({ active: false });
+    expect(JSON.stringify(state.updates.at(-1)?.where)).toContain("user_1");
   });
 });
