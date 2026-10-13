@@ -914,6 +914,26 @@ export interface PublicPairedProduct {
   available: boolean;
   variants: Array<{ id: string; size: string | null; color: string | null; priceCents: number; stock: number }>;
 }
+/** An active seller bundle holding a product (GET /api/bundles/public/product/:id). Prices are what checkout charges. */
+export interface PublicProductBundle {
+  id: string;
+  sellerId: string;
+  name: string;
+  bundlePriceCents: number;
+  /** Sum of the items at their current (lowest buyable) prices. */
+  itemsTotalCents: number;
+  items: Array<{
+    productId: string;
+    /** Set when the seller pinned one variant. */
+    variantId: string | null;
+    quantity: number;
+    name: string;
+    image: string | null;
+    isPreOrder: boolean;
+    priceCents: number;
+    variants: Array<{ id: string; size: string | null; color: string | null; priceCents: number; stock: number }>;
+  }>;
+}
 export interface ProductVideoInfo { videoUrl: string; posterUrl: string | null; durationMs: number | null }
 
 /** Like uploadVideo, but reports upload progress (0–1). */
@@ -4033,6 +4053,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Seller: sales per bundle (paid, not cancelled, net of refunds). */
       sales: (days?: number) =>
         get<BundleSales[]>(`/api/bundles/sales${days ? `?days=${days}` : ''}`),
+      /** Public (works signed out): active bundles holding this product, priced like checkout. */
+      forProduct: (productId: string) =>
+        get<PublicProductBundle[]>(`/api/bundles/public/product/${encodeURIComponent(productId)}`),
     },
     /** "Complete the fit" — seller-curated related products for a product page. */
     productPairings: {

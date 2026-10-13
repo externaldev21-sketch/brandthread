@@ -8,8 +8,8 @@
  * product page uses (services/cartService.addToCart); a product with more than
  * one purchasable variant opens a small variant picker first.
  *
- * Bundle pricing is intentionally NOT shown here: checkout does not apply
- * bundle prices today, so a "save $X" row would be a promise the cart breaks.
+ * Bundle pricing is not shown here: seller bundles have their own block
+ * (BundleOffer, "Buy the set"), and checkout applies them server-side.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';

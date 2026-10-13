@@ -33,6 +33,27 @@ const router = Router();
 
 // ── Public ────────────────────────────────────────────────────────────────────
 
+// Compatibility shape for the Buy the set offer; use the canonical public
+// availability/pricing helper and the existing checkout discount engine.
+router.get("/public/product/:productId", async (req, res) => {
+  const productId = String(req.params.productId);
+  const bundles = await publicBundlesForProduct(productId);
+  const ids = [...new Set(bundles.flatMap((bundle) => bundle.items.map((item) => item.productId)))];
+  const preorderRows = ids.length
+    ? await db.select({ id: products.id, isPreOrder: products.isPreOrder }).from(products).where(inArray(products.id, ids))
+    : [];
+  const preorder = new Map(preorderRows.map((row) => [row.id, row.isPreOrder]));
+  res.json(bundles.map((bundle) => ({
+    id: bundle.id, sellerId: bundle.sellerId, name: bundle.name,
+    bundlePriceCents: bundle.bundlePriceCents, itemsTotalCents: bundle.itemsTotalCents,
+    items: bundle.items.map((item) => ({
+      productId: item.productId, variantId: item.variantId, quantity: item.quantity,
+      name: item.productName, image: item.image, isPreOrder: preorder.get(item.productId) ?? false,
+      priceCents: item.priceCents, variants: item.variants,
+    })).sort((a, b) => Number(b.productId === productId) - Number(a.productId === productId)),
+  })));
+});
+
 router.get("/public/by-product/:productId", async (req, res) => {
   res.json(await publicBundlesForProduct(String(req.params.productId)));
 });

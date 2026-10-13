@@ -566,6 +566,8 @@ export const orders = pgTable('orders', {
   // Discount code applied at checkout
   discountCode:        text('discount_code'),
   discountAmountCents: integer('discount_amount_cents').notNull().default(0),
+  // Part of discountAmountCents that came from seller bundles (migration 263).
+  bundleDiscountCents: integer('bundle_discount_cents').notNull().default(0),
   // Post/video that drove the Shop button click (attribution)
   sourcePostId: text('source_post_id'),
   // Live stream the order was bought from (migration 304). Set only when the
@@ -878,6 +880,9 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   // order creation by the paid-order webhook (see lib/discounts.ts).
   discountCodeId: text('discount_code_id'),
   discountCodeAmountCents: integer('discount_code_amount_cents').notNull().default(0),
+  // Seller bundle discount ("Buy the set") on this session's merchandise,
+  // applied before the discount code (lib/bundles). Seller-funded like the code.
+  bundleDiscountCents: integer('bundle_discount_cents').notNull().default(0),
   // Optional Thread Cash redemption reserved for this Stripe Checkout Session.
   // Platform-funded (unlike loyalty/discount code above): it discounts the
   // buyer's Stripe charge only — it must never reduce platformFeeCents /

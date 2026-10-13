@@ -86,6 +86,7 @@ import { CompleteTheFit } from '@/components/products/CompleteTheFit';
 
 import { BrandLink, brandLinkHref } from '@/components/products/BrandLink';
 
+import { BundleOffer } from '@/components/products/BundleOffer';
 import { ProductVideo } from '@/components/products/ProductVideo';
 
 import { ProductShareButton } from '@/components/products/ProductShareButton';
@@ -1581,7 +1582,7 @@ export default function BuyerProductDetailScreen() {
           )}
 
           {/* Bundle & save — active bundles with this product; renders nothing when none. */}
-          <BundleSaveSection productId={product.id} dividerStyle={s.divider} headerStyle={s.reviewsHeader} onAdded={bumpCart} />
+
 
 
           <View style={s.divider} />
@@ -1632,6 +1633,8 @@ export default function BuyerProductDetailScreen() {
 
           {/* Worn in these videos */}
           <WornInVideos productId={product.id} productName={product.name} />
+
+          <BundleOffer productId={product.id} />
 
           <CompleteTheFit productId={product.id} />
 
