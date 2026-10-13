@@ -59,6 +59,9 @@ export function createFakeStripe() {
     customers: [] as any[],
     /** PaymentIntents created by the one-page checkout route. */
     paymentIntents: new Map<string, any>(),
+    paymentIntentConfirms: [] as Array<{ id: string; params: any }>,
+    /** Next off-session confirms throw a card error with this code, e.g. "authentication_required". */
+    confirmFails: null as string | null,
     paymentIntentKeys: new Map<string, any>(),
     paymentIntentCreates: [] as Array<{ params: any; options: any }>,
     /** Tax per Stripe Tax calculation (default 8% of the taxable amount). */
@@ -132,6 +135,20 @@ export function createFakeStripe() {
           state.paymentIntents.set(id, intent);
           return intent;
         });
+      },
+      /** Off-session confirm: succeeds unless `confirmFails` names a Stripe error code. */
+      confirm: async (id: string, params: any = {}) => {
+        const intent = state.paymentIntents.get(id);
+        if (!intent) throw stripeError("definitive", "No such payment_intent");
+        state.paymentIntentConfirms.push({ id, params });
+        if (state.confirmFails) {
+          const err: any = stripeError("definitive", "Card error");
+          err.code = state.confirmFails;
+          intent.status = "requires_payment_method";
+          throw err;
+        }
+        Object.assign(intent, params, { status: "succeeded", amount_received: intent.amount, latest_charge: `ch_${id}` });
+        return intent;
       },
       cancel: async (id: string, params: any = {}) => {
         const intent = state.paymentIntents.get(id);
@@ -268,6 +285,8 @@ export function createFakeStripe() {
     state.coupons.length = 0;
     state.customers.length = 0;
     state.paymentIntents.clear();
+    state.paymentIntentConfirms.length = 0;
+    state.confirmFails = null;
     state.paymentIntentKeys.clear();
     state.paymentIntentCreates.length = 0;
     state.taxRate = 0.08;

@@ -45,6 +45,7 @@ import profileCoverRouter from "./profile-cover";
 import avatarVideoRouter from "./avatar-video";
 import buyerRouter from "./buyer";
 import checkoutIntentRouter from "./checkout-intent";
+import orderAddOnRouter from "./order-add-on";
 import guestCheckoutRouter from "./guest-checkout";
 import connectRouter, { connectRedirectRouter } from "./connect";
 import subscriptionRouter from "./subscription";
@@ -281,6 +282,7 @@ router.use("/product-seo",               productSeoRouter);
 router.use("/buyer/cart",                cartDbRouter);
 // One-page checkout (one PaymentIntent per cart). Before /buyer so its card-data guard runs first.
 router.use("/buyer/checkout/payment-intent", checkoutIntentRouter);
+router.use("/buyer/add-on", orderAddOnRouter);
 router.use("/buyer/notifications",       notificationsFeedRouter);
 router.use("/notifications",             notificationEventsRouter);
 router.use("/buyer",                     buyerRouter);
