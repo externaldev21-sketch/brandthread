@@ -15,17 +15,21 @@ import { Icon } from '@/components/ui';
 import * as Haptics from 'expo-haptics';
 import { hapticFollow } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { discoverBrands, type DiscoverBrand } from '@/services/discoverService';
+import { discoverBrands, featuredBrands, type DiscoverBrand, type FeaturedBrand } from '@/services/discoverService';
 import { setSellerFollowing } from '@/services/socialService';
 import { SPACE } from './onboardingTokens';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { FILL_ELEVATED, FONT, TEXT } from '@/lib/theme';
+import { FeaturedBrandsRail } from './FeaturedBrandsRail';
 
 export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerIds: string[]) => void } = {}) {
   const { theme } = useAppTheme();
   const styles = createStyles(theme);
 
   const [brands, setBrands] = useState<DiscoverBrand[]>([]);
+  // Dev's own brands with their real product photos, first (less-AI pass,
+  // item 54). Empty unless the server lists them — the step is then unchanged.
+  const [featured, setFeatured] = useState<FeaturedBrand[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [following, setFollowing] = useState<Record<string, boolean>>({});
@@ -35,6 +39,9 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
     let cancelled = false;
     setLoading(true);
     setLoadError(false);
+    featuredBrands()
+      .then((list) => { if (!cancelled) setFeatured(list); })
+      .catch(() => { /* optional rail — the rest of the step still works */ });
     discoverBrands(24)
       .then((list) => { if (!cancelled) setBrands(list); })
       .catch(() => { if (!cancelled) setLoadError(true); })
@@ -49,7 +56,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
     onLikedChange(Object.keys(following).filter((id) => following[id]));
   }, [following, onLikedChange]);
 
-  async function toggleFollow(brand: DiscoverBrand) {
+  async function toggleFollow(brand: { sellerId: string }) {
     const next = !following[brand.sellerId];
     hapticFollow(next);
     // Optimistic — the follow API itself is the source of truth; on failure
@@ -67,7 +74,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
 
   async function followAll() {
     hapticFollow(true);
-    const toFollow = brands.filter((b) => !following[b.sellerId]);
+    const toFollow = [...featured, ...gridBrands].filter((b) => !following[b.sellerId]);
     setFollowing((prev) => {
       const next = { ...prev };
       toFollow.forEach((b) => { next[b.sellerId] = true; });
@@ -81,6 +88,9 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
   }
 
   const followedCount = Object.values(following).filter(Boolean).length;
+  const featuredIds = new Set(featured.map((b) => b.sellerId));
+  const gridBrands = brands.filter((b) => !featuredIds.has(b.sellerId));
+  const totalBrands = featured.length + gridBrands.length;
 
   return (
     <View testID="onboarding-brands-list">
@@ -94,7 +104,18 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
         <Text style={styles.emptyText}>Couldn't load brands. You can follow brands from Discover.</Text>
       )}
 
-      {!loading && !loadError && brands.length === 0 && (
+      <FeaturedBrandsRail
+        brands={featured}
+        following={following}
+        pending={pending}
+        onToggle={(brand) => { void toggleFollow(brand); }}
+      />
+
+      {!loading && !loadError && totalBrands === 0 && (
+        <Text style={styles.emptyText}>No brands to show yet — check back soon.</Text>
+      )}
+
+      {!loading && !loadError && totalBrands === 0 && (
         <Text style={styles.emptyText}>No brands to follow yet. Brands you follow from Discover show up in your feed.</Text>
       )}
 
@@ -112,7 +133,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
         </Pressable>
       )}
 
-      {brands.map((brand) => {
+      {gridBrands.map((brand) => {
         const isFollowing = !!following[brand.sellerId];
         const isPending = !!pending[brand.sellerId];
         return (

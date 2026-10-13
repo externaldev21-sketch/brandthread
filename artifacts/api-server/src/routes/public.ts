@@ -25,6 +25,7 @@ import { TREND_RECENT_HOURS, TREND_WINDOW_HOURS, rankSearchTrends, type RankedTr
 import { buildFacets, parseSearchFilters, type FacetRow } from "../lib/searchFilters";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
+import { parseFeaturedHandles, shapeFeaturedBrands } from "../lib/onboardingFeaturedBrands";
 import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant } from "../lib/publicProfile";
 import { matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
@@ -1379,6 +1380,75 @@ router.get("/brands/discover", async (req, res) => {
     });
   } catch (err) {
     req.log.error({ err }, "Failed to fetch discover brands");
+    res.status(500).json({ error: "Failed to fetch brands" });
+  }
+});
+
+// ─── GET /api/public/brands/featured — Dev's brands for onboarding ───────────
+// Unauthenticated. The brands named in ONBOARDING_FEATURED_SELLER_HANDLES
+// (lib/onboardingFeaturedBrands.ts), each with its newest real product
+// photos, for the Brands-to-follow step's featured rail (less-AI pass, item
+// 54). Unset → { brands: [] } and the step is unchanged.
+router.get("/brands/featured", async (req, res) => {
+  try {
+    const handles = parseFeaturedHandles(process.env.ONBOARDING_FEATURED_SELLER_HANDLES);
+    if (handles.length === 0) {
+      res.json({ brands: [] });
+      return;
+    }
+    const viewerId = optionalViewerId(req);
+    const sellers = await db
+      .select({
+        clerkId:         users.clerkId,
+        username:        users.username,
+        displayName:     users.displayName,
+        brandName:       users.brandName,
+        profileImageUrl: users.profileImageUrl,
+        avatarUrl:       users.avatarUrl,
+        verified:        users.verified,
+        verificationStatus: users.verificationStatus,
+        activeStanding:  users.activeStanding,
+        policyRestricted: users.policyRestricted,
+      })
+      .from(users)
+      .where(and(
+        eq(users.accountType, "seller"),
+        inArray(sql`lower(${users.username})`, handles),
+        isNull(users.suspendedAt),
+        isNull(users.deletedAt), isNull(users.deletionRequestedAt),
+        eq(users.policyRestricted, false),
+        notBlockedWith(viewerId, users.clerkId),
+      ));
+    const sellerIds = sellers.map((s) => s.clerkId);
+    if (sellerIds.length === 0) {
+      res.json({ brands: [] });
+      return;
+    }
+    const activeProduct = and(
+      inArray(products.ownerId, sellerIds),
+      eq(products.status, "active"),
+      isNull(products.deletedAt),
+    );
+    const [recent, counts] = await Promise.all([
+      db.select({ ownerId: products.ownerId, images: products.images })
+        .from(products)
+        .where(activeProduct)
+        .orderBy(desc(products.createdAt), asc(products.id))
+        .limit(sellerIds.length * 12),
+      db.select({ ownerId: products.ownerId, total: count() })
+        .from(products)
+        .where(activeProduct)
+        .groupBy(products.ownerId),
+    ]);
+    const brands = shapeFeaturedBrands(
+      handles,
+      sellers.map((s) => ({ ...s, verified: deriveSellerVerified(s) })),
+      recent,
+      new Map(counts.map((c) => [c.ownerId, Number(c.total)])),
+    );
+    res.json({ brands });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch featured brands");
     res.status(500).json({ error: "Failed to fetch brands" });
   }
 });
