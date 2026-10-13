@@ -20,6 +20,7 @@ import {
   reportNetworkError,
 } from '@/lib/networkNotice';
 import { reportServerError } from '@/lib/monitoringHooks';
+import { AUTO_RETRY_DELAY_MS, isTransientFailure, slowRequests } from '@/lib/requestResilience';
 import { trackAfter } from '@/lib/analytics/trackAfter';
 import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
 import { isSellerDevPreview } from '@/lib/devPreview';
@@ -461,6 +462,7 @@ async function doRequest<T = any>(
   getCacheScope: GetCacheScope = () => 'anonymous',
   reportErrors = true,
   timeoutMs: number = REQUEST_TIMEOUT_MS,
+  attempt = 0,
 ): Promise<T> {
   rejectSellerPreviewApiRequest();
   await waitOutRateLimit();
@@ -489,10 +491,21 @@ async function doRequest<T = any>(
           : (options.headers as Record<string, string>)
       : {}),
   };
+  // One quiet retry for a read that failed for a transient reason, before
+  // anything reaches the user (lib/requestResilience.ts).
+  const retryQuietly = (failure: unknown) => isRead && attempt === 0 && isTransientFailure(failure)
+    ? new Promise((r) => setTimeout(r, AUTO_RETRY_DELAY_MS)).then(() =>
+        doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs, attempt + 1))
+    : null;
+  // Ordinary reads feed the slow-connection strip; long AI/upload calls don't.
+  const endSlowTracking = isRead && reportErrors && timeoutMs === REQUEST_TIMEOUT_MS ? slowRequests.start() : null;
   let res: Response;
   try {
     res = await fetchWithTimeout(`${BASE}${resolvedPath}`, { ...options, headers }, timeoutMs);
   } catch (error) {
+    endSlowTracking?.();
+    const quiet = retryQuietly(error);
+    if (quiet) return quiet;
     const retry = isRead
       ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs)
       : undefined;
@@ -501,7 +514,10 @@ async function doRequest<T = any>(
     if (cached !== null) return cached;
     throw error;
   }
+  endSlowTracking?.();
   if (!res.ok) {
+    const quiet = retryQuietly(res);
+    if (quiet) return quiet;
     const body = await res.text();
     // AI credit gate refusals (402/429/503 with a credits code) are not generic rate limiting.
     const aiCreditsKind = classifyAiCreditsError(res.status, body);

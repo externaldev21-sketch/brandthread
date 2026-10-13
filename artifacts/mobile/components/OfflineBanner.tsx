@@ -6,10 +6,14 @@
  * and re-runs the currently failed reads (lib/networkNotice.ts retry
  * registry + any errored TanStack queries).
  *
+ * The same strip says "Slow connection" (no Retry: the request is still
+ * running) once an ordinary read has been in flight for 8s while online
+ * (lib/requestResilience.ts), and goes away when that read settles.
+ *
  * Distinct from the intentionally-empty NetworkNoticeBanner: that one reacted
  * to page-read failures (incl. server 5xx); this never does.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -18,12 +22,14 @@ import { recheckConnectivity, useIsOffline } from '@/hooks/useIsOffline';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { queryClient } from '@/lib/queryClient';
 import { retryNetworkNotice } from '@/lib/networkNotice';
+import { slowRequests } from '@/lib/requestResilience';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 
 export default function OfflineBanner() {
   const offline = useIsOffline();
+  const slow = useSyncExternalStore(slowRequests.subscribe, slowRequests.isSlow, slowRequests.isSlow);
   const { theme } = useAppTheme();
   const top = useHeaderTopInset();
   const [retrying, setRetrying] = useState(false);
@@ -43,6 +49,24 @@ export default function OfflineBanner() {
       setRetrying(false);
     }
   }, [retrying]);
+
+  if (!offline && slow) {
+    return (
+      <View pointerEvents="none" style={[styles.wrap, { top: top + HEADER_BLOCK }]}>
+        <View
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          testID="slow-connection-banner"
+          style={[styles.pill, { backgroundColor: theme.card, borderColor: theme.border }]}
+        >
+          <Feather name="wifi" size={14} color={theme.text} />
+          <Text style={[TYPE_SCALE.footnote, styles.text, { color: theme.text }]} numberOfLines={1}>
+            Slow connection
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   if (!offline) return null;
 

@@ -15,6 +15,7 @@ import {
 import { storeContextHeaders, versionApiPath } from '@/lib/api';
 import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { AUTO_RETRY_DELAY_MS, isTransientFailure, slowRequests } from '@/lib/requestResilience';
 
 type GetToken = () => Promise<string | null>;
 
@@ -98,6 +99,7 @@ export async function serviceRequest<T = unknown>(
   path: string,
   options: RequestInit = {},
   reportErrors = true,
+  attempt = 0,
 ): Promise<T> {
   if (isSellerDevPreview()) {
     throw new ApiError(403, JSON.stringify({
@@ -111,6 +113,14 @@ export async function serviceRequest<T = unknown>(
     throw new ApiError(401, JSON.stringify({ error: { message: 'Sign in required', code: 'auth_required' } }));
   }
   const base = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
+  const isRead = !options.method || options.method.toUpperCase() === 'GET';
+  // Same as lib/api.ts: one quiet retry for a transient read failure, and
+  // ordinary reads feed the slow-connection strip (lib/requestResilience.ts).
+  const retryQuietly = (failure: unknown) => isRead && attempt === 0 && isTransientFailure(failure)
+    ? new Promise((r) => setTimeout(r, AUTO_RETRY_DELAY_MS)).then(() =>
+        serviceRequest<T>(path, options, reportErrors, attempt + 1))
+    : null;
+  const endSlowTracking = isRead && reportErrors ? slowRequests.start() : null;
   let res: Response;
   try {
     res = await fetchWithTimeout(`${base}${versionApiPath(path)}`, {
@@ -123,13 +133,19 @@ export async function serviceRequest<T = unknown>(
       },
     });
   } catch (error) {
+    endSlowTracking?.();
+    const quiet = retryQuietly(error);
+    if (quiet) return quiet;
     const retry = !options.method || options.method === 'GET'
       ? () => serviceRequest<T>(path, options, reportErrors)
       : undefined;
     if (reportErrors) reportNetworkError(error, retry);
     throw error;
   }
+  endSlowTracking?.();
   if (!res.ok) {
+    const quiet = retryQuietly(res);
+    if (quiet) return quiet;
     const body = await res.text();
     const error = new ApiError(res.status, body);
     const retry = !options.method || options.method === 'GET'
