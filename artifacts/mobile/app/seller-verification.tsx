@@ -6,7 +6,7 @@
  * Stripe sends a webhook that flips the status; the screen polls on re-focus.
  */
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking, Pressable } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -254,6 +254,14 @@ export default function SellerVerificationScreen() {
                 <Text style={s.benefitText}>{b.text}</Text>
               </View>
             ))}
+            <Pressable
+              onPress={() => router.push('/verified-brands' as never)}
+              accessibilityRole="link"
+              hitSlop={8}
+              testID="seller-verification-badge-rules"
+            >
+              <Text style={[s.benefitText, { textDecorationLine: 'underline' }]}>See the badge rules</Text>
+            </Pressable>
           </View>
         )}
 

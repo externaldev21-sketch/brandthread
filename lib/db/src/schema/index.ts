@@ -1365,6 +1365,9 @@ export const reviews = pgTable('reviews', {
   sizeBought:      text('size_bought'),
   fitNote:         text('fit_note'),
   fitScale:        integer('fit_scale'),
+  /** Optional 1–5 detail ratings (migration 521): how fast it shipped, and whether it matched the listing. */
+  shipSpeedRating: integer('ship_speed_rating'),
+  accuracyRating:  integer('accuracy_rating'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
