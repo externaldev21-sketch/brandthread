@@ -13,11 +13,12 @@ import { FONT } from '@/lib/theme';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 
-export function PostOwnerSheet({ visible, onClose, pinned, onTogglePin }: {
+export function PostOwnerSheet({ visible, onClose, pinned, onTogglePin, onFitsOptions }: {
   visible: boolean;
   onClose: () => void;
   pinned: boolean;
   onTogglePin: () => void;
+  onFitsOptions?: () => void;
 }) {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
@@ -35,6 +36,14 @@ export function PostOwnerSheet({ visible, onClose, pinned, onTogglePin }: {
           <MaterialCommunityIcons name={pinned ? 'pin-off-outline' : 'pin-outline'} size={24} color={theme.text} />
           <Text style={s.label}>{label}</Text>
         </Pressable>
+        {onFitsOptions ? (
+          <Pressable onPress={() => { hapticLight(); onClose(); requestAnimationFrame(onFitsOptions); }}
+            style={({ pressed }) => [s.row, pressed && s.rowPressed]}
+            accessibilityRole="button" accessibilityLabel="Fits and repost permissions">
+            <MaterialCommunityIcons name="tshirt-crew-outline" size={24} color={theme.text} />
+            <Text style={s.label}>Fits and repost permissions</Text>
+          </Pressable>
+        ) : null}
       </View>
     </BottomSheet>
   );

@@ -3010,6 +3010,7 @@ export * from './ranking';
 export * from './comments';
 export * from './commentMedia';
 export * from './hashtags';
+export * from './fits';
 export * from './captions';
 export * from './postPolls';
 export * from './postPins';

@@ -79,6 +79,7 @@ import notificationsFeedRouter from "./notifications-feed";
 import notificationPrefsRouter from "./notification-prefs";
 import smsPrefsRouter from "./notification-prefs-sms";
 import postsRouter from "./posts";
+import fitsRouter, { productFitChecksRouter } from "./fits";
 import postCaptionsRouter from "./post-captions";
 import postPollsRouter from "./post-polls";
 import postPinsRouter from "./post-pins";
@@ -343,6 +344,7 @@ router.use("/auth",            ageRouter); // POST /auth/age (age gate)
 // handler is mounted here (never the paid /logo/generate); the AI gate meters
 // it against the global cap and a per-user daily ceiling.
 router.use("/onboarding-sample", aiSafetyGuard("onboarding-logo"), onboardingSampleRouter);
+router.use("/products",        productFitChecksRouter); // public GET /:id/fit-checks (F6 fits)
 router.use("/products",        tc, productsRouter);
 router.use("/orders",          tc, ordersRouter);
 router.use("/customers",       tc, customersRouter);
@@ -444,6 +446,7 @@ router.use("/posts",                     postPinsRouter); // Pin to your profile
 router.use("/posts",                     postMentionsLabelsRouter); // product mentions + BTS label (per-route team context)
 router.use("/posts",                     tc, postsRouter);
 router.use("/upload-sessions",           uploadSessionsRouter); // resumable chunked uploads; owned by the signed-in person, no tc
+router.use("/fits",                      fitsRouter); // stitches, buyer fit checks, brand repost requests
 router.use("/feed",                      feedRouter); // buyer-scoped (For You ranking + event ingestion); no tc
 router.use("/feed",                      feedFollowedFreshRouter); // GET /followed-fresh (requireAuth); no tc
 router.use("/reports",                   reportsRouter);

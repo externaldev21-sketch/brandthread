@@ -93,6 +93,7 @@ import { BrandLink, brandLinkHref } from '@/components/products/BrandLink';
 
 import { BundleOffer } from '@/components/products/BundleOffer';
 import { MysteryBoxLabel } from '@/components/products/MysteryBoxLabel';
+import { FitChecksStrip } from '@/components/products/FitChecksStrip';
 import { ProductVideo } from '@/components/products/ProductVideo';
 
 import { ProductShareButton } from '@/components/products/ProductShareButton';
@@ -1933,6 +1934,8 @@ export default function BuyerProductDetailScreen() {
           <WornInVideos productId={product.id} productName={product.name} />
 
           <BundleOffer productId={product.id} onAdded={bumpCart} />
+          {/* Fit checks — buyers' posts wearing it (verified purchases). */}
+          <FitChecksStrip productId={product.id} productName={product.name} />
 
           <CompleteTheFit productId={product.id} />
 

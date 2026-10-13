@@ -84,6 +84,7 @@ import { minHitSlop } from '@/lib/hitSlop';
 
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 
+import { usePostFits } from '@/components/social/PostFits';
 
 function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () => void; captions?: CaptionSegment[] }) {
   // Starts muted with no player chrome (less-AI pass, item 49); the small
@@ -305,6 +306,7 @@ export default function BuyerPostViewer() {
   const isOwner = post !== null && post.authorId === MY_USER_ID;
   // Pinning is checked by the server (owner + published); real posts carry the Clerk id as authorId.
   const canPin = post !== null && !post.isDraft && (isOwner || (!!userId && post.authorId === userId));
+  const fits = usePostFits({ postId: params.postId, isOwner });
 
   const loadPost = useCallback(async () => {
     let found: BuyerPost | null = null;
@@ -498,7 +500,11 @@ export default function BuyerPostViewer() {
         actions={[
           { icon: 'send', onPress: handleShare, accessibilityLabel: 'Share' },
           // Owner ••• sheet (Instagram): Pin to your profile / Unpin from profile.
-          ...(canPin ? [{ icon: 'more-horizontal' as const, onPress: () => setOwnerSheetOpen(true), accessibilityLabel: 'More options' }] : []),
+          ...(canPin || fits.openMenu ? [{
+            icon: 'more-horizontal' as const,
+            onPress: canPin ? () => setOwnerSheetOpen(true) : fits.openMenu!,
+            accessibilityLabel: 'More options',
+          }] : []),
         ]}
       />
       {tileExpandOverlay}
@@ -563,6 +569,8 @@ export default function BuyerPostViewer() {
             />
           </View>
         ) : null}
+
+        {fits.info}
 
         {post?.location ? (
           <LocationTag location={post.location} style={{ marginHorizontal: SP.md, marginTop: SP.sm }} />
@@ -731,7 +739,7 @@ export default function BuyerPostViewer() {
       >
         <Text style={s.modalDesc}>This will permanently remove the post from your profile. This cannot be undone.</Text>
       </Sheet>
-      <PostOwnerSheet visible={ownerSheetOpen} onClose={() => setOwnerSheetOpen(false)} pinned={!!post?.pinnedAt} onTogglePin={() => { void togglePin(); }} />
+      <PostOwnerSheet visible={ownerSheetOpen} onClose={() => setOwnerSheetOpen(false)} pinned={!!post?.pinnedAt} onTogglePin={() => { void togglePin(); }} onFitsOptions={fits.openMenu} />
       <Snackbar visible={!!pinToast} message={pinToast ?? ''} onDismiss={() => setPinToast(null)} />
     </View>
   );

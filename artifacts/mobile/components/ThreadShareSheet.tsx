@@ -33,6 +33,7 @@ import { useApi } from '@/lib/api';
 import { isUUID } from '@/lib/engagementUtils';
 import { buildPostUrl } from '@/lib/shareLinks';
 import { quotePostHref } from '@/lib/quotePost';
+import { stitchHref } from '@/lib/fits';
 import { useRouter } from 'expo-router';
 import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { isBuyerDevPreview } from '@/lib/devPreview';
@@ -346,7 +347,7 @@ export function ThreadShareSheet({
 
           <View style={styles.divider} />
           <View style={styles.section}>
-            <View style={styles.actionRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionRow}>
               <ShareAction label="Report" icon="flag" onPress={() => { onClose(); onReport(); }} muted />
               <ShareAction label="Not interested" icon="slash" onPress={() => { onClose(); onNotInterested(); }} muted />
               {isVideo && mediaUri && downloadAllowed === true ? (
@@ -365,7 +366,17 @@ export function ThreadShareSheet({
               {remixAllowed ? (
                 <ShareAction label="Remix" icon="layers" onPress={() => { onClose(); router.push(remixRoute(postId) as never); }} muted />
               ) : null}
-            </View>
+              {isUUID(postId) ? (
+                <ShareAction
+                  label="Stitch"
+                  icon="scissors"
+                  onPress={() => {
+                    onClose();
+                    router.push(stitchHref(postId) as never);
+                  }}
+                />
+              ) : null}
+            </ScrollView>
           </View>
       </Sheet>
 

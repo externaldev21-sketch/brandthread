@@ -50,6 +50,7 @@ import { decodeCursor, encodeCursor } from "../lib/cursor";
 import { mergeHashtags, syncPostHashtags } from "../lib/hashtags";
 import { attachQuoteData, postCardImage } from "../lib/quotedPosts";
 import { attachPostExtras } from "../lib/postExtras";
+import { brandRepostBlocked, isFitCheckPost, REPOST_PERMISSION_REQUIRED } from "../lib/fits";
 import {
   authorInGoodStanding,
   enqueueAutoFilterReport,
@@ -874,6 +875,7 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
     if (original.visibility?.allowReposts === false) {
       return res.status(403).json({ error: "Reposts are disabled for this post", code: "REPOSTS_DISABLED" });
     }
+    if (await brandRepostBlocked(clerkId, original.userId, original.id)) return res.status(403).json(REPOST_PERMISSION_REQUIRED);
     if (original.repostKind === "quote") {
       const [inner] = original.quotedPostId
         ? await db.select({ id: posts.id }).from(posts)
@@ -1923,7 +1925,8 @@ router.get("/:id", async (req, res) => {
         and(eq(follows.followerId, post.userId), eq(follows.followingId, viewerId)),
       )) : [];
       const mutual = !!viewerId && edges.some((e) => e.followerId === viewerId) && edges.some((e) => e.followerId === post.userId);
-      if (!mutual) return res.status(404).json({ error: "Post not found" });
+      // A fit check linked to a product is shown on that product's page (F6 fits).
+      if (!mutual && !(await isFitCheckPost(post.id))) return res.status(404).json({ error: "Post not found" });
     }
   }
 
@@ -2073,6 +2076,10 @@ router.post("/:id/interact", requireAuth, rateLimit("post-interact"), validateBo
     && !(await repostsAllowedBy(visiblePost.ownerId))
   ) {
     return res.status(403).json({ error: "This account doesn't allow reposts.", code: "REPOSTS_DISABLED" });
+  }
+  // Brands repost a buyer's post only after the buyer approves (F6 fits).
+  if (type === "repost" && value !== "remove" && await brandRepostBlocked(clerkId, visiblePost.ownerId, id)) {
+    return res.status(403).json(REPOST_PERMISSION_REQUIRED);
   }
 
   if (RECORDED_ONLY_TYPES.includes(type)) {
