@@ -7,6 +7,7 @@
  * Preserves video/feed position behind the drawer.
  */
 
+import { BrandLink } from '@/components/products/BrandLink';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import {
@@ -1498,7 +1499,7 @@ function ProductHeader({
         </View>
         {showSellerLine && (
           <Text style={ss.sellerName} numberOfLines={1}>
-            by {product.sellerName}
+            by <BrandLink sellerId={product.sellerId} name={product.sellerName} style={ss.sellerName} testID="shop-sheet-brand-link" />
             {product.sellerHandle ? ` · ${product.sellerHandle}` : ''}
           </Text>
         )}
@@ -1611,7 +1612,7 @@ function ProductListRow({
           <Text style={ss.listRowPrice}>{formatCents(tag.priceCents)}</Text>
           {product && (
             <View style={ss.listRowSellerRow}>
-              <Text style={ss.listRowSellerText} numberOfLines={1}>{product.sellerName}</Text>
+              <BrandLink sellerId={product.sellerId} name={product.sellerName} style={ss.listRowSellerText} />
               {product.sellerVerified && (
                 <Feather name="check-circle" size={11} color={theme.text} />
               )}
