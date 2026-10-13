@@ -91,4 +91,17 @@ config.transformer.getTransformOptions = async (...args) => {
   };
 };
 
+// Inline requires (speed polish #3): a module's code runs the first time it is
+// actually used instead of all at startup, so the first tab paints without
+// evaluating every other screen's imports. Release builds already run on
+// Hermes (Expo's default engine; jsEngine is not overridden in app.json).
+const _origTransformOptions = config.transformer.getTransformOptions;
+config.transformer.getTransformOptions = async (...args) => {
+  const base = _origTransformOptions ? await _origTransformOptions(...args) : {};
+  return {
+    ...base,
+    transform: { ...(base && base.transform), inlineRequires: true },
+  };
+};
+
 module.exports = config;

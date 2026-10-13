@@ -40,6 +40,46 @@ export interface RoutePerfEntry {
 
 const recent: RoutePerfEntry[] = [];
 const MAX_RECENT = 50;
+const perfListeners = new Set<() => void>();
+
+/**
+ * Per-screen budgets (speed polish #25), keyed by expo-router pathname (the
+ * buyer and seller home tabs are both '/'). `firstRenderMs` is the tap-to-
+ * first-frame budget; `dataMs` is the time-to-interactive budget (real data
+ * on screen). Any navigation over budget logs a `[perf] over budget` warning
+ * in dev and shows in the perf overlay, so a regression is visible the day it
+ * lands instead of after users feel it.
+ */
+export interface PerfBudget { firstRenderMs: number; dataMs: number }
+export const DEFAULT_PERF_BUDGET: PerfBudget = { firstRenderMs: 150, dataMs: 1000 };
+export const TAB_PERF_BUDGETS: Readonly<Record<string, PerfBudget>> = {
+  '/': { firstRenderMs: 100, dataMs: 1000 },
+  '/feed': { firstRenderMs: 100, dataMs: 1000 },
+  '/discover': { firstRenderMs: 100, dataMs: 1200 },
+  '/inbox': { firstRenderMs: 100, dataMs: 800 },
+  '/profile': { firstRenderMs: 100, dataMs: 800 },
+  '/products': { firstRenderMs: 100, dataMs: 800 },
+  '/orders': { firstRenderMs: 100, dataMs: 800 },
+};
+
+export function budgetFor(route: string): PerfBudget {
+  return TAB_PERF_BUDGETS[route] ?? DEFAULT_PERF_BUDGET;
+}
+
+/** Which measured numbers went over this route's budget (empty = within budget). */
+export function overBudget(entry: Pick<RoutePerfEntry, 'route' | 'firstRenderMs' | 'dataMs'>): Array<'firstRender' | 'data'> {
+  const budget = budgetFor(entry.route);
+  const over: Array<'firstRender' | 'data'> = [];
+  if (entry.firstRenderMs !== null && entry.firstRenderMs > budget.firstRenderMs) over.push('firstRender');
+  if (entry.dataMs !== null && entry.dataMs > budget.dataMs) over.push('data');
+  return over;
+}
+
+/** Dev perf overlay subscribes here to repaint when a new timing lands. */
+export function subscribeRoutePerf(listener: () => void): () => void {
+  perfListeners.add(listener);
+  return () => { perfListeners.delete(listener); };
+}
 
 let unsubscribeQueryCache: (() => void) | null = null;
 let pendingRoute: { route: string; startedAt: number; dataLogged: boolean } | null = null;
@@ -314,15 +354,35 @@ function pushEntry(entry: RoutePerfEntry) {
   if (recent.length > MAX_RECENT) recent.shift();
 }
 
+/** Immutable copy of the newest entry, replaced on every update, so React
+ *  (and the React Compiler's memoization) sees a new value each time. */
+let latestSnapshot: RoutePerfEntry | null = null;
+
+/** Newest route timing as an immutable snapshot (for useSyncExternalStore). */
+export function getLatestRoutePerf(): RoutePerfEntry | null {
+  return latestSnapshot;
+}
+
 function logIfDone(entry: RoutePerfEntry) {
+  if (recent[recent.length - 1] === entry) {
+    latestSnapshot = { ...entry };
+    perfListeners.forEach((l) => l());
+  }
   if (entry.firstRenderMs === null || !__DEV__) return;
-  // Dev-only diagnostic (entries are only recorded under __DEV__). `info`,
-  // not `log`, per the app's no-console.log rule; not `warn`, which would
-  // raise a LogBox toast on every navigation.
   console.info(
     `[perf] ${entry.route} firstRender=${entry.firstRenderMs}ms` +
       (entry.dataMs !== null ? ` data=${entry.dataMs}ms` : ' data=(no query cache activity)'),
   );
+  const over = overBudget(entry);
+  if (over.length > 0) {
+    const budget = budgetFor(entry.route);
+    console.warn(
+      `[perf] over budget on ${entry.route}: ` +
+        over.map((k) => (k === 'firstRender'
+          ? `firstRender ${entry.firstRenderMs}ms > ${budget.firstRenderMs}ms`
+          : `data ${entry.dataMs}ms > ${budget.dataMs}ms`)).join(', '),
+    );
+  }
 }
 
 /** Recent route timings, newest last — used by the in-app perf overlay and
