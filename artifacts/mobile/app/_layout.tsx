@@ -60,6 +60,7 @@ import { adoptGuestCart, flushDirtyCart } from '@/services/cartService';
 import { initOrderService } from '@/services/orderService';
 import { initAnalyticsService } from '@/services/analyticsService';
 import { initTabDataCache } from '@/lib/tabDataCache';
+import { clearSiriSalesSnapshot } from '@/lib/siriSalesSnapshot';
 import { initFeedPostsCache } from '@/lib/feedPostsCache';
 import { initEngagementRetryQueue } from '@/lib/engagementRetryQueue';
 import { clearUserLocalData } from '@/lib/userLocalData';
@@ -1113,6 +1114,8 @@ function ServiceConfigurer() {
       // Explicit sign-out (not a switch): the person is leaving, so their
       // cached orders/inbox/profile/feed and queued offline taps go too.
       if (newUserId === null) clearUserLocalData(oldUserId).catch(() => {});
+      // Siri's "Sales today" answer belongs to the previous account.
+      clearSiriSalesSnapshot();
     }
     prevUserIdRef.current = newUserId;
     // The shared TanStack queryClient (lib/queryClient.ts) and the two

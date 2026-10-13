@@ -456,6 +456,7 @@
       "./plugins/with-upload-live-activity",
       "./plugins/with-voip-callkit",
       "expo-dev-client",
+      "./plugins/with-siri-shortcuts",
       [
         "@stripe/stripe-react-native",
         {
