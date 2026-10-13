@@ -20,7 +20,7 @@ import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructi
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { useFeeSchedule } from '@/hooks/useFeeSchedule';
-import { quoteFromSchedule } from '@/lib/feeSchedule';
+import { buildOrderFeeBreakdown, orderFeeColumnsFromApi } from '@/lib/orderFeeBreakdown';
 import { adaptReturnRow, itemsTotalCents, returnReasonLabel as returnRequestReasonLabel, statusLabel as returnRequestStatusLabel, type ReturnView } from '@/lib/returns';
 import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
@@ -285,6 +285,7 @@ export function adaptApiOrder(raw: any): Order {
        shippingLabelAllocationCents: shippingCents,
        platformFeeCents:        Math.max(0, raw.platformFeeCents ?? 0),
        processingFeeCents:      Math.max(0, raw.processingFeeChargedCents || raw.processingFeeCents || 0),
+       fees:                    orderFeeColumnsFromApi(raw),
       payoutStatus:            isRefundPending ? 'held' : uiStatus === 'refunded' ? 'paid' : 'pending',
     },
     threadCashPayout: sellerThreadCashPayout(raw),
@@ -1337,17 +1338,57 @@ function CustomerTab({ order }: { order: Order }) {
 // TAB: PAYMENT
 // ═══════════════════════════════════════════════════════
 
-/** "Fees" row: the recorded fees for this order, else the schedule's estimate; hidden with neither. */
+/**
+ * "Fees" row: the recorded fees for this order, else the schedule's estimate
+ * (captioned "Estimated"); hidden with neither. Tapping it opens the
+ * breakdown in place (Shopify order detail "Payment" card pattern).
+ */
 function FeesRow({ payment: p }: { payment: Order['payment'] }) {
+  const { MUTED } = useThemeAliases();
+  const { theme } = useAppTheme();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const schedule = useFeeSchedule();
-  const recorded = p.platformFeeCents + (p.processingFeeCents ?? 0);
-  let fees = recorded;
-  if (!recorded && schedule && p.totalCents > 0) {
-    const q = quoteFromSchedule(schedule, Math.max(0, p.subtotalCents - p.discountTotalCents), { shippingCents: p.shippingTotalCents });
-    fees = q.platformFeeCents + q.processingFeeCents;
-  }
-  if (!fees) return null;
-  return <InfoRow label="Fees" value={`-${usd(fees)}`} />;
+  const [open, setOpen] = useState(false);
+  const columns = p.fees ?? {
+    totalCents: p.totalCents, subtotalCents: p.subtotalCents, discountCents: p.discountTotalCents,
+    shippingCents: p.shippingTotalCents, platformFeeCents: p.platformFeeCents,
+    processingFeeCents: p.processingFeeCents ?? 0, sellerNetCents: 0, platformFeeRefundedCents: 0,
+    refundedCents: 0, threadCashAppliedCents: 0, recorded: false,
+  };
+  const b = buildOrderFeeBreakdown(columns, schedule);
+  if (!b || !b.feesCents) return null;
+  const signed = (cents: number) => (cents < 0 ? `-${usd(-cents)}` : usd(cents));
+  return (
+    <View>
+      <TouchableOpacity
+        style={s.infoRow}
+        onPress={() => { hapticToggle(); setOpen(o => !o); }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={b.estimated ? 'Estimated fees' : 'Fees'}
+        testID="order-fees-toggle"
+      >
+        <View>
+          <View style={s.feesLabelRow}>
+            <Text style={s.infoLabel}>Fees</Text>
+            <Feather name={open ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={MUTED} />
+          </View>
+          {b.estimated && <Text style={s.feesCaption}>Estimated</Text>}
+        </View>
+        <Text style={s.infoValue}>{`-${usd(b.feesCents)}`}</Text>
+      </TouchableOpacity>
+      {open && (
+        <View style={s.feesLines} testID="order-fees-breakdown">
+          {b.lines.map(line => (
+            <View key={line.key} style={[s.infoRow, line.strong && s.feesNetRow]}>
+              <Text style={[s.infoLabel, line.strong && s.feesStrong]}>{line.key === 'net' && b.estimated ? 'You earn (estimated)' : line.label}</Text>
+              <Text style={[s.infoValue, line.strong && s.feesStrong]}>{signed(line.cents)}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
 }
 
 function PaymentTab({ order }: { order: Order }) {
@@ -2034,6 +2075,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   infoLabel:        { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
   infoValue:        { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   infoValueBold:    { fontFamily: FONT.bold, fontSize: FS.base },
+  feesLabelRow:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  feesCaption:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  feesLines:        { paddingLeft: SP.md, paddingBottom: SP.xs, borderLeftWidth: 1, borderLeftColor: BORDER, marginLeft: 2, marginBottom: SP.xs },
+  feesNetRow:       { borderTopWidth: 1, borderTopColor: BORDER, marginTop: SP.xs, paddingTop: SP.sm },
+  feesStrong:       { color: FG, fontFamily: FONT.semibold },
 
   // Line items
   lineItemCard:     { marginBottom: SP.xs },

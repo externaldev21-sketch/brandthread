@@ -247,6 +247,8 @@ export interface PaymentSummary {
   platformFeeCents: number;
   /** Stripe processing charged to the seller on this order (0 when not recorded). */
   processingFeeCents?: number;
+  /** Stored money columns behind the Payment tab's fee breakdown (lib/orderFeeBreakdown). */
+  fees?: import('@/lib/orderFeeBreakdown').OrderFeeColumns;
   payoutStatus: 'available' | 'pending' | 'held' | 'paid';
 }
 
