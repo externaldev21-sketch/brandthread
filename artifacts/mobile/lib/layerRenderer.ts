@@ -245,3 +245,107 @@ export function hsbToColorMatrixValues(adj: HsbAdjustment): number[] {
 export function hsbToColorMatrixString(adj: HsbAdjustment): string {
   return hsbToColorMatrixValues(adj).map(v => v.toFixed(4)).join(' ');
 }
+
+// ─── Effects → SVG filter primitive inputs ────────────────────────────────────
+//
+// Pure builders consumed by renderLayerInSvg. Each returns exactly the
+// attribute values a real SVG primitive takes — nothing here is rendered,
+// so all of it is unit-testable without react-native.
+
+// NOTE on primitive choice: react-native-svg (15.x) implements only
+// feBlend / feColorMatrix / feComposite / feGaussianBlur / feMerge /
+// feOffset / feFlood / feDropShadow — feConvolveMatrix, feTurbulence and
+// feComponentTransfer render null (`warnUnimplementedFilter` in
+// src/elements/filters/*). So every effect below is built ONLY from the
+// implemented set: motion blur as an N-tap feOffset box blur averaged with
+// arithmetic feComposite, sharpen as an unsharp mask (source minus its
+// Gaussian blur), gradient map as an exact luminance-ramp feColorMatrix.
+
+/** Number of offset taps in the motion-blur box filter (odd, so the centre tap is the source itself). */
+export const MOTION_BLUR_TAPS = 7;
+
+/**
+ * motionBlurTaps — the (dx, dy) offsets for a directional box blur of total
+ * length `amount` px along `angleDeg`, symmetric about the source. Averaging
+ * the taps with equal weight (1/N) preserves brightness.
+ */
+export function motionBlurTaps(amount: number, angleDeg: number): { dx: number; dy: number }[] {
+  const a = Math.max(0, amount);
+  if (a === 0) return [{ dx: 0, dy: 0 }];
+  const rad = (angleDeg * Math.PI) / 180;
+  const ux = Math.cos(rad), uy = Math.sin(rad);
+  const n = MOTION_BLUR_TAPS, half = (n - 1) / 2;
+  const taps: { dx: number; dy: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = ((i - half) / half) * (a / 2);
+    taps.push({ dx: +(t * ux).toFixed(3), dy: +(t * uy).toFixed(3) });
+  }
+  return taps;
+}
+
+/**
+ * unsharpParams — unsharp mask parameters for strength 0..1: result =
+ * source × (1 + k) − blur × k, i.e. feComposite arithmetic with k2 = 1 + k,
+ * k3 = −k. k scales 0..1.5; the blur radius is fixed at 1.5 px (canvas scale
+ * is applied by the caller).
+ */
+export function unsharpParams(strength: number): { k: number; stdDeviation: number } {
+  const s = Math.max(0, Math.min(1, strength));
+  return { k: +(s * 1.5).toFixed(4), stdDeviation: 1.5 };
+}
+
+/**
+ * colorBalanceMatrixValues — 20-value feColorMatrix applying a per-channel
+ * additive bias: cyan↔red shifts R, magenta↔green shifts G, yellow↔blue
+ * shifts B, each by up to ±0.5 of full scale. This is a real global colour
+ * balance. Procreate additionally splits it into Shadows / Midtones /
+ * Highlights bands; that tonal split is NOT implemented here (it needs a
+ * luminance-masked three-way composite) and the UI says so.
+ */
+export function colorBalanceMatrixValues(cb: { cyanRed: number; magentaGreen: number; yellowBlue: number }): number[] {
+  const k = 0.5;
+  return [
+    1, 0, 0, 0, cb.cyanRed * k,
+    0, 1, 0, 0, cb.magentaGreen * k,
+    0, 0, 1, 0, cb.yellowBlue * k,
+    0, 0, 0, 1, 0,
+  ];
+}
+
+export function colorBalanceMatrixString(cb: { cyanRed: number; magentaGreen: number; yellowBlue: number }): string {
+  return colorBalanceMatrixValues(cb).map(v => v.toFixed(4)).join(' ');
+}
+
+/** "#rrggbb" → [r, g, b] each 0..1; null when malformed. */
+export function hexToUnitRgb(hex: string): [number, number, number] | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}
+
+const LUMA_R = 0.2126, LUMA_G = 0.7152, LUMA_B = 0.0722;
+
+/**
+ * gradientMapMatrixValues — a single 20-value feColorMatrix implementing an
+ * exact two-stop gradient map: out_c = from_c + (to_c − from_c) × luma(in),
+ * with luma the Rec.709 weights. Because luma is linear in RGB and the ramp
+ * is linear in luma, the whole map is one affine matrix — no table transfer
+ * needed. Alpha passes through. Returns null for malformed hex.
+ */
+export function gradientMapMatrixValues(from: string, to: string): number[] | null {
+  const a = hexToUnitRgb(from), b = hexToUnitRgb(to);
+  if (!a || !b) return null;
+  const row = (c: number) => { const d = b[c] - a[c]; return [d * LUMA_R, d * LUMA_G, d * LUMA_B, 0, a[c]]; };
+  return [...row(0), ...row(1), ...row(2), 0, 0, 0, 1, 0];
+}
+
+export function gradientMapMatrixString(from: string, to: string): string | null {
+  const v = gradientMapMatrixValues(from, to);
+  return v ? v.map(x => x.toFixed(4)).join(' ') : null;
+}
+
+/** Bloom: blur radius grows with strength; the blurred copy is screened back over the source. */
+export function bloomStdDeviation(strength: number): number {
+  return Math.max(0, Math.min(1, strength)) * 12;
+}
