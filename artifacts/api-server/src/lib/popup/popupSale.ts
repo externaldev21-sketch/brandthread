@@ -158,7 +158,7 @@ export async function pricePopupCart(input: {
     throw new PopupSaleError(400, "BELOW_MINIMUM", "The total must be at least $0.50.");
   }
   const platformFeeBps = await resolveSellerPlatformFeeBps(input.sellerId);
-  const fee = destinationApplicationFeeCents({ merchandiseCents: subtotalCents, preTaxTotalCents: subtotalCents, platformFeeBps });
+  const fee = destinationApplicationFeeCents({ shippingCents: 0, merchandiseCents: subtotalCents, preTaxTotalCents: subtotalCents, platformFeeBps });
   return {
     sellerId: input.sellerId,
     lines,

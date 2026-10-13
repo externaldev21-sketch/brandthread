@@ -11,7 +11,7 @@
  * Request URL https://brandthread.app/api/webhooks/twilio/sms (HTTP POST).
  */
 import { Router, type Request } from "express";
-import { handleInboundSms, twiml } from "../lib/sms";
+import { handleInboundSms, twiml, twilioAuthToken, smsEnabled } from "../lib/sms";
 import { applyInboundKeyword } from "../lib/dropSmsWaitlist";
 import { getSmsConfig, isValidTwilioSignature, normalizePhone } from "../lib/sms";
 import { CANONICAL_WEB_ORIGIN, getWebOrigin } from "../lib/webOrigin";
@@ -32,12 +32,13 @@ export function signatureUrlCandidates(req: Request): string[] {
 
 router.post("/sms", async (req, res): Promise<void> => {
   const config = getSmsConfig();
-  if (!config) { res.status(503).json({ error: "SMS is not configured", code: "SMS_NOT_CONFIGURED" }); return; }
+  const authToken = config?.authToken ?? (smsEnabled() ? twilioAuthToken() : null);
+  if (!authToken) { res.status(503).json({ error: "SMS is not configured", code: "SMS_NOT_CONFIGURED" }); return; }
 
   const params = (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body))
     ? req.body as Record<string, unknown>
     : {};
-  if (!isValidTwilioSignature(config.authToken, req.headers["x-twilio-signature"], signatureUrlCandidates(req), params)) {
+  if (!isValidTwilioSignature(authToken, req.headers["x-twilio-signature"], signatureUrlCandidates(req), params)) {
     res.status(403).json({ error: "Invalid signature", code: "INVALID_SIGNATURE" });
     return;
   }

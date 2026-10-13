@@ -307,8 +307,6 @@ export function RightActionRail({
       <EngagementButton
         icon="bookmark"
         solidIcon="bookmark"
-        iconSize={26}
-        // Plain count, no roll: only like counts animate (polish #69).
         iconSize={RAIL_ICON_SIZE}
         count={formatCount(engagement?.saves ?? saves)}
         active={engagement?.saved ?? false}
@@ -359,7 +357,6 @@ const styles = StyleSheet.create({
   avatarWrap: { alignItems: 'center', marginBottom: 8 },
   avatar: {
     width: 38, height: 38, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
-    borderWidth: crispPx(1.5), borderColor: ON_DARK,
     // 2px white ring (V2).
     borderWidth: 2, borderColor: ON_DARK,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,

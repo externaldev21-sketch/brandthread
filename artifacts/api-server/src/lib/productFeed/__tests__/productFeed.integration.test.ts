@@ -1,3 +1,4 @@
+import {getWebOrigin} from "../../webOrigin";
 /**
  * Seller product feed against real Postgres: secret URL lifecycle (create,
  * re-read, regenerate revokes), what the public CSV contains and never
@@ -27,6 +28,7 @@ import { clearFeedCache } from "../service";
 
 let app: { base: string; close: () => Promise<void> };
 beforeAll(async () => {
+  vi.stubEnv("PRODUCT_FEEDS_ENABLED", "1");
   app = await startApp((server) => {
     server.use("/api/seller/product-feed", sellerProductFeedRouter);
     server.use("/api/v1/public/feeds", publicProductFeedRouter);
@@ -65,7 +67,8 @@ describe("seller product feed URL", () => {
 
     const created = await call(app.base, "POST", "/api/seller/product-feed", seller);
     expect(created.status).toBe(201);
-    expect(created.body.feed.metaUrl).toMatch(/^https:\/\/brandthread\.app\/api\/v1\/public\/feeds\/[A-Za-z0-9_-]{43}\/meta\.csv$/);
+    expect(new URL(created.body.feed.metaUrl).origin).toBe(getWebOrigin());
+    expect(new URL(created.body.feed.metaUrl).pathname).toMatch(/^\/api\/v1\/public\/feeds\/[A-Za-z0-9_-]{43}\/meta\.csv$/);
     expect(created.body.feed.tiktokUrl).toBe(created.body.feed.metaUrl.replace("meta.csv", "tiktok.csv"));
 
     const again = await call(app.base, "POST", "/api/seller/product-feed", seller);
@@ -115,7 +118,7 @@ describe("public feed CSV", () => {
     expect(lines[1]).toContain(`,${listed.productId},`);
     expect(lines[1]).toContain("29.99 USD");
     expect(lines[1]).toContain("19.99 USD");
-    expect(lines[1]).toContain(`https://brandthread.app/store/product/${listed.productId}`);
+    expect(lines[1]).toContain(`${getWebOrigin()}/store/product/${listed.productId}`);
     expect(lines[1]).toContain("in stock");
     for (const hidden of [draft, deleted, foreign, noImage]) expect(res.text).not.toContain(hidden.productId);
     expect(res.text).not.toContain(listed.sku);

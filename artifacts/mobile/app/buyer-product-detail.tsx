@@ -350,6 +350,7 @@ function ZoomableGalleryImage({ uri, brand, name, onOpen, onZoomChange, onLoupeC
   const savedTx = useSharedValue(0);
   const savedTy = useSharedValue(0);
   const [zoomed, setZoomedState] = useState(false);
+  const loupe = useGalleryLoupe({enabled: !zoomed, onActiveChange: onLoupeChange});
 
   const setZoomed = useCallback((next: boolean) => {
     setZoomedState(next);
@@ -617,7 +618,7 @@ function ProductGallery({ imageUris, accentColor, video, focusUri, brand, name }
                 ? (
                   <View style={[galleryStyles.thumbImage, galleryStyles.thumbVideo]}>
                     {slide.poster ? <CachedImage source={{ uri: slide.poster }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
-                    <Feather name="play" size={16} color={ON_DARK} />
+                    <AppIcon name="play" size={16} color={ON_DARK} />
                   </View>
                 )
                 : <CachedImage source={{ uri: slide.uri }} style={galleryStyles.thumbImage} contentFit="cover" />}

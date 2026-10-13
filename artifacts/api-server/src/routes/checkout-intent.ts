@@ -239,15 +239,18 @@ async function finishPricing(
   priced: PricedGroup[],
   plan: CartRewardPlan,
   shipping: CartShipping,
+  forReservation = false,
 ): Promise<PricedCartGroup[]> {
   const result: PricedCartGroup[] = [];
-  let firstOrderAvailable = await isFirstOrderDiscountEligible(payer.buyerId);
+  // Quotes omit an already-held offer. Payment attempts must instead reach
+  // the atomic claim and return 409, never silently charge the full price.
+  let firstOrderAvailable = await isFirstOrderDiscountEligible(payer.buyerId, forReservation);
   for (let index = 0; index < priced.length; index++) {
     let group = priced[index];
     const loyaltyCents = plan.loyaltyCents[index] ?? 0;
     const threadCashCents = plan.threadCashCents[index] ?? 0;
     const tax = await calculateGroupTax(stripe, group, shipping, loyaltyCents + threadCashCents);
-    const firstOrderDiscountCents = firstOrderAvailable && group.chargePlan.chargeModel === "transfer" && loyaltyCents === 0 && threadCashCents === 0
+    const firstOrderDiscountCents = firstOrderAvailable && group.chargePlan.chargeModel === "destination" && loyaltyCents === 0 && threadCashCents === 0
       ? firstOrderDiscountForGroup(group.subtotalCents - group.bundleDiscountCents - group.discountCents) : 0;
     if (firstOrderDiscountCents > 0) firstOrderAvailable = false;
     const fullTotalCents = group.subtotalCents - group.bundleDiscountCents + group.shippingCents - group.discountCents - loyaltyCents - threadCashCents + tax.taxCents - firstOrderDiscountCents;
@@ -562,7 +565,7 @@ export function createCheckoutIntentRouter(mode: CheckoutIntentMode): Router {
       if (payer.buyerId && (body.loyaltyToken || body.threadCashToken)) {
         ({ plan, held } = await reserveRewards(payer.buyerId, groups, body));
       }
-      priced = await finishPricing(stripe, payer, body.groups, groups, plan, shipping);
+      priced = await finishPricing(stripe, payer, body.groups, groups, plan, shipping, true);
     } catch (error) {
       if (payer.buyerId) await releaseHeld(payer.buyerId, held);
       if (sendError(res, error)) return;

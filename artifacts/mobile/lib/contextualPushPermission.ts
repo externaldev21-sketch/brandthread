@@ -21,8 +21,7 @@ const declinedKey = (userId: string) => `bt:push:preprompt-declined:v1:${userId}
 let prompting = false;
 
 type PushApi = {
-  push: { register: (body: { token: string; platform?: string; accountIds?: string[] }) => Promise<unknown> };
-  push: { register: (body: { token: string; platform?: string; timezone?: string }) => Promise<unknown> };
+  push: { register: (body: { token: string; platform?: string; accountIds?: string[]; timezone?: string }) => Promise<unknown> };
 };
 
 let signedInAccountIds: string[] = [];

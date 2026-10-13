@@ -36,7 +36,6 @@ export function Avatar({ uri, name, size = 40, style }: AvatarProps) {
     return (
       <CachedImage
         source={{ uri }}
-        onError={() => setFailed(true)}
         style={[dimension, style] as StyleProp<ImageStyle>}
         accessibilityLabel={name ? `${name}'s avatar` : 'Avatar'}
         onError={() => setFailedUri(uri)}

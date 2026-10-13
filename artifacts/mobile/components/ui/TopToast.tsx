@@ -15,6 +15,8 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { ELEVATION, FONT, SP } from '@/lib/theme';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 import { toastIconFor } from '@/lib/confirmationSheet';
+const TOAST_FOREGROUND = '#FFFFFF'; // theme-exempt: contrast on the shared dark toast surface
+
 
 export const TOAST_DURATION_MS = 2000;
 /** A toast with an action button (e.g. "Undo") stays long enough to tap it. */
@@ -99,7 +101,7 @@ export function TopToast({
         {thumbnailUri ? (
           <Image source={{ uri: thumbnailUri }} style={styles.thumb} accessible={false} />
         ) : (
-          <Icon name={leadIcon} size={16} color="#FFFFFF" />
+          <Icon name={leadIcon} size={16} color={TOAST_FOREGROUND} />
         )}
         <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={styles.message} numberOfLines={1}>{message}</Text>
         {hasAction ? (
@@ -122,7 +124,7 @@ const styles = StyleSheet.create({
     backgroundColor: ELEVATION.card,
   },
   thumb: { width: 24, height: 24, borderRadius: 4 },
-  message: { flexShrink: 1, color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },
-  action: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 15 },
+  message: { flexShrink: 1, color: TOAST_FOREGROUND, fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },
+  action: { color: TOAST_FOREGROUND, fontFamily: FONT.bold, fontSize: 15 },
   actionHit: { paddingLeft: SP.xs, minHeight: 32, justifyContent: 'center' },
 });

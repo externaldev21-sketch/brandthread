@@ -45,7 +45,8 @@ export type StickerContent = {
 };
 
 const FONT_STACK = "-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif";
-const INK = '#000000';
+const INK = '#000000'; // theme-exempt: fixed printed QR ink for scanner contrast
+const PAPER = '#FFFFFF'; // theme-exempt: physical sticker paper, not app chrome
 const CUT = '#BDBDBD';
 
 export function escapeXml(text: string): string {
@@ -99,7 +100,7 @@ export function stickerSvg(layoutId: StickerLayoutId, content: StickerContent, o
     const w = 105;
     const h = 148;
     const parts = [
-      `<rect x="0" y="0" width="${w}" height="${h}" fill="#FFFFFF"/>`,
+      `<rect x="0" y="0" width="${w}" height="${h}" fill="${PAPER}"/>`,
       cut ? `<rect x="0.5" y="0.5" width="${w - 1}" height="${h - 1}" fill="none" stroke="${CUT}" stroke-width="0.3"/>` : '',
       textEl(name, w / 2, 24, fitFont(name, 88, 9), 700),
       textEl('Scan to shop', w / 2, 35, 5.5, 500),
@@ -111,8 +112,8 @@ export function stickerSvg(layoutId: StickerLayoutId, content: StickerContent, o
 
   const round = layout.shape === 'round';
   const outline = round
-    ? `<circle cx="50" cy="50" r="49.6" fill="#FFFFFF"${cut ? ` stroke="${CUT}" stroke-width="0.4"` : ''}/>`
-    : `<rect x="0.4" y="0.4" width="99.2" height="99.2" rx="6" fill="#FFFFFF"${cut ? ` stroke="${CUT}" stroke-width="0.4"` : ''}/>`;
+    ? `<circle cx="50" cy="50" r="49.6" fill="${PAPER}"${cut ? ` stroke="${CUT}" stroke-width="0.4"` : ''}/>`
+    : `<rect x="0.4" y="0.4" width="99.2" height="99.2" rx="6" fill="${PAPER}"${cut ? ` stroke="${CUT}" stroke-width="0.4"` : ''}/>`;
   // Text widths stay inside the circle's chord at each line's height, and the
   // code keeps about four modules of white around it (the QR quiet zone).
   const parts = [

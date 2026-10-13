@@ -25,6 +25,15 @@ import type { FeedPlatform } from "../lib/productFeed/feed";
 export const sellerProductFeedRouter = Router();
 sellerProductFeedRouter.use(requireAuth);
 sellerProductFeedRouter.use(requirePermission("marketing"));
+// Catalog integrations remain off until explicitly enabled after provider setup.
+const productFeedsEnabled = () => process.env.PRODUCT_FEEDS_ENABLED === "1";
+sellerProductFeedRouter.use((_req, res, next) => {
+  if (!productFeedsEnabled()) {
+    res.status(503).json({ error: "Product feeds are not configured.", code: "PRODUCT_FEEDS_NOT_CONFIGURED" });
+    return;
+  }
+  next();
+});
 
 const store = (req: Request) => (req as any).clerkUserId as string;
 
@@ -65,6 +74,10 @@ sellerProductFeedRouter.post("/regenerate", async (req, res) => {
 });
 
 export const publicProductFeedRouter = Router();
+publicProductFeedRouter.use((_req, res, next) => {
+  if (!productFeedsEnabled()) { res.status(404).end(); return; }
+  next();
+});
 
 async function serveFeed(req: Request, res: Response, platform: FeedPlatform) {
   try {

@@ -102,11 +102,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: '#000000',
+    backgroundColor: '#000000', // theme-exempt: development-only high-contrast diagnostic overlay
     zIndex: 99999,
   },
   line: {
-    color: '#FFFFFF',
+    color: '#FFFFFF', // theme-exempt: development-only high-contrast diagnostic overlay
     fontFamily: FONT.medium,
     fontSize: 11,
     fontVariant: ['tabular-nums'],

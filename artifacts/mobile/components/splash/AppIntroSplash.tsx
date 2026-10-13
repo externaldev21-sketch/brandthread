@@ -21,7 +21,6 @@
  * always runs in parallel with the animation, never after it.
  */
 
-import { BG, ON_DARK } from '@/lib/theme';
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -47,6 +46,9 @@ import { DEFAULT_THEME, peekPersistedTheme, type AppThemePreset } from '@/contex
 import { consumeFirstLaunch } from '@/lib/introSplash';
 import { hapticLight } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
+const LAUNCH_FOREGROUND = '#FFFFFF'; // theme-exempt: brand launch logo on the fixed dark launch plane
+const LAUNCH_BACKGROUND = '#000000'; // theme-exempt: brand launch plane stays opaque before account theme restoration
+
 
 const LOGO_BOX = 132;
 const SWEEP_WIDTH = LOGO_BOX * 0.9;
@@ -280,7 +282,7 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
       {children}
       <Animated.View
         // Always black, like the native splash — not the persisted theme tint.
-        style={[styles.overlay, { backgroundColor: BG }, overlayStyle]}
+        style={[styles.overlay, { backgroundColor: LAUNCH_BACKGROUND }, overlayStyle]}
         pointerEvents="auto"
       >
         {isFirstLaunch && !reducedMotion && (
@@ -307,7 +309,7 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
             <BrandthreadLogo size={LOGO_BOX} tintColor={theme.accentLight} opacity={0.5} />
           </Animated.View>
           <Animated.View style={logoStyle}>
-            <BrandthreadLogo size={LOGO_BOX} tintColor={ON_DARK} />
+            <BrandthreadLogo size={LOGO_BOX} tintColor={LAUNCH_FOREGROUND} />
           </Animated.View>
           {(phase === 'shine' || phase === 'hold' || phase === 'wordmark' || phase === 'reveal') &&
             !reducedMotion && (

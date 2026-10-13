@@ -78,12 +78,13 @@ const hasKeptPaidOrder = (buyerId: string) => sql`EXISTS (
  * priced: the flag is on, they have no kept paid order, and the discount is
  * not already applied or held by another unfinished checkout.
  */
-export async function isFirstOrderDiscountEligible(buyerId: string | null | undefined): Promise<boolean> {
+export async function isFirstOrderDiscountEligible(buyerId: string | null | undefined, forReservation = false): Promise<boolean> {
   if (!buyerId) return false;
   if (!(await isFeatureEnabled(FIRST_ORDER_DISCOUNT_FLAG))) return false;
   const [row] = rows<{ blocked: boolean }>(await db.execute(sql`
     SELECT (
-      EXISTS (SELECT 1 FROM first_order_discounts f WHERE f.buyer_id = ${buyerId} AND f.status IN ('reserved', 'applied'))
+      EXISTS (SELECT 1 FROM first_order_discounts f WHERE f.buyer_id = ${buyerId}
+        AND (f.status = 'applied' OR (${!forReservation} AND f.status = 'reserved')))
       OR ${hasKeptPaidOrder(buyerId)}
     ) AS blocked
   `));

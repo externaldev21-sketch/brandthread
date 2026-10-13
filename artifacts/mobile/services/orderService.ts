@@ -658,6 +658,7 @@ export interface BuyerOrderItemApiRow {
 
 /** GET /api/buyer/orders(/:id) row (only the fields read here). */
 export interface BuyerOrderApiRow {
+  buyerCancelDeadline?: string | null;
   id: string;
   orderNumber: string;
   ownerId?: string | null;

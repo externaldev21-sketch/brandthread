@@ -9,13 +9,14 @@ CREATE TABLE IF NOT EXISTS seller_locations (
   address                TEXT,
   city                   TEXT,
   state                  TEXT,
-  country                TEXT DEFAULT 'US',
+  country                TEXT NOT NULL DEFAULT 'US',
   zip                    TEXT,
   phone                  TEXT,
   is_active              BOOLEAN NOT NULL DEFAULT TRUE,
   is_primary             BOOLEAN NOT NULL DEFAULT FALSE,
   fulfills_online_orders BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at             TIMESTAMP NOT NULL DEFAULT now()
+  created_at             TIMESTAMP NOT NULL DEFAULT now(),
+  updated_at             TIMESTAMP NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS seller_locations_owner_idx ON seller_locations (owner_id);
 

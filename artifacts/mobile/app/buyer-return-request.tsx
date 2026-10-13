@@ -185,7 +185,7 @@ export default function BuyerReturnRequestScreen() {
 
   async function handleSubmit() {
     setAttempted(true);
-    if (!order || reasonMissing || descriptionMissing || submitting) return;
+    if (!order || reasonMissing || submitting) return;
     setSubmitting(true);
     setSubmitError(null);
     try {

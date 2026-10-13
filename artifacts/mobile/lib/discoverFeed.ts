@@ -145,6 +145,7 @@ interface FriendActivityRow {
 
 /** One friend suggestion row (`getFriendSuggestions`), only the fields read here. */
 interface FriendSuggestionRow {
+  mutualCount?: number | null;
   userId: string;
   name: string;
   handle?: string | null;
@@ -157,6 +158,10 @@ interface FriendSuggestionRow {
 
 /** One row of `api.publicDrops.list()` (only the fields read here). */
 interface PublicDropRow {
+  seller?: {brandName?: string | null; displayName?: string | null} | null;
+  heroImageUrl?: string | null;
+  products?: {images?: string[] | null}[] | null;
+  isLive?: boolean | null;
   id: string;
   name?: string | null;
   title?: string | null;

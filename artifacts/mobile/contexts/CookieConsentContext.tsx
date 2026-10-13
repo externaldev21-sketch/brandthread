@@ -152,7 +152,7 @@ function ConsentCard({ visible, onAllowAll, onOnlyNecessary, onSettings }: {
 
   const slide = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
   if (!mounted) return null;
-  const surface = theme.card === '#000000' ? RAISED_SURFACE : theme.card;
+  const surface = theme.card === '#000000' ? RAISED_SURFACE : theme.card; // theme-exempt: comparison detects the monochrome preset; rendered colors still come from the theme
 
   return (
     // A full-screen, touch-through layer: the card floats; nothing below moves.

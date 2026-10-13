@@ -76,8 +76,8 @@ export function InterestTileGrid({
                 <CachedImage source={{ uri: photo }} style={StyleSheet.absoluteFill} contentFit="cover" recyclingKey={photo} />
               ) : null}
               {isOn ? (
-                <View style={styles.check}>
-                  <Feather name="check" size={14} color="#000000" />
+                <View style={[styles.check, {backgroundColor: theme.text}]}>
+                  <Feather name="check" size={14} color={theme.background} />
                 </View>
               ) : null}
             </View>
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   check: {
     position: 'absolute', top: 6, right: 6,
     width: 22, height: 22, borderRadius: 11,
-    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   label: { marginTop: 6, textAlign: 'center' },
 });

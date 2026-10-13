@@ -50,7 +50,7 @@ export async function creditReferralCash(
       amountCents: input.amountCents,
       source: "referral",
       referenceId: input.inviteeId,
-      note: input.role === "invitee" ? "Referral welcome credit — your first order" : "Referral reward — friend's first order",
+      note: input.role === "invitee" ? "Referral welcome credit" : "Referral reward — friend's first order",
       idempotencyKey: referralIdempotencyKey(input.inviteeId, input.role),
     })
     .onConflictDoNothing()
@@ -129,8 +129,25 @@ export async function applyReferralCode(input: {
       note: "Referral bonus — friend joined",
     }, tx);
 
-    // Nothing credited yet: the welcome credit is paid with the first order.
-    return { inviteeRewardCents: 0 };
+    try {
+      await assertThreadCashNotFrozen(tx, inviteeId);
+      await reserveRewardsBudget(tx, REFERRAL_INVITEE_REWARD_CENTS, new Date());
+    } catch (err) {
+      if (err instanceof ThreadCashError) return {inviteeRewardCents: 0};
+      throw err;
+    }
+    const entryId = await creditReferralCash(tx, {
+      buyerId: inviteeId,
+      inviteeId,
+      role: "invitee",
+      amountCents: REFERRAL_INVITEE_REWARD_CENTS,
+    });
+    if (entryId) {
+      await tx.update(referrals)
+        .set({ inviteeRewardCents: REFERRAL_INVITEE_REWARD_CENTS, inviteeRewardEntryId: entryId })
+        .where(eq(referrals.id, created.id));
+    }
+    return { inviteeRewardCents: entryId ? REFERRAL_INVITEE_REWARD_CENTS : 0 };
   });
 
   if (!applied) return { ok: false, status: 409, error: "Referral already recorded.", code: "ALREADY_APPLIED" };
@@ -197,27 +214,6 @@ export async function qualifyReferralForOrder(orderId: string): Promise<QualifyR
     if (decision.action === "skip") return { rewarded: false, reason: decision.reason };
 
     const now = new Date();
-    // The friend's welcome credit is paid with this first paid order too,
-    // even when the inviter has hit the cap. Both credits draw on the month's
-    // rewards budget; when it is spent the referral stays pending.
-    const inviterCents = decision.action === "reward" ? decision.amountCents : 0;
-    try {
-      await reserveRewardsBudget(tx, REFERRAL_INVITEE_REWARD_CENTS + inviterCents, now);
-    } catch (err) {
-      if (err instanceof ThreadCashError) return { rewarded: false, reason: "budget_exhausted" };
-      throw err;
-    }
-    const inviteeEntryId = await creditReferralCash(tx, {
-      buyerId: inviteeId,
-      inviteeId,
-      role: "invitee",
-      amountCents: REFERRAL_INVITEE_REWARD_CENTS,
-    });
-    if (inviteeEntryId) {
-      await tx.update(referrals)
-        .set({ inviteeRewardCents: REFERRAL_INVITEE_REWARD_CENTS, inviteeRewardEntryId: inviteeEntryId })
-        .where(eq(referrals.id, referral.id));
-    }
 
     if (decision.action === "cap") {
       await tx.update(referrals)
@@ -226,6 +222,12 @@ export async function qualifyReferralForOrder(orderId: string): Promise<QualifyR
       return { rewarded: false, reason: "capped" };
     }
 
+    try {
+      await reserveRewardsBudget(tx, decision.amountCents, now);
+    } catch (err) {
+      if (err instanceof ThreadCashError) return {rewarded: false, reason: "budget_exhausted"};
+      throw err;
+    }
     const entryId = await creditReferralCash(tx, {
       buyerId: referral.inviterId,
       inviteeId,

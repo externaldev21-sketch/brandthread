@@ -1,3 +1,4 @@
+import {getWebOrigin} from "../../lib/webOrigin";
 /**
  * Pop-up QR sticker link: one find-or-create tracked store link per seller
  * (utm_source=popup, utm_medium=qr) whose /api/l/:code scans redirect to the
@@ -80,7 +81,7 @@ describe("pop-up QR sticker link", () => {
       label: "Pop-up QR sticker", destinationType: "store", utmSource: "popup", utmMedium: "qr", utmCampaign: "qr-sticker",
       username, storeName: "Northline Studio", clicks: 0,
     });
-    expect(a.body.qrUrl).toBe(`https://brandthread.app/api/l/${a.body.code}`);
+    expect(a.body.qrUrl).toBe(`${getWebOrigin()}/api/l/${a.body.code}`);
     const rows = await db.select().from(trackedLinks).where(eq(trackedLinks.sellerId, seller));
     expect(rows).toHaveLength(1);
   });
@@ -90,7 +91,7 @@ describe("pop-up QR sticker link", () => {
     const scan = await fetch(`${base}/api/l/${body.code}`, { redirect: "manual", headers: { "user-agent": CHROME } });
     expect(scan.status).toBe(302);
     const to = new URL(scan.headers.get("location")!);
-    expect(to.pathname).toBe(`/u/${username}`);
+    expect(to.pathname).toBe(`/@${username}`);
     expect(to.searchParams.get("utm_source")).toBe("popup");
     expect(to.searchParams.get("utm_medium")).toBe("qr");
     expect((await post(seller)).body.clicks).toBe(1);

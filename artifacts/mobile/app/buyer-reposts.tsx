@@ -19,6 +19,8 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi, type MyRepost } from '@/lib/api';
 import { profileVideosHref } from '@/lib/profileNavigation';
 import { FONT, FS, SP } from '@/lib/theme';
+const MEDIA_FOREGROUND = '#FFFFFF'; // theme-exempt: foreground on authored video covers
+
 
 const COLUMNS = 3;
 const GAP = 2;
@@ -119,7 +121,7 @@ export default function BuyerReposts() {
                 ? <CachedImage source={{ uri: item.thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
                 : null}
               {item.mediaType === 'video' ? (
-                <Icon name="play" size={14} color="#FFFFFF" style={styles.badge} />
+                <Icon name="play" size={14} color={MEDIA_FOREGROUND} style={styles.badge} />
               ) : null}
               <Text numberOfLines={1} style={styles.author}>{item.authorName}</Text>
             </Pressable>
@@ -139,10 +141,10 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   center: { flex: 1 },
   tile: { backgroundColor: theme.surface, overflow: 'hidden', justifyContent: 'flex-end' },
   // theme-exempt: white glyph/label with a shadow over the cover photo
-  badge: { position: 'absolute', top: SP.xs + 2, right: SP.xs + 2, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 3 },
+  badge: { position: 'absolute', top: SP.xs + 2, right: SP.xs + 2, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 3 }, // theme-exempt: shadow for white labels on authored video covers
   author: {
-    color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.xs, paddingHorizontal: SP.xs + 2, paddingBottom: SP.xs + 2,
-    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+    color: MEDIA_FOREGROUND, fontFamily: FONT.semibold, fontSize: FS.xs, paddingHorizontal: SP.xs + 2, paddingBottom: SP.xs + 2,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3, // theme-exempt: shadow for white labels on authored video covers
   },
   footer: { paddingVertical: SP.lg },
 });

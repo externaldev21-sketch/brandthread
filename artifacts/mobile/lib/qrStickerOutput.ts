@@ -51,7 +51,7 @@ async function svgToPngDataUrl(svg: string, widthPx: number, heightPx: number): 
     canvas.height = heightPx;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('canvas unavailable');
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = '#FFFFFF'; // theme-exempt: white paper backing in the exported QR bitmap
     ctx.fillRect(0, 0, widthPx, heightPx);
     ctx.drawImage(img, 0, 0, widthPx, heightPx);
     return canvas.toDataURL('image/png');

@@ -23,7 +23,7 @@ function demoReveals(orderId: string): MysteryBoxRevealItem[] {
   if (new URLSearchParams(window.location.search).get('mystery') !== '1') return [];
   return [{
     orderItemId: 'preview-mystery-1', unitIndex: 0, boxName: 'Mystery box', variantId: 'preview-mystery-v1',
-    productId: null, name: 'Washed Logo Tee', size: 'M', color: 'Black', image: null,
+    productId: null, name: 'Washed Logo Tee', size: 'M', color: 'Black', image: null, // theme-exempt: product-variant color metadata, not a UI color
   }];
 }
 

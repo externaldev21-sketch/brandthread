@@ -8,6 +8,8 @@ import React from 'react';
 import type { StyleProp, TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+const MEDIA_FOREGROUND = '#FFFFFF'; // theme-exempt: white glyph only on authored photo/video; app chrome uses active theme
+
 
 export const VERIFIED_BADGE_SIZE = 14;
 
@@ -17,7 +19,7 @@ export function VerifiedBadge({ onMedia = false, style }: { onMedia?: boolean; s
     <Ionicons
       name="checkmark-circle"
       size={VERIFIED_BADGE_SIZE}
-      color={onMedia ? '#FFFFFF' /* theme-exempt: on photo/video */ : colors.foreground}
+      color={onMedia ? MEDIA_FOREGROUND : colors.foreground}
       accessibilityLabel="Verified"
       style={style}
     />

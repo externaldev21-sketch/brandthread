@@ -425,7 +425,7 @@ export function getPreviewActivitySuggestedPeople(): PreviewSuggestedPerson[] {
       handle: `@${person.name.toLowerCase().replace(/\s+/g, '')}`,
       initials: person.initials,
       color: pickAvatarColor(person.userId),
-      avatarUrl: posterUri(person.poster),
+      avatarUrl: undefined,
       reason: person.reason,
       isFollowing: false,
     }));

@@ -46,7 +46,7 @@ vi.mock("../../threadCash/wallet", async (importOriginal) => ({
   isFeatureEnabled: async (key: string) => key === "firstOrderPlatformDiscount" ? flags.firstOrder : false,
 }));
 
-import { db, checkoutSessions, firstOrderDiscounts, orders } from "@workspace/db";
+import { db, checkoutSessions, firstOrderDiscounts, orders, shippingRates } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { fake } from "./fakeStripe";
 import { handleCartPaymentSucceeded } from "../../../routes/webhooks";
@@ -93,6 +93,8 @@ const quote = (buyer: string, groups: Groups) =>
 
 async function cart(tag: string, priceCents = 4_000) {
   const seller = await seedSeller(tag);
+  // This suite measures the platform discount independently of shipping.
+  await db.insert(shippingRates).values({id: uid("free-shipping"), sellerId: seller, flatRateCents: 0});
   const buyer = await seedBuyer(tag);
   const product = await seedProduct(seller, { priceCents, stock: 10 });
   const groups: Groups = [{ items: [{ variantId: product.variantId, productId: product.productId, quantity: 1 }] }];

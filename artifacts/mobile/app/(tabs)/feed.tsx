@@ -145,7 +145,7 @@ import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 
 import { PollCard } from '@/components/social/PollCard';
-import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer-feed/ShopSideTab';
+import { ShopTagPill } from '@/components/buyer-feed/ShopSideTab';
 
 import { LongPressMenu, type NotInterestedReason } from '@/components/buyer-feed/LongPressMenu';
 
@@ -248,7 +248,6 @@ function servedAgainExcept(activeId: string | null): Set<string> {
   if (activeId) ids.delete(activeId.replace(/__loop\d+$/, ''));
   return ids;
 }
-const CAPTION_BOTTOM_GAP = 10;
 /** Double-tap heart glyph size (pt). */
 const HEART_BURST_SIZE = 110;
 /** How many posts ahead of the visible one get their images warmed (item 90). */
@@ -1702,7 +1701,7 @@ function SpotlightPageImpl({
   // Shop tag pill's shared expand/collapse state — see ShopSideTab.tsx's
   // module comment for why this is lifted up here (its backdrop and its
   // visual pill render in two different places below).
-  const shopTagPillState = useShopTagPill(isActive);
+
   // Product tag waits ~1s after the video starts (polish #138), so the
   // first thing on screen is the video, then the thing to buy. The seller
   // name and caption stay static (#150).
@@ -1990,12 +1989,6 @@ function SpotlightPageImpl({
           "tap outside collapses it" backdrop stays here — it has to cover
           the whole video, not just the small caption-stack box the pill
           itself renders inside. */}
-      {!!item.productTags?.length && (
-        <ShopTagBackdrop
-          visible={shopTagPillState.expanded}
-          onPress={shopTagPillState.collapse}
-        />
-      )}
 
       {/* ─ Right action rail (components/buyer-feed/RightActionRail) ─
           bottom: bottomClearance + RAIL_BOTTOM_GAP, not bare bottomClearance
@@ -2120,7 +2113,6 @@ function SpotlightPageImpl({
               tag={item.productTags[0]}
               extraCount={Math.max(0, item.productTags.length - 1)}
               onPress={() => onShopTag(item, item.productTags![0])}
-              state={shopTagPillState}
               soldOut={tagSoldOut}
             />
           </Animated.View>

@@ -116,10 +116,10 @@ export function groupCornerRadii(
  *  corner on the last bubble of a group, white sent / #262628 received. */
 export const BUBBLE_RADIUS = 18;
 export const BUBBLE_TAIL_RADIUS = 4;
-export const SENT_BUBBLE = '#FFFFFF';
-export const SENT_BUBBLE_TEXT = '#000000';
+export const SENT_BUBBLE = '#FFFFFF'; // theme-exempt: default conversation palette data; conversation themes override these defaults
+export const SENT_BUBBLE_TEXT = '#000000'; // theme-exempt: default conversation palette data; conversation themes override these defaults
 export const RECEIVED_BUBBLE = '#262628';
-export const RECEIVED_BUBBLE_TEXT = '#FFFFFF';
+export const RECEIVED_BUBBLE_TEXT = '#FFFFFF'; // theme-exempt: default conversation palette data; conversation themes override these defaults
 
 export interface PreviewableMessage {
   text?: string | null;

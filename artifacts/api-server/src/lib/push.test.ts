@@ -117,7 +117,7 @@ describe("rich pushes, actions and badge", () => {
       to: "ExponentPushToken[a]",
       title: "New order!",
       body: "Order #1042 for $48.00 is ready to review.",
-      data: { type: "new_order_received", targetType: "order", targetId: "ord-1", imageUrl: IMAGE },
+      data: { type: "new_order_received", targetType: "order", targetId: "ord-1", orderId: "ord-1", imageUrl: IMAGE },
       sound: "order_received.wav",
       badge: 3,
       channelId: "orders",

@@ -103,13 +103,15 @@ describe('no stock or AI-generated people (item 47)', () => {
     expect(read('app/live-feed.tsx')).not.toMatch(/avatar: require\('\.\.\/assets\/videos\/fashion_runway/);
   });
   it('a real search never blends in the bundled sample posts or products', () => {
-    const search = read('app/buyer-search.tsx');
-    expect(search).toContain('(previewMode && trimmedQuery.length > 0 ? PREVIEW_VIDEOS');
-    expect(search).toContain('(previewMode && trimmedQuery.length > 0 && activeFilterCount === 0 ? PREVIEW_PRODUCTS');
+    expect(read('app/buyer-search.tsx')).toContain('Redirect');
+    const search = read('components/discover/search/useLiveSearch.ts');
+    expect(search).toContain('if (rows.length === 0 && isPreviewDemoMode()) rows = demoResults(term)');
+    expect(search).not.toContain('isBuyerDevPreview()');
   });
   it('release builds never download the sample runway clip', () => {
     const feed = read('app/(tabs)/feed.tsx');
     expect(feed).toContain('if (__DEV__ && FASHION_PREVIEW_POSTER_URIS[0])');
-    expect(feed).toContain('if (__DEV__ && FASHION_PREVIEW_VIDEO_URIS[0])');
+    // Remote clips stream only when a demo cell mounts; no launch download.
+    expect(feed).not.toContain('Asset.fromModule(FASHION_PREVIEW_VIDEO_SOURCES[0]');
   });
 });

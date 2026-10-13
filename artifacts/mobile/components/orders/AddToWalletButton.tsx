@@ -18,6 +18,8 @@ import { API_BASE_URL } from '@/lib/api';
 import { hapticError, hapticLight } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
+const WALLET_FOREGROUND = '#FFFFFF'; // theme-exempt: Apple Wallet brandmark foreground on its prescribed black badge
+
 
 let cachedEnabled: boolean | null = null;
 
@@ -66,10 +68,10 @@ export function AddToWalletButton({ orderId }: { orderId: string }) {
         testID="add-to-apple-wallet"
       >
         {busy ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color={WALLET_FOREGROUND} />
         ) : (
           <>
-            <Feather name="credit-card" size={20} color="#FFFFFF" />
+            <Feather name="credit-card" size={20} color={WALLET_FOREGROUND} />
             <Text style={styles.label}>Add to Apple Wallet</Text>
           </>
         )}

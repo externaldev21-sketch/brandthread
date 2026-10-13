@@ -26,6 +26,9 @@ vi.mock('@/hooks/useApi', () => ({ useApi: () => ({ buyer: { recentlyViewed: { l
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({ theme: { muted: 'muted', text: 'text', cardElevated: 'card' } }),
 }));
+vi.mock('@/components/ui/Icon', () => ({Icon: () => null}));
+vi.mock('@/components/media/ProductPhoto', () => ({ProductPhoto: () => null}));
+vi.mock('@/lib/detailPrefetch', () => ({prefetchProductOnPressIn: () => {}}));
 vi.mock('@/components/CachedImage', () => ({ CachedImage: () => null }));
 vi.mock('@/lib/money', () => ({ formatCents: (c: number) => `$${(c / 100).toFixed(2)}` }));
 vi.mock('@/lib/theme', () => ({ FONT: {}, FS: {}, SP: {}, RADIUS: {} }));

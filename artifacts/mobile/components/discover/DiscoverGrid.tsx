@@ -15,6 +15,7 @@ import React, { forwardRef, useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { TYPE_SCALE } from '@/constants/typography';
 import { SP } from '@/lib/theme';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { EditorialTile, TileRailSkeleton, type EditorialTileItem } from './EditorialTile';

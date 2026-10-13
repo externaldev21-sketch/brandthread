@@ -646,7 +646,8 @@ export function renderOrderReceiptText(input: OrderReceiptInput): string {
     "Thank you for your purchase!",
     "We're getting your order ready to be shipped. We will notify you when it has been sent.",
     "",
-    `View your order: ${input.orderUrl ?? ORDERS_URL}`,
+    `${input.orderId ? "Track order" : "View your order"}: ${input.orderUrl ?? (input.orderId ? orderDeepLink(input.orderId) : ORDERS_URL)}`,
+    ...(orderConfirmationDeliveryEstimate(input.delivery) ? [`Estimated delivery: ${orderConfirmationDeliveryEstimate(input.delivery)}`] : []),
     "",
     "Order summary",
   ];

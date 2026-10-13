@@ -6,6 +6,7 @@
  * No react-native imports, so it is unit-testable (tests/discover-masonry.test.ts).
  */
 import type { DiscoverPost } from '@/lib/discoverFeed';
+import type { SponsoredFeedItem } from '@/lib/feedAds';
 import type { GridRow } from '@/lib/discoverGridPacking';
 
 /** Tallest / widest a tile may get (width:height), so one pin never fills a screen. */
@@ -78,10 +79,11 @@ export function splitMasonryColumns<T>(items: T[], heightOf: (item: T) => number
   return out;
 }
 
+type MasonryRow = GridRow | { key: string; type: "sponsored"; item: SponsoredFeedItem };
 export type MasonrySection =
   | { key: string; type: 'trendingNow' }
   | { key: string; type: 'masonry'; posts: DiscoverPost[] }
-  | Exclude<GridRow, { type: 'normal' } | { type: 'feature' }>;
+  | Exclude<MasonryRow, { type: 'normal' } | { type: 'feature' }>;
 
 /**
  * Turns the Explore grid's rows (lib/discoverGridPacking.ts — which still
@@ -89,7 +91,7 @@ export type MasonrySection =
  * run of consecutive post rows becomes one 2-column block. "Trending now"
  * leads when there is trending data.
  */
-export function buildMasonrySections(rows: GridRow[], { trendingNow }: { trendingNow: boolean }): MasonrySection[] {
+export function buildMasonrySections(rows: MasonryRow[], { trendingNow }: { trendingNow: boolean }): MasonrySection[] {
   const sections: MasonrySection[] = trendingNow ? [{ key: 'trending-now', type: 'trendingNow' }] : [];
   let run: DiscoverPost[] = [];
   let runKey = '';

@@ -206,12 +206,12 @@ describe("referral program: give $5 / get $5 Thread Cash", () => {
     try {
       expect(await qualifyReferralForOrder(orderId)).toEqual({ rewarded: false, reason: "budget_exhausted" });
     } finally { broke(); }
-    expect(await balance(friendC)).toBe(0);
+    expect(await balance(friendC)).toBe(500); // Welcome credit was granted on join.
     const [pending] = await db.select().from(referrals).where(eq(referrals.inviteeId, friendC));
     expect(pending.status).toBe("pending");
 
     expect(await qualifyReferralForOrder(orderId)).toMatchObject({ rewarded: true });
-    expect(await balance(friendC)).toBe(1000);
-    expect(await balance(inviterId)).toBe(2000);
+    expect(await balance(friendC)).toBe(500); // Purchase must not grant it twice.
+    expect(await balance(inviterId)).toBe(1000);
   });
 });
