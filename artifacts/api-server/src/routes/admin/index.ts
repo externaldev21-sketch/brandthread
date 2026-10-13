@@ -23,6 +23,7 @@ import b2bRouter from "./b2b";
 import platformBalanceRouter from "./platformBalance";
 import shippingAdjustmentsRouter from "./shippingAdjustments";
 import metricsRouter from "./metrics";
+import killSwitchesRouter from "./killSwitches";
 
 const router = Router();
 router.use(requireAuth);
@@ -48,5 +49,6 @@ router.use(b2bRouter); // sample/bulk card refunds + B2B chargebacks
 router.use(platformBalanceRouter); // BT-062: payout schedule + balance vs seller_held
 router.use("/shipping-adjustments", shippingAdjustmentsRouter); // carrier surcharges charged back to the seller
 router.use(metricsRouter); // internal launch metrics
+router.use(killSwitchesRouter); // Live / Payments / AI kill switches
 
 export default router;
