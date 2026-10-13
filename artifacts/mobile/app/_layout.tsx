@@ -95,6 +95,7 @@ import { ActionSheetHost } from '@/components/ui/ActionSheet';
 import { showNotificationBanner } from '@/lib/notificationBannerBus';
 import { getNotifications as getFeedNotifications } from '@/services/socialService';
 import { syncNotificationBadge } from '@/lib/notificationBadge';
+import { registerNotificationCategories } from '@/lib/notificationCategories';
 import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
@@ -501,6 +502,9 @@ if (Platform.OS !== 'web') {
     handleNotification: async () =>
       ({ shouldShowAlert: false, shouldPlaySound: true, shouldSetBadge: true }) as any,
   });
+
+  // Action buttons (seller new-order push → "Ship now").
+  void registerNotificationCategories();
 
   // ─── Android notification channels ──────────────────────────────────────────
   if (Platform.OS === 'android') {
@@ -1271,7 +1275,9 @@ function RootLayoutNav() {
         // Refresh the in-app feed so the unread badge count picks up this
         // notification immediately rather than waiting for the feed screen
         // to be opened.
-        void getFeedNotifications().then(syncNotificationBadge).catch(() => {});
+        void getFeedNotifications()
+          .catch(() => {})
+          .then(() => syncNotificationBadge());
       },
     );
     void Notifications.getLastNotificationResponseAsync()

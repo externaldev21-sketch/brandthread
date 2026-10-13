@@ -16,6 +16,7 @@ import { db, users } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { channelView, parseChannelKey, channelPrefKey } from "../lib/notificationChannels";
+import { isValidTimeZone } from "../lib/push";
 
 const router = Router();
 router.use(requireAuth);
@@ -139,8 +140,8 @@ router.put("/", async (req, res) => {
       if (!bothUnset && (!isValidTimeOfDay(start) || !isValidTimeOfDay(end))) {
         return res.status(400).json({ error: "quietHours.start and quietHours.end must be \"HH:MM\" (or both null to disable)" });
       }
-      if (timezone !== undefined && typeof timezone !== "string") {
-        return res.status(400).json({ error: "quietHours.timezone must be a string" });
+      if (timezone !== undefined && !isValidTimeZone(timezone)) {
+        return res.status(400).json({ error: "quietHours.timezone must be an IANA time zone" });
       }
       quietHoursPatch = {
         start: bothUnset ? null : (start as string),

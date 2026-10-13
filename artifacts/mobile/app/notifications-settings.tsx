@@ -14,6 +14,7 @@ import { useColors } from '@/hooks/useColors';
 import { hapticToggle } from '@/lib/haptics';
 import { ListRow } from '@/components/ui';
 import { QuietHoursRow, type QuietHoursPreset } from '@/components/notifications/QuietHoursRow';
+import { quietHoursBody } from '@/lib/deviceTimeZone';
 import { Card } from '@/components/ui/Card';
 import { SPACING } from '@/constants/spacing';
 
@@ -105,7 +106,7 @@ export default function NotificationsSettingsScreen() {
     setQuietHours({ start: preset.start, end: preset.end });
     try {
       await api.notificationPrefs.update({
-        quietHours: preset.start && preset.end ? { start: preset.start, end: preset.end } : null,
+        quietHours: quietHoursBody(preset.start, preset.end),
       });
     } catch {
       setQuietHours(prior);

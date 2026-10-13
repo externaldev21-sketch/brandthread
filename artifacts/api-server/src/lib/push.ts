@@ -30,6 +30,18 @@ export interface PushPayload {
   kind?: "transactional" | "promotional";
   /** The user asked for this exact push (e.g. a per-drop "notify me"). */
   explicitRequest?: boolean;
+  /**
+   * Product/target image shown in the expanded notification. Only https URLs
+   * are forwarded (see safePushImageUrl). Android renders it natively; iOS
+   * needs the Notification Service Extension (BT_IOS_RICH_PUSH=1 builds).
+   */
+  imageUrl?: string | null;
+  /**
+   * Notification category registered on the device with
+   * Notifications.setNotificationCategoryAsync — adds action buttons (e.g.
+   * "new_order" → "Ship now").
+   */
+  categoryId?: string;
 }
 
 export type NotificationEventType = "receipt" | "open" | "tap";
@@ -116,6 +128,42 @@ export interface ExpoPushMessage {
   sound: string | null;
   badge?: number;
   channelId?: string;
+  /** Expo push API: image shown in the expanded notification. */
+  richContent?: { image: string };
+  /** Expo push API (iOS): lets the Notification Service Extension attach the image. */
+  mutableContent?: boolean;
+  /** Expo push API: category id registered on the device (action buttons). */
+  categoryId?: string;
+}
+
+const MAX_PUSH_IMAGE_URL_LENGTH = 2048;
+/**
+ * The image URL is also mirrored into `data.imageUrl` so the iOS service
+ * extension can always find it, but only when short enough that the doubled
+ * URL cannot push the APNs payload past its 4 KB limit.
+ */
+const MAX_MIRRORED_IMAGE_URL_LENGTH = 1024;
+
+/** Only absolute https image URLs are forwarded to the device. */
+export function safePushImageUrl(url: string | null | undefined): string | undefined {
+  if (typeof url !== "string" || !url || url.length > MAX_PUSH_IMAGE_URL_LENGTH) return undefined;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && parsed.hostname ? parsed.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** True for an IANA timezone the server's Intl implementation recognises. */
+export function isValidTimeZone(value: unknown): value is string {
+  if (typeof value !== "string" || !value || value.length > 64) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function preferenceKey(accountType: string | null, category: PushEventCategory): string | null {
@@ -152,15 +200,31 @@ export function buildExpoPushMessages(
   tokens: { token: string }[],
   payload: PushPayload,
 ): ExpoPushMessage[] {
-  return tokens.map((token) => ({
-    to: token.token,
-    title: payload.title,
-    body: payload.body,
-    data: payload.data ?? {},
-    sound: payload.sound ?? "default",
-    badge: payload.badge,
-    channelId: payload.channelId,
-  }));
+  const image = safePushImageUrl(payload.imageUrl);
+  const badge = typeof payload.badge === "number" && Number.isFinite(payload.badge)
+    ? Math.max(0, Math.floor(payload.badge))
+    : undefined;
+  return tokens.map((token) => {
+    const message: ExpoPushMessage = {
+      to: token.token,
+      title: payload.title,
+      body: payload.body,
+      // The image URL is mirrored into data so the iOS service extension can
+      // find it regardless of how Expo nests richContent in the APNs payload.
+      data: image && image.length <= MAX_MIRRORED_IMAGE_URL_LENGTH
+        ? { ...(payload.data ?? {}), imageUrl: image }
+        : (payload.data ?? {}),
+      sound: payload.sound ?? "default",
+      badge,
+      channelId: payload.channelId,
+    };
+    if (image) {
+      message.richContent = { image };
+      message.mutableContent = true;
+    }
+    if (payload.categoryId) message.categoryId = payload.categoryId;
+    return message;
+  });
 }
 
 /** Keep stable-ID retries limited to token deliveries that are not sent. */

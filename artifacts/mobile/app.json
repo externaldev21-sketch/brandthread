@@ -436,6 +436,7 @@
       ],
       "./plugins/with-sentry-upload-guard",
       "./plugins/with-upload-live-activity",
+      "./plugins/with-rich-push-service",
       [
         "@stripe/stripe-react-native",
         {

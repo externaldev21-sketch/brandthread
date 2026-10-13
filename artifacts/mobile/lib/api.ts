@@ -1575,7 +1575,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       },
     },
     push: {
-      register:   (body: { token: string; platform?: string }) =>
+      register:   (body: { token: string; platform?: string; timezone?: string }) =>
         post<{ ok: boolean }>('/api/push/register', body),
       deregister: (token: string) =>
         request<{ ok: boolean }>(

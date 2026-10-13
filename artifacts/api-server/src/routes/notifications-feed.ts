@@ -21,6 +21,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
 import {
   normalizePushEventCategory,
+  safePushImageUrl,
   sendPushToUser,
   type PushEventCategory,
 } from "../lib/push";
@@ -275,23 +276,46 @@ buyerRouter.get("/actors", async (req, res) => {
  * changes on every new event (read/dismiss don't touch it), so the client
  * can tell "count changed" apart from "something new arrived" if it wants to.
  */
+/**
+ * Unread, unmuted feed rows — the bell badge, GET /unread-count and the app
+ * icon badge every push carries all use this one count.
+ */
+export async function countUnreadFeedNotifications(userId: string): Promise<number> {
+  const [countRow] = await db.select({ count: sql<number>`cast(count(*) as int)` })
+    .from(notificationsFeed)
+    .where(and(
+      eq(notificationsFeed.userId, userId),
+      eq(notificationsFeed.isRead, false),
+      eq(notificationsFeed.isMuted, false),
+    ));
+  return countRow?.count ?? 0;
+}
+
+/** Badge for a push; undefined (badge left unchanged) if the count is unavailable. */
+async function pushBadgeFor(userId: string): Promise<number | undefined> {
+  try {
+    return await countUnreadFeedNotifications(userId);
+  } catch (err) {
+    logger.warn({ err }, "Unread count unavailable for push badge");
+    return undefined;
+  }
+}
+
+/** Feed thumbnails may be private object paths; push only gets a signed https URL. */
+async function pushImageFor(n: PublishInput): Promise<string | undefined> {
+  return safePushImageUrl(await resolveTargetImage(n.targetImageUrl ?? null));
+}
+
 buyerRouter.get("/unread-count", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const [[countRow], [latestRow]] = await Promise.all([
-    db.select({ count: sql<number>`cast(count(*) as int)` })
-      .from(notificationsFeed)
-      .where(and(
-        eq(notificationsFeed.userId, userId),
-        eq(notificationsFeed.isRead, false),
-        eq(notificationsFeed.isMuted, false),
-      )),
+  const [count, [latestRow]] = await Promise.all([
+    countUnreadFeedNotifications(userId),
     db.select({ id: notificationsFeed.id })
       .from(notificationsFeed)
       .where(eq(notificationsFeed.userId, userId))
       .orderBy(desc(notificationsFeed.createdAt), desc(notificationsFeed.id))
       .limit(1),
   ]);
-  const count = countRow?.count ?? 0;
   const etag = `"${count}-${latestRow?.id ?? "none"}"`;
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("ETag", etag);
@@ -347,6 +371,8 @@ type PublishInput = {
   pushKind?: "transactional" | "promotional";
   /** The recipient asked for this exact alert (e.g. per-drop "notify me"). */
   pushExplicitRequest?: boolean;
+  /** Device notification category (action buttons), e.g. "new_order" → Ship now. */
+  pushCategoryId?: string;
 };
 
 /** conversation_participants.muted_until in the future (Chat details > Mute). */
@@ -364,6 +390,7 @@ async function isConversationMutedFor(n: PublishInput): Promise<boolean> {
 
 async function sendFeedlessPush(n: PublishInput, pushCategory: PushEventCategory): Promise<void> {
   if (await isConversationMutedFor(n)) return;
+  const [badge, imageUrl] = await Promise.all([pushBadgeFor(n.userId), pushImageFor(n)]);
   await sendPushToUser(n.userId, {
     title: n.title,
     body: n.body ?? "",
@@ -379,6 +406,9 @@ async function sendFeedlessPush(n: PublishInput, pushCategory: PushEventCategory
     channelId: n.pushChannelId,
     kind: n.pushKind,
     explicitRequest: n.pushExplicitRequest,
+    badge,
+    imageUrl,
+    categoryId: n.pushCategoryId,
   }, pushCategory, n.analyticsOwnerId);
 }
 
@@ -438,6 +468,8 @@ export async function publishNotification(n: PublishInput): Promise<void> {
     // above is kept and unread state is unchanged.
     if (await isConversationMutedFor(n)) return;
 
+    // Exact app-icon badge: the recipient's unread count including this row.
+    const [badge, imageUrl] = await Promise.all([pushBadgeFor(n.userId), pushImageFor(n)]);
     await sendPushToUser(n.userId, {
       title: n.title,
       body: n.body ?? "",
@@ -454,6 +486,9 @@ export async function publishNotification(n: PublishInput): Promise<void> {
       channelId: n.pushChannelId,
       kind: n.pushKind,
       explicitRequest: n.pushExplicitRequest,
+      badge,
+      imageUrl,
+      categoryId: n.pushCategoryId,
     }, pushCategory, n.analyticsOwnerId);
   }
 }
