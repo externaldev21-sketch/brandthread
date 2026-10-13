@@ -183,9 +183,18 @@ export function creditToolPrices(): Array<{ tool: string; label: string; cost: n
 
 export type CreditPack = { id: string; credits: number; amountCents: number; label: string };
 
-/** Starter / Growth only. Prices are proposals (about 1.2 cents per credit, cheaper in bulk). */
+/**
+ * Starter / Growth only (about 1 cent per credit, cheaper in bulk).
+ *
+ * credits_500 is the $5 top-up, priced $4.99 rather than $5.00 because App
+ * Store and Play consumables can only use fixed price tiers ($4.99 is the
+ * USD tier, there is no $5.00 one). Web Stripe charges the same $4.99 so a
+ * seller sees one price everywhere. Its store product
+ * (brandthread_ai_credits_500) must be set to the $4.99 tier in App Store
+ * Connect and Play Console. The larger packs' prices are still proposals.
+ */
 export const CREDIT_PACKS: CreditPack[] = [
-  { id: "credits_500",  credits: 500,  amountCents: 599,  label: "500 credits" },
+  { id: "credits_500",  credits: 500,  amountCents: 499,  label: "500 credits" },
   { id: "credits_1500", credits: 1500, amountCents: 1499, label: "1,500 credits" },
   { id: "credits_5000", credits: 5000, amountCents: 4499, label: "5,000 credits" },
 ];

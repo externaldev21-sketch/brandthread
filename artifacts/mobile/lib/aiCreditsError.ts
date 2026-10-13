@@ -1,11 +1,13 @@
 /**
  * Recognises the AI credit gate's refusals (server: lib/aiCredits/gate.ts):
- *   402 insufficient_credits  -> send the user to the AI credits screen
+ *   402 insufficient_credits  -> the AI credits screen, leading with the one-tap top-up
  *   429 user_daily_cap        -> standard alert
  *   503 global_daily_cap      -> standard alert
  * The classifier is pure; `surfaceAiCreditsError` does the navigation/alert
  * and is called once from the central request helper in lib/api.ts.
  */
+
+import { OUT_OF_CREDITS_ROUTE } from './aiCredits';
 
 export type AiCreditsErrorKind = 'insufficient_credits' | 'user_daily_cap' | 'global_daily_cap';
 
@@ -43,7 +45,7 @@ export function surfaceAiCreditsError(kind: AiCreditsErrorKind, now = Date.now()
   try {
     if (kind === 'insufficient_credits') {
       const { router } = require('expo-router') as typeof import('expo-router');
-      router.push('/ai-credits' as never);
+      router.push(OUT_OF_CREDITS_ROUTE as never);
       return;
     }
     const { Alert } = require('react-native') as typeof import('react-native');

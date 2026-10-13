@@ -21,6 +21,7 @@ import { FONT, FS, SP, RADIUS, COMP, ICON, FILL_ELEVATED, TEXT_DISABLED } from '
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, EmptyState, FormInput, StatusBadge } from '@/components/BrandthreadUI';
 
 import { useApi } from '@/lib/api';
+import { useProductLimitSheet } from '@/components/products/ProductLimitSheet';
 
 import { useColors } from '@/hooks/useColors';
 
@@ -61,6 +62,7 @@ export default function ProductImportScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const productLimit = useProductLimitSheet();
 
   const [selectedMethod, setSelectedMethod] = useState<'csv' | 'shopify' | 'manual' | null>(null);
 
@@ -148,6 +150,8 @@ export default function ProductImportScreen() {
       setPublished(null);
       void loadProviders();
     } catch (error) {
+      // Nothing was imported because the plan is full: close the review and show what unlocks.
+      if (productLimit.showFor(error)) { setReviewOpen(false); return; }
       setReviewError(messageOf(error));
     } finally {
       setReviewBusy(false);
@@ -227,7 +231,8 @@ export default function ProductImportScreen() {
         ],
       );
     } catch (e: any) {
-      Alert.alert('Import failed', e?.message ?? 'Try again.');
+      if (productLimit.showFor(e)) return;
+      Alert.alert('Error', e?.message ?? 'Import failed. Please try again.');
     } finally {
       setImporting(false);
     }
@@ -470,6 +475,7 @@ export default function ProductImportScreen() {
         publishing={publishingImport}
         published={published}
       />
+      {productLimit.sheet}
     </View>
   );
 }

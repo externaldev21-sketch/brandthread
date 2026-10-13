@@ -32,9 +32,10 @@ import { tabularType, TABULAR_NUMS } from '@/constants/typography';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isPreviewDemoMode, isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { useRevenueCat } from '@/lib/revenueCat';
+import { useCreditPackPurchase } from '@/hooks/useCreditPackPurchase';
 import { invalidateAiCredits } from '@/hooks/useAiCredits';
 import {
-  STORE_PRODUCT_FOR_PACK, buildCreditsReturnUrl, entryLabel, formatDelta, formatPackPrice, formatResetDate,
+  STORE_PRODUCT_FOR_PACK, entryLabel, formatDelta, formatPackPrice, formatResetDate, leadsWithTopUp, topUpPack,
   type AiCreditEntry, type AiCreditsOverview,
 } from '@/lib/aiCredits';
 import { crispPx } from '@/lib/crispPixel';
@@ -46,7 +47,7 @@ const DEMO_TOOLS = [
   { tool: 'bg_remove', label: 'Remove background', cost: 2 },
 ];
 const DEMO_PACKS = [
-  { id: 'credits_500', credits: 500, amountCents: 599, label: '500 credits' },
+  { id: 'credits_500', credits: 500, amountCents: 499, label: '500 credits' },
   { id: 'credits_1500', credits: 1500, amountCents: 1499, label: '1,500 credits' },
   { id: 'credits_5000', credits: 5000, amountCents: 4499, label: '5,000 credits' },
 ];
@@ -83,7 +84,8 @@ export default function AiCreditsScreen() {
   const api = useApi();
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const rc = useRevenueCat();
-  const params = useLocalSearchParams<{ paymentReturn?: string; checkout_session_id?: string; demoPlan?: string }>();
+  const params = useLocalSearchParams<{ paymentReturn?: string; checkout_session_id?: string; demoPlan?: string; reason?: string }>();
+  const purchase = useCreditPackPurchase();
 
   const demo = isPreviewDemoMode() && (isBuyerDevPreview() || isSellerDevPreview());
   const live = !!isSignedIn;
@@ -98,7 +100,6 @@ export default function AiCreditsScreen() {
   const [loadError, setLoadError] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [selected, setSelected] = useState<string>(POPULAR_PACK_ID);
-  const [buying, setBuying] = useState(false);
   const [storePrices, setStorePrices] = useState<Record<string, string>>({});
   const returnHandled = useRef(false);
 
@@ -124,7 +125,7 @@ export default function AiCreditsScreen() {
   useEffect(() => { void load(); }, [load]);
 
   const native = Platform.OS !== 'web';
-  const canBuy = !!overview && overview.packs.length > 0 && (native ? rc.available : overview.purchase.stripe);
+  const canBuy = purchase.canBuy(overview);
 
   // Store prices (native) so the list shows what the store will charge.
   const productIds = useMemo(() => overview?.packs.map((p) => STORE_PRODUCT_FOR_PACK[p.id]).filter(Boolean) as string[] | undefined, [overview]);
@@ -165,35 +166,16 @@ export default function AiCreditsScreen() {
     if (id) void verify(id);
   }, [params.paymentReturn, params.checkout_session_id, live, router, verify]);
 
-  async function buy() {
-    const pack = overview?.packs.find((p) => p.id === selected);
-    if (!pack || buying || demo) return;
-    setBuying(true);
-    try {
-      if (native) {
-        const before = overview?.balance ?? 0;
-        await rc.purchaseCreditPack(STORE_PRODUCT_FOR_PACK[pack.id]!);
-        // RevenueCat's webhook credits the pack; poll briefly for it to land.
-        for (let i = 0; i < 8; i += 1) {
-          await new Promise((r) => setTimeout(r, 1500));
-          const o = await api.aiCredits.get();
-          if ((o.balance ?? 0) > before) break;
-        }
-        invalidateAiCredits();
-        await load();
-        return;
-      }
-      const returnUrl = buildCreditsReturnUrl(window.location.origin);
-      const { url } = await api.aiCredits.checkout(pack.id, returnUrl);
-      if (!url) throw new Error('no url');
-      window.location.assign(url);
-    } catch (e: any) {
-      const cancelled = e?.userCancelled === true || /cancel/i.test(String(e?.message ?? ''));
-      if (!cancelled) Alert.alert('Purchase failed', 'Try again.');
-    } finally {
-      setBuying(false);
-    }
+  async function buy(packId: string = selected) {
+    const pack = overview?.packs.find((p) => p.id === packId);
+    if (!pack || purchase.buyingId || demo) return;
+    const result = await purchase.buyPack(pack, overview?.balance ?? 0);
+    if (result === 'purchased') await load();
   }
+
+  const topUp = topUpPack(overview);
+  const priceFor = (pack: { id: string; amountCents: number }) =>
+    (native && storePrices[STORE_PRODUCT_FOR_PACK[pack.id] ?? '']) || formatPackPrice(pack.amountCents);
 
   const tools = overview?.tools ?? [];
 
@@ -236,6 +218,19 @@ export default function AiCreditsScreen() {
               <Text style={[styles.balance, tabularType('display')]} testID="ai-credits-balance">
                 {(overview.balance ?? 0).toLocaleString('en-US')}
               </Text>
+              {topUp && canBuy && leadsWithTopUp(overview, params.reason) ? (
+                <View style={{ marginTop: SP.md }}>
+                  <Button
+                    label={`Top up ${priceFor(topUp)}`}
+                    onPress={() => void buy(topUp.id)}
+                    loading={purchase.buyingId === topUp.id}
+                    accessibilityLabel={`Top up ${topUp.credits.toLocaleString('en-US')} credits for ${priceFor(topUp)}`}
+                    fullWidth
+                    testID="ai-credits-top-up"
+                  />
+                  <Text style={styles.footnote}>{topUp.credits.toLocaleString('en-US')} credits, one-time payment</Text>
+                </View>
+              ) : null}
               {overview.monthlyAllowance || (overview.purchasedBalance ?? 0) > 0 || overview.packs.length > 0 ? (
               <View style={styles.card}>
                 {overview.monthlyAllowance ? (
@@ -265,7 +260,7 @@ export default function AiCreditsScreen() {
               <Text style={styles.sectionTitle}>Get more credits</Text>
               {overview.packs.map((pack) => {
                 const on = pack.id === selected;
-                const price = (native && storePrices[STORE_PRODUCT_FOR_PACK[pack.id] ?? '']) || formatPackPrice(pack.amountCents);
+                const price = priceFor(pack);
                 return (
                   <Pressable
                     key={pack.id}
@@ -285,7 +280,7 @@ export default function AiCreditsScreen() {
                 );
               })}
               <View style={{ marginTop: SP.sm }}>
-                <Button label="Confirm purchase" onPress={() => void buy()} loading={buying} fullWidth />
+                <Button label="Confirm purchase" onPress={() => void buy()} loading={purchase.buyingId === selected} fullWidth />
               </View>
               <Text style={styles.footnote}>One-time payment. No subscription.</Text>
             </>

@@ -86,6 +86,8 @@ describe("AI tool rules", () => {
 describe("credit packs", () => {
   it("offers three packs to Starter and Growth only (Pro unchanged)", () => {
     expect(CREDIT_PACKS.map((p) => p.credits)).toEqual([500, 1500, 5000]);
+    // The entry pack is the $5 top-up at the $4.99 App Store tier; web charges the same.
+    expect(CREDIT_PACKS.map((p) => [p.id, p.amountCents])).toEqual([["credits_500", 499], ["credits_1500", 1499], ["credits_5000", 4499]]);
     expect(packsForPlan("starter")).toHaveLength(3);
     expect(packsForPlan("growth")).toHaveLength(3);
     expect(packsForPlan("pro")).toEqual([]);

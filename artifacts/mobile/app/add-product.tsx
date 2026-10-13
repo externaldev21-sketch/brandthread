@@ -52,6 +52,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { Button } from '@/components/ui/Button';
 
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
+import { useProductLimitSheet } from '@/components/products/ProductLimitSheet';
 
 import { openShareStoreSheet } from '@/lib/shareStoreSheet';
 
@@ -275,6 +276,7 @@ export default function AddProductScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const variantsSectionY = useRef<number | null>(null);
   const pendingSectionScroll = useRef(params.section === 'variants');
+  const productLimit = useProductLimitSheet();
 
   const [draftData, setDraftData] = useState<Partial<Product>>({
     name: '',
@@ -1010,6 +1012,7 @@ export default function AddProductScreen() {
         }
         return;
       }
+      if (productLimit.showFor(err)) return;
       const planLimit = getEntitlementRejection(err);
       if (planLimit) {
         setPublishError(planLimit.message);
@@ -2646,6 +2649,8 @@ export default function AddProductScreen() {
         </ScrollView>
         {renderStepFooter()}
       </KeyboardAvoidingView>
+
+      {productLimit.sheet}
 
       <SuccessSheet
         visible={!!publishSuccess}

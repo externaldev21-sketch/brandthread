@@ -99,6 +99,15 @@ describe("pack checkout", () => {
     expect(r.body.url).toContain("checkout.stripe.com");
   });
 
+  it("charges $4.99 for the 500-credit top-up (App Store tier, same on web)", async () => {
+    const r = await call("POST", "/api/ai/credits/packs/credits_500/checkout", { user: userA, body: { returnUrl: okReturn } });
+    expect(r.status).toBe(200);
+    expect(stripeState.lastCreate.line_items[0].price_data.unit_amount).toBe(499);
+    expect(stripeState.sessions.get(r.body.sessionId).amount_total).toBe(499);
+    const [row] = await db.select().from(aiCreditPurchases).where(inArray(aiCreditPurchases.stripeCheckoutSessionId, [r.body.sessionId]));
+    expect(row).toMatchObject({ packId: "credits_500", credits: 500, amountCents: 499 });
+  });
+
   it("rejects unknown packs and non-allowlisted return URLs", async () => {
     expect((await call("POST", "/api/ai/credits/packs/credits_nope/checkout", { user: userA, body: { returnUrl: okReturn } })).status).toBe(404);
     expect((await call("POST", "/api/ai/credits/packs/credits_500/checkout", { user: userA, body: { returnUrl: "https://evil.example/ai-credits?paymentReturn=1" } })).status).toBe(400);
@@ -160,6 +169,20 @@ describe("verify", () => {
     const r = await call("POST", "/api/ai/credits/purchases/verify", { user: userA, body: { sessionId: s.id } });
     expect(r.status).toBe(403);
     expect(r.body.code).toBe("amount_mismatch");
+  });
+
+  it("still credits a session opened at the old $5.99 price and paid after the change", async () => {
+    const { fulfilCreditCheckoutSession } = await import("../../lib/aiCredits/purchases");
+    const id = `cs_test_old_price_${tag}`;
+    await db.insert(aiCreditPurchases).values({
+      clerkUserId: userB, packId: "credits_500", credits: 500, amountCents: 599, stripeCheckoutSessionId: id, status: "pending_payment",
+    });
+    const before = await balance(userB);
+    const session = { id, metadata: { kind: "ai_credits", packId: "credits_500", clerkUserId: userB }, payment_status: "paid", amount_total: 599, currency: "usd" } as any;
+    expect(await fulfilCreditCheckoutSession(session)).toMatchObject({ ok: true, granted: true, credits: 500 });
+    expect(await balance(userB)).toBe(before + 500);
+    // An amount that matches neither the catalogue nor the recorded session is still refused.
+    expect(await fulfilCreditCheckoutSession({ ...session, id: `cs_test_unknown_${tag}`, amount_total: 599 })).toMatchObject({ ok: false, code: "amount_mismatch" });
   });
 
   it("webhook fulfilment is idempotent", async () => {
