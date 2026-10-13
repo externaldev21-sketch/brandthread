@@ -289,9 +289,48 @@ pnpm run update:production -- --message "Fix checkout total rounding"
 ```
 
 Options: `--platform ios` or `--platform android` to update one platform
-only, and `--rollout 10` to send it to 10% of users first. Watch the crash
-rate in Sentry, then raise it with `eas update:edit --rollout-percentage 100`
-(or roll back).
+only, and `--rollout 10` to send it to 10% of users first.
+
+### Staged rollout: 10% → 50% → 100%
+
+Every production update goes out in three steps. Each step moves forward only
+if crash-free sessions for that release are **at least 99.8%** over at least
+500 sessions:
+
+```powershell
+cd artifacts\mobile
+pnpm run update:production -- --message "Fix checkout total rounding" --rollout 10
+# copy the update group ID it prints; wait about a day, then:
+pnpm run release:gate -- --release "com.brandthread.mobile@1.0.0+42" --group <group-id> --current 10 --advance
+# wait about a day again, then:
+pnpm run release:gate -- --release "com.brandthread.mobile@1.0.0+42" --group <group-id> --current 50 --advance
+```
+
+The `--release` value is the release name shown in Sentry → **Releases**.
+
+| Gate result | Exit code | What to do |
+| --- | --- | --- |
+| ✔ passed | 0 | With `--advance` the rollout is raised to the next step. Without it, nothing changes. |
+| ✖ below 99.8% | 1 | Stop. Run `pnpm run update:rollback`, then fix forward. |
+| ● not enough data, or Sentry not set up | 2 | Wait and check again. The rollout stays where it is. |
+
+The gate needs `SENTRY_AUTH_TOKEN` (scopes `org:read`, `project:read`),
+`SENTRY_ORG`, `SENTRY_PROJECT` and `SENTRY_PROJECT_ID` (the numeric ID under
+Sentry → Project Settings → General). Without them it never raises a rollout.
+Options: `--target 99.8`, `--min-sessions 500`, `--period 24h`.
+
+**Store builds** follow the same steps with each store's own controls:
+
+- **App Store:** in App Store Connect → the version → *Phased Release for
+  Automatic Updates*. Apple's phased release runs over 7 days and can be
+  paused for up to 30 days. Pause it if the gate fails for that build's
+  release.
+- **Google Play:** Play Console → *Production* → *Create release*, staged
+  rollout at 10%, then *Update rollout* to 50% and 100% once the gate passes.
+  *Halt rollout* stops it.
+
+Before any build is submitted, go through
+[pre-launch-qa-checklist.md](pre-launch-qa-checklist.md) on all five devices.
 
 Updates appear on expo.dev → Project → **Updates**, with how many phones
 have downloaded each one.

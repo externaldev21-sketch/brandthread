@@ -1,0 +1,12 @@
+# Maestro end-to-end suite: sign-up, buy, sell, ship, refund (polish #246).
+# Run: maestro test .maestro/flows   (see .maestro/README.md)
+flows:
+  - "flows/*.yaml"
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - sign-up
+    - buy
+    - sell
+    - ship
+    - refund

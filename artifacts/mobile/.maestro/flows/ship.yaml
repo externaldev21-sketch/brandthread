@@ -1,0 +1,16 @@
+# Ship: the seller adds tracking by hand and marks the order shipped.
+# ORDER_ID_TO_SHIP is a paid, unshipped order in the seller's store.
+appId: com.brandthread.mobile
+name: ship
+---
+- openLink: brandthread://fulfill-order?orderId=${ORDER_ID_TO_SHIP}&step=3
+- extendedWaitUntil:
+    visible: "Ship it"
+    timeout: 20000
+- tapOn: "Enter tracking manually instead"
+- tapOn: "Tracking number"
+- inputText: "9400111899223197428490"
+- hideKeyboard
+- tapOn: "Continue"
+- tapOn: "Mark as Shipped"
+- assertNotVisible: "Mark as Shipped"

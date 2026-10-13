@@ -1,0 +1,29 @@
+# Sell: create a listing with a photo and save it.
+# Needs a signed-in seller. addMedia puts a photo in the simulator library.
+appId: com.brandthread.mobile
+name: sell
+---
+- addMedia:
+    - "../media/listing-photo.png"
+- openLink: brandthread://add-product
+- extendedWaitUntil:
+    visible:
+      id: add-product-add-photos
+    timeout: 20000
+- tapOn:
+    id: add-product-add-photos
+# First photo in the system picker.
+- tapOn:
+    point: "20%,25%"
+- runFlow:
+    when:
+      visible: "Add"
+    commands:
+      - tapOn: "Add"
+- tapOn: "e.g. Vintage Washed Tee"
+- inputText: "E2E Washed Tee ${MAESTRO_RUN_ID}"
+- hideKeyboard
+- tapOn:
+    id: add-product-save
+- assertNotVisible:
+    id: add-product-publish-error

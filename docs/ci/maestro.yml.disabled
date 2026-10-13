@@ -1,0 +1,49 @@
+# End-to-end tests (Maestro) for sign-up, buy, sell, ship and refund.
+# Manual only: Actions → "Maestro e2e" → Run workflow, with a link to a
+# simulator .app zip (iOS) or .apk (Android). Skips unless the repository has
+# the MAESTRO_CLOUD_API_KEY secret. See artifacts/mobile/.maestro/README.md.
+name: Maestro e2e
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: "Download link for a simulator .app zip or an .apk (e.g. from an EAS build)"
+        required: true
+      app_file_name:
+        description: "File name to save it as (ends in .zip for iOS, .apk for Android)"
+        required: true
+        default: "brandthread.zip"
+
+permissions:
+  contents: read
+
+jobs:
+  maestro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      MAESTRO_CLOUD_API_KEY: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
+    steps:
+      - name: Skip without a Maestro Cloud key
+        if: env.MAESTRO_CLOUD_API_KEY == ''
+        run: echo "::notice::MAESTRO_CLOUD_API_KEY is not set, so the e2e suite was skipped. See artifacts/mobile/.maestro/README.md."
+      - uses: actions/checkout@v4
+        if: env.MAESTRO_CLOUD_API_KEY != ''
+      - name: Download app build
+        if: env.MAESTRO_CLOUD_API_KEY != ''
+        env:
+          APP_URL: ${{ inputs.app_url }}
+          APP_FILE: ${{ inputs.app_file_name }}
+        run: curl -fsSL "$APP_URL" -o "$APP_FILE"
+      - uses: mobile-dev-inc/action-maestro-cloud@v1
+        if: env.MAESTRO_CLOUD_API_KEY != ''
+        with:
+          api-key: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
+          app-file: ${{ inputs.app_file_name }}
+          workspace: artifacts/mobile/.maestro
+          env: |
+            MAESTRO_RUN_ID=${{ github.run_id }}
+            PRODUCT_ID=${{ vars.E2E_PRODUCT_ID }}
+            ORDER_ID_TO_SHIP=${{ vars.E2E_ORDER_ID_TO_SHIP }}
+            ORDER_ID_TO_REFUND=${{ vars.E2E_ORDER_ID_TO_REFUND }}
