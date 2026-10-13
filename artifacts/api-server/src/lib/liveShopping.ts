@@ -69,3 +69,9 @@ export function purchaseText(productTitles: string[]): string {
   const first = titles[0].slice(0, 60);
   return titles.length === 1 ? `just bought ${first}` : `just bought ${first} and ${titles.length - 1} more`;
 }
+
+/** "sent $5 Thread Cash" — the gift as the buyer sent it. */
+export function giftText(grossCents: number): string {
+  const dollars = grossCents % 100 === 0 ? `$${grossCents / 100}` : `$${(grossCents / 100).toFixed(2)}`;
+  return `sent ${dollars} Thread Cash`;
+}

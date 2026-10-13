@@ -71,8 +71,8 @@ router.put("/:id/cohost/products", requireAuth, async (req, res) => {
       await tx.execute(sql`DELETE FROM live_cohost_products WHERE stream_id = ${id}::uuid AND cohost_id = ${userId}`);
       for (const productId of productIds) {
         await tx.execute(sql`
-          INSERT INTO live_cohost_products (stream_id, cohost_id, product_id)
-          VALUES (${id}::uuid, ${userId}, ${productId}::uuid)
+          INSERT INTO live_cohost_products (stream_id, cohost_id, product_id, created_at)
+          VALUES (${id}::uuid, ${userId}, ${productId}::uuid, clock_timestamp())
           ON CONFLICT DO NOTHING
         `);
       }

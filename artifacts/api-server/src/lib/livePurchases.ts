@@ -17,7 +17,7 @@ import { sql } from "drizzle-orm";
 import { broadcastToRoom } from "../ws/liveHub";
 import { logger } from "./logger";
 import { isSellerInLive } from "./liveBag";
-import { publicBuyerName, purchaseText } from "./liveShopping";
+import { giftText, publicBuyerName, purchaseText } from "./liveShopping";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -91,7 +91,7 @@ export async function listLiveActivity(streamId: string, since: Date): Promise<L
   const rows = await db.execute(sql`
     SELECT * FROM (
       SELECT 'purchase' AS kind, lso.id::text AS id, lso.announced_at AS at,
-             u.display_name, u.name, u.username, cs.items, NULL::int AS gross_cents
+             u.display_name, u.name, u.username, cs.items::jsonb AS items, NULL::int AS gross_cents
       FROM live_stream_orders lso
       JOIN checkout_sessions cs ON cs.id = lso.checkout_session_id
       LEFT JOIN users u ON u.clerk_id = lso.buyer_id
@@ -119,8 +119,4 @@ export async function listLiveActivity(streamId: string, since: Date): Promise<L
   });
 }
 
-/** "sent $5 Thread Cash" — the gift as the buyer sent it. */
-export function giftText(grossCents: number): string {
-  const dollars = grossCents % 100 === 0 ? `$${grossCents / 100}` : `$${(grossCents / 100).toFixed(2)}`;
-  return `sent ${dollars} Thread Cash`;
-}
+export { giftText };

@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
+  REPLAY_SHOPPABLE_DAYS,
   canViewReplay,
+  isReplayExpired,
+  replayExpiresAt,
   normalizeVisibility,
   replayDurationSeconds,
   shapeReplay,
@@ -20,6 +23,14 @@ const base: ReplayRow = {
   post_status: "published",
   post_moderation_status: "visible",
 };
+
+// The fixture live ended 2026-09-01; pin "now" to the day after so the
+// 7-day shoppable window doesn't make these rules depend on the real date.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-09-02T00:00:00.000Z"));
+});
+afterAll(() => { vi.useRealTimers(); });
 
 describe("canViewReplay", () => {
   it("shows a public replay to anyone, including signed-out visitors", () => {
@@ -79,5 +90,24 @@ describe("normalizeVisibility", () => {
     expect(normalizeVisibility("hidden")).toBe("hidden");
     expect(normalizeVisibility("private")).toBeNull();
     expect(normalizeVisibility(undefined)).toBeNull();
+  });
+});
+
+describe("7-day shoppable replays", () => {
+  it("expires REPLAY_SHOPPABLE_DAYS after the live ended", () => {
+    expect(REPLAY_SHOPPABLE_DAYS).toBe(7);
+    expect(replayExpiresAt(base)?.toISOString()).toBe("2026-09-08T10:30:00.000Z");
+    expect(isReplayExpired(base, new Date("2026-09-08T10:29:59.000Z"))).toBe(false);
+    expect(isReplayExpired(base, new Date("2026-09-08T10:30:00.000Z"))).toBe(true);
+    expect(replayExpiresAt({ ended_at: null })).toBeNull();
+  });
+
+  it("hides an expired replay from visitors but keeps it for the owner, marked expired", () => {
+    const later = new Date("2026-09-10T00:00:00.000Z");
+    expect(canViewReplay("buyer_1", base, { now: later })).toBe(false);
+    expect(canViewReplay(null, base, { now: later })).toBe(false);
+    expect(canViewReplay("seller_1", base, { now: later })).toBe(true);
+    expect(shapeReplay(base, "seller_1", later)).toMatchObject({ expired: true, expiresAt: "2026-09-08T10:30:00.000Z" });
+    expect(shapeReplay(base, "buyer_1")).toMatchObject({ expired: false });
   });
 });

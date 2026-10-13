@@ -929,7 +929,13 @@ export async function sendLiveGift(
       if (sentTodayFriends + sentTodayGifts + amountCents > config.dailySendCapCents) {
         throw new ThreadCashError("You've reached today's Thread Cash sending limit.", 400, "THREAD_CASH_DAILY_SEND_CAP");
       }
-      const receivedTodayBySeller = await liveGiftRollingWindowCents(tx, sellerId, "received");
+      // Gross gifts received: the net credits plus Brandthread's cut of them,
+      // so the platform fee never lets a seller take in more than the cap.
+      const [feesToday] = await tx
+        .select({ total: sql<string>`COALESCE(SUM(${liveGiftPlatformFees.feeCents}), 0)` })
+        .from(liveGiftPlatformFees)
+        .where(and(eq(liveGiftPlatformFees.sellerId, sellerId), gt(liveGiftPlatformFees.createdAt, sql`now() - interval '24 hours'`)));
+      const receivedTodayBySeller = await liveGiftRollingWindowCents(tx, sellerId, "received") + Number(feesToday?.total ?? 0);
       if (receivedTodayBySeller + amountCents > config.dailyReceiveCapCents) {
         throw new ThreadCashError("This seller has reached today's Thread Cash receiving limit.", 400, "THREAD_CASH_DAILY_RECEIVE_CAP");
       }
