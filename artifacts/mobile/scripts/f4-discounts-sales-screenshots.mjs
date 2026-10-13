@@ -108,6 +108,15 @@ async function go(page, activity, origin, path, ready) {
 }
 
 async function routes(context) {
+  // Keep the cached preview role out of localStorage for the whole run (see go()): the app
+  // re-saves it after auth sync, which would switch lib/api.ts back to "signed-out preview".
+  await context.addInitScript(() => {
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'user_role' && document.location.search.includes('bt_preview=signed-in')) return;
+      return set.call(this, key, value);
+    };
+  });
   await context.route(`${API}/**`, async (route) => {
     const request = route.request();
     if (request.method() === 'OPTIONS') return route.fallback();
@@ -143,7 +152,7 @@ async function discounts(browser, images, origin) {
   if (MODE === 'after') {
     await page.getByLabel('Limit total uses').click();
     await page.getByLabel('Limit uses per customer').click();
-    await page.getByLabel('Uses per customer').fill('2');
+    await page.getByLabel('Uses per customer', { exact: true }).fill('2');
     await toTop(page, 'Usage limits');
     await shot(page, '03-discount-usage-limits-on');
     await overflowCheck(page, 'usage-on');
@@ -174,6 +183,7 @@ async function discounts(browser, images, origin) {
   await page.getByLabel(/^Close Edit Discount Code/).click();
   await page.waitForTimeout(1200);
   if (MODE === 'after') {
+    if (process.env.F4_DEBUG) console.log('url before redemptions', await page.evaluate(() => location.href));
     await page.getByLabel('View redemptions for WELCOME15').click();
     await page.waitForTimeout(1500);
     await shot(page, '08-redemptions');
