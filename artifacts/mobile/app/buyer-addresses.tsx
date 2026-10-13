@@ -188,11 +188,11 @@ export default function BuyerAddressesScreen() {
             <View style={styles.form}>
               <View style={styles.field}>
                 <Text style={styles.label}>Label (e.g. Home, Office)</Text>
-                <TextInput value={label} onChangeText={setLabel} style={styles.input} placeholder="Label" placeholderTextColor={palette.mutedForeground} returnKeyType="next" />
+                <TextInput value={label} onChangeText={setLabel} style={styles.input} placeholder="Home" placeholderTextColor={palette.mutedForeground} returnKeyType="next" />
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Recipient name</Text>
-                <TextInput value={recipientName} onChangeText={setRecipientName} style={styles.input} placeholder="Full name" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="name" autoComplete="name" returnKeyType="next" />
+                <TextInput value={recipientName} onChangeText={setRecipientName} style={styles.input} placeholder="Maya Chen" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="name" autoComplete="name" returnKeyType="next" />
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Street address</Text>
@@ -205,17 +205,17 @@ export default function BuyerAddressesScreen() {
               <View style={styles.row}>
                 <View style={[styles.field, { flex: 1 }]}>
                   <Text style={styles.label}>City</Text>
-                  <TextInput value={city} onChangeText={setCity} style={styles.input} placeholder="City" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="addressCity" returnKeyType="next" />
+                  <TextInput value={city} onChangeText={setCity} style={styles.input} placeholder="Los Angeles" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="addressCity" returnKeyType="next" />
                 </View>
                 <View style={[styles.field, { flex: 1, marginLeft: SPACING.sm }]}>
                   <Text style={styles.label}>State / Province</Text>
-                  <TextInput value={state} onChangeText={setState} style={styles.input} placeholder="State" placeholderTextColor={palette.mutedForeground} autoCapitalize="characters" textContentType="addressState" returnKeyType="next" />
+                  <TextInput value={state} onChangeText={setState} style={styles.input} placeholder="CA" placeholderTextColor={palette.mutedForeground} autoCapitalize="characters" textContentType="addressState" returnKeyType="next" />
                 </View>
               </View>
               <View style={styles.row}>
                 <View style={[styles.field, { flex: 1 }]}>
                   <Text style={styles.label}>ZIP / Postal Code</Text>
-                  <TextInput value={postalCode} onChangeText={setPostalCode} style={styles.input} placeholder="ZIP" placeholderTextColor={palette.mutedForeground} keyboardType="number-pad" textContentType="postalCode" autoComplete="postal-code" returnKeyType="next" />
+                  <TextInput value={postalCode} onChangeText={setPostalCode} style={styles.input} placeholder="90012" placeholderTextColor={palette.mutedForeground} keyboardType="number-pad" textContentType="postalCode" autoComplete="postal-code" returnKeyType="next" />
                 </View>
                 <View style={[styles.field, { flex: 1, marginLeft: SPACING.sm }]}>
                   <Text style={styles.label}>Country</Text>

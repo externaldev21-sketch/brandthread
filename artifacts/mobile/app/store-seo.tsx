@@ -86,7 +86,7 @@ export default function StoreSEOScreen() {
               style={se.input}
               value={seo.homepageTitle}
               onChangeText={v => patch({ homepageTitle: v.slice(0, 60) })}
-              placeholder="Your Store – Shop Now"
+              placeholder="Desires – Washed black basics"
               placeholderTextColor={SUBTLE}
             />
           </View>
@@ -102,7 +102,7 @@ export default function StoreSEOScreen() {
               style={[se.input, se.multiline]}
               value={seo.homepageDescription}
               onChangeText={v => patch({ homepageDescription: v.slice(0, 160) })}
-              placeholder="Describe your store for search engines..."
+              placeholder="Heavyweight tees and washed denim from Los Angeles."
               placeholderTextColor={SUBTLE}
               multiline
               numberOfLines={3}
