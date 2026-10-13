@@ -46,6 +46,8 @@ const FEED = [
   { id: 'o1', category: 'orders', type: 'order_shipped', title: 'Your order has shipped', body: 'Order #1042 is on its way.', targetId: 'ord1', targetType: 'order', mins: 26 * 60 },
 ].map(({ mins, ...row }) => ({ isRead: true, isMuted: false, ...row, createdAt: iso(mins) }));
 
+let feedRows = FEED;
+
 async function installFakeFeed(context) {
   const norm = (pathname) => `/api${pathname.replace(/^\/api\/v1/, '').replace(/^\/api/, '')}`;
   const owns = (url) => url.origin === 'https://api.brandthread.test' && /^\/api\/buyer\/notifications(\/.*)?$/.test(norm(url.pathname));
@@ -62,7 +64,7 @@ async function installFakeFeed(context) {
     const url = new URL(req.url());
     const p = norm(url.pathname);
     if (p === '/api/buyer/notifications' && req.method() === 'GET') {
-      return json(Number(url.searchParams.get('offset') ?? 0) > 0 ? [] : FEED);
+      return json(Number(url.searchParams.get('offset') ?? 0) > 0 ? [] : feedRows);
     }
     if (p === '/api/buyer/notifications/unread-count') return json({ count: 0, latestId: 'f1' });
     return json({ ok: true });
@@ -98,6 +100,18 @@ async function main() {
     await settle();
     const orders = rows(await text());
     console.log(JSON.stringify({ prefix: args.prefix, labels, all, [args['money-chip']]: money, orders }));
+
+    // Nothing money-related loaded: the chip's own empty state, not a blank list.
+    feedRows = FEED.filter((row) => row.category === 'social' && row.type !== 'thread_cash_received');
+    for (let attempt = 1; ; attempt += 1) {
+      await openScreen(page, activity, origin, role, '/activity-center');
+      try { await page.getByText('Fola Reyes').first().waitFor({ timeout: 15_000 }); break; } catch (error) { if (attempt >= 3) throw error; }
+    }
+    await settle(900);
+    await page.getByTestId(`activity-chip-${args['money-chip']}`).click();
+    await settle();
+    await page.screenshot({ path: path.join(args.out, `${args.prefix}-chip-${args['money-chip'].replace('_', '-')}-empty.png`) });
+    console.log('empty state visible:', await page.getByTestId(`activity-empty-${args['money-chip']}`).isVisible());
     await context.close();
   } finally {
     await close();
