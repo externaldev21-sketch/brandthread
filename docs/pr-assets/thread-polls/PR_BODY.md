@@ -96,6 +96,9 @@ None. No external service and no keys. The feature is live for every Thread that
   - The batch endpoint only returns visible posts, enforces the 50-id cap, and cascade-deletes with the post.
 - `cd artifacts/mobile && pnpm exec vitest run tests/thread-polls.test.ts`: **11 passed**. Covers draft rules, the poll-length and time-left copy, the batched service calls, keeping the server's poll on "already voted", and attachPoll retry and reporting.
 - `pnpm run typecheck` in artifacts/api-server: 0 errors. `pnpm exec tsc -p tsconfig.json --noEmit` in artifacts/mobile: only the 2 errors that were already there (`lib/api-client-react/dist` not built). Nothing new.
+- Lints:
+  - `tests/no-hardcoded-theme-color-lint.test.ts` flags none of the new files. `PollCard` takes its overlay colours from `theme.text` / `theme.shadowColor` with alpha, not literal rgba. The lint's remaining failures are on 16 untracked files and 1 stale entry that already fail on dev.
+  - `a11y-icon-only-lint` reports `PostScreen.tsx: 1 unlabeled icon-only pressable`. That count is the same with dev's PostScreen (checked), so this PR didn't introduce it.
 - Screenshots: `node artifacts/mobile/scripts/f6-thread-polls-screenshots.mjs` at 390x844, output in `docs/pr-assets/thread-polls/ours/`. Each screenshot was checked by eye.
 
 ## Suggestions for Dev
