@@ -49,6 +49,7 @@ import {
   buyerCancellationEligibility,
 } from "../lib/buyerCancellationPolicy";
 import { consumeBuyerAddressListFailure } from "./release-test-control";
+import { AuctionError, recordAuctionCheckout, resolveAuctionLinePrice } from "../lib/liveAuctions";
 import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
 
 const router = Router();
@@ -416,6 +417,18 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
     }
     // Automatic sale price (lib/pricing/sales.ts) is what the buyer is charged.
     row.priceCents = (await effectiveUnitPrice({ productId: item.productId, sellerId: row.sellerId, priceCents: row.priceCents })).priceCents;
+    // Live auction: the winner's line is the winning price; a held piece can't be bought.
+    try {
+      const auctionLine = await resolveAuctionLinePrice({
+        buyerId, productId: item.productId, variantId: item.variantId, quantity: Number(item.quantity),
+        auctionId: typeof item.auctionId === "string" ? item.auctionId : null,
+      });
+      if (auctionLine) row.priceCents = auctionLine.priceCents;
+    } catch (err) {
+      if (!(err instanceof AuctionError)) throw err;
+      issues.push({ itemId, productName: row.productName, type: "unavailable", message: err.message, canContinue: false });
+      continue;
+    }
     sellerIds.add(row.sellerId);
     const quantity = Number(item.quantity);
     if (!Number.isInteger(quantity) || quantity < 1 || row.stock < quantity) {
@@ -571,6 +584,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     // can feed weight-tiered shipping zones without changing the shape of
     // the stored cart item snapshot.
     let cartWeightGrams = 0;
+    const auctionCheckoutIds: string[] = [];
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
@@ -618,6 +632,24 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       }
 
       row.priceCents = (await effectiveUnitPrice({ productId: item.productId, sellerId: row.sellerId, priceCents: row.priceCents })).priceCents;
+      // Live auction: the winner pays the winning price (never a client price);
+      // a piece that's in an auction or held for its winner can't be bought.
+      try {
+        const auctionLine = await resolveAuctionLinePrice({
+          buyerId, productId: item.productId, variantId: item.variantId, quantity: qty,
+          auctionId: typeof item.auctionId === "string" ? item.auctionId : null,
+        });
+        if (auctionLine) {
+          row.priceCents = auctionLine.priceCents;
+          auctionCheckoutIds.push(auctionLine.auctionId);
+        }
+      } catch (err) {
+        if (err instanceof AuctionError) {
+          res.status(err.status).json({ error: err.message, code: err.code });
+          return;
+        }
+        throw err;
+      }
       sellerIds.add(row.sellerId);
       if (sellerIds.size > 1) {
         res.status(400).json({
@@ -1123,6 +1155,8 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       );
       loyaltyReservation.reservationId = csId;
     }
+    // Live auction win: the paid order closes the auction (lib/liveAuctions.ts).
+    for (const auctionId of auctionCheckoutIds) await recordAuctionCheckout(csId, auctionId, buyerId);
     if (threadCashReservation) {
       await bindThreadCashRedemptionToCheckout(
         threadCashReservation.buyerId,

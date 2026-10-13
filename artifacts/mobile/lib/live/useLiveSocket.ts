@@ -41,6 +41,8 @@ export type LiveSocketEvent =
   | { type: 'user_banned'; userId: string }
   | { type: 'cohosts'; cohosts: any[] }
   | { type: 'cohost_removed'; userId: string }
+  // Live auctions (routes/live-auctions.ts, live_auctions flag)
+  | { type: 'auction_started' | 'auction_bid' | 'auction_ended'; auction: import('./liveAuction').LiveAuction }
   /** Synthesised client-side when the server closes this socket with 4003 (host banned this viewer). */
   | { type: 'removed' };
 
