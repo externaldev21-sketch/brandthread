@@ -176,7 +176,10 @@ export type QuoteGroup = {
   checkoutSessionId: string;
   subtotalCents: number;
   shippingCents: number;
+  /** All discounts on this group, seller bundles included. */
   discountCents: number;
+  /** Seller bundle ("Buy the set") part of discountCents, applied before any code. */
+  bundleDiscountCents?: number;
   taxCents: number;
   /** Covered by a store gift card; totalCents is what the card payment still covers. */
   giftCardCents?: number;
