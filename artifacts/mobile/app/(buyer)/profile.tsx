@@ -25,6 +25,8 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
+import { ProfileSongLine } from '@/components/profile/ProfileSongLine';
+import { useProfileMusicEnabled } from '@/hooks/useProfileMusic';
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { hapticLight, hapticMedium, hapticSelection, hapticDestructiveConfirm } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS, ICON, OVERLAY } from '@/lib/theme';
@@ -306,6 +308,7 @@ export default function ProfileScreen() {
   const barInset = useBuyerTabBarInset();
   const router  = useRouter();
   const { user } = useUser();
+  const profileMusicOn = useProfileMusicEnabled();
   const api     = useApi();
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -873,13 +876,15 @@ export default function ProfileScreen() {
         name={displayName}
         handle={displayHandle && displayHandle !== displayName ? displayHandle : null}
         chip={<ProfileChip label="Buyer" icon="user" />}
-        meta={(profile?.bio || profile?.website || profile?.location) ? (
+        meta={(profile?.bio || profile?.website || profile?.location || profileMusicOn) ? (
           <ProfileMeta
             bio={profile?.bio}
             website={profile?.website}
             location={profile?.location}
             onOpenWebsite={(url) => { void Linking.openURL(url); }}
-          />
+          >
+            <ProfileSongLine userId={user?.id} />
+          </ProfileMeta>
         ) : null}
         stats={stats}
         statsLoading={loading}

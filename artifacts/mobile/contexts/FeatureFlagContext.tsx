@@ -15,7 +15,8 @@ export type FeatureFlagKey =
   | 'oauthAppleEnabled'
   | 'hostedCheckoutFallback'
   | 'live_tips'
-  | 'autoCaptions';
+  | 'autoCaptions'
+  | 'profileMusic';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   aiPhotoShoot: true,
@@ -47,6 +48,10 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   // Auto captions (Whisper) on video posts. OFF until the server has the AI keys
   // and an operator flips it (PUT /api/feature-flags/autoCaptions).
   autoCaptions: false,
+  // Profile song. OFF until a licensed preview source is configured server-side
+  // (PROFILE_MUSIC_PROVIDER + APPLE_MUSIC_DEVELOPER_TOKEN) and an operator flips
+  // it (PUT /api/config/features/profileMusic). The server re-checks both.
+  profileMusic: false,
 };
 
 const STORAGE_KEY = 'bt:feature-flags:v1';
