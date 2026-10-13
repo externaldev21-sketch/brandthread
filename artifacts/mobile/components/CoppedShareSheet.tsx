@@ -112,7 +112,7 @@ export function CoppedShareSheet({ visible, data, onClose }: {
           accessibilityLabel={label}
           testID={`copped-share-${action}`}
         >
-          <View style={[styles.tileCircle, { backgroundColor: theme.cardElevated }]}>
+          <View style={[styles.tileCircle, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
             <Feather name={confirmed?.icon ?? icon} size={20} color={theme.text} />
           </View>
           <Text style={[styles.tileLabel, { color: theme.text }]} numberOfLines={1}>{confirmed?.label ?? label}</Text>
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
   tiles: { flexDirection: 'row', paddingHorizontal: SP.lg, marginTop: SP.lg },
   tileFlex: { flex: 1 },
   tile: { alignItems: 'center', gap: SP.xs },
-  tileCircle: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  tileCircle: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   tileLabel: { fontFamily: FONT.medium, fontSize: FS.xs },
   error: { fontFamily: FONT.medium, fontSize: FS.sm, textAlign: 'center', marginTop: SP.md, marginBottom: SP.md },
 });
