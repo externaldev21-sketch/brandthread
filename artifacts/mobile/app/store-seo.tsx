@@ -73,7 +73,7 @@ export default function StoreSEOScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={se.scroll}>
 
         {/* HOMEPAGE SEO */}
-        <SectionHeader title="HOMEPAGE SEO" style={se.sh} />
+        <SectionHeader title="HOMEPAGE" style={se.sh} />
         <BrandthreadCard style={se.card}>
           <View style={se.fieldRow}>
             <View style={se.labelRow}>
@@ -86,7 +86,7 @@ export default function StoreSEOScreen() {
               style={se.input}
               value={seo.homepageTitle}
               onChangeText={v => patch({ homepageTitle: v.slice(0, 60) })}
-              placeholder="Your Store – Shop Now"
+              placeholder="Desires – Washed black basics"
               placeholderTextColor={SUBTLE}
             />
           </View>
@@ -102,7 +102,7 @@ export default function StoreSEOScreen() {
               style={[se.input, se.multiline]}
               value={seo.homepageDescription}
               onChangeText={v => patch({ homepageDescription: v.slice(0, 160) })}
-              placeholder="Describe your store for search engines..."
+              placeholder="Heavyweight tees and washed denim from Los Angeles."
               placeholderTextColor={SUBTLE}
               multiline
               numberOfLines={3}
@@ -143,7 +143,7 @@ export default function StoreSEOScreen() {
         </BrandthreadCard>
 
         {/* GOOGLE PREVIEW */}
-        <SectionHeader title="GOOGLE PREVIEW" style={se.sh} />
+        <SectionHeader title="PREVIEW" style={se.sh} />
         <BrandthreadCard style={[se.card, { backgroundColor: SURFACE }]}>
           <Text style={se.previewTitle} numberOfLines={1}>
             {seo.homepageTitle || 'Your Store Name'}
@@ -187,7 +187,7 @@ export default function StoreSEOScreen() {
         </BrandthreadCard>
 
         {/* PRODUCT DEFAULTS */}
-        <SectionHeader title="PRODUCT DEFAULTS" style={se.sh} />
+        <SectionHeader title="PRODUCTS" style={se.sh} />
         <BrandthreadCard style={se.card}>
           <View style={se.fieldRow}>
             <Text style={se.fieldLabel}>Title Template</Text>
@@ -218,7 +218,7 @@ export default function StoreSEOScreen() {
         </BrandthreadCard>
 
         {/* COLLECTION DEFAULTS */}
-        <SectionHeader title="COLLECTION DEFAULTS" style={se.sh} />
+        <SectionHeader title="COLLECTIONS" style={se.sh} />
         <BrandthreadCard style={se.card}>
           <View style={se.fieldRow}>
             <Text style={se.fieldLabel}>Title Template</Text>

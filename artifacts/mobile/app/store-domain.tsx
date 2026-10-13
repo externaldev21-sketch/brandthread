@@ -150,7 +150,7 @@ export default function StoreDomainScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={dm.scroll}>
 
         {/* Brandthread Subdomain */}
-        <SectionHeader title="BRANDTHREAD SUBDOMAIN" style={dm.sh} />
+        <SectionHeader title="SUBDOMAIN" style={dm.sh} />
         {btDomain && (
           <BrandthreadCard style={dm.card}>
             <View style={dm.urlInputRow}>
@@ -176,7 +176,7 @@ export default function StoreDomainScreen() {
         )}
 
         {/* Custom Domains */}
-        <SectionHeader title="CUSTOM DOMAIN" style={dm.sh} />
+        <SectionHeader title="CUSTOM" style={dm.sh} />
         {customDomains.map(cd => (
           <BrandthreadCard key={cd.id} style={dm.card}>
             <View style={dm.domainRow}>

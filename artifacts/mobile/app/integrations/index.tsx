@@ -140,10 +140,6 @@ export default function IntegrationsScreen() {
       <ScreenHeader title="Integrations" />
       <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={s.section}>
-          <Text style={[s.sectionSubtitle, { color: colors.mutedForeground }]}>
-            Connect the tools you already use to run your brand — sales channels, marketing, and shipping in one place.
-          </Text>
-
           {loading ? (
             <View style={s.loadingRow}><ActivityIndicator color={colors.primary} /></View>
           ) : loadError ? (

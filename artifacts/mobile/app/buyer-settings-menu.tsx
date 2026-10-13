@@ -70,7 +70,7 @@ export default function BuyerSettingsMenuScreen() {
 
   const sections: MenuSection[] = useMemo(() => [
     {
-      title: 'Your account',
+      title: 'Account',
       rows: [
         { key: 'edit-profile', icon: 'edit-3', label: 'Edit profile', onPress: () => router.push('/(buyer)/edit-profile') },
         { key: 'share-profile', icon: 'share-2', label: 'Share profile', onPress: () => { hapticLight(); setShareSheetOpen(true); } },
