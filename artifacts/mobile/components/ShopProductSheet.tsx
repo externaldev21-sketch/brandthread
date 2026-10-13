@@ -34,6 +34,9 @@ import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useSheetTransition } from '@/components/ui/BottomSheet';
 import { CachedImage } from '@/components/CachedImage';
+import { PhotoViewer } from '@/components/media/PhotoViewer';
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 import { Avatar } from '@/components/ui/Avatar';
 import { profileHref } from '@/lib/profileNavigation';
 import { ProductReviewsSection, type ReviewsSeed } from '@/components/ProductReviewsSection';
@@ -1145,7 +1148,7 @@ export function ShopProductSheet({
                 details sit above the fold without scrolling. */}
             {/* Measured at Add-to-cart time: the flight lifts off this photo. */}
             <View ref={productPhotoRef} collapsable={false}>
-              <ProductImageCarousel imageUris={product.imageUris} />
+              <ProductImageCarousel imageUris={product.imageUris} brand={product.sellerName} name={product.name} />
             </View>
 
             {/* Product title/price row — the WHOLE row is the tap target to
@@ -1468,17 +1471,7 @@ function ProductHeader({
     >
       {showImage && (
         <View style={ss.productImageWrap}>
-          {imageUri ? (
-            <CachedImage
-              source={{ uri: imageUri }}
-              style={ss.productImage}
-              contentFit="cover"
-            />
-          ) : (
-            <View style={[ss.productImage, ss.productImagePlaceholder]}>
-              <Feather name="image" size={22} color={theme.subtle} />
-            </View>
-          )}
+          <ProductPhoto uri={imageUri} brand={product.sellerName} name={product.name} style={ss.productImage} />
           {product.isPreOrder && (
             <View style={ss.preOrderBadge}>
               <Text style={ss.preOrderText}>PRE</Text>
@@ -1598,12 +1591,8 @@ function ProductListRow({
             <View style={[ss.listRowThumb, ss.listRowThumbSkeleton]}>
               <ActivityIndicator size="small" color={theme.subtle} />
             </View>
-          ) : imageUri ? (
-            <CachedImage source={{ uri: imageUri }} style={ss.listRowThumb} contentFit="cover" />
           ) : (
-            <View style={[ss.listRowThumb, ss.listRowThumbSkeleton]}>
-              <Feather name="image" size={18} color={theme.subtle} />
-            </View>
+            <ProductPhoto uri={imageUri} brand={product?.sellerName} name={tag.productName} style={ss.listRowThumb} />
           )}
         </View>
         <View style={ss.listRowInfo}>
@@ -1646,68 +1635,22 @@ function ProductListRow({
   );
 }
 
-// ─── Full-screen image viewer — swipeable, tap/swipe-down to dismiss ────────
+// ─── Full-screen image viewer — the shared PhotoViewer (pinch-zoom, swipe
+// down to close, thumbnail strip; components/media/PhotoViewer.tsx) ─────────
 
 function FullScreenImageViewer({
   imageUris, startIndex, onClose,
 }: {
   imageUris: string[]; startIndex: number; onClose: () => void;
 }) {
-  const { theme } = useAppTheme();
-  const ss = useMemo(() => makeSheetStyles(theme), [theme]);
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const [index, setIndex] = useState(startIndex);
-  const scrollRef = useRef<ScrollView>(null);
-
-  return (
-    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
-      <View style={[ss.fullScreenWrap, { backgroundColor: '#000' }]}>
-        <ScrollView
-          ref={scrollRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          contentOffset={{ x: startIndex * windowWidth, y: 0 }}
-          onMomentumScrollEnd={e => {
-            const next = Math.round(e.nativeEvent.contentOffset.x / windowWidth);
-            setIndex(Math.max(0, Math.min(imageUris.length - 1, next)));
-          }}
-        >
-          {imageUris.map((uri, i) => (
-            <TouchableOpacity
-              key={`${uri}-${i}`}
-              activeOpacity={1}
-              onPress={onClose}
-              style={{ width: windowWidth, height: windowHeight }}
-              accessibilityRole="button"
-              accessibilityLabel="Close full-screen photo"
-            >
-              <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        <TouchableOpacity
-          onPress={onClose}
-          style={ss.fullScreenClose}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Close"
-        >
-          <Feather name="x" size={20} color={ON_DARK} />
-        </TouchableOpacity>
-        {imageUris.length > 1 && (
-          <View style={ss.fullScreenCounter} pointerEvents="none">
-            <Text style={ss.carouselCounterText}>{index + 1}/{imageUris.length}</Text>
-          </View>
-        )}
-      </View>
-    </Modal>
-  );
+  return <PhotoViewer visible images={imageUris} initialIndex={startIndex} onClose={onClose} />;
 }
 
-// ─── Product image carousel — full sheet-width 3:4, swipeable, dot indicator ──
+// ─── Product image carousel — full sheet-width 4:5, swipeable, dot indicator ──
 // Photo audit follow-up ("all these screens where you're swiping should be
 // 3x4 instead of 9x16, I don't like how it cuts off the image at all."):
-// always a fixed 3:4 portrait frame at the sheet's own width — never a
+// always a fixed 4:5 portrait frame (constants/media.ts; Dev's less-AI pass
+// moved every product photo from 3:4 to 4:5) at the sheet's own width — never a
 // near-square height cap — and `contentFit="contain"` rather than `cover`,
 // so a differently-shaped seller photo is letterboxed on `theme.
 // cardElevated` (visible, but never crops/cuts off real photo content)
@@ -1715,12 +1658,12 @@ function FullScreenImageViewer({
 // viewer for a closer look. Page dots only — no numeric "1/N" badge (item
 // 3); the full-screen viewer (a separate, immersive view) keeps its own.
 
-function ProductImageCarousel({ imageUris }: { imageUris: string[] }) {
+function ProductImageCarousel({ imageUris, brand, name }: { imageUris: string[]; brand?: string; name?: string }) {
   const { theme } = useAppTheme();
   const ss = useMemo(() => makeSheetStyles(theme), [theme]);
   const { width: windowWidth } = useWindowDimensions();
   const pageWidth = Math.min(windowWidth, 520);
-  const pageHeight = Math.round(pageWidth * (4 / 3)); // fixed 3:4 portrait, full sheet width
+  const pageHeight = productPhotoHeight(pageWidth); // fixed 4:5 portrait, full sheet width
   const [index, setIndex] = useState(0);
   const [fullScreen, setFullScreen] = useState(false);
   const images = imageUris.length > 0 ? imageUris : [''];
@@ -1728,13 +1671,7 @@ function ProductImageCarousel({ imageUris }: { imageUris: string[] }) {
   if (images.length === 1) {
     return (
       <View style={[ss.carouselWrap, { height: pageHeight }]}>
-        {images[0] ? (
-          <CachedImage source={{ uri: images[0] }} style={StyleSheet.absoluteFill} contentFit="contain" />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
-            <Feather name="image" size={28} color={theme.subtle} />
-          </View>
-        )}
+        <ProductPhoto uri={images[0]} brand={brand} name={name} style={StyleSheet.absoluteFill} contentFit="contain" />
       </View>
     );
   }
@@ -1760,13 +1697,7 @@ function ProductImageCarousel({ imageUris }: { imageUris: string[] }) {
           >
             {images.map((uri, i) => (
               <View key={`${uri}-${i}`} style={{ width: pageWidth, height: pageHeight }}>
-                {uri ? (
-                  <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
-                ) : (
-                  <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
-                    <Feather name="image" size={28} color={theme.subtle} />
-                  </View>
-                )}
+                <ProductPhoto uri={uri} brand={brand} name={name} style={StyleSheet.absoluteFill} contentFit="contain" />
               </View>
             ))}
           </ScrollView>
@@ -1968,7 +1899,7 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
   // shared parent (that's the plain View `listRow` is applied to at the
   // call site) — see the no-nested-pressables comment in ProductListRow.
   listRowBody: { flex: 1, flexDirection: 'row', gap: 12 },
-  listRowThumbWrap: { width: 72, height: 96, borderRadius: 10, overflow: 'hidden', backgroundColor: theme.cardElevated, flexShrink: 0 },
+  listRowThumbWrap: { width: 72, height: productPhotoHeight(72), borderRadius: 10, overflow: 'hidden', backgroundColor: theme.cardElevated, flexShrink: 0 },
   listRowThumb: { width: '100%', height: '100%' },
   listRowThumbSkeleton: { alignItems: 'center', justifyContent: 'center' },
   listRowInfo: { flex: 1, gap: 3, justifyContent: 'center' },
@@ -2041,7 +1972,7 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
   productImageWrap: { position: 'relative' },
   productImage: {
     width: 88,
-    height: 88 * 4 / 3, // 3:4 — matches how product photos are now saved
+    height: productPhotoHeight(88), // 4:5 — the one product photo frame
     borderRadius: RADIUS.md,
     backgroundColor: theme.cardElevated,
   },

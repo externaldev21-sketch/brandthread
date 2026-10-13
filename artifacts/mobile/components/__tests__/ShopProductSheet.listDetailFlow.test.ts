@@ -73,8 +73,8 @@ describe('LIST step rows: real per-product data, a compact sibling cart button, 
     expect(rowFn).toContain('style={[ss.listRowCartBtn,');
   });
 
-  it('no giant preview image in the list step — only a 72x96 thumbnail per row', () => {
-    expect(sheet).toContain('listRowThumbWrap: { width: 72, height: 96');
+  it('no giant preview image in the list step — only a 72-wide 4:5 thumbnail per row', () => {
+    expect(sheet).toContain('listRowThumbWrap: { width: 72, height: productPhotoHeight(72)');
   });
 
   it('opens at a real 55% height for the list step, draggable up to 90%', () => {

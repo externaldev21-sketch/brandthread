@@ -10,7 +10,7 @@
  * context rather than an aspect-ratio picker) and the story composer's 9:16
  * capture frame.
  *
- * Fixed `targetRatio` frame (3/4 for photos, 9/16 for stories/video covers)
+ * Fixed `targetRatio` frame (4/5 for product photos, 9/16 for stories/video covers)
  * — no aspect-ratio toggle. The creator pans (one-finger drag / mouse drag)
  * and pinch-zooms (two-finger / mouse wheel / the zoom slider on web) the
  * source image inside that frame. Minimum zoom always exactly fills the

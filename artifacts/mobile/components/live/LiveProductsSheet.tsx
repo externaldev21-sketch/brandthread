@@ -7,7 +7,8 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetRise } from '@/components/motion/SheetRise';
-import { CachedImage } from '@/components/CachedImage';
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
@@ -82,7 +83,7 @@ export function LiveProductsSheet({
               <View key={p.productId} style={[styles.row, { borderColor: live ? theme.text : theme.border }]}>
                 <Text style={[styles.index, { color: theme.muted }, TABULAR_NUMS]}>{i + 1}</Text>
                 <View style={[styles.thumb, { backgroundColor: theme.cardElevated }]}>
-                  {p.imageUri ? <CachedImage source={{ uri: p.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <Feather name="shopping-bag" size={18} color={theme.muted} />}
+                  <ProductPhoto uri={p.imageUri} brand={hostName} name={p.name} style={StyleSheet.absoluteFill} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   {live && (
@@ -120,7 +121,7 @@ const styles = StyleSheet.create({
   close: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: RADIUS.md, padding: 8 },
   index: { fontFamily: FONT.semibold, fontSize: FS.xs, width: 14, textAlign: 'center' },
-  thumb: { width: 56, height: 56, borderRadius: RADIUS.xs, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  thumb: { width: 56, height: productPhotoHeight(56), borderRadius: RADIUS.xs, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   liveChip: { alignSelf: 'flex-start', borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1, marginBottom: 3 },
   liveChipText: { fontFamily: FONT.bold, fontSize: 8.5, letterSpacing: 0.8 },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm },

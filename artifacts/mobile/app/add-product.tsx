@@ -25,6 +25,7 @@ import { File, Paths } from 'expo-file-system';
 
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { PRODUCT_PHOTO_ASPECT } from '@/constants/media';
 import { RADII, radius } from '@/constants/radii';
 import { TYPE_SCALE } from '@/constants/typography';
 import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
@@ -1007,7 +1008,7 @@ export default function AddProductScreen() {
       createdAt: new Date().toISOString(),
     }));
     patchDraft({ media: [...existingMedia, ...newItems] });
-    // Every new photo crops to 3:4 before it uploads — the crop queue opens
+    // Every new photo crops to 4:5 (PRODUCT_PHOTO_ASPECT) before it uploads — the crop queue opens
     // the shared cropper for each one in turn.
     const newIds = newItems.map(item => item.id);
     setCropQueue(prev => [...prev, ...newIds]);
@@ -2214,7 +2215,7 @@ export default function AddProductScreen() {
           <MediaCropper
             visible
             uri={cropItem.originalUri ?? cropItem.uri}
-            targetRatio={3 / 4}
+            targetRatio={PRODUCT_PHOTO_ASPECT}
             initialRect={cropItem.cropRect ?? null}
             title="Crop photo"
             onCancel={() => handleCropCancel(cropTargetId)}
@@ -2492,7 +2493,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Review step: live preview cards
   previewCard: { padding: 0, overflow: 'hidden' },
-  previewImageWrap: { width: '100%', aspectRatio: 1, backgroundColor: CARD },
+  previewImageWrap: { width: '100%', aspectRatio: PRODUCT_PHOTO_ASPECT, backgroundColor: CARD },
   previewImage: { width: '100%', height: '100%' },
   previewSaleBadge: {
     position: 'absolute', top: SP.sm, left: SP.sm,

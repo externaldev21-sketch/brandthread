@@ -22,6 +22,8 @@ import { FONT, FS, ON_DARK, ON_DARK_MUTED, RADIUS, SP } from '@/lib/theme';
 import { computeCountdownParts } from '@/lib/dropCountdown';
 import { EmptyState, LoadingSkeleton } from '@/components/BrandthreadUI';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { ProductPhotoPlaceholder } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 
 const { width: W } = Dimensions.get('window');
 const HERO_H = Math.max(420, Math.min(540, W * 1.2));
@@ -83,7 +85,7 @@ export default function SellerDropPreview() {
         <View style={{ padding: SP.md, gap: 10 }}>
           <LoadingSkeleton height={16} style={{ width: 100 }} />
           <View style={styles.grid}>
-            {[0, 1].map(i => <LoadingSkeleton key={i} height={(W - SP.md * 2 - 10) * 0.68 + 40} style={{ width: (W - SP.md * 2 - 10) / 2 }} />)}
+            {[0, 1].map(i => <LoadingSkeleton key={i} height={productPhotoHeight((W - SP.md * 2 - 10) / 2) + 40} style={{ width: (W - SP.md * 2 - 10) / 2 }} />)}
           </View>
         </View>
       </View>
@@ -147,9 +149,7 @@ export default function SellerDropPreview() {
                 {p.images?.[0] ? (
                   <Image source={{ uri: p.images[0] }} style={styles.tileImage} resizeMode="cover" />
                 ) : (
-                  <View style={[styles.tileImage, { alignItems: 'center', justifyContent: 'center' }]}>
-                    <Feather name="image" size={22} color={theme.muted} />
-                  </View>
+                  <ProductPhotoPlaceholder name={p.name} style={styles.tileImage} />
                 )}
                 <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm, padding: 8 }} numberOfLines={2}>{p.name}</Text>
               </View>
@@ -183,5 +183,5 @@ const styles = StyleSheet.create({
   earlyAccess: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 6 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   tile: { width: (W - SP.md * 2 - 10) / 2, borderRadius: RADIUS.sm, overflow: 'hidden' },
-  tileImage: { width: '100%', height: (W - SP.md * 2 - 10) * 0.68 },
+  tileImage: { width: '100%', height: productPhotoHeight((W - SP.md * 2 - 10) / 2) },
 });

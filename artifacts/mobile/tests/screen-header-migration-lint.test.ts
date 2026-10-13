@@ -165,7 +165,6 @@ const MODAL_INSETS_ALLOWLIST = new Set([
   'app/design-bg-replace.tsx',
   'app/help.tsx',
   'components/PlanUpsellModal.tsx',
-  'components/ProductReviewsSection.tsx',
   'components/SellerTutorialOverlay.tsx',
   'components/SetupCelebration.tsx',
   'components/buyer-feed/LongPressMenu.tsx',

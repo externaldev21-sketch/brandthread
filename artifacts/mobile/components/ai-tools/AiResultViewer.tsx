@@ -12,6 +12,7 @@ import { Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Glass } from '@/components/ui/Glass';
+import { SwipeDownToDismiss } from '@/components/media/SwipeDownToDismiss';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import type { AiResultSlot } from './AiResultTypes';
 
@@ -44,7 +45,8 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <View style={s.root}>
+      <SwipeDownToDismiss onDismiss={onClose}>
+      <View style={[s.root, { backgroundColor: 'transparent' }]}>
         <FlatList
           data={items}
           keyExtractor={(item) => String(item.id)}
@@ -110,6 +112,7 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
           </Glass>
         </View>
       </View>
+      </SwipeDownToDismiss>
     </Modal>
   );
 }
