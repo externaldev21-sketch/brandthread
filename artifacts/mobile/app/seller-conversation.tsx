@@ -67,6 +67,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   formatDate as sharedFormatDate, formatTime, groupFlags,
   groupCornerRadii, lastOwnMessageId, messagePreviewText,
+  BUBBLE_RADIUS, BUBBLE_TAIL_RADIUS, SENT_BUBBLE, SENT_BUBBLE_TEXT, RECEIVED_BUBBLE, RECEIVED_BUBBLE_TEXT,
 } from '@/lib/chatGrouping';
 import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
 import { ReplyBanner } from '@/components/chat/ReplyBanner';
@@ -551,10 +552,12 @@ export default function SellerConversationScreen() {
   // and bubble colors for both participants. Null = the app's existing
   // default monochrome look, completely unchanged.
   const convTheme = getConversationTheme(conv?.themeId);
-  const sentBubbleColor = convTheme?.sentBubble ?? PURPLE;
-  const sentTextColor = convTheme?.sentText ?? ON_DARK;
-  const receivedBubbleColor = convTheme?.receivedBubble ?? CARD;
-  const receivedTextColor = convTheme?.receivedText ?? FG;
+  // Same default bubbles as the buyer's side of the thread (white sent,
+  // #262628 received); a chat theme still overrides both.
+  const sentBubbleColor = convTheme?.sentBubble ?? SENT_BUBBLE;
+  const sentTextColor = convTheme?.sentText ?? SENT_BUBBLE_TEXT;
+  const receivedBubbleColor = convTheme?.receivedBubble ?? RECEIVED_BUBBLE;
+  const receivedTextColor = convTheme?.receivedText ?? RECEIVED_BUBBLE_TEXT;
   const messagingBlocked = messaging.blockedByMe || messaging.unavailable;
   // New every-role-pair DM/message-request routing: `conv.isRequest` and
   // `requestedBy` are the same for every viewer (conversation-level, not
@@ -1400,12 +1403,13 @@ export default function SellerConversationScreen() {
               s.bubble,
               {
                 backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor,
-                borderColor: isOwn ? sentBubbleColor : BORDER,
+                // Filled, no outline — same as the buyer's view.
+                borderColor: isOwn ? sentBubbleColor : receivedBubbleColor,
                 // Shared corner-grouping math (lib/chatGrouping.ts) — the
-                // shared edge between grouped bubbles is tightened, every
-                // outer corner stays fully rounded, matching the buyer's
-                // own thread view of this same conversation.
-                ...groupCornerRadii(isOwn, isFirstInGroup, isLastInGroup, RADIUS.lg, 4),
+                // shared edge between grouped bubbles is tightened, the last
+                // bubble of a group gets the 4pt tail corner, matching the
+                // buyer's own thread view of this same conversation.
+                ...groupCornerRadii(isOwn, isFirstInGroup, isLastInGroup, BUBBLE_RADIUS, BUBBLE_TAIL_RADIUS, BUBBLE_TAIL_RADIUS),
               },
             ]}
             accessibilityHint="Touch and hold to react or see more options"
@@ -1428,8 +1432,8 @@ export default function SellerConversationScreen() {
                 app/buyer-conversation.tsx, so a thread reads identically from
                 both sides. */}
             {msg.replyToId && !removed ? (
-              <View style={[s.replyQuote, { borderLeftColor: isOwn ? ON_DARK : PURPLE }]}>
-                <Text style={[s.replyQuoteText, { color: isOwn ? `${ON_DARK}CC` : MUTED }]} numberOfLines={1}>
+              <View style={[s.replyQuote, { borderLeftColor: isOwn ? sentTextColor : PURPLE }]}>
+                <Text style={[s.replyQuoteText, { color: isOwn ? `${sentTextColor}CC` : MUTED }]} numberOfLines={1}>
                   {msg.replyPreview ?? messagePreviewText(messages.find(m => m.id === msg.replyToId) ?? {})}
                 </Text>
               </View>
@@ -1459,13 +1463,13 @@ export default function SellerConversationScreen() {
                 this was chosen over tap-to-reveal). */}
             {isLastInGroup && (
               <View style={s.bubbleMeta}>
-                <Text style={[s.bubbleTime, { color: isOwn ? `${ON_DARK}B0` : MUTED }]}>
+                <Text style={[s.bubbleTime, { color: isOwn ? `${sentTextColor}B0` : MUTED }]}>
                   {formatTime(msg.ts)}
                 </Text>
                 {isOwn && msg.status !== 'failed' && (
                   <View style={s.receiptChecks}>
-                    <Feather name="check" size={11} color={isRead ? ON_DARK : `${ON_DARK}B0`} />
-                    {isRead && <Feather name="check" size={11} color={ON_DARK} style={{ marginLeft: -7 }} />}
+                    <Feather name="check" size={11} color={isRead ? sentTextColor : `${sentTextColor}B0`} />
+                    {isRead && <Feather name="check" size={11} color={sentTextColor} style={{ marginLeft: -7 }} />}
                   </View>
                 )}
               </View>

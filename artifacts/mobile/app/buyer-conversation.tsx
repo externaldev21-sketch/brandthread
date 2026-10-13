@@ -91,6 +91,7 @@ import { EMOJI_FONT_STACK } from '@/lib/appleEmoji';
 import {
   formatDate as sharedFormatDate, formatTime as sharedFormatTime,
   sameSenderClose, groupCornerRadii, lastOwnMessageId, messagePreviewText,
+  BUBBLE_RADIUS, BUBBLE_TAIL_RADIUS, SENT_BUBBLE, SENT_BUBBLE_TEXT, RECEIVED_BUBBLE, RECEIVED_BUBBLE_TEXT,
 } from '@/lib/chatGrouping';
 import { radius } from '@/constants/radii';
 
@@ -605,10 +606,13 @@ export default function BuyerConversationScreen() {
   // and bubble colors for both participants. Null = Brandthread's existing
   // default monochrome look, completely unchanged.
   const convTheme = getConversationTheme(conv?.themeId);
-  const sentBubbleColor = convTheme?.sentBubble ?? theme.accent;
-  const sentTextColor = convTheme?.sentText ?? theme.onAccent;
-  const receivedBubbleColor = convTheme?.receivedBubble ?? theme.cardElevated;
-  const receivedTextColor = convTheme?.receivedText ?? theme.text;
+  // Default bubbles (Instagram, reskinned): white sent / black text,
+  // #262628 received / white text — the same in every app theme. A chat
+  // theme picked in Chat details still overrides both.
+  const sentBubbleColor = convTheme?.sentBubble ?? SENT_BUBBLE;
+  const sentTextColor = convTheme?.sentText ?? SENT_BUBBLE_TEXT;
+  const receivedBubbleColor = convTheme?.receivedBubble ?? RECEIVED_BUBBLE;
+  const receivedTextColor = convTheme?.receivedText ?? RECEIVED_BUBBLE_TEXT;
   const isDisabled = conv?.isFriendshipActive === false;
   // Request mode (Instagram-style): the composer is hidden and replaced with
   // the accept/block/delete bottom panel below until the recipient accepts.
@@ -1939,12 +1943,12 @@ export default function BuyerConversationScreen() {
               {
                 backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor,
                 // IG-style grouping: the corner touching an adjacent bubble
-                // in the same group (same side as the avatar column) is
-                // reduced to 6pt; every outer corner stays the full 18pt.
-                // Shared with app/seller-conversation.tsx via chatGrouping.ts
-                // so a grouped run looks identical from both sides of the
-                // same thread.
-                ...groupCornerRadii(isOwn, isFirstInGroup, isLastInGroup, RADIUS.lg),
+                // in the same group is reduced to 4pt, the last bubble of a
+                // group gets a 4pt tail corner on the sender's side, every
+                // other corner stays the full 18pt. Shared with
+                // app/seller-conversation.tsx via chatGrouping.ts so a
+                // grouped run looks identical from both sides of the thread.
+                ...groupCornerRadii(isOwn, isFirstInGroup, isLastInGroup, BUBBLE_RADIUS, BUBBLE_TAIL_RADIUS, BUBBLE_TAIL_RADIUS),
                 alignSelf: isOwn ? 'flex-end' : 'flex-start',
                 shadowColor: theme.shadowColor,
                 shadowOffset: { width: 0, height: 2 },
@@ -1956,8 +1960,8 @@ export default function BuyerConversationScreen() {
           >
             {/* Quoted reply */}
             {msg.replyToId ? (
-              <View style={[s.replyQuote, { borderLeftColor: isOwn ? theme.onAccent : theme.accent }]}>
-                <Text style={[s.replyQuoteText, { color: isOwn ? `${theme.onAccent}CC` : theme.muted }]} numberOfLines={1}>
+              <View style={[s.replyQuote, { borderLeftColor: isOwn ? sentTextColor : theme.accent }]}>
+                <Text style={[s.replyQuoteText, { color: isOwn ? `${sentTextColor}CC` : theme.muted }]} numberOfLines={1}>
                   {msg.replyPreview ?? messagePreviewText(messages.find(m => m.id === msg.replyToId) ?? {})}
                 </Text>
               </View>
@@ -1974,16 +1978,16 @@ export default function BuyerConversationScreen() {
             {/* Inline bottom-right timestamp + read receipt (last bubble of a run) */}
             {isLastInGroup && (
               <View style={s.bubbleMeta}>
-                <Text style={[s.bubbleTime, { color: isOwn ? `${theme.onAccent}B0` : theme.muted }]}>
+                <Text style={[s.bubbleTime, { color: isOwn ? `${sentTextColor}B0` : theme.muted }]}>
                   {formatTime(msg.ts)}
                 </Text>
                 {isOwn && msg.status !== 'failed' && (
                   msg.status === 'sending' ? (
-                    <Feather name="clock" size={11} color={`${theme.onAccent}B0`} style={s.receiptIcon} />
+                    <Feather name="clock" size={11} color={`${sentTextColor}B0`} style={s.receiptIcon} />
                   ) : (
                     <View style={s.receiptChecks}>
-                      <Feather name="check" size={11} color={isRead ? theme.onAccent : `${theme.onAccent}B0`} />
-                      {isRead && <Feather name="check" size={11} color={theme.onAccent} style={{ marginLeft: -7 }} />}
+                      <Feather name="check" size={11} color={isRead ? sentTextColor : `${sentTextColor}B0`} />
+                      {isRead && <Feather name="check" size={11} color={sentTextColor} style={{ marginLeft: -7 }} />}
                     </View>
                   )
                 )}
