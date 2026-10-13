@@ -55,13 +55,41 @@ export const RESERVE_ROLLING_DAYS = 30;
 export const PAYOUT_POLICY_ENFORCED = false;
 
 /**
- * Stripe Instant Payouts: 1% of the payout, minimum $0.50 (Stripe's published
- * US pricing as of writing; not verifiable from this sandbox, so re-check at
- * https://stripe.com/pricing before launch). Named constants, nothing else
- * hard-codes them.
+ * Instant payout fee the seller pays: 1.5% of the payout, minimum $0.50.
+ * It has two parts, both taken from the seller's Stripe balance:
+ *   - Stripe's own Instant Payouts fee, 1% (min $0.50), which Stripe debits
+ *     itself (Stripe's published US pricing as of writing; re-check at
+ *     https://stripe.com/pricing before launch);
+ *   - Brandthread's part, INSTANT_PAYOUT_PLATFORM_FEE_BPS (env, default 0.5%),
+ *     collected right after the payout by lib/money/instantPayoutFee.ts.
+ * The $0.50 minimum applies to the total, so on small payouts Stripe's own
+ * minimum is all of it and Brandthread's part is 0. Named constants, nothing
+ * else hard-codes them.
  */
-export const INSTANT_PAYOUT_FEE_BPS = 100;
+export const INSTANT_PAYOUT_STRIPE_FEE_BPS = 100;
 export const INSTANT_PAYOUT_MIN_FEE_CENTS = 50;
+export const DEFAULT_INSTANT_PAYOUT_PLATFORM_FEE_BPS = 50;
+/** Upper bound for the env override, so a typo can't take a large cut. */
+export const MAX_INSTANT_PAYOUT_PLATFORM_FEE_BPS = 500;
+
+/**
+ * Brandthread's part of the instant fee, in bps, from
+ * INSTANT_PAYOUT_PLATFORM_FEE_BPS. A missing or invalid value (not a whole
+ * number from 0 to 500) uses the default.
+ */
+export function instantPayoutPlatformFeeBps(env: Record<string, string | undefined> = process.env): number {
+  const raw = env.INSTANT_PAYOUT_PLATFORM_FEE_BPS?.trim();
+  if (!raw || !/^\d+$/.test(raw)) return DEFAULT_INSTANT_PAYOUT_PLATFORM_FEE_BPS;
+  const bps = Number(raw);
+  return Number.isSafeInteger(bps) && bps <= MAX_INSTANT_PAYOUT_PLATFORM_FEE_BPS
+    ? bps
+    : DEFAULT_INSTANT_PAYOUT_PLATFORM_FEE_BPS;
+}
+
+/** Total instant fee rate the seller sees (Stripe's part + Brandthread's part). */
+export function instantPayoutTotalFeeBps(platformBps = instantPayoutPlatformFeeBps()): number {
+  return INSTANT_PAYOUT_STRIPE_FEE_BPS + platformBps;
+}
 
 export const PAYOUT_WEEKLY_ANCHORS = [
   "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
@@ -173,11 +201,31 @@ export function computeHeldFunds(orders: HoldableOrder[], now: Date, opts: HoldR
 
 // ─── Instant payout fee ─────────────────────────────────────────────────────
 
-/** Fee Stripe charges for an instant payout of `amountCents`: 1%, min $0.50. */
-export function instantPayoutFeeCents(amountCents: number): number {
+export type InstantPayoutFee = {
+  /** Stripe's Instant Payouts fee (Stripe debits it from the balance itself). */
+  stripeFeeCents: number;
+  /** Brandthread's part, collected after the payout. */
+  platformFeeCents: number;
+  /** What the seller pays in all: max($0.50, total bps of the amount). */
+  totalFeeCents: number;
+};
+
+/**
+ * The instant fee on `amountCents`, split into its two parts. Rounds half-up
+ * to the cent. The total is never below the minimum, and Brandthread's part
+ * is whatever the total is above Stripe's own fee (never negative).
+ */
+export function instantPayoutFee(amountCents: number, platformBps = instantPayoutPlatformFeeBps()): InstantPayoutFee {
   assertCents(amountCents, "amountCents");
-  if (amountCents === 0) return 0;
-  return Math.max(INSTANT_PAYOUT_MIN_FEE_CENTS, bpsOfCents(amountCents, INSTANT_PAYOUT_FEE_BPS));
+  if (amountCents === 0) return { stripeFeeCents: 0, platformFeeCents: 0, totalFeeCents: 0 };
+  const stripeFeeCents = Math.max(INSTANT_PAYOUT_MIN_FEE_CENTS, bpsOfCents(amountCents, INSTANT_PAYOUT_STRIPE_FEE_BPS));
+  const totalFeeCents = Math.max(stripeFeeCents, bpsOfCents(amountCents, instantPayoutTotalFeeBps(platformBps)));
+  return { stripeFeeCents, platformFeeCents: totalFeeCents - stripeFeeCents, totalFeeCents };
+}
+
+/** Total instant fee on `amountCents`: 1.5% by default, min $0.50. */
+export function instantPayoutFeeCents(amountCents: number, platformBps = instantPayoutPlatformFeeBps()): number {
+  return instantPayoutFee(amountCents, platformBps).totalFeeCents;
 }
 
 /**
@@ -185,13 +233,13 @@ export function instantPayoutFeeCents(amountCents: number): number {
  * paid from the same balance (amount + fee <= available). The fee grows
  * monotonically with the amount, so a binary search is exact.
  */
-export function maxInstantPayoutCents(availableCents: number): number {
+export function maxInstantPayoutCents(availableCents: number, platformBps = instantPayoutPlatformFeeBps()): number {
   assertCents(availableCents, "availableCents");
   let lo = 0;
   let hi = Math.max(0, availableCents - INSTANT_PAYOUT_MIN_FEE_CENTS);
   while (lo < hi) {
     const mid = Math.floor((lo + hi + 1) / 2);
-    if (mid + instantPayoutFeeCents(mid) <= availableCents) lo = mid;
+    if (mid + instantPayoutFeeCents(mid, platformBps) <= availableCents) lo = mid;
     else hi = mid - 1;
   }
   return lo;
@@ -278,7 +326,9 @@ export function payoutPolicySnapshot() {
     domesticDays: holdDays(HOME_COUNTRY),
     internationalDays: INTERNATIONAL_HOLD_DAYS,
     reserveBps: PAYOUT_PROTECTION_MODE === "reserve" ? RESERVE_BPS : null,
-    instantFeeBps: INSTANT_PAYOUT_FEE_BPS,
+    instantFeeBps: instantPayoutTotalFeeBps(),
+    instantStripeFeeBps: INSTANT_PAYOUT_STRIPE_FEE_BPS,
+    instantPlatformFeeBps: instantPayoutPlatformFeeBps(),
     instantMinFeeCents: INSTANT_PAYOUT_MIN_FEE_CENTS,
   };
 }

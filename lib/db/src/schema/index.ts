@@ -2513,6 +2513,8 @@ export const sellerCashoutAttempts = pgTable('seller_cashout_attempts', {
   bankDestinationId: text('bank_destination_id'),
   status: text('status').notNull().default('processing'), // processing|succeeded|failed
   method: text('method').notNull().default('standard'), // standard|instant
+  /** Brandthread's part of an instant payout fee, fixed at confirmation (migration 276). */
+  platformFeeCents: integer('platform_fee_cents').notNull().default(0),
   stripePayoutId: text('stripe_payout_id'),
   responseStatus: text('response_status'),
   responseArrivalDate: timestamp('response_arrival_date', { withTimezone: true }),

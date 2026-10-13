@@ -27,10 +27,11 @@ import { stripe } from "../lib/stripe";
 import { cashOutableAmount, isValidPayoutIdempotencyKey } from "../lib/payoutSafety";
 import { publishNotification } from "./notifications-feed";
 import {
-  computeHeldFunds, estimateNextPayout, instantPayoutFeeCents, maxInstantPayoutCents,
+  computeHeldFunds, estimateNextPayout, instantPayoutFee, maxInstantPayoutCents,
   payoutPolicySnapshot, type HoldableOrder, type NextPayoutEstimate, type PayoutScheduleInterval,
   type WeeklyAnchor,
 } from "../lib/money/payoutPolicy";
+import { collectInstantPayoutPlatformFee } from "../lib/money/instantPayoutFee";
 import {
   currentScheduleOf, findInstantDestination, scheduleMatches, stripeScheduleParams,
   validateScheduleInput,
@@ -123,6 +124,8 @@ type CashoutResult =
   | {
       kind: "success";
       duplicate: boolean;
+      /** The cash-out attempt row, so an instant fee can be collected after. */
+      attempt?: { id: string; method: string; platformFeeCents: number };
       payout: {
         id: string;
         amount: number;
@@ -651,6 +654,7 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
           return {
             kind: "success" as const,
             duplicate: true,
+            attempt: { id: existing.id, method: existing.method, platformFeeCents: existing.platformFeeCents ?? 0 },
             payout: {
               id: existing.stripePayoutId,
               amount: existing.amountCents,
@@ -750,6 +754,9 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
           stripeAccountId: currentAccountId,
           bankDestinationId: bankAccount.id,
           method,
+          // Brandthread's part of the instant fee, fixed now so a retry
+          // can never charge a different amount (lib/money/instantPayoutFee.ts).
+          platformFeeCents: method === "instant" ? instantPayoutFee(amount).platformFeeCents : 0,
           status: "processing",
         });
         return { kind: "continue" as const };
@@ -787,6 +794,7 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
           return {
             kind: "success",
             duplicate: true,
+            attempt: { id: current.id, method: current.method, platformFeeCents: current.platformFeeCents ?? 0 },
             payout: {
               id: current.stripePayoutId,
               amount: current.amountCents,
@@ -847,6 +855,7 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
           return {
             kind: "success",
             duplicate: true,
+            attempt: { id: current.id, method: current.method, platformFeeCents: current.platformFeeCents ?? 0 },
             payout: {
               id: reconciledPayout.id,
               amount: reconciledPayout.amount,
@@ -898,6 +907,7 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
         return {
           kind: "success" as const,
           duplicate: false,
+          attempt: { id: current.id, method: current.method, platformFeeCents: current.platformFeeCents ?? 0 },
           payout: {
             id: payout.id,
             amount: payout.amount,
@@ -946,6 +956,17 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
       return;
     }
 
+    // Instant: collect Brandthread's part of the fee now that the payout
+    // exists (also on a retry, in case an earlier collection failed). It is
+    // idempotent and never blocks the payout; whatever fails stays owed and
+    // the money sweep retries it.
+    const instantAttempt = result.attempt?.method === "instant" ? result.attempt : null;
+    if (instantAttempt && instantAttempt.platformFeeCents > 0) {
+      await collectInstantPayoutPlatformFee(instantAttempt.id).catch((err) => {
+        req.log.error({ err, sellerId, attemptId: instantAttempt.id }, "Instant payout fee collection failed");
+      });
+    }
+
     if (!result.duplicate) {
       void publishNotification({
         userId: sellerId,
@@ -968,6 +989,7 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
       status: result.payout.status,
       arrivalDate: result.payout.arrivalDate.toISOString(),
       duplicate: result.duplicate,
+      ...(instantAttempt ? { instantFee: instantFeeReceipt(result.payout.amount, instantAttempt.platformFeeCents) } : {}),
     });
   } catch (err: any) {
     req.log.error({ err }, "Failed to request payout");
@@ -983,10 +1005,26 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
 // "Instant" is the manual schedule plus on-demand instant payouts, available
 // only when Stripe reports an instant-capable debit card on the account.
 
-const INSTANT_INFO = {
-  feeBps: payoutPolicySnapshot().instantFeeBps,
-  minFeeCents: payoutPolicySnapshot().instantMinFeeCents,
-};
+function instantInfo() {
+  const policy = payoutPolicySnapshot();
+  return { feeBps: policy.instantFeeBps, minFeeCents: policy.instantMinFeeCents };
+}
+
+/**
+ * The instant fee as the seller sees it on the quote and the receipt: Stripe's
+ * part (what Stripe debited, else its published rate) + Brandthread's part
+ * (fixed on the cash-out attempt).
+ */
+function instantFeeReceipt(amountCents: number, platformFeeCents: number, stripeFeeCents?: number) {
+  const stripePart = stripeFeeCents ?? instantPayoutFee(amountCents).stripeFeeCents;
+  const total = stripePart + platformFeeCents;
+  return {
+    amount: total,
+    formatted: formatCents(total),
+    stripeFee: stripePart,
+    platformFee: platformFeeCents,
+  };
+}
 
 function scheduleView(account: any) {
   const schedule = currentScheduleOf(account);
@@ -1005,7 +1043,7 @@ router.get("/payout-schedule", requirePayoutsRead(), async (req, res) => {
         providerConfigured: Boolean(stripe),
         payoutsEnabled: false,
         schedule: null,
-        instant: { eligible: false, reason: "not_connected", destination: null, ...INSTANT_INFO, maxAmount: null, quote: null },
+        instant: { eligible: false, reason: "not_connected", destination: null, ...instantInfo(), maxAmount: null, quote: null },
         nextPayoutEstimate: null,
         policy: payoutPolicySnapshot(),
       });
@@ -1040,7 +1078,8 @@ router.get("/payout-schedule", requirePayoutsRead(), async (req, res) => {
       return;
     }
     const quoteAmount = requested ?? maxInstant;
-    const fee = quoteAmount > 0 ? instantPayoutFeeCents(quoteAmount) : 0;
+    const feeParts = instantPayoutFee(quoteAmount);
+    const fee = feeParts.totalFeeCents;
     const extras = await balanceExtras({
       sellerId, account, available: spendable, existing: pendingPayouts.data[0] ?? null, log: req.log,
     });
@@ -1053,13 +1092,15 @@ router.get("/payout-schedule", requirePayoutsRead(), async (req, res) => {
         eligible: account.payouts_enabled === true && eligibility.eligible,
         reason: !account.payouts_enabled ? "payouts_disabled" : eligibility.eligible ? null : eligibility.reason,
         destination: eligibility.eligible ? eligibility.destination : null,
-        ...INSTANT_INFO,
+        ...instantInfo(),
         maxAmount: { amount: maxInstant, formatted: formatCents(maxInstant) },
         quote: quoteAmount > 0
           ? {
               amount: quoteAmount,
               fee: fee,
               feeFormatted: formatCents(fee),
+              stripeFee: feeParts.stripeFeeCents,
+              platformFee: feeParts.platformFeeCents,
               total: quoteAmount + fee,
               withinBalance: quoteAmount + fee <= spendable,
             }
@@ -1177,9 +1218,19 @@ router.get("/payouts/:id", requirePayoutsRead(), async (req, res) => {
       : null;
     if (breakdown) assertBreakdownReconciles(breakdown);
 
-    const instantFee = payout.method === "instant" && typeof payout.balance_transaction === "object"
+    const stripeInstantFee = payout.method === "instant" && typeof payout.balance_transaction === "object"
       ? Math.max(0, Number(payout.balance_transaction?.fee ?? 0))
       : 0;
+    // Brandthread's part of the instant fee, from the cash-out that made it.
+    let platformInstantFee = 0;
+    if (payout.method === "instant") {
+      const [attempt] = await db.select({ platformFeeCents: sellerCashoutAttempts.platformFeeCents })
+        .from(sellerCashoutAttempts)
+        .where(and(eq(sellerCashoutAttempts.ownerId, sellerId), eq(sellerCashoutAttempts.stripePayoutId, payout.id)))
+        .limit(1);
+      platformInstantFee = Math.max(0, Number(attempt?.platformFeeCents ?? 0));
+    }
+    const instantFee = stripeInstantFee + platformInstantFee;
     const destination = typeof payout.destination === "object" && payout.destination ? payout.destination : null;
     const money = (cents: number) => ({ amount: cents, formatted: formatCents(cents, payout.currency) });
     res.json({
