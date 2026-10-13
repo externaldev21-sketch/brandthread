@@ -61,6 +61,13 @@ export const LEDGER_ACCOUNTS = {
    * the card is redeemed at that store — see lib/giftCards/payout.ts.
    */
   gift_card_liability: "gift_card_liability",
+  /**
+   * Brandthread's cost of the first-order discount (a platform-funded $ off a
+   * buyer's first paid order): the supplemental transfer that tops the seller
+   * up to the full price — same shape as `thread_cash_seller_topup`, see
+   * lib/firstOrderDiscount.ts.
+   */
+  first_order_discount: "first_order_discount",
 } as const;
 export type LedgerAccount = keyof typeof LEDGER_ACCOUNTS;
 

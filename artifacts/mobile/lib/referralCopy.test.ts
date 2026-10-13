@@ -8,13 +8,13 @@ import {
 } from './referralCopy';
 
 describe('referral copy', () => {
-  it('says give $10 / get $10 and matches the server reward', () => {
-    expect(REFERRAL_HEADLINE).toBe('Give $10. Get $10.');
-    expect(REFERRAL_GIVE_CENTS).toBe(1000);
-    expect(REFERRAL_GET_CENTS).toBe(1000);
+  it('says give $5 / get $5 and matches the server reward', () => {
+    expect(REFERRAL_HEADLINE).toBe('Give $5. Get $5.');
+    expect(REFERRAL_GIVE_CENTS).toBe(500);
+    expect(REFERRAL_GET_CENTS).toBe(500);
     const policy = readFileSync(join(__dirname, '../../api-server/src/lib/referrals/policy.ts'), 'utf8');
-    expect(policy).toContain('REFERRAL_INVITEE_REWARD_CENTS = 1000');
-    expect(policy).toContain('REFERRAL_INVITER_REWARD_CENTS = 1000');
+    expect(policy).toContain('REFERRAL_INVITEE_REWARD_CENTS = 500');
+    expect(policy).toContain('REFERRAL_INVITER_REWARD_CENTS = 500');
     expect(policy).toContain('REFERRAL_MIN_ORDER_CENTS = 1000');
   });
 
@@ -26,7 +26,7 @@ describe('referral copy', () => {
 
   it('labels every status', () => {
     expect(referralStatusLabel('pending')).toBe('Waiting for first order');
-    expect(referralStatusLabel('rewarded')).toBe('You earned $10');
+    expect(referralStatusLabel('rewarded')).toBe('You earned $5');
   });
 
   it('builds a safe onboarding path', () => {

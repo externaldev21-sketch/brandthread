@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
 import { db, users } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, isNotNull } from "drizzle-orm";
 
 const state = vi.hoisted(() => ({
   userId: "",
@@ -117,6 +117,39 @@ describe("PATCH /api/auth/profile", () => {
       brandName: "Threaded Studio",
       bio: "Thoughtful essentials for everyday wear.",
     });
+  });
+});
+
+describe("Founding Seller on switching to selling", () => {
+  it("gives a buyer who switches to seller from their profile a founding number", async () => {
+    const owner = state.userId;
+    const switcher = `auth-profile-switch-${crypto.randomBytes(6).toString("hex")}`;
+    // Not a test-signature email: test-signature accounts never get a number.
+    await db.insert(users).values({
+      clerkId: switcher,
+      email: `${switcher}@brandthread-spec.com`,
+      name: "Switcher",
+      accountType: "buyer",
+      onboardingComplete: true,
+      ageBand: "18_plus",
+    });
+    state.userId = switcher;
+    try {
+      const taken = await db.$count(users, isNotNull(users.foundingSellerNumber));
+      const result = await patchProfile({ accountType: "seller" });
+      expect(result.status).toBe(200);
+      expect(result.body.accountType).toBe("seller");
+      const [row] = await db.select({ n: users.foundingSellerNumber }).from(users).where(eq(users.clerkId, switcher));
+      if (taken < 100) {
+        expect(row.n).toEqual(expect.any(Number));
+        expect(result.body.foundingSellerNumber).toBe(row.n);
+      } else {
+        expect(row.n).toBeNull();
+      }
+    } finally {
+      state.userId = owner;
+      await db.delete(users).where(eq(users.clerkId, switcher));
+    }
   });
 });
 

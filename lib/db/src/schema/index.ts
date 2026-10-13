@@ -24,6 +24,7 @@ export * from './emailMarketing';
 export * from './giftCards';
 export * from './productBulkSeo';
 export * from './promotions';
+export * from './firstOrderDiscounts';
 export * from './sellerPushGiveaways';
 export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
@@ -214,6 +215,10 @@ export const users = pgTable('users', {
   // Internal App Review demo account (migration 240). Never purged by the
   // test-data tooling; seeded by scripts/seedReviewAccounts.ts.
   isReviewAccount: boolean('is_review_account').notNull().default(false),
+  // "Founding Seller #N" (migration 271): 1..100, unique, assigned once when
+  // an account first completes seller onboarding while fewer than 100 are
+  // taken (api-server lib/foundingSellers.ts). Never reassigned or reused.
+  foundingSellerNumber: integer('founding_seller_number'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -769,6 +774,9 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   // intent was created. The paid webhook builds the order from these instead
   // of a Stripe Checkout Session's totals. NULL for hosted-Checkout rows.
   amountTotalCents: integer('amount_total_cents'),
+  // Brandthread-funded first-order discount taken off this group's
+  // amountTotalCents (migration 271). Never part of the fee basis.
+  firstOrderDiscountCents: integer('first_order_discount_cents').notNull().default(0),
   shippingCents: integer('shipping_cents'),
   taxCents: integer('tax_cents'),
   stripeTaxCalculationId: text('stripe_tax_calculation_id'),

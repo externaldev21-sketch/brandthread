@@ -1,13 +1,13 @@
 /**
- * Referral / invite-code system ("Give $10, get $10" Thread Cash).
+ * Referral / invite-code system ("Give $5, get $5" Thread Cash).
  *
  * GET  /api/referrals/invite/:code — PUBLIC: count an invite-link click, say if the code is valid
  * GET  /api/referrals/code      — get (or lazily generate) my invite code + shareable link
  * GET  /api/referrals/stats     — my invitees with status, pending vs earned Thread Cash
  * POST /api/referrals/apply     — apply an invite code (call once after signup)
  *
- * Reward timing (see lib/referrals/policy.ts): the invitee gets $10 Thread Cash
- * on joining; the inviter gets $10 when the invitee's first order of $10 or
+ * Reward timing (see lib/referrals/policy.ts): the invitee gets $5 Thread Cash
+ * on joining; the inviter gets $5 when the invitee's first order of $10 or
  * more is paid (hook: qualifyReferralForOrderSafe in routes/webhooks.ts). The
  * inviter's 500 loyalty points on join are unchanged.
  */
@@ -24,6 +24,7 @@ import {
   REFERRAL_JOIN_POINTS,
   REFERRAL_MAX_PAID_PER_INVITER,
   REFERRAL_MIN_ORDER_CENTS,
+  formatCents,
   generateInviteCode,
   inviteLink,
   normalizeInviteCode,
@@ -119,7 +120,7 @@ router.get("/code", async (req, res) => {
     link,
     terms: rewardTerms,
     /** Pre-composed share text — mobile client can pass directly to Share API */
-    shareText: `${senderName} invited you to Brandthread. Join with my link and get $10 Thread Cash.\n\nUse invite code ${code} or tap: ${link}`,
+    shareText: `${senderName} invited you to Brandthread. Join with my link and get ${formatCents(REFERRAL_INVITEE_REWARD_CENTS)} Thread Cash.\n\nUse invite code ${code} or tap: ${link}`,
   });
 });
 

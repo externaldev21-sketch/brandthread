@@ -1,9 +1,9 @@
 /**
- * Referral program policy: "Give $10, get $10" in Thread Cash.
+ * Referral program policy: "Give $5, get $5" in Thread Cash.
  *
  * Timing (the ONE wording every surface must use):
- *   - Your friend gets $10 Thread Cash when they join with your link or code.
- *   - You get $10 Thread Cash when your friend completes their first order of
+ *   - Your friend gets $5 Thread Cash when they join with your link or code.
+ *   - You get $5 Thread Cash when your friend completes their first order of
  *     $10 or more.
  *   - You still earn 500 loyalty points when your friend joins (unchanged).
  *
@@ -12,8 +12,8 @@
 import { randomInt } from "node:crypto";
 
 /** All amounts are integer cents. */
-export const REFERRAL_INVITEE_REWARD_CENTS = 1000;
-export const REFERRAL_INVITER_REWARD_CENTS = 1000;
+export const REFERRAL_INVITEE_REWARD_CENTS = 500;
+export const REFERRAL_INVITER_REWARD_CENTS = 500;
 /** Loyalty points the inviter earns on join — pre-existing behaviour, unchanged. */
 export const REFERRAL_JOIN_POINTS = 500;
 /** The invitee's first order must be at least this much in real money (Thread Cash applied does not count) before the inviter is paid. */
@@ -92,7 +92,7 @@ export function decideQualification(input: QualificationInput): QualificationDec
   return { action: "reward", amountCents: REFERRAL_INVITER_REWARD_CENTS };
 }
 
-/** Whole-dollar friendly money string for copy (integer cents in, "$10" out). */
+/** Whole-dollar friendly money string for copy (integer cents in, "$5" out). */
 export function formatCents(cents: number): string {
   return `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
 }

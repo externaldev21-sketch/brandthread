@@ -26,6 +26,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { publishNotification } from "../routes/notifications-feed";
 import { blockedUserIds, profilesById, type ProfileSummary } from "./safety";
 import { logger } from "./logger";
+import { formatCents, REFERRAL_INVITER_REWARD_CENTS, REFERRAL_MIN_ORDER_CENTS } from "./referrals/policy";
 
 const AVATAR_COLORS = [
   "#8B5CF6", "#EC4899", "#3B82F6", "#10B981", "#F59E0B",
@@ -724,7 +725,7 @@ export async function notifyReferralJoined(input: { inviterId: string; inviteeId
       category: "social",
       type: "referral_joined",
       title: `${actor?.actorName ?? "A friend"} joined with your invite`,
-      body: "You earn $10 Thread Cash after their first order of $10 or more",
+      body: `You earn ${formatCents(REFERRAL_INVITER_REWARD_CENTS)} Thread Cash after their first order of ${formatCents(REFERRAL_MIN_ORDER_CENTS)} or more`,
       ...(actor ?? {}),
       targetId: input.inviteeId,
       targetType: "referral",
@@ -734,7 +735,7 @@ export async function notifyReferralJoined(input: { inviterId: string; inviteeId
   }
 }
 
-/** Tell an inviter their $10 Thread Cash landed. Idempotent per invitee. */
+/** Tell an inviter their referral Thread Cash landed. Idempotent per invitee. */
 export async function notifyReferralReward(input: {
   inviterId: string;
   inviteeId: string;

@@ -43,6 +43,7 @@ import { applyThreadCashSellerTopup } from "../lib/threadCash/checkoutTopup";
 import { qualifyReferralForOrderSafe } from "../lib/referrals/rewards";
 import { GIFT_CARD_PURCHASE_KIND, handleGiftCardPaymentSucceeded } from "../lib/giftCards/purchase";
 import { finalizeGiftCardsForGroup } from "../lib/giftCards/checkout";
+import { finalizeFirstOrderDiscountForGroup } from "../lib/firstOrderDiscount";
 import { giftCentsForCheckouts } from "../lib/giftCards/service";
 import { settleTransferOrder } from "../lib/money/cartTransfers";
 import { stampDeliveryDeadlines } from "../lib/delivery/deliveryState";
@@ -665,13 +666,17 @@ export async function handleCartPaymentSucceeded(pi: any, providerEventId: strin
       total_details: {
         amount_tax: tax,
         amount_shipping: shippingCents,
-        amount_discount: Math.max(0, subtotal + shippingCents + tax - amountTotal - (giftByGroup.get(group.id) ?? 0)),
+        // The Brandthread-funded first-order discount is not a seller discount either (lib/firstOrderDiscount.ts).
+        amount_discount: Math.max(0, subtotal + shippingCents + tax - amountTotal - (giftByGroup.get(group.id) ?? 0) - (group.firstOrderDiscountCents ?? 0)),
       },
       shipping_details: shipping,
       metadata: { csRef: group.id },
     }, providerEventId, paidAt);
     await finalizeGiftCardsForGroup(stripe, group).catch((err) => {
       logger.error({ err, checkoutSessionId: group.id }, "Gift card settlement failed; redelivery retries it");
+    });
+    await finalizeFirstOrderDiscountForGroup(stripe, group).catch((err) => {
+      logger.error({ err, checkoutSessionId: group.id }, "First-order discount settlement failed; redelivery retries it");
     });
     await recordCartTaxTransaction(group).catch((err) => {
       logger.error({ err, checkoutSessionId: group.id }, "Stripe Tax transaction record failed");
@@ -763,7 +768,7 @@ export async function handleCheckoutPaid(
   if (existing) {
     await recordPaidPhysicalOrder(existing);
     await awardPurchasePoints(existing);
-    await qualifyReferralForOrderSafe(existing.id); // referral: inviter's $10 on first paid order (idempotent)
+    await qualifyReferralForOrderSafe(existing.id); // referral: inviter's Thread Cash on first paid order (idempotent)
     try {
       await sendOrderConfirmationForOrder(existing.id);
     } catch (err) {
@@ -1354,7 +1359,7 @@ export async function handleCheckoutPaid(
         logger.error({ err, orderId: createdOrderId }, "Thread Cash seller top-up failed");
       }
 
-      await qualifyReferralForOrderSafe(createdOrderId); // referral: inviter's $10 on first paid order (idempotent)
+      await qualifyReferralForOrderSafe(createdOrderId); // referral: inviter's Thread Cash on first paid order (idempotent)
 
       // One-page checkout: pay the seller their share now (separate charges
       // and transfers). A failure is retried by webhook redelivery and the

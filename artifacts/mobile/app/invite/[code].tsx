@@ -50,7 +50,7 @@ export default function InviteDeepLinkScreen() {
     <View style={[styles.root, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.lg }]}>
       <Text style={[styles.title, { color: theme.text }]}>You are already on Brandthread</Text>
       <Text style={[styles.body, { color: theme.muted }]}>
-        Invite links are for new members. Share yours and you both get $10 Thread Cash.
+        Invite links are for new members. Share yours and you both get $5 Thread Cash.
       </Text>
       <PrimaryButton
         label="Share your invite"

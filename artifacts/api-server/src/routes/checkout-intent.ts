@@ -43,6 +43,9 @@ import { bnplMethodsForCart } from "../lib/payments/sellerPaymentSettings";
 import { StockReservationError, releaseStockReservation, reserveStock } from "../lib/money/stockReservation";
 import { applyGiftCardToGroup, trimGiftCardsForMinimumCharge } from "../lib/giftCards/checkout";
 import { GiftCardError, claimCard, giftCentsForCheckouts, reserveForCheckout } from "../lib/giftCards/service";
+import {
+  firstOrderDiscountForGroup, isFirstOrderDiscountEligible, reserveFirstOrderDiscount,
+} from "../lib/firstOrderDiscount";
 
 const router = Router();
 
@@ -119,6 +122,8 @@ type GroupBreakdown = {
   taxCents: number;
   /** Covered by a store gift card; totalCents is what is left for the card payment. */
   giftCardCents: number;
+  /** Brandthread-funded first-order discount (also counted in discountCents). */
+  firstOrderDiscountCents: number;
   totalCents: number;
   processingDays: number | null;
 };
@@ -131,9 +136,10 @@ function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gi
       checkoutSessionId: row.id,
       subtotalCents: subtotal,
       shippingCents: row.shippingCents ?? 0,
-      discountCents: row.discountCodeAmountCents ?? 0,
+      discountCents: (row.discountCodeAmountCents ?? 0) + (row.firstOrderDiscountCents ?? 0),
       taxCents: row.taxCents ?? 0,
       giftCardCents: gift.get(row.id) ?? 0,
+      firstOrderDiscountCents: row.firstOrderDiscountCents ?? 0,
       totalCents: row.amountTotalCents ?? 0,
       processingDays: null,
     };
@@ -143,6 +149,7 @@ function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gi
 type PricedCartGroup = PricedGroup & {
   taxCents: number; calculationId: string | null; totalCents: number;
   giftCardId: string | null; giftCardCents: number;
+  firstOrderDiscountCents: number;
 };
 
 /** Prices every seller group, then its Stripe Tax. Throws CartCheckoutError. */
@@ -154,6 +161,9 @@ async function priceCart(
 ): Promise<PricedCartGroup[]> {
   const priced: PricedCartGroup[] = [];
   const sellers = new Set<string>();
+  // Brandthread-funded $5 off the buyer's first order: the first seller group
+  // with at least $10 of merchandise (lib/firstOrderDiscount.ts).
+  let firstOrderAvailable = await isFirstOrderDiscountEligible(buyerId);
   for (const group of groups) {
     const pricedGroup = await priceCartGroup({ buyerId, items: group.items, discountCode: group.discountCode ?? null, liveStreamId: group.liveStreamId ?? null, shipping });
     if (sellers.has(pricedGroup.sellerId)) {
@@ -161,7 +171,12 @@ async function priceCart(
     }
     sellers.add(pricedGroup.sellerId);
     const tax = await calculateGroupTax(stripe, pricedGroup, shipping);
-    const fullTotalCents = pricedGroup.subtotalCents + pricedGroup.shippingCents - pricedGroup.discountCents + tax.taxCents;
+    const firstOrderDiscountCents = firstOrderAvailable
+      ? firstOrderDiscountForGroup(pricedGroup.subtotalCents - pricedGroup.discountCents)
+      : 0;
+    if (firstOrderDiscountCents > 0) firstOrderAvailable = false;
+    const fullTotalCents = pricedGroup.subtotalCents + pricedGroup.shippingCents - pricedGroup.discountCents + tax.taxCents
+      - firstOrderDiscountCents;
     // A store gift card covers part of THIS seller's group only.
     const gift = group.giftCard
       ? await applyGiftCardToGroup({
@@ -175,6 +190,7 @@ async function priceCart(
       calculationId: tax.calculationId,
       giftCardId: gift?.cardId ?? null,
       giftCardCents: gift?.cents ?? 0,
+      firstOrderDiscountCents,
       totalCents: fullTotalCents - (gift?.cents ?? 0),
     });
   }
@@ -188,9 +204,10 @@ function breakdown(priced: PricedCartGroup[], rows?: Array<{ id: string }>): Gro
     checkoutSessionId: rows?.[index]?.id ?? "",
     subtotalCents: group.subtotalCents,
     shippingCents: group.shippingCents,
-    discountCents: group.discountCents,
+    discountCents: group.discountCents + group.firstOrderDiscountCents,
     taxCents: group.taxCents,
     giftCardCents: group.giftCardCents,
+    firstOrderDiscountCents: group.firstOrderDiscountCents,
     totalCents: group.totalCents,
     processingDays: group.processingDays,
   }));
@@ -332,6 +349,7 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
           processingFeeEstimateCents: group.processingFeeEstimateCents,
           ...(group.discountCodeId ? { discountCodeId: group.discountCodeId, discountCodeAmountCents: group.discountCents } : {}),
           amountTotalCents: group.totalCents,
+          firstOrderDiscountCents: group.firstOrderDiscountCents,
           shippingCents: group.shippingCents,
           taxCents: group.taxCents,
           stripeTaxCalculationId: group.calculationId,
@@ -339,6 +357,14 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
         await reserveStock(tx, row.id, group.items.map((item) => ({
           variantId: item.variantId, quantity: item.quantity, productName: item.productName,
         })));
+        if (group.firstOrderDiscountCents > 0 && !(await reserveFirstOrderDiscount(tx, {
+          buyerId, checkoutSessionId: row.id, amountCents: group.firstOrderDiscountCents,
+        }))) {
+          // Another checkout took it a moment ago: never charge a discounted
+          // price without holding the discount. The page re-quotes.
+          throw new CartCheckoutError(409, "FIRST_ORDER_DISCOUNT_UNAVAILABLE",
+            "Your first-order discount is already being used on another checkout. Check your total and pay again.");
+        }
         if (group.giftCardId && group.giftCardCents > 0) {
           // Claims an unclaimed card for this buyer, then atomically takes the amount off it.
           await claimCard(tx, group.giftCardId, buyerId);

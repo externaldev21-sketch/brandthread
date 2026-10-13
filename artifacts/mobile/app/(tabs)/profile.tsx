@@ -37,6 +37,7 @@ import { connectionsHref, productDetailHref, profileProductsHref, profileVideosH
 import { getSellerShopPage, taggedItemHref, type ShopProduct } from '@/services/profileService';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
+import { FoundingSellerBadge, foundingSellerNumberOf } from '@/components/profile/FoundingSellerBadge';
 import {
   ProfileChip, ProfileEditMessagesRow, ShopPill, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
@@ -74,6 +75,8 @@ interface SellerProfileData {
   /** A moving profile picture — when set, plays instead of the static photo. */
   avatarVideoUrl?:    string | null;
   avatarPosterUrl?:   string | null;
+  /** "Founding Seller #N" (first 100 sellers), else null. */
+  foundingSellerNumber?: number | null;
   metrics: {
     revenueCents: number;
     visitors: number;
@@ -237,6 +240,7 @@ export default function ProfileScreen() {
         coverPosterUrl:     (data as any).coverPosterUrl ?? null,
         avatarVideoUrl:     (data as any).avatarVideoUrl ?? null,
         avatarPosterUrl:    (data as any).avatarPosterUrl ?? null,
+        foundingSellerNumber: foundingSellerNumberOf((data as any).foundingSellerNumber),
         metrics: data.metrics ?? {
           revenueCents: 0,
           visitors: 0,
@@ -674,7 +678,9 @@ export default function ProfileScreen() {
           </ProfileTopBarIconRow>
         )}
         meta={(
-          <ProfileMeta bio={profile?.bio} />
+          <ProfileMeta bio={profile?.bio}>
+            <FoundingSellerBadge number={profile?.foundingSellerNumber} />
+          </ProfileMeta>
         )}
         stats={stats}
         statsLoading={statsInitialLoading}
