@@ -27,6 +27,14 @@ For explicitly ordered PR batches, drive the sequence from the complete authorit
 
 **How to apply:** Verify the ledger equals the exact requested prefix and confirm each incoming head's ancestry before the final merge. Deduplicate ledger rows before counting coverage. With user approval, recover premature terminal merges on a new branch from the preceding commit while retaining the original branch intact; never disguise a reset.
 
+## Reconcile complete UI components
+
+Resolve conflicts across component openings, props, bodies and closing tags as one unit, not as independently selected hunks. Preserve current functional handlers while integrating the incoming presentation.
+
+**Why:** Older UI branches can use a different component hierarchy. Hunk-by-hunk resolution can pair incompatible containers or silently omit the intended UI change even when the branch becomes an ancestor.
+
+**How to apply:** Compare complete components, check types after the conflict batch, and verify the resulting interaction. If an incoming change remains unintegrated, report it explicitly rather than treating ancestry alone as proof of integration.
+
 Keep the authoritative ordered request and per-step audit ledger in an ignored workspace directory, not only in `/tmp`.
 
 **Why:** A workspace runtime replacement discarded temporary audit files while preserving the repository. Git ancestry could recover coverage, but it could not independently recover the user's intended order; the earlier complete-prefix verification was essential.
