@@ -82,6 +82,10 @@ export const users = pgTable('users', {
   readReceiptsEnabled: boolean('read_receipts_enabled').notNull().default(true),
   // Private account (buyers only): new followers need approval (follow_requests).
   isPrivate:      boolean('is_private').notNull().default(false),
+  // Activity status (migration 261): throttled "last seen" + the user's own
+  // "Show activity status" switch (off = hidden both ways, like Instagram).
+  lastActiveAt:   timestamp('last_active_at', { withTimezone: true }),
+  showActivityStatus: boolean('show_activity_status').notNull().default(true),
   // Buyer onboarding style picks (cold start for the For You ranking pipeline).
   buyerStyleInterests: jsonb('buyer_style_interests').$type<string[]>().notNull().default([]),
   // Brand onboarding fields (seller side)

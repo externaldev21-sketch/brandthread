@@ -5,6 +5,7 @@ import { users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { getEffectiveEntitlement } from "../lib/nativeEntitlements";
 import { PLAN_CATALOGUE, type SellerPlanId } from "../lib/planCatalogue";
+import { touchPresence } from "../lib/presence";
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const { userId } = getAuth(req);
@@ -24,6 +25,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   (req as any).clerkUserId = ctx && ctx.actorClerkId === userId && !(req as any).actAsSelf
     ? ctx.storeOwnerId
     : userId;
+  // Presence belongs to the authenticated person, not the team store owner.
+  if (!process.env.VITEST) touchPresence(userId);
   next();
 }
 

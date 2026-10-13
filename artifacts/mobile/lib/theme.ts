@@ -136,6 +136,8 @@ export const CYAN_DIM      = ACCENT_DIM;
 // ─── Semantic Colors ──────────────────────────────────────────────────────────
 export const SUCCESS        = '#10B981';   // completion, available, shipped
 export const SUCCESS_DIM    = 'rgba(16,185,129,0.15)';
+/** Messages' active-now status (semantic, not decorative chrome). */
+export const ONLINE_GREEN = '#30D158';
 /** @deprecated Use ACCENT. Kept for compatibility; info chrome is grayscale. */
 export const BLUE           = ACCENT;
 /** @deprecated Use ACCENT_DIM. Kept for compatibility; info chrome is grayscale. */

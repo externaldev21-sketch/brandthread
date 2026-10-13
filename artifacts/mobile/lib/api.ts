@@ -3652,10 +3652,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     privacy: {
       /** Get current server-side privacy preferences */
       get: () =>
-        get<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; canBePrivate?: boolean; readReceipts?: boolean }>('/api/auth/privacy'),
+        get<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; canBePrivate?: boolean; readReceipts?: boolean; showActivityStatus?: boolean }>('/api/auth/privacy'),
       /** Update server-side privacy preferences */
-      update: (settings: { dmPrivacy?: 'requests' | 'followers_only'; isPrivate?: boolean; readReceipts?: boolean }) =>
-        patch<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; readReceipts?: boolean }>('/api/auth/privacy', settings),
+      update: (settings: { dmPrivacy?: 'requests' | 'followers_only'; isPrivate?: boolean; readReceipts?: boolean; showActivityStatus?: boolean }) =>
+        patch<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; readReceipts?: boolean; showActivityStatus?: boolean }>('/api/auth/privacy', settings),
     },
     /** Private-account follow requests (incoming) and the Close Friends list. */
     followRequests: {

@@ -70,7 +70,10 @@ export default function BuyerPrivacySettings() {
           setDmPrivacy(server.dmPrivacy);
           if (typeof server.isPrivate === 'boolean') setServerPrivate(server.isPrivate);
         }
-        setSettings(typeof server?.readReceipts === 'boolean' ? { ...local, readReceiptsEnabled: server.readReceipts } : local);
+        setSettings({ ...local,
+          ...(typeof server?.readReceipts === 'boolean' ? { readReceiptsEnabled: server.readReceipts } : {}),
+          ...(typeof server?.showActivityStatus === 'boolean' ? { activityStatusVisible: server.showActivityStatus } : {}),
+        });
       });
       api.followRequests.list(50, 0).then((rows) => setRequestCount(Array.isArray(rows) ? rows.length : 0)).catch(() => {});
     }, [])
@@ -88,7 +91,7 @@ export default function BuyerPrivacySettings() {
       await updatePrivacySettings(settings);
       // Server-side: DM privacy, and read receipts (enforced when the other
       // person loads the chat — they stop seeing "Seen").
-      await api.privacy.update({ dmPrivacy, readReceipts: settings.readReceiptsEnabled });
+      await api.privacy.update({ dmPrivacy, readReceipts: settings.readReceiptsEnabled, showActivityStatus: settings.activityStatusVisible });
       setHasChanges(false);
       setSaveError(null);
     } catch {

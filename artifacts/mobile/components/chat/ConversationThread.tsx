@@ -45,7 +45,7 @@ import { Chip } from '@/components/ui/Chip';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticSuccessAction, hapticSelection, hapticDestructiveConfirm, hapticToggle, hapticFollow } from '@/lib/haptics';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, ONLINE_GREEN } from '@/lib/theme';
 import {
   getConversation, createOrGetConversation, getMessages,
   sendMessage, retryMessage, addReaction, deleteMessageForMe,
@@ -2459,7 +2459,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                       <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
                     </View>
                   )}
-                  {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
+                  {participant.isOnline && <View style={[s.headerAvatarOnlineDot, { backgroundColor: ONLINE_GREEN }]} />}
                 </View>
               )}
               <View style={s.headerTextCol}>

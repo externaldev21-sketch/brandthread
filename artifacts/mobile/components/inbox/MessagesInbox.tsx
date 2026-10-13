@@ -46,7 +46,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { useAuth, useUser } from '@clerk/expo';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FONT, FS, SP, RADIUS, SCREEN_BG, CONTENT_MAX_WIDTH } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, SCREEN_BG, CONTENT_MAX_WIDTH, ONLINE_GREEN } from '@/lib/theme';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
@@ -1326,6 +1326,12 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
                   )}
                 </LiveHostRing>
               )}
+              {participant.isOnline && !conv.isOfficial ? (
+                <View testID={`inbox-online-${conv.id}`} style={{
+                  position: 'absolute', right: 0, bottom: 0, width: 14, height: 14,
+                  borderRadius: 7, backgroundColor: ONLINE_GREEN, borderWidth: 2, borderColor: theme.background,
+                }} />
+              ) : null}
             </View>
 
             {/* Center content — flex:1 + minWidth:0 (s.convCenter) so a long

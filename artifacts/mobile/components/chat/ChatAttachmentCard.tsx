@@ -5,9 +5,19 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
+import {
+  BUBBLE_RADIUS, RECEIVED_BUBBLE, RECEIVED_BUBBLE_TEXT, SENT_BUBBLE, SENT_BUBBLE_TEXT,
+} from '@/lib/chatGrouping';
 
 /**
- * Standalone product/order card for chat — Dev's "chat card redesign" fix.
+ * Product/order card for chat, drawn AS a message bubble (Instagram's shared
+ * post in DMs, https://mobbin.com/flows/fe474697-1948-4140-bcd4-353c1a748c05):
+ * the card takes the bubble's own colour and 18pt radius — white for what you
+ * sent, #262628 for what you received — with the photo inset, name and price
+ * in the bubble's text colour, and a "View" button along the bottom. Still
+ * one tap target (the button is a styled View, not a nested Pressable).
+ *
+ * History — standalone card for chat, Dev's "chat card redesign" fix.
  *
  * Mobbin refs: Etsy standalone product card in chat (image-top / name /
  * price, no wrapping bubble or border —
@@ -51,6 +61,10 @@ export type ChatAttachmentCardProps = {
   accessibilityLabel: string;
   testID?: string;
   style?: StyleProp<ViewStyle>;
+  /** Bubble fill / text colour — defaults to the standard sent/received
+   *  bubble; pass a chat theme's colours to follow it. */
+  bubbleColor?: string;
+  bubbleTextColor?: string;
 };
 
 export function ChatAttachmentCard({
@@ -70,8 +84,12 @@ export function ChatAttachmentCard({
   accessibilityLabel,
   testID,
   style,
+  bubbleColor,
+  bubbleTextColor,
 }: ChatAttachmentCardProps) {
   const hasImage = !!imageUri;
+  const fill = bubbleColor ?? (isMe ? SENT_BUBBLE : RECEIVED_BUBBLE);
+  const ink = bubbleTextColor ?? (isMe ? SENT_BUBBLE_TEXT : RECEIVED_BUBBLE_TEXT);
   // expo-image decodes remote images at their RENDERED size (see
   // components/CachedImage.tsx's own doc comment), which keeps memory
   // bounded — but that's a decode-time optimization only. The full
@@ -102,7 +120,7 @@ export function ChatAttachmentCard({
       accessibilityRole="button"
       testID={testID}
       noMinHeight
-      style={[s.card, { backgroundColor: theme.card, alignSelf: isMe ? 'flex-end' : 'flex-start' }, style]}
+      style={[s.card, { backgroundColor: fill, alignSelf: isMe ? 'flex-end' : 'flex-start' }, style]}
     >
       <View style={s.media} accessibilityRole="none">
         {hasImage ? (
@@ -130,20 +148,22 @@ export function ChatAttachmentCard({
       </View>
 
       <View style={s.body} accessibilityRole="none">
-        <Text style={[s.title, { color: theme.text }]} numberOfLines={1}>{title}</Text>
+        <Text style={[s.title, { color: ink }]} numberOfLines={1}>{title}</Text>
         {statusBadge ? (
           <View style={s.statusRow}>{statusBadge}</View>
         ) : !unavailable && priceLabel ? (
-          <Text style={[s.price, { color: theme.text }]} numberOfLines={1}>{priceLabel}</Text>
+          <Text style={[s.price, { color: ink }]} numberOfLines={1}>{priceLabel}</Text>
         ) : null}
         {sellerLine ? (
-          <Text style={[s.sellerLine, { color: theme.muted }]} numberOfLines={1}>{sellerLine}</Text>
+          <Text style={[s.sellerLine, { color: ink, opacity: 0.6 }]} numberOfLines={1}>{sellerLine}</Text>
         ) : null}
       </View>
 
-      <View style={[s.footer, { borderTopColor: theme.border }]} accessibilityRole="none">
-        <Text style={[s.footerText, { color: theme.text }]}>{footerLabel}</Text>
-        <Icon name={footerIcon} size={13} color={theme.text} style={s.footerIcon} />
+      {/* "View" button inside the bubble — outlined in the bubble's text
+          colour. Visual only: the whole card is the one tap target. */}
+      <View style={[s.footer, { borderColor: `${ink}40` }]} accessibilityRole="none" testID={testID ? `${testID}-view` : undefined}>
+        <Text style={[s.footerText, { color: ink }]}>{footerLabel}</Text>
+        <Icon name={footerIcon} size={13} color={ink} style={s.footerIcon} />
       </View>
     </PressableScale>
   );
@@ -152,13 +172,14 @@ export function ChatAttachmentCard({
 const s = StyleSheet.create({
   card: {
     width: CHAT_ATTACHMENT_CARD_WIDTH,
-    borderRadius: RADIUS.md,
+    borderRadius: BUBBLE_RADIUS,
     overflow: 'hidden',
-    // No border — the card is a free-floating unit, not something faking
-    // "inside a bubble" anymore.
+    padding: 4,
   },
   media: {
     width: '100%',
+    borderRadius: BUBBLE_RADIUS - 4,
+    overflow: 'hidden',
     // 3:4 — matches how product/post photos are now saved (cropped by the
     // creator to 3:4 at upload time), and still clearly bigger than the old
     // 44×44 inline thumbnail this replaces.
@@ -190,7 +211,7 @@ const s = StyleSheet.create({
   body: {
     paddingHorizontal: SP.sm,
     paddingTop: SP.sm,
-    paddingBottom: SP.xs,
+    paddingBottom: SP.sm,
   },
   title: {
     fontSize: FS.sm,
@@ -216,12 +237,15 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingVertical: SP.sm,
+    height: 36,
+    borderRadius: BUBBLE_RADIUS,
+    borderWidth: 1,
+    marginHorizontal: 4,
+    marginBottom: 4,
     gap: 4,
   },
   footerText: {
-    fontSize: FS.meta,
+    fontSize: FS.sm,
     fontFamily: FONT.semibold,
   },
   footerIcon: {
