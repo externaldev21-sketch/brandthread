@@ -2598,6 +2598,7 @@ export * from './sellerPaymentSettings';
 export * from './sellerMessaging';
 export * from './aiCredits';
 export * from './liveModeration';
+export * from './popup';
 
 // ─── Automatic media screening results (migration 115) ───────────────────────
 // Held / rejected uploads only. No raw images are stored.
@@ -2635,4 +2636,3 @@ export * from './comments';
 export * from './hashtags';
 export * from './captions';
 export * from './places';
-export * from './popup';
