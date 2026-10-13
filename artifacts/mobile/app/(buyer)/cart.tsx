@@ -17,6 +17,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header, StickyFooter } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -196,9 +198,7 @@ function CartItemRow({
           purchase control on the line: checkout is per seller group (under
           the group subtotal) and the main Checkout bar. */}
       <View style={ir.img}>
-        {item.imageUri
-          ? <CachedImage source={{ uri: item.imageUri }} style={ir.productImage} contentFit="contain" recyclingKey={item.imageUri} />
-          : <Feather name="image" size={ICON.md} color={theme.muted} />}
+        <ProductPhoto uri={item.imageUri} brand={item.sellerName} name={item.productName} style={ir.productImage} recyclingKey={item.imageUri} />
       </View>
 
       <View style={ir.col}>
@@ -317,9 +317,9 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 10, alignItems: 'center', justifyContent: 'center',
   },
-  // 3:4 and `contain`: the whole product shows, never cropped.
+  // 4:5, cropped to fill (Dev's less-AI pass: every product photo is 4:5).
   img: {
-    width: 84, height: 112, borderRadius: RADII.card,
+    width: 84, height: productPhotoHeight(84), borderRadius: RADII.card,
     backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },

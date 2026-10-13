@@ -44,6 +44,8 @@ import {
 import { ResponsiveContainer, StickyFooter } from '@/components/layout';
 import { SaveHeart } from '@/components/SaveHeart';
 import { CachedImage } from '@/components/CachedImage';
+import { ProductPhoto, ProductPhotoPlaceholder } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar, SuccessCheck } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -177,10 +179,9 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
 
 const fmtPrice = formatCents;
 const GALLERY_WIDTH = Dimensions.get('window').width;
-// 3:4 — matches how product photos are now saved (cropped by the seller to
-// 3:4 at upload time; see ShopProductSheet's ProductImageCarousel, fixed the
-// same way in an earlier photo-audit pass).
-const GALLERY_HEIGHT = GALLERY_WIDTH * 4 / 3;
+// 4:5 — the one product photo frame (constants/media.ts); photos are cropped
+// to 4:5 at upload, so the frame fills edge to edge.
+const GALLERY_HEIGHT = productPhotoHeight(GALLERY_WIDTH);
 
 function renderStars(rating: number): string {
   const full = Math.round(Math.max(0, Math.min(5, rating)));
@@ -212,7 +213,8 @@ function isVariantComboAvailable(
   );
 }
 
-function ZoomableGalleryImage({ uri }: { uri: string }) {
+function ZoomableGalleryImage({ uri, brand, name }: { uri: string; brand?: string; name?: string }) {
+  const [failed, setFailed] = useState(false);
   const scale = useRef(new Animated.Value(1)).current;
   const currentScale = useRef(1);
   const pinchStartDistance = useRef(0);
@@ -255,10 +257,15 @@ function ZoomableGalleryImage({ uri }: { uri: string }) {
     },
   })).current;
 
+  if (failed) {
+    return <ProductPhotoPlaceholder brand={brand} name={name} style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT }} />;
+  }
+
   return (
     <View style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT, overflow: 'hidden' }} {...responder.panHandlers}>
       <Animated.Image
         source={{ uri }}
+        onError={() => setFailed(true)}
         style={[StyleSheet.absoluteFill, { transform: [{ scale }] }]}
         resizeMode="contain"
         accessibilityLabel="Product photo. Pinch with two fingers to zoom."
@@ -295,13 +302,13 @@ const galleryStyles = StyleSheet.create({
   resetZoomText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.xs },
   thumbRail: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
   thumb: {
-    width: 56, height: 56, borderRadius: RADIUS.sm, overflow: 'hidden',
+    width: 56, height: productPhotoHeight(56), borderRadius: RADIUS.sm, overflow: 'hidden',
     borderWidth: 2, borderColor: 'transparent',
   },
   thumbImage: { width: '100%', height: '100%' },
 });
 
-function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accentColor: string }) {
+function ProductGallery({ imageUris, accentColor, brand, name }: { imageUris: string[]; accentColor: string; brand?: string; name?: string }) {
   const images = imageUris.filter(Boolean);
   const scrollX = useRef(new Animated.Value(0)).current;
   const listRef = useRef<Animated.FlatList<string>>(null);
@@ -309,10 +316,7 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
 
   if (!images.length) {
     return (
-      <View style={[galleryStyles.gallery, galleryStyles.galleryEmpty]}>
-        <Feather name="image" size={ICON.xxl} color={MUTED} />
-        <Text style={galleryStyles.emptyText}>Product image unavailable</Text>
-      </View>
+      <ProductPhotoPlaceholder brand={brand} name={name} style={galleryStyles.gallery} />
     );
   }
 
@@ -326,7 +330,7 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => <ZoomableGalleryImage uri={item} />}
+          renderItem={({ item }) => <ZoomableGalleryImage uri={item} brand={brand} name={name} />}
           getItemLayout={(_, index) => ({ length: GALLERY_WIDTH, offset: GALLERY_WIDTH * index, index })}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
           onMomentumScrollEnd={(e) => {
@@ -978,7 +982,7 @@ export default function BuyerProductDetailScreen() {
       >
         {/* Immersive product gallery */}
         <View style={s.imageArea} ref={galleryRef} collapsable={false}>
-          <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} />
+          <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} brand={product.sellerName} name={product.name} />
           {/* Back button — solid dark chrome over the full-bleed gallery. A
               BlurView-based "glass" variant re-samples whatever sits behind
               it every frame; on a swipeable gallery that reads as the same
@@ -1380,13 +1384,7 @@ export default function BuyerProductDetailScreen() {
           <SuccessCheck size={56} iconSize={26} />
           <Text style={s.addedSheetTitle}>Added to your bag</Text>
           <View style={s.addedSheetProductRow}>
-            {product.imageUris[0] ? (
-              <CachedImage source={{ uri: product.imageUris[0] }} style={s.addedSheetImage} contentFit="cover" />
-            ) : (
-              <View style={[s.addedSheetImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED }]}>
-                <Feather name="image" size={18} color={SUBTLE} />
-              </View>
-            )}
+            <ProductPhoto uri={product.imageUris[0]} brand={product.sellerName} name={product.name} style={s.addedSheetImage} />
             <View style={{ flex: 1 }}>
               <Text style={s.addedSheetProductName} numberOfLines={1}>{product.name}</Text>
               <Text style={s.addedSheetProductMeta}>
@@ -1779,14 +1777,8 @@ function RelatedProducts({ productId, dividerStyle, headerStyle }: {
               }
             }}
           >
-            <View style={{ width: 140, height: 180, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SP.sm }}>
-              {(p.images && p.images[0]) ? (
-                <CachedImage source={{ uri: p.images[0] }} style={{ width: '100%', height: '100%' }} contentFit="cover" recyclingKey={p.images[0]} />
-              ) : (
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                  <Feather name="image" size={24} color={MUTED} />
-                </View>
-              )}
+            <View style={{ width: 140, height: productPhotoHeight(140), backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SP.sm }}>
+              <ProductPhoto uri={p.images?.[0]} brand={p.sellerDisplayName} name={p.name} style={{ width: '100%', height: '100%' }} recyclingKey={p.images?.[0]} />
             </View>
             <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG }} numberOfLines={1}>{p.name}</Text>
             <Text style={{ fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 }} numberOfLines={1}>
@@ -1894,7 +1886,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, width: '100%',
     marginBottom: SP.lg, padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
   },
-  addedSheetImage: { width: 52, height: 52, borderRadius: RADIUS.sm },
+  addedSheetImage: { width: 52, height: productPhotoHeight(52), borderRadius: RADIUS.sm },
   addedSheetProductName: { ...TYPE.bodyMedium, color: FG },
   addedSheetProductMeta: { ...TYPE.caption, color: MUTED, marginTop: 2 },
   sellerCard: {
