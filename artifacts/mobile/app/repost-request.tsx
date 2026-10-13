@@ -88,6 +88,7 @@ export default function RepostRequestScreen() {
               avatar={{ uri: request.brand?.avatarUrl ?? null, name: brandName }}
               title={brandName}
               subtitle={request.brand?.handle || undefined}
+              style={styles.brandRow}
             />
             <Text style={styles.ask}>{`${brandName} wants to repost your post.`}</Text>
             {request.post ? (
@@ -126,6 +127,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   root: { flex: 1, backgroundColor: theme.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg },
   muted: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', paddingHorizontal: SP.md },
+  brandRow: { paddingHorizontal: SP.md },
   ask: { color: theme.text, fontFamily: FONT.medium, fontSize: FS.base, paddingHorizontal: SP.md, paddingBottom: SP.md },
   media: { backgroundColor: theme.surface },
   caption: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22, paddingHorizontal: SP.md, paddingTop: SP.sm },

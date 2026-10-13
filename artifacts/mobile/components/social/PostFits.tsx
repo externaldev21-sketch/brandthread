@@ -16,15 +16,15 @@ import { showActionSheet, type ActionSheetButton } from '@/components/ui/ActionS
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 import { isUUID } from '@/lib/engagementUtils';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { authorLabel, fitsErrorMessage, stitchHref } from '@/lib/fits';
 import { fitsService, type FitProduct, type RepostRequestStatus, type StitchInfo } from '@/services/fitsService';
 import { RADII } from '@/constants/radii';
 import { FONT, FS, SP } from '@/lib/theme';
 
-export function usePostFits({ postId, isOwner, authorAccountType }: {
+export function usePostFits({ postId, isOwner }: {
   postId: string | undefined;
   isOwner: boolean;
-  authorAccountType?: string | null;
 }) {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -33,20 +33,29 @@ export function usePostFits({ postId, isOwner, authorAccountType }: {
   const [stitch, setStitch] = useState<StitchInfo | null>(null);
   const [product, setProduct] = useState<FitProduct | null>(null);
   const [request, setRequest] = useState<{ id: string; status: RepostRequestStatus } | null>(null);
+  // The server decides whether this is a buyer post the brand may ask to repost
+  // (GET /api/fits/posts/:id/repost-eligibility); POST keeps NOT_A_BUYER_POST as the backstop.
+  const [repostEligible, setRepostEligible] = useState(false);
   const valid = !!postId && isUUID(postId);
-  // Unknown author type still offers it; the server answers NOT_A_BUYER_POST for brand posts.
-  const brandViewingBuyer = role === 'seller' && !isOwner && authorAccountType !== 'seller';
+  const brandViewer = role === 'seller' && !isOwner;
 
   useFocusEffect(useCallback(() => {
     let cancelled = false;
     if (!valid || !postId) return;
     fitsService.stitch(postId).then((r) => { if (!cancelled) setStitch(r.stitch); }).catch(() => { if (!cancelled) setStitch(null); });
     fitsService.fitCheck(postId).then((r) => { if (!cancelled) setProduct(r.fitCheck.product); }).catch(() => { if (!cancelled) setProduct(null); });
-    if (brandViewingBuyer) {
-      fitsService.repostRequestStatus(postId).then((r) => { if (!cancelled) setRequest(r.request); }).catch(() => {});
+    if (brandViewer && isSellerDevPreview()) {
+      // The signed-out seller preview makes no API calls; only its demo dataset shows the item.
+      setRepostEligible(isPreviewDemoMode());
+    } else if (brandViewer) {
+      fitsService.repostEligibility(postId)
+        .then((r) => { if (!cancelled) { setRepostEligible(r.eligible); setRequest(r.request); } })
+        .catch(() => { if (!cancelled) setRepostEligible(false); });
+    } else {
+      setRepostEligible(false);
     }
     return () => { cancelled = true; };
-  }, [valid, postId, brandViewingBuyer]));
+  }, [valid, postId, brandViewer]));
 
   const openMenu = useCallback(() => {
     if (!valid || !postId) return;
@@ -65,7 +74,7 @@ export function usePostFits({ postId, isOwner, authorAccountType }: {
         buttons.push({ text: 'Tag product', onPress: tag });
       }
     }
-    if (brandViewingBuyer && request?.status !== 'approved' && request?.status !== 'declined') {
+    if (brandViewer && repostEligible && request?.status !== 'approved' && request?.status !== 'declined') {
       if (request?.status === 'pending') {
         buttons.push({
           text: 'Withdraw repost request',
@@ -85,7 +94,7 @@ export function usePostFits({ postId, isOwner, authorAccountType }: {
     }
     buttons.push({ text: 'Cancel', style: 'cancel' });
     showActionSheet(undefined, undefined, buttons);
-  }, [brandViewingBuyer, isOwner, postId, product, request, role, router, valid]);
+  }, [brandViewer, isOwner, postId, product, repostEligible, request, role, router, valid]);
 
   const source = stitch && !('unavailable' in stitch.source) ? stitch.source : null;
   const info = stitch || product ? (

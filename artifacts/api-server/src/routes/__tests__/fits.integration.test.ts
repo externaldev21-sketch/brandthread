@@ -310,6 +310,26 @@ describe("brand repost requests", () => {
     expect(reposts).toHaveLength(0);
   });
 
+  it("repost eligibility: true only for brands viewing a visible buyer post", async () => {
+    const pid = await fitCheck();
+    const elig = (u: string, p: string) => call(`/api/fits/posts/${p}/repost-eligibility`, u);
+    expect((await elig(brand, pid)).body).toEqual({ eligible: true, request: null });
+    // Non-brands, brand posts, own posts, friends-only buyer posts and blocked brands are not eligible.
+    expect((await elig(friend, pid)).body.eligible).toBe(false);
+    const brandPost = await seedPost(brand2, { surface: "thread" });
+    expect((await elig(brand, brandPost)).body.eligible).toBe(false);
+    expect((await elig(brand2, brandPost)).body.eligible).toBe(false);
+    const friendsOnly = await seedPost(buyer, { surface: "profile" });
+    expect((await elig(brand, friendsOnly)).body.eligible).toBe(false);
+    await db.insert(blocks).values({ blockerId: buyer, blockedId: brand2 });
+    expect((await elig(brand2, pid)).body.eligible).toBe(false);
+    await db.delete(blocks).where(and(eq(blocks.blockerId, buyer), eq(blocks.blockedId, brand2)));
+    // Carries the latest request state once one exists.
+    const r = await post("/api/fits/repost-requests", brand, { postId: pid });
+    expect((await elig(brand, pid)).body.request).toMatchObject({ id: r.body.request.id, status: "pending" });
+    expect((await call(`/api/fits/posts/${pid}/repost-eligibility`, null)).status).toBe(401);
+  });
+
   it("only brands can request, only for visible buyer posts, never across blocks", async () => {
     const pid = await fitCheck();
     expect((await post("/api/fits/repost-requests", friend, { postId: pid })).body.code).toBe("SELLERS_ONLY");

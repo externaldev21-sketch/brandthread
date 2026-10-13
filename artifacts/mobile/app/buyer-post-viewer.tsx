@@ -209,7 +209,7 @@ export default function BuyerPostViewer() {
   // When post is null (not yet loaded or not found in my posts), assume non-owner
   // so report is visible and owner-only controls are hidden.
   const isOwner = post !== null && post.authorId === MY_USER_ID;
-  const fits = usePostFits({ postId: params.postId, isOwner, authorAccountType: post?.authorAccountType });
+  const fits = usePostFits({ postId: params.postId, isOwner });
 
   const loadPost = useCallback(async () => {
     let found: BuyerPost | null = null;

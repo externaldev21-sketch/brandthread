@@ -112,9 +112,9 @@ async function shot(page, index, name) {
   console.log(`  saved ${path.relative(MOBILE_ROOT, file)}`);
 }
 
-async function go(page, activity, origin, role, target) {
+async function go(page, activity, origin, role, target, extraQuery = '') {
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    await openScreen(page, activity, origin, role, target);
+    await openScreen(page, activity, origin, role, target, { extraQuery });
     await page.waitForTimeout(600);
     const pathname = await page.evaluate(() => window.location.pathname);
     if (pathname.startsWith(target.split('?')[0])) break;
@@ -236,7 +236,7 @@ async function main() {
     const seller = await openContext(browser, { device, role: 'seller', origin, images, videos });
     await installRoutes(seller.page, origin);
     await step(seller.page, 'seller-menu', async () => {
-      await go(seller.page, seller.activity, origin, 'seller', `/buyer-post-viewer?postId=${FIT_POST}`);
+      await go(seller.page, seller.activity, origin, 'seller', `/buyer-post-viewer?postId=${FIT_POST}`, '&demo=1'); // seller preview makes no API calls; demo dataset only
       await seller.page.getByRole('button', { name: 'More options' }).click({ timeout: 10000 });
       await seller.page.waitForTimeout(600);
       await shot(seller.page, ++i, 'seller-request-to-repost-menu');

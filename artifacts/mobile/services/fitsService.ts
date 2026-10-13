@@ -85,6 +85,8 @@ export const fitsService = {
   productFitChecks: (productId: string, limit = 12) =>
     serviceRequest<{ fitChecks: ProductFitCheck[] }>(`/api/products/${enc(productId)}/fit-checks?limit=${limit}`, {}, false),
 
+  repostEligibility: (postId: string) =>
+    serviceRequest<{ eligible: boolean; request: { id: string; status: RepostRequestStatus } | null }>(`/api/fits/posts/${enc(postId)}/repost-eligibility`, {}, false),
   repostRequestStatus: (postId: string) =>
     serviceRequest<{ request: { id: string; status: RepostRequestStatus } | null }>(`/api/fits/repost-requests/status?postId=${enc(postId)}`, {}, false),
   requestRepost: (postId: string) =>

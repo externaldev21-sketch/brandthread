@@ -331,6 +331,26 @@ router.get("/repost-requests/status", requireAuth, async (req, res) => {
   return res.json({ request: row ?? null });
 });
 
+/**
+ * Whether the caller (a brand) may ask to repost this post — the ••• menu
+ * shows "Request to repost" only when `eligible`. Same checks as the POST
+ * below: caller is a seller, post is published and visible to them (blocks,
+ * private accounts, friends-only buyer posts), and its author is a buyer.
+ */
+router.get("/posts/:postId/repost-eligibility", requireAuth, async (req, res) => {
+  const userId = me(req);
+  const { postId } = req.params;
+  if (!isUuid(postId)) return res.status(404).json({ error: "Post not found" });
+  const types = await accountTypes([userId]);
+  const post = types.get(userId) === "seller" ? await loadVisiblePost(postId, userId) : null;
+  const eligible = !!post && post.postStatus === "published" && post.userId !== userId && post.author.accountType === "buyer";
+  if (!eligible) return res.json({ eligible: false, request: null });
+  const [row] = await db.select({ id: repostRequests.id, status: repostRequests.status }).from(repostRequests)
+    .where(and(eq(repostRequests.postId, postId), eq(repostRequests.requesterSellerId, userId)))
+    .orderBy(desc(repostRequests.createdAt)).limit(1);
+  return res.json({ eligible: true, request: row ?? null });
+});
+
 router.post("/repost-requests", requireAuth, rateLimit("post-interact"), async (req, res) => {
   const userId = me(req);
   const { postId } = (req.body ?? {}) as { postId?: unknown };

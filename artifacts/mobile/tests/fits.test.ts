@@ -43,6 +43,14 @@ describe('fits helpers', () => {
     expect(activityHref({ targetType: 'repost_request', targetId: 'r1', type: 'repost_request' } as never)).toBe('/repost-request?id=r1');
   });
 
+  it('shows "Request to repost" only when the server says the post is eligible', () => {
+    const hook = read('components/social/PostFits.tsx');
+    expect(hook).toContain('fitsService.repostEligibility(postId)');
+    expect(hook).toContain('brandViewer && repostEligible');
+    expect(hook).not.toContain('authorAccountType');
+    expect(read('services/fitsService.ts')).toContain('/repost-eligibility');
+  });
+
   it('wires the entry points additively', () => {
     expect(read('components/ThreadShareSheet.tsx')).toContain('label="Stitch"');
     expect(read('app/buyer-product-detail.tsx')).toContain('<FitChecksStrip productId={product.id}');
