@@ -103,9 +103,11 @@ describe('notes bubble wiring', () => {
 
   it('the 60-char cap is shared, not re-guessed, across type, preview data and UI', () => {
     expect(NOTE_MAX_CHARS).toBe(60);
-    const inbox = read('components/inbox/MessagesInbox.tsx');
-    expect(inbox).toContain('NOTE_MAX_CHARS');
-    expect(inbox).toContain('maxLength={NOTE_MAX_CHARS}');
+    // The composer moved into its own sheet (Instagram "Leave a note").
+    const composer = read('components/social/NoteComposerSheet.tsx');
+    expect(composer).toContain("import { NOTE_MAX_CHARS, type NoteAudience } from '@/services/socialTypes';");
+    expect(composer).toContain('maxLength={NOTE_MAX_CHARS}');
+    expect(read('components/inbox/MessagesInbox.tsx')).toContain('<NoteComposerSheet');
   });
 
   it('renders the note bubble as an addition above the tray, not a replacement of its chrome', () => {
@@ -143,8 +145,30 @@ describe('notes bubble wiring', () => {
   });
 
   it('posting a note shows a real error, not a dead end, on failure', () => {
+    // The sheet stays open with an inline error (no OS alert over the keyboard).
+    const composer = read('components/social/NoteComposerSheet.tsx');
+    expect(composer).toContain('Couldn’t share your note. Try again.');
+    expect(composer).toMatch(/catch \{\s*hapticError\(\);\s*setFailed\(true\);/);
+    // The inbox's handler throws on failure so the sheet can show it.
     const inbox = read('components/inbox/MessagesInbox.tsx');
-    expect(inbox).toContain("Alert.alert('Couldn’t post your note'");
+    expect(inbox).toContain('setMyNote(await postNote(text, audience));');
+  });
+
+  it('the composer copies Instagram Notes: audience picker, live bubble, Share enabled on input', () => {
+    const composer = read('components/social/NoteComposerSheet.tsx');
+    expect(composer).toContain("friends: 'Followers you follow back'");
+    expect(composer).toContain("close_friends: 'Close friends'");
+    expect(composer).toContain('title="Share with"');
+    expect(composer).toContain('placeholder="Share a thought…"');
+    expect(composer).toContain('const canShare = trimmed.length > 0 && !saving;');
+    expect(composer).toContain('<CharacterRing');
+    // Sits on the shared sheet, so it rides the keyboard.
+    expect(composer).toContain('<Sheet');
+  });
+
+  it('posts the chosen audience to the server', () => {
+    const social = read('services/socialService.ts');
+    expect(social).toContain('JSON.stringify(audience ? { text, audience } : { text })');
   });
 });
 

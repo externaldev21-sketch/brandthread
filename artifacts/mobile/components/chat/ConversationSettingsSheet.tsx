@@ -1,18 +1,14 @@
-import { hexToRgba as mediaAlpha } from '@/lib/backgroundPalette';
-import { MEDIA } from '@/lib/theme';
-import { radius as ControlRadius } from '@/constants/radii';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { hapticFollow } from '@/lib/haptics';
 import { useAuth } from '@clerk/expo';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { hapticFollow } from '@/lib/haptics';
 import { apiErrorMessage } from '@/lib/safety';
-import { FONT, FS, SP, RADIUS, TEXT_DISABLED } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 
 type Confirmation = 'block' | 'unblock' | 'unfollow';
 
@@ -34,7 +30,6 @@ export function ConversationSettingsSheet({
   onMutedChange, onBlockedChange, onArchive, onReport,
 }: Props) {
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
   const { userId } = useAuth();
   const api = useApi();
   const [following, setFollowing] = useState<boolean | null>(null);
@@ -133,92 +128,72 @@ export function ConversationSettingsSheet({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: disabled || busy }}
-      style={[styles.row, { borderColor: theme.border }]}
+      style={[styles.row, { borderColor: theme.border, opacity: disabled ? 0.5 : 1 }]}
     >
-      {/* Disabled rows are solid gray, not faded. */}
-      <Icon name={icon} size={19} color={disabled ? TEXT_DISABLED : destructive ? theme.error : theme.text} />
+      <Icon name={icon} size={19} color={destructive ? theme.error : theme.text} />
       <View style={styles.rowCopy}>
-        <Text style={[styles.label, { color: disabled ? TEXT_DISABLED : destructive ? theme.error : theme.text }]}>{label}</Text>
-        <Text style={[styles.detail, { color: disabled ? TEXT_DISABLED : theme.muted }]}>{detail}</Text>
+        <Text style={[styles.label, { color: destructive ? theme.error : theme.text }]}>{label}</Text>
+        <Text style={[styles.detail, { color: theme.muted }]}>{detail}</Text>
       </View>
       <Icon name="chevron-right" size={17} color={theme.muted} />
     </PressableScale>
   );
 
-  return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close conversation settings" />
-        <SheetRise style={[styles.sheet, { backgroundColor: theme.surface, borderColor: theme.border, paddingBottom: Math.max(insets.bottom, SP.md) + SP.md }]}>
-          <View style={[styles.handle, { backgroundColor: theme.border }]} />
-          <View style={styles.heading}>
-            <View style={styles.headingCopy}>
-              <Text style={[styles.title, { color: theme.text }]}>{confirm ? 'Confirm action' : 'Conversation settings'}</Text>
-              <Text style={[styles.subtitle, { color: theme.muted }]} numberOfLines={1}>{counterpart.name}</Text>
-            </View>
-            <PressableScale onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={styles.close}>
-              <Icon name="x" size={20} color={theme.text} />
-            </PressableScale>
-          </View>
+  const confirmLabel = confirm === 'block' ? 'Block' : confirm === 'unblock' ? 'Unblock' : 'Unfollow';
 
-          {confirm ? (
-            <>
-              <Text style={[styles.confirmText, { color: theme.text }]}>
-                {confirm === 'block'
-                  ? `Block ${counterpart.name}? They won't be able to message you or see your content.`
-                  : confirm === 'unblock'
-                    ? `Unblock ${counterpart.name}? They will be able to message you again.`
-                    : `Unfollow ${counterpart.name}? You can follow them again later.`}
-              </Text>
-              <View style={styles.confirmActions}>
-                <PressableScale onPress={() => { setConfirm(null); setError(''); }} disabled={busy} style={[styles.confirmButton, { borderColor: theme.border }]}>
-                  <Text style={[styles.label, { color: theme.text }]}>Cancel</Text>
-                </PressableScale>
-                <PressableScale onPress={applyConfirmation} disabled={busy} style={[styles.confirmButton, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                  {busy ? <ActivityIndicator color={theme.text} /> : <Text style={[styles.label, { color: confirm === 'block' ? theme.error : theme.text }]}>
-                    {confirm === 'block' ? 'Block' : confirm === 'unblock' ? 'Unblock' : 'Unfollow'}
-                  </Text>}
-                </PressableScale>
-              </View>
-            </>
-          ) : (
-            <>
-              {row(isMuted ? 'bell' : 'bell-off', isMuted ? 'Unmute conversation' : 'Mute conversation',
-                isMuted ? 'Turn push alerts for this chat back on' : 'Stop push alerts, keep messages in your inbox', toggleMute)}
-              {row('user-minus', 'Unfollow user',
-                followError ? 'Could not check follow status — tap to retry' : following === null ? 'Checking follow status…' : following ? 'Stop following this user' : 'You are not following this user',
-                followError ? retryFollowStatus : () => setConfirm('unfollow'), !followError && following !== true)}
-              {row(blockedByMe ? 'user-check' : 'slash', blockedByMe ? 'Unblock user' : 'Block user',
-                blockedByMe ? 'Allow messages from this user again' : 'Stop messages and hide your content from this user',
-                () => setConfirm(blockedByMe ? 'unblock' : 'block'), false, !blockedByMe)}
-              {(onArchive || onReport) && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
-              {onArchive && row('archive', 'Archive conversation', 'Remove it from your inbox', archive)}
-              {onReport && row('flag', 'Report user', 'Tell us about a safety concern', () => { onClose(); onReport(); })}
-            </>
-          )}
-          {!!error && <Text style={[styles.error, { color: theme.error }]} accessibilityRole="alert">{error}</Text>}
-        </SheetRise>
-      </View>
-    </Modal>
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={confirm ? `${confirmLabel} ${counterpart.name}?` : counterpart.name}
+      accessibilityLabel="Conversation settings"
+      primaryAction={confirm ? {
+        label: confirmLabel,
+        onPress: applyConfirmation,
+        loading: busy,
+        variant: confirm === 'unblock' ? 'primary' : 'destructive',
+      } : undefined}
+      secondaryAction={confirm ? {
+        label: 'Cancel',
+        onPress: () => { setConfirm(null); setError(''); },
+        disabled: busy,
+      } : undefined}
+      testID="conversation-settings-sheet"
+    >
+      {confirm ? (
+        <Text style={[styles.confirmText, { color: theme.muted }]}>
+          {confirm === 'block'
+            ? "They won't be able to message you or see your content."
+            : confirm === 'unblock'
+              ? 'They will be able to message you again.'
+              : 'You can follow them again later.'}
+        </Text>
+      ) : (
+        <>
+          {row(isMuted ? 'bell' : 'bell-off', isMuted ? 'Unmute conversation' : 'Mute conversation',
+            isMuted ? 'Turn push alerts for this chat back on' : 'Stop push alerts, keep messages in your inbox', toggleMute)}
+          {row('user-minus', 'Unfollow user',
+            followError ? 'Could not check follow status — tap to retry' : following === null ? 'Checking follow status…' : following ? 'Stop following this user' : 'You are not following this user',
+            followError ? retryFollowStatus : () => setConfirm('unfollow'), !followError && following !== true)}
+          {row(blockedByMe ? 'user-check' : 'slash', blockedByMe ? 'Unblock user' : 'Block user',
+            blockedByMe ? 'Allow messages from this user again' : 'Stop messages and hide your content from this user',
+            () => setConfirm(blockedByMe ? 'unblock' : 'block'), false, !blockedByMe)}
+          {(onArchive || onReport) && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
+          {onArchive && row('archive', 'Archive conversation', 'Remove it from your inbox', archive)}
+          {onReport && row('flag', 'Report user', 'Tell us about a safety concern', () => { onClose(); onReport(); })}
+        </>
+      )}
+      {!!error && <Text style={[styles.error, { color: theme.error }]} accessibilityRole="alert">{error}</Text>}
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: mediaAlpha(MEDIA.background, 0.62) },
-  sheet: { width: '100%', maxWidth: 480, alignSelf: 'center', borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, borderWidth: 1, paddingHorizontal: SP.lg, paddingTop: SP.sm, gap: SP.xs },
-  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
-  heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
-  headingCopy: { flex: 1, paddingRight: SP.sm },
-  title: { fontSize: FS.lg, fontFamily: FONT.bold },
-  subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, marginTop: 3 },
-  close: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   row: { minHeight: 58, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, gap: SP.md, paddingVertical: SP.sm },
   rowCopy: { flex: 1 },
   label: { fontSize: FS.base, fontFamily: FONT.semibold },
   detail: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 3 },
   divider: { height: 1, marginTop: SP.sm },
-  confirmText: { fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 23, marginVertical: SP.md },
-  confirmActions: { flexDirection: 'row', gap: SP.sm, marginTop: SP.sm },
-  confirmButton: { flex: 1, height: 48, borderWidth: 1, borderRadius: ControlRadius.md, alignItems: 'center', justifyContent: 'center' },
+  confirmText: { fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 22, marginBottom: SP.sm },
   error: { fontSize: FS.sm, fontFamily: FONT.medium, marginTop: SP.sm },
 });

@@ -24,7 +24,7 @@ import type {
   Friendship, FriendshipStatus, FriendRequest, FriendSuggestion,
   Conversation, ConversationType, ConversationParticipant,
   Message, MessageAttachment, MessageReaction, ReactionType,
-  Story, StoryMedia, StoryPrivacySettings, StoryViewer, Note,
+  Story, StoryMedia, StoryPrivacySettings, StoryViewer, Note, NoteAudience,
   Notification, NotificationCategory, NotificationPreference,
   BlockRecord, MuteRecord, RestrictRecord,
   SavedItem, SavedItemType, SavedCollection, PrivacySettings, ProfileSearchResult,
@@ -1808,10 +1808,10 @@ export async function deleteStory(storyId: string): Promise<void> {
 
 /** Post (or replace) my own active note — 60 chars max, 24h TTL, matching the
  *  server's own validation in POST /api/social/notes. */
-export async function postNote(text: string): Promise<Note> {
+export async function postNote(text: string, audience?: Exclude<NoteAudience, 'followers'>): Promise<Note> {
   const note = await serviceRequest<Note>('/api/social/notes', {
     method: 'POST',
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(audience ? { text, audience } : { text }),
   });
   notify();
   return note;

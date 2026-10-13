@@ -517,6 +517,11 @@ export interface MentionPerson {
 // author — posting a new one replaces the old.
 export const NOTE_MAX_CHARS = 60;
 
+/** Who sees a note. 'friends' = followers you follow back, 'close_friends' =
+ *  your Close Friends list (the two Instagram options). 'followers' is how
+ *  notes posted before audiences existed are stored. */
+export type NoteAudience = 'followers' | 'friends' | 'close_friends';
+
 export interface Note {
   authorId: string;
   authorName: string;
@@ -524,6 +529,7 @@ export interface Note {
   authorInitials: string;
   authorColor: string;
   text: string;
+  audience?: NoteAudience;
   createdAt: number;   // Unix ms
   expiresAt: number;   // createdAt + 24h
 }

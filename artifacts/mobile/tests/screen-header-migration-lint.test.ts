@@ -192,7 +192,6 @@ const MODAL_INSETS_ALLOWLIST = new Set([
   'components/SellerTutorialOverlay.tsx',
   'components/SetupCelebration.tsx',
   'components/buyer-feed/LongPressMenu.tsx',
-  'components/chat/ThemePickerSheet.tsx',
   'components/discover/DiscoverSafetyMenu.tsx',
   'components/motion/SheetRise.tsx',
   'components/settings/SettingsKit.tsx',

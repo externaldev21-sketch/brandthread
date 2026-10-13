@@ -16,7 +16,7 @@ import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
  * (see docs/dm-flows.md) rather than a real-time push-based one.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +25,7 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { PressableScale, HapticSwitch} from '@/components/BrandthreadUI';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { CachedImage } from '@/components/CachedImage';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { ThemePickerSheet } from '@/components/chat/ThemePickerSheet';
 import { ThemePreviewScreen } from '@/components/chat/ThemePreviewScreen';
 import { CONVERSATION_THEMES, getConversationTheme } from '@/lib/conversationThemes';
@@ -397,23 +397,18 @@ export default function ConversationDetailsScreen() {
         </View>
       </ScrollView>
 
-      <Modal visible={muteVisible} transparent animationType="fade" onRequestClose={() => setMuteVisible(false)}>
-        <PressableScale accessibilityRole="button" accessibilityLabel="Close" rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={() => setMuteVisible(false)} />
-        <SheetRise style={[s.muteSheet, { backgroundColor: theme.surface, paddingBottom: insets.bottom + SP.md }]}>
-          <View style={s.sheetHandle} />
-          <Text style={[s.muteSheetTitle, { color: theme.text }]}>Mute notifications</Text>
-          {MUTE_OPTIONS.map((opt) => (
-            <PressableScale rippleEnabled={false}
-              key={opt.label}
-              style={s.muteOption}
-              onPress={() => applyMute(opt.minutes)}
-              testID={`chat-details-mute-${opt.minutes}`}
-            >
-              <Text style={[s.muteOptionText, { color: theme.text }]}>{opt.label}</Text>
-            </PressableScale>
-          ))}
-        </SheetRise>
-      </Modal>
+      <Sheet visible={muteVisible} onClose={() => setMuteVisible(false)} title="Mute notifications" testID="chat-details-mute-sheet">
+        {MUTE_OPTIONS.map((opt) => (
+          <PressableScale rippleEnabled={false}
+            key={opt.label}
+            style={s.muteOption}
+            onPress={() => applyMute(opt.minutes)}
+            testID={`chat-details-mute-${opt.minutes}`}
+          >
+            <Text style={[s.muteOptionText, { color: theme.text }]}>{opt.label}</Text>
+          </PressableScale>
+        ))}
+      </Sheet>
 
       <ThemePickerSheet
         visible={themePickerVisible}
@@ -504,10 +499,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   rowSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   pill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS.pill, marginRight: SP.sm },
   pillText: { fontSize: 11, fontFamily: FONT.bold },
-  modalBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#00000066' },
-  muteSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingHorizontal: SP.md, paddingTop: SP.sm },
-  sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginBottom: SP.md },
-  muteSheetTitle: { fontFamily: FONT.semibold, fontSize: FS.md, textAlign: 'center', marginBottom: SP.sm },
   muteOption: { paddingVertical: SP.md, alignItems: 'center' },
   muteOptionText: { fontFamily: FONT.regular, fontSize: FS.base },
 });

@@ -3460,12 +3460,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         }>>('/api/social/stories/following'),
       // ── Notes (bubble above story-tray avatars) ────────────────────────────
       /** Post (or replace) my own active note — 60 chars max, 24h TTL. */
-      postNote: (text: string) =>
+      postNote: (text: string, audience?: 'friends' | 'close_friends') =>
         post<{
           authorId: string; authorName: string; authorHandle: string;
           authorInitials: string; authorColor: string;
-          text: string; createdAt: number; expiresAt: number;
-        }>('/api/social/notes', { text }),
+          text: string; audience?: 'followers' | 'friends' | 'close_friends';
+          createdAt: number; expiresAt: number;
+        }>('/api/social/notes', audience ? { text, audience } : { text }),
       /** Active notes from people I follow (+ my own), for the stories tray. */
       notesFollowing: () =>
         get<Array<{

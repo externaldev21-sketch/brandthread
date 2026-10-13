@@ -4,7 +4,6 @@ import {
   Alert,
   Animated,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -26,9 +25,7 @@ import {
 import type { Friendship } from '@/services/socialTypes';
 import { FONT, FS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import Reanimated from 'react-native-reanimated';
-import { GestureDetector } from 'react-native-gesture-handler';
-import { useSheetTransition } from '@/components/ui/BottomSheet';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { useApi } from '@/lib/api';
 import { isUUID } from '@/lib/engagementUtils';
 import { buildPostUrl } from '@/lib/shareLinks';
@@ -70,8 +67,6 @@ export function ThreadShareSheet({
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  // Shared sheet engine: rises on the iOS sheet curve, drag the grabber down to dismiss.
-  const sheetMotion = useSheetTransition(visible, onClose);
   const api = useApi();
   const router = useRouter();
   const [friends, setFriends] = useState<Friendship[]>([]);
@@ -294,24 +289,14 @@ export function ThreadShareSheet({
 
   return (
     <>
-      <Modal visible={sheetMotion.modalVisible} transparent animationType="none" onRequestClose={onClose}>
-        <Reanimated.View style={[StyleSheet.absoluteFill, sheetMotion.backdropStyle]}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close" style={styles.backdrop} onPress={onClose} />
-        </Reanimated.View>
-        <Reanimated.View onLayout={sheetMotion.onSheetLayout}
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) }, sheetMotion.sheetStyle]}>
-          <GestureDetector gesture={sheetMotion.panGesture}>
-          <Reanimated.View>
-          <View style={styles.grabberWrap}><View style={[styles.grabber, { backgroundColor: theme.muted }]} /></View>
-          <View style={styles.header}>
-            <View style={styles.headerSpacer} />
-            <Text style={styles.title}>Share to</Text>
-            <Pressable onPress={onClose} style={styles.close} accessibilityLabel="Close share menu" testID="thread-share-close">
-              <Icon name="x" size={20} color={theme.text} />
-            </Pressable>
-          </View>
-          </Reanimated.View>
-          </GestureDetector>
+      <Sheet
+        visible={visible}
+        onClose={onClose}
+        title="Share to"
+        padded={false}
+        accessibilityLabel="Share menu"
+        testID="thread-share-sheet"
+      >
 
           <View style={styles.section}>
             <ScrollView
@@ -372,8 +357,7 @@ export function ThreadShareSheet({
               ) : null}
             </View>
           </View>
-        </Reanimated.View>
-      </Modal>
+      </Sheet>
 
       {savingProgress != null && (
         <View style={[styles.progressWrap, { bottom: insets.bottom + 70 }]}>
@@ -436,25 +420,7 @@ function ShareAction({
 }
 
 const makeStyles = (theme: { background: string; card: string; border: string; text: string; muted: string; surface: string; onAccent: string }) => StyleSheet.create({
-  grabberWrap: { alignItems: 'center', paddingTop: 6, paddingBottom: 2 },
-  grabber: { width: 36, height: 4, borderRadius: 2, opacity: 0.4 },
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: `${theme.background}55` },
-  sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    backgroundColor: theme.card,
-    borderTopWidth: 1,
-    borderColor: theme.border,
-  },
-  header: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 },
-  headerSpacer: { width: 34 },
-  title: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
-  close: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface },
-  section: { paddingHorizontal: 14, paddingVertical: 14 },
+  section: { paddingHorizontal: 20, paddingVertical: 14 },
   actionRow: { flexDirection: 'row', gap: 12 },
   action: { width: 66, alignItems: 'center', gap: 7 },
   actionCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border },

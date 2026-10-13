@@ -73,13 +73,13 @@ export function getPreviewMyNote(): Note | null {
 
 /** Post (or replace) my own preview note — mirrors the real POST
  *  /api/social/notes contract (trim, 60-char cap enforced by the caller). */
-export function postPreviewNote(text: string): Note {
+export function postPreviewNote(text: string, audience?: Note['audience']): Note {
   const trimmed = text.trim();
   const nowTs = Date.now();
   myPreviewNote = {
     authorId: 'me', authorName: 'You', authorHandle: '@you',
     authorInitials: 'Y', authorColor: '#3A3A3E',
-    text: trimmed, createdAt: nowTs, expiresAt: nowTs + 24 * HOUR,
+    text: trimmed, audience, createdAt: nowTs, expiresAt: nowTs + 24 * HOUR,
   };
   return myPreviewNote;
 }

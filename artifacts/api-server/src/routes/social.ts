@@ -38,6 +38,7 @@ import {
 } from "../lib/safety";
 import { actorFieldsFromProfile, notifyStoryLike, notifyStoryMention, notifyStoryReshare } from "../lib/activityEvents";
 import { viewerRelations, audienceAllows, viewerMayOpenAudience } from "../lib/storyAccess";
+import { normalizeNoteAudience, parseNoteAudience } from "../lib/noteAudience";
 import { sanitizeStoryOverlays, withStickerState, StickerValidationError } from "../lib/storyStickers";
 import { MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
 import { isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs } from "../lib/mediaModerationStore";
@@ -1638,6 +1639,7 @@ function buildNoteView(row: typeof notes.$inferSelect) {
     authorInitials: row.authorInitials ?? "",
     authorColor:    row.authorColor ?? "#71717A",
     text:           row.text,
+    audience:       normalizeNoteAudience(row.audience),
     createdAt:      new Date(row.createdAt).getTime(),
     expiresAt:      new Date(row.expiresAt).getTime(),
   };
@@ -1646,9 +1648,11 @@ function buildNoteView(row: typeof notes.$inferSelect) {
 // ─── POST /api/social/notes — post/replace my own note ───────────────────────
 router.post("/notes", validateBody(createNoteBody), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
-  const { text: rawText } = req.body as { text?: string };
+  const { text: rawText, audience: rawAudience } = req.body as { text?: string; audience?: unknown };
   const text = typeof rawText === "string" ? rawText.trim() : "";
   if (!text) { res.status(400).json({ error: "text required" }); return; }
+  const audience = parseNoteAudience(rawAudience);
+  if (!audience) { res.status(400).json({ error: "audience must be friends or close_friends" }); return; }
   if (text.length > NOTE_MAX_CHARS) {
     res.status(400).json({ error: `Notes are limited to ${NOTE_MAX_CHARS} characters` }); return;
   }
@@ -1679,6 +1683,7 @@ router.post("/notes", validateBody(createNoteBody), async (req, res) => {
     authorInitials: initials(myName),
     authorColor:    avatarColor(myId),
     text,
+    audience,
     createdAt:      now,
     expiresAt,
   }).onConflictDoUpdate({
@@ -1689,6 +1694,7 @@ router.post("/notes", validateBody(createNoteBody), async (req, res) => {
       authorInitials: initials(myName),
       authorColor:    avatarColor(myId),
       text,
+      audience,
       createdAt:      now,
       expiresAt,
     },
@@ -1717,6 +1723,19 @@ router.get("/notes/following", async (req, res) => {
         eq(notes.authorId, myId),
         and(
           inArray(notes.authorId, db.select({ id: follows.followingId }).from(follows).where(eq(follows.followerId, myId))),
+          // Filter audience before LIMIT/OFFSET so private notes cannot
+          // consume visible page slots or leak through a paginated response.
+          or(
+            sql`${notes.audience} NOT IN ('friends', 'close_friends')`,
+            and(
+              eq(notes.audience, 'friends'),
+              inArray(notes.authorId, db.select({ id: follows.followerId }).from(follows).where(eq(follows.followingId, myId))),
+            ),
+            and(
+              eq(notes.audience, 'close_friends'),
+              inArray(notes.authorId, db.select({ id: closeFriends.userId }).from(closeFriends).where(eq(closeFriends.friendId, myId))),
+            ),
+          ),
           sql`NOT EXISTS (SELECT 1 FROM ${blocks} WHERE (${blocks.blockerId} = ${myId} AND ${blocks.blockedId} = ${notes.authorId}) OR (${blocks.blockedId} = ${myId} AND ${blocks.blockerId} = ${notes.authorId}))`,
         ),
       ),

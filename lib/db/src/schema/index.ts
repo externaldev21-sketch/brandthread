@@ -1737,6 +1737,9 @@ export const notes = pgTable('notes', {
   authorInitials: text('author_initials'),
   authorColor:    text('author_color'),
   text:           text('text').notNull(),
+  // 'followers' (pre-audience default) | 'friends' (followers you follow
+  // back) | 'close_friends' — see api-server lib/noteAudience.ts.
+  audience:       text('audience').notNull().default('followers'),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
   expiresAt:      timestamp('expires_at').notNull(),
 }, (t) => ({

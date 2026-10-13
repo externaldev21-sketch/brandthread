@@ -98,7 +98,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { formatCents } from '@/lib/money';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
 import UploadRing from '@/components/chat/UploadRing';
 import MediaUploadThumb from '@/components/chat/MediaUploadThumb';
 import MediaViewer from '@/components/chat/MediaViewer';
@@ -2858,17 +2858,12 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       )}
 
       {/* ── Media picker sheet ─────────────────────────────────────────────── */}
-      <Modal
+      <Sheet
         visible={showMediaSheet}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowMediaSheet(false)}
+        onClose={() => setShowMediaSheet(false)}
+        title="Add to message"
+        testID="chat-media-sheet"
       >
-        <ModalSafeArea>
-          <PressableScale accessibilityRole="button" accessibilityLabel="Close" rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
-          <SheetRise style={s.mediaSheet}>
-            <View style={s.mediaSheetHandle} />
-            <Text style={s.mediaSheetTitle}>Add to message</Text>
             <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickPhoto}>
               <View style={s.mediaSheetIcon}><Feather name="image" size={ICON.md} color={theme.accent} /></View>
               <View>
@@ -2904,24 +2899,17 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
               </PressableScale>
             ) : null}
             <View style={{ height: 20 }} />
-          </SheetRise>
-        </ModalSafeArea>
-      </Modal>
+      </Sheet>
 
-      <Modal
+      <Sheet
         visible={showAttachmentPicker}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowAttachmentPicker(false)}
+        onClose={() => setShowAttachmentPicker(false)}
+        title="Attach to message"
+        scrollable={false}
+        contentContainerStyle={{ height: Math.round(Dimensions.get('window').height * 0.72) }}
+        testID="chat-attachment-sheet"
       >
-        <ModalSafeArea>
-          <View style={s.modalBackdrop}>
-            <View style={s.productPicker}>
-              <ScreenHeader
-                title="Attach to message"
-                variant="modal"
-                onBack={() => setShowAttachmentPicker(false)}
-              />
+            <View style={{ flex: 1, minHeight: 0 }}>
               <View style={s.attachmentTabs}>
               <PressableScale rippleEnabled={false}
                 style={[s.attachmentTab, attachmentTab === 'product' && s.attachmentTabActive]}
@@ -3037,24 +3025,16 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
               )
             )}
             </View>
-          </View>
-        </ModalSafeArea>
-      </Modal>
+      </Sheet>
 
       {/* Seller side: this buyer's orders with you — same sheet chrome as
           "Add to message" above. */}
       {isSeller ? (
-        <Modal
+        <Sheet
           visible={showBuyerOrders}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowBuyerOrders(false)}
+          onClose={() => setShowBuyerOrders(false)}
+          title={`Orders from ${participant?.name ?? displayName}`}
         >
-          <ModalSafeArea>
-            <PressableScale rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowBuyerOrders(false)} />
-            <SheetRise style={s.mediaSheet}>
-              <View style={s.mediaSheetHandle} />
-              <Text style={s.mediaSheetTitle} numberOfLines={2}>Orders from {participant?.name ?? displayName}</Text>
               <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false} testID="conversation-buyer-orders">
                 {buyerOrdersLoading ? (
                   <View style={s.pickerLoading}>
@@ -3114,9 +3094,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                 )}
               </ScrollView>
               <View style={{ height: 20 }} />
-            </SheetRise>
-          </ModalSafeArea>
-        </Modal>
+        </Sheet>
       ) : null}
 
       {/* Long-press reactions — Glass overlay. Mobbin: Instagram DM "Tap and
