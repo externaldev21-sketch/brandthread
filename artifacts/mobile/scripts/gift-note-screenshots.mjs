@@ -106,7 +106,22 @@ async function openCheckout(page, activity, origin) {
     await openScreen(page, activity, origin, 'buyer', '/buyer-checkout?source=buynow', {
       beforeNavigate: () => page.evaluate(([key, value]) => localStorage.setItem(key, value), [CHECKOUT_KEY, JSON.stringify(session)]),
     });
-    try { await page.getByText('Order total').first().waitFor({ timeout: 15_000 }); break; } catch (e) { if (attempt >= 4) throw e; }
+    try {
+      await page.getByTestId('checkout-payment').first().waitFor({ timeout: 15_000 });
+      // The app occasionally restores the harness's demo cart instead of this
+      // scenario's single-item session; only accept the scenario.
+      const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null'), CHECKOUT_KEY);
+      const groups = stored?.deliveryGroups?.length;
+      const twoSellers = await page.getByText(/Items from 2 sellers/).count();
+      if (groups !== 1 || twoSellers > 0) throw new Error(`scenario not loaded (groups=${groups})`);
+      break;
+    } catch (e) {
+      if (attempt >= 4) {
+        await page.screenshot({ path: path.join(WORK_DIR, 'gift-note-debug.png') });
+        console.error('  debug screenshot', path.join(WORK_DIR, 'gift-note-debug.png'), page.url());
+        throw e;
+      }
+    }
   }
   await waitForQuietNetwork(activity).catch(() => {});
   await waitForImages(page).catch(() => {});
@@ -161,7 +176,26 @@ async function captureApp(browser, images, origin, phase) {
       const { context, page, activity } = await newPage(browser, images, origin, 'seller', viewport);
       for (let attempt = 0; ; attempt++) {
         await openScreen(page, activity, origin, 'seller', `/order-detail?id=${ORDER_ID}`);
-        try { await page.getByText('BT-00042').first().waitFor({ timeout: 15_000 }); break; } catch (e) { if (attempt >= 3) throw e; }
+        // The signed-out seller preview keeps every API call on-device
+        // (lib/api.ts rejectSellerPreviewApiRequest), so this screen could
+        // never reach the routed fake order. Once the seller shell is up, the
+        // same route is pushed with bt_preview=buyer (signed-in demo seller
+        // session, API calls allowed) and the screen's own Retry reloads it.
+        await page.waitForTimeout(3500);
+        await page.evaluate((url) => {
+          history.pushState(history.state, '', url);
+          window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+        }, `/order-detail?id=${ORDER_ID}&bt_preview=buyer`);
+        await page.waitForTimeout(3000);
+        const retry = page.getByText('Retry').first();
+        if (await retry.isVisible().catch(() => false)) await retry.click();
+        try { await page.getByText('BT-00042').first().waitFor({ timeout: 15_000 }); break; } catch (e) {
+          if (attempt >= 3) {
+            await page.screenshot({ path: path.join(WORK_DIR, 'gift-note-debug2.png') });
+            console.error('  debug', page.url());
+            throw e;
+          }
+        }
       }
       await waitForQuietNetwork(activity).catch(() => {});
       await waitForImages(page).catch(() => {});

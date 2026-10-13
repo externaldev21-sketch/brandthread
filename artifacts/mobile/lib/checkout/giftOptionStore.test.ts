@@ -36,3 +36,14 @@ describe('giftOptionStore', () => {
     expect(gift.message).toHaveLength(GIFT_MESSAGE_MAX);
   });
 });
+
+describe('gift in the payment-intent body', () => {
+  it('is sent only when the order is a gift', async () => {
+    const { buildCreatePaymentIntentBody } = await import('@/lib/checkoutPayment');
+    const session = { deliveryGroups: [{ sellerId: 's1', items: [{ variantId: 'v1', productId: 'p1', quantity: 1 }] }], discounts: [] } as any;
+    const input = { session, contact: {}, address: {}, idempotencyKey: 'ck_12345678', saveCard: true };
+    expect('gift' in buildCreatePaymentIntentBody({ ...input, ...giftOptionBody() })).toBe(false);
+    setGiftOption({ to: 'Sam', message: 'Hi' });
+    expect(buildCreatePaymentIntentBody({ ...input, ...giftOptionBody() }).gift).toEqual({ to: 'Sam', message: 'Hi' });
+  });
+});
