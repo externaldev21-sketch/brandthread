@@ -18,6 +18,7 @@ import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-nat
 import { BlurView } from 'expo-blur';
 import { FONT, FS, SP, ON_DARK_MUTED } from '@/lib/theme';
 import { GestureGlyph } from './GestureGlyph';
+import { useRegisterCoach } from '@/lib/coachPresence';
 import type { GestureKind } from './types';
 
 export interface FullScreenGuideRow {
@@ -41,6 +42,8 @@ export function FullScreenGuideTip({
   visible, onDismiss, title, subtitle, rows, dismissLabel = 'Tap anywhere to continue', reduceMotion = false, testID,
 }: FullScreenGuideTipProps) {
   const fade = useRef(new Animated.Value(0)).current;
+  // Other first-run UI (the cookie-consent card) waits while this is up.
+  useRegisterCoach(testID ?? 'full-screen-guide-tip', visible);
 
   useEffect(() => {
     Animated.timing(fade, { toValue: visible ? 1 : 0, duration: reduceMotion ? 1 : 220, useNativeDriver: true }).start();

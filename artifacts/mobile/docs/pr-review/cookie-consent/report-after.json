@@ -1,0 +1,97 @@
+[
+  {
+    "screen": "buyer-discover",
+    "state": "banner",
+    "barTop": 762,
+    "barBottom": 820,
+    "viewport": 844,
+    "card": {
+      "top": 592,
+      "bottom": 746,
+      "left": 16,
+      "right": 374
+    }
+  },
+  {
+    "screen": "buyer-discover",
+    "state": "chosen",
+    "barTop": 762,
+    "barBottom": 820,
+    "viewport": 844,
+    "card": null
+  },
+  {
+    "screen": "buyer-inbox",
+    "state": "banner",
+    "barTop": 762,
+    "barBottom": 820,
+    "viewport": 844,
+    "card": {
+      "top": 592,
+      "bottom": 746,
+      "left": 16,
+      "right": 374
+    }
+  },
+  {
+    "screen": "buyer-inbox",
+    "state": "chosen",
+    "barTop": 762,
+    "barBottom": 820,
+    "viewport": 844,
+    "card": null
+  },
+  {
+    "screen": "buyer-profile",
+    "state": "banner",
+    "barTop": 767.1,
+    "barBottom": 814.9,
+    "viewport": 844,
+    "card": {
+      "top": 592,
+      "bottom": 746,
+      "left": 16,
+      "right": 374
+    }
+  },
+  {
+    "screen": "buyer-profile",
+    "state": "chosen",
+    "barTop": 767.1,
+    "barBottom": 814.9,
+    "viewport": 844,
+    "card": null
+  },
+  {
+    "screen": "seller-dashboard",
+    "state": "banner",
+    "barTop": 762,
+    "barBottom": 820,
+    "viewport": 844,
+    "card": {
+      "top": 592,
+      "bottom": 746,
+      "left": 16,
+      "right": 374
+    }
+  },
+  {
+    "screen": "seller-dashboard",
+    "state": "chosen",
+    "barTop": 762,
+    "barBottom": 820,
+    "viewport": 844,
+    "card": null
+  },
+  {
+    "screen": "buyer-feed-coach",
+    "during": {
+      "coach": true,
+      "card": false
+    },
+    "after": {
+      "coach": false,
+      "card": true
+    }
+  }
+]

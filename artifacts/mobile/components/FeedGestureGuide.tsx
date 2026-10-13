@@ -10,6 +10,7 @@ import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'r
 import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, SP, ON_DARK_MUTED } from '@/lib/theme';
+import { useRegisterCoach } from '@/lib/coachPresence';
 
 export {
   FEED_GESTURES_TIP_VERSION,
@@ -110,6 +111,8 @@ const ROWS: { key: string; glyph: React.ComponentType; title: string; subtitle: 
 
 export function FeedGestureGuide({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
   const fade = useRef(new Animated.Value(0)).current;
+  // Other first-run UI (the cookie-consent card) waits while this is up.
+  useRegisterCoach('feed-gesture-guide', visible);
 
   useEffect(() => {
     Animated.timing(fade, { toValue: visible ? 1 : 0, duration: 220, useNativeDriver: true }).start();
