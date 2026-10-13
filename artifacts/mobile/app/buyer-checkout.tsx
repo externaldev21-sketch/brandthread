@@ -99,6 +99,7 @@ import { FONT, FS, SP } from '@/lib/theme';
 import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_CHECKOUT_STEPS } from '@/lib/firstRunTips/content';
+import { syncOrderActivities } from '@/lib/nativeSystem';
 
 /**
  * A fully verified order reference returned from the server after payment.
@@ -522,6 +523,20 @@ export default function BuyerCheckoutScreen() {
       };
     }
     setVerifiedOrders(confirmed);
+    // Lock Screen order tracker at "Ordered", like Uber Eats after checkout
+    // (iOS dev/TestFlight builds with the nativeSurfaces flag only).
+    const paidAt = new Date().toISOString();
+    syncOrderActivities((status?.orders ?? []).map((order) => {
+      const group = base.deliveryGroups.find((g) => g.sellerId === order.sellerId);
+      return {
+        id: order.orderId,
+        orderNumber: order.orderNumber,
+        sellerName: group?.sellerName ?? '',
+        status: 'processing',
+        paidAt,
+        lineItems: group?.items.map((item) => ({ imageUri: item.imageUri ?? null })),
+      };
+    }));
     setPendingSessionIds(status?.complete ? [] : [`${PI_PREFIX}${started.paymentIntentId}`]);
     void trackAndRelayConversionEvent(
       'Purchase',

@@ -27,6 +27,11 @@ public class BrandthreadSystemModule: Module {
             LiveActivityTokens.shared.listener = { [weak self] kind, targetId, token in
                 self?.sendEvent("onLiveActivityPushToken", ["kind": kind, "targetId": targetId, "token": token])
             }
+            #if canImport(ActivityKit)
+            if #available(iOS 17.2, *) {
+                LiveActivityTokens.shared.observeOrderPushToStart()
+            }
+            #endif
         }
 
         OnStopObserving {
@@ -156,8 +161,40 @@ final class LiveActivityTokens {
     var listener: ((String, String, String) -> Void)?
 
     #if canImport(ActivityKit)
+    private var observingPushToStart = false
+    private var observedActivityIds = Set<String>()
+    private let lock = NSLock()
+
+    /// iOS 17.2+: the device's push-to-start token for order trackers (sent
+    /// as kind "order_start"), plus every order activity the server starts
+    /// with it, so their update tokens reach the API too. Runs once.
+    @available(iOS 17.2, *)
+    func observeOrderPushToStart() {
+        lock.lock()
+        let already = observingPushToStart
+        observingPushToStart = true
+        lock.unlock()
+        guard !already else { return }
+        Task {
+            for await data in Activity<OrderTrackingAttributes>.pushToStartTokenUpdates {
+                let token = data.map { String(format: "%02x", $0) }.joined()
+                DispatchQueue.main.async { self.listener?("order_start", "", token) }
+            }
+        }
+        Task {
+            for await activity in Activity<OrderTrackingAttributes>.activityUpdates {
+                self.observe(activity, kind: "order", targetId: activity.attributes.orderId)
+            }
+        }
+    }
+
     @available(iOS 16.2, *)
     func observe<A: ActivityAttributes>(_ activity: Activity<A>, kind: String, targetId: String) {
+        // One token stream per activity, however often it's re-synced.
+        lock.lock()
+        let isNew = observedActivityIds.insert(activity.id).inserted
+        lock.unlock()
+        guard isNew else { return }
         Task {
             for await data in activity.pushTokenUpdates {
                 let token = data.map { String(format: "%02x", $0) }.joined()

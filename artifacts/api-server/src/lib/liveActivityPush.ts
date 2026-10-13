@@ -15,14 +15,17 @@
  *   LiveStreamContentState    { viewers: Int, salesCents: Int, ordersCount: Int, isLive: Bool }
  *
  * Feature flag: everything is a no-op ({ skipped: "not_configured" }) until
- * APNS_KEY_ID, APNS_TEAM_ID, APNS_AUTH_KEY and APNS_BUNDLE_ID are all set.
+ * APNS_KEY_ID, APNS_TEAM_ID, APNS_AUTH_KEY and APNS_BUNDLE_ID are all set;
+ * order tracking also needs the `nativeSurfaces` flag (lib/nativeSurfaces.ts).
  */
 import crypto from "node:crypto";
 import http2 from "node:http2";
 import { and, eq } from "drizzle-orm";
-import { db, liveActivityTokens, orders } from "@workspace/db";
+import { db, liveActivityStartTokens, liveActivityTokens, orders, users } from "@workspace/db";
 import { logger } from "./logger";
 import { currentStepKey } from "./delivery/policy";
+import { isNativeSurfacesEnabled } from "./nativeSurfaces";
+import { activitiesExpired, dbRemoteStartDeps, startOrderActivityRemotely, type RemoteStartResult } from "./liveActivityRemoteStart";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -136,11 +139,6 @@ export interface LiveActivityPayload<TState> {
   };
 }
 
-const ORDER_STAGE_ALERT_TITLES: Partial<Record<OrderActivityStage, string>> = {
-  out_for_delivery: "Out for delivery",
-  delivered: "Delivered",
-};
-
 export function buildOrderActivityPayload(input: {
   stage: OrderActivityStage;
   statusText: string;
@@ -156,14 +154,15 @@ export function buildOrderActivityPayload(input: {
       ? { etaEpoch: input.etaEpochSeconds }
       : {}),
   };
-  const alertTitle = ORDER_STAGE_ALERT_TITLES[input.stage];
+  // No `alert`: the buyer's regular "Out for delivery" / "Delivered" push
+  // already announces the change (and respects their notification
+  // settings). An alert here too would buzz twice for one event.
   return {
     aps: {
       timestamp: input.nowSeconds,
       event: input.event,
       "content-state": contentState,
       ...(typeof input.dismissalEpochSeconds === "number" ? { "dismissal-date": input.dismissalEpochSeconds } : {}),
-      ...(alertTitle ? { alert: { title: alertTitle, body: input.statusText } } : {}),
     },
   };
 }
@@ -333,8 +332,14 @@ export async function deactivateLiveActivityToken(token: string): Promise<void> 
 
 export async function sendLiveActivityPush(
   token: string,
-  payload: LiveActivityPayload<unknown>,
-  options: { priority?: 5 | 10; config?: ApnsConfig | null; now?: Date } = {},
+  payload: LiveActivityPayload<unknown> | { aps: object },
+  options: {
+    priority?: 5 | 10;
+    config?: ApnsConfig | null;
+    now?: Date;
+    /** How to retire a dead token (defaults to the update-token table). */
+    deactivate?: (token: string) => Promise<void>;
+  } = {},
 ): Promise<LiveActivitySendResult> {
   const config = options.config === undefined ? readApnsConfig() : options.config;
   if (!config) return { skipped: "not_configured" };
@@ -360,7 +365,7 @@ export async function sendLiveActivityPush(
   }
   const dead = response.status === 410 || (reason !== null && DEAD_TOKEN_REASONS.has(reason));
   if (dead) {
-    await deactivateLiveActivityToken(token).catch((err) =>
+    await (options.deactivate ?? deactivateLiveActivityToken)(token).catch((err) =>
       logger.warn({ err }, "Failed to deactivate Live Activity token"));
   } else {
     logger.warn({ status: response.status, reason }, "APNs rejected a Live Activity update");
@@ -379,9 +384,31 @@ async function activeTokens(kind: "order" | "live", targetId: string): Promise<s
   return rows.map((row) => row.token);
 }
 
+async function activeOrderTokens(orderId: string): Promise<Array<{ token: string; createdAt?: Date | string | null }>> {
+  return db.select({ token: liveActivityTokens.token, createdAt: liveActivityTokens.createdAt })
+    .from(liveActivityTokens)
+    .where(and(
+      eq(liveActivityTokens.kind, "order"),
+      eq(liveActivityTokens.targetId, orderId),
+      eq(liveActivityTokens.active, true),
+    ));
+}
+
+export async function deactivateLiveActivityStartToken(token: string): Promise<void> {
+  await db.update(liveActivityStartTokens)
+    .set({ active: false, updatedAt: new Date() })
+    .where(eq(liveActivityStartTokens.token, token));
+}
+
+async function sellerNameFor(ownerId: string): Promise<string> {
+  const [row] = await db.select({ name: users.brandName }).from(users).where(eq(users.clerkId, ownerId)).limit(1);
+  return row?.name?.trim() || "Your order";
+}
+
 export type LiveActivityNotifyResult =
-  | { skipped: "not_configured" | "not_found" | "no_tokens" | "throttled" | "error" }
-  | { sent: number; failed: number };
+  | { skipped: "not_configured" | "flag_off" | "not_found" | "no_tokens" | "throttled" | "error" }
+  | { sent: number; failed: number }
+  | RemoteStartResult;
 
 async function fanOut(
   tokens: string[],
@@ -405,16 +432,27 @@ const ORDER_DISMISS_AFTER_DELIVERY_SECONDS = 4 * 60 * 60;
 /**
  * Pushes an order's current stage/ETA to every active order-tracking Live
  * Activity for it. Ends the activity (dismissed 4 h later) once delivered.
+ * When every activity for the order has passed ActivityKit's 8-hour limit,
+ * starts a fresh one instead (push-to-start, lib/liveActivityRemoteStart.ts).
+ * Off unless APNs is configured AND the `nativeSurfaces` flag is on.
  * Never throws — safe to call fire-and-forget from any status change.
  */
 export async function notifyOrderLiveActivity(orderId: string): Promise<LiveActivityNotifyResult> {
   try {
     const config = readApnsConfig();
     if (!config) return { skipped: "not_configured" };
-    const tokens = await activeTokens("order", orderId);
-    if (!tokens.length) return { skipped: "no_tokens" };
+    if (!(await isNativeSurfacesEnabled())) return { skipped: "flag_off" };
+    const tokenRows = await activeOrderTokens(orderId);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    // ActivityKit ends an activity after 8 hours; tokens older than that
+    // point at an activity that is already gone.
+    const expired = activitiesExpired(tokenRows.map((row) => row.createdAt), nowSeconds);
+    if (!tokenRows.length && !(await hasStartTokensForOrder(orderId))) return { skipped: "no_tokens" };
 
     const [order] = await db.select({
+      buyerId: orders.buyerId,
+      ownerId: orders.ownerId,
+      orderNumber: orders.orderNumber,
       status: orders.status,
       trackingStatus: orders.trackingStatus,
       estimatedDelivery: orders.estimatedDelivery,
@@ -423,7 +461,6 @@ export async function notifyOrderLiveActivity(orderId: string): Promise<LiveActi
     }).from(orders).where(eq(orders.id, orderId)).limit(1);
     if (!order) return { skipped: "not_found" };
 
-    const nowSeconds = Math.floor(Date.now() / 1000);
     const stage = orderStageFromStatus(order.status, order.trackingStatus, order.deliveredAt);
     const delivered = stage === "delivered";
     const payload = buildOrderActivityPayload({
@@ -436,11 +473,36 @@ export async function notifyOrderLiveActivity(orderId: string): Promise<LiveActi
       dismissalEpochSeconds: delivered ? nowSeconds + ORDER_DISMISS_AFTER_DELIVERY_SECONDS : null,
       nowSeconds,
     });
-    return await fanOut(tokens, payload, 10, config);
+
+    if (!expired) return await fanOut(tokenRows.map((row) => row.token), payload, 10, config);
+
+    // Every earlier activity has expired: start a fresh one (shipped / out
+    // for delivery only, once per stage).
+    if (!order.buyerId) return { skipped: "no_tokens" };
+    return await startOrderActivityRemotely({
+      buyerId: order.buyerId,
+      orderId,
+      orderNumber: order.orderNumber,
+      sellerName: order.ownerId ? await sellerNameFor(order.ownerId) : "Your order",
+      state: payload.aps["content-state"],
+      nowSeconds,
+    }, {
+      ...dbRemoteStartDeps,
+      send: (token, startPayload) => sendLiveActivityPush(token, startPayload, {
+        priority: 10, config, deactivate: deactivateLiveActivityStartToken,
+      }),
+    });
   } catch (err) {
     logger.warn({ err, orderId }, "Order Live Activity update failed");
     return { skipped: "error" };
   }
+}
+
+/** Cheap pre-check so orders nobody can track skip the order lookup. */
+async function hasStartTokensForOrder(orderId: string): Promise<boolean> {
+  const [order] = await db.select({ buyerId: orders.buyerId }).from(orders).where(eq(orders.id, orderId)).limit(1);
+  if (!order?.buyerId) return false;
+  return (await dbRemoteStartDeps.startTokens(order.buyerId)).length > 0;
 }
 
 /** Routine stat updates are throttled per stream to respect the APNs update budget. */

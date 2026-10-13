@@ -22,6 +22,9 @@ export interface TrackableOrder {
   status: string;
   trackingStatus?: string | null;
   estimatedDelivery?: string | null;
+  /** When payment was captured; an order placed in the last 8 hours shows
+   *  the "Ordered" stage (Uber Eats starts its activity at checkout). */
+  paidAt?: string | null;
   lineItems?: { imageUri?: string | null }[];
   delivery?: {
     deliveredAt?: string | null;
@@ -50,9 +53,15 @@ export function etaToEpoch(value: string | null | undefined): number | null {
 
 /**
  * What the order's Live Activity should show, or null when it shouldn't
- * have one (not shipped yet, cancelled, refunded, disputed).
+ * have one (cancelled, refunded, disputed, or not shipped and placed more
+ * than 8 hours ago).
  */
-export function orderActivityState(order: TrackableOrder): OrderActivityState | null {
+/** ActivityKit ends a Live Activity after 8 hours, so the "Ordered" stage
+ *  is only shown for that long after checkout. Later stages are restarted
+ *  by the server (push-to-start) when the order ships. */
+export const ORDERED_STAGE_WINDOW_MS = 8 * 60 * 60 * 1000;
+
+export function orderActivityState(order: TrackableOrder, nowMs: number = Date.now()): OrderActivityState | null {
   const d = order.delivery ?? undefined;
   if (d?.autoRefund) return null;
   if (order.status === 'cancelled' || order.status === 'refunded' || order.status === 'disputed') return null;
@@ -70,6 +79,10 @@ export function orderActivityState(order: TrackableOrder): OrderActivityState | 
     || order.trackingStatus === 'accepted'
     || (shippedStep ? shippedStep.state !== 'upcoming' : false);
   if (shipped) return { stage: 'shipped', statusText: STATUS_TEXT.shipped, etaEpoch: eta };
+  const paidMs = order.paidAt ? Date.parse(order.paidAt) : NaN;
+  if (Number.isFinite(paidMs) && nowMs - paidMs >= 0 && nowMs - paidMs < ORDERED_STAGE_WINDOW_MS) {
+    return { stage: 'ordered', statusText: STATUS_TEXT.ordered, etaEpoch: eta };
+  }
   return null;
 }
 
