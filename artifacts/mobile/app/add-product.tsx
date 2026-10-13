@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/Button';
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
 
 import { preOrderShipDateError, PREORDER_SHIP_DATE_REQUIRED_MESSAGE } from '@/lib/deliveryGuarantee';
+import { apiErrorMessage } from '@/lib/safety';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
 
 import { getProduct, saveDraft, loadDraft, deleteDraft, getCollections } from '@/services/productService';
@@ -791,6 +792,18 @@ export default function AddProductScreen() {
         setPublishSuccess({ name, kind: 'created', productId: newProduct.id });
       }
     } catch (err: any) {
+      if (err?.code === 'COUNTERFEIT_TERMS') {
+        // The server names the words to remove; verified brands can keep them.
+        const message = apiErrorMessage(err, 'Remove brand names and replica terms to publish.');
+        setPublishError(`Can't publish yet: ${message}`);
+        if (Platform.OS !== 'web') {
+          Alert.alert("Can't publish yet", message, [
+            { text: 'Edit listing', style: 'cancel' },
+            { text: 'Get verified', onPress: () => router.push('/seller-verification' as any) },
+          ]);
+        }
+        return;
+      }
       const needsShipDate = err?.code === 'PREORDER_SHIP_DATE_REQUIRED';
       showPublishError(
         needsShipDate ? 'Add a ship date' : 'Error',

@@ -14,6 +14,7 @@ import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
 import { afterStockChange } from "../lib/stockRules";
 import { normalizeUploadedImage } from "../lib/productImageResize";
+import { checkListingIntegrity, counterfeitRefusal } from "../lib/listingIntegrity";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -214,6 +215,11 @@ router.post("/", requireRole("manager"), async (req, res) => {
     });
   }
 
+  if (status === "active") {
+    const hits = await checkListingIntegrity(ownerId, { name, description, tags, styleTags });
+    if (hits) { res.status(422).json(counterfeitRefusal(hits)); return; }
+  }
+
   const access = await getProductAccess(req, res);
   if (!access) return;
 
@@ -309,6 +315,23 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
           : stored.shipDate,
       });
       if (problem) { res.status(problem.status).json({ error: problem.error, code: problem.code }); return; }
+    }
+  }
+
+  {
+    // Counterfeit keyword guard: judge the listing as it will read once saved.
+    const [stored] = await db.select({
+      status: products.status, name: products.name, description: products.description,
+      tags: products.tags, styleTags: products.styleTags,
+    }).from(products).where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId))).limit(1);
+    if (stored && (status ?? stored.status) === "active") {
+      const hits = await checkListingIntegrity(ownerId, {
+        name: name || stored.name,
+        description: description !== undefined ? description : stored.description,
+        tags: tags || stored.tags,
+        styleTags: styleTags !== undefined ? styleTags : stored.styleTags,
+      });
+      if (hits) { res.status(422).json(counterfeitRefusal(hits)); return; }
     }
   }
 
