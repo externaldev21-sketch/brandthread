@@ -28,6 +28,7 @@ const ROWS: Row[] = [
   { label: "Where you're logged in", icon: 'smartphone', route: '/login-activity' },
   { label: 'Download your information', icon: 'download', route: '/buyer-download-data' },
   { label: 'Ad and recommendation preferences', icon: 'sliders', route: '/buyer-settings-detail?section=content' },
+  { label: 'Account status', icon: 'activity', route: '/account-status' },
   { label: 'Delete account', icon: 'trash-2', sub: 'Permanently delete your account and data', route: '/delete-account', destructive: true },
 ];
 

@@ -74,6 +74,13 @@ We use automated filters and human review. Our safety team reviews reports and f
 - Permanent ban: severe or repeated violations — including threats, hate, child safety violations, counterfeits and fraud — lead to permanent removal.
 - Payments: for commerce violations we may pause payouts, refund buyers from held funds, and cooperate with Stripe and law enforcement.
 
+## Strikes
+
+- Each time we take action on something you posted or listed — removing it, warning you, or suspending your account — you get one strike, however many people reported it. Upheld intellectual property takedowns count too.
+- A strike stays active for 90 days.
+- At 3 active strikes, a moderator reviews your account for suspension.
+- See your strikes, and what happened to the reports you filed, in Settings → Accounts Center → Account status.
+
 ## Appeals and contact
 
 If you think we made a mistake, reply to the notice you received or email safety@brandthread.app with your username and what you’d like us to review. We look at every appeal.

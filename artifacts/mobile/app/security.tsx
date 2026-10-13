@@ -28,6 +28,7 @@ export default function SecurityScreen() {
     { title: 'Email address', label: 'Change', route: '/change-email' },
     { title: 'Two-factor authentication', subtitle: 'App and backup codes', label: 'Manage', route: '/login-methods' },
     { title: 'Download my data', label: 'Open', route: '/seller-data-export' },
+    { title: 'Account status', label: 'Open', route: '/account-status' },
   ];
 
   return (

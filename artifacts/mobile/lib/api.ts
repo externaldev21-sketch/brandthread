@@ -76,6 +76,7 @@ import { isPublicApiRequest, signedOutErrorBody } from '@/lib/signedOutApiPolicy
 import type { LiveAnalytics, LiveAnalyticsListItem } from '@/lib/live/liveAnalytics';
 import type { OrderRefundsResponse, SellerRefundRequest, SellerRefundResponse } from '@/lib/sellerRefund';
 import type { StoreDetailRatings } from '@/lib/storeTrust';
+import type { AccountStatus, MyReport } from '@/lib/accountStatus';
 
 import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
@@ -2008,6 +2009,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       get: () => freshGet<AiConsentStatus>('/api/ai-consent'),
       set: (granted: boolean) => put<AiConsentStatus>('/api/ai-consent', { granted }),
       accept: () => post<{ consented: boolean; consentedAt: string | null; provider: string }>('/api/ai-consent', { accept: true }),
+    },
+    /** Your standing, strikes (of 3) and the reports you filed. */
+    accountStatus: {
+      get: () => get<AccountStatus>('/api/account-status'),
+      myReports: () => get<{ reports: MyReport[] }>('/api/account-status/reports'),
     },
     notificationPrefs: {
       get: () =>
