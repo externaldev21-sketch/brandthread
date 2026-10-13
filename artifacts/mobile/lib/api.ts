@@ -3615,6 +3615,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
           iBlockedThem: boolean;
           isPrivate?: boolean; followRequested?: boolean; contentHidden?: boolean;
+          website?: string | null;
+          mutualFollowers?: {
+            users: Array<{ userId: string; username: string | null; displayName: string | null; avatarUrl: string | null }>;
+            count: number;
+          };
         }>(`/api/social/profile/${encodeURIComponent(userId)}`),
       /** Posts where someone tagged this profile (the profile "Tagged" tab). */
       tagged: (userId: string, limit = 30, offset = 0) =>
@@ -3624,10 +3629,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       friendActivity: (limit = 30, offset = 0) =>
         get<any[]>(`/api/social/friends/activity?limit=${limit}&offset=${offset}`),
       /** List buyers I follow. `sort`: 'default' (recent first) | 'latest' | 'earliest'. */
-      following: (userId?: string, sort?: 'default' | 'latest' | 'earliest') => {
+      following: (userId?: string, sort?: 'default' | 'latest' | 'earliest', opts?: { q?: string; offset?: number }) => {
         const params = new URLSearchParams();
         if (userId) params.set('userId', userId);
         if (sort && sort !== 'default') params.set('sort', sort);
+        if (opts?.q) params.set('q', opts.q);
+        if (opts?.offset) params.set('offset', String(opts.offset));
         const qs = params.toString();
         return quietGet<Array<{
           userId: string; name: string; username: string | null; handle: string;
@@ -3635,11 +3642,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         }>>(`/api/social/following${qs ? `?${qs}` : ''}`);
       },
       /** List buyers who follow me (with isFollowingBack flag) */
-      followers: (userId?: string) =>
-        quietGet<Array<{
+      followers: (userId?: string, opts?: { q?: string; offset?: number }) => {
+        const params = new URLSearchParams();
+        if (userId) params.set('userId', userId);
+        if (opts?.q) params.set('q', opts.q);
+        if (opts?.offset) params.set('offset', String(opts.offset));
+        const qs = params.toString();
+        return quietGet<Array<{
           userId: string; name: string; username: string | null; handle: string;
-          initials: string; color: string; followedAt: string; isFollowingBack: boolean;
-        }>>(`/api/social/followers${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`),
+          initials: string; color: string; followedAt: string; isFollowingBack: boolean; followsMe?: boolean;
+        }>>(`/api/social/followers${qs ? `?${qs}` : ''}`);
+      },
       /**
        * Search real user profiles by name / username — both buyer and
        * seller accounts (not just brands/storefronts). `roleTag` is "Buyer"

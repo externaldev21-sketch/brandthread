@@ -18,7 +18,7 @@ import { haptics, hapticLight, hapticSelection, hapticSuccess } from '@/lib/hapt
  */
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { View, Text, Alert, StyleSheet, Pressable, Platform, Share } from 'react-native';
+import { View, Text, Alert, StyleSheet, Modal, Pressable, Platform, Share, Linking } from 'react-native';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -65,6 +65,7 @@ import { radius } from '@/constants/radii';
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { MutualFollowersLine, type MutualFollowers } from '@/components/profile/MutualFollowersLine';
 
 type ContentTab = 'Posts' | 'Tagged';
 const CONTENT_TAB_ITEMS: ProfileTab[] = [
@@ -85,6 +86,10 @@ type RemoteProfile = {
   postsCount: number;
   /** Private account: a follow request from me is pending / the account is private. */
   followRequested?: boolean; isPrivate?: boolean;
+  /** Private account the viewer doesn't follow: posts are hidden. */
+  contentHidden?: boolean;
+  website?: string | null;
+  mutualFollowers?: MutualFollowers;
 };
 
 export default function BuyerOtherProfileScreen() {
@@ -140,6 +145,7 @@ export default function BuyerOtherProfileScreen() {
   const isMutual      = profile?.isMutual     ?? false;
   const iBlockedThem  = profile?.iBlockedThem ?? false;
   const followRequested = profile?.followRequested ?? false;
+  const contentHidden = profile?.contentHidden === true && !iBlockedThem;
 
   const videos = useCreatorVideos(canonicalReady && !iBlockedThem ? canonicalUserId : null, { asVisitor: previewAsVisitor });
   const banner = useProfileBannerState({ server: iBlockedThem ? null : resolveProfileBanner(profile), ownerId: canonicalUserId, own: false });
@@ -402,7 +408,13 @@ export default function BuyerOtherProfileScreen() {
   ];
 
   const meta = (
-    <ProfileMeta bio={profile?.bio ?? null}>
+    <ProfileMeta bio={profile?.bio ?? null} website={iBlockedThem ? null : profile?.website ?? null} onOpenWebsite={(url) => { void Linking.openURL(url.replace(/^http:\/\//i, 'https://')); }}>
+      {!iBlockedThem && canonicalReady ? (
+        <MutualFollowersLine
+          mutual={profile?.mutualFollowers}
+          onPress={() => { hapticSelection(); router.push(connectionsHref('followers', canonicalUserId) as never); }}
+        />
+      ) : null}
       {isFollowedBy && !isMutual ? <ProfileChip label="Follows you" icon="user-check" /> : null}
       {isMutual ? <ProfileChip label="Friends" icon="users" tone="accent" /> : null}
       {isMutual && threadCashSendEnabled ? (
@@ -578,7 +590,7 @@ export default function BuyerOtherProfileScreen() {
           active: activeTab,
           onChange: (key) => setActiveTab(key === 'Tagged' ? 'Tagged' : 'Posts'),
         }}
-        data={gridItems}
+        data={contentHidden ? [] : gridItems}
         renderItem={renderTile}
         keyExtractor={(item) => item.id}
         numColumns={layout.gridColumns}
@@ -591,6 +603,18 @@ export default function BuyerOtherProfileScreen() {
               onRetry={() => { setApiLoaded(false); void loadProfile(); }}
               layout={layout}
               title="Couldn't load this profile"
+            />
+          ) : contentHidden ? (
+            // Instagram's private-account state in place of the grid.
+            <ProfileGridPlaceholder
+              loading={false}
+              error={false}
+              onRetry={() => {}}
+              layout={layout}
+              icon="lock"
+              title="This account is private"
+              description="Follow this account to see their photos and videos."
+              testID="buyer-other-profile-private"
             />
           ) : activeTab === 'Tagged' ? (
             <ProfileGridPlaceholder
