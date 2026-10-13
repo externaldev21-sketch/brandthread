@@ -1673,9 +1673,6 @@ function WornInVideos({ productId, productName }: { productId: string; productNa
                 <Feather name="video" size={20} color={theme.muted} />
               </View>
             )}
-            <View style={wv.playBadge}>
-              <Feather name="play" size={12} color="#FFFFFF" />
-            </View>
             <Text style={[wv.authorName, { color: theme.muted }]} numberOfLines={1}>{video.authorName}</Text>
           </TouchableOpacity>
         ))}

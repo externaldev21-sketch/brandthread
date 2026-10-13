@@ -10,7 +10,7 @@ import { buildPostUrl } from '@/lib/shareLinks';
 import { QuotedPostCard } from '@/components/social/QuotedPostCard';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Modal, Share, Animated, useWindowDimensions, Platform,
+  TextInput, Modal, Share, Animated, useWindowDimensions, Platform, Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -25,7 +25,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import {
   BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
-  FONT, FS, SP, RADIUS, ICON, OVERLAY, RED, COMP,
+  FONT, FS, SP, RADIUS, ICON, OVERLAY, RED, COMP, CREATE_CANVAS,
 } from '@/lib/theme';
 import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
 import {
@@ -48,7 +48,11 @@ import { useCaptionsPreference, useReadyCaptionTrack } from '@/lib/captions';
 import { LocationTag } from '@/components/social/LocationTag';
 
 function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () => void; captions?: CaptionSegment[] }) {
-  const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; p.timeUpdateEventInterval = 0.25; });
+  // Starts muted with no player chrome (less-AI pass, item 49); the small
+  // speaker button turns sound on, same as PostCarousel.
+  const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = true; p.timeUpdateEventInterval = 0.25; });
+  const [muted, setMuted] = useState(true);
+  useEffect(() => { player.muted = muted; }, [muted, player]);
   const [currentTime, setCurrentTime] = useState(0);
   useEffect(() => {
     if (!captions) return;
@@ -67,12 +71,26 @@ function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () =
         player={player}
         style={StyleSheet.absoluteFill}
         contentFit="contain"
-        nativeControls
+        nativeControls={false}
       />
       {captions ? <CaptionsOverlay segments={captions} currentTime={currentTime} bottomOffset={56} /> : null}
+      <Pressable
+        onPress={() => setMuted((m) => !m)}
+        style={postVideoStyles.mute}
+        accessibilityRole="button"
+        accessibilityLabel={muted ? 'Unmute' : 'Mute'}
+        testID="post-video-mute"
+        hitSlop={8}
+      >
+        <Feather name={muted ? 'volume-x' : 'volume-2'} size={14} color={CREATE_CANVAS.white} />
+      </Pressable>
     </>
   );
 }
+
+const postVideoStyles = StyleSheet.create({
+  mute: { position: 'absolute', right: 10, bottom: 10, width: 28, height: 28, borderRadius: 14, backgroundColor: CREATE_CANVAS.black, alignItems: 'center', justifyContent: 'center' },
+});
 
 function PostMedia({
   mediaUrl, type, mediaColor1, mediaColor2, typeIcon, onWatched, captions,

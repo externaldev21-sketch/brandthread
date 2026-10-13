@@ -128,11 +128,6 @@ function PostCard({
               size={44}
               color={palette.mutedForeground}
             />
-            {post.type === 'video' && (
-              <View style={[s.playBtn, { backgroundColor: palette.elevated }]}>
-                <Feather name="play" size={ICON.md} color={theme.accent} />
-              </View>
-            )}
           </View>
         )}
       </PressableScale>

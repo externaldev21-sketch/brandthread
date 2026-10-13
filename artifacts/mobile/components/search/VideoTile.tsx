@@ -49,9 +49,6 @@ export function VideoTile({ item, width, onPress }: {
           locations={[0, 1]}
           style={styles.scrim}
         />
-        <View style={styles.playBadge} pointerEvents="none">
-          <Feather name="play" size={14} color="#FFFFFF" />
-        </View>
         <View style={styles.overlay} pointerEvents="none">
           {item.caption ? (
             <Text style={styles.caption} numberOfLines={2}>{item.caption}</Text>

@@ -53,11 +53,6 @@ export function DiscoverTileView({
           )}
         </View>
       )}
-      {post.media === 'video' && (
-        <View style={styles.glyphWrap}>
-          <Feather name="play" size={13} color="#FFFFFF" />
-        </View>
-      )}
       {post.media === 'slideshow' && (
         <View style={styles.glyphWrap}>
           <Feather name="copy" size={13} color="#FFFFFF" />

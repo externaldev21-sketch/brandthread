@@ -94,9 +94,6 @@ function GridCell({
       {item.type === 'slideshow' && (
         <Feather name="copy" size={14} color="#FFFFFF" style={styles.badge} />
       )}
-      {item.type === 'video' && (
-        <Feather name="play" size={14} color="#FFFFFF" style={styles.badge} />
-      )}
     </Pressable>
   );
 }
