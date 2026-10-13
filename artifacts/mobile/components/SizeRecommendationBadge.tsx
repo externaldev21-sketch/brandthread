@@ -16,7 +16,7 @@ import { buildSizeBadgeModel, type SizeBadgeModel, type SizeBadgeProduct } from 
 import type { BuyerSizePreferences } from '@/lib/sizeRecommendation';
 
 /** Seeded saved sizes, only in the &demo=1 preview. */
-const DEMO_PREFERENCES: BuyerSizePreferences = { sizes: { tops: 'M', outerwear: 'M', bottoms: 'M', shoes: '9' } };
+export const DEMO_PREFERENCES: BuyerSizePreferences = { sizes: { tops: 'M', outerwear: 'M', bottoms: 'M', shoes: '9' } };
 
 export function useSizeBadgeModel(product: SizeBadgeProduct | null | undefined): SizeBadgeModel | null {
   const { preferences, status } = useBuyerPreferences();

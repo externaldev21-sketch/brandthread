@@ -160,6 +160,8 @@ import { useStockInfo, variantStockLine } from '@/lib/stockInfo';
 import { PayLaterLine } from '@/components/products/PayLaterLine';
 
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
+import { Snackbar } from '@/components/ui/Snackbar';
+import { useAutoSelectSize } from '@/hooks/useAutoSelectSize';
 import { ApiError } from '@/lib/networkNotice';
 
 type ThemeAliases = {
@@ -695,10 +697,11 @@ export function OptionPicker({ product, option, selections, onSelect, recommende
                   isSelected && op.colorSwatchSelected,
                   !available && op.unavail,
                 ]}
-                onPress={() => { if (available) { haptic('select'); onSelect(option.id, val.id); } }}
+                onPress={() => { hapticToggle(); onSelect(option.id, val.id); }}
                 activeOpacity={0.8}
                 accessibilityRole="radio"
                 accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}
+                accessibilityHint={available ? undefined : SOLD_OUT_HINT}
                 accessibilityState={{ selected: isSelected, disabled: !available }}
               >
                 <View style={[op.colorDot, { backgroundColor: val.colorHex }]} />
@@ -731,13 +734,16 @@ export function OptionPicker({ product, option, selections, onSelect, recommende
               key={val.id}
               label={val.label}
               selected={isSelected}
-              disabled={!available}
-              // A leading slash glyph makes "unavailable" a distinct shape,
+                      // A leading slash glyph makes "unavailable" a distinct shape,
               // not just a greyed-out label (Nike / GOAT / UNIQLO size-grid
               // convention) — see https://mobbin.com/screens/76430e6c-342a-42be-8fce-148ab5d9651e
               icon={available ? undefined : 'slash'}
               iconColor={theme.subtle}
               strikethrough={!available}
+              // Sold out keeps its look but stays selectable, so the buyer
+              // reaches "Notify me" (Zalando stock reminder).
+              pressableWhenDisabled
+              accessibilityHint={available ? undefined : SOLD_OUT_HINT}
               accessibilityRole="radio"
               accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', sold out'}`}
               onPress={() => onSelect(option.id, val.id)}
@@ -781,11 +787,11 @@ function SizeChip({ label, selected, available, onPress, accessibilityLabel, tes
   const { theme } = useThemeAliases();
   return (
     <Pressable
-      onPress={() => { if (!available) return; hapticToggle(); onPress(); }}
+      onPress={() => { hapticToggle(); onPress(); }}
       disabled={!available}
       accessibilityRole="radio"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ selected, disabled: !available }}
+      accessibilityState={{ selected }}
       testID={testID}
       style={[
         sizeChipStyles.chip,
@@ -858,6 +864,7 @@ const infoRowStyles = StyleSheet.create({
   label: { fontSize: 16, lineHeight: 21, fontWeight: '500' },
   body: { paddingBottom: SP.md },
 });
+const SOLD_OUT_HINT = 'Select to set a restock reminder';
 
 const makeOptionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight;
@@ -996,6 +1003,8 @@ export default function BuyerProductDetailScreen() {
   // crossing itself.
   const [pastPhoto, setPastPhoto] = useState(false);
   const pastPhotoRef = useRef(false);
+  const [reminderToast,   setReminderToast]   = useState<string | null>(null);
+  const reminderToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Add to cart → the product photo flies to the bag icon, which bumps and
   // shows the count (the feed / shop sheet pattern, #287 / #291).
@@ -1227,6 +1236,17 @@ export default function BuyerProductDetailScreen() {
     setSelections(Object.fromEntries(cartVariant.optionValues.map(value => [value.optionId, value.valueId])));
   }, [product, editVariantId]);
 
+  // "Your size" preselected once per product (never over a cart edit or a tap).
+  useAutoSelectSize({
+    product,
+    selections,
+    badgeModel: sizeBadgeModel,
+    enabled: !editVariantId,
+    onSelect: (optionId, valueId) => setSelections(prev => (prev[optionId] ? prev : { ...prev, [optionId]: valueId })),
+  });
+
+  useEffect(() => () => { if (reminderToastTimer.current) clearTimeout(reminderToastTimer.current); }, []);
+
   async function handleRefresh() {
     if (!product?.sellerId) return;
     setRefreshing(true);
@@ -1377,9 +1397,27 @@ export default function BuyerProductDetailScreen() {
     try {
       await (api as any).waitlist.join(product.id, variant.id);
       setWaitlistJoined(true);
-      Alert.alert("You're on the waitlist", "We'll notify you the moment this restocks.");
-    } catch { Alert.alert("Couldn't join waitlist", 'Try again.'); }
+      showReminderToast('Reminder set');
+    } catch { Alert.alert('Error', 'Could not join waitlist. Please try again.'); }
     finally { setWaitlistLoading(false); }
+  }
+
+  async function handleLeaveWaitlist() {
+    if (!product || !variant || !isSignedIn) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setWaitlistLoading(true);
+    try {
+      await api.waitlist.leave(product.id, variant.id);
+      setWaitlistJoined(false);
+      showReminderToast('Reminder removed');
+    } catch { Alert.alert('Error', 'Could not remove the reminder. Please try again.'); }
+    finally { setWaitlistLoading(false); }
+  }
+
+  function showReminderToast(message: string) {
+    setReminderToast(message);
+    if (reminderToastTimer.current) clearTimeout(reminderToastTimer.current);
+    reminderToastTimer.current = setTimeout(() => setReminderToast(null), 2500);
   }
 
   async function handleReserve() {
@@ -1769,12 +1807,14 @@ export default function BuyerProductDetailScreen() {
           {allSelected && variant && !variant.isAvailable && !product.isPreOrder && (
             <TouchableOpacity
               style={[wl.btn, waitlistJoined && wl.joined]}
-              onPress={waitlistJoined ? undefined : handleJoinWaitlist}
-              disabled={waitlistLoading || waitlistJoined}
+              onPress={waitlistJoined ? handleLeaveWaitlist : handleJoinWaitlist}
+              disabled={waitlistLoading}
               activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel={waitlistJoined ? "You're on the waitlist" : 'Notify me when restocked'}
-              accessibilityState={{ disabled: waitlistLoading || waitlistJoined, busy: waitlistLoading }}
+              accessibilityLabel={waitlistJoined ? 'Reminder set' : 'Notify me when back in stock'}
+              accessibilityHint={waitlistJoined ? 'Removes the restock reminder' : undefined}
+              accessibilityState={{ disabled: waitlistLoading, busy: waitlistLoading }}
+              testID="product-notify-me"
             >
               {waitlistLoading ? (
                 <ActivityIndicator size="small" color={PURPLE_LIGHT} />
@@ -1782,7 +1822,7 @@ export default function BuyerProductDetailScreen() {
                 <>
                   <AppIcon name={waitlistJoined ? 'check' : 'bell'} size={14} color={waitlistJoined ? SUCCESS : PURPLE_LIGHT} />
                   <Text style={[wl.text, waitlistJoined && { color: SUCCESS }]}>
-                    {waitlistJoined ? "You're on the waitlist" : 'Notify me when restocked'}
+                    {waitlistJoined ? 'Reminder set' : 'Notify me when back in stock'}
                   </Text>
                 </>
               )}
@@ -2036,6 +2076,13 @@ export default function BuyerProductDetailScreen() {
         chart={sizeChart}
         imageUri={product.sizeChartImageUrl ?? null}
         onClose={() => setSizeGuideOpen(false)}
+      />
+
+      {/* Stock reminder confirmation — top toast below the back button (Zalando). */}
+      <Snackbar
+        visible={!!reminderToast}
+        message={reminderToast ?? ''}
+        topOffset={headerTopInset + SP.sm + COMP.iconBtn + SP.sm}
       />
 
       {/* Persistent purchase bar remains visible while product content scrolls.

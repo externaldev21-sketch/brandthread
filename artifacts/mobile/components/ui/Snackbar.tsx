@@ -18,6 +18,9 @@ export interface SnackbarProps {
   onDismiss?: () => void;
   /** @deprecated Toasts sit at the top now; kept so existing callers compile. */
   bottomOffset?: number;
+  /** Anchor to the top instead, this far from the top edge (pass at least the
+   *  safe-area/header inset). Used for the PDP "Reminder set" toast (Zalando). */
+  topOffset?: number;
 }
 
 export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction, onDismiss }: SnackbarProps) {

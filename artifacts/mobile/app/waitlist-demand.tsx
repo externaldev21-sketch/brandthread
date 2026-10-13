@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { Header } from '@/components/layout';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { ApiError } from '@/lib/networkNotice';
 
 type Row = {
   productId: string;
@@ -68,7 +69,10 @@ export default function WaitlistDemandScreen() {
           onPress: async () => {
             setSending(row.variantId);
             try { await api.waitlist.sellerNotify(row.variantId!); await load(true); }
-            catch { Alert.alert("Couldn't send", 'Try again.'); }
+            catch (e) {
+              if (e instanceof ApiError && e.status === 409) Alert.alert('Restock this size first', 'It is still out of stock.');
+              else Alert.alert("Couldn't send", 'Try again.');
+            }
             finally { setSending(null); }
           },
         },
