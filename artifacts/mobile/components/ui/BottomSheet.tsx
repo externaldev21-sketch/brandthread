@@ -149,6 +149,7 @@ export function SheetCloseButton({ onPress, label = 'Close' }: { onPress: () => 
       accessibilityRole="button"
       accessibilityLabel={label}
       hitSlop={{ top: 7, bottom: 7, left: 7, right: 7 }}
+      noMinHeight
       style={[styles.closeCircle, { backgroundColor: `${theme.text}1F` }]}
       testID="sheet-close"
     >
