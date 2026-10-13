@@ -8,8 +8,8 @@ import React, { useCallback, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, Dimensions,
-  Modal, TextInput, ActivityIndicator, Share,
-} from 'react-native';
+  Modal, TextInput, ActivityIndicator, Share, Platform} from 'react-native';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -243,6 +243,8 @@ export default function BuyerCollection() {
 
       <Modal transparent animationType="fade" visible={renameOpen} onRequestClose={() => setRenameOpen(false)}>
         <ModalSafeArea>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={{ flex: 1 }}>
           <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setRenameOpen(false)} />
           <View style={styles.centerModal}>
             <View style={styles.renameCard}>
@@ -269,6 +271,8 @@ export default function BuyerCollection() {
               </View>
             </View>
           </View>
+            </View>
+          </KeyboardAvoidingView>
         </ModalSafeArea>
       </Modal>
     </View>

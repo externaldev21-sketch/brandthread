@@ -4,6 +4,7 @@ import {
   Alert, StyleSheet, ScrollView, RefreshControl,
   Modal, TextInput, ActivityIndicator, Platform, Animated,
 } from 'react-native';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
@@ -1844,6 +1845,8 @@ export default function InboxScreen() {
         transparent
         onRequestClose={closeNoteCompose}
       >
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={{ flex: 1 }}>
         <View style={s.composeBackdrop}>
           <Glass
             variant="regular"
@@ -1894,6 +1897,8 @@ export default function InboxScreen() {
             />
           </Glass>
         </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Snackbar

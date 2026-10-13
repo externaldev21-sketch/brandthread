@@ -12,6 +12,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Modal, Share, Animated, useWindowDimensions, Platform,
 } from 'react-native';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
@@ -518,6 +519,8 @@ export default function BuyerPostViewer() {
       {/* Edit caption modal */}
       <Modal visible={editOpen} transparent animationType="fade" onRequestClose={() => setEditOpen(false)}>
         <ModalSafeArea>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={{ flex: 1 }}>
           <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setEditOpen(false)}>
             <TouchableOpacity activeOpacity={1} style={s.modalSheet}>
               <View style={s.modalHandle} />
@@ -537,6 +540,8 @@ export default function BuyerPostViewer() {
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
         </ModalSafeArea>
       </Modal>
 

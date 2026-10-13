@@ -11,7 +11,8 @@
  * this sheet reflects it immediately with no app update.
  */
 import React, { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View, Platform } from 'react-native';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { randomUUID } from 'expo-crypto';
@@ -83,6 +84,8 @@ export function CashOutSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={{ flex: 1 }}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close cash out" />
       <SheetRise style={[styles.sheet, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.md }]} testID="cash-out-sheet">
         <View style={[styles.handle, { backgroundColor: theme.border }]} />
@@ -152,6 +155,8 @@ export function CashOutSheet({
           </Text>
         </Pressable>
       </SheetRise>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

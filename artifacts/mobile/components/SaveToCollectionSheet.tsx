@@ -10,8 +10,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, Modal, StyleSheet, Text, TextInput, TouchableOpacity,
-  TouchableWithoutFeedback, View, FlatList,
-} from 'react-native';
+  TouchableWithoutFeedback, View, FlatList, Platform} from 'react-native';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import ReanimatedAnimated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
@@ -110,6 +110,8 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
 
   return (
     <Modal transparent animationType="none" visible={modalVisible} onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={{ flex: 1 }}>
       <ReanimatedAnimated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
         <TouchableWithoutFeedback onPress={onClose}>
           <View style={styles.backdrop} />
@@ -199,6 +201,8 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
         )}
       </ReanimatedAnimated.View>
       </GestureDetector>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

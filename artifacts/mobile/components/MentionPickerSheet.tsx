@@ -12,8 +12,8 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Image, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
-} from 'react-native';
+  ActivityIndicator, Image, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Platform} from 'react-native';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CARD, FG, FONT, FS, MUTED, ON_DARK, RADIUS, SP } from '@/lib/theme';
@@ -78,6 +78,8 @@ export function MentionPickerSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <ModalSafeArea>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={{ flex: 1 }}>
         <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
         <View style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }]}>
           <View style={styles.handle} />
@@ -123,6 +125,8 @@ export function MentionPickerSheet({
             ))}
           </ScrollView>
         </View>
+          </View>
+        </KeyboardAvoidingView>
       </ModalSafeArea>
     </Modal>
   );

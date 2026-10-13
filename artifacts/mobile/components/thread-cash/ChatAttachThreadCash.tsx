@@ -18,7 +18,8 @@
  * is Cash-App-style (huge amount up top, plain 3-column numeric pad).
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Pressable, Alert, Animated, Easing } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Pressable, Alert, Animated, Easing, Platform } from 'react-native';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { ThreadCashBill, ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from './ThreadCashBill';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -304,6 +305,8 @@ export function ThreadCashAttachButton({
         </TouchableOpacity>
       )}
       <Modal transparent animationType="fade" visible={open} onRequestClose={() => { if (step !== 'sent') setOpen(false); }}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={{ flex: 1 }}>
         {/* The transfer is already sent by the time this confirmation shows
             — no backdrop-dismiss race that could skip posting the chat
             bubble (see the 'sent' step effect above, which owns closing). */}
@@ -482,6 +485,8 @@ export function ThreadCashAttachButton({
             />
           )}
         </SheetRise>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );
