@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,11 +11,17 @@ import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, ListRow } from '@/components/ui';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { collectAppDiagnostics, formatAppVersion } from '@/lib/appDiagnostics';
+import { useInternalDevMenuGesture } from '@/lib/internalDevMenu';
+
+const APP_VERSION_LABEL = formatAppVersion(collectAppDiagnostics());
 
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
-type Item = { label: string; sub?: string; icon?: keyof typeof Feather.glyphMap; toggle?: ToggleKey; value?: string; action?: () => void };
+type Item = { label: string; sub?: string; icon?: keyof typeof Feather.glyphMap; toggle?: ToggleKey; value?: string; action?: () => void;
+  /** Invisible tap target: the row keeps its read-only look (About → App version → internal dev menu). */
+  secretTap?: () => void };
 
-type Config = { title: string; intro?: string; items: (s: BuyerSettingsState, router?: ReturnType<typeof useRouter>) => Item[] };
+type Config = { title: string; intro?: string; items: (s: BuyerSettingsState, router?: ReturnType<typeof useRouter>, extra?: { onVersionTap?: () => void }) => Item[] };
 
 const CONFIG: Record<string, Config> = {
   activity: { title: 'Your activity', intro: 'Review and manage the things you do on Brandthread.', items: () => [
@@ -48,7 +54,7 @@ const CONFIG: Record<string, Config> = {
   media: { title: 'Media quality and data usage', items: s => [{ label: 'Use less cellular data', toggle: 'dataSaver' }, { label: 'Upload at highest quality', toggle: 'highQualityUploads' }, { label: 'Autoplay videos', toggle: 'autoplayVideos' }] },
   appearance: { title: 'Appearance', items: s => [{ label: 'Theme', value: s.theme }, { label: 'Reduce motion', toggle: 'reduceMotion' }] },
   'privacy-center': { title: 'Privacy Center', items: () => [{ label: 'Privacy policy', icon: 'file-text' }, { label: 'How Brandthread uses your data', icon: 'database' }, { label: 'Ad and recommendation controls', icon: 'sliders' }, { label: 'Download your information', icon: 'download' }] },
-  about: { title: 'About Brandthread', items: (_s, router) => [{ label: 'App version', value: '1.0.0' }, { label: 'Terms of service', icon: 'file-text', action: () => router?.push('/terms' as never) }, { label: 'Community guidelines', icon: 'users', action: () => router?.push('/community-guidelines' as never) }, { label: 'Privacy policy', icon: 'lock', action: () => router?.push('/privacy' as never) }, { label: 'Refund policy', icon: 'rotate-ccw', action: () => router?.push('/refund-policy' as never) }, { label: 'Seller agreement', icon: 'briefcase', action: () => router?.push('/seller-agreement' as never) }, { label: 'Open-source licenses', icon: 'code' }] },
+  about: { title: 'About Brandthread', items: (_s, router, extra) => [{ label: 'App version', value: APP_VERSION_LABEL, secretTap: extra?.onVersionTap }, { label: 'Terms of service', icon: 'file-text', action: () => router?.push('/terms' as never) }, { label: 'Community guidelines', icon: 'users', action: () => router?.push('/community-guidelines' as never) }, { label: 'Privacy policy', icon: 'lock', action: () => router?.push('/privacy' as never) }, { label: 'Refund policy', icon: 'rotate-ccw', action: () => router?.push('/refund-policy' as never) }, { label: 'Seller agreement', icon: 'briefcase', action: () => router?.push('/seller-agreement' as never) }, { label: 'Open-source licenses', icon: 'code' }] },
 };
 
 export default function BuyerSettingsDetail() {
@@ -102,7 +108,8 @@ export default function BuyerSettingsDetail() {
       Alert.alert('Could not update setting', 'Try again.');
     }
   }, [api, section, settings]);
-  const items = useMemo(() => settings ? cfg.items(settings, router) : [], [cfg, settings, router]);
+  const onVersionTap = useInternalDevMenuGesture();
+  const items = useMemo(() => settings ? cfg.items(settings, router, { onVersionTap }) : [], [cfg, settings, router, onVersionTap]);
 
   return <View style={styles.page}>
     <ScreenHeader title={cfg.title} variant="push" onBack={() => goBackOr(router, '/buyer-settings-menu')} />
@@ -110,8 +117,7 @@ export default function BuyerSettingsDetail() {
       {cfg.intro ? <Text style={styles.intro}>{cfg.intro}</Text> : null}
       {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings && items.length > 0 ? <Card style={styles.card}>{items.map((item, i) => {
         const isActionable = !!item.toggle || !!item.action;
-        return <React.Fragment key={`${item.label}-${i}`}>
-          <ListRow
+        const row = <ListRow
             icon={item.icon}
             title={item.label}
             subtitle={item.sub}
@@ -120,7 +126,9 @@ export default function BuyerSettingsDetail() {
             toggle={item.toggle && settings ? { value: Boolean(settings[item.toggle]), onChange: (v) => toggle(item.toggle!, v) } : undefined}
             onPress={isActionable && item.action ? item.action : undefined}
             disabled={!isActionable}
-          />
+          />;
+        return <React.Fragment key={`${item.label}-${i}`}>
+          {item.secretTap ? <Pressable onPress={item.secretTap} accessible={false}>{row}</Pressable> : row}
           {i < items.length - 1 && <View style={styles.divider} />}
         </React.Fragment>;
       })}</Card> : null}
