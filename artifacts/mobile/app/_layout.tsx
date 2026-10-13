@@ -4,6 +4,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { queryClient, queryPersister, setQueryKeyScope } from '@/lib/queryClient';
 import { warmBuyerTabs, warmSellerTabs } from '@/lib/appStartPrefetch';
 import { recordNavigationStart } from '@/lib/perf';
+import { PerfOverlay } from '@/components/dev/PerfOverlay';
 import { isGuestBrowseRoute, safeReturnTo } from '@/lib/guestRoutes';
 import { runAfterFirstPaint } from '@/lib/deferStartup';
 import { isAccessCleared } from '@/lib/accessGate';
@@ -1758,6 +1759,7 @@ function RootLayout() {
                                       <RootLayoutNav />
                                     </ReportSheetProvider>
                                     <GlobalCallOverlay />
+                                    <PerfOverlay />
                                     <SaveHeartHost />
                                   </FirstRunTipsProvider>
                                 </CallSessionProvider>
