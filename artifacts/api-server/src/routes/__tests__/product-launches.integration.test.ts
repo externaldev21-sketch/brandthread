@@ -148,13 +148,26 @@ describe("product launches", () => {
     await api(`/api/product-launches/${id}`, seller, "PUT", { launchAt: future(3).toISOString() });
     await api(`/api/product-launches/${id}/alert`, buyerA, "POST");
     const pub = await api(`/api/product-launches/${id}`);
-    expect(Object.keys(pub.body).sort()).toEqual(["launchAt", "launching", "serverNow"]);
+    expect(Object.keys(pub.body).sort()).toEqual(["launchAt", "launching", "notifyCount", "serverNow"]);
     expect(pub.body.launching).toBe(true);
+    expect(pub.body.notifyCount).toBe(1);
 
     await db.update(products).set({ status: "draft" }).where(eq(products.id, id));
-    expect((await api(`/api/product-launches/${id}`)).body).toMatchObject({ launching: false, launchAt: null });
+    expect((await api(`/api/product-launches/${id}`)).body).toMatchObject({ launching: false, launchAt: null, notifyCount: 0 });
     expect((await api(`/api/product-launches/${id}/alert`, undefined, "POST")).status).toBe(401);
     expect((await api(`/api/product-launches`)).status).toBe(401);
+  });
+
+  it("lobby notify count is the real number of Notify me rows and follows on/off", async () => {
+    const id = await makeProduct();
+    await api(`/api/product-launches/${id}`, seller, "PUT", { launchAt: future(2).toISOString() });
+    expect((await api(`/api/product-launches/${id}`)).body.notifyCount).toBe(0);
+    await api(`/api/product-launches/${id}/alert`, buyerA, "POST");
+    await api(`/api/product-launches/${id}/alert`, buyerA, "POST"); // repeat tap is not a second person
+    await api(`/api/product-launches/${id}/alert`, buyerB, "POST");
+    expect((await api(`/api/product-launches/${id}`)).body.notifyCount).toBe(2);
+    await api(`/api/product-launches/${id}/alert`, buyerB, "DELETE");
+    expect((await api(`/api/product-launches/${id}`)).body.notifyCount).toBe(1);
   });
 
   it("notify-me is refused for products with no launch or already live", async () => {

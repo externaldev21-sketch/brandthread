@@ -2,7 +2,8 @@
  * Scheduled product launches + "Notify me".
  *
  * Public:
- *   GET    /api/product-launches/:productId         launch state for an active product (no subscriber data)
+ *   GET    /api/product-launches/:productId         launch state for an active product: time + how many
+ *                                                    people have Notify me on (a count only, never who)
  * Buyer (auth):
  *   GET    /api/product-launches/:productId/alert   am I subscribed?
  *   POST   /api/product-launches/:productId/alert   notify me at launch
@@ -68,9 +69,19 @@ router.get("/:productId", async (req, res) => {
     .limit(1);
   const now = new Date();
   const launching = !!row && !isProductLive(row, now);
+  // The drop lobby shows this live. It is the real row count, nothing added.
+  let notifyCount = 0;
+  if (launching) {
+    const [c] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(productLaunchAlerts)
+      .where(eq(productLaunchAlerts.productId, req.params.productId));
+    notifyCount = c?.n ?? 0;
+  }
   res.json({
     launching,
     launchAt: launching ? row!.launchAt.toISOString() : null,
+    notifyCount,
     serverNow: now.toISOString(),
   });
 });
