@@ -63,6 +63,8 @@ import {
   type AppThemeId,
 } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
+import { InterestTileGrid } from '@/components/onboarding/InterestTileGrid';
+import { FeedPreviewStep } from '@/components/onboarding/FeedPreviewStep';
 import { hydrateMyProfileFromAccount, socialKeysForUser } from '@/services/socialService';
 import { DEFAULT_BUYER_PROFILE, saveBuyerProfileForUser } from '@/lib/buyerProfile';
 import { SellerPlanRecommendationStep } from '@/components/onboarding/SellerPlanRecommendationStep';
@@ -232,22 +234,33 @@ function mapClerkError(err: any): string {
 // ─── Shared UI ───────────────────────────────────────────────────────────────
 
 /**
- * Progress indicator: the signature thread, sewn node-to-node as the user
- * advances (one stitch node per step). Replaces the old dot row.
+ * Progress indicator: thin segmented bars across the top — one 3pt segment
+ * per step, done steps white, the rest at 20% (Instagram Stories-style
+ * segments, the pattern Dev approved for onboarding).
  */
 function StepDots({ current, total }: { current: number; total: number }) {
   const { theme } = useAppTheme();
+  const count = Math.max(total, 1);
   return (
-    <ThreadProgress
-      current={current}
-      total={total}
-      color={theme.text}
-      trackColor={theme.border}
-      accessibilityLabel={`Step ${current + 1} of ${total}`}
-      style={{ flex: 1 }}
-    />
+    <View
+      style={stepBarStyles.row}
+      accessibilityRole="progressbar"
+      accessibilityLabel={`Step ${current + 1} of ${count}`}
+      accessibilityValue={{ min: 0, max: count, now: current + 1 }}
+    >
+      {Array.from({ length: count }).map((_, i) => (
+        <View
+          key={i}
+          style={[stepBarStyles.segment, { backgroundColor: i <= current ? theme.text : `${theme.text}33` }]}
+        />
+      ))}
+    </View>
   );
 }
+const stepBarStyles = StyleSheet.create({
+  row: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4, height: 16 },
+  segment: { flex: 1, height: 3, borderRadius: 2 },
+});
 
 /**
  * Style-interest chip with solid-fill selected state and checkmark.
@@ -331,6 +344,37 @@ const createSr = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.
 });
 
 /** Full-width primary pill (press scale + optional light haptic). */
+/**
+ * Live @handle preview under the username field — the handle as people
+ * will see it, with the availability check beside it.
+ */
+function HandlePreview({ handle, status }: { handle: string; status: 'checking' | 'available' | 'taken' | 'short' }) {
+  const { theme } = useAppTheme();
+  const tone = status === 'taken' ? theme.error : theme.muted;
+  return (
+    <View style={handlePreviewStyles.row} testID="onboarding-handle-preview" accessibilityLiveRegion="polite">
+      <Text style={[handlePreviewStyles.handle, { color: theme.text }]} numberOfLines={1}>@{handle}</Text>
+      <View style={handlePreviewStyles.status}>
+        {status === 'checking' ? (
+          <ActivityIndicator size="small" color={theme.muted} />
+        ) : status === 'available' ? (
+          <Feather name="check-circle" size={16} color={theme.text} />
+        ) : status === 'taken' ? (
+          <Feather name="x-circle" size={16} color={tone} />
+        ) : null}
+        <Text style={[TYPE.label, { color: status === 'available' ? theme.text : tone }]}>
+          {status === 'checking' ? 'Checking' : status === 'available' ? 'Available' : status === 'taken' ? 'Not available' : 'Too short'}
+        </Text>
+      </View>
+    </View>
+  );
+}
+const handlePreviewStyles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.sm, marginTop: -SPACE.xxs, marginBottom: SPACE.sm, paddingHorizontal: SPACE.xxs },
+  handle: { flexShrink: 1, fontSize: 22, lineHeight: 28, fontFamily: 'Inter_700Bold', letterSpacing: -0.4 },
+  status: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+});
+
 function PrimaryButton({ label, onPress, disabled, loading, haptic = true }: { label: string; onPress: () => void; disabled?: boolean; loading?: boolean; haptic?: boolean }) {
   return <PillButton label={label} onPress={onPress} disabled={disabled} loading={loading} haptic={haptic} />;
 }
@@ -1520,14 +1564,16 @@ function SharedAuthStep({
             maxLength={30}
             error={usernameError || usernameLiveCheck.error || null}
             valid={isUsernameValid && !usernameLiveCheck.error && !usernameLiveCheck.checking}
-            hint={usernameLiveCheck.checking
-              ? 'Checking availability…'
-              : username.length >= 3 && !usernameLiveCheck.error
-                ? `@${username} is available`
-                : username.length > 0
-                  ? `@${username} · letters, numbers, underscores only`
-                  : 'Letters, numbers, and underscores only'}
+            hint={username.length > 0 ? null : 'Letters, numbers, and underscores only'}
           />
+          {username.length > 0 ? (
+            <HandlePreview
+              handle={username}
+              status={usernameError || usernameLiveCheck.error
+                ? 'taken'
+                : usernameLiveCheck.checking ? 'checking' : isUsernameValid ? 'available' : 'short'}
+            />
+          ) : null}
         </Reveal>
 
         {/* Referral code */}
@@ -1589,9 +1635,9 @@ function SharedAuthStep({
             accessibilityLabel="Continue with Apple"
             disabled={!!oauthLoading || loading}
           >
-            {oauthLoading === 'Apple' ? <ActivityIndicator color={theme.text} size="small" /> : <>
-              <Ionicons name="logo-apple" size={20} color={FG} />
-              <Text style={ssa.oauthText}>Continue with Apple</Text>
+            {oauthLoading === 'Apple' ? <ActivityIndicator color="#000000" size="small" /> : <>
+              <Ionicons name="logo-apple" size={20} color="#000000" />
+              <Text style={[ssa.oauthText, { color: '#000000' }]}>Continue with Apple</Text>
             </>}
           </PressableScale>
         )}
@@ -1697,8 +1743,10 @@ const createSsa = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   divider:   { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, marginVertical: SPACE.md },
   divLine:   { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: BORDER },
   divText:   { ...TYPE.label, color: MUTED },
-  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, minHeight: 56, backgroundColor: 'transparent', marginBottom: SPACE.sm },
-  appleBtn:  { borderColor: BORDER },
+  // Apple, Google and the email "Create account" button: 52pt, full width.
+  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, height: 52, backgroundColor: 'transparent', marginBottom: SPACE.sm },
+  // Apple per the HIG on a dark background: white fill, black logo + label.
+  appleBtn:  { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
   oauthText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: FG },
   existingEmailChip: {
     alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -2594,21 +2642,18 @@ export default function OnboardingScreen() {
         </KeyboardAvoidingView>
       );
 
-      // Step 3: Style interests — emoji chips with solid-fill selected state
+      // Step 3: Style interests — Pinterest's photo-tile grid with a check
+      // on the ones picked (components/onboarding/InterestTileGrid.tsx).
       if (step === BUYER_STEP_INDEX.STYLE) return (
         <ScrollView contentContainerStyle={sm.scroll} showsVerticalScrollIndicator={false}>
           <StepHeadline>What do you{'\n'}want to see?</StepHeadline>
           <StepSub>Pick a few for better recommendations. You can skip this for now.</StepSub>
-          <Reveal index={2} style={sm.chipGrid}>
-            {STYLE_INTERESTS_WITH_EMOJI.map(({ label: item, emoji }) => (
-              <StyleChip
-                key={item}
-                label={item}
-                emoji={emoji}
-                selected={styleInterests.includes(item)}
-                onPress={() => setStyleArr((prev) => prev.includes(item) ? prev.filter((v) => v !== item) : [...prev, item])}
-              />
-            ))}
+          <Reveal index={2}>
+            <InterestTileGrid
+              interests={STYLE_INTERESTS}
+              selected={styleInterests}
+              onToggle={(item) => setStyleArr((prev) => prev.includes(item) ? prev.filter((v) => v !== item) : [...prev, item])}
+            />
           </Reveal>
         </ScrollView>
       );
@@ -2639,7 +2684,9 @@ export default function OnboardingScreen() {
 
       // Step 6: Success
       if (step === BUYER_STEP_INDEX.SUCCESS) return (
-        <SuccessScreen flow="buyer" firstName={firstName} brandName="" onFinish={finishBuyer} finishing={finishing} />
+        // Pinterest's "Meet your home feed": a first look at their feed, not
+        // a "you're all set" checklist.
+        <FeedPreviewStep interests={styleInterests.length ? styleInterests : DEFAULT_BUYER_INTERESTS} onFinish={finishBuyer} finishing={finishing} />
       );
     }
 
