@@ -17,7 +17,7 @@
  *
  * Every other transition already publishes (routes/orders.ts status and
  * tracking changes, webhooks-shippo/-shopify, dropLifecycle, returns). Copy
- * uses the same "Order #<orderNumber>" / "$12.34" format as those. Buyer rows
+ * uses "Order #<orderNumber>" and VOICE.md money ("$1,240" / "$12.50"). Buyer rows
  * target `buyer_order` so a tap opens the buyer's order screen, never the
  * seller's. All best-effort: a notification failure never fails the order
  * operation that triggered it.
@@ -26,8 +26,45 @@ import { publishNotification } from "../routes/notifications-feed";
 import { actorFieldsFromProfile } from "./activityEvents";
 import { profilesById } from "./safety";
 import { logger } from "./logger";
+import { formatMoney } from "./money/fees";
 
 export const formatOrderCents = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
+
+/** "Maya Lopez" → "Maya". Null when there is no usable name. */
+export function firstNameOf(name: string | null | undefined): string | null {
+  const first = name?.trim().split(/\s+/)[0];
+  return first ? first : null;
+}
+
+/** "Desires Tee", or "Desires Tee and 2 more" for a multi-item order. Null without a product name. */
+export function orderItemsLabel(productName: string | null | undefined, itemCount = 1): string | null {
+  const name = productName?.trim();
+  if (!name) return null;
+  return itemCount > 1 ? `${name} and ${itemCount - 1} more` : name;
+}
+
+/**
+ * The seller's new-order notification (docs/VOICE.md: lead with the person
+ * and the thing). "Maya bought Desires Tee" · "$89 · Order #BT-00012". With
+ * no buyer name it says "Someone"; with no product name, "placed an order".
+ * The seller's first sale is the one notification that gets an "!".
+ */
+export function newOrderCopy(input: {
+  buyerName?: string | null;
+  productName?: string | null;
+  itemCount?: number;
+  orderNumber: string;
+  totalCents: number;
+  firstSale?: boolean;
+}): { title: string; body: string } {
+  const who = firstNameOf(input.buyerName) ?? "Someone";
+  const items = orderItemsLabel(input.productName, input.itemCount);
+  const sentence = items ? `${who} bought ${items}` : `${who} placed an order`;
+  return {
+    title: input.firstSale ? `First sale! ${sentence}` : sentence,
+    body: `${formatMoney(input.totalCents)} · Order #${input.orderNumber}`,
+  };
+}
 
 export async function notifyBuyerOrderConfirmed(input: {
   buyerId: string;
@@ -35,14 +72,17 @@ export async function notifyBuyerOrderConfirmed(input: {
   orderNumber: string;
   totalCents: number;
   targetImageUrl?: string | null;
+  productName?: string | null;
+  itemCount?: number;
 }): Promise<void> {
+  const items = orderItemsLabel(input.productName, input.itemCount);
   try {
     await publishNotification({
       userId: input.buyerId,
       category: "orders",
       type: "order_confirmed",
-      title: "Order confirmed",
-      body: `Order #${input.orderNumber} for ${formatOrderCents(input.totalCents)} is confirmed. We'll let you know when it ships.`,
+      title: items ? `You bought ${items}` : "Order confirmed",
+      body: `${formatMoney(input.totalCents)} · Order #${input.orderNumber}. We'll tell you when it ships.`,
       targetId: input.orderId,
       targetType: "buyer_order",
       targetImageUrl: input.targetImageUrl ?? null,
@@ -60,12 +100,12 @@ export async function notifyBuyerOrderCancelled(input: {
   reason: "buyer_cancelled" | "sold_out";
 }): Promise<void> {
   const refund = input.refundedCents > 0
-    ? ` Your refund of ${formatOrderCents(input.refundedCents)} is on its way.`
+    ? ` Your ${formatMoney(input.refundedCents)} refund is on its way.`
     : "";
   const copy = input.reason === "sold_out"
     ? {
       title: "Order cancelled: item sold out",
-      body: `An item in order #${input.orderNumber} sold out while you were paying, so the order was cancelled.${refund}`,
+      body: `An item in order #${input.orderNumber} sold out, so we cancelled the order.${refund}`,
     }
     : { title: "Order cancelled", body: `You cancelled order #${input.orderNumber}.${refund}` };
   try {
@@ -94,13 +134,13 @@ export async function notifySellerOrderCancelledByBuyer(input: {
     const profile = (await profilesById([input.buyerId])).get(input.buyerId);
     const actor = profile && !profile.deleted && !profile.suspended ? actorFieldsFromProfile(profile) : null;
     const who = actor?.actorName ?? "A buyer";
-    const refund = input.refundedCents > 0 ? ` ${formatOrderCents(input.refundedCents)} was refunded.` : "";
+    const refund = input.refundedCents > 0 ? ` ${formatMoney(input.refundedCents)} refunded.` : "";
     await publishNotification({
       userId: input.sellerId,
       category: "orders",
       type: "order_cancelled_by_buyer",
       title: `${who} cancelled order #${input.orderNumber}`,
-      body: `The items were restocked.${refund}`,
+      body: `Items restocked.${refund}`,
       ...(actor ?? {}),
       targetId: input.orderId,
       targetType: "order",
@@ -154,7 +194,7 @@ export async function notifySellerReturnRequested(input: {
       category: "returns",
       type: "return_request_received",
       title: `${who} requested a return`,
-      body: `Order #${input.orderNumber}. Review the request and approve or decline it.`,
+      body: `Order #${input.orderNumber}. Approve or decline it.`,
       ...(actor ?? {}),
       targetId: input.returnId,
       targetType: "return",

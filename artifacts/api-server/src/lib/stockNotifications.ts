@@ -10,6 +10,7 @@ import { productThumbnail } from "./activityEvents";
 import { publishNotification } from "../routes/notifications-feed";
 import { logger } from "./logger";
 import { noteVariantPriceLowered, noteVariantStockRaised, trackStockNotificationWork } from "./savedProductAlerts";
+import { formatMoney } from "./money/fees";
 
 async function likersOf(productId: string): Promise<string[]> {
   const rows = await db
@@ -75,10 +76,10 @@ async function notifyStockLevelChangedWork(input: {
     userId: input.ownerId,
     category: "stock",
     type: "low_stock",
-    title: isOut ? "Out of stock" : "Low stock alert",
+    title: isOut ? "Sold out" : "Low stock",
     body: isOut
-      ? `${input.productName} just sold out.`
-      : `${input.productName} is running low — ${input.newStock} left.`,
+      ? `${input.productName} sold out.`
+      : `${input.productName} has ${input.newStock} left.`,
     targetId: input.productId,
     targetType: "product",
     cta: "Manage inventory",
@@ -127,8 +128,8 @@ export async function notifyWaitlistRestock(input: {
       userId: entry.userId,
       category: "order",
       type: "waitlist_restock",
-      title: "Back in stock!",
-      body: `${input.productName}${entry.variantLabel ? ` (${entry.variantLabel})` : ""} is available again. Grab it before it sells out.`,
+      title: "Restock",
+      body: `${input.productName}${entry.variantLabel ? ` (${entry.variantLabel})` : ""} is back.`,
       targetId: input.productId,
       targetType: "product",
       targetImageUrl: image,

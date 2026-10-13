@@ -26,6 +26,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { publishNotification } from "../routes/notifications-feed";
 import { blockedUserIds, profilesById, type ProfileSummary } from "./safety";
 import { logger } from "./logger";
+import { formatMoney } from "./money/fees";
 
 const AVATAR_COLORS = [
   "#8B5CF6", "#EC4899", "#3B82F6", "#10B981", "#F59E0B",
@@ -498,17 +499,14 @@ export async function notifyThreadCashReceived(input: {
 
     const actor = await actorFields(input.fromUserId);
     if (!actor) return;
-    const dollars = (input.amountCents / 100).toLocaleString(undefined, {
-      style: "currency",
-      currency: "USD",
-    });
+    const dollars = formatMoney(input.amountCents);
 
     await publishNotification({
       userId: input.toUserId,
       category: "social",
       type: "thread_cash_received",
       title: `${actor.actorName} sent you Thread Cash`,
-      body: `${dollars} · tap to view`,
+      body: dollars,
       ...actor,
       targetId: input.transferId,
       targetType: "thread_cash_transfer",
@@ -797,7 +795,7 @@ export async function notifyReferralReward(input: {
       .limit(1);
     if (existing) return;
     const actor = await actorFields(input.inviteeId);
-    const dollars = (input.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+    const dollars = formatMoney(input.amountCents);
     await publishNotification({
       userId: input.inviterId,
       category: "social",

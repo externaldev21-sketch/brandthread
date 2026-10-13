@@ -1015,7 +1015,7 @@ router.post("/:id/messages", rateLimit("messaging"), validateBody(sendMessageBod
             userId:        recipientId,
             category:      "messages",
             type:          notifType,
-            title:         `New message from ${sender.name || "someone"}`,
+            title:         `${sender.name || "Someone"} sent a message`,
             body:          previewText.slice(0, 100),
             // The sender, so Activity's block filter and "see less" actor
             // mutes apply to message notifications like every other row.

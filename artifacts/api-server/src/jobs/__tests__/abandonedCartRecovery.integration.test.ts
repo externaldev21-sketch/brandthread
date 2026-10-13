@@ -67,8 +67,8 @@ describe("runCartReminders", () => {
 
     const mine = sent.pushes.filter((p) => ids.includes(p.userId));
     expect(mine.sort((a, b) => a.userId.localeCompare(b.userId))).toEqual([
-      { userId: optedOut, category: "cart", body: "Hoodie is waiting in your cart." },
-      { userId: stale, category: "cart", body: "Hoodie is waiting in your cart." },
+      { userId: optedOut, category: "cart", body: "Hoodie is waiting." },
+      { userId: stale, category: "cart", body: "Hoodie is waiting." },
     ]);
     expect(sent.emails.filter((e) => e.includes(suffix)).sort()).toEqual([`${stale}@test.local`]);
 

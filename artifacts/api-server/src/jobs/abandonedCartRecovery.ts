@@ -85,8 +85,8 @@ export async function runCartReminders(now: Date = new Date()): Promise<{ pushed
           category: "orders",
           pushCategory: "cart",
           type: "abandoned_cart",
-          title: "Still thinking it over?",
-          body: `${itemSummary(items)} is waiting in your cart.`,
+          title: "Still in your cart",
+          body: `${itemSummary(items)} is waiting.`,
           targetType: "cart",
           cta: "Open your cart",
         });

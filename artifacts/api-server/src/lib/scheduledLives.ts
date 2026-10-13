@@ -112,7 +112,7 @@ export async function markScheduledLiveStarted(input: {
     category: "drops",
     type: "live_started",
     title: `${label} is live now`,
-    body: `${row.title} just started. Tap to watch.`,
+    body: `${row.title} just started.`,
     targetId: input.streamId,
     targetType: "live",
     actorId: row.seller_id,
