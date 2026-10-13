@@ -1101,6 +1101,48 @@ export interface AccessWaitlist {
   items: { id: string; email: string; createdAt: string; invitedAt: string | null; code: string | null }[];
   counts: { total: number; invited: number; pending: number };
 }
+/**
+ * POST JSON with upload progress (0–1). fetch() can't report upload bytes,
+ * so this goes through XMLHttpRequest; same base URL, auth and store headers
+ * as every other request. Used for DM photo/video uploads (polish #161).
+ */
+async function postWithUploadProgress<T>(
+  path: string,
+  body: unknown,
+  getToken: GetToken,
+  onProgress: (fraction: number) => void,
+): Promise<T> {
+  rejectSellerPreviewApiRequest();
+  const resolvedPath = versionApiPath(path);
+  const token = await getCachedToken(getToken);
+  if (!token && isSignedInOnlyPath(resolvedPath)) {
+    throw new ApiError(401, JSON.stringify({ error: { message: 'Sign in required', code: 'auth_required' } }));
+  }
+  const payload = JSON.stringify(body);
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${BASE}${resolvedPath}`);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    for (const [key, value] of Object.entries(storeContextHeaders())) xhr.setRequestHeader(key, String(value));
+    xhr.timeout = EXPENSIVE_REQUEST_TIMEOUT_MS;
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress(Math.min(0.99, event.loaded / event.total));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(1);
+        try { resolve(JSON.parse(xhr.responseText) as T); } catch (error) { reject(error); }
+      } else {
+        reject(new ApiError(xhr.status, xhr.responseText));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network request failed'));
+    xhr.ontimeout = () => reject(new Error('Upload timed out'));
+    xhr.send(payload);
+  });
+}
+
 export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () => 'anonymous') {
   const get     = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope);
   const freshGet = <T>(path: string) => request<T>(path, { method: 'GET', cache: 'no-store' }, getToken, false, getCacheScope);
@@ -1922,6 +1964,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       }) => post<any>('/api/conversations', { type: 'group', ...body }),
       messages:   (id: string, limit = 50) =>
         get<any[]>(`/api/conversations/${encodeURIComponent(id)}/messages?limit=${limit}`),
+      /** DM link card for the first URL in a message (server fetches, SSRF-guarded). */
+      linkPreview: (url: string) =>
+        get<{ preview: import('@/lib/linkPreview').LinkPreview | null }>(`/api/link-preview?url=${encodeURIComponent(url)}`),
       /** Search-in-chat (chat details > Search): this conversation's own
        *  message history only, never global search. */
       searchMessages: (id: string, q: string) =>
@@ -1956,6 +2001,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Upload a base64-encoded image/video/audio file and get back a public URL. */
       uploadMedia: (body: { data: string; mimeType: string; extension: string }) =>
         post<{ url: string }>('/api/conversations/upload-media', body),
+      /** Same upload, reporting progress 0–1 (for the in-bubble ring, #161). */
+      uploadMediaWithProgress: (body: { data: string; mimeType: string; extension: string }, onProgress: (fraction: number) => void) =>
+        postWithUploadProgress<{ url: string }>('/api/conversations/upload-media', body, getToken, onProgress),
       /** Set (or replace) my reaction on a message — one active reaction per user per message. */
       addReaction: (conversationId: string, messageId: string, reactionType: string) =>
         put<{ userId: string; userName: string; reactionType: string; createdAt: string }>(

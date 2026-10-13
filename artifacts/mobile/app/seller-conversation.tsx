@@ -39,6 +39,8 @@ import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import Composer from '@/components/ui/Composer';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { LinkPreviewCard } from '@/components/chat/LinkPreviewCard';
+import { CHAT_FOCUS_HIGHLIGHT_MS, messageRowIndex, takePendingChatFocus } from '@/lib/chatFocus';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
 import * as Clipboard from 'expo-clipboard';
@@ -306,6 +308,10 @@ export default function SellerConversationScreen() {
   // Item 74 (photo/video upload progress ring) — see the identical comment
   // in app/buyer-conversation.tsx.
   const mediaUploadTokenRef = useRef(0);
+  // Polish #161: real upload progress (0–1) — composer thumb, and inside the
+  // bubble when Send is tapped before the upload finishes (same as buyer).
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const pendingUploadRef = useRef<Promise<MsgAttachment | null> | null>(null);
   // Real-time "X is typing…" — same pattern as app/buyer-conversation.tsx's
   // identical refs.
   const isTypingSentRef = useRef(false);
@@ -617,8 +623,12 @@ export default function SellerConversationScreen() {
 
   // ── Media upload helper ───────────────────────────────────────────────────────
 
-  async function uploadMedia(base64: string, mimeType: string, extension: string): Promise<string> {
-    const result = await api.conversations.uploadMedia({ data: base64, mimeType, extension });
+  async function uploadMedia(
+    base64: string, mimeType: string, extension: string, onProgress?: (fraction: number) => void,
+  ): Promise<string> {
+    const result = onProgress
+      ? await api.conversations.uploadMediaWithProgress({ data: base64, mimeType, extension }, onProgress)
+      : await api.conversations.uploadMedia({ data: base64, mimeType, extension });
     return result.url;
   }
 
@@ -805,26 +815,34 @@ export default function SellerConversationScreen() {
       meta: { photoUris: JSON.stringify(localUris), uploading: 'true' },
     });
     setIsUploading(true);
-    try {
+    setUploadProgress(0);
+    const assets = result.assets.filter((a) => !!a.base64);
+    const upload = (async (): Promise<MsgAttachment | null> => {
       const urls: string[] = [];
-      for (const asset of result.assets) {
-        if (!asset.base64) continue;
-        urls.push(await uploadMedia(asset.base64, 'image/jpeg', 'jpg'));
+      for (const [i, asset] of assets.entries()) {
+        urls.push(await uploadMedia(asset.base64!, 'image/jpeg', 'jpg', (p) => {
+          if (mediaUploadTokenRef.current === token || pendingUploadRef.current === upload) setUploadProgress((i + p) / assets.length);
+        }));
       }
-      if (mediaUploadTokenRef.current !== token) return;
-      if (!urls.length) { setPendingAttachment(null); return; }
-      setPendingAttachment({
+      return urls.length ? {
         type: 'image', uri: urls[0],
         title: urls.length > 1 ? `${urls.length} photos` : 'Photo',
         meta: { photoUris: JSON.stringify(urls) },
-      });
+      } : null;
+    })();
+    pendingUploadRef.current = upload;
+    try {
+      const uploaded = await upload;
+      if (mediaUploadTokenRef.current !== token) return;
+      if (!uploaded) { setPendingAttachment(null); return; }
+      setPendingAttachment(uploaded);
     } catch {
       if (mediaUploadTokenRef.current === token) {
         setPendingAttachment(null);
         Alert.alert('Upload failed', 'Could not upload. Please try again.');
       }
     }
-    finally { if (mediaUploadTokenRef.current === token) setIsUploading(false); }
+    finally { if (mediaUploadTokenRef.current === token) { setIsUploading(false); setUploadProgress(null); } }
   }
 
   async function handlePickVideo() {
@@ -845,18 +863,23 @@ export default function SellerConversationScreen() {
     const durationLabel = String(Math.round((asset.duration ?? 0) / 1000));
     setPendingAttachment({ type: 'video', title: 'Video clip', meta: { duration: durationLabel, uploading: 'true' } });
     setIsUploading(true);
+    setUploadProgress(0);
+    const ext = (asset.uri.split('.').pop() ?? 'mp4').replace(/\?.*/, '');
+    const upload = uploadMedia(asset.base64, 'video/mp4', ext, (p) => {
+      if (mediaUploadTokenRef.current === token || pendingUploadRef.current === upload) setUploadProgress(p);
+    }).then((url): MsgAttachment => ({ type: 'video', uri: url, title: 'Video clip', meta: { duration: durationLabel } }));
+    pendingUploadRef.current = upload;
     try {
-      const ext = (asset.uri.split('.').pop() ?? 'mp4').replace(/\?.*/, '');
-      const url = await uploadMedia(asset.base64, 'video/mp4', ext);
+      const uploaded = await upload;
       if (mediaUploadTokenRef.current !== token) return;
-      setPendingAttachment({ type: 'video', uri: url, title: 'Video clip', meta: { duration: durationLabel } });
+      setPendingAttachment(uploaded);
     } catch {
       if (mediaUploadTokenRef.current === token) {
         setPendingAttachment(null);
         Alert.alert('Upload failed', 'Could not upload video. Please try again.');
       }
     }
-    finally { if (mediaUploadTokenRef.current === token) setIsUploading(false); }
+    finally { if (mediaUploadTokenRef.current === token) { setIsUploading(false); setUploadProgress(null); } }
   }
 
   // ── Voice recording ───────────────────────────────────────────────────────────
@@ -931,6 +954,11 @@ export default function SellerConversationScreen() {
           {uris.slice(0, 4).map((uri, idx) => (
             <PressableScale rippleEnabled={false} key={idx} style={[s.photoCell, uris.length === 1 && s.photoCellSingle]} activeOpacity={0.9} onPress={() => setViewerUri(uri)}>
               <CachedImage source={{ uri }} style={s.photoImg} recyclingKey={uri} />
+              {att.meta?.uploading === 'true' && idx === 0 ? (
+                <View style={s.bubbleUploadOverlay} testID="bubble-upload-progress">
+                  <UploadRing size={36} color="#fff" progress={uploadProgress} />
+                </View>
+              ) : null}
               {idx === 3 && uris.length > 4 && (
                 <View style={s.photoMore}><Text style={s.photoMoreText}>+{uris.length - 4}</Text></View>
               )}
@@ -948,7 +976,11 @@ export default function SellerConversationScreen() {
           onPress={() => { if (att.uri && !att.meta?.uploading) setViewerVideoUri(att.uri); }}
         >
           {att.uri ? <CachedImage source={{ uri: att.uri }} style={s.videoThumbImg} recyclingKey={att.uri} /> : null}
-          <View style={s.videoPlayOverlay}><Feather name="play-circle" size={36} color="#fff" /></View>
+          <View style={s.videoPlayOverlay}>
+            {att.meta?.uploading === 'true'
+              ? <UploadRing size={36} color="#fff" progress={uploadProgress} />
+              : <Feather name="play-circle" size={36} color="#fff" />}
+          </View>
           {att.meta?.duration ? <View style={s.videoDurBadge}><Text style={s.videoDurText}>{att.meta.duration}s</Text></View> : null}
         </PressableScale>
       );
@@ -1111,6 +1143,35 @@ export default function SellerConversationScreen() {
       return;
     }
 
+    // Sent before its photo/video finished uploading (#161): the bubble shows
+    // up now with the upload ring inside it, and posts once the upload lands.
+    if (att?.meta?.uploading === 'true' && pendingUploadRef.current) {
+      const upload = pendingUploadRef.current;
+      mediaUploadTokenRef.current += 1; // the composer no longer owns this upload
+      const localId = `local-upload-${Date.now()}`;
+      const convId = id;
+      setMessages((prev) => [...prev, {
+        id: localId, conversationId: convId, fromId: effectiveMyId, fromName: 'You', fromInitials: '',
+        fromColor: theme.accent, text: t, attachment: att, status: 'sending', ts: Date.now(),
+        replyToId: replyingTo?.id, reactions: [],
+      } as Msg]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      try {
+        const uploaded = await upload;
+        if (!uploaded) throw new Error('Nothing uploaded');
+        const msg = await api.conversations.send(convId, { text: t, attachment: uploaded, replyToId: replyingTo?.id });
+        setMessages((prev) => prev.map((m) => (m.id === localId ? (msg as Msg) : m)));
+      } catch (e) {
+        setMessages((prev) => prev.map((m) => (m.id === localId ? { ...m, status: 'failed' } : m)));
+        Alert.alert('Not sent', apiErrorMessage(e, 'The upload didn’t finish. Please try again.'));
+      } finally {
+        if (pendingUploadRef.current === upload) pendingUploadRef.current = null;
+        setIsUploading(false);
+        setUploadProgress(null);
+      }
+      return;
+    }
+
     setIsSending(true);
     try {
       const msg = await api.conversations.send(id, {
@@ -1216,7 +1277,33 @@ export default function SellerConversationScreen() {
 
   // ── Render helpers ──────────────────────────────────────────────────────────
 
-  function renderItem({ item }: ListRenderItemInfo<ListRow>) {
+  // Search in chat → jump (#164): rows, and the found message's highlight.
+  const listRows = groupByDate(messages, callLog);
+  const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null);
+  const focusHoldRef = useRef<number | null>(null);
+  const focusScrollIdRef = useRef<string | null>(null);
+  useFocusEffect(useCallback(() => {
+    const target = takePendingChatFocus(id);
+    if (!target) return undefined;
+    const index = messageRowIndex(listRows as { type: string; msg?: { id: string } }[], target);
+    if (index < 0) return undefined;
+    focusHoldRef.current = messages.length;
+    focusScrollIdRef.current = target;
+    setFocusedMessageId(target);
+    requestAnimationFrame(() => flatListRef.current?.scrollToIndex({ index, viewPosition: 0.5, animated: false }));
+    const timer = setTimeout(() => setFocusedMessageId(null), CHAT_FOCUS_HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, listRows.length]));
+
+  function renderItem(info: ListRenderItemInfo<ListRow>) {
+    const row = renderRow(info);
+    return info.item.type === 'message' && info.item.msg.id === focusedMessageId
+      ? <View style={{ backgroundColor: theme.border }} testID="conversation-focused-message">{row}</View>
+      : row;
+  }
+
+  function renderRow({ item }: ListRenderItemInfo<ListRow>) {
     if (item.type === 'date') {
       return (
         <View style={s.dateWrap}>
@@ -1452,6 +1539,8 @@ export default function SellerConversationScreen() {
             ) : (msg.text?.trim().length ?? 0) > 0 ? (
               <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
             ) : null}
+            {/* Link card for the first URL (#163); seeded preview threads skip it. */}
+            {!removed && msg.text ? <LinkPreviewCard text={msg.text} enabled={!isSellerPreviewConversationId(id ?? '')} /> : null}
 
             {/* Inline bottom-right timestamp + read receipt (last bubble of
                 a run) — same automatic, group-boundary timestamp behavior as
@@ -1532,6 +1621,7 @@ export default function SellerConversationScreen() {
               type={pendingAttachment.type as 'image' | 'video'}
               uri={pendingAttachment.type === 'image' ? pendingAttachment.uri : undefined}
               uploading={uploadingMedia}
+              progress={uploadingMedia ? uploadProgress : null}
               size={40}
               ringColor={PURPLE}
               iconColor={MUTED}
@@ -1763,7 +1853,7 @@ export default function SellerConversationScreen() {
       ) : (
         <FlatList
           ref={flatListRef}
-          data={groupByDate(messages, callLog)}
+          data={listRows}
           keyExtractor={(item, i) => (
             item.type === 'date' ? `date-${item.date}-${i}`
               : item.type === 'call_log' ? `call-${item.entry.id}`
@@ -1774,7 +1864,20 @@ export default function SellerConversationScreen() {
           contentContainerStyle={s.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          onContentSizeChange={() => {
+            // Hold on a search result until a new message arrives (#164).
+            if (focusHoldRef.current !== null) {
+              if (messages.length <= focusHoldRef.current) return;
+              focusHoldRef.current = null;
+            }
+            flatListRef.current?.scrollToEnd({ animated: false });
+          }}
+          onScrollToIndexFailed={(info) => {
+            if (!focusScrollIdRef.current) return;
+            focusScrollIdRef.current = null;
+            flatListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+            setTimeout(() => flatListRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: false }), 60);
+          }}
         />
       )}
 
@@ -2751,6 +2854,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   photoCellSingle: { width: '100%', aspectRatio: 4 / 3 },
   photoImg:        { width: '100%', height: '100%' },
   photoMore:       { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  // theme-exempt: scrim over the photo while it uploads (#161)
+  bubbleUploadOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
   photoMoreText:   { color: '#fff', fontSize: FS.lg, fontFamily: FONT.bold },
 
   // Video thumb
