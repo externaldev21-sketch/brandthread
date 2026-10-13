@@ -53,6 +53,10 @@ const OPTIONAL_VARS = [
   "SHIPPO_WEBHOOK_SECRET",
   "SENTRY_DSN",
   "POSTHOG_API_KEY",
+  // Drop SMS waitlist "drop is live" text blast (lib/sms). All three or none.
+  "TWILIO_ACCOUNT_SID",
+  "TWILIO_AUTH_TOKEN",
+  "TWILIO_MESSAGING_SERVICE_SID",
 ];
 
 /**
