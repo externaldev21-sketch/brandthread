@@ -168,7 +168,9 @@ const MATCHERS = [
     async load(match) {
       const drop = await fetchJson(`${apiBase()}/public/drops/${encodeURIComponent(match[1])}`);
       if (!drop) return null;
-      const image = Array.isArray(drop.products) && drop.products[0]?.images?.[0];
+      // The seller's chosen hero image first, then the first product photo.
+      const image = (typeof drop.heroImageUrl === 'string' && /^https?:\/\//i.test(drop.heroImageUrl) ? drop.heroImageUrl : null)
+        || (Array.isArray(drop.products) && drop.products[0]?.images?.[0]);
       return {
         title: drop.name ? `${drop.name} — a drop on Brandthread` : 'A drop on Brandthread',
         description: drop.description || 'Limited drop on Brandthread.',
@@ -219,6 +221,9 @@ async function fetchJson(url) {
     clearTimeout(timer);
   }
 }
+
+// Further matchers (invites, community invites) live in sharePreviewMore.js.
+MATCHERS.push(...require('./sharePreviewMore').buildMoreMatchers({ apiBase, fetchResource, NOT_FOUND, OG_IMAGE_FALLBACK }));
 
 function escapeHtmlAttr(value) {
   return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -292,4 +297,4 @@ async function renderSharePreviewHtml(pathname, shellHtml) {
   return result && result.status === 200 ? result.html : null;
 }
 
-module.exports = { renderSharePreviewHtml, renderSharePreview, apiBase };
+module.exports = { renderSharePreviewHtml, renderSharePreview, apiBase, findMatcher };

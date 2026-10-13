@@ -196,6 +196,8 @@ import sharePreviewRouter from "./share-preview";
 import publicMediaRouter from "./public-media";
 import metaCapiPublicRouter from "./meta-capi-public";
 import sitemapRouter from "./sitemap";
+import seoPublicRouter from "./seo-public";
+import wellKnownRouter from "./wellKnown";
 import affiliatePublicRouter from "./affiliate-public";
 import affiliateCreatorRouter, { affiliateConnectRedirectRouter } from "./affiliate-creator";
 import sellerAffiliateRouter from "./seller-affiliate";
@@ -266,6 +268,10 @@ router.use("/public",          sharePreviewRouter); // /posts/:id/share-preview,
 router.use("/public",          sitemapRouter); // /sitemap.xml — products, seller profiles, drops (served at brandthread.app/sitemap.xml)
 router.use("/public/meta",     metaCapiPublicRouter); // POST /conversion-events — CAPI credited to the product's seller (BT-325)
 router.use("/public",          publicMediaRouter); // /media/products/:id/:index — public product photo (share cards, bio, email)
+router.use("/public",          seoPublicRouter); // /seo/products/:id, /new-this-week, /seo/sitemap/:kind, /invites/:code/share-preview
+// brandthread.app only routes /api/* here, so the web server (serve.js)
+// proxies /.well-known/* from this mirror of the root verification files.
+router.use("/public/well-known", wellKnownRouter);
 router.use("/public",          discoveryRouter); // /categories, /trending/products, /trending/brands
 router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
