@@ -76,6 +76,7 @@ type RemoteProfile = {
   postsCount: number;
   /** Private account: a follow request from me is pending / the account is private. */
   followRequested?: boolean; isPrivate?: boolean;
+  pronouns?: string | null;
 };
 
 export default function BuyerOtherProfileScreen() {
@@ -479,6 +480,7 @@ export default function BuyerOtherProfileScreen() {
           initials: displayInitials,
           avatarUrl: profile?.avatarUrl ?? null,
           roleLabel: 'Buyer',
+          pronouns: profile?.pronouns ?? null,
         }}
         avatar={storyIds.length > 0
           ? { ring: true, onPress: openStories, accessibilityLabel: `View ${displayName}'s story`, liveHostId: canonicalUserId }

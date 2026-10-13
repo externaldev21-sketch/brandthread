@@ -29,6 +29,7 @@ export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { places } from './places';
 import { relations, sql } from 'drizzle-orm';
+import { varchar } from 'drizzle-orm/pg-core';
 
 // ─── Users (brand team members + buyers, linked to Clerk) ─────────────────────
 
@@ -151,8 +152,10 @@ export const users = pgTable('users', {
   // a UNIQUE INDEX on lower(username) WHERE username IS NOT NULL —
   // migration 109 — not by this .unique(). Always store/compare lowercased.
   username: text('username').unique(),
-  // When the @handle last changed (migration 117). Drives the 30-day change cooldown.
+  // When the @handle last changed (migration 117). Drives the 14-day change cooldown.
   usernameChangedAt: timestamp('username_changed_at', { withTimezone: true }),
+  // Optional pronouns shown next to the name on profiles (migration 311).
+  pronouns: varchar('pronouns', { length: 40 }),
   // Storefront visit counter — incremented by a public endpoint each time a buyer
   // views this seller's storefront. Drives the real conversion rate stat.
   storefrontVisitCount: integer('storefront_visit_count').notNull().default(0),

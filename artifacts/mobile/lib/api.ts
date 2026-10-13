@@ -964,6 +964,8 @@ export interface LocalUserProfile {
   deletionCancelled?: boolean;
   /** Derived age band (the date of birth is never stored). null = not asked yet. */
   ageBand?: 'under_13' | '13_17' | '18_plus' | null;
+  /** Optional pronouns shown next to the name (users.pronouns). */
+  pronouns?: string | null;
 }
 
 export interface ShopifyImportJob {
@@ -2817,6 +2819,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
           iBlockedThem: boolean;
           isPrivate?: boolean; followRequested?: boolean; contentHidden?: boolean;
+          pronouns?: string | null;
         }>(`/api/social/profile/${encodeURIComponent(userId)}`),
       /** Posts where someone tagged this profile (the profile "Tagged" tab). */
       tagged: (userId: string, limit = 30, offset = 0) =>

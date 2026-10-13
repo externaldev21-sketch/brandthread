@@ -39,7 +39,7 @@ import { createWelcomeConversationOnce } from "../lib/brandthreadAgent";
 import { AGE_RESTRICTED_MESSAGE, bandMaySellOrEarn, denyIfAgeRestricted } from "../lib/ageGate";
 import { LEGAL_ACCEPTANCE_SOURCES, recordLegalAcceptance, type LegalAcceptanceSource } from "../lib/legalAcceptance";
 import { buildAccountDataExport } from "../lib/dataExport";
-import { decideUsernameChange, usernameNextChangeAt } from "../lib/usernameCooldown";
+import { decideUsernameChange, usernameNextChangeAt, USERNAME_COOLDOWN_MESSAGE } from "../lib/usernameCooldown";
 import { hasRedeemedAccessCode, isInviteOnlyEnabled } from "../lib/access/inviteOnly";
 
 const router = Router();
@@ -80,6 +80,8 @@ const profileBodySchema = z.object({
   contactEmail: z.union([z.literal(""), requestPrimitives.email]).optional(),
   tags: z.array(z.string().trim().min(1).max(30)).max(20).optional(),
   socialLinks: z.record(z.string(), z.string().trim().max(300)).optional(),
+  // Optional pronouns shown next to the name; "" or null clears them.
+  pronouns: z.string().trim().max(40, "Pronouns can be up to 40 characters.").nullable().optional(),
 }).passthrough();
 const privacyBodySchema = z.object({
   dmPrivacy: z.enum(["requests", "followers_only"]).optional(),
@@ -785,7 +787,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
   const clerkId = (req as any).clerkUserId as string;
   const {
     displayName, brandName, bio, website, name, username, accountType, appThemeId, appIconId, expectedClerkId,
-    category, location, contactEmail, tags, socialLinks,
+    category, location, contactEmail, tags, socialLinks, pronouns,
   } = req.body as {
     displayName?: string;
     brandName?:   string;
@@ -802,6 +804,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
     contactEmail?: string;
     tags?:         string[];
     socialLinks?:  Record<string, string>;
+    pronouns?:     string | null;
   };
   if (expectedClerkId && expectedClerkId !== clerkId) {
     (req as any).log?.warn("profile update rejected after account context changed");
@@ -840,8 +843,9 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
   if (contactEmail !== undefined) updates.contactEmail = contactEmail;
   if (tags         !== undefined) updates.tags         = tags;
   if (socialLinks  !== undefined) updates.socialLinks   = socialLinks;
+  if (pronouns     !== undefined) updates.pronouns     = pronouns?.trim() || null;
 
-  // Username: format + uniqueness check + 30-day change cooldown
+  // Username: format + uniqueness check + 14-day change cooldown
   if (username !== undefined) {
     const uname = String(username).trim().toLowerCase();
     if (uname !== "") {
@@ -865,7 +869,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
       const retryAfterSec = Math.max(1, Math.ceil((decision.nextChangeAt.getTime() - Date.now()) / 1000));
       res.setHeader("Retry-After", String(retryAfterSec));
       res.status(429).json({
-        error: "You can change your username once every 30 days.",
+        error: USERNAME_COOLDOWN_MESSAGE,
         code: "USERNAME_COOLDOWN",
         nextChangeAt: decision.nextChangeAt.toISOString(),
       });
@@ -929,7 +933,7 @@ router.get("/username/check", requireAuth, async (req, res) => {
     return;
   }
 
-  // The 30-day @handle change cooldown surfaces here so the edit screens can
+  // The 14-day @handle change cooldown surfaces here so the edit screens can
   // explain it inline before anyone taps Save.
   const [ownHandle] = await db
     .select({ username: users.username, usernameChangedAt: users.usernameChangedAt })
@@ -946,7 +950,7 @@ router.get("/username/check", requireAuth, async (req, res) => {
       available: false,
       code: "USERNAME_COOLDOWN",
       nextChangeAt: cooldown.nextChangeAt.toISOString(),
-      error: "You can change your username once every 30 days.",
+      error: USERNAME_COOLDOWN_MESSAGE,
     });
     return;
   }

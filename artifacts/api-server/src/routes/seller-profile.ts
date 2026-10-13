@@ -19,6 +19,7 @@ import {
 } from "../lib/storeIdentity";
 import { normalizeUploadedImage } from "../lib/productImageResize";
 import { MEDIA_REJECTED_MESSAGE, screenImageBuffer } from "../lib/mediaModeration";
+import { decideUsernameChange, USERNAME_COOLDOWN_MESSAGE } from "../lib/usernameCooldown";
 
 // ─── Startup migration — add tutorial flag + questionnaire + profile columns ───
 (async () => {
@@ -256,7 +257,7 @@ router.post("/profile/banner/upload", ...createProfileImageUploadHandler("banner
 // ─── Store identity setup ─────────────────────────────────────────────────────
 // Claim a store name + @handle, pick a monochrome accent, connect socials.
 // Every write re-validates server-side; the mobile screens only preview.
-type AvailabilityResult = { available: boolean; error?: string; code?: string };
+type AvailabilityResult = { available: boolean; error?: string; code?: string; nextChangeAt?: string };
 
 async function nameAvailability(clerkId: string, raw: unknown): Promise<AvailabilityResult & { name: string }> {
   const { name, problem } = validateBrandName(raw);
@@ -270,9 +271,31 @@ async function nameAvailability(clerkId: string, raw: unknown): Promise<Availabi
   return { name, available: true };
 }
 
-async function handleAvailability(clerkId: string, raw: unknown): Promise<AvailabilityResult & { handle: string }> {
+async function handleAvailability(clerkId: string, raw: unknown): Promise<AvailabilityResult & { handle: string; stamp?: boolean }> {
   const { handle, problem } = validateHandle(raw);
   if (problem) return { handle, available: false, error: problem.error, code: problem.code };
+  // Same @handle change cooldown as PATCH /api/auth/profile: the first-ever
+  // handle is free, keeping the current one is a no-op, anything else waits.
+  const [own] = await db
+    .select({ username: users.username, usernameChangedAt: users.usernameChangedAt })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  const decision = decideUsernameChange({
+    current: own?.username ?? null,
+    requested: handle,
+    changedAt: own?.usernameChangedAt ?? null,
+  });
+  if (decision.kind === "blocked") {
+    return {
+      handle,
+      available: false,
+      error: USERNAME_COOLDOWN_MESSAGE,
+      code: "USERNAME_COOLDOWN",
+      nextChangeAt: decision.nextChangeAt.toISOString(),
+    };
+  }
+  const stamp = decision.kind === "allowed" && decision.stamp;
   const [taken] = await db
     .select({ clerkId: users.clerkId })
     .from(users)
@@ -281,7 +304,7 @@ async function handleAvailability(clerkId: string, raw: unknown): Promise<Availa
   if (taken && taken.clerkId !== clerkId) {
     return { handle, available: false, error: "That handle is already taken.", code: "USERNAME_TAKEN" };
   }
-  return { handle, available: true };
+  return { handle, available: true, stamp };
 }
 
 // ─── GET /api/seller/identity/check?name=&handle= ─────────────────────────────
@@ -293,7 +316,7 @@ router.get("/identity/check", async (req, res): Promise<void> => {
     out.name = rest;
   }
   if (typeof req.query.handle === "string") {
-    const { handle: _h, ...rest } = await handleAvailability(clerkId, req.query.handle);
+    const { handle: _h, stamp: _s, ...rest } = await handleAvailability(clerkId, req.query.handle);
     out.handle = rest;
   }
   res.json(out);
@@ -309,13 +332,25 @@ router.put("/identity", async (req, res): Promise<void> => {
   }
   const handleCheck = await handleAvailability(clerkId, req.body?.handle);
   if (!handleCheck.available) {
+    if (handleCheck.code === "USERNAME_COOLDOWN" && handleCheck.nextChangeAt) {
+      const retryAfterSec = Math.max(1, Math.ceil((new Date(handleCheck.nextChangeAt).getTime() - Date.now()) / 1000));
+      res.setHeader("Retry-After", String(retryAfterSec));
+      res.status(429).json({ error: handleCheck.error, code: handleCheck.code, nextChangeAt: handleCheck.nextChangeAt, field: "handle" });
+      return;
+    }
     res.status(handleCheck.code === "USERNAME_TAKEN" ? 409 : 400).json({ error: handleCheck.error, code: handleCheck.code, field: "handle" });
     return;
   }
   try {
+    const now = new Date();
     const [updated] = await db
       .update(users)
-      .set({ brandName: nameCheck.name, username: handleCheck.handle, updatedAt: new Date() })
+      .set({
+        brandName: nameCheck.name,
+        username: handleCheck.handle,
+        ...(handleCheck.stamp ? { usernameChangedAt: now } : {}),
+        updatedAt: now,
+      })
       .where(eq(users.clerkId, clerkId))
       .returning({ brandName: users.brandName, username: users.username });
     if (!updated) {
