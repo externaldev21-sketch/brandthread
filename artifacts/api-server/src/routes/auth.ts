@@ -897,11 +897,20 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
   }
 
   try {
-    const [updated] = await db
-      .update(users)
-      .set(updates)
-      .where(eq(users.clerkId, clerkId))
-      .returning();
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(users)
+        .set(updates)
+        .where(eq(users.clerkId, clerkId))
+        .returning();
+      // Switching to selling here (not via onboarding/complete) still counts
+      // toward the first 100 Founding Sellers.
+      if (row && updates.accountType === "seller" && row.foundingSellerNumber == null) {
+        const n = await assignFoundingSellerNumber(tx, clerkId);
+        if (n != null) return { ...row, foundingSellerNumber: n };
+      }
+      return row;
+    });
 
     if (!updated) {
       res.status(404).json({ error: "User not found" });
