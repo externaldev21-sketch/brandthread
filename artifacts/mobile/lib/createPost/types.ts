@@ -2,6 +2,7 @@ import type { PostAspect, PostMode } from '@/constants/postLimits';
 import type { SlideCrop } from '@/lib/createPost/crop';
 import type { Adjust } from '@/lib/createPost/adjust';
 import type { PostProductTag, PostVisibility } from '@/services/types';
+import type { PostProductMention } from '@/lib/captionMentions';
 
 /** One item from the device library (or, on web, a file the user chose). */
 export interface PickedAsset {
@@ -55,6 +56,10 @@ export interface PostDetails {
   productTags: PostProductTag[];
   visibility: PostVisibility;
   scheduledAt: string | null;
+  /** Seller only: caption labels linked to their own products (lib/captionMentions.ts). */
+  productMentions?: PostProductMention[];
+  /** Seller only: "Behind the scenes" label. */
+  bts?: boolean;
 }
 
 export interface PublishInput {

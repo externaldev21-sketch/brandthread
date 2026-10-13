@@ -25,6 +25,7 @@ import { FONT, FS, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 import { CaptionSpans } from '@/components/social/CaptionText';
+import type { PostProductMention } from '@/lib/captionMentions';
 
 export interface RepostFriend {
   userId: string;
@@ -50,6 +51,9 @@ export function CaptionBlock({
   onHeightChange,
   topSlot,
   sponsored,
+  postLabel,
+  productMentions,
+  onProductMention,
 }: {
   creator: string;
   verified: boolean;
@@ -79,6 +83,11 @@ export function CaptionBlock({
   topSlot?: React.ReactNode;
   /** Paid promotion (admin-approved boost) served in For You: shows the "Sponsored" label beside the brand name. */
   sponsored?: boolean;
+  /** Seller label shown on its own line between the name and the caption (e.g. "Behind the scenes"). */
+  postLabel?: string;
+  /** Caption labels linked to products; tapping one calls `onProductMention`. */
+  productMentions?: PostProductMention[];
+  onProductMention?: (mention: PostProductMention) => void;
 }) {
   const handleLayout = onHeightChange
     ? (e: LayoutChangeEvent) => onHeightChange(e.nativeEvent.layout.height)
@@ -158,6 +167,10 @@ export function CaptionBlock({
         </View>
       </TouchableOpacity>
 
+      {!!postLabel && (
+        <Text style={styles.postLabel} numberOfLines={1} testID="post-label">{postLabel}</Text>
+      )}
+
       <TouchableOpacity
         style={captionHit.boostStyle}
         onLayout={captionHit.onLayout}
@@ -168,7 +181,7 @@ export function CaptionBlock({
         hitSlop={{ top: 4, bottom: 4 }}
       >
         <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : 2}>
-          <CaptionSpans text={caption} />
+          <CaptionSpans text={caption} productMentions={productMentions} onProductMention={onProductMention} />
           {caption.length > 86 && (
             <Text style={styles.moreText}>{captionExpanded ? '  less' : '  more'}</Text>
           )}
@@ -239,6 +252,12 @@ const styles = StyleSheet.create({
     fontSize: 11, fontFamily: FONT.semibold, color: ON_DARK, letterSpacing: 0.2,
     borderWidth: 1, borderColor: ON_DARK, borderRadius: RADII.pill, paddingHorizontal: 7, paddingVertical: 1,
     overflow: 'hidden', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  // Text-only label line (TikTok's "Paid partnership" pattern): same colour and
+  // shadow as the caption, smaller, semibold.
+  postLabel: {
+    fontSize: 12, fontFamily: FONT.semibold, color: `${ON_DARK}E6`, marginTop: -2, marginBottom: 4, letterSpacing: 0.1,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   caption: {
     fontSize: 14, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 8,
