@@ -287,6 +287,10 @@ export default function ConnectionsScreen() {
 
     return (
       <View style={styles.row}>
+        {/* PressableScale puts object styles on its inner view, so this flex
+            cell lets a long name shrink instead of pushing the trailing pill
+            off-screen. */}
+        <View style={styles.rowTapCell}>
         <PressableScale
           style={styles.rowTap}
           activeOpacity={0.8}
@@ -319,6 +323,7 @@ export default function ConnectionsScreen() {
             </>
           )}
         </PressableScale>
+        </View>
 
         {isMe ? (
           <Feather name="chevron-right" size={16} color={theme.muted} />
@@ -450,6 +455,9 @@ function TabButton({ label, active, onPress, theme }: {
   label: string; active: boolean; onPress: () => void; theme: AppThemePreset;
 }) {
   return (
+    // Flex cell outside PressableScale (whose object style lands on its inner
+    // view) so the two tabs split the row instead of running together.
+    <View style={tabStyles.cell}>
     <PressableScale
       onPress={onPress}
       style={[tabStyles.tab, active && { borderBottomColor: theme.text, borderBottomWidth: 2 }]}
@@ -462,10 +470,12 @@ function TabButton({ label, active, onPress, theme }: {
         </Text>
       )}
     </PressableScale>
+    </View>
   );
 }
 
 const tabStyles = StyleSheet.create({
+  cell: { flex: 1 },
   tab: { flex: 1, alignItems: 'center', paddingVertical: SP.sm, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabText: { fontSize: FS.sm },
 });
@@ -536,6 +546,7 @@ function makeStyles(theme: AppThemePreset) {
     sortValueRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     sortValue: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
     row:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, minHeight: 64, paddingVertical: SP.sm },
+    rowTapCell: { flex: 1, minWidth: 0 },
     rowTap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: SP.sm },
     rowCopy: { flex: 1, minWidth: 0 },
     rowTags: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: 4 },
