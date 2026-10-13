@@ -10,6 +10,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
+import { PackingSlipSheet } from '@/components/orders/PackingSlipSheet';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, SectionHeader } from '@/components/BrandthreadUI';
@@ -110,6 +111,10 @@ export default function FulfillBatchScreen() {
     setRunning(null);
   }
 
+  // Bulk packing slips: one page per selected order. Mounted on first open.
+  const [showPackingSlips, setShowPackingSlips] = useState(false);
+  const [packingSlipsMounted, setPackingSlipsMounted] = useState(false);
+
   const successCount = results.filter(r => r.ok).length;
   const failCount = results.length - successCount;
 
@@ -156,10 +161,19 @@ export default function FulfillBatchScreen() {
               </>
             )}
 
+            <SecondaryButton
+              label="Print packing slips"
+              icon="file-text"
+              onPress={() => { setPackingSlipsMounted(true); setShowPackingSlips(true); }}
+              disabled={running !== null || orders.length === 0}
+            />
             <SecondaryButton label="Done" icon="check" onPress={() => router.replace('/(tabs)/orders')} />
           </>
         )}
       </ScrollView>
+      {packingSlipsMounted ? (
+        <PackingSlipSheet visible={showPackingSlips} orders={orders} onClose={() => setShowPackingSlips(false)} />
+      ) : null}
     </View>
   );
 }

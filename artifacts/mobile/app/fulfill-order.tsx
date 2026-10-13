@@ -31,7 +31,7 @@ import {
   getPackagePresets, createPackagePreset, deletePackagePreset,
   updateFulfillmentChecklist, PackagePreset, getParcelSuggestion,
 } from '@/services/orderService';
-import { sharePackingSlip } from '@/lib/packingSlip';
+import { PackingSlipSheet } from '@/components/orders/PackingSlipSheet';
 import { radius } from '@/constants/radii';
 
 const LAST_PACKAGE_KEY = '@brandthread/fulfill-last-package:v1';
@@ -104,6 +104,11 @@ export default function FulfillOrderScreen() {
   const [done, setDone] = useState(false);
   const successScale = useRef(new Animated.Value(0)).current;
   const successOpacity = useRef(new Animated.Value(0)).current;
+
+  // Packing slip (print / share PDF; only this parcel's items when shipping some).
+  const [showPackingSlip, setShowPackingSlip] = useState(false);
+  // Mounted on first open, then kept so the sheet can animate closed.
+  const [packingSlipMounted, setPackingSlipMounted] = useState(false);
 
   useEffect(() => {
     if (!orderId) return;
@@ -339,13 +344,10 @@ export default function FulfillOrderScreen() {
     }
   }
 
-  async function handlePackingSlip() {
+  function handlePackingSlip() {
     if (!order) return;
-    try {
-      await sharePackingSlip(order);
-    } catch (err: any) {
-      Alert.alert('Could not create packing slip', err?.message ?? 'Please try again.');
-    }
+    setPackingSlipMounted(true);
+    setShowPackingSlip(true);
   }
 
   async function handleOpenLabel() {
@@ -620,6 +622,7 @@ export default function FulfillOrderScreen() {
                         <View style={{ flex: 1 }}>
                           <Text style={s.rateCarrier}>{rate.carrier} · {rate.service}</Text>
                           <Text style={s.mutedText}>Est. {rate.estimatedDelivery} · {rate.estimatedDays}d</Text>
+                          {rate.savingsCents ? <Text style={s.rateSavings}>Save {formatCents(rate.savingsCents)} vs retail</Text> : null}
                         </View>
                         <Text style={s.ratePrice}>{formatCents(rate.priceCents)}</Text>
                         {buying && <ActivityIndicator color={ACCENT} style={{ marginLeft: SP.sm }} />}
@@ -724,6 +727,14 @@ export default function FulfillOrderScreen() {
           </>
         )}
       </ScrollView>
+      {order && packingSlipMounted ? (
+        <PackingSlipSheet
+          visible={showPackingSlip}
+          orders={[order]}
+          itemIds={isPartial ? partialItemIds : undefined}
+          onClose={() => setShowPackingSlip(false)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -773,6 +784,7 @@ const createStyles = (theme: { background: string; card: string; border: string;
     rateCard: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
     rateCarrier: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
     ratePrice: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
+    rateSavings: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG, marginTop: 2 },
 
     successTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
     successCircle: { width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center' },
