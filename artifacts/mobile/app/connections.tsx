@@ -18,7 +18,8 @@
  *    opens a two-option unfollow confirm (Unfollow / Cancel), and a
  *    "Sort by" row above the list opens a bottom sheet (Default / Date
  *    followed: latest / Date followed: earliest).
- *  - A small "Follows you" tag marks mutual rows on the viewer's own lists.
+ *  - A small "Follows you" tag marks rows that follow the viewer (any list).
+ *  - Search queries the whole list server-side (?q=); more rows load on scroll.
  *
  * Every row still opens that person's profile — the brand profile for
  * sellers, the buyer profile for buyers.
@@ -99,6 +100,9 @@ export function connectionHref(user: ConnectionUser): string {
   });
 }
 
+/** The API's default page size for these lists — a full page means there may be more. */
+const PAGE_SIZE = 100;
+
 const SORT_OPTIONS: { id: FollowSort; label: string }[] = [
   { id: 'default', label: 'Default' },
   { id: 'latest', label: 'Date followed: latest' },
@@ -134,6 +138,10 @@ export default function ConnectionsScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const generationRef = useRef(0);
+  // Server-side search (?q=) over the whole list, and further pages beyond the first.
+  const [searchRows, setSearchRows] = useState<ConnectionUser[] | null>(null);
+  const [hasMore, setHasMore] = useState<Record<ConnectionsTab, boolean>>({ followers: false, following: false });
+  const loadingMoreRef = useRef(false);
 
   const showToast = useCallback((message: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -163,6 +171,7 @@ export default function ConnectionsScreen() {
         if (generation !== generationRef.current) return;
         setFollowers((Array.isArray(followerRows) ? followerRows : []).map(toConnectionUser).filter((row) => row.id));
         setFollowing((Array.isArray(followingRows) ? followingRows : []).map(toConnectionUser).filter((row) => row.id));
+        setHasMore({ followers: Array.isArray(followerRows) && followerRows.length >= PAGE_SIZE, following: Array.isArray(followingRows) && followingRows.length >= PAGE_SIZE });
         setFollowersLoaded(true);
         setFollowingLoaded(true);
       })
@@ -183,19 +192,68 @@ export default function ConnectionsScreen() {
     setSortSheetOpen(false);
     if (!user?.id) return;
     api.social.following(listOwner, nextSort)
-      .then((rows) => setFollowing((Array.isArray(rows) ? rows : []).map(toConnectionUser).filter((row) => row.id)))
+      .then((rows) => {
+        setFollowing((Array.isArray(rows) ? rows : []).map(toConnectionUser).filter((row) => row.id));
+        setHasMore((prev) => ({ ...prev, following: Array.isArray(rows) && rows.length >= PAGE_SIZE }));
+      })
       .catch(() => {});
   }, [api, listOwner, user?.id]);
+
+  // Typing in the search bar queries the whole list server-side (debounced);
+  // the loaded rows are filtered locally until the results arrive.
+  const trimmedQuery = query.trim();
+  useEffect(() => {
+    setSearchRows(null);
+    if (!trimmedQuery || !user?.id) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      const request = tab === 'followers'
+        ? api.social.followers(listOwner, { q: trimmedQuery })
+        : api.social.following(listOwner, sort, { q: trimmedQuery });
+      request
+        .then((rows) => { if (!cancelled) setSearchRows((Array.isArray(rows) ? rows : []).map(toConnectionUser).filter((row) => row.id)); })
+        .catch(() => {});
+    }, 250);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [api, listOwner, sort, tab, trimmedQuery, user?.id]);
+
+  const loadMore = useCallback(() => {
+    if (trimmedQuery || !hasMore[tab] || loadingMoreRef.current || !user?.id) return;
+    loadingMoreRef.current = true;
+    const activeTab = tab;
+    const offset = (activeTab === 'followers' ? followers : following).length;
+    const request = activeTab === 'followers'
+      ? api.social.followers(listOwner, { offset })
+      : api.social.following(listOwner, sort, { offset });
+    request
+      .then((rows) => {
+        const next = (Array.isArray(rows) ? rows : []).map(toConnectionUser).filter((row) => row.id);
+        (activeTab === 'followers' ? setFollowers : setFollowing)((prev) => {
+          const seen = new Set(prev.map((u) => u.id));
+          return [...prev, ...next.filter((u) => !seen.has(u.id))];
+        });
+        setHasMore((prev) => ({ ...prev, [activeTab]: Array.isArray(rows) && rows.length >= PAGE_SIZE }));
+      })
+      .catch(() => {})
+      .finally(() => { loadingMoreRef.current = false; });
+  }, [api, followers, following, hasMore, listOwner, sort, tab, trimmedQuery, user?.id]);
+
+  // Follow/unfollow/remove update the tab's list and any search results shown.
+  const setListFor = useCallback((which: ConnectionsTab) => (fn: (prev: ConnectionUser[]) => ConnectionUser[]) => {
+    (which === 'followers' ? setFollowers : setFollowing)(fn);
+    setSearchRows((prev) => (prev ? fn(prev) : prev));
+  }, []);
 
   const list = tab === 'followers' ? followers : following;
   const listLoaded = tab === 'followers' ? followersLoaded : followingLoaded;
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return list;
+    if (searchRows) return searchRows;
     return list.filter((row) => (
       row.name?.toLowerCase().includes(q) || row.username?.toLowerCase().includes(q)
     ));
-  }, [list, query]);
+  }, [list, query, searchRows]);
 
   const followStateFor = useCallback((row: ConnectionUser) => (
     row.isFollowing ?? (isOwnList && tab === 'following')
@@ -203,7 +261,7 @@ export default function ConnectionsScreen() {
 
   const handleFollow = useCallback(async (row: ConnectionUser) => {
     if (followPending.has(row.id) || row.id === user?.id) return;
-    const setList = tab === 'followers' ? setFollowers : setFollowing;
+    const setList = setListFor(tab);
     setFollowPending((prev) => new Set(prev).add(row.id));
     setList((prev) => prev.map((u) => (u.id === row.id ? { ...u, isFollowing: true } : u)));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -218,11 +276,11 @@ export default function ConnectionsScreen() {
     } finally {
       setFollowPending((prev) => { const next = new Set(prev); next.delete(row.id); return next; });
     }
-  }, [api, followPending, tab, user?.id]);
+  }, [api, followPending, setListFor, tab, user?.id]);
 
   const handleUnfollow = useCallback(async (row: ConnectionUser) => {
     if (followPending.has(row.id)) return;
-    const setList = tab === 'followers' ? setFollowers : setFollowing;
+    const setList = setListFor(tab);
     setFollowPending((prev) => new Set(prev).add(row.id));
     setList((prev) => prev.map((u) => (u.id === row.id ? { ...u, isFollowing: false } : u)));
     hapticDestructiveConfirm();
@@ -234,7 +292,7 @@ export default function ConnectionsScreen() {
     } finally {
       setFollowPending((prev) => { const next = new Set(prev); next.delete(row.id); return next; });
     }
-  }, [api, followPending, tab]);
+  }, [api, followPending, setListFor, tab]);
 
   // Following list's own row button: not-yet-following just follows; tapping
   // "Following" opens Instagram's own inline two-option unfollow confirm
@@ -260,7 +318,7 @@ export default function ConnectionsScreen() {
     setRemoving(true);
     try {
       await removeFollower(row.id);
-      setFollowers((prev) => prev.filter((u) => u.id !== row.id));
+      setListFor('followers')((prev) => prev.filter((u) => u.id !== row.id));
       setRemoveTarget(null);
       showToast('Removed');
     } catch {
@@ -268,7 +326,7 @@ export default function ConnectionsScreen() {
     } finally {
       setRemoving(false);
     }
-  }, [removeTarget, showToast]);
+  }, [removeTarget, setListFor, showToast]);
 
   const removePerson: RemoveFollowerPerson | null = removeTarget ? {
     id: removeTarget.id,
@@ -280,10 +338,10 @@ export default function ConnectionsScreen() {
   function renderItem({ item }: { item: ConnectionUser }) {
     const initials = item.initials || initialsFor(item.name ?? item.username ?? '?');
     const isMe = item.id === user?.id;
-    // "Follows you" tag: only meaningful on the viewer's own lists — the
-    // followers list is by definition all "follows you" so it's skipped
-    // there, and shown on the Following list when that row also follows me.
-    const showsFollowsYou = isOwnList && tab === 'following' && !!item.followsMe;
+    // "Follows you" tag: on any list (own or someone else's) when that row
+    // follows the viewer — except the viewer's own Followers list, which is
+    // by definition all "follows you", and the viewer's own row.
+    const showsFollowsYou = !isMe && !!item.followsMe && !(isOwnList && tab === 'followers');
 
     return (
       <View style={styles.row}>
@@ -410,6 +468,8 @@ export default function ConnectionsScreen() {
           keyExtractor={item => item.id}
           renderItem={renderItem}
           refreshControl={pull.refreshControl}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
           keyboardShouldPersistTaps="handled"
