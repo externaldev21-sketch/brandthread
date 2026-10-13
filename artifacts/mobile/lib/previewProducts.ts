@@ -190,13 +190,13 @@ export function getPreviewBuyerProduct(id: string | null | undefined): BuyerProd
  * pieces first, then the same category, then the rest of the catalog, in
  * the related-products row shape ({ id, name, images, priceCents }).
  */
-export function getPreviewRelatedProducts(id: string, limit = 4): Array<{ id: string; name: string; images: string[]; priceCents: number; sellerDisplayName: string }> {
+export function getPreviewRelatedProducts(id: string, limit = 4): Array<{ id: string; name: string; images: string[]; priceCents: number; sellerDisplayName: string; sellerId: string }> {
   if (!isPreviewProductId(id) || !previewEnabled()) return [];
   return rankPreviewRelated(catalog().getPreviewCatalog(), id, limit);
 }
 
 /** Pure ranking behind getPreviewRelatedProducts (exported for tests). */
-export function rankPreviewRelated(all: PreviewCatalogProduct[], id: string, limit = 4): Array<{ id: string; name: string; images: string[]; priceCents: number; sellerDisplayName: string }> {
+export function rankPreviewRelated(all: PreviewCatalogProduct[], id: string, limit = 4): Array<{ id: string; name: string; images: string[]; priceCents: number; sellerDisplayName: string; sellerId: string }> {
   const self = all.find(p => p.productId === id);
   if (!self) return [];
   const others = all.filter(p => p.productId !== id);
@@ -206,7 +206,7 @@ export function rankPreviewRelated(all: PreviewCatalogProduct[], id: string, lim
     ...others.filter(p => p.sellerId !== self.sellerId && p.category !== self.category),
   ];
   return ranked.slice(0, limit).map(p => ({
-    id: p.productId, name: p.name, images: p.images, priceCents: p.currentPriceCents, sellerDisplayName: p.sellerDisplayName,
+    id: p.productId, name: p.name, images: p.images, priceCents: p.currentPriceCents, sellerDisplayName: p.sellerDisplayName, sellerId: p.sellerId,
   }));
 }
 

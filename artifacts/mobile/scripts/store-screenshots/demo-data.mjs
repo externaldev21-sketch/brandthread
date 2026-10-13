@@ -66,7 +66,7 @@ const BRANDS = {
 
 /** Public catalogue used by discover, the feed, the product sheet and the cart. */
 export const CATALOGUE = [
-  { id: 'prod_nl_hoodie_ember', brand: 'northline', name: 'Heavyweight Hoodie — Ember', image: 'hoodie-ember', priceCents: 9800, claimed: 212, remaining: 38, tag: 'Drop 04' },
+  { id: 'prod_nl_hoodie_ember', brand: 'northline', name: 'Heavyweight Hoodie — Ember', image: 'hoodie-ember', gallery: ['story-hoodie', 'look-rust'], priceCents: 9800, claimed: 212, remaining: 38, tag: 'Drop 04' },
   { id: 'prod_nl_jacket_rust', brand: 'northline', name: 'Field Shell Jacket — Rust', image: 'jacket-rust', priceCents: 22000, claimed: 64, remaining: 11, tag: 'Limited' },
   { id: 'prod_ea_hoodie_graphite', brand: 'ember', name: 'Boxy Fleece Hoodie — Graphite', image: 'hoodie-graphite', priceCents: 8800, claimed: 140, remaining: 60, tag: 'New' },
   { id: 'prod_fo_runner_rust', brand: 'field', name: 'Trail Runner 02 — Clay', image: 'runner-rust', priceCents: 16500, claimed: 91, remaining: 9, tag: 'Almost gone' },
@@ -85,11 +85,13 @@ function publicProduct(item, index = 0) {
     id: item.id,
     name: item.name,
     description: `${item.name} from ${brand.name}. Cut and sewn in small batches from heavyweight, garment-washed cotton for a broken-in feel from day one.`,
-    images: [img(item.image)],
+    images: [img(item.image), ...(item.gallery ?? []).map(img)],
     imageUrl: img(item.image),
     tags: item.tag ? [item.tag] : [],
     category: item.name.includes('Runner') ? 'Footwear' : item.name.includes('Pant') ? 'Pants' : item.name.includes('Jacket') || item.name.includes('Anorak') ? 'Outerwear' : 'Hoodies',
     sellerId: brand.clerkId,
+    // The real GET /api/public/products/:id row carries the seller as ownerId.
+    ownerId: brand.clerkId,
     sellerProfileId: brand.id,
     sellerDisplayName: brand.name,
     sellerHandle: brand.handle,
