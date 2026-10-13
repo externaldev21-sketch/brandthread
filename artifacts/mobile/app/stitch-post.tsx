@@ -43,7 +43,11 @@ function ClipPreview({ uri, startMs, endMs, onDuration }: { uri: string; startMs
   const player = useVideoPlayer(uri, (p) => { p.loop = false; p.muted = true; p.timeUpdateEventInterval = 0.25; });
   useEffect(() => {
     const sub = player.addListener('sourceLoad', (e: { duration: number }) => onDuration(Math.round((e.duration || player.duration || 0) * 1000)));
-    return () => sub.remove();
+    // Web fires readyToPlay but not always sourceLoad.
+    const ready = player.addListener('statusChange', (e: { status: string }) => {
+      if (e.status === 'readyToPlay' && player.duration > 0) onDuration(Math.round(player.duration * 1000));
+    });
+    return () => { sub.remove(); ready.remove(); };
   }, [player, onDuration]);
   // Loop only the chosen window, like TikTok's trim preview.
   useEffect(() => {
@@ -54,7 +58,11 @@ function ClipPreview({ uri, startMs, endMs, onDuration }: { uri: string; startMs
     });
     return () => sub.remove();
   }, [player, startMs, endMs]);
-  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />;
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <VideoView player={player} style={{ width: '100%', height: '100%' }} contentFit="cover" nativeControls={false} />
+    </View>
+  );
 }
 
 export default function StitchPostScreen() {
@@ -97,8 +105,11 @@ export default function StitchPostScreen() {
 
   const onDuration = useCallback((ms: number) => {
     if (ms <= 0) return;
-    setDurationMs(ms);
-    setClip(clipWindowAt(0, ms));
+    // First known duration sets the default window; later reports keep the user's pick.
+    setDurationMs((prev) => {
+      if (prev === 0) setClip(clipWindowAt(0, ms));
+      return ms;
+    });
   }, []);
 
   const moveClip = useCallback((x: number) => {
