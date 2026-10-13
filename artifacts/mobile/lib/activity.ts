@@ -414,6 +414,10 @@ export function buyerOrderHref(id: string, type?: string | null): string {
 // they're always a buyer-facing "things you follow/saved" event for the
 // Activity Center's purposes.
 const SOCIAL_TYPES = new Set(['price_drop', 'back_in_stock', 'waitlist_restock', 'product_restocked', 'new_product']);
+// Restock pushes to buyers who bagged the item (category "cart") or whose
+// saved size is back (category "stock").
+SOCIAL_TYPES.add('bag_restock');
+SOCIAL_TYPES.add('size_back');
 
 export type ActivityGroup = 'orders' | 'social' | 'money' | 'other';
 
@@ -546,6 +550,8 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'price_drop': return 'trending-down';
     case 'back_in_stock':
     case 'waitlist_restock':
+    case 'bag_restock':
+    case 'size_back':
     case 'product_restocked': return 'refresh-cw';
     case 'new_product': return 'star';
     case 'new_order_received': return 'shopping-bag';

@@ -7,6 +7,7 @@
 import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import { db, notificationsFeed, productVariants, products, savedItems, waitlistEntries } from "@workspace/db";
 import { productThumbnail } from "./activityEvents";
+import { notifyRestockAudiences } from "./restockAudiences";
 import { publishNotification } from "../routes/notifications-feed";
 import { logger } from "./logger";
 import { noteVariantPriceLowered, noteVariantStockRaised, trackStockNotificationWork } from "./savedProductAlerts";
@@ -162,6 +163,7 @@ async function notifyBackInStockWork(input: {
   newStock: number;
   variantId?: string;
 }): Promise<void> {
+  void notifyRestockAudiences(input).catch((err) => logger.warn({ err, productId: input.productId }, "Restock audiences failed"));
   if (!isRestock(input)) return;
   const waitlisted = new Set(await notifyWaitlistRestock({
     productId: input.productId,

@@ -287,7 +287,7 @@ router.patch("/:productId/variants/bulk", requireRole("manager"), validateInput(
     "product", product.id, { variants: outcomes.length });
   for (const o of outcomes) {
     void notifyStockLevelChanged({ productId: product.id, ownerId, productName: product.name, previousStock: o.previousStock, newStock: o.newStock, lowStockThreshold: o.threshold });
-    void notifyBackInStock({ productId: product.id, ownerId, productName: product.name, previousStock: o.previousStock, newStock: o.newStock });
+    void notifyBackInStock({ productId: product.id, ownerId, productName: product.name, previousStock: o.previousStock, newStock: o.newStock, variantId: o.variantId });
     void notifyPriceDrop({ productId: product.id, ownerId, productName: product.name, previousPriceCents: o.previousPrice, newPriceCents: o.newPrice });
   }
   await afterStockChange(product.id);

@@ -7,6 +7,7 @@ export * from './freelancers';
 export * from './subscriptionEntitlements';
 export * from './sellerStoreShares';
 export * from './productVariantsStock';
+export * from './restockAlerts';
 export * from './security';
 export * from './realtime';
 export * from './sellerWinback';
