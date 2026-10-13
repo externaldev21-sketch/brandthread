@@ -65,8 +65,9 @@ export const SUBTLE_WASH = 'rgba(192,192,192,0.28)';
 // use SUBTLE_WASH/MUTED_WASH (above) only for non-text backgrounds/borders.
 export const FG      = '#FFFFFF';
 export const TEXT_PRIMARY   = FG;
-export const TEXT_SECONDARY = '#C0C0C0';
-export const TEXT_TERTIARY  = '#8E8E93'; // tertiary / disabled
+// White at 60% over the black base, as a solid colour.
+export const TEXT_SECONDARY = '#999999';
+export const TEXT_TERTIARY  = '#8F8F8F'; // white at 56%
 // A disabled control's label/glyph: Apple's dark systemGray2. Solid, so a
 // disabled state reads as clearly dimmer than secondary text without fading
 // the control with opacity.
@@ -318,9 +319,11 @@ export const WEB_SAFE_AREA_TOP = 47;
 // Heading / body type scale (paired with FS above). Use these role names
 // instead of picking raw FS.* sizes per screen.
 export const TYPE = {
-  largeTitle: { fontSize: FS.h1, fontFamily: FONT.bold, lineHeight: 42, letterSpacing: -0.3 },
-  title:      { fontSize: FS.h2, fontFamily: FONT.bold, lineHeight: 36, letterSpacing: -0.3 },
-  heading:    { fontSize: FS.xl, fontFamily: FONT.semibold, lineHeight: 28 },
+  // Big titles are tracked tight (iOS display style): the bigger the size,
+  // the tighter. Text at body size and below keeps natural tracking.
+  largeTitle: { fontSize: FS.h1, fontFamily: FONT.bold, lineHeight: 42, letterSpacing: -0.8 },
+  title:      { fontSize: FS.h2, fontFamily: FONT.bold, lineHeight: 36, letterSpacing: -0.6 },
+  heading:    { fontSize: FS.xl, fontFamily: FONT.semibold, lineHeight: 28, letterSpacing: -0.3 },
   subheading: { fontSize: FS.lg, fontFamily: FONT.semibold, lineHeight: 24 },
   body:       { fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 22 },
   bodyMedium: { fontSize: FS.base, fontFamily: FONT.medium, lineHeight: 22 },

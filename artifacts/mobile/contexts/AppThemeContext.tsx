@@ -5,6 +5,7 @@ import { Platform, type TextStyle } from 'react-native';
 import { useApi } from '@/lib/api';
 import { isProductionPreviewHost } from '@/lib/devPreview';
 import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
+import { secondaryText } from '@/lib/whiteOver';
 
 export type AppThemeId =
   | 'monochrome' | 'purple' | 'olive' | 'navy' | 'champagne' | 'black' | 'silver'
@@ -43,7 +44,7 @@ const palette = (
   // (BRANDTHREAD_DESIGN.md, "Surfaces" / "Color usage").
   surfaceGlass: surface, cardGlass: card, cardElevatedGlass: card,
   border: '#FFFFFF24', borderSubtle: '#FFFFFF14',
-  text: '#FFFFFF', muted: '#C0C0C0', subtle: '#B0B0B0',
+  text: '#FFFFFF', muted: secondaryText(background, [background, surface, card], 0.6, 4.9), subtle: secondaryText(background, [background, surface, card], 0.56, 4.6),
   accent, accentLight: accent, accentDim: `${accent}2E`, onAccent,
   secondary: accent, secondaryDim: `${accent}24`,
   // No glow washes: the seller tab-bar swipe glow is the app's only glow.

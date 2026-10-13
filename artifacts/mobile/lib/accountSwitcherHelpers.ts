@@ -2,6 +2,7 @@
  * Pure account-switcher logic — no React Native/Clerk imports, so it can be
  * unit-tested directly instead of only through a full component mount.
  */
+import { formatHandle } from '@/lib/handle';
 
 /** A person can be logged into up to this many accounts (any buyer/seller mix) on one device. */
 export const MAX_ACCOUNTS = 8;
@@ -17,9 +18,9 @@ export interface SessionUserLike {
 
 export function getHandle(sessionUser: SessionUserLike, serverUsername?: string | null): string {
   const username = serverUsername ?? sessionUser.username;
-  if (username) return `@${username}`;
+  if (username) return formatHandle(username);
   const email = sessionUser.primaryEmailAddress?.emailAddress;
-  return email ? `@${email.split('@')[0]}` : '@you';
+  return email ? formatHandle(email.split('@')[0]) : '@you';
 }
 
 export function getDisplayName(sessionUser: SessionUserLike, serverDisplayName?: string | null): string {

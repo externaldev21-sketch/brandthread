@@ -290,6 +290,8 @@ const styles = StyleSheet.create({
   caption: {
     fontSize: 15, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 8,
     lineHeight: 19, letterSpacing: 0.1,
+    // ~38 characters a line at 14pt — a comfortable reading measure.
+    maxWidth: 280,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   moreText: { fontFamily: FONT.bold, color: ON_DARK },
