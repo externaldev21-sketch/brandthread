@@ -936,6 +936,17 @@ export default function AddProductScreen() {
       }
     } catch (err: any) {
       // Over the plan's product limit (the free limits when unsubscribed, BT-002).
+      if (err?.code === 'COUNTERFEIT_TERMS') {
+        const message = apiErrorMessage(err, 'Remove brand names and replica terms to publish.');
+        setPublishError(`Can't publish yet: ${message}`);
+        if (Platform.OS !== 'web') {
+          Alert.alert("Can't publish yet", message, [
+            { text: 'Edit listing', style: 'cancel' },
+            { text: 'Get verified', onPress: () => router.push('/seller-verification' as any) },
+          ]);
+        }
+        return;
+      }
       const planLimit = getEntitlementRejection(err);
       if (planLimit) {
         setPublishError(planLimit.message);

@@ -29,6 +29,7 @@ import { notifyNewProduct } from "../lib/activityEvents";
 import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
 import { afterStockChange } from "../lib/stockRules";
 import { isValidStockChange, planProductStock, type ProductStockPlan } from "../lib/bulkStock";
+import { checkListingIntegrity, counterfeitRefusal } from "../lib/listingIntegrity";
 import {
   isValidPriceChange, planProductPrices, uniqueCopySku,
   type CompareAtMode, type PriceChange, type PriceRounding, type ProductPricePlan,
@@ -421,6 +422,24 @@ router.post("/status", requireRole("manager"), validateInput({ body: statusBody 
             error: "Some listings are locked by a platform moderation action",
             code: "PRODUCT_MODERATION_LOCKED", lockedIds,
           });
+        }
+        if (target === "active") {
+          const publishing = owned.filter((p) => p.status !== "active");
+          if (publishing.length > 0) {
+            const texts = await tx.select({
+              id: products.id, name: products.name, description: products.description,
+              tags: products.tags, styleTags: products.styleTags,
+            }).from(products).where(inArray(products.id, publishing.map((p) => p.id)));
+            const blocked: Array<{ id: string; terms: string[] }> = [];
+            for (const t of texts) {
+              const hits = await checkListingIntegrity(ownerId, t);
+              if (hits) blocked.push({ id: t.id, terms: hits.map((h) => h.term) });
+            }
+            if (blocked.length > 0) {
+              const refusal = counterfeitRefusal([...new Set(blocked.flatMap((b) => b.terms))].map((term) => ({ term, kind: "signal" as const })));
+              throw new BulkRefusal(422, { ...refusal, blockedIds: blocked.map((b) => b.id) });
+            }
+          }
         }
         // Only going live counts against the plan's product cap.
         const publishing = target === "active" ? owned.filter((p) => p.status !== "active").length : 0;
