@@ -20,7 +20,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { StatusBadge, PressableScale } from '@/components/BrandthreadUI';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { deriveProductListStatus, PRODUCT_LIST_STATUS_LABEL } from '@/lib/productListStatus';
+import { ProductStatusChip } from './ProductStatusChip';
 import { CachedImage } from '@/components/CachedImage';
 import { Product } from '@/services/productTypes';
 import { formatCents, integerPercent } from '@/lib/money';
@@ -72,7 +74,10 @@ export const ProductCard = React.memo(function ProductCard({
 
   const stock = product.inventory.totalStock;
   const threshold = product.inventory.lowStockThreshold;
-  const stockColor = stock === 0 ? theme.error : stock <= threshold ? theme.warning : theme.success;
+  // Black / white / silver only: low and out-of-stock read as a silver chip,
+  // healthy stock as quiet muted text.
+  const stockColor = theme.muted;
+  const listStatus = deriveProductListStatus(product);
   const stockLabel = stock === 0 ? 'Out of stock' : stock <= threshold ? `${stock} in stock` : `${stock} in stock`;
 
   const price = product.pricing.priceCents;
@@ -126,7 +131,7 @@ export const ProductCard = React.memo(function ProductCard({
               onPress={() => onPress(product)}
               onPressIn={onPressIn ? () => onPressIn(product) : undefined}
               activeScale={0.98}
-              accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatCents(price)}`}
+              accessibilityLabel={`${product.name}, ${PRODUCT_LIST_STATUS_LABEL[listStatus]}, ${formatCents(price)}`}
             >
             <View style={{ height: imageHeight, width: '100%' }}>
             {coverUri ? (
@@ -137,7 +142,7 @@ export const ProductCard = React.memo(function ProductCard({
 
             {/* Status chip */}
             <View style={s.chipTopLeft}>
-              <StatusBadge label={statusLabel(product.status)} variant={statusVariant(product.status)} small />
+              <ProductStatusChip status={listStatus} onMedia testID={`product-status-${product.id}`} />
             </View>
             </View>
             </PressableScale>
@@ -163,7 +168,7 @@ export const ProductCard = React.memo(function ProductCard({
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 accessibilityLabel={`Edit stock for ${product.name}, ${stockLabel}`}
               >
-                <Text style={s.chipBottomLabel} numberOfLines={1}>{stockLabel}</Text>
+                <Text style={[s.chipBottomLabel, { color: theme.background }]} numberOfLines={1}>{stockLabel}</Text>
               </PressableScale>
             )}
           </View>
@@ -242,7 +247,6 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   chipBottomLabel: {
     fontFamily: FONT.bold,
     fontSize: FS.xs,
-    color: '#FFFFFF',
     textAlign: 'center',
   },
   moreBtn: {

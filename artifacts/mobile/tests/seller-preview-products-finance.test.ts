@@ -50,7 +50,10 @@ describe('seller demo products and finance fixtures', () => {
     const navigation = screen.slice(screen.indexOf('const openProduct ='), screen.indexOf('const openActionSheet ='));
     expect(navigation).toContain('if (previewOnly && !previewDemo)');
     expect(navigation).toContain("router.push(('/product-detail?id=' + product.id)");
-    expect(screen).toContain("onPress: () => router.push('/add-product' as never)");
+    // Add product moved from the header "+" to the floating button (item 81);
+    // it still opens the creation form in preview.
+    expect(screen).toContain('testID="products-add-fab"');
+    expect(screen).toContain("router.push('/add-product' as never); }}");
     const detail = readFileSync(resolve(root, 'app/product-detail.tsx'), 'utf8');
     expect(detail.indexOf('getPreviewSellerProducts().find')).toBeLessThan(
       detail.indexOf('if (!id || !userId)'),
