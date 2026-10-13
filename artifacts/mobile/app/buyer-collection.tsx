@@ -32,6 +32,7 @@ import { GridSkeleton } from '@/components/layout/Skeleton';
 import { EmptyState, HapticSwitch } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
 import { formatCents } from '@/lib/money';
+import { BrandLink } from '@/components/products/BrandLink';
 import { buildCanonicalCollectionUrl } from '@/lib/shareCollection';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -192,11 +193,25 @@ export default function BuyerCollection() {
               <Icon name="shopping-bag" size={22} color={theme.accent} />
             </View>
           )}
+          {item.priceDropped ? (
+            <View style={styles.dropTag} testID="collection-price-drop-tag">
+              <Text style={styles.dropTagText}>Price drop</Text>
+            </View>
+          ) : null}
         </View>
         <View style={styles.tileInfo}>
-          {item.brand ? <Text style={styles.tileBrand} numberOfLines={1}>{item.brand}</Text> : null}
+          {item.brand ? <BrandLink sellerId={item.sellerId} name={item.brand} style={styles.tileBrand} /> : null}
           <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
-          {item.priceCents != null ? <Text style={styles.tilePrice}>{formatCents(item.priceCents)}</Text> : null}
+          {item.priceCents != null ? (
+            // Price drop on a wishlisted item (item 137), same as Saved: the
+            // saved price struck through next to the new one, plus the tag.
+            <View style={styles.priceRow}>
+              <Text style={styles.tilePrice}>{formatCents(item.priceCents)}</Text>
+              {item.priceDropped && item.oldPriceCents != null ? (
+                <Text style={styles.tileOldPrice}>{formatCents(item.oldPriceCents)}</Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       </TouchableOpacity>
     );
@@ -317,6 +332,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], TILE_SIZE: n
   tileBrand: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium },
   tileTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
   tilePrice: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  tileOldPrice: { color: theme.subtle, fontFamily: FONT.medium, fontSize: FS.xs, textDecorationLine: 'line-through' },
+  dropTag: { position: 'absolute', left: 6, top: 6, paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.pill, backgroundColor: theme.text },
+  dropTagText: { color: theme.background, fontSize: 10, fontFamily: FONT.bold, letterSpacing: 0.2 },
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: OVERLAY },
   centerModal: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg },
   renameCard: {

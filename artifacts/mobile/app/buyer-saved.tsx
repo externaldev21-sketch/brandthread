@@ -31,6 +31,7 @@ import { GridSkeleton } from '@/components/layout/Skeleton';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { SaveToCollectionSheet, SaveToCollectionItem } from '@/components/SaveToCollectionSheet';
 import { formatCents } from '@/lib/money';
+import { BrandLink } from '@/components/products/BrandLink';
 import { Card, IconButton, Button, ListRow, SegmentedControl, BottomSheet, ThemedRefreshControl } from '@/components/ui';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -242,19 +243,22 @@ export default function BuyerSaved() {
   // sold out > price drop > low stock > back in stock.
   function renderBadges(item: SavedItem) {
     if (item.type !== 'product') return null;
+    // Monochrome (items 137 / 145 / 149): the price drop is the one white
+    // tag; the other states are silver. No green, red or amber here — the
+    // LIVE badge is the app's only red, Thread Cash its only green.
     const badge = item.soldOut
-      ? { label: 'Sold out', color: theme.error }
+      ? { label: 'Sold out', color: theme.muted }
       : item.priceDropped
-        ? { label: 'Price drop', color: theme.success }
+        ? { label: 'Price drop', color: theme.text }
         : item.lowStock
-          ? { label: 'Low stock', color: theme.warning }
+          ? { label: 'Low stock', color: theme.muted }
           : item.backInStock
-            ? { label: 'Back in stock', color: theme.accent }
+            ? { label: 'Back in stock', color: theme.muted }
             : null;
     if (!badge) return null;
     return (
       <View style={styles.badgeRow}>
-        <Badge label={badge.label} color={badge.color} />
+        <Badge label={badge.label} color={badge.color} textColor={item.priceDropped && !item.soldOut ? theme.background : undefined} />
       </View>
     );
   }
@@ -290,11 +294,11 @@ export default function BuyerSaved() {
           {renderBadges(item)}
         </View>
         <View style={styles.tileInfo}>
-          {item.brand ? <Text style={styles.tileBrand} numberOfLines={1}>{item.brand}</Text> : null}
+          {item.brand ? <BrandLink sellerId={item.sellerId} name={item.brand} style={styles.tileBrand} /> : null}
           <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
           {isProduct && item.priceCents != null ? (
             <View style={styles.priceRow}>
-              <Text style={[styles.tilePrice, TABULAR_NUMS, item.priceDropped && { color: theme.success }]}>
+              <Text style={[styles.tilePrice, TABULAR_NUMS]}>
                 {formatCents(item.priceCents)}
               </Text>
               {item.priceDropped && item.oldPriceCents != null ? (
@@ -500,13 +504,13 @@ export default function BuyerSaved() {
   );
 }
 
-function Badge({ label, color }: { label: string; color: string }) {
+function Badge({ label, color, textColor }: { label: string; color: string; textColor?: string }) {
   // Status accents (theme.success/warning/error) are pale across every
   // preset, so a near-black label reads reliably on all of them — a white
   // label would wash out against the lighter ones.
   return (
     <View style={[bs.badge, { backgroundColor: color }]}>
-      <Text style={bs.badgeText}>{label}</Text>
+      <Text style={[bs.badgeText, textColor ? { color: textColor } : null]}>{label}</Text>
     </View>
   );
 }
