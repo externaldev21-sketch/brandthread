@@ -16,6 +16,11 @@
       "fallbackToCacheTimeout": 0
     },
     "ios": {
+      "icon": {
+        "light": "./assets/images/app-icons/monochrome.png",
+        "dark": "./assets/images/app-icons/monochrome-ios-dark.png",
+        "tinted": "./assets/images/app-icons/monochrome-ios-tinted.png"
+      },
       "bundleIdentifier": "com.brandthread.mobile",
       "usesAppleSignIn": true,
       "entitlements": {
