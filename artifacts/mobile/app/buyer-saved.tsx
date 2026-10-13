@@ -457,7 +457,7 @@ function Badge({ label, color }: { label: string; color: string }) {
 }
 const bs = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADII.pill, marginRight: SPACING.xxs, marginBottom: SPACING.xxs },
-  badgeText: { color: '#0A0A0B', fontSize: 10, fontFamily: FONT.bold, letterSpacing: 0.2 },
+  badgeText: { color: '#0A0A0B', fontSize: 11, fontFamily: FONT.bold, letterSpacing: 0.2 },
 });
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: ReturnType<typeof useColors>) => StyleSheet.create({

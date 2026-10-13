@@ -113,5 +113,5 @@ const styles = StyleSheet.create({
   // per-weight static Inter faces has no matching real weight file, so the
   // browser synthesizes ("faux-bolds") it instead of using a real bold
   // glyph — see components/ui/AppText.tsx's doc comment.
-  badgeText: { fontSize: 10, fontFamily: FONT.bold },
+  badgeText: { fontSize: 11, fontFamily: FONT.bold },
 });

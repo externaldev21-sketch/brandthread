@@ -289,8 +289,8 @@ export function RightActionRail({
         icon="bookmark"
         solidIcon="bookmark"
         iconSize={26}
+        // Plain count, no roll: only like counts animate (polish #69).
         count={formatCount(engagement?.saves ?? saves)}
-        value={engagement?.saves ?? saves}
         active={engagement?.saved ?? false}
         activeColor={GOLD}
         inactiveColor={ON_DARK}
