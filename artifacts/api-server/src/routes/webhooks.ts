@@ -4,6 +4,7 @@
  */
 import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
+import { generateOrderNumberIn } from "../lib/orderNumber";
 import type Stripe from "stripe";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed,
@@ -90,7 +91,6 @@ import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
 import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
 import { amountBucket, captureServerEvent } from "../lib/analytics";
-import { generateOrderNumberIn } from "../lib/orderNumber";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
