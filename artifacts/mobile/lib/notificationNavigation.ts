@@ -38,11 +38,11 @@ export function notificationHref(rawData: unknown): string | null {
     // Buyer order updates (shipped/delivered/…) open the buyer's order
     // screen; only seller-side order pushes open /order-detail.
     return isBuyerOrderNotification(typeof data.type === 'string' ? data.type : null)
-      ? `/buyer-order-detail?id=${encodeURIComponent(data.targetId)}`
+      ? `/buyer-order-detail?id=${encodeURIComponent(data.targetId)}${data.type === 'review_request' ? '&review=1' : ''}`
       : `/order-detail?id=${encodeURIComponent(data.targetId)}`;
   }
   if (data?.targetType === 'buyer_order' && typeof data.targetId === 'string' && data.targetId) {
-    return `/buyer-order-detail?id=${encodeURIComponent(data.targetId)}`;
+    return `/buyer-order-detail?id=${encodeURIComponent(data.targetId)}${data.type === 'review_request' ? '&review=1' : ''}`;
   }
   if (data?.targetType === 'manufacturer_thread' && typeof data.targetId === 'string' && data.targetId) {
     return `/manufacturer-messages?threadId=${encodeURIComponent(data.targetId)}`;

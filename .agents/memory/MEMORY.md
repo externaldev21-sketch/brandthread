@@ -17,7 +17,7 @@
 - [Design Studio Architecture](design-studio-architecture.md) — Expo-safe shared rendering, full-resolution master exports, validated imports, and ordered timer persistence govern the editor.
 - [expo-file-system v19 API](expo-file-system-v19.md) — legacy API (readAsStringAsync/writeAsStringAsync/EncodingType/cacheDirectory) removed; use File+Paths classes; for reading images before API call, request base64:true in ImagePicker instead.
 - [Dev API routing](expo-public-api-base-url.md) — base URL must be domain ROOT; proxy forwards /api/* verbatim; /api-server/* returns SPA HTML with 200 (silent fallback trap); verify via Metro's /proc environ, not shell env.
-- [Expo web boot & root route](expo-web-boot.md) — boot never blank; dev web preview defaults to seller and bypasses auth; ?bt_preview=buyer overrides for captures; static screenshots catch FOIT.
+- [Expo web boot & root route](expo-web-boot.md) — buyer-default development review stays fresh; explicit role links remain, and real users/production are unchanged.
 - [Expo dependency repair](expo-dependency-repair.md) — avoid interrupted pnpm relinks; newly published SDK patches may be blocked by registry release age before online Expo checks advance.
 - [Expo Go native module boundary](expo-go-native-module-boundary.md) — Expo Go startup must not statically import custom native modules absent from its client; keep those behind compatible fallbacks.
 - [Expo root navigation readiness](expo-root-navigation-readiness.md) — wait for root registration before redirecting; merged Stack screen names must stay unique.

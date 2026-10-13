@@ -59,7 +59,7 @@ export default function OfflineBanner() {
           testID="slow-connection-banner"
           style={[styles.pill, { backgroundColor: theme.card, borderColor: theme.border }]}
         >
-          <Feather name="wifi" size={14} color={theme.text} />
+          <Icon name="wifi" size={14} color={theme.text} />
           <Text style={[TYPE_SCALE.footnote, styles.text, { color: theme.text }]} numberOfLines={1}>
             Slow connection
           </Text>

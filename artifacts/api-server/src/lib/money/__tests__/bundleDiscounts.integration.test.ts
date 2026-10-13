@@ -36,7 +36,7 @@ vi.mock("../../../middlewares/requireAuth", () => ({
   },
 }));
 
-import { bundleItems, checkoutSessions, db, discountCodeUses, discountCodes, orders, productBundles } from "@workspace/db";
+import { bundleItems, shippingZones, checkoutSessions, db, discountCodeUses, discountCodes, orders, productBundles } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { fake } from "./fakeStripe";
 import { handleCartPaymentSucceeded } from "../../../routes/webhooks";
@@ -82,6 +82,8 @@ async function seedShop(tag: string) {
   ]);
   const code = `TEN${uid("c").replace(/[^a-z0-9]/gi, "").slice(-8).toUpperCase()}`;
   await db.insert(discountCodes).values({ id: uid("dc"), sellerId: seller, code, type: "percentage", value: "10.00" });
+  // This suite exercises bundle/promo accounting with explicitly free shipping.
+  await db.insert(shippingZones).values({ id: uid('zone'), sellerId: seller, name: 'US free', countries: ['US'], flatRateCents: 0 });
   return { seller, buyer, tee, cap, bundle, code };
 }
 
@@ -102,10 +104,10 @@ describe("bundle discounts at checkout", () => {
     const promoCents = Math.round(SET * 0.1); // 550, on what the bundle left
     const merchandise = TEE + CAP - bundleCents - promoCents;
     const tax = Math.round(merchandise * 0.08);
-    expect(quote.body.groups[0]).toMatchObject({
+    expect(quote.body.groups[0], JSON.stringify(quote.body.groups[0])).toMatchObject({
       subtotalCents: TEE + CAP,
       bundleDiscountCents: bundleCents,
-      discountCents: bundleCents + promoCents,
+      discountCents: promoCents, // Existing wire contract keeps bundle savings separate.
       taxCents: tax,
       totalCents: merchandise + tax,
     });
@@ -121,7 +123,7 @@ describe("bundle discounts at checkout", () => {
     expect(row.bundleDiscountCents).toBe(bundleCents);
     expect(row.discountCodeAmountCents).toBe(promoCents);
     expect(row.platformFeeCents).toBe(destinationApplicationFeeCents({
-      merchandiseCents: merchandise, preTaxTotalCents: merchandise, platformFeeBps: row.platformFeeBps,
+      shippingCents: 0, merchandiseCents: merchandise, preTaxTotalCents: merchandise, platformFeeBps: row.platformFeeBps,
     }).platformFeeCents);
 
     const intent = fake.state.paymentIntents.get(created.body.paymentIntentId);

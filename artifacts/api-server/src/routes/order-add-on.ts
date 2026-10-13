@@ -150,6 +150,7 @@ router.get("/:orderId", async (req, res) => {
 function withoutShipping(group: PricedGroup): PricedGroup {
   const discountCents = Math.max(0, group.discountCents - group.shippingDiscountCents);
   const fee = destinationApplicationFeeCents({
+    shippingCents: 0,
     merchandiseCents: Math.max(0, group.subtotalCents - discountCents),
     preTaxTotalCents: Math.max(0, group.subtotalCents - discountCents),
     platformFeeBps: group.platformFeeBps,

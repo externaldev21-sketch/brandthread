@@ -4,7 +4,7 @@ import { optionsFor, pageById, pagesFor, pausedUntilLabel, PAUSE_OPTIONS, SETTIN
 describe('Instagram-style notification settings model', () => {
   it('has the Instagram category rows in order', () => {
     expect(pagesFor('buyer').map((p) => p.title)).toEqual([
-      'Posts and comments', 'Following and followers', 'Messages', 'Calls', 'Live', 'Orders and shopping',
+      'Account security', 'Posts and comments', 'Following and followers', 'Messages', 'Calls', 'Live', 'Orders and shopping',
     ]);
   });
 

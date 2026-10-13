@@ -1634,7 +1634,7 @@ export default function BuyerProductDetailScreen() {
           {/* Worn in these videos */}
           <WornInVideos productId={product.id} productName={product.name} />
 
-          <BundleOffer productId={product.id} />
+          <BundleOffer productId={product.id} onAdded={bumpCart} />
 
           <CompleteTheFit productId={product.id} />
 

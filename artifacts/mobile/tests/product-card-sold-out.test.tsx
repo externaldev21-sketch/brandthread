@@ -58,8 +58,8 @@ const text = (r: ReactTestRenderer) => JSON.stringify(r.toJSON());
 const dimmed = (r: ReactTestRenderer) => r.root.findAll((n) => typeof n.type === 'string' && (n.props as { style?: { opacity?: number } }).style?.opacity === 0.4).length;
 
 describe('ProductCard stock states', () => {
-  it('reads "N left" for in-stock and low-stock products, undimmed', () => {
-    expect(text(render(product(12)))).toContain('12 left');
+  it('keeps healthy cards uncluttered and labels low-stock products, undimmed', () => {
+    expect(text(render(product(12)))).not.toContain('product-card-restock');
     expect(text(render(product(3)))).toContain('3 left');
     expect(dimmed(render(product(12)))).toBe(0);
   });
@@ -78,6 +78,6 @@ describe('ProductCard stock states', () => {
   it('leaves archived sold-out cards as they were', () => {
     const r = render(product(0, 'archived'));
     expect(dimmed(r)).toBe(0);
-    expect(text(r)).toContain('Out of stock');
+    expect(text(r)).toContain('Sold out');
   });
 });

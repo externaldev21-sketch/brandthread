@@ -6,6 +6,8 @@
 import { inArray } from "drizzle-orm";
 import { db, bundleItems, productBundles } from "@workspace/db";
 import { priceBundles, type BundleCartLine, type BundleDef, type BundlePricing } from "./bundlePricing";
+import { loadActiveBundles } from "../bundles/activeBundles";
+import { applyBundleDiscounts } from "../bundles/applyBundleDiscounts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -45,6 +47,29 @@ export function noBundles(count: number): BundlePricing {
 
 /** Prices one seller group's bundles. Throws BundlePricingError for another seller's bundle. */
 export async function priceGroupBundles(input: { sellerId: string; lines: BundleCartLine[] }): Promise<BundlePricing> {
+  // Explicitly tagged sets retain their existing allocation and validation.
+  // Untagged carts also receive the new automatic complete-set offer, once.
+  if (taggedBundleIds(input.lines).length === 0) {
+    const definitions = await loadActiveBundles(input.sellerId, [...new Set(input.lines.map(line => line.productId))]);
+    const automatic = applyBundleDiscounts(input.lines.map(line => ({
+      productId: line.productId, variantId: line.variantId,
+      quantity: line.quantity, unitPriceCents: line.priceCents,
+    })), definitions);
+    return {
+      bundleDiscountCents: automatic.totalDiscountCents,
+      lineDiscountCents: automatic.lineDiscountCents,
+      lineBundleId: input.lines.map(() => null),
+      skipped: [],
+      applied: automatic.applied.map(bundle => {
+        const price = definitions.find(definition => definition.id === bundle.bundleId)!.bundlePriceCents;
+        return {
+          bundleId: bundle.bundleId, name: bundle.name, sets: bundle.copies,
+          itemsCents: price * bundle.copies + bundle.discountCents,
+          bundlePriceCents: price, discountCents: bundle.discountCents,
+        };
+      }),
+    };
+  }
   const lines = input.lines.map((line) => ({
     ...line,
     bundleId: typeof line.bundleId === "string" && UUID.test(line.bundleId) ? line.bundleId.toLowerCase() : null,

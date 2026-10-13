@@ -106,7 +106,7 @@ function demoOffer(productId: string): Offer | null {
   return { id: 'preview-bundle-01', name: 'The coat and boots', bundlePriceCents: itemsTotalCents - 6000, itemsTotalCents, items };
 }
 
-export function BundleOffer({ productId }: { productId: string }) {
+export function BundleOffer({ productId, onAdded }: { productId: string; onAdded?: () => void }) {
   const colors = useColors();
   const api = useApi();
   const router = useRouter();
@@ -151,9 +151,10 @@ export function BundleOffer({ productId }: { productId: string }) {
     }
     setBusy(false);
     haptic('addToBag');
+    onAdded?.();
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
-  }, []);
+  }, [onAdded]);
 
   const onAddAll = useCallback(() => {
     if (!offer || busy) return;

@@ -58,3 +58,8 @@ Review unexpected deletions and markerless unmerged paths against the pre-batch 
 **Why:** Older integration snapshots can leave a required native provider absent while its unchanged callers still reference it. A feedback-only merge must not treat that absence as an intentional feature retirement.
 
 **How to apply:** Check baseline existence and indexed merge stages before accepting a deletion. Preserve the current functional dependency, layer the actual incoming change, and confirm native imports and TypeScript after the complete batch.
+Preserve established financial field semantics when merging independently designed commerce features; adapt the new feature at the shared pricing/wire boundary rather than replacing the existing engine wholesale.
+
+**Why:** Parallel bundle implementations used different meanings for the same discount field and different shipping assumptions. Blindly combining them risks double discounts, misleading totals, and broken fee validation even when each isolated branch passes.
+
+**How to apply:** Check explicit versus automatic eligibility, keep them mutually exclusive, preserve the existing quote and ledger contracts, and reconcile incoming fixtures with actual shipping and fee inputs. Verify both backend charges and customer-facing savings.

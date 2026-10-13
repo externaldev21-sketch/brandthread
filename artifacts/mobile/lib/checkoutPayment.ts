@@ -251,10 +251,8 @@ export type QuoteGroup = {
   /** Bundle savings (taken off before the promo code); absent on older servers. */
   bundleDiscountCents?: number;
   shippingCents: number;
-  /** All discounts on this group, seller bundles included. */
+  /** Promo/shipping discounts; bundleDiscountCents is separate on the existing API. */
   discountCents: number;
-  /** Seller bundle ("Buy the set") part of discountCents, applied before any code. */
-  bundleDiscountCents?: number;
   taxCents: number;
   /** Covered by a store gift card; totalCents is what the card payment still covers. */
   giftCardCents?: number;

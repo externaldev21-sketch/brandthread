@@ -50,3 +50,10 @@ Read-only agent contexts can also prevent Chromium from starting because its con
 **Why:** Chromium failed before page navigation while trying to write its crash-report settings in a read-only workspace; redirecting browser configuration and cache locations to writable temporary directories allowed the same installed browser to run.
 
 **How to apply:** Keep browser profiles, configuration, and caches in writable temporary directories for automated checks. Account for XDG/Chromium configuration-home selection rather than changing repository permissions or app authentication. Confirm the endpoint is serving before attributing a browser launch or HTTP failure to UI code.
+
+## Development review default
+The owner explicitly selected a buyer-default development preview for buyer-app work. This is a development review choice, not a change to real account roles or production onboarding. Without the current URL’s explicit demo=1, preview accounts stay fresh and empty; native previews never seed demo data. Explicit buyer/seller preview links remain available.
+
+**Why:** Switching the review side must not revive demo data or silently change real users’ roles.
+
+**How to apply:** Preserve buyer-default preview behavior through merges unless the owner requests another review side; keep demonstration data URL-scoped and development-only.

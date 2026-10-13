@@ -141,6 +141,8 @@ const createSchema = z.object({
 const guestTokenSchema = z.object({ guestAccessToken: z.string().min(32).max(512) });
 
 type GroupBreakdown = {
+  bundleDiscountCents: number;
+  bundles: Array<{ bundleId: string; name: string; copies: number; discountCents: number }>;
   sellerId: string;
   checkoutSessionId: string;
   subtotalCents: number;
@@ -164,6 +166,8 @@ function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gi
       sellerId: row.sellerId,
       checkoutSessionId: row.id,
       subtotalCents: subtotal,
+      bundleDiscountCents: row.bundleDiscountCents ?? 0,
+      bundles: (row.bundleLines ?? []).map(line => ({ bundleId: line.bundleId, name: line.name, copies: line.sets, discountCents: line.discountCents })),
       shippingCents: row.shippingCents ?? 0,
       discountCents: row.discountCodeAmountCents ?? 0,
       loyaltyCents: row.loyaltyDiscountCents ?? 0,
@@ -276,6 +280,7 @@ function breakdown(priced: PricedCartGroup[], rows?: Array<{ id: string }>): Gro
     shippingCents: group.shippingCents,
     discountCents: group.discountCents,
     bundleDiscountCents: group.bundleDiscountCents,
+    bundles: group.bundleLines.map(line => ({ bundleId: line.bundleId, name: line.name, copies: line.sets, discountCents: line.discountCents })),
     tipCents: group.tipCents, tippingEnabled: group.tippingEnabled,
     loyaltyCents: group.loyaltyCents,
     threadCashCents: group.threadCashCents,

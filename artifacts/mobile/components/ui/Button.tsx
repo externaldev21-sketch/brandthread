@@ -118,7 +118,6 @@ export function Button({
 
   const handlePress = (event: GestureResponderEvent) => {
     if (isDisabled) return;
-    if (variant === 'destructive') 
     onPress(event);
   };
 

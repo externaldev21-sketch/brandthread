@@ -230,7 +230,7 @@ export function ExpressPay({ amountCents, subtotalCents, shippingCents, quote, c
     const { PlatformPay } = stripe;
     const tax = next ? next.groups.reduce((sum, group) => sum + group.taxCents, 0) : 0;
     const ship = next ? next.groups.reduce((sum, group) => sum + group.shippingCents, 0) : shippingCents;
-    const discount = next ? next.groups.reduce((sum, group) => sum + group.discountCents, 0) : 0;
+    const discount = next ? next.groups.reduce((sum, group) => sum + group.discountCents + (group.bundleDiscountCents ?? 0), 0) : 0;
     const tip = next ? next.groups.reduce((sum, group) => sum + (group.tipCents ?? 0), 0) : 0;
     const total = next ? next.amountCents : amountCents;
     const item = (label: string, cents: number, pending = false): PlatformPayTypes.ImmediateCartSummaryItem => ({
