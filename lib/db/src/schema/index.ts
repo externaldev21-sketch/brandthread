@@ -795,6 +795,14 @@ export const posts = pgTable('posts', {
   createdPublishedIdx: index('posts_created_published_idx')
     .on(table.createdAt)
     .where(sql`${table.postStatus} = 'published'`),
+  // Migration 262: keyset order for public feed reads (publicPostCondition's
+  // published-OR-due-scheduled filter can't use the published-only partials).
+  feedKeysetIdx: index('posts_feed_keyset_idx')
+    .on(table.createdAt.desc().nullsFirst(), table.id.desc().nullsFirst())
+    .where(sql`${table.moderationStatus} = 'visible' AND ${table.postStatus} IN ('published', 'scheduled')`),
+  userFeedKeysetIdx: index('posts_user_feed_keyset_idx')
+    .on(table.userId, table.createdAt.desc().nullsFirst(), table.id.desc().nullsFirst())
+    .where(sql`${table.moderationStatus} = 'visible' AND ${table.postStatus} IN ('published', 'scheduled')`),
 }));
 
 // ─── Interactions ─────────────────────────────────────────────────────────────

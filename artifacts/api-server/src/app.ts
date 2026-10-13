@@ -34,6 +34,7 @@ import {
 import { giveawayLanding } from "./routes/giveawayLanding";
 import { aiUsageContext } from "./lib/aiUsage";
 import { normalizeGatePath } from "./lib/gatePath";
+import { responseCompression } from "./middlewares/compression";
 
 const app: Express = express();
 app.set("trust proxy", 1);
@@ -60,6 +61,10 @@ app.use("/.well-known", wellKnownRouter);
 
 // Clerk proxy must be mounted BEFORE body parsers (streams raw bytes)
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
+
+// gzip/brotli for everything after the Clerk proxy (which streams raw
+// bytes and must stay untouched). SSE is excluded — see the middleware.
+app.use(responseCompression);
 
 // Credentials (cookies) are only ever sent to a known first-party web
 // origin for this environment — reflecting an arbitrary Origin header with
