@@ -1,7 +1,7 @@
 /**
  * Every Follow / Unfollow tap in the app fires the same haptic, from one
- * place: `hapticFollow` in lib/haptics.ts. Follow = light impact + success
- * notification, Unfollow = selection tick, no-op on web.
+ * place: `hapticFollow` in lib/haptics.ts. Follow = one light impact,
+ * Unfollow = selection tick, no-op on web.
  *
  * Two guards:
  *  1. Unit — hapticFollow plays the right expo-haptics calls per direction.
@@ -32,7 +32,7 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
 }));
 
-import { hapticFollow } from '@/lib/haptics';
+import { hapticFollow, resetHapticsForTests } from '@/lib/haptics';
 
 describe('hapticFollow', () => {
   beforeEach(() => {
@@ -40,12 +40,14 @@ describe('hapticFollow', () => {
     haptics.impactAsync.mockClear();
     haptics.notificationAsync.mockClear();
     haptics.selectionAsync.mockClear();
+    resetHapticsForTests();
   });
 
-  it('Follow plays a light impact plus a success notification', () => {
+  it('Follow plays one light impact (max one haptic per action)', () => {
     hapticFollow(true);
+    expect(haptics.impactAsync).toHaveBeenCalledTimes(1);
     expect(haptics.impactAsync).toHaveBeenCalledWith('light');
-    expect(haptics.notificationAsync).toHaveBeenCalledWith('success');
+    expect(haptics.notificationAsync).not.toHaveBeenCalled();
     expect(haptics.selectionAsync).not.toHaveBeenCalled();
   });
 

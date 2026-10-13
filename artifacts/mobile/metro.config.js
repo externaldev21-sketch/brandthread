@@ -18,6 +18,8 @@ config.resolver.blockList = [
 // The native SDK uses CodeGen native components that cannot bundle for web.
 // The seller-live and buyer-live screens degrade gracefully when the module is null.
 const agoraShim = path.resolve(__dirname, 'shims/react-native-agora.js');
+const hapticsShim = path.resolve(__dirname, 'shims/expo-haptics.ts');
+const hapticsService = path.resolve(__dirname, 'lib/haptics.ts');
 // System font (BRANDTHREAD_DESIGN.md): every `react-native` import resolves
 // to shims/react-native.js, which re-exports react-native with Text/TextInput
 // mapping weight-token font families (FONT.bold, 'Inter_700Bold', …) to the
@@ -56,6 +58,13 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     context.originModulePath !== systemFontComponent
   ) {
     return { filePath: systemFontShim, type: 'sourceFile' };
+  }
+  if (
+    moduleName === 'expo-haptics' &&
+    context.originModulePath !== hapticsShim &&
+    context.originModulePath !== hapticsService
+  ) {
+    return { filePath: hapticsShim, type: 'sourceFile' };
   }
   return resolveDefault(context, moduleName, platform);
 };
