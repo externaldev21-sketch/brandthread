@@ -28,6 +28,8 @@ export interface PlanPricing {
   period: string;
   loading: boolean;
   failed: boolean;
+  /** Replaces the per-week line, e.g. "$65.83/mo billed yearly" on a yearly price. */
+  note?: string | null;
 }
 
 export interface SellerPlanSelectorProps {
@@ -104,7 +106,7 @@ export function SellerPlanSelector({
                 )}
                 <Text style={[styles.pricePeriod, inverted && styles.mutedOnInverted]}>{pricing.period}</Text>
                 {!pricing.loading && !pricing.failed && (
-                  <Text style={[styles.priceWeekly, inverted && styles.mutedOnInverted]}>{weeklyEquivalentFor(plan)}</Text>
+                  <Text style={[styles.priceWeekly, inverted && styles.mutedOnInverted]}>{pricing.note ?? weeklyEquivalentFor(plan)}</Text>
                 )}
               </View>
             </View>

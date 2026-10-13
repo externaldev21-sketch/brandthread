@@ -79,8 +79,9 @@ describe('PLAN_FAQ', () => {
     }
   });
 
-  it('is honest that billing is monthly-only today (no fabricated annual checkout)', () => {
+  it('describes monthly and yearly billing with the real 2-months-free rule', () => {
     const billing = PLAN_FAQ.find((item) => /monthly|yearly/i.test(item.question));
     expect(billing?.answer).toMatch(/billed monthly/i);
+    expect(billing?.answer).toMatch(/10 months/);
   });
 });

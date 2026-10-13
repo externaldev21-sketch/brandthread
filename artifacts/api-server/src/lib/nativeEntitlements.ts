@@ -13,6 +13,14 @@ const PRODUCT_TO_PLAN: Record<string, SellerPlanId> = {
   "brandthread_growth_monthly:monthly": "growth",
   brandthread_pro_monthly: "pro",
   "brandthread_pro_monthly:monthly": "pro",
+  // Annual products (item 116). App Store: brandthread_<plan>_annual;
+  // Google Play: subscription brandthread_<plan>_annual, base plan "annual".
+  brandthread_starter_annual: "starter",
+  "brandthread_starter_annual:annual": "starter",
+  brandthread_growth_annual: "growth",
+  "brandthread_growth_annual:annual": "growth",
+  brandthread_pro_annual: "pro",
+  "brandthread_pro_annual:annual": "pro",
   // Compatibility aliases for purchases made before the top tier was renamed.
   brandthread_scale_monthly: "pro",
   "brandthread_scale_monthly:monthly": "pro",

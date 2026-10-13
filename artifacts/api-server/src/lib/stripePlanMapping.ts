@@ -17,5 +17,9 @@ export function sellerPlanFromStripeLookupKey(lookupKey: unknown): SellerPlanId 
   if (lookupKey === "brandthread_starter_annual_web") return "starter";
   if (lookupKey === "brandthread_growth_annual_web") return "growth";
   if (lookupKey === "brandthread_pro_annual_web") return "pro";
+  // Annual prices (item 116: 10 × monthly). New keys, no legacy meaning.
+  if (lookupKey === "brandthread_starter_annual") return "starter";
+  if (lookupKey === "brandthread_growth_annual") return "growth";
+  if (lookupKey === "brandthread_pro_annual") return "pro";
   return undefined;
 }

@@ -6,6 +6,7 @@ export * from './sizeCharts';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
 export * from './sellerStoreShares';
+export * from './billingDunning';
 export * from './productVariantsStock';
 export * from './restockAlerts';
 export * from './security';

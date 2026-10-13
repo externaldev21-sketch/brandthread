@@ -5,7 +5,7 @@ import {
 } from './subscriptionRecovery';
 
 describe('subscription payment recovery', () => {
-  it.each(['past_due', 'unpaid'])('shows recovery for %s subscriptions', (status) => {
+  it.each(['past_due', 'unpaid', 'paused'])('shows recovery for %s subscriptions', (status) => {
     expect(isSubscriptionPaymentRecoveryRequired(status)).toBe(true);
   });
 

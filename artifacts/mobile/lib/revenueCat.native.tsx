@@ -15,6 +15,7 @@ import {
 } from '@/lib/revenueCatSession';
 import { isExpoGo } from '@/lib/expoGoRuntime';
 import { runAfterFirstPaint } from '@/lib/deferStartup';
+import { isSellerRevenueCatPackage } from '@/lib/sellerBilling';
 
 export type RevenueCatPackage = import('react-native-purchases').PurchasesPackage;
 type PurchasesClient = typeof import('react-native-purchases').default;
@@ -117,7 +118,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     if (!sessionGuard.isCurrent(generation)) return;
     setCustomerInfo(info);
     setPackages(offerings.current?.availablePackages.filter((pkg) =>
-      pkg.identifier === '$bt_starter' || pkg.identifier === '$bt_growth' || pkg.identifier === '$bt_pro',
+      isSellerRevenueCatPackage(pkg.identifier), // monthly + optional yearly packages
     ) ?? []);
   }, [available, isSignedIn, sessionGuard, accountReady]);
 
@@ -145,7 +146,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
         if (!sessionGuard.isCurrent(generation)) return;
         setCustomerInfo(info);
         setPackages(offerings.current?.availablePackages.filter((pkg) =>
-          pkg.identifier === '$bt_starter' || pkg.identifier === '$bt_growth' || pkg.identifier === '$bt_pro',
+          isSellerRevenueCatPackage(pkg.identifier), // monthly + optional yearly packages
         ) ?? []);
         if (clerkId) void sync(generation).catch(() => {});
       } catch { /* Billing remains unavailable until RevenueCat is reachable. */ }

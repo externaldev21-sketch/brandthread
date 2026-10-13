@@ -102,7 +102,9 @@ export function SellerPaywallExitDrawer({
             <Text style={[styles.title, { color: theme.text }]}>Not ready to commit?</Text>
             {!pricing.loading && !pricing.failed && (
               <Text style={[styles.reframe, { color: theme.muted }]}>
-                {`${pricing.priceLabel ?? selectedPlan.priceLabel}${pricing.period}, that's about ${weekly}${daily ? ` (${daily})` : ''}`}
+                {pricing.note
+                  ? `${pricing.priceLabel ?? selectedPlan.priceLabel}${pricing.period}, that's ${pricing.note}`
+                  : `${pricing.priceLabel ?? selectedPlan.priceLabel}${pricing.period}, that's about ${weekly}${daily ? ` (${daily})` : ''}`}
               </Text>
             )}
 

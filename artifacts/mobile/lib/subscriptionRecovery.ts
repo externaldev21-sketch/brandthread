@@ -1,7 +1,8 @@
 export type SubscriptionBillingProvider = 'stripe' | 'revenuecat' | 'none';
 
 export function isSubscriptionPaymentRecoveryRequired(status: string | null | undefined): boolean {
-  return status === 'past_due' || status === 'unpaid';
+  // 'paused' = paused after the last failed retry (item 115).
+  return status === 'past_due' || status === 'unpaid' || status === 'paused';
 }
 
 export function getBillingRecoveryTarget(
