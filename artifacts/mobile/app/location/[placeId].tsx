@@ -10,22 +10,40 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { EmptyState } from '@/components/BrandthreadUI';
+
 import { ProfileGridSkeleton, ProfileVideoTile, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
+
 import { PROFILE_GRID_GAP, useProfileLayout } from '@/components/profile/profileLayout';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useApi, type PlaceInfo, type PlacePostsPage } from '@/lib/api';
+
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
 import { formatCompactCount } from '@/lib/compactFormat';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { FONT } from '@/lib/theme';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
+
 import { FASHION_PREVIEW_POSTS } from '@/app/(tabs)/feed';
 
 type Sort = 'top' | 'recent';
@@ -159,7 +177,7 @@ export default function LocationScreen() {
             <TouchableOpacity
               key={key}
               style={styles.tab}
-              onPress={() => { if (!active) { haptics.selection(); setSort(key); } }}
+              onPress={() => { if (!active) { haptic('select'); setSort(key); } }}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               accessibilityLabel={key === 'top' ? 'Top posts' : 'Recent posts'}

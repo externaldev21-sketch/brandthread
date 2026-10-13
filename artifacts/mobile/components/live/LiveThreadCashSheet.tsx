@@ -1,4 +1,6 @@
+import { haptic } from '@/lib/haptics';
 import { haptics, hapticLight, hapticSuccess } from '@/lib/haptics';
+
 /**
  * LIVE viewer Thread Cash gift sheet — the rail's bill icon. TikTok LIVE
  * gift-sheet structure (balance at top, grid of tip amounts, one Send CTA),
@@ -16,22 +18,34 @@ import { haptics, hapticLight, hapticSuccess } from '@/lib/haptics';
  */
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { randomUUID } from 'expo-crypto';
+
 import { Sheet } from '@/components/ui/BottomSheet';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useApi } from '@/lib/api';
+
 import { formatMoney as formatCents } from '@/lib/format';
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
+
 import { isPreviewThreadCashEnabled, getPreviewThreadCashStatus, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
+
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 // Dev preview role only (not every __DEV__ build): demo shows the sample balance, fresh shows the empty one.
 const isPreviewRole = () => __DEV__ && (isBuyerDevPreview() || isSellerDevPreview());
 import { radius } from '@/constants/radii';
+
 import { apiErrorMessage } from '@/lib/safety';
 
 const TIP_AMOUNTS_CENTS = [100, 500, 1000, 2000, 5000, 10000];
@@ -163,7 +177,7 @@ export function LiveThreadCashSheet({
             <Pressable
               key={cents}
               disabled={!affordable}
-              onPress={() => { hapticLight(); setSelected(cents); }}
+              onPress={() => { haptic('select'); setSelected(cents); }}
               style={[
                 styles.tip,
                 { borderColor: isSelected ? theme.accent : theme.border },

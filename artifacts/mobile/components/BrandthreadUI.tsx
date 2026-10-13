@@ -1,4 +1,5 @@
-import { radius as ControlRadius } from '@/constants/radii';
+import { radius as ControlRadius, radius } from '@/constants/radii';
+
 /**
  * Brandthread Shared UI Components
  *
@@ -7,44 +8,52 @@ import { radius as ControlRadius } from '@/constants/radii';
  */
 
 import React, { useRef, useState, useEffect, createContext, useContext, useCallback } from 'react';
-import {
-  View, Text, TouchableOpacity, TextInput, ScrollView,
-  StyleSheet, ActivityIndicator, Animated, Platform,
-  ViewStyle, TextStyle, StyleProp, Pressable,
-  SwitchProps, PressableProps, LayoutChangeEvent, TextInputProps,
-} from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, ActivityIndicator, Animated, Platform, ViewStyle, TextStyle, StyleProp, Pressable, SwitchProps, PressableProps, LayoutChangeEvent, TextInputProps } from 'react-native';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import Svg, { Line as SvgLine } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED,
-  SURFACE_GLASS, CARD_GLASS, CARD_ELEVATED_GLASS, SKELETON_GLASS,
-  BORDER, BORDER_ACTIVE, BORDER_FOCUS,
-  FG, MUTED, SUBTLE,
-  SUCCESS, SUCCESS_DIM,
-  BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  FONT, FS, SP, RADIUS, COMP, ICON, ANIM, FILL_ELEVATED,
-  SHADOW_SM, TEXT_DISABLED,
-} from '@/lib/theme';
+
+import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, SURFACE_GLASS, CARD_GLASS, CARD_ELEVATED_GLASS, SKELETON_GLASS, BORDER, BORDER_ACTIVE, BORDER_FOCUS, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, FILL_ELEVATED, SHADOW_SM, TEXT_DISABLED } from '@/lib/theme';
+
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useColors } from '@/hooks/useColors';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, hapticSelection } from '@/lib/haptics';
+
+
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
+
 import { undoExpiresAt } from '@/lib/undoRecovery';
+
 import { displayPriceInput, finishPriceInput, sanitizePriceInput } from '@/lib/priceInput';
+
 import { PRESS_SCALE, PRESS_DURATION_MS } from '@/constants/motion';
+
 import { useSettled } from '@/lib/animationUtils';
+
 import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 import { a11yHidden } from '@/lib/a11yHidden';
+
 import { iconAccessibilityLabel } from '@/lib/a11y/iconLabels';
+
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+
 import { EmptyStateBadge, EMPTY_STATE_BADGE_SIZE } from '@/components/layout/EmptyStateBadge';
+
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { useFocusedAnimationLoop } from '@/lib/useFocusedAnimationLoop';
-import { radius } from '@/constants/radii';
+
+
 import { minHitSlop } from '@/lib/hitSlop';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { DISABLED_OPACITY } from '@/constants/states';
 
 // ─── Shared undo action/toast ─────────────────────────────────────────────────
@@ -711,7 +720,7 @@ export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
   const palette = useColors();
   return (
     <PressableScale
-      onPress={() => { haptics.selection(); onPress(); }}
+      onPress={() => {  onPress(); }}
       accessibilityLabel={count !== undefined ? `${label}, ${count}` : label}
       accessibilityState={{ selected: active }}
       style={[fcS.chip, { backgroundColor: 'transparent', borderColor: palette.border }, active && [fcS.active, { backgroundColor: theme.accent, borderColor: theme.accent }]]}

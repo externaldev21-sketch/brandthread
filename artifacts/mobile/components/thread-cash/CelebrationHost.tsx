@@ -13,7 +13,9 @@
  */
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Platform, StyleSheet, Text } from 'react-native';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import Animated, {
   Easing,
   runOnJS,
@@ -22,9 +24,11 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { hapticSuccess } from '@/lib/haptics';
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { formatMoney as formatCents } from '@/lib/format';
+
 import { ThreadCashBillIcon } from './ThreadCashBill';
 
 export type CelebrateThreadCashPayload = {
@@ -133,7 +137,6 @@ export function CelebrationHost({ children }: { children: React.ReactNode }) {
     // Item 148: the toast says money arrived; the bill + confetti burst that
     // used to play with it was decoration and is gone (the seller swipe glow
     // is the app's only "wow" effect).
-    if (!reduceMotionRef.current) hapticSuccess();
   }, []);
 
   const value = useMemo(() => ({ celebrateThreadCash }), [celebrateThreadCash]);

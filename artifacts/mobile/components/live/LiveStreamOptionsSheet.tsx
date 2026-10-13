@@ -10,11 +10,17 @@
  */
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { SheetRise } from '@/components/motion/SheetRise';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { MenuSheet } from '@/components/ui/MenuSheet';
 
 export function LiveStreamOptionsSheet({

@@ -23,111 +23,104 @@ import * as Haptics from 'expo-haptics';
  * reopening the app lands on the same step with the same answers.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Alert,
-  Animated,
-  Easing,
-  Platform,
-  Pressable,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, Animated, Easing, Platform, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useAuth, useClerk, useSSO, useSignUp, useUser } from '@clerk/expo';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic as playHaptic } from '@/lib/haptics';
+
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+
+import { useUsernameLiveCheck } from '@/lib/onboarding/useUsernameLiveCheck';
+
+
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 
 import { track } from '@/lib/analytics';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
-import { useUsernameLiveCheck } from '@/lib/onboarding/useUsernameLiveCheck';
+
+
+
 import { suggestUsername } from '@/lib/onboarding/usernameSuggestion';
+
 import { classifySignUpCreateError, identifierTakenMessage } from '@/lib/onboarding/signUpErrors';
+
 import { findSessionForEmail } from '@/lib/signUpErrors';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useApi } from '@/lib/api';
+
 import { hydrateMyProfileFromAccount, socialKeysForUser } from '@/services/socialService';
+
 import { DEFAULT_BUYER_PROFILE, saveBuyerProfileForUser } from '@/lib/buyerProfile';
+
 import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
+
 import { getInstallId } from '@/lib/installId';
+
 import { pickFromLibrary } from '@/lib/pickProfileImage';
+
 import { rememberPendingConsent } from '@/lib/legalConsent';
+
 import { checkDobInput, setPendingDob, submitPendingAge } from '@/lib/ageGate';
+
 import { COUNTRIES } from '@/lib/addressRegions';
-import {
-  queueBuyerOnboardingSync,
-  isRecoverableBuyerOnboardingSyncError,
-  syncBuyerOnboarding,
-} from '@/lib/buyerOnboardingSync';
+
+import { queueBuyerOnboardingSync, isRecoverableBuyerOnboardingSyncError, syncBuyerOnboarding } from '@/lib/buyerOnboardingSync';
+
 import { ApiError } from '@/lib/networkNotice';
-import {
-  APPLE_OAUTH_STRATEGY,
-  oauthProviderVisibility,
-  isOAuthCancellationError,
-  isOAuthFlowComplete,
-  makeBrandthreadRedirectUri,
-  mapOAuthError,
-} from '@/lib/oauthFlow';
-import {
-  allStepsFor,
-  isAccountStep,
-  firstStepAfterAccount,
-  isStepId,
-  nextStepId,
-  prevStepId,
-  progressFraction,
-  DRAFT_VERSION,
-  SELLER_QUESTION_STEPS,
-  type AuthMethod,
-  type Flow,
-  type StepId,
-} from '@/lib/onboardingFlow';
-import {
-  PENDING_DRAFT_KEY,
-  parseDraft,
-  resolveResumeStep,
-  sanitizeDraftForStorage,
-  userDraftKey,
-  type OnboardingDraft,
-} from '@/lib/onboardingDraft';
+
+import { APPLE_OAUTH_STRATEGY, oauthProviderVisibility, isOAuthCancellationError, isOAuthFlowComplete, makeBrandthreadRedirectUri, mapOAuthError } from '@/lib/oauthFlow';
+
+import { allStepsFor, isAccountStep, firstStepAfterAccount, isStepId, nextStepId, prevStepId, progressFraction, DRAFT_VERSION, SELLER_QUESTION_STEPS, type AuthMethod, type Flow, type StepId } from '@/lib/onboardingFlow';
+
+import { PENDING_DRAFT_KEY, parseDraft, resolveResumeStep, sanitizeDraftForStorage, userDraftKey, type OnboardingDraft } from '@/lib/onboardingDraft';
+
 import { EMPTY_SURVEY, hasSurveyAnswers, sanitizeDraftSurvey, saveBuyerSurvey, type OnboardingSurvey } from '@/lib/onboardingSurvey';
+
 import { Icon, Input } from '@/components/ui';
+
 import { WelcomeStep } from '@/components/onboarding/WelcomeStep';
+
 import { BrandsToFollowStep } from '@/components/onboarding/BrandsToFollowStep';
+
 import { SizesStep } from '@/components/onboarding/SizesStep';
+
 import { StepScreen } from '@/components/onboarding/steps/StepScreen';
+
 import { ClearButton } from '@/components/onboarding/steps/FieldAccessories';
-import {
-  BirthdayStep,
-  CodeStep,
-  EmailStep,
-  PasswordStep,
-  TermsStep,
-  dobToWheelDate,
-  wheelDateToDobInput,
-} from '@/components/onboarding/steps/AccountSteps';
+
+import { BirthdayStep, CodeStep, EmailStep, PasswordStep, TermsStep, dobToWheelDate, wheelDateToDobInput } from '@/components/onboarding/steps/AccountSteps';
+
 import { BrandNameStep, NameStep, PhotoStep, UsernameStep, WelcomeUserStep } from '@/components/onboarding/steps/ProfileSteps';
-import {
-  BRAND_STAGE_OPTIONS,
-  BuildingStoreStep,
-  ChoiceCardsStep,
-  LocationStep,
-  SELLER_GOAL_OPTIONS,
-} from '@/components/onboarding/steps/SellerSteps';
+
+import { BRAND_STAGE_OPTIONS, BuildingStoreStep, ChoiceCardsStep, LocationStep, SELLER_GOAL_OPTIONS } from '@/components/onboarding/steps/SellerSteps';
+
 import type { WheelDate } from '@/components/onboarding/steps/WheelDatePicker';
 import { PlanStep } from '@/components/onboarding/steps/PlanStep';
+
 import { useSellerTrialCheckout } from '@/lib/useSellerTrialCheckout';
+
 import { recommendSellerPlan } from '@/lib/sellerPlans';
+
 import type { SellerPlanId } from '@/lib/sellerBilling';
 import { AccountTypeStep, type AccountType } from './account-type';
+
 import { ONBOARDING_KEY, ONBOARDING_OWNER_KEY } from './_layout';
+
 import { FILL_ELEVATED, FONT, TEXT } from '@/lib/theme';
+
 import { SPACING } from '@/constants/spacing';
+
 import { radius } from '@/constants/radii';
 
 // Required on Android so the in-app browser tab closes after OAuth redirect
@@ -207,7 +200,7 @@ function StyleChip({ label, selected, onPress }: { label: string; selected: bool
       style={[styles.chip, { borderColor: selected ? theme.text : 'transparent' }]}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
-      onPress={() => { haptics.selection(); onPress(); }}
+      onPress={() => {  onPress(); }}
     >
       <Text style={[styles.chipText, { color: selected ? theme.text : theme.muted }]}>{label}</Text>
     </Pressable>

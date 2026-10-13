@@ -6,26 +6,40 @@
  * change applies on every device immediately.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  View, Text, FlatList, StyleSheet, ActivityIndicator,
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { useColors } from '@/hooks/useColors';
+
 import { getMutedUsers, unmuteUser, subscribeSocial } from '@/services/socialService';
+
 import type { MuteRecord } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+
 import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
+
 import { apiErrorMessage, confirmUnblock, shortRelativeTime } from '@/lib/safety';
+
 import type { BlockedAccount } from '@/lib/safetyTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Button, ListRow, SegmentedControl, ThemedRefreshControl } from '@/components/ui';
+
 import { haptics } from '@/lib/haptics';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
+
 import { FONT } from '@/lib/theme';
 
 type Tab = 'blocked' | 'muted';
@@ -72,13 +86,11 @@ export default function BlockedAndMutedScreen() {
     const done = await confirmUnblock({ userId: account.userId, name: account.name }, api.social.unblock);
     setPendingId(null);
     if (done) {
-      haptics.success();
       setBlocked((prev) => prev.filter((row) => row.userId !== account.userId));
     }
   }
 
   async function unmute(record: MuteRecord) {
-    haptics.light();
     await unmuteUser(record.mutedUserId);
     setMuted((prev) => prev.filter((row) => row.id !== record.id));
   }

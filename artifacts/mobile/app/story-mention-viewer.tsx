@@ -18,45 +18,70 @@
  * (api.social.storyMentions(), or the `&demo=1` preview seed).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Alert, Animated, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions,
-} from 'react-native';
+import { Alert, Animated, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { StatusBar } from 'expo-status-bar';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { FontAwesome } from '@expo/vector-icons';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { PressableScale } from '@/components/BrandthreadUI';
+
 import { IconButton } from '@/components/ui';
+
 import { MentionStickerView, ReshareCard } from '@/components/StoryMentionSticker';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { useStoryMentions } from '@/hooks/useStoryMentions';
+
 import Composer from '@/components/ui/Composer';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT, FS, ON_DARK, RADIUS, SP, ICON, TEXT_SECONDARY } from '@/lib/theme';
+
 import { RADII, radius } from '@/constants/radii';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { prefetchImage } from '@/lib/prefetch';
+
 import { useApi } from '@/lib/api';
+
 import { useReportSheet } from '@/components/safety/ReportSheet';
+
 import { ApiError } from '@/lib/networkNotice';
+
 import { relativeTime } from '@/lib/activity';
+
 import { sendMessage } from '@/services/socialService';
-import {
-  isPreviewInboxEnabled, getOrCreatePreviewConversationForAuthor, appendPreviewMessage, touchPreviewConversation,
-} from '@/lib/previewInbox';
+
+import { isPreviewInboxEnabled, getOrCreatePreviewConversationForAuthor, appendPreviewMessage, touchPreviewConversation } from '@/lib/previewInbox';
+
 import { markPreviewStoryMentionSeen } from '@/lib/previewStoryMentions';
+
 import { isPreviewActivityEnabled } from '@/lib/previewActivity';
-import {
-  atHandle, isMentionExpired, orderMentions, reshareEditorHref, startIndexFor,
-} from '@/lib/storyMentionsRail';
+
+import { atHandle, isMentionExpired, orderMentions, reshareEditorHref, startIndexFor } from '@/lib/storyMentionsRail';
+
 import { advance, retreat, nextUser, prevUser, classifyGesture, type NavResult } from '@/lib/storyViewerNav';
+
 import type { MessageAttachment, StoryMedia, StoryMentionItem, StoryOverlay } from '@/services/socialTypes';
 
 
@@ -313,7 +338,7 @@ export default function StoryMentionViewerScreen() {
     if (!current) return;
     const id = current.storyId;
     const wasLiked = likedNow(current);
-    haptics.light();
+    if (!wasLiked) haptic('like');
     if (!wasLiked) {
       heartPop.setValue(0.75);
       Animated.timing(heartPop, { toValue: 1, duration: 160, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();

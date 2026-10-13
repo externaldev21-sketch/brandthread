@@ -28,23 +28,37 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Alert, View, Text, StyleSheet, Pressable } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import { useAuth, useClerk, useSessionList } from '@clerk/expo';
+
 import { haptics } from '@/lib/haptics';
+
 import { BottomSheet } from '@/components/ui/BottomSheet';
+
 import { ListRow } from '@/components/ui';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useApi } from '@/hooks/useApi';
+
 import { SPACING } from '@/constants/spacing';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { FONT } from '@/lib/theme';
+
 import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+
 import { useRole } from '@/contexts/RoleContext';
-import {
-  MAX_ACCOUNTS_MESSAGE, getHandle, getDisplayName, resolveAccountTypeLabel, isAtAccountCap,
-} from '@/lib/accountSwitcherHelpers';
+
+import { MAX_ACCOUNTS_MESSAGE, getHandle, getDisplayName, resolveAccountTypeLabel, isAtAccountCap } from '@/lib/accountSwitcherHelpers';
+
 import { useLinkedProfiles } from '@/hooks/useLinkedProfiles';
+
 import { addProfileLabel, otherRole, profilesMissingFromDevice } from '@/lib/linkedProfiles';
 
 export interface AccountSwitcherSheetProps {
@@ -162,7 +176,6 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
 
   async function handleSwitch(account: AccountRow) {
     if (account.current || switchingId || loggingOutId) return;
-    haptics.selection();
     if (isPreview) {
       // No real second session in preview — just flip the local role so the
       // rest of the app (buyer vs seller routing) follows immediately.
@@ -214,7 +227,6 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
 
   function handleAddAccountPress() {
     if (atCap) {
-      haptics.warning();
       Alert.alert('Account limit reached', MAX_ACCOUNTS_MESSAGE);
       return;
     }

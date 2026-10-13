@@ -1,4 +1,5 @@
 import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
+
 /**
  * Brandthread Product Detail Screen
  * 8-tab deep-dive into a single product: Overview, Variants, Inventory,
@@ -7,38 +8,63 @@ import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { formatCalendarDate } from '@/lib/calendarDate';
+
 import AIBrainFAB from '@/components/AIBrainFAB';
 import { View, Text, ScrollView, StyleSheet, Alert, Animated, FlatList, Share, Linking, TextInput } from 'react-native';
+
 import { CachedImage as Image } from '@/components/CachedImage';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { Button } from '@/components/ui/Button';
+
 import { useRouter, useLocalSearchParams } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
+
 import { isSellerDevPreview } from '@/lib/devPreview';
+
 import { isPreviewSellerProductId } from '@/lib/previewSellerProducts';
+
 import { previewAsBuyerHref } from '@/lib/sellerProductPreview';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { AnimatedEntrance, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, StatCard, NavigationCard, LoadingSkeleton, EmptyState, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 
 import { initProductService, getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct, adjustInventory, adjustVariantStock, setVariantStock, duplicateProduct, deleteProduct } from '@/services/productService';
+
 import { useApi } from '@/lib/api';
+
 import { ProductSaveStatsRow } from '@/components/products/ProductSaveStatsRow';
+
 import { Product, ProductVariant, ProductStatus } from '@/services/productTypes';
+
 import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/productUtils';
+
 import { reportNetworkError } from '@/lib/networkNotice';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { MissingItemState } from '@/components/states/MissingItemState';
+
 import { fmtRelativeDay, fmtDate } from '@/lib/format';
 
 import { ChipRow } from '@/components/ui/ChipRow';
+
 function useThemeAliases() {
   const { theme } = useAppTheme();
   return {
@@ -146,7 +172,7 @@ export default function ProductDetailScreen() {
   }, [activeTab, id, analyticsRetry, userId]);
 
   const handleTabPress = useCallback((tab: Tab, index: number) => {
-    haptics.selection();
+    haptic('select');
     setActiveTab(tab);
   }, []);
 
@@ -218,8 +244,7 @@ export default function ProductDetailScreen() {
             <Text style={s.editBtnText}>Edit</Text>
           </PressableScale>
           <PressableScale
-            onPress={(event) => {
-              openPullDownMenu(event, menuItemsFromButtons([
+            onPress={(event) => { haptic('sheet'); openPullDownMenu(event, menuItemsFromButtons([
                 { text: product.status === 'active' ? 'Archive' : 'Publish', onPress: () => {
                   if (product.status === 'active') {
                     archiveProduct(product.id).then(p => {

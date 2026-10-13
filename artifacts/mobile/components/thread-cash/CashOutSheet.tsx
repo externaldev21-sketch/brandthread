@@ -1,4 +1,5 @@
 import { hapticSuccess, hapticLight, haptics } from '@/lib/haptics';
+
 /**
  * Seller Thread Cash cash-out sheet — moves earned Thread Cash (Live gifts,
  * message payments) into the seller's real Stripe payout balance.
@@ -15,16 +16,27 @@ import { hapticSuccess, hapticLight, haptics } from '@/lib/haptics';
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View, Platform } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { randomUUID } from 'expo-crypto';
+
 import { Sheet } from '@/components/ui/BottomSheet';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useApi } from '@/lib/api';
+
 import { formatCents } from '@/lib/money';
+
 import { FONT, FS, SP } from '@/lib/theme';
+
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
+
 import { radius } from '@/constants/radii';
 
 export function CashOutSheet({
@@ -84,7 +96,7 @@ export function CashOutSheet({
       attemptKey.current ??= randomUUID();
       const result = await api.threadCash.cashOut({ threadCashCents: amountCents, idempotencyKey: attemptKey.current });
       attemptKey.current = null;
-      hapticSuccess();
+      
       onCashedOut(result);
     } catch (err: any) {
       setError(err?.message ?? 'Could not cash out right now. Try again.');
@@ -129,7 +141,7 @@ export function CashOutSheet({
             {formatCents(balanceCents)} available
           </Text>
           <Pressable
-            onPress={() => { hapticLight(); setAmountText((balanceCents / 100).toFixed(2)); }}
+            onPress={() => {  setAmountText((balanceCents / 100).toFixed(2)); }}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="Cash out all"

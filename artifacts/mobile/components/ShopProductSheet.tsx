@@ -8,67 +8,60 @@
  */
 
 import { BrandLink } from '@/components/products/BrandLink';
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  Easing,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import { CachedImage as Image } from '@/components/CachedImage';
+import { ActivityIndicator, Animated, Easing, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
+
+import { CachedImage as Image, CachedImage } from '@/components/CachedImage';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import ReanimatedAnimated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import { useRouter } from 'expo-router';
+
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useSheetTransition } from '@/components/ui/BottomSheet';
-import { CachedImage } from '@/components/CachedImage';
+
+
 import { Avatar } from '@/components/ui/Avatar';
+
 import { profileHref } from '@/lib/profileNavigation';
+
 import { ProductReviewsSection, type ReviewsSeed } from '@/components/ProductReviewsSection';
+
 import { formatCents } from '@/lib/money';
+
 import { processingTimeLine, sellerAcceptsReturns } from '@/lib/productTrust';
+
 import { SizeRecommendationBadge, RecommendedTag, useSizeBadgeModel } from '@/components/SizeRecommendationBadge';
-import {
-  ON_DARK, OVERLAY,
-  FONT, FS, SP, RADIUS, ICON, COMP,
-} from '@/lib/theme';
-import {
-  addToCart,
-  createBuyNowSession,
-  getCart,
-  getBuyerProduct,
-  warmCart,
-} from '@/services/cartService';
+
+import { ON_DARK, OVERLAY, FONT, FS, SP, RADIUS, ICON, COMP } from '@/lib/theme';
+
+import { addToCart, createBuyNowSession, getCart, getBuyerProduct, warmCart } from '@/services/cartService';
+
 import type {
   BuyerProduct,
   BuyerProductOption,
   BuyerProductVariant,
   CheckoutAttribution,
 } from '@/services/cartTypes';
-import {
-  CART_FLIGHT_ITEM_SIZE,
-  getCartFlightVector,
-  getSuccessfulCartCount,
-  flightSourceFromRect,
-  measureCartTarget,
-  measureWindowRect,
-  shouldAnimateCartSuccess,
-  type CartFlightPoint,
-  type CartFlightSource,
-} from '@/lib/cartFlight';
+import { CART_FLIGHT_ITEM_SIZE, getCartFlightVector, getSuccessfulCartCount, flightSourceFromRect, measureCartTarget, measureWindowRect, shouldAnimateCartSuccess, type CartFlightPoint, type CartFlightSource } from '@/lib/cartFlight';
+
 import { crispPx } from '@/lib/crispPixel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -837,7 +830,7 @@ export function ShopProductSheet({
         setVariantError(result.message ?? 'Could not add to cart.');
         return;
       }
-      haptics.light();
+      haptic('addToBag');
       setPhase('added');
       void flyProductToCart(newCount);
     } catch {
@@ -950,7 +943,7 @@ export function ShopProductSheet({
                 accentColor={accent}
                 recommended={option === sizeOption && sizeBadgeModel?.kind === 'recommend' && sizeBadgeModel.size === val.label}
                 onPress={() => {
-                  haptics.selection();
+                  if (selections[option.id] !== val.id) haptic('select');
                   setSelections(prev => {
                     const updated = { ...prev, [option.id]: val.id };
                     const newVariant = findVariant(product, updated);

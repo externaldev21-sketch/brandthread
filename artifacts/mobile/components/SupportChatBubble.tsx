@@ -10,20 +10,22 @@
 import React, {
   useState, useRef, useCallback, useEffect, memo,
 } from 'react';
-import {
-  View, Text, Modal, FlatList, TouchableOpacity,
-  StyleSheet, Platform, Animated,
-  Keyboard, ActivityIndicator, Pressable,
-} from 'react-native';
+import { View, Text, Modal, FlatList, TouchableOpacity, StyleSheet, Platform, Animated, Keyboard, ActivityIndicator, Pressable } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { haptic } from '@/lib/haptics';
+
 import { useApi } from '@/lib/api';
-import {
-  BG, CARD, BORDER, FG, MUTED,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
+
+import { BG, CARD, BORDER, FG, MUTED, FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import Composer from '@/components/ui/Composer';
 
 const SUCCESS_GRN = '#34D399';
@@ -331,6 +333,7 @@ export default function SupportChatBubble({ bottomOffset = 0, side = 'left' }: S
   }, []);
 
   function handlePress() {
+    haptic('sheet');
     Animated.sequence([
       Animated.timing(scale, { toValue: 0.88, duration: 80, useNativeDriver: true }),
       Animated.spring(scale,  { toValue: 1,    useNativeDriver: true, damping: 10 }),

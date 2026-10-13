@@ -92,6 +92,15 @@ export function resetHapticsForTests() {
   enabled = true;
 }
 
+function isWeb() {
+  try {
+    return Platform?.OS === 'web';
+  } catch {
+    // Test doubles of react-native without Platform.
+    return false;
+  }
+}
+
 function shouldPlay(kind: HapticKind, now: number) {
   if (!enabled) return false;
   if (Platform?.OS === 'web' || process.env.EXPO_OS === 'web') return false;
@@ -205,8 +214,8 @@ export const hapticToggle = hapticSelection;
 export const hapticSuccessAction = hapticSuccess;
 /** Destructive-confirm: delete, remove, cancel-order confirmations. */
 export const hapticDestructiveConfirm = hapticWarning;
-/** Bottom tab bar switch — a meaningful navigation change, not a selection tick. */
-export const hapticTabChange = hapticMedium;
+/** Bottom tab bar switch — a selection tick (HAPTIC_MAP.tabChange). */
+export const hapticTabChange = hapticSelection;
 
 // ─── Follow ───────────────────────────────────────────────────────────────────
 

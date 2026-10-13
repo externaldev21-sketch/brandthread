@@ -6,37 +6,58 @@
  */
 import React, { useCallback, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, useWindowDimensions, Dimensions,
-  Modal, TextInput, ActivityIndicator, Share, Platform,
-} from 'react-native';
+
+import { View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, useWindowDimensions, Dimensions, Modal, TextInput, ActivityIndicator, Share, Platform } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic, hapticSuccess } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
-import {
-  CARD, BORDER, FG, MUTED, OVERLAY,
-  FONT, FS, SP, RADIUS, COMP,
-} from '@/lib/theme';
+
+import { CARD, BORDER, FG, MUTED, OVERLAY, FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { getCollectionItems, updateCollection, deleteCollection, moveSavedItemToCollection } from '@/services/socialService';
+
 import { SavedItem, SavedCollection } from '@/services/socialTypes';
+
 import { reportNetworkError } from '@/lib/networkNotice';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
+
 import { isBuyerDevPreview } from '@/lib/devPreview';
+
 import { ModalSafeArea } from '@/components/ModalSafeArea';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { GridSkeleton } from '@/components/layout/Skeleton';
+
 import { EmptyState, HapticSwitch } from '@/components/BrandthreadUI';
+
 import { Sheet } from '@/components/ui/BottomSheet';
-import { hapticSuccess } from '@/lib/haptics';
+
+
 import { formatCents } from '@/lib/money';
+
 import { BrandLink } from '@/components/products/BrandLink';
+
 import { buildCanonicalCollectionUrl } from '@/lib/shareCollection';
+
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+
 import { ErrorState } from '@/components/ui/ErrorState';
+
 import { openPullDownMenu } from '@/lib/contextMenu';
 
 const GAP = SP.sm;
@@ -184,7 +205,7 @@ export default function BuyerCollection() {
       <TouchableOpacity
         style={styles.tile}
         onPress={() => openItem(item)}
-        onLongPress={() => { haptics.rigid(); removeItem(item); }}
+        onLongPress={() => { haptic('longPress'); removeItem(item); }}
         activeOpacity={0.85}
       >
         <View style={styles.tileImageWrap}>

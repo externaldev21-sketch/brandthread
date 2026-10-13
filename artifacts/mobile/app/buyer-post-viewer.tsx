@@ -5,49 +5,79 @@ import * as Haptics from 'expo-haptics';
  * from socialService. Owner-only: edit caption (inline modal) and delete.
  */
 import { track } from '@/lib/analytics';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { buildPostUrl } from '@/lib/shareLinks';
+
 import { QuotedPostCard } from '@/components/social/QuotedPostCard';
-import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Share, Animated, useWindowDimensions, Platform, Alert,
-} from 'react-native';
+
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Share, Animated, useWindowDimensions, Platform, Alert } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { FontAwesome } from '@expo/vector-icons';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { Button } from '@/components/ui/Button';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
 import { useVideoPlayer, VideoView } from 'expo-video';
+
 import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { CachedImage } from '@/components/CachedImage';
-import {
-  BG, SURFACE, BORDER, FG, MUTED, SUBTLE, ON_DARK,
-  FONT, FS, SP, RADIUS, ICON, RED, COMP,
-} from '@/lib/theme';
+
+import { BG, SURFACE, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RADIUS, ICON, RED, COMP } from '@/lib/theme';
+
 import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
+
 import { getComments, likePost, repostPost, saveItem, getMyPosts, getPostById, updatePost, deletePost, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE, mapSlides } from '@/services/socialService';
+
 import type { BuyerPost, Comment, PostSlide } from '@/services/socialTypes';
 import { PostCarousel } from '@/components/social/PostCarousel';
+
 import { getPreviewActivityPost } from '@/lib/previewActivity';
+
 import { useAuth } from '@clerk/expo';
+
 import { useApi } from '@/lib/api';
+
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Sheet } from '@/components/ui/BottomSheet';
+
 import { CaptionSpans } from '@/components/social/CaptionText';
+
 import { CaptionsOverlay, type CaptionSegment } from '@/components/social/CaptionsOverlay';
+
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+
 import { useCaptionsPreference, useReadyCaptionTrack } from '@/lib/captions';
+
 import { LocationTag } from '@/components/social/LocationTag';
+
 import { TranslatableCaption } from '@/components/translation/CaptionTranslation';
+
 import { minHitSlop } from '@/lib/hitSlop';
+
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
+
 
 function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () => void; captions?: CaptionSegment[] }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; p.timeUpdateEventInterval = 0.25; });
@@ -271,10 +301,11 @@ export default function BuyerPostViewer() {
   }, [api, userId, realPostId]);
 
   const handleLike = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
     const wasLiked = liked;
     const prevCount = likeCount;
     const newLiked = !liked;
+    if (newLiked) haptic('like');
     setLiked(newLiked);
     setLikeCount(c => newLiked ? c + 1 : Math.max(0, c - 1));
     if (!realPostId) {
@@ -351,7 +382,6 @@ export default function BuyerPostViewer() {
     await updatePost(post.id, { caption: editCaption });
     setPost(prev => prev ? { ...prev, caption: editCaption } : prev);
     setEditOpen(false);
-    haptics.success();
   };
 
   const handleDelete = async () => {
@@ -538,7 +568,7 @@ export default function BuyerPostViewer() {
           {captionTrack ? (
             <TouchableOpacity
               style={s.engageBtn}
-              onPress={() => { haptics.selection(); setCaptionsOn(!captionsOn); }}
+              onPress={() => {  setCaptionsOn(!captionsOn); }}
               accessibilityRole="button"
               accessibilityLabel={captionsOn ? 'Turn captions off' : 'Turn captions on'}
               accessibilityState={{ selected: captionsOn }}
@@ -602,7 +632,7 @@ export default function BuyerPostViewer() {
           <View style={{ paddingHorizontal: SP.md, marginTop: SP.lg }}>
             <TouchableOpacity
               style={s.deleteBtn}
-              onPress={() => setDeleteConfirm(true)}
+              onPress={() => { haptic('sheet'); setDeleteConfirm(true); }}
             >
               <Icon name="trash-2" size={16} color={RED} />
               <Text style={s.deleteBtnText}>Delete post</Text>

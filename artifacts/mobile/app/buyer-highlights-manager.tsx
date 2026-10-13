@@ -5,32 +5,48 @@
  * and from the profile menu.
  */
 import React, { useState, useCallback, useRef } from 'react';
-import {
-  View, Text, StyleSheet, FlatList, TextInput, Modal, Platform, Alert, Pressable,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, Modal, Platform, Alert, Pressable } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT } from '@/lib/theme';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
-import { haptics } from '@/lib/haptics';
-import { PressableScale } from '@/components/BrandthreadUI';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
+import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
+
 import { Button } from '@/components/ui';
-import {
-  loadHighlights, createHighlight, updateHighlight, deleteHighlight,
-  reorderHighlights, type Highlight,
-} from '@/lib/highlightsService';
+
+import { loadHighlights, createHighlight, updateHighlight, deleteHighlight, reorderHighlights, type Highlight } from '@/lib/highlightsService';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { ModalSafeArea } from '@/components/ModalSafeArea';
-import { EmptyState } from '@/components/BrandthreadUI';
+
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { canSyncSocialServer } from '@/services/socialService';
+
 import { isPreviewDemoMode } from '@/lib/devPreview';
+
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 const EMOJIS = ['✨', '🌟', '💜', '🎵', '🌿', '🔥', '💫', '🌙', '🎨', '🏄', '🍕', '📸', '🎉', '💙', '🌸', '🏆'];
@@ -96,7 +112,7 @@ function HLFormModal({
                     <PressableScale
                       key={e}
                       style={s.emojiBtn}
-                      onPress={() => { haptics.selection(); setEmoji(e); setEmojiGridOpen(false); }}
+                      onPress={() => { haptic('select'); setEmoji(e); setEmojiGridOpen(false); }}
                       accessibilityRole="button"
                       accessibilityLabel={`Use ${e} as the emoji`}
                     >
@@ -125,7 +141,7 @@ function HLFormModal({
                     key={c}
                     noMinHeight
                     style={[s.colorSwatch, { backgroundColor: c }, coverColor === c && [s.colorSwatchActive, { borderColor: colors.foreground }]]}
-                    onPress={() => { haptics.selection(); setCoverColor(c); }}
+                    onPress={() => { haptic('select'); setCoverColor(c); }}
                     accessibilityRole="button"
                     accessibilityLabel={`Use this color as the cover`}
                     accessibilityState={{ selected: coverColor === c }}
@@ -201,6 +217,7 @@ export default function BuyerHighlightsManager() {
   }, [params.create, params.edit]));
 
   function openCreate() {
+    haptic('sheet');
     setLabel('');
     setEmoji('✨');
     setCoverColor(COVER_COLORS[0]);
@@ -208,6 +225,7 @@ export default function BuyerHighlightsManager() {
   }
 
   function openEdit(h: Highlight) {
+    haptic('sheet');
     setEditing(h);
     setLabel(h.label);
     setEmoji(h.emoji);
@@ -217,7 +235,6 @@ export default function BuyerHighlightsManager() {
   async function handleSaveCreate() {
     if (!label.trim()) return;
     const h = await createHighlight({ emoji, label, coverColor });
-    haptics.success();
     setHighlights(prev => [...prev, h]);
     setCreating(false);
   }
@@ -228,7 +245,6 @@ export default function BuyerHighlightsManager() {
   async function handleSelectStoriesCreate() {
     if (!label.trim()) return;
     const h = await createHighlight({ emoji, label, coverColor });
-    haptics.success();
     setHighlights(prev => [...prev, h]);
     setCreating(false);
     router.push(`/buyer-highlight-stories?highlightId=${encodeURIComponent(h.id)}` as any);
@@ -246,13 +262,11 @@ export default function BuyerHighlightsManager() {
   async function handleSaveEdit() {
     if (!editing) return;
     await updateHighlight(editing.id, { emoji, label, coverColor });
-    haptics.success();
     setHighlights(prev => prev.map(h => h.id === editing.id ? { ...h, emoji, label, coverColor } : h));
     setEditing(null);
   }
 
   function confirmDelete(h: Highlight) {
-    haptics.warning();
     Alert.alert(
       'Delete highlight?',
       `"${h.label}" will be removed from your profile. This can't be undone.`,

@@ -1,114 +1,178 @@
-import { haptics, hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
+import { haptics, hapticLight, hapticMedium, hapticSelection, haptic } from '@/lib/haptics';
+
 import { spotlightPagePropsEqual } from '@/lib/feedPageMemo';
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { DEMO_RUNWAY_VIDEO_SOURCES, DEMO_RUNWAY_VIDEO_URIS } from '@/lib/demoMedia';
+
 import { UploadProgressPill } from '@/components/feed/UploadProgressPill';
+
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback, Animated, TextInput, Modal, Pressable, PanResponder, AccessibilityInfo, ScrollView, RefreshControl, ActivityIndicator, Easing, useWindowDimensions, type LayoutChangeEvent, type ViewToken, Platform, type ImageSourcePropType } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { FontAwesome } from '@expo/vector-icons';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useIsFocused, useScrollToTop } from 'expo-router';
+
 import { useReportSheet } from '@/components/safety/ReportSheet';
+
 import { useAuth } from '@clerk/expo';
+
 import { ForYouEmptyShop } from '@/components/feed/ForYouEmptyShop';
+
 import { useSignInGate } from '@/hooks/useSignInGate';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createThreadFeedCursor, getSellerFollowStates, getThreadPostsPage, setSellerFollowing, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
+
 import { confirmSponsoredImpression } from '@/services/sponsoredService';
+
 import * as Haptics from 'expo-haptics';
-import { isPreviewDemoMode } from '@/lib/devPreview';
+import { isPreviewDemoMode, isBuyerDevPreview } from '@/lib/devPreview';
+
+import type { SellerThreadPost } from '@/services/socialService';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
+
 import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
+
 import { useFeedWatchSignals } from '@/hooks/useFeedWatchSignals';
+
 import { useAppActive } from '@/hooks/useAppActive';
+
 import { Asset } from 'expo-asset';
+
 import { Image as ExpoImage } from 'expo-image';
+
 import { prefetchImage } from '@/lib/prefetch';
-import {
-  enqueueEngagementRetry, isRetryableFailure, setEngagementRetryExecutor, startEngagementRetryQueuePump,
-} from '@/lib/engagementRetryQueue';
+
+import { enqueueEngagementRetry, isRetryableFailure, setEngagementRetryExecutor, startEngagementRetryQueuePump } from '@/lib/engagementRetryQueue';
+
 import { computeJustDroppedDrops, type FollowedDrop } from '@/lib/justDroppedDrops';
+
 import { useApi } from '@/lib/api';
+
 import { useSettled } from '@/lib/animationUtils';
-import {
-  BG, SCREEN_BG, SURFACE, CARD, OVERLAY,
-  BORDER, BORDER_SUBTLE,
-  FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED,
-  SUCCESS, RED, GOLD,
-  FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRID_MAX_WIDTH,
-} from '@/lib/theme';
+
+import { BG, SCREEN_BG, SURFACE, CARD, OVERLAY, BORDER, BORDER_SUBTLE, FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED, SUCCESS, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRID_MAX_WIDTH } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
+
 import { FeedSkeleton, PressableScale } from '@/components/BrandthreadUI';
+
 import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { SponsoredAdCard } from '@/components/ads/SponsoredAdCard';
+
 import { useFeedAds } from '@/hooks/useFeedAds';
+
 import { isSponsoredFeedItem, type SponsoredFeedItem } from '@/lib/feedAds';
+
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
+
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
+
 import { FIRST_FRAME_FALLBACK_MS, pickPlaybackUri, remoteVideoUri, shouldRevealVideo, withVideoCaching } from '@/lib/videoPreload';
+
 import { useFeedVideoPreload } from '@/hooks/useFeedVideoPreload';
+
 import { FEED_FRAME_SAMPLER_PROPS, mark as perfMark, useScreenInteractive } from '@/lib/perf';
+
 import { getLiveDirectory, useOpenLive } from '@/lib/live/useLiveDirectory';
+
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
-import {
-  ClaimedRemainingLabel,
-  TimeRemainingLabel,
-  UrgencyBar,
-  HighDemandSectionHead,
-  URGENCY_UNITS_THRESHOLD,
-  type CommerceSignalData,
-} from '@/components/CommerceSignal';
+
+import { ClaimedRemainingLabel, TimeRemainingLabel, UrgencyBar, HighDemandSectionHead, URGENCY_UNITS_THRESHOLD, type CommerceSignalData } from '@/components/CommerceSignal';
+
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
+
 import { FeedGestureGuide } from '@/components/FeedGestureGuide';
+
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+
 import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
+
 import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
-import { isBuyerDevPreview } from '@/lib/devPreview';
+
+
 import { getCachedFeedPosts, getFollowGraphVersion, hydrateFeedPostsCache, setCachedFeedPosts } from '@/lib/feedPostsCache';
+
 import { useCommentCountDelta } from '@/lib/commentCountBus';
+
 import type { BuyerProduct } from '@/services/cartTypes';
 import { getCart } from '@/services/cartService';
-import {
-  EngagementButton,
-  FeedToastProvider,
-  useFeedToast,
-} from '@/components/EngagementButton';
+
+import { EngagementButton, FeedToastProvider, useFeedToast } from '@/components/EngagementButton';
+
 import { formatCount, isUUID as isUUIDId } from '@/lib/engagementUtils';
+
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
+
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
+
 import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { Sheet } from '@/components/ui/BottomSheet';
+
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { RADII, radius } from '@/constants/radii';
+
 import { minHitSlop } from '@/lib/hitSlop';
+
 import { TABULAR_NUMS } from '@/constants/typography';
+
 import { getVideoFeedPage, loadExactCreatorVideoReplay, loadVideoFeedThrough } from '@/services/profileService';
+
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
+
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
+
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
+
 import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer-feed/ShopSideTab';
+
 import { LongPressMenu, type NotInterestedReason } from '@/components/buyer-feed/LongPressMenu';
+
 import { CaptionsOverlay, type CaptionSegment } from '@/components/social/CaptionsOverlay';
+
 import { useCaptionsPreference, useReadyCaptionTrack, type CaptionTrack } from '@/lib/captions';
+
 import { saveVideoToPhotos } from '@/lib/saveVideoToPhotos';
+
 import { buildPostUrl } from '@/lib/shareLinks';
+
 import * as Clipboard from 'expo-clipboard';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+
 import { finishedVideoIds, loadFinishedVideos, markVideoFinished, reachedEnd, withoutFinished } from '@/lib/finishedVideos';
+
 import { a11yHidden } from '@/lib/a11yHidden';
+
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+
 import { remixCreditLabel } from '@/lib/interactionSettings';
+
 import { prefetchSellerOnPressIn } from '@/lib/detailPrefetch';
 
 /** Looped feed copies carry `<postId>__loopN` keys; every API call uses the real post id. */
 const feedPostId = (id: string) => id.replace(/__loop\d+$/, '');
 import { crispPx } from '@/lib/crispPixel';
+
 import { formatMoney } from '@/lib/format';
 
 /**
@@ -973,7 +1037,7 @@ function ScrubProgressBar({
     if (duration > 0) player.currentTime = fraction * duration;
     if (Math.abs(fraction - lastTickFraction.current) >= 0.03) {
       lastTickFraction.current = fraction;
-      haptics.selection();
+      haptic('select');
     }
   }).current;
 
@@ -1680,7 +1744,7 @@ function SpotlightPageImpl({
       onDoubleTapLike(item.id);
       if (!engagement?.liked) popOnce(heartScale);
       burstHeart(lastPressPoint.current);
-      haptics.light();
+      haptic('like');
     } else {
       lastTap.current = now;
       pauseTimer.current = setTimeout(() => {
@@ -1737,7 +1801,7 @@ function SpotlightPageImpl({
           (390x0) while the separately-sized blurred mirror strip kept
           rendering, producing an all-black screen with nothing playing. */}
       <Pressable
-        onLongPress={() => { haptics.rigid(); setMenuOpen(true); }}
+        onLongPress={() => { haptic('longPress'); setMenuOpen(true); }}
         delayLongPress={550}
         onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ width: pageWidth, height: pageHeight }}>
         <View style={[StyleSheet.absoluteFill, { width: pageWidth, height: pageHeight }]}>
@@ -2197,7 +2261,6 @@ export default function FeedScreen({
       AsyncStorage.setItem(SOUND_PREF_KEY, next ? 'on' : 'off').catch(() => {});
       return next;
     });
-    haptics.selection();
   }, []);
   const [showGestureGuide, setShowGestureGuide] = useState(false);
   // Measured height of the absolutely-positioned top bar overlay (status
@@ -3144,6 +3207,7 @@ export default function FeedScreen({
   }, [allItems, router]);
 
   const handleShopTag = useCallback((item: SpotlightItem, tag: SpotlightProductTag) => {
+    haptic('sheet');
     const allTags = (item.productTags ?? []).length > 0
       ? (item.productTags as Array<{ productId: string; productName: string; priceCents: number; imageUri?: string }>)
       : [tag];
@@ -3709,7 +3773,7 @@ export default function FeedScreen({
               style={styles.topIconBtn}
               activeOpacity={0.7}
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowSearch(true); }}
+              onPress={() => {  setShowSearch(true); }}
               accessibilityLabel="Search"
             >
                 <Icon name="search" size={19} color={ON_DARK} />

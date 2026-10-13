@@ -4,21 +4,32 @@
  */
 import React, { useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, ActivityIndicator,
-  ScrollView, StatusBar,
-} from 'react-native';
+
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, ActivityIndicator, ScrollView, StatusBar } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { haptics } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useApi } from '@/lib/api';
+
 import { ApiError } from '@/lib/networkNotice';
+
 import { FONT, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 
 type Step = 'email' | 'code' | 'done';

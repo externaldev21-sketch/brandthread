@@ -8,17 +8,30 @@
  */
 import React from 'react';
 import { Animated, Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useColors } from '@/hooks/useColors';
+
 import { hapticLight } from '@/lib/haptics';
+
 import { FONT, TEXT_DISABLED } from '@/lib/theme';
+
+
 import { HapticSwitch } from '@/components/BrandthreadUI';
+
 import { Avatar } from '@/components/ui/Avatar';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
+
 import { PRESS_DURATION_MS } from '@/constants/motion';
+
 import { BODY_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+
 import { DISABLED_OPACITY } from '@/constants/states';
 
 export interface ListRowProps {
@@ -93,7 +106,7 @@ export function ListRow({
       accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
       accessibilityState={selected === undefined ? { disabled } : { disabled, selected }}
       disabled={disabled}
-      onPress={() => { onPress?.(); }}
+      onPress={onPress}
       onPressIn={() => Animated.timing(highlight, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
       onPressOut={() => Animated.timing(highlight, { toValue: 0, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
       testID={testID}

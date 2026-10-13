@@ -8,23 +8,31 @@
  * board, so this works whether the item was already saved or not.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator, Modal, StyleSheet, Text, TextInput, TouchableOpacity,
-  TouchableWithoutFeedback, View, FlatList, Platform} from 'react-native';
+import { ActivityIndicator, Modal, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View, FlatList, Platform } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import ReanimatedAnimated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
+
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic, hapticError, hapticSuccess } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { Sheet } from '@/components/ui/BottomSheet';
-import { hapticError, hapticSuccess } from '@/lib/haptics';
-import {
-  CARD, BORDER, FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, ICON, COMP,
-} from '@/lib/theme';
+
+
+import { CARD, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, ICON, COMP } from '@/lib/theme';
+
 import { createCollection, getCollections, moveSavedItemToCollection, saveItem } from '@/services/socialService';
+
 import { SavedCollection, SavedItemType } from '@/services/socialTypes';
 
 export interface SaveToCollectionItem {
@@ -80,11 +88,11 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
         collectionId,
       });
       await moveSavedItemToCollection(item.targetId, collectionId);
-      haptics.success();
+      
       onSaved?.(collectionId);
       onClose();
     } catch {
-      haptics.error();
+      haptic('error');
     } finally {
       setBusyId(null);
     }
@@ -98,7 +106,7 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
       const collection = await createCollection(name);
       await fileInto(collection.id);
     } catch {
-      haptics.error();
+      haptic('error');
       setBusyId(null);
     }
   }

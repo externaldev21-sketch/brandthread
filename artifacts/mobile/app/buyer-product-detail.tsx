@@ -1,95 +1,148 @@
-import { hapticToggle } from '@/lib/haptics';
+import { hapticToggle, haptics, haptic } from '@/lib/haptics';
+
 /**
  * Brandthread Buyer Product Detail
  * Variant selection, add to cart, buy now.
  */
 import { track } from '@/lib/analytics';
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { formatCalendarDate } from '@/lib/calendarDate';
+
 import { allOptionsSelected, onlyVariantSelection } from '@/lib/buyerProductSelection';
+
 import Reanimated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl,
-  Animated, Dimensions, PanResponder, Easing, AccessibilityInfo, AppState, Pressable,
-} from 'react-native';
+
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl, Animated, Dimensions, PanResponder, Easing, AccessibilityInfo, AppState, Pressable } from 'react-native';
+
 import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
+
 import { useQueryClient } from '@tanstack/react-query';
+
 import { DETAIL_STALE_TIME_MS, queryKeys } from '@/lib/queryClient';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { formatMoney as formatCents } from '@/lib/format';
+
+import { formatCents } from '@/lib/money';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
+
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
-import {
-  addToCart, createBuyNowSession, replaceCartItemVariant,
-  getCart, warmCart,
-} from '@/services/cartService';
+
+import { addToCart, createBuyNowSession, replaceCartItemVariant, getCart, warmCart } from '@/services/cartService';
+
 import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribution } from '@/services/cartTypes';
+
 import { useApi } from '@/hooks/useApi';
+
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
+
 import { reportHref } from '@/lib/safety';
+
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
+
 import { useAuth } from '@clerk/expo';
+
 import { useSignInGate } from '@/hooks/useSignInGate';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER,
-  FG, MUTED, SUBTLE, ON_DARK,
-  SUCCESS, SUCCESS_DIM,
-  ORANGE, ORANGE_DIM,
-  RED, RED_DIM,
-  GOLD,
-  GRAD_SUCCESS_G,
-  FONT, FS, SP, RADIUS, COMP, ICON, TYPE,
-} from '@/lib/theme';
+
+import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, ON_DARK, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_SUCCESS_G, FONT, FS, SP, RADIUS, COMP, ICON, TYPE } from '@/lib/theme';
+
 import { ResponsiveContainer, StickyFooter } from '@/components/layout';
+
 import { SaveHeart } from '@/components/SaveHeart';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Sheet, Avatar } from '@/components/ui';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII, radius } from '@/constants/radii';
-import { haptics } from '@/lib/haptics';
+
+
+
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
+
 import { LaunchCountdown } from '@/components/products/LaunchCountdown';
+
 import { PreOrderShipBy } from '@/components/products/PreOrderShipBy';
+
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
+
 import { CompleteTheFit } from '@/components/products/CompleteTheFit';
+
 import { BrandLink, brandLinkHref } from '@/components/products/BrandLink';
+
 import { ProductVideo } from '@/components/products/ProductVideo';
+
 import { ProductShareButton } from '@/components/products/ProductShareButton';
+
 import { ProductShippingLine } from '@/components/products/ProductShippingLine';
+
 import { POLICY_NOT_LISTED, readSellerPolicies, readSellerShipping } from '@/lib/productTrust';
+
 import { ProductQuestionsSection } from '@/components/ProductQuestionsSection';
+
 import { SizeRecommendationBadge, RecommendedTag, useSizeBadgeModel } from '@/components/SizeRecommendationBadge';
+
 import { BundleSaveSection } from '@/components/bundles/BundleSaveSection';
+
 import { useRememberedSize } from '@/hooks/useRememberedSize';
-import {
-  messageSellerAboutProductHref, profileHref, profileVideosHref, resolveStoreVisitSource,
-} from '@/lib/profileNavigation';
+
+import { messageSellerAboutProductHref, profileHref, profileVideosHref, resolveStoreVisitSource } from '@/lib/profileNavigation';
+
 import { getPreviewBuyerProduct, getPreviewRelatedProducts, getPreviewSellerProducts, isPreviewProductId } from '@/lib/previewProducts';
+
 import { isPreviewSellerId } from '@/lib/previewCheckout';
+
 import { isOwnerPreviewRow, sellerProductToBuyerProduct } from '@/lib/sellerProductPreview';
+
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+
 import { getProduct as getLocalSellerProduct } from '@/services/productService';
+
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
+
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
+
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+
 import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
+
 import { StockCounter } from '@/components/products/StockCounter';
+
 import { ProductSellerRow } from '@/components/products/ProductSellerRow';
+
 import { SizeSheet } from '@/components/products/SizeSheet';
+
 import { Icon, Icon as AppIcon, type IconName } from '@/components/ui/Icon';
+
 import { primaryOption, sizeCells } from '@/lib/sizeSheet';
+
 import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
+
 import { productTransitionKey } from '@/lib/tileTransition';
+
 import { deliveryPromiseLine } from '@/lib/deliveryGuarantee';
+
 import { useStockInfo, variantStockLine } from '@/lib/stockInfo';
+
 import { PayLaterLine } from '@/components/products/PayLaterLine';
+
 import { ApiError } from '@/lib/networkNotice';
 
 type ThemeAliases = {
@@ -110,14 +163,8 @@ function useThemeAliases(): ThemeAliases {
     ORANGE: theme.warning, ORANGE_DIM: `${theme.warning}26`, GOLD: theme.accent,
   };
 }
-import {
-  ClaimedRemainingLabel,
-  TimeRemainingLabel,
-  UrgencyBar,
-  DemandBadge,
-  URGENCY_UNITS_THRESHOLD,
-  HIGH_DEMAND_THRESHOLD,
-} from '@/components/CommerceSignal';
+import { ClaimedRemainingLabel, TimeRemainingLabel, UrgencyBar, DemandBadge, URGENCY_UNITS_THRESHOLD, HIGH_DEMAND_THRESHOLD } from '@/components/CommerceSignal';
+
 import { useScreenInteractive } from '@/lib/perf';
 
 function useChrome() {
@@ -512,7 +559,7 @@ function OptionPicker({ product, option, selections, onSelect, recommendedLabel 
                   isSelected && op.colorSwatchSelected,
                   !available && op.unavail,
                 ]}
-                onPress={() => { if (available) { haptics.selection(); onSelect(option.id, val.id); } }}
+                onPress={() => { if (available) { haptic('select'); onSelect(option.id, val.id); } }}
                 activeOpacity={0.8}
                 accessibilityRole="radio"
                 accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}
@@ -1047,7 +1094,6 @@ export default function BuyerProductDetailScreen() {
       goToSignIn();
       return;
     }
-    haptics.light();
     setWaitlistLoading(true);
     try {
       await (api as any).waitlist.join(product.id, variant.id);
@@ -1063,7 +1109,6 @@ export default function BuyerProductDetailScreen() {
       goToSignIn();
       return;
     }
-    haptics.light();
     setReserveLoading(true);
     try {
       await (api as any).buyer.reserve(product.id);
@@ -1079,7 +1124,7 @@ export default function BuyerProductDetailScreen() {
     if (!allSelected) {
       // Mark options as touched so unselected options show a required indicator
       setOptionsTouched(true);
-      haptics.warning();
+      haptic('addToBag');
       return;
     }
     if (!variant) return;
@@ -1096,7 +1141,9 @@ export default function BuyerProductDetailScreen() {
       setAddedToCart(true);
       setCartCount(result.cart.items.reduce((sum, item) => sum + item.quantity, 0));
       bumpCart();
-      haptics.light();
+      setShowAddedSheet(true);
+      // Auto-clear the icon-button checkmark after 2.5s; the sheet itself
+      // stays open until the buyer taps View bag or Keep shopping.
       if (addedBannerTimerRef.current) clearTimeout(addedBannerTimerRef.current);
       addedBannerTimerRef.current = setTimeout(() => setAddedToCart(false), IN_BAG_CONFIRM_MS);
     } else {
@@ -1439,7 +1486,7 @@ export default function BuyerProductDetailScreen() {
           {hasSizeGuide && (
             <TouchableOpacity
               style={s.sizeGuideLink}
-              onPress={() => { setSizeGuideOpen(true); }}
+              onPress={() => { haptic('sheet'); setSizeGuideOpen(true); }}
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel="Size guide"

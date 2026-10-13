@@ -20,6 +20,7 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { Animated as RNAnimated, View, StyleSheet } from 'react-native';
+
 import Animated, {
   Easing,
   useAnimatedProps,
@@ -31,20 +32,27 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Icon } from '@/components/ui/Icon';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, play } from '@/lib/haptics';
+
 
 export interface SuccessCheckProps {
   size?: number;
   iconSize?: number;
-  /** Fires once, when the spring-in starts (haptic is best-effort). */
+  /**
+   * Off by default: the success haptic belongs to the action that succeeded
+   * (lib/haptics.ts HAPTIC_MAP), not to the checkmark appearing. Opt in only
+   * where nothing else plays it. Fires once, when the spring-in starts.
+   */
   haptic?: boolean;
   /** 'filled' (default): accent disc + check. 'draw': white ring + check drawn in. */
   variant?: 'filled' | 'draw';
   testID?: string;
 }
 
-export function SuccessCheck({ size = 76, iconSize = 38, haptic = true, variant = 'filled', testID }: SuccessCheckProps) {
+export function SuccessCheck({ size = 76, iconSize = 38, haptic = false, variant = 'filled', testID }: SuccessCheckProps) {
   if (variant === 'draw') return <DrawnSuccessCheck size={size} haptic={haptic} testID={testID} />;
   return <FilledSuccessCheck size={size} iconSize={iconSize} haptic={haptic} testID={testID} />;
 }
@@ -54,7 +62,7 @@ function FilledSuccessCheck({ size, iconSize, haptic, testID }: { size: number; 
   const scale = useRef(new RNAnimated.Value(0)).current;
 
   useEffect(() => {
-    if (haptic) haptics.success();
+    if (haptic) void play('success');
     RNAnimated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 10 }).start();
     // Only ever plays once per mount — a success moment is shown, then dismissed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,7 +108,7 @@ function DrawnSuccessCheck({ size, haptic, testID }: { size: number; haptic: boo
   const scale = useSharedValue(reduceMotion ? 1 : 0.94);
 
   useEffect(() => {
-    if (haptic) haptics.success();
+    if (haptic) void play('success');
     if (reduceMotion) return;
     ring.value = withTiming(1, { duration: RING_MS, easing: EASE });
     scale.value = withTiming(1, { duration: RING_MS, easing: EASE });

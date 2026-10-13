@@ -7,24 +7,43 @@
  */
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, Pressable, Alert } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFocusEffect, useRouter } from 'expo-router';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT } from '@/lib/theme';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { radius } from '@/constants/radii';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { EmptyState } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Button, ListRow, StickyBottomCTA } from '@/components/ui';
+
 import { getAcceptedFriends, getCloseFriendIds, saveCloseFriendIds } from '@/services/socialService';
+
 import type { Friendship } from '@/services/socialTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { useApi } from '@/lib/api';
+
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 export default function BuyerCloseFriends() {
@@ -83,7 +102,7 @@ export default function BuyerCloseFriends() {
 
   // Key on userId (e.g. "u_maya") so isCloseFriendOf() can match correctly
   function toggle(userId: string) {
-    haptics.selection();
+    haptic('select');
     setCloseFriends(prev => {
       const next = new Set(prev);
       next.has(userId) ? next.delete(userId) : next.add(userId);
@@ -100,7 +119,6 @@ export default function BuyerCloseFriends() {
       await saveCloseFriendIds(all);
       const result = await api.closeFriends.replace(all.filter(id => !id.startsWith('u_')));
       await saveCloseFriendIds([...result.friendIds, ...all.filter(id => id.startsWith('u_'))]);
-      haptics.success();
       goBackOr(router);
     } catch {
       Alert.alert("Couldn't save", 'Your Close Friends list was kept on this device but not saved to your account. Try again.');

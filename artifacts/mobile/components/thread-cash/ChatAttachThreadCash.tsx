@@ -19,22 +19,40 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Pressable, Alert, Animated, Easing, Platform } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { ThreadCashBill, ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from './ThreadCashBill';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { useRouter } from 'expo-router';
+
 import { Button } from '@/components/ui/Button';
+
 import { Sheet } from '@/components/ui/BottomSheet';
+
 import { SuccessCheck } from '@/components/ui/SuccessCheck';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { randomUUID } from 'expo-crypto';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { useApi } from '@/lib/api';
+
 import { formatCents } from '@/lib/money';
+
 import { isPreviewConversationId, isSellerPreviewConversationId } from '@/lib/previewInbox';
+
 import { authenticateForAppLock, getDeviceSecurity } from '@/lib/appLock';
+
 import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
 import { radius } from '@/constants/radii';
 
@@ -180,13 +198,13 @@ export function ThreadCashAttachButton({
   }
 
   function pickChip(dollars: number) {
-    haptics.selection();
+    haptic('select');
     setSelectedChip(dollars);
     setCents(dollars * 100);
   }
 
   function pickCustom() {
-    haptics.selection();
+    haptic('select');
     setSelectedChip('custom');
     setCents(0);
     setStep('keypad');
@@ -261,7 +279,6 @@ export function ThreadCashAttachButton({
       // until the confirmation moment finishes, not skipped: see the
       // 'sent' step effect below.
       const result: SentResult = { transferId, amountCents: cents, note: note.trim() || null };
-      haptics.success();
       setSentResult(result);
       setStep('sent');
     } catch (error: any) {
@@ -551,7 +568,6 @@ export function ThreadCashMessageCard({
     setBusy(true);
     try {
       await Promise.resolve(action());
-      haptics.success();
     } catch (error: any) {
       Alert.alert('Something went wrong', error?.message ?? 'Please try again.');
     } finally {

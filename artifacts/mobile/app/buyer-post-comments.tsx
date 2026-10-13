@@ -22,49 +22,80 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useStableCallback } from '@/hooks/useStableCallback';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, FlatList, TextInput, Modal, Pressable, PanResponder, Platform, StyleSheet, Animated, Easing, Keyboard, useWindowDimensions,
-} from 'react-native';
+
+import { View, Text, FlatList, TextInput, Modal, Pressable, PanResponder, Platform, StyleSheet, Animated, Easing, Keyboard, useWindowDimensions } from 'react-native';
+
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
+
 import Composer from '@/components/ui/Composer';
 import { KeyboardAccessoryBar, keyboardAccessoryID } from '@/components/ui/KeyboardAccessoryBar';
+
 import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/KeyboardProviderCompat';
+
 import { FontAwesome } from '@expo/vector-icons';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useVideoPlayer, VideoView } from 'expo-video';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useRouter, useLocalSearchParams, useFocusEffect, useIsFocused } from 'expo-router';
+
 import { useUser } from '@clerk/expo';
-import {
-  SURFACE, CARD, BORDER,
-  FG, MUTED, SUBTLE, SUBTLE_WASH,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
+
+import { SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, SUBTLE_WASH, FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { SHEET_EASING_BEZIER, SHEET_OPEN_MS, SHEET_CLOSE_MS } from '@/constants/motion';
+
 import { RADII } from '@/constants/radii';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
+
 import { InlineSpinner, InlineError } from '@/components/InlineFeedback';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { Sheet } from '@/components/ui/BottomSheet';
+
 import { MenuBlocks } from '@/components/ui/MenuSheet';
+
 import { useApi } from '@/lib/api';
+
 import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
+
 import { apiErrorCode, apiErrorMessage, reportHref, shortRelativeTime, BLOCK_EXPLAINER } from '@/lib/safety';
+
 import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
+
 import type { ThreadComment } from '@/lib/safetyTypes';
-import { haptics, hapticDestructiveConfirm } from '@/lib/haptics';
+import { haptics, hapticDestructiveConfirm, haptic } from '@/lib/haptics';
+
+
 import { bumpCommentCount } from '@/lib/commentCountBus';
+
 import { buildPreviewComments, previewNotificationComments, PREVIEW_MENTION_PEOPLE } from '@/lib/previewComments';
+
 import { isPreviewDemoMode } from '@/lib/devPreview';
+
 import { MentionText } from '@/components/social/MentionText';
+
 import { MentionSuggestionsBar } from '@/components/MentionPickerSheet';
+
 import { activeMentionQuery, insertMentionHandle, type CommentMentionRef } from '@/lib/commentMentions';
+
 import { getPreviewActivityForComment } from '@/lib/previewActivity';
+
 import { AppleEmoji, QUICK_REACTION_EMOJI } from '@/lib/appleEmoji';
+
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+
 import { TranslationLink, useCaptionTranslation } from '@/components/translation/CaptionTranslation';
+
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 
 const MAX_COMMENT_LENGTH = 1000;
@@ -829,7 +860,7 @@ export default function BuyerPostCommentsScreen() {
   // liked row: CommentRow is memoized and the other rows' props are unchanged.
   const handleLike = useCallback(async (comment: Row) => {
     const liked = !comment.likedByMe;
-    haptics.light();
+    if (liked) haptic('like');
     // Optimistic update
     setCommentsSynced(prev => prev.map(c => c.id === comment.id
       ? { ...c, likedByMe: liked, likesCount: Math.max(0, c.likesCount + (liked ? 1 : -1)) }
@@ -867,7 +898,6 @@ export default function BuyerPostCommentsScreen() {
     try {
       await api.social.block(comment.author.userId);
       setActionsFor(null);
-      haptics.success();
       showToast(`${comment.author.name} is blocked`);
       await load();
     } catch (error) {
@@ -913,7 +943,6 @@ export default function BuyerPostCommentsScreen() {
     }
     try {
       if (pin) await api.comments.pin(postId, comment.id); else await api.comments.unpin(postId, comment.id);
-      haptics.success();
       showToast(pin ? 'Comment pinned' : 'Comment unpinned');
       await load();
     } catch (error) {
@@ -979,7 +1008,7 @@ export default function BuyerPostCommentsScreen() {
       const finalized: Row = { ...optimistic, id: `preview-comment-${postId}-posted-${Date.now()}` };
       setCommentsSynced(prev => prev.map(c => (c.id === optimistic.id ? finalized : c)));
       bumpCommentCount(postId, 1);
-      haptics.success();
+      haptic('postPublished');
       setSending(false);
       return;
     }
@@ -994,7 +1023,7 @@ export default function BuyerPostCommentsScreen() {
       setCommentsSynced(prev => prev.filter(c => c.id !== optimistic.id));
       await load();
       bumpCommentCount(postId, 1);
-      haptics.success();
+      haptic('postPublished');
     } catch (error) {
       // Remove optimistic item, keep the draft for editing, show inline error
       setCommentsSynced(prev => prev.filter(c => c.id !== optimistic.id));
@@ -1006,7 +1035,7 @@ export default function BuyerPostCommentsScreen() {
           ? apiErrorMessage(error, 'This comment can’t be posted.')
           : 'Could not post comment. Tap to retry.',
       );
-      haptics.error();
+      haptic('error');
     } finally {
       setSending(false);
     }
@@ -1343,7 +1372,6 @@ export default function BuyerPostCommentsScreen() {
                 enabled={!isPreviewPost}
                 demoPeople={isPreviewPost && isPreviewDemoMode() ? PREVIEW_MENTION_PEOPLE : undefined}
                 onPick={(person) => {
-                  haptics.selection();
                   setInputText(value => insertMentionHandle(value, person.username ?? person.handle));
                   inputRef.current?.focus();
                 }}

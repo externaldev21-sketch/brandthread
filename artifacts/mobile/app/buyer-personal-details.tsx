@@ -1,22 +1,39 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, type TextInputProps } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
-import { type TextInputProps } from 'react-native';
+
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useRouter } from 'expo-router';
+
 import { useUser } from '@clerk/expo';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useColors } from '@/hooks/useColors';
+
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
+
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Card, ListRow, StickyBottomCTA } from '@/components/ui';
+
 import { haptics } from '@/lib/haptics';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { FONT } from '@/lib/theme';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
 import { getPreviewAccount } from '@/lib/previewAccount';
 
 /** Fields stored in BuyerProfileFields — everything editable is persisted. */

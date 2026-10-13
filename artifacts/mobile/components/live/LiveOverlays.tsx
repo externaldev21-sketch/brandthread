@@ -3,26 +3,41 @@
  * style. Red is used only for the LIVE marker itself.
  */
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import {
-  Animated, Easing, Platform, Pressable, StyleSheet, Text, View,
-} from 'react-native';
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { FontAwesome } from '@expo/vector-icons';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { FONT, FS, RADIUS, ON_DARK_MUTED, FG, TEXT_SECONDARY } from '@/lib/theme';
+
 import { formatCents } from '@/lib/money';
+
 import { TABULAR_NUMS } from '@/constants/typography';
-import { haptics, hapticFollow } from '@/lib/haptics';
+
+import { haptics, hapticFollow, haptic } from '@/lib/haptics';
+
+
 import { LIVE_CHAT_VISIBLE, formatViewerCount } from '@/lib/live/liveOrdering';
+
 import type { LiveChatMessage, LiveHost, LiveProduct, LiveViewerAvatar } from '@/lib/live/types';
 import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
+
 import { a11yHidden } from '@/lib/a11yHidden';
+
 import { minHitSlop } from '@/lib/hitSlop';
+
 import { Glass } from '@/components/ui/Glass';
+
 import Composer from '@/components/ui/Composer';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { LIVE_RED } from './LiveAvatarRing';
+
 import { radius } from '@/constants/radii';
+
 import { crispPx } from '@/lib/crispPixel';
 
 const ND = Platform.OS !== 'web';
@@ -231,7 +246,7 @@ export function LivePinnedProductCard({
         </View>
       </Pressable>
       <Pressable
-        onPress={() => onBuy()}
+        onPress={() => { haptic('sheet'); onBuy(); }}
         style={styles.buyBtn}
         hitSlop={BUY_HIT_SLOP}
         accessibilityRole="button"
@@ -276,7 +291,7 @@ export function LiveRail({
   const likeRef = useRef<View>(null);
   const pop = useRef(new Animated.Value(1)).current;
   const handleLike = () => {
-    haptics.light();
+    haptic('like');
     pop.setValue(0.75);
     Animated.timing(pop, { toValue: 1, duration: 160, easing: Easing.out(Easing.cubic), useNativeDriver: ND }).start();
     likeRef.current?.measureInWindow?.((x, y, w) => onLike({ x: x + w / 2, y }));

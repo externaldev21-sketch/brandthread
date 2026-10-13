@@ -1,43 +1,63 @@
-import { haptics } from '@/lib/haptics';
+import { haptics, hapticLight, hapticSuccess, hapticSuccessAction, haptic } from '@/lib/haptics';
+
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { usePersistedChoice } from '@/hooks/usePersistedChoice';
-import {
-  View, Text, FlatList, Alert, StyleSheet, useWindowDimensions, Dimensions,
-  Modal, TextInput, Animated, Pressable, Platform,
-} from 'react-native';
+
+import { View, Text, FlatList, Alert, StyleSheet, useWindowDimensions, Dimensions, Modal, TextInput, Animated, Pressable, Platform } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFocusEffect, useRouter } from 'expo-router';
+
 import { prefetchProductOnPressIn } from '@/lib/detailPrefetch';
-import {
-  OVERLAY,
-  FONT, ICON, SHADOW_SM,
-} from '@/lib/theme';
+
+import { OVERLAY, FONT, ICON, SHADOW_SM } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useColors } from '@/hooks/useColors';
-import {
-  getSavedItems, removeSavedItem, subscribeSocial,
-  getCollections, createCollection, setSavedItemAlerts,
-} from '@/services/socialService';
+
+import { getSavedItems, removeSavedItem, subscribeSocial, getCollections, createCollection, setSavedItemAlerts } from '@/services/socialService';
+
 import { SavedItem, SavedCollection } from '@/services/socialTypes';
+
 import { getBuyerProduct, addToCart, createBuyNowSession, getCart } from '@/services/cartService';
+
 import { reportNetworkError } from '@/lib/networkNotice';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { GridSkeleton } from '@/components/layout/Skeleton';
+
 import { EmptyState } from '@/components/BrandthreadUI';
+
 import { SaveToCollectionSheet, SaveToCollectionItem } from '@/components/SaveToCollectionSheet';
+
 import { formatCents } from '@/lib/money';
+
 import { BrandLink } from '@/components/products/BrandLink';
+
 import { Card, IconButton, Button, ListRow, SegmentedControl, BottomSheet, Sheet, ThemedRefreshControl } from '@/components/ui';
+
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
+
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
-import { hapticLight, hapticSuccess, hapticSuccessAction } from '@/lib/haptics';
+
+
 import { isBuyerDevPreview } from '@/lib/devPreview';
+
 
 const GAP = SPACING.xs;
 
@@ -198,7 +218,7 @@ export default function BuyerSaved() {
       }
       const result = await addToCart({ product, variant, quantity: 1 });
       if (result.success) {
-        haptics.light();
+        haptic('addToBag');
         setActionsFor(null);
       } else {
         Alert.alert('Cannot Add to Cart', result.message ?? 'Please try again.');

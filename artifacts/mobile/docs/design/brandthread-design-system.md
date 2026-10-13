@@ -76,12 +76,17 @@ The app's line-icon set is a custom SVG family (`components/buyer-nav/BuyerNavIc
 
 ### Haptics — `lib/haptics.ts`
 
-Semantic wrappers over `expo-haptics` (already a dependency):
+One service. Call `haptic('<event>')` (or `haptics.<event>()`); the map is `HAPTIC_MAP`:
 
-- `hapticPrimaryAction` (light) — primary action taps.
-- `hapticToggle` (selection) — toggles, pills, segmented controls, scrubbing.
-- `hapticSuccessAction` (success) — add-to-bag, follow, order-placed.
-- `hapticDestructiveConfirm` (warning) — destructive-confirm actions.
+| Event | Haptic |
+|---|---|
+| follow (`hapticFollow`), like, save, addToBag | light impact |
+| tabChange, select (chips, pickers, segmented controls) | selection tick |
+| sheet, refresh, longPress | soft impact |
+| purchaseSuccess, postPublished, productListed, orderShipped, newOrder | success |
+| error (card declined, failed upload) | error |
+
+Never on scrolling, typing, plain taps or navigation. Max one haptic per user action (enforced in `play()`). Everything respects Settings › Sounds & haptics, including raw `expo-haptics` imports (routed through `shims/expo-haptics.ts`).
 
 ---
 

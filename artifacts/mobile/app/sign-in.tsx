@@ -11,44 +11,59 @@
  * with its own custom email-code-based reset, not part of this flow.
  */
 import { track } from '@/lib/analytics';
+
 import React, { useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  Alert, View, Text, TextInput, StyleSheet, Platform, ActivityIndicator,
-  ScrollView, StatusBar,
-} from 'react-native';
+
+import { Alert, View, Text, TextInput, StyleSheet, Platform, ActivityIndicator, ScrollView, StatusBar } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import GoogleGlyph from '@/components/branding/GoogleGlyph';
 import { useSignIn, useSSO, useAuth, useUser, useClerk } from '@clerk/expo';
+
 import { wasPreviousSessionDropped, MULTI_SESSION_OFF_MESSAGE } from '@/lib/multiSessionMode';
+
 import { detectIdentifierKind, normalizePhoneNumber, isPhoneStrategyUnsupportedError } from '@/lib/signInIdentifier';
+
 import { OtpCodeInput } from '@/components/auth/OtpCodeInput';
+
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { Ionicons } from '@expo/vector-icons';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+
 import { Button } from '@/components/ui/Button';
+
 import { safeReturnTo } from '@/lib/guestRoutes';
+
 import { IconButton } from '@/components/ui/IconButton';
+
 import { Avatar } from '@/components/ui/Avatar';
+
 import { PressableScale } from '@/components/BrandthreadUI';
+
 import { FONT } from '@/lib/theme';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
-import {
-  APPLE_OAUTH_STRATEGY,
-  oauthProviderVisibility,
-  isOAuthCancellationError,
-  makeBrandthreadRedirectUri,
-  mapOAuthError,
-} from '@/lib/oauthFlow';
+
+import { APPLE_OAUTH_STRATEGY, oauthProviderVisibility, isOAuthCancellationError, makeBrandthreadRedirectUri, mapOAuthError } from '@/lib/oauthFlow';
 
 WebBrowser.maybeCompleteAuthSession();
 

@@ -16,48 +16,77 @@
  * the real /api/live backend otherwise.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  AccessibilityInfo, ActivityIndicator, Animated, FlatList, Platform,
-  Pressable, Share, StyleSheet, Text, View, type GestureResponderEvent, type ViewToken,
-} from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Animated, FlatList, Platform, Pressable, Share, StyleSheet, Text, View, type GestureResponderEvent, type ViewToken } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ExpoLinking from 'expo-linking';
 import { buildLiveUrl } from '@/lib/shareLinks';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
+
 import { Snackbar } from '@/components/ui/Snackbar';
+
 import { FONT, FS, FG, TEXT_SECONDARY } from '@/lib/theme';
+
 import { formatCents } from '@/lib/money';
+
+import { haptic } from '@/lib/haptics';
+
 import { profileHref } from '@/lib/profileNavigation';
+
 import { useApi } from '@/lib/api';
+
 import { confirmBlock, reportHref } from '@/lib/safety';
+
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
+
 import { getLiveStreamProvider } from '@/lib/live/liveProvider';
+
 import { useLivePager, LIVE_END_ANIMATION_MS, type LiveRuntime } from '@/lib/live/useLivePager';
+
 import { liveShopSelection } from '@/lib/live/liveShop';
+
 import { fetchLiveCodes, describeLiveCode, type LiveCode } from '@/lib/live/liveCommerce';
+
 import { clearLiveCheckoutContext, getLiveCheckoutContext, setLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
+
 import type { LiveStream } from '@/lib/live/types';
-import {
-  LiveChatList, LiveCommentBar, LiveHeartLayer, LiveHostPill, LivePinnedProductCard, LiveRail,
-  LiveViewerStack, type LiveHeartLayerHandle,
-} from '@/components/live/LiveOverlays';
+import { LiveChatList, LiveCommentBar, LiveHeartLayer, LiveHostPill, LivePinnedProductCard, LiveRail, LiveViewerStack, type LiveHeartLayerHandle } from '@/components/live/LiveOverlays';
+
 import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
+
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+
 import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
+
 import { LiveStreamOptionsSheet } from '@/components/live/LiveStreamOptionsSheet';
+
 import { LiveEmptyState } from '@/components/live/LiveEmptyState';
+
 import { VideoVisual } from './(tabs)/feed';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { a11yHidden } from '@/lib/a11yHidden';
+
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+
 import { LIVE_VIEWER_GESTURE } from '@/lib/firstRunTips/content';
+
 import { radius } from '@/constants/radii';
+
 import { formatMoney } from '@/lib/format';
 
 /** Same preference key as the Threads feed, so sound on/off carries over. */
@@ -330,6 +359,7 @@ export default function LiveScreen() {
   }, []);
 
   const gift = useCallback((stream: LiveStream) => {
+    haptic('sheet');
     setGiftFor(stream);
   }, []);
 
@@ -340,6 +370,7 @@ export default function LiveScreen() {
   // is exactly why buyer-live.tsx's equivalent menu silently does nothing in
   // the web preview — a real Modal-based sheet instead.
   const openStreamOptions = useCallback((stream: LiveStream) => {
+    haptic('sheet');
     setOptionsFor(stream);
   }, []);
 

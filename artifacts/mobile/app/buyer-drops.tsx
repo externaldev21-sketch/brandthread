@@ -1,22 +1,37 @@
 import { radius as ControlRadius } from '@/constants/radii';
+
 /**
  * Drops browse screen — Live now / Upcoming / Recently dropped tabs.
  * Backed by api.publicDrops.list('live' | 'upcoming' | 'recent').
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { useApi } from '@/lib/api';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { ListSkeleton } from '@/components/layout';
+
 import { EmptyState } from '@/components/BrandthreadUI';
+
 import { SectionError } from '@/components/InlineFeedback';
+
 import { LivePulseDot, UpcomingCountdown } from '@/components/CommerceSignal';
+
 import { DropsCalendar } from '@/components/drops/DropsCalendar';
+
 import { BORDER, FONT, FS, MUTED, RADIUS, SP } from '@/lib/theme';
 
 type DropsTab = 'live' | 'upcoming' | 'recent';
@@ -130,6 +145,7 @@ export default function BuyerDrops() {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
+    haptic('refresh');
     fetchTab(tab).finally(() => setRefreshing(false));
   }, [fetchTab, tab]);
 
@@ -147,7 +163,7 @@ export default function BuyerDrops() {
           <TouchableOpacity
             key={t.key}
             style={styles.tabItem}
-            onPress={() => { haptics.selection(); setTab(t.key); }}
+            onPress={() => { haptic('select'); setTab(t.key); }}
             accessibilityRole="tab"
             accessibilityState={{ selected: tab === t.key }}
           >
@@ -188,7 +204,7 @@ export default function BuyerDrops() {
                 {(['list', 'calendar'] as const).map(v => (
                   <TouchableOpacity
                     key={v}
-                    onPress={() => { haptics.selection(); setUpcomingView(v); }}
+                    onPress={() => { haptic('select'); setUpcomingView(v); }}
                     accessibilityRole="button"
                     accessibilityState={{ selected: upcomingView === v }}
                     style={[styles.viewPill, { backgroundColor: upcomingView === v ? theme.text : 'transparent', borderColor: theme.border }]}

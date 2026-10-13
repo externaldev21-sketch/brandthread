@@ -1,69 +1,98 @@
 import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
-import { hapticSuccessAction } from '@/lib/haptics';
-import { trackStoryView } from '@/services/socialService';
+
+import { hapticSuccessAction, haptics, haptic } from '@/lib/haptics';
+
+import { trackStoryView, getStories, subscribeSocial, muteUser, MY_USER_ID, MY_NAME, MY_HANDLE, MY_INITIALS, MY_COLOR } from '@/services/socialService';
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { relativeTime } from '@/lib/activity';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, Pressable, Animated, Easing,
-  PanResponder, StyleSheet, Alert, Modal, FlatList,
-  Linking, Platform, Share, useWindowDimensions,
-} from 'react-native';
+
+import { View, Text, Pressable, Animated, Easing, PanResponder, StyleSheet, Alert, Modal, FlatList, Linking, Platform, Share, useWindowDimensions } from 'react-native';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { prefetchImage } from '@/lib/prefetch';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { StatusBar } from 'expo-status-bar';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { FontAwesome } from '@expo/vector-icons';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useIsFocused } from 'expo-router';
+
+import { useRouter, useLocalSearchParams, useIsFocused } from 'expo-router';
+
+
 import { useAppActive } from '@/hooks/useAppActive';
+
 import { useVideoPlayer, VideoView } from 'expo-video';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import Composer from '@/components/ui/Composer';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER,
-  FG, MUTED, SUBTLE, ON_DARK,
-  FONT, FS, SP, RADIUS, ICON, TEXT_TERTIARY,
-} from '@/lib/theme';
+
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RADIUS, ICON, TEXT_TERTIARY } from '@/lib/theme';
+
 import { RADII, radius } from '@/constants/radii';
+
 import { AppleEmoji } from '@/components/ui/AppleEmoji';
-import { haptics } from '@/lib/haptics';
+
+
+
 import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
+
 import { PressableScale } from '@/components/BrandthreadUI';
+
 import { IconButton } from '@/components/ui';
+
 import { ModalSafeArea } from '@/components/ModalSafeArea';
-import {
-  getStories, subscribeSocial, muteUser,
-  MY_USER_ID, MY_NAME, MY_HANDLE, MY_INITIALS, MY_COLOR,
-} from '@/services/socialService';
-import {
-  isPreviewInboxEnabled, getOrCreatePreviewConversationForAuthor, appendPreviewMessage, touchPreviewConversation,
-} from '@/lib/previewInbox';
+
+
+import { isPreviewInboxEnabled, getOrCreatePreviewConversationForAuthor, appendPreviewMessage, touchPreviewConversation } from '@/lib/previewInbox';
+
 import { getPreviewActivityStory } from '@/lib/previewActivity';
+
 import { isPreviewDemoMode } from '@/lib/devPreview';
+
 import { PREVIEW_HIGHLIGHT_ID, previewHighlightStories } from '@/lib/previewHighlights';
+
 import { ViewerStickerLayer } from '@/components/social/StoryStickers';
+
 import { StoryQuestionResponsesSheet, type QuestionResponses } from '@/components/social/StoryQuestionResponsesSheet';
+
 import { isPreviewStickerStory, previewStickerStory, PREVIEW_STICKER_ANSWERS } from '@/lib/previewStickers';
+
 import { useAuth } from '@clerk/expo';
-import { confirmBlock, reportHref } from '@/lib/safety';
+
+import { confirmBlock, reportHref, apiErrorMessage } from '@/lib/safety';
+
 import type { Story, StoryMedia, MessageAttachment } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+
 import StoryGestureGuide from '@/components/social/StoryGestureGuide';
 import { shouldShowStoryGestureGuide } from '@/lib/storyGestureGuideStorage';
-import {
-  ViewerMentionStickers, ViewerReshareCard, MentionPopover, TaggedPeopleSheet, type MentionTap,
-} from '@/components/StoryMentionViewerParts';
+
+import { ViewerMentionStickers, ViewerReshareCard, MentionPopover, TaggedPeopleSheet, type MentionTap } from '@/components/StoryMentionViewerParts';
+
 import { taggedPeople, mentionProfileHref, type TaggedPerson } from '@/lib/storyMentionSticker';
+
 import { reshareGradientFromBackground } from '@/lib/storyReshare';
+
 import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, prevUser as navPrevUser, classifyGesture } from '@/lib/storyViewerNav';
-import { apiErrorMessage } from '@/lib/safety';
+
+
 import { crispPx } from '@/lib/crispPixel';
+
 import { fmtRelativeDay } from '@/lib/format';
 
 // Mirrors Instagram's own quick-reaction row (Mobbin: Instagram iOS story
@@ -365,7 +394,7 @@ export default function BuyerStoryViewer() {
         await api.social.replyToStory(currentStory.id, { text, slideUri: currentSlide?.imageUri });
       }
       if (!override) setInputText('');
-      hapticSuccessAction();
+      
     } catch (error) {
       // e.g. "Replies are turned off for this story." from the server.
       Alert.alert('Couldn’t send reply', apiErrorMessage(error, 'Try again.'));
@@ -375,7 +404,6 @@ export default function BuyerStoryViewer() {
   };
 
   const sendQuickReaction = (emoji: string) => {
-    haptics.light();
     void handleSendReply(emoji);
   };
 
@@ -534,7 +562,6 @@ export default function BuyerStoryViewer() {
   // ── Interactive sticker actions ──────────────────────────────────────────
   const stickerActions = {
     vote: async (sid: string, overlayId: string, optionIndex: number) => {
-      haptics.selection();
       try {
         return (await api.social.pollVote(sid, overlayId, optionIndex)).stickerState;
       } catch (err) {
@@ -554,7 +581,7 @@ export default function BuyerStoryViewer() {
         throw err;
       }
     },
-    notify: async (dropId: string) => { haptics.light(); await api.publicDrops.subscribe(dropId); },
+    notify: async (dropId: string) => {  await api.publicDrops.subscribe(dropId); },
     openProduct: (productId: string, name: string) => {
       router.push(`/thread-product-detail?productId=${encodeURIComponent(productId)}&productName=${encodeURIComponent(name)}` as never);
     },
@@ -562,6 +589,7 @@ export default function BuyerStoryViewer() {
       router.push(`/buyer-drop-detail?dropId=${encodeURIComponent(dropId)}&dropName=${encodeURIComponent(name)}` as never);
     },
     openResponses: async (sid: string) => {
+      haptic('sheet');
       setResponsesOpen(true);
       if (isPreviewStickerStory(sid)) {
         setResponses({ questions: [{ overlayId: 'question', prompt: 'What should we drop next?', answers: PREVIEW_STICKER_ANSWERS }] });
@@ -721,7 +749,7 @@ export default function BuyerStoryViewer() {
       {/* MENTIONS + RESHARE CARD — above the tap zones so a tagged sticker (or the
           44pt square around a tiny/invisible one) and the reshare credit are tappable. */}
       <View style={[StyleSheet.absoluteFill, { zIndex: 6 }]} pointerEvents="box-none">
-        <ViewerMentionStickers overlays={currentSlide.overlays ?? []} onTap={(t) => setMentionTap(t)} />
+        <ViewerMentionStickers overlays={currentSlide.overlays ?? []} onTap={(t) => { haptic('sheet'); setMentionTap(t); }} />
         {/* Interactive stickers: poll, question, product link, drop countdown. */}
         <ViewerStickerLayer
           key={currentStory.id}
@@ -804,6 +832,7 @@ export default function BuyerStoryViewer() {
           <Pressable
             style={({ pressed }) => [styles.productTag, { opacity: pressed ? 0.8 : 1 }]}
             onPress={() => {
+              haptic('sheet');
               Alert.alert(currentSlide.productTagName ?? 'Product', undefined, [
                 {
                   text: 'Shop',
@@ -886,7 +915,7 @@ export default function BuyerStoryViewer() {
       {slidePeople.length > 0 && !replyFocused ? (
         <Pressable
           style={[styles.taggedChip, { bottom: insets.bottom + SP.md + 44 + SP.md + SP.sm }]}
-          onPress={() => setTaggedSheetOpen(true)}
+          onPress={() => { haptic('sheet'); setTaggedSheetOpen(true); }}
           accessibilityRole="button"
           accessibilityLabel={`Tagged people, ${slidePeople.length}`}
           testID="story-tagged-chip"
@@ -906,7 +935,7 @@ export default function BuyerStoryViewer() {
           <View style={styles.ownStoryBar}>
             <PressableScale
               style={styles.seenByRow}
-              onPress={() => openViewersModal()}
+              onPress={() => { haptic('sheet'); openViewersModal(); }}
               accessibilityRole="button"
               accessibilityLabel={`Seen by ${seenByCount}`}
             >
@@ -944,6 +973,7 @@ export default function BuyerStoryViewer() {
             </PressableScale>
             <PressableScale
               onPress={() => {
+                haptic('sheet');
                 setIsPaused(true);
                 Alert.alert('Your story', undefined, [
                   ...(slidePeople.length > 0 ? [{
@@ -962,7 +992,6 @@ export default function BuyerStoryViewer() {
                         const perm = await MediaLibrary.requestPermissionsAsync();
                         if (!perm.granted || !currentSlide?.imageUri) throw new Error('permission');
                         await MediaLibrary.createAssetAsync(currentSlide.imageUri);
-                        haptics.success();
                       } catch {
                         Alert.alert('Couldn’t save', 'Check your photo library permission and try again.');
                       } finally {
@@ -1042,7 +1071,7 @@ export default function BuyerStoryViewer() {
               rightAccessory={(
                 <>
                   <PressableScale
-                    onPress={() => { haptics.light(); handleLike(); }}
+                    onPress={() => { haptic('like'); handleLike(); }}
                     style={styles.likeBtn}
                     accessibilityRole="button"
                     accessibilityLabel={likedSet.has(currentStory.id) ? 'Unlike this story' : 'Like this story'}

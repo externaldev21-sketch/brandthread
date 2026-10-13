@@ -8,27 +8,30 @@
  * - Sellers are never sent here; only buyer flow routes here.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  Animated,
-  Platform,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Animated, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { useRouter } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Icon } from '@/components/ui/Icon';
+
+import { Feather } from '@expo/vector-icons';
+
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { ONBOARDING_OWNER_KEY } from './_layout';
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 const EXPLAINER_SEEN_PREFIX = 'thread_explainer_seen:';

@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
-import { MEDIA } from '@/lib/theme';
+import { MEDIA, FONT, FS, SP, RADIUS, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
+
 /**
  * Delete account (App Store guideline 5.1.1(v)) — fully in-app for buyer and
  * seller accounts.
@@ -17,35 +18,56 @@ import { MEDIA } from '@/lib/theme';
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, TextInput, StyleSheet, ActivityIndicator, Platform, Linking,
-} from 'react-native';
+
+import { View, Text, ScrollView, TextInput, StyleSheet, ActivityIndicator, Platform, Linking } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { Ionicons } from '@expo/vector-icons';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { useFocusEffect, useRouter } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
-import { haptics } from '@/lib/haptics';
-import { FONT, FS, SP, RADIUS, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
+
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { useApi } from '@/lib/api';
+
 import { clearAccountLifecycleState } from '@/lib/accountService';
+
 import { PressableScale, PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
 import { apiErrorCode, apiErrorDetails, apiErrorMessage } from '@/lib/safety';
+
 import type { AccountDeletionCheck, DeletionBlocker } from '@/lib/safetyTypes';
 import { radius } from '@/constants/radii';
+
 import * as AppleAuthentication from 'expo-apple-authentication';
-import {
-  DELETE_ACCOUNT_REAUTH_ROUTE, deletionReauthPlan, deletionReauthSatisfied,
-} from '@/lib/deletionReauth';
+import { DELETE_ACCOUNT_REAUTH_ROUTE, deletionReauthPlan, deletionReauthSatisfied } from '@/lib/deletionReauth';
+
 import { storeSubscriptionsUrl } from '@/lib/currentPlan';
+
 import { isOAuthCancellationError } from '@/lib/oauthFlow';
+
 import { ListRow } from '@/components/ui';
+
 import { useLinkedProfiles } from '@/hooks/useLinkedProfiles';
+
 import { crispPx } from '@/lib/crispPixel';
 
 type Step = 'overview' | 'confirm' | 'done';
@@ -176,7 +198,7 @@ export default function DeleteAccountScreen() {
       const result = scope === 'login' && hasOther
         ? await api.accounts.deleteLogin(reauth)
         : await api.auth.deleteAccount(reauth);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
       setScheduledFor(result.scheduledFor);
       setStep('done');
       if (!keepsOther) {
@@ -185,7 +207,7 @@ export default function DeleteAccountScreen() {
         signOut().catch(() => {});
       }
     } catch (err) {
-      haptics.error();
+      haptic('error');
       if (apiErrorCode(err) === 'DELETION_BLOCKED') {
         const details = apiErrorDetails<{ blockers?: DeletionBlocker[] }>(err);
         setCheck((prev) => prev ? { ...prev, canDelete: false, blockers: details?.blockers ?? prev.blockers } : prev);
@@ -511,7 +533,7 @@ export default function DeleteAccountScreen() {
             )}
 
             <PressableScale
-              onPress={() => { haptics.selection(); setAcknowledged((v) => !v); }}
+              onPress={() => {  setAcknowledged((v) => !v); }}
               style={s.ackRow}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: acknowledged }}

@@ -10,19 +10,33 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useScreenPadding } from '@/components/layout/Screen';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { EmptyState } from '@/components/BrandthreadUI';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { showActionSheet } from '@/components/ui/ActionSheet';
+
 import { Snackbar } from '@/components/ui/Snackbar';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useApi, type LiveReplay } from '@/lib/api';
+
 import { formatReplayDuration } from '@/lib/liveReplayFormat';
+
 import { FONT, FS, SP } from '@/lib/theme';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
 
 const COLUMNS = 3;
 const GAP = 2;
@@ -80,6 +94,7 @@ export default function LiveReplaysScreen() {
   }, [api]);
 
   const openManage = useCallback((replay: LiveReplay) => {
+    haptic('sheet');
     const hidden = replay.visibility === 'hidden';
     showActionSheet(replay.title, undefined, [
       {

@@ -1,38 +1,66 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, Alert, ActivityIndicator, Animated,
-} from 'react-native';
+
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, TextInput, Alert, ActivityIndicator, Animated } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { HapticSwitch } from '@/components/BrandthreadUI';
+
 import { Avatar } from '@/components/ui/Avatar';
+
 import { OptionSheet } from '@/components/ui/OptionSheet';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useNavigation, useRouter } from 'expo-router';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { useAuth } from '@clerk/expo';
+
 import { loadStyleBadge, saveStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeState } from '@/lib/styleBadge';
-import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
+
+import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields, profileExtrasFromSettings, profileExtrasToSettings } from '@/lib/buyerProfile';
+
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
+
 import { useApi } from '@/lib/api';
+
 import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
+
 import { useImageSourceSheet, AVATAR_VIDEO_MAX_SECONDS } from '@/components/profile/ImageSourceSheet';
+
 import { useScrollReset } from '@/hooks/useScrollReset';
+
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { SP, FONT, TEXT_DISABLED } from '@/lib/theme';
+
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
+
 import { isBuyerDevPreview } from '@/lib/devPreview';
+
 import { canSyncAccountServer, fetchAccountSettings, patchAccountSettings, withTimeout } from '@/lib/accountSettings';
-import { profileExtrasFromSettings, profileExtrasToSettings } from '@/lib/buyerProfile';
+
+
 import { CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia } from '@/components/profile/ProfileCover';
+
 import { COVER_MAX_SECONDS } from '@/components/profile/profileCoverRules';
+
 import { crispPx } from '@/lib/crispPixel';
+
 import { EditProfileBanner, useProfileBanner } from '@/components/profile/ProfileBannerEditor';
+
 import { resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
+
 import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 
 const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Prefer not to say', 'Custom'] as const;
@@ -241,11 +269,11 @@ export default function BuyerEditProfileScreen() {
       setAvatarUri(finalUri);
       setLoadedProfile(prev => ({ ...prev, avatarUri: finalUri, avatarVideoUri: '' }));
       await saveBuyerProfile({ ...loadedProfile, avatarUri: finalUri, avatarVideoUri: '' });
-      haptics.success();
       showToast('Photo updated');
     } catch {
       setAvatarUri(previousUri);
       setAvatarVideoUri(previousVideoUri);
+      haptic('error');
       setAvatarError('Could not upload photo. Check your connection and try again.');
     } finally {
       setAvatarUploading(false);
@@ -296,11 +324,11 @@ export default function BuyerEditProfileScreen() {
       setAvatarVideoUri(finalVideoUri);
       setLoadedProfile(prev => ({ ...prev, avatarUri: finalPosterUri, avatarVideoUri: finalVideoUri }));
       await saveBuyerProfile({ ...loadedProfile, avatarUri: finalPosterUri, avatarVideoUri: finalVideoUri });
-      haptics.success();
       showToast('Profile video updated');
     } catch {
       setAvatarUri(previousUri);
       setAvatarVideoUri(previousVideoUri);
+      haptic('error');
       setAvatarError('Could not upload video. Check your connection and try again.');
     } finally {
       setAvatarUploading(false);
@@ -393,14 +421,14 @@ export default function BuyerEditProfileScreen() {
   async function handleSave() {
     if (saving || avatarUploading) return;
     if (!validate()) {
-      haptics.warning();
+      haptic('error');
       return;
     }
     const rawUsername = fields.username.trim().toLowerCase();
     if (rawUsername !== initial.username.trim().toLowerCase()) {
       const available = await checkUsernameAvailability(rawUsername);
       if (!available) {
-        haptics.warning();
+        haptic('error');
         return;
       }
     }
@@ -457,7 +485,6 @@ export default function BuyerEditProfileScreen() {
           : patchAccountSettings(profileExtrasToSettings(cleanedFields)).catch(() => {}),
       ]);
 
-      haptics.success();
       setInitial(fields);
       setLoadedProfile(cleanedFields);
       showToast('Profile updated');
@@ -665,7 +692,7 @@ export default function BuyerEditProfileScreen() {
             <TouchableOpacity
               style={styles.row}
               activeOpacity={0.7}
-              onPress={() => { setGenderPickerOpen(true); }}
+              onPress={() => { haptic('sheet'); setGenderPickerOpen(true); }}
             >
               <Text style={[styles.rowLabel, { color: theme.text, flex: 1 }]} numberOfLines={1}>Gender</Text>
               <Text style={[styles.chevronLabel, { color: theme.muted }]}>{extra.gender || 'Add'}</Text>

@@ -19,15 +19,25 @@ import * as Haptics from 'expo-haptics';
  */
 import React from 'react';
 import { Animated, LayoutChangeEvent, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
+
 import { Feather } from '@expo/vector-icons';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { FONT, FS, ON_DARK } from '@/lib/theme';
+
 import { RADII } from '@/constants/radii';
+
 import { TranslationLink, useCaptionTranslation } from '@/components/translation/CaptionTranslation';
+
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
+
 import { CaptionSpans } from '@/components/social/CaptionText';
+
 import { crispPx } from '@/lib/crispPixel';
+
 import { SoundMarquee } from '@/components/buyer-feed/SoundMarquee';
 
 export interface RepostFriend {
@@ -160,7 +170,7 @@ export function CaptionBlock({
         style={creatorHit.boostStyle}
         onLayout={creatorHit.onLayout}
         activeOpacity={0.8}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onOpenCreator(); }}
+        onPress={() => {  onOpenCreator(); }}
         onPressIn={onPressInCreator}
         accessibilityRole="button"
         accessibilityLabel={`View ${creator}'s profile`}

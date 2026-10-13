@@ -1,4 +1,5 @@
 import { CachedImage as Image } from '@/components/CachedImage';
+
 import * as Haptics from 'expo-haptics';
 /**
  * Buyer Threads Home feed — right action rail.
@@ -18,18 +19,34 @@ import * as Haptics from 'expo-haptics';
  * EngagementButton-driven icon here (like/repost/save/follow).
  */
 import React from 'react';
-import { Animated, Text, TouchableOpacity, View, StyleSheet, Platform, type StyleProp, type ViewStyle } from 'react-native';
-import { FontAwesome } from '@expo/vector-icons';
+import { Animated, Text, TouchableOpacity, View, StyleSheet, Platform, type StyleProp, type ViewStyle, Image } from 'react-native';
+
+import { FontAwesome, Feather } from '@expo/vector-icons';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { EngagementButton } from '@/components/EngagementButton';
+
 import { formatCount } from '@/lib/engagementUtils';
-import { haptics, hapticFollow } from '@/lib/haptics';
-import { FONT, FS, ON_DARK } from '@/lib/theme';
+
+import { haptics, hapticFollow, haptic } from '@/lib/haptics';
+
+import { FONT, FS, ON_DARK, GOLD } from '@/lib/theme';
+
+
+
+
+
 import { TABULAR_NUMS } from '@/constants/typography';
+
 import { RADII } from '@/constants/radii';
+
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
+
 import { useLiveStreamForHost } from '@/lib/live/useLiveDirectory';
+
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
+
 import { crispPx } from '@/lib/crispPixel';
 
 export interface RailEngagement {
@@ -148,7 +165,7 @@ export function RightActionRail({
           style={avatarHit.boostStyle}
           onLayout={avatarHit.onLayout}
           activeOpacity={0.8}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onOpenCreator(); }}
+          onPress={() => {  onOpenCreator(); }}
           onPressIn={onPressInCreator}
           accessibilityRole="button"
           accessibilityLabel={`View ${creator}'s profile`}
@@ -238,12 +255,12 @@ export function RightActionRail({
           accessibilityState={{ checked: engagement?.liked ?? false }}
           scaleAnim={heartScale}
           style={styles.actionContent}
-          // "Light" tier per the haptics tokens in lib/haptics.ts — unchanged
-          // from earlier polish rounds. Fires synchronously here, in the
+          // HAPTIC_MAP.like in lib/haptics.ts (only when liking, not unliking).
+          // Fires synchronously here, in the
           // same tick EngagementButton's tapSpring kicks off (both happen
           // before `onLike` is awaited), so the haptic and the icon's
           // squash-overshoot-settle spring read as one moment.
-          onPress={async () => { haptics.light(); await onLike(); }}
+          onPress={async () => { haptic('like'); await onLike(); }}
           tapSpring
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           testID={`like-btn-${testIdBase}`}
@@ -275,7 +292,7 @@ export function RightActionRail({
         accessibilityState={{ checked: engagement?.reposted ?? false }}
         style={styles.actionContent}
         scaleAnim={repostScale}
-        onPress={async () => { haptics.light(); await onRepost(); }}
+        onPress={async () => {  await onRepost(); }}
         hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
         testID={`repost-btn-${testIdBase}`}
       />
@@ -295,7 +312,7 @@ export function RightActionRail({
         accessibilityState={{ checked: engagement?.saved ?? false }}
         style={styles.actionContent}
         scaleAnim={saveScale}
-        onPress={async () => { haptics.light(); await onSave(); }}
+        onPress={async () => { haptic('save'); await onSave(); }}
         hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
         testID={`save-btn-${testIdBase}`}
       />

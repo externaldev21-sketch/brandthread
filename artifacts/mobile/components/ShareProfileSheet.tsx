@@ -1,4 +1,5 @@
-import { radius as ControlRadius } from '@/constants/radii';
+import { radius as ControlRadius, radius } from '@/constants/radii';
+
 /**
  * Share Profile — full-screen page opened from the "Share profile" action on
  * both the buyer and seller profile screens (same component, same props,
@@ -30,28 +31,43 @@ import { radius as ControlRadius } from '@/constants/radii';
  * as the Mobbin reference's COLOR vs. EMOJI screenshots.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions,
-} from 'react-native';
+import { Animated, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { Image } from 'expo-image';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { useRouter } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
 
 import { FONT, FS, SP, RADIUS, ICON, SUCCESS, RED } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useApi } from '@/lib/api';
+
 import { PressableScale } from '@/components/BrandthreadUI';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { buildCanonicalProfileUrl, normalizeUsername, shareLinkWithFallback } from '@/lib/shareProfile';
+
 import { captureCardAtNaturalSize, saveCardImageToLibrary, triggerWebImageDownload } from '@/lib/shareCard';
+
 import { LOGO_SOURCE } from '@/constants/branding';
+
 import { ShareProfileQrScanner } from '@/components/ShareProfileQrScanner';
-import { radius } from '@/constants/radii';
+
 
 // Lazy: keeps react-native-svg's QR codegen out of every screen that merely
 // imports ShareProfileSheet (mirrors the pattern in ShareCardFrame.tsx).
@@ -192,7 +208,7 @@ export function ShareProfileSheet({
 
   const handleSelectVariant = useCallback((next: BackgroundVariant) => {
     if (variant === next) return;
-    haptics.selection();
+    haptic('select');
     setVariant(next);
   }, [variant]);
 

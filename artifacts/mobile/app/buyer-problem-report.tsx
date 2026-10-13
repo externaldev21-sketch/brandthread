@@ -4,34 +4,46 @@
  */
 import React, { useState, useEffect } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
-  ActivityIndicator, Alert, Platform } from 'react-native';
+
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
+
 import { CachedImage as Image } from '@/components/CachedImage';
+
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { LinearGradient } from 'expo-linear-gradient';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
 import { createProblemReport } from '@/services/cartService';
+
 import { PROBLEM_TYPE_OPTIONS, BuyerProblemType } from '@/services/cartTypes';
+
 import { getBuyerOrder } from '@/services/orderService';
+
 import { BuyerOrderView } from '@/services/orderTypes';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER,
-  FG, MUTED, SUBTLE,
-  SUCCESS, ON_DARK,
-  RED, RED_DIM,
-  FONT, FS, SP, RADIUS, COMP,
-} from '@/lib/theme';
+
+import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, SUCCESS, ON_DARK, RED, RED_DIM, FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { HapticSwitch, PrimaryButton } from '@/components/BrandthreadUI';
+
 import { useAuth, useUser } from '@clerk/expo';
+
 import { useApi } from '@/lib/api';
+
 import { collectAppDiagnostics } from '@/lib/appDiagnostics';
+
 import { buildProblemReportTicket } from '@/lib/problemReportTicket';
+
 
 export default function BuyerProblemReportScreen() {
   const { theme } = useAppTheme();
@@ -107,7 +119,6 @@ export default function BuyerProblemReportScreen() {
         evidenceUris: evidencePhotos,
         contactedSeller,
       });
-      haptics.success();
       setSubmitted(true);
     } catch {
       Alert.alert('Error', 'Could not submit your report. Please try again.');
@@ -146,7 +157,7 @@ export default function BuyerProblemReportScreen() {
               <TouchableOpacity
                 key={opt.key}
                 style={[s.typeCard, problemType === opt.key && s.typeCardSelected]}
-                onPress={() => { haptics.selection(); setProblemType(opt.key); }}
+                onPress={() => { haptic('select'); setProblemType(opt.key); }}
                 activeOpacity={0.8}
               >
                 <Icon name={opt.icon as any} size={20} color={problemType === opt.key ? PURPLE_LIGHT : MUTED} />

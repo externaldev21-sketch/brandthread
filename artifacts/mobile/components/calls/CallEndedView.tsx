@@ -14,13 +14,22 @@ import * as Haptics from 'expo-haptics';
  */
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useCallSession } from '@/lib/calls/CallSessionContext';
+
 import { useApi } from '@/lib/api';
+
 import { endedSubtitle } from '@/lib/calls/dmCallClient';
+
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
+
 import { CallAvatarCircle } from './CallAvatarCircle';
+
 import { BigCircleButton, CallScreenShell, TopBarIconButton, formatCallDuration } from './CallControls';
 
 const AUTO_DISMISS_MS = 1100;
@@ -51,7 +60,7 @@ export function CallEndedView() {
   function rate(value: 'good' | 'not-good') {
     if (rating) return;
     setRating(value);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    void haptic('select');
     if (session && isRealCall) {
       void api.call.dm.rate(session.callId, value === 'good' ? 'good' : 'not_good').catch(() => {});
     }

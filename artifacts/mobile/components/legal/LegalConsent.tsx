@@ -6,11 +6,17 @@
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import { haptics } from '@/lib/haptics';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT } from '@/lib/theme';
+
 import { crispPx } from '@/lib/crispPixel';
 
 export function LegalConsent({
@@ -41,7 +47,7 @@ export function LegalConsent({
   return (
     <View style={style}>
       <Pressable
-        onPress={() => { haptics.selection(); onChange(!checked); }}
+        onPress={() => {  onChange(!checked); }}
         style={styles.row}
         accessibilityRole="checkbox"
         accessibilityState={{ checked }}

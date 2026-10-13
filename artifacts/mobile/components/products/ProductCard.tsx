@@ -1,4 +1,5 @@
 import { haptics } from '@/lib/haptics';
+
 /**
  * "The Rack" — editorial product card for the seller Products tab.
  *
@@ -15,18 +16,31 @@ import { haptics } from '@/lib/haptics';
 
 import React, { useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+
 import { Swipeable } from 'react-native-gesture-handler';
+
 import { Icon, ICON_SIZE } from '@/components/ui/Icon';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { StatusBadge, PressableScale } from '@/components/BrandthreadUI';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { Product } from '@/services/productTypes';
+
 import { formatCents, integerPercent } from '@/lib/money';
+
 import { stockStatusLabel } from '@/lib/productBulk';
+
 import { stockFlagColors } from '@/components/products/StockFlag';
+
 import { formatMoney } from '@/lib/format';
 
 export function getCategoryColors(category: string, theme: AppThemePreset): readonly [string, string] {
@@ -101,14 +115,14 @@ export const ProductCard = React.memo(function ProductCard({
       <View style={[s.swipeActions, { height: imageHeight }]}>
         <PressableScale
           style={[s.swipeBtn, { backgroundColor: theme.muted }]}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); closeSwipe(); onQuickArchive(product); }}
+          onPress={() => {  closeSwipe(); onQuickArchive(product); }}
           accessibilityLabel={isArchived ? `Unarchive ${product.name}` : `Archive ${product.name}`}
         >
           <Icon name={isArchived ? 'rotate-ccw' : 'archive'} size={ICON_SIZE.md} color={theme.background} />
         </PressableScale>
         <PressableScale
           style={[s.swipeBtn, { backgroundColor: theme.error }]}
-          onPress={() => { haptics.warning(); closeSwipe(); onQuickDelete(product); }}
+          onPress={() => {  closeSwipe(); onQuickDelete(product); }}
           accessibilityLabel={`Delete ${product.name}`}
         >
           <Icon name="trash-2" size={ICON_SIZE.md} color={theme.background} />

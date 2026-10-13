@@ -5,13 +5,21 @@
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useColors } from '@/hooks/useColors';
-import { haptics } from '@/lib/haptics';
-import { hapticToggle } from '@/lib/haptics';
+
+import { haptics, hapticToggle } from '@/lib/haptics';
+
+
 import { FONT, TEXT_DISABLED } from '@/lib/theme';
+
+
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
+
 import { radius } from '@/constants/radii';
+
 import { DISABLED_OPACITY } from '@/constants/states';
 
 export interface QuantityStepperProps {
@@ -44,13 +52,11 @@ export function QuantityStepper({
   const sm = size === 'sm';
 
   const step = (delta: number) => {
-    haptics.selection();
     onChange(Math.min(max, Math.max(min, value + delta)));
   };
 
   const decrement = () => {
     if (removeMode) {
-      haptics.selection();
       onRemoveAtMin?.();
       return;
     }

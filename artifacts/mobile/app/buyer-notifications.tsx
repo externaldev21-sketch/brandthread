@@ -1,41 +1,61 @@
-import { hapticDestructiveConfirm, hapticToggle } from '@/lib/haptics';
+import { hapticDestructiveConfirm, hapticToggle, haptics, haptic } from '@/lib/haptics';
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
-import {
-  View, Text, FlatList,
-  Alert, StyleSheet,
-} from 'react-native';
+
+import { View, Text, FlatList, Alert, StyleSheet } from 'react-native';
+
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFocusEffect, useRouter } from 'expo-router';
+
 import { FONT, ICON } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  getNotifications, markNotificationRead, markNotificationUnread,
-  deleteNotification, muteNotificationCategory, clearAllReadNotifications,
-  subscribeSocial,
-} from '@/services/socialService';
+
+import { getNotifications, markNotificationRead, markNotificationUnread, deleteNotification, muteNotificationCategory, clearAllReadNotifications, subscribeSocial } from '@/services/socialService';
+
 import type { Notification, NotificationCategory } from '@/services/socialTypes';
 import { BrandedLoadingState, EmptyState, PressableScale, ThreadDivider } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Chip, MenuSheet } from '@/components/ui';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
-import { haptics } from '@/lib/haptics';
+
+
 import SwipeRow from '@/components/ui/SwipeRow';
+
+import SwipeActionRow from '@/components/SwipeActionRow';
 import { useApi } from '@/lib/api';
+
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
+
 import { syncNotificationBadge } from '@/lib/notificationBadge';
+
 import { useUser } from '@clerk/expo';
+
 import { isBuyerDevPreview } from '@/lib/devPreview';
+
 import { getPreviewNotifications } from '@/lib/previewInbox';
+
 import { ErrorState } from '@/components/ui/ErrorState';
+
 import { fmtRelativeDay } from '@/lib/format';
 
 import { ChipRow } from '@/components/ui/ChipRow';
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function timeAgo(iso: string): string {
@@ -339,7 +359,7 @@ export default function BuyerNotifications() {
   };
 
   const handleLongPress = (notif: Notification) => {
-    haptics.rigid();
+    haptic('longPress');
     setOptionsFor(notif);
   };
 
@@ -363,8 +383,9 @@ export default function BuyerNotifications() {
   };
 
   const handleDeleteOption = async () => {
-    // The menu row already fires a haptic on tap; the sheet closes and the row is
+// The menu row already fires a haptic on tap; the sheet closes and the row is
     // removed immediately so no second haptic is needed here.
+    // The sheet closes and the row is removed immediately.
     const notif = optionsFor;
     if (!notif) return;
     closeOptions();
@@ -390,7 +411,7 @@ export default function BuyerNotifications() {
         text: 'Clear read',
         style: 'destructive',
         onPress: async () => {
-          hapticDestructiveConfirm();
+          
           if (isBuyerDevPreview()) {
             setNotifs(prev => prev.filter(n => !n.isRead));
             return;
@@ -404,7 +425,7 @@ export default function BuyerNotifications() {
   };
 
   const toggleRead = async (notif: Notification) => {
-    hapticToggle();
+    
     if (isBuyerDevPreview()) {
       // Signed-out preview: local-only, never the protected endpoints.
     } else if (notif.isRead) {

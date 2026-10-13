@@ -7,17 +7,29 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
+
 import { useApi } from '@/hooks/useApi';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
+
 import { haptics } from '@/lib/haptics';
+
 import { FONT, FS, SP } from '@/lib/theme';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { RADII } from '@/constants/radii';
+
 import { dayHeading, groupDropsByDay, releaseTimeLabel } from '@/lib/discoveryShelves';
 
 export interface CalendarDropRow {
@@ -56,7 +68,6 @@ export function DropsCalendar({ drops }: { drops: CalendarDropRow[] }) {
       Alert.alert('Sign in to get drop alerts', 'Create or sign in to your buyer account, then tap the bell again.');
       return;
     }
-    haptics.selection();
     const wasOn = !!subscribed[drop.id];
     setPending((p) => ({ ...p, [drop.id]: true }));
     try {

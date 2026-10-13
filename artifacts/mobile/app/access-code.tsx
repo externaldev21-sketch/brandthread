@@ -6,17 +6,29 @@
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, ScrollView, Platform } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { useRouter } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { haptics } from '@/lib/haptics';
+
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useApi } from '@/lib/api';
+
 import { PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { apiErrorMessage } from '@/lib/safety';
+
 import { markAccessCleared } from '@/lib/accessGate';
 
 type Mode = 'code' | 'waitlist' | 'joined';
@@ -50,7 +62,6 @@ export default function AccessCodeScreen() {
     setError(null);
     try {
       await api.access.redeem(value);
-      haptics.success();
       markAccessCleared(userId);
       router.replace('/onboarding' as never);
     } catch (err) {
@@ -68,7 +79,6 @@ export default function AccessCodeScreen() {
     setError(null);
     try {
       await api.access.joinWaitlist(value);
-      haptics.success();
       setMode('joined');
     } catch (err) {
       setError(apiErrorMessage(err, 'We couldn’t add you right now. Try again.'));

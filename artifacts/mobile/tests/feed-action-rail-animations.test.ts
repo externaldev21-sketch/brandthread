@@ -10,7 +10,9 @@
  * are passed down as props.
  */
 import { readFileSync } from 'node:fs';
+
 import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 const feed = readFileSync(resolve(__dirname, '../app/(tabs)/feed.tsx'), 'utf8');

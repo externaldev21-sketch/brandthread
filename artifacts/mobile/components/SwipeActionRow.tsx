@@ -1,9 +1,14 @@
 import React, { useMemo, useRef } from 'react';
 import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { haptics } from '@/lib/haptics';
 
+import { Feather } from '@expo/vector-icons';
+
 import { FONT, FS, SP } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 const ACTION_WIDTH = 92;
@@ -44,7 +49,6 @@ export default function SwipeActionRow({
   const runAction = async () => {
     if (disabled || actionTriggered.current) return;
     actionTriggered.current = true;
-    haptics.selection();
     try {
       await onAction();
     } finally {

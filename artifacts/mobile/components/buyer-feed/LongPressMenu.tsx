@@ -15,12 +15,19 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { Sheet } from '@/components/ui/BottomSheet';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { FONT, FS } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { SheetRise } from '@/components/motion/SheetRise';
+
 import { hapticLight } from '@/lib/haptics';
 
 export type NotInterestedReason = 'video' | 'creator';

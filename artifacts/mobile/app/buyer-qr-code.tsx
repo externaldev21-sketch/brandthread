@@ -1,21 +1,29 @@
 import * as Haptics from 'expo-haptics';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, Platform } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useRouter } from 'expo-router';
+
 import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'expo-linear-gradient';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
+
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+
 import { getMyProfile } from '@/services/socialService';
+
 import type { BuyerSocialProfile } from '@/services/socialTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { radius } from '@/constants/radii';
+
 import { Button } from '@/components/ui/Button';
+
 import { previewBuyerIdentity, profileShareUrl } from '@/lib/previewBuyerIdentity';
 
 export default function BuyerQRCode() {

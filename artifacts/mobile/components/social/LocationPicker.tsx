@@ -1,13 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useApi, type PlaceInfo, type PlaceSearchResult } from '@/lib/api';
+
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { FONT } from '@/lib/theme';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
 
 const DEBOUNCE_MS = 250;
@@ -87,7 +97,7 @@ export function LocationPicker({ value, onSelect, onClear, coords, placeholder =
 
   const pick = async (result: PlaceSearchResult, key: string) => {
     if (savingKey) return;
-    haptics.selection();
+    haptic('select');
     if (result.id) { onSelect(result as PlaceInfo); setQuery(''); return; }
     if (preview) { onSelect({ id: `preview-place-${key}`, name: result.name }); setQuery(''); return; }
     setSavingKey(key);

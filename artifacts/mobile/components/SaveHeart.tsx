@@ -13,11 +13,17 @@
  */
 import React from 'react';
 import { Pressable, StyleProp, StyleSheet, ViewStyle } from 'react-native';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { IconFillTransition } from '@/components/ui/IconFillTransition';
+
 import { useIsProductSaved } from '@/hooks/useSavedProduct';
+
 import { openSaveToCollection, toggleSavedProduct } from '@/lib/saved/savedProducts';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
 
 export interface SaveHeartProps {
   productId: string | null | undefined;
@@ -50,8 +56,8 @@ export const SaveHeart = React.memo(function SaveHeart({
 
   return (
     <Pressable
-      onPress={() => { haptics.light(); void toggleSavedProduct(draft); }}
-      onLongPress={() => { haptics.rigid(); openSaveToCollection(draft); }}
+      onPress={() => { haptic('save'); void toggleSavedProduct(draft); }}
+      onLongPress={() => { haptic('longPress'); openSaveToCollection(draft); }}
       delayLongPress={350}
       hitSlop={{ top: pad, bottom: pad, left: pad, right: pad }}
       accessibilityRole="button"

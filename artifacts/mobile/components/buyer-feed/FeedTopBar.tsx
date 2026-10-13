@@ -9,12 +9,21 @@
  */
 import React from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
+import { Feather } from '@expo/vector-icons';
+
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+
 import { Glass } from '@/components/ui/Glass';
+
 import { FONT, ON_DARK, TEXT_SECONDARY } from '@/lib/theme';
+
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
+
 import { radius } from '@/constants/radii';
 
 export function FeedTopBar({

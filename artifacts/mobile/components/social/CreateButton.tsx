@@ -1,9 +1,16 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { BlurView } from 'expo-blur';
+
 import { Icon } from '@/components/ui/Icon';
+
+import { Feather } from '@expo/vector-icons';
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { FONT, FS, SP } from '@/lib/theme';
+
 import { radius } from '@/constants/radii';
 
 type Props = {

@@ -1,13 +1,32 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, StatusBar } from 'react-native';
+
 import { useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import * as Haptics from 'expo-haptics';
 import { Button } from '@/components/ui';
+
 import { ChoiceCard, type ChoiceOption } from '@/components/onboarding/steps/SellerSteps';
+
 import { useColors } from '@/hooks/useColors';
+
 import { FILL_ELEVATED, TEXT } from '@/lib/theme';
+
 import { SPACING } from '@/constants/spacing';
+
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
+import { Feather } from '@expo/vector-icons';
+
+import { haptic } from '@/lib/haptics';
+
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
+import { PillButton, PressableScale, Reveal, StepHeadline, StepSub, StitchAccent } from '@/components/onboarding/OnboardingUI';
+
+import { RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
 
 /**
  * The first onboarding question: buyer or seller. Same card pattern as the
@@ -63,7 +82,7 @@ export function AccountTypeStep({
               option={option}
               multi={false}
               selected={selected === option.value}
-              onPress={() => { Haptics.selectionAsync(); onSelect(option.value); }}
+              onPress={() => { haptic('select'); onSelect(option.value); }}
             />
           ))}
         </View>

@@ -4,25 +4,38 @@
  * their list through the account API.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, Platform,
-} from 'react-native';
+import { View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFocusEffect } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
 import { FONT, FS, SP, RADIUS, ICON, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
+
+
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { useApi } from '@/lib/api';
+
 import { PressableScale } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
 import { apiErrorMessage } from '@/lib/safety';
-import {
-  addGuestMutedWord, GUEST_MUTED_WORD_LIMIT, readGuestMutedWords, removeGuestMutedWord,
-} from '@/lib/guestMutedWords';
+
+import { addGuestMutedWord, GUEST_MUTED_WORD_LIMIT, readGuestMutedWords, removeGuestMutedWord } from '@/lib/guestMutedWords';
+
 import type { MutedWord } from '@/lib/safetyTypes';
 import { radius } from '@/constants/radii';
 
@@ -117,13 +130,12 @@ export default function MutedWordsScreen() {
             : [...prev, { phrase: created.phrase, createdAt: created.createdAt }].sort((a, b) => a.phrase.localeCompare(b.phrase)));
         }
       }
-      haptics.success();
       if (loadGeneration.current === generation) setDraft('');
     } catch (err) {
       if (loadGeneration.current === generation) {
         setError(guestMode && err instanceof Error ? err.message : apiErrorMessage(err, 'We couldn’t mute that word. Try again.'));
       }
-      haptics.error();
+      haptic('error');
     } finally {
       setSaving(false);
     }

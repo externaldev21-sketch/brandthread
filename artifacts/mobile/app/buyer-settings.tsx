@@ -21,20 +21,41 @@
  */
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useLargeTitleCollapse } from '@/hooks/useLargeTitleCollapse';
+
 import { useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+
+import { useAuth, useUser } from '@clerk/expo';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ScreenHeader } from '@/components/ScreenHeader';
-import { ConfirmSheet } from '@/components/settings/SettingsKit';
-import { ShareProfileSheet } from '@/components/ShareProfileSheet';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+
+
+import { useColors } from '@/hooks/useColors';
+
 import { FONT, FS, SP } from '@/lib/theme';
+
+import { BUYER_SETTINGS_CATALOG, SettingsCatalogItem, settingsGroupsFor, type SettingsCatalogItem } from '@/services/settingsCatalog';
+
+import { SettingsProfileCard, SettingsSearchBar, ConfirmSheet } from '@/components/settings/SettingsKit';
+
+import { ScreenHeader } from '@/components/ScreenHeader';
+
+
+import { ShareProfileSheet } from '@/components/ShareProfileSheet';
+
+import { useAppTheme } from '@/contexts/AppThemeContext';
+
+
 import { hapticLight, hapticSuccess } from '@/lib/haptics';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { useJoinedCommunities } from '@/lib/communities/useCommunityClient';
-import { BUYER_SETTINGS_CATALOG, settingsGroupsFor, type SettingsCatalogItem } from '@/services/settingsCatalog';
+
+
 import { collectAppDiagnostics, formatAppVersion } from '@/lib/appDiagnostics';
 
 const APP_VERSION_LABEL = formatAppVersion(collectAppDiagnostics());
@@ -73,7 +94,6 @@ export default function BuyerSettingsScreen() {
     setSigningOut(true);
     try {
       await signOut();
-      hapticSuccess();
       router.replace('/sign-in' as never);
     } catch {
       // stay signed in; the sheet closes below

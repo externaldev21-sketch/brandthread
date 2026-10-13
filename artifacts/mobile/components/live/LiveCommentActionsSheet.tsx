@@ -10,14 +10,22 @@
  */
 import React, { useRef } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { SHEET_GUTTER, SHEET_RADIUS, SheetGrabber, sheetSurfaceColor, useSheetTransition } from '@/components/ui/BottomSheet';
+
 import { MenuBlocks } from '@/components/ui/MenuSheet';
+
 import { a11yModalProps } from '@/lib/a11y/modal';
 
 export interface CommentActionTarget {

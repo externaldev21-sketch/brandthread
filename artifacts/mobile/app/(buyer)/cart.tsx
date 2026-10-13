@@ -1,4 +1,5 @@
-import { haptics } from '@/lib/haptics';
+import { haptics, haptic } from '@/lib/haptics';
+
 /**
  * Brandthread bag — SSENSE's Shopping bag flow 1:1, reskinned
  * (https://mobbin.com/flows/b906e342-83ab-4424-bf3b-59514df7dc6d; parts in
@@ -8,53 +9,80 @@ import { haptics } from '@/lib/haptics';
  */
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
+
 import { View, Text, ScrollView, StyleSheet, Alert, TextInput, TouchableOpacity } from 'react-native';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter, useFocusEffect } from 'expo-router';
+
 import { applyCartQuantity } from '@/lib/cartOptimistic';
+
 import * as Haptics from 'expo-haptics';
-import {
-  getCartForScreen, updateCartItemQuantity, removeCartItem, removeCartItems, restoreCartSnapshot,
-  saveForLater, moveToCart, removeSavedItem,
-  groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart,
-  estimateGroupShipping, totalShippingEstimate, replaceCartItemVariant, type ShippingEstimate,
-  refreshCartStock,
-} from '@/services/cartService';
+
+import { getCartForScreen, updateCartItemQuantity, removeCartItem, removeCartItems, restoreCartSnapshot, saveForLater, moveToCart, removeSavedItem, groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart, estimateGroupShipping, totalShippingEstimate, replaceCartItemVariant, type ShippingEstimate, refreshCartStock } from '@/services/cartService';
+
 import { FreeShippingStrip } from '@/components/cart/FreeShippingStrip';
+
 import { refreshFreeShippingThresholds } from '@/lib/freeShipping';
+
 import { VariantPickerSheet } from '@/components/buy-now/VariantPickerSheet';
-import {
-  BAG_BAR_HEIGHT, BagCheckoutBar, BagColumns, BagEmpty, BagHeader, BagItemRow, BagTotals, toNewArrivals,
-  type BagLineBusy, type NewArrival,
-} from '@/components/bag/BagParts';
+
+import { BAG_BAR_HEIGHT, BagCheckoutBar, BagColumns, BagEmpty, BagHeader, BagItemRow, BagTotals, toNewArrivals, type BagLineBusy, type NewArrival } from '@/components/bag/BagParts';
+
 import { Cart, CartItem, SavedCartItem, CheckoutThreadCashRedemption, CheckoutLoyaltyRedemption, BuyerProduct, BuyerProductVariant } from '@/services/cartTypes';
+
 import { useScrollReset } from '@/hooks/useScrollReset';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { ThreadIllustration } from '@/components/illustrations/EmptyStateArt';
+
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
+
 import { rewardsNeedOneStore } from '@/lib/threadCashCheckout';
+
 import { stripePaymentAvailable } from '@/components/checkout/StripePayment';
+
 // Same flat-black language as the one-page checkout: sections on pure black,
 // uppercase labels, 1px hairlines. No card containers.
 import { CheckoutSection } from '@/components/checkout/CheckoutPrimitives';
+
 import { isPreviewCheckoutGroup } from '@/lib/previewCheckout';
+
 import { isBuyerDevPreview } from '@/lib/devPreview';
+
 import { useApi } from '@/hooks/useApi';
+
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { savedProducts } from '@/lib/saved/savedProducts';
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { BrandedLoader, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
+
 import { Button, ErrorState, ThemedRefreshControl } from '@/components/ui';
+
 import { useAuth } from '@clerk/expo';
+
 import { formatCents } from '@/lib/money';
+
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+
 import { BUYER_CART_STEPS } from '@/lib/firstRunTips/content';
+
 import { useScreenInteractive } from '@/lib/perf';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -275,7 +303,7 @@ export default function CartScreen() {
   }
 
   function toggleSelectAll() {
-    haptics.selection();
+    haptic('select');
     setSelectedIds(allSelected ? new Set() : new Set(cart.items.map(i => i.id)));
   }
 
@@ -289,7 +317,7 @@ export default function CartScreen() {
 
   async function changeQuantity(itemId: string, delta: number) {
     if (pendingByItemId[itemId]) return;
-    Haptics.selectionAsync();
+    
     const snapshot = cartRef.current;
     const item = snapshot.items.find(i => i.id === itemId);
     if (!item) return;
@@ -321,7 +349,6 @@ export default function CartScreen() {
 
   async function handleRemove(itemId: string) {
     if (pendingByItemId[itemId]) return;
-    haptics.warning();
     const removed = cart.items.find(item => item.id === itemId);
     const snapshot = cart;
     setPending(itemId, 'remove');
@@ -341,7 +368,7 @@ export default function CartScreen() {
 
   async function handleSaveForLater(itemId: string) {
     if (pendingByItemId[itemId]) return;
-    haptics.light();
+    haptic('save');
     setPending(itemId, 'save');
     try {
       const newCart = await saveForLater(itemId);
@@ -352,7 +379,7 @@ export default function CartScreen() {
   }
 
   async function handleMoveToCart(savedId: string) {
-    haptics.light();
+    haptic('addToBag');
     const newCart = await moveToCart(savedId);
     setCart(newCart);
   }
@@ -416,7 +443,6 @@ export default function CartScreen() {
       });
       setLoyaltyBalance(current => Math.max(0, current - result.pointsUsed));
       setPointsInput('');
-      haptics.success();
     } catch (error: any) {
       Alert.alert("Couldn't apply points", error?.message ?? 'Try again.');
     } finally {

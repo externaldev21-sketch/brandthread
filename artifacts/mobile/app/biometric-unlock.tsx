@@ -5,18 +5,27 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Linking, Platform } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFocusEffect } from 'expo-router';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
 import { FONT, FS, SP, RADIUS, TEXT_DISABLED } from '@/lib/theme';
+
+
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
-import {
-  GRACE_OPTIONS, authenticateForAppLock, getDeviceSecurity, loadAppLockSettings, saveAppLockSettings,
-  type AppLockSettings, type DeviceSecurity, type GraceSeconds,
-} from '@/lib/appLock';
+
+import { GRACE_OPTIONS, authenticateForAppLock, getDeviceSecurity, loadAppLockSettings, saveAppLockSettings, type AppLockSettings, type DeviceSecurity, type GraceSeconds } from '@/lib/appLock';
+
 import { crispPx } from '@/lib/crispPixel';
 
 export default function AppLockSettingsScreen() {

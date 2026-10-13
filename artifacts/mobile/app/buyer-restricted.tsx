@@ -4,24 +4,37 @@
  * Restricting limits a user's comment visibility without blocking them.
  */
 import React, { useState, useCallback } from 'react';
-import {
-  View, Text, FlatList, StyleSheet,
-  TextInput,
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, TextInput } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFocusEffect } from 'expo-router';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useColors } from '@/hooks/useColors';
+
 import { getRestrictedUsers, unrestrictUser } from '@/services/socialService';
+
 import type { RestrictRecord } from '@/services/socialTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { showActionSheet } from '@/components/ui/ActionSheet';
+
 import { Button, ListRow } from '@/components/ui';
+
 import { EmptyState } from '@/components/BrandthreadUI';
+
+import { haptic } from '@/lib/haptics';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 export default function RestrictedAccountsScreen() {
@@ -104,7 +117,7 @@ export default function RestrictedAccountsScreen() {
             right={(
               <Button
                 label="Unrestrict"
-                onPress={() => { confirmUnrestrict(item); }}
+                onPress={() => { haptic('sheet'); confirmUnrestrict(item); }}
                 variant="secondary"
                 size="small"
                 accessibilityHint={`Unrestricts ${item.restrictedUserName}`}

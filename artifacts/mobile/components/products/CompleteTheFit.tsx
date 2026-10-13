@@ -13,18 +13,34 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { useRouter } from 'expo-router';
+
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { Sheet } from '@/components/ui';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useApi, type PublicPairedProduct } from '@/lib/api';
+
 import { isPreviewDemoMode } from '@/lib/devPreview';
+
 import { getPreviewBuyerProduct, getPreviewRelatedProducts, isPreviewProductId } from '@/lib/previewProducts';
+
 import { formatCents } from '@/lib/money';
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { addToCart } from '@/services/cartService';
+
 import type { BuyerProduct, BuyerProductVariant } from '@/services/cartTypes';
 
 interface RailItem {
@@ -121,7 +137,7 @@ export function CompleteTheFit({ productId }: { productId: string }) {
     if (!item.product) return;
     const result = await addToCart({ product: item.product, variant, quantity: 1 });
     if (result.success) {
-      haptics.light();
+      haptic('addToBag');
       setMessage(null);
       setAddedId(item.id);
       setTimeout(() => setAddedId((cur) => (cur === item.id ? null : cur)), 2000);

@@ -1,5 +1,7 @@
-import { haptics } from '@/lib/haptics';
-import { radius as ControlRadius } from '@/constants/radii';
+import { haptics, haptic } from '@/lib/haptics';
+
+import { radius as ControlRadius, radius } from '@/constants/radii';
+
 /**
  * Buyer onboarding — optional "Your sizes" step (between Style and Brands).
  * Renders the size sections only; the title, subtitle and buttons come from
@@ -10,14 +12,22 @@ import { radius as ControlRadius } from '@/constants/radii';
  * Depop's "Interests and sizes": a section heading per category with chips.
  */
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
+
 import * as Haptics from 'expo-haptics';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { SURVEY_SIZE_CATEGORIES, toggleSize, type OnboardingSurvey } from '@/lib/onboardingSurvey';
+
 import type { SizeCategory } from '@/lib/sizeRecommendation';
 import { SPACE } from './onboardingTokens';
+
 import { FILL_ELEVATED, FONT, TEXT } from '@/lib/theme';
-import { radius } from '@/constants/radii';
+
 
 interface Props {
   sizes: OnboardingSurvey['sizes'];
@@ -29,7 +39,7 @@ export function SizesStep({ sizes, onChange }: Props) {
   const styles = createStyles(theme);
 
   function pick(key: SizeCategory, value: string) {
-    haptics.selection();
+    haptic('select');
     onChange(toggleSize(sizes, key, value));
   }
 

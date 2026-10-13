@@ -1,47 +1,77 @@
 import { openContextMenu } from '@/lib/contextMenu';
+
 import { copyText } from '@/lib/shareActions';
+
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { usePersistedChoice } from '@/hooks/usePersistedChoice';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl,
-} from 'react-native';
+
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
+
 import { CachedImage as Image } from '@/components/CachedImage';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
+
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { statusBadgeRepeatsHeadline } from '@/lib/buyerOrderCardStatus';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useAuth } from '@clerk/expo';
+
 import { isSecondDeliveryMoment, maybeRequestStoreReview } from '@/lib/storeReviewPrompt';
-import { useRouter } from 'expo-router';
-import { useFocusEffect } from 'expo-router';
+
+import { useRouter, useFocusEffect } from 'expo-router';
+
+
 import { prefetchBuyerOrderOnPressIn } from '@/lib/detailPrefetch';
+
 import * as Haptics from 'expo-haptics';
+import { haptic } from '@/lib/haptics';
+
 import { useScrollReset } from '@/hooks/useScrollReset';
+
 import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } from '@/services/orderTypes';
+
 import { getBuyerOrdersWithStatus, mapApiBuyerOrder } from '@/services/orderService';
+
 import { visibleOrdersForBuyer } from '@/lib/buyerOrdersVisibility';
+
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
 import { getPreviewBuyerOrders as getPreviewDeliveryBuyerOrders, isPreviewOrderId } from '@/lib/previewOrders';
+
 import { getPreviewBuyerOrders as getPreviewCommerceBuyerOrders, isPreviewCommerceId } from '@/lib/previewCommerce';
+
 import { deliveryHeadline } from '@/lib/deliveryGuarantee';
+
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import {
-  BrandthreadScreen, FilterChip,
-  StatusBadge, EmptyState,
-} from '@/components/BrandthreadUI';
+
+import { BrandthreadScreen, FilterChip, StatusBadge, EmptyState } from '@/components/BrandthreadUI';
+
 import { Header, SkeletonBlock, useCenteredContentPadding } from '@/components/layout';
+
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
+
 import { useReorderFlow } from '@/components/orders/ReorderFlow';
+
 import { canReorderStatus } from '@/lib/reorderSummary';
+
 import { RetryRow } from '@/components/ui/RetryRow';
+
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
+
 import { syncOrderActivities } from '@/lib/nativeSystem';
+
 import { formatMoney } from '@/lib/format';
 
 import { ChipRow } from '@/components/ui/ChipRow';
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string): string {
@@ -255,7 +285,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
           <TouchableOpacity
              style={[styles.actionBtn, styles.actionBtnSecondary, { backgroundColor: theme.secondaryDim, borderColor: theme.secondary }]}
             activeOpacity={0.8}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
+            onPress={() => {  onPress(); }}
             hitSlop={ORDER_ACTION_HIT_SLOP}
             accessibilityRole="button"
           >
@@ -405,6 +435,7 @@ export default function BuyerOrdersScreen() {
 
   const retry = useCallback(() => {
     if (refreshing) return;
+    haptic('refresh');
     consecutiveFailuresRef.current = 0;
     setRefreshing(true);
     if (orders.length === 0) setLoading(true);

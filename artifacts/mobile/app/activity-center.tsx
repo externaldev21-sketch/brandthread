@@ -27,98 +27,86 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { navigateOrShareStore } from '@/lib/shareStoreSheet';
+
 import { usePersistedChoice } from '@/hooks/usePersistedChoice';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  SectionList,
-  StyleSheet,
-  Text,
-  View,
-  type ViewToken,
-} from 'react-native';
+
+import { ActivityIndicator, Alert, Pressable, SectionList, StyleSheet, Text, View, type ViewToken } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useFocusEffect, useRouter, useSegments } from 'expo-router';
+
 import { useUser } from '@clerk/expo';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { useRole } from '@/contexts/RoleContext';
+
 import { FONT, FS, ICON, SP } from '@/lib/theme';
+
 import { EmptyState, SkeletonBlock, useScreenPadding } from '@/components/layout';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useScrollReset } from '@/hooks/useScrollReset';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
+
 import { useBuyerTabBarTopInset, useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { FollowPill } from '@/components/search/PersonRow';
+
 import { ThemedRefreshControl } from '@/components/ui';
+
 import { showActionSheet } from '@/components/ui/ActionSheet';
+
 import SwipeRow, { type SwipeRowAction } from '@/components/ui/SwipeRow';
 import { RemoveFollowerSheet } from '@/components/social/RemoveFollowerSheet';
+
 import { CenteredToast } from '@/components/social/CenteredToast';
+
 import { Glass } from '@/components/ui/Glass';
+
 import { LiveRowEnter } from '@/components/motion/LiveRowEnter';
-import { findActivityArrivals } from '@/lib/activity';
+
+import { findActivityArrivals, ACTIVITY_PAGE_SIZE, ACTIVITY_CHIPS, activityCategory, activityChipEmpty, matchesActivityChip, type ActivityChip, activityDetail, activityRowHref, activityIcon, followControlState, activityKind, activityMessage, applyRead, buildActivitySections, chipRowGap, excludeActivityActors, createReadTracker, createDeferredDelete, ACTIVITY_UNDO_MS, isFollowBackRow, relativeTime, type ActivityActor, type ActivityItem, type ActivityRow, type ActivitySection, type ActivitySectionKey } from '@/lib/activity';
+
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+
 import StoryMentionsRail from '@/components/StoryMentionsRail';
 import { useStoryMentions } from '@/hooks/useStoryMentions';
+
 import { storyMentionViewerHref } from '@/lib/storyMentionsRail';
-import {
-  deliverPreviewLiveArrival, hasPendingPreviewLiveArrival, PREVIEW_LIVE_ARRIVAL_DELAY_MS,
-} from '@/lib/previewActivity';
+
+import { deliverPreviewLiveArrival, hasPendingPreviewLiveArrival, PREVIEW_LIVE_ARRIVAL_DELAY_MS, isPreviewActivityEnabled, getVisiblePreviewActivity, getPreviewActivitySuggestedPeople, previewActorAvatarUri, isPreviewActivityId, markPreviewActivityDismissed } from '@/lib/previewActivity';
+
 import { ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from '@/components/thread-cash/ThreadCashBill';
+
 import { useApi } from '@/lib/api';
+
 import { ApiError } from '@/lib/networkNotice';
+
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
+
 import { haptics, hapticFollow } from '@/lib/haptics';
-import {
-  isPreviewActivityEnabled, getVisiblePreviewActivity, getPreviewActivitySuggestedPeople, previewActorAvatarUri,
-  isPreviewActivityId, markPreviewActivityDismissed,
-} from '@/lib/previewActivity';
+
+
+
 import { applyPreviewFollowState, getPreviewFollowing } from '@/lib/previewFollowStore';
+
 import { Chip } from '@/components/ui/Chip';
+
 import { minHitSlop } from '@/lib/hitSlop';
+
 import { ChipRow } from '@/components/ui/ChipRow';
-import {
-  ACTIVITY_PAGE_SIZE,
-  ACTIVITY_CHIPS,
-  activityCategory,
-  activityChipEmpty,
-  matchesActivityChip,
-  type ActivityChip,
-  activityDetail,
-  activityRowHref,
-  activityIcon,
-  followControlState,
-  activityKind,
-  activityMessage,
-  applyRead,
-  buildActivitySections,
-  chipRowGap,
-  excludeActivityActors,
-  createReadTracker,
-  createDeferredDelete,
-  ACTIVITY_UNDO_MS,
-  isFollowBackRow,
-  relativeTime,
-  type ActivityActor,
-  type ActivityItem,
-  type ActivityRow,
-  type ActivitySection,
-  type ActivitySectionKey,
-} from '@/lib/activity';
-import {
-  dismissActivity,
-  dismissSuggestedPerson,
-  getActivity,
-  getSuggestedPeople,
-  markActivityRead,
-  markAllActivityRead,
-  watchActivityRealtime,
-  type SuggestedPerson,
-} from '@/services/activityService';
+
+
+import { dismissActivity, dismissSuggestedPerson, getActivity, getSuggestedPeople, markActivityRead, markAllActivityRead, watchActivityRealtime, type SuggestedPerson } from '@/services/activityService';
+
 import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
+
 import { radius } from '@/constants/radii';
 
 /** Within this many points of the top, live arrivals come straight in (item 84). */
@@ -1135,7 +1123,6 @@ export default function ActivityCenterScreen() {
   const handleBlockFromMenu = useCallback(async (row: ActivityRow) => {
     const actor = row.actors[0];
     if (!actor?.id) return;
-    haptics.warning();
     try {
       await blockUser({ userId: actor.id, name: actor.name, handle: '', initials: actor.initials, color: actor.color ?? '#3F3F46' });
       setItems((prev) => prev.filter((item) => item.actorId !== actor.id));
@@ -1173,7 +1160,6 @@ export default function ActivityCenterScreen() {
     const row = removeFollowerTarget;
     const actor = row?.actors[0];
     if (!row || !actor?.id) return;
-    haptics.warning();
     setRemovingFollower(true);
     try {
       await removeFollower(actor.id);

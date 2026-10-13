@@ -5,29 +5,41 @@ import * as Haptics from 'expo-haptics';
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, } from 'react-native';
+
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useFocusEffect } from 'expo-router';
+
+import { useRouter, useFocusEffect } from 'expo-router';
+
+
 import { LinearGradient } from 'expo-linear-gradient';
-import { haptics } from '@/lib/haptics';
-import {
-  BG, CARD, BORDER, FG, MUTED,
-  FONT, FS, SP, RADIUS, GRAD_PRIMARY,
-} from '@/lib/theme';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
+import { BG, CARD, BORDER, FG, MUTED, FONT, FS, SP, RADIUS, GRAD_PRIMARY } from '@/lib/theme';
+
 import { useColors } from '@/hooks/useColors';
+
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+
 import { HapticSwitch } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
 import { minHitSlop } from '@/lib/hitSlop';
+
 import { loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
+
 import { useBuyerPreferences } from '@/hooks/useBuyerPreferences';
-import {
-  mergeStyleInterests, selectedCategoriesFromInterests, type ShoppingSizeField,
-} from '@/lib/shoppingPreferences';
+
+import { mergeStyleInterests, selectedCategoriesFromInterests, type ShoppingSizeField } from '@/lib/shoppingPreferences';
+
 import { radius } from '@/constants/radii';
 
 const TOPS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL+'];
@@ -79,7 +91,7 @@ function SizeSelector({
           <TouchableOpacity
             key={opt}
             style={[s.sizeBubble, selected === opt && s.sizeBubbleActive]}
-            onPress={() => { Haptics.selectionAsync(); onSelect(opt); }}
+            onPress={() => { haptic('select'); onSelect(opt); }}
             hitSlop={SIZE_BUBBLE_HIT_SLOP}
             accessibilityRole="button"
             accessibilityLabel={`${label}, ${opt}`}
@@ -173,13 +185,12 @@ export default function ShoppingPreferences() {
       }
     }
     setHasChanges(false);
-    haptics.success();
     goBackOr(router);
   }
 
   function toggleCat(key: string) {
     catsTouched.current = true;
-    Haptics.selectionAsync();
+    haptic('select');
     setSelectedCats(prev => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);

@@ -5,8 +5,11 @@
  * working and the thread stays the theme's own near-white `text` color.
  */
 import { useCallback } from 'react';
+
 import { type TextStyle } from 'react-native';
+
 import { Easing, useReducedMotion } from 'react-native-reanimated';
+
 import { FONT } from '@/lib/theme';
 
 /** Brandthread type scale for the onboarding flow (Inter). */

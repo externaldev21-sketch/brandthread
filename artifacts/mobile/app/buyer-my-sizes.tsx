@@ -6,20 +6,35 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TextInput } from 'react-native';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useRouter } from 'expo-router';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Chip, SegmentedControl } from '@/components/ui';
+
 import { RetryRow } from '@/components/ui/RetryRow';
+
 import { Toast } from '@/components/BrandthreadUI';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useBuyerPreferences } from '@/hooks/useBuyerPreferences';
+
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+
 import { haptics } from '@/lib/haptics';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { FONT } from '@/lib/theme';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import type { BuyerPreferencesPatch } from '@/lib/api';
 import type { SizeCategory } from '@/lib/sizeRecommendation';
 

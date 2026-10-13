@@ -7,13 +7,23 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+
 import { useRouter } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { haptics } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
 import { useApi } from '@/lib/api';
+
 import { useColors } from '@/hooks/useColors';
+
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+
 import { PressableScale } from '@/components/BrandthreadUI';
 
 export function splitCountdown(ms: number): { days: number; hours: number; minutes: number; seconds: number } {
@@ -92,7 +102,6 @@ export function LaunchCountdown({
   async function toggle() {
     if (!productId || busy) return;
     if (!isSignedIn) { router.push('/sign-in' as never); return; }
-    haptics.light();
     setBusy(true);
     const next = !subscribed;
     setSubscribed(next);

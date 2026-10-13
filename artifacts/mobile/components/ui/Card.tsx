@@ -7,9 +7,13 @@
  */
 import React from 'react';
 import { Animated, Pressable, StyleProp, View, ViewStyle } from 'react-native';
+
 import { useColors } from '@/hooks/useColors';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
+
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 
 export interface CardProps {

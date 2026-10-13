@@ -8,16 +8,27 @@
  */
 import React, { useCallback, useRef, useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useColors } from '@/hooks/useColors';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { FONT, ON_DARK_MUTED } from '@/lib/theme';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII, radius, nestedRadius } from '@/constants/radii';
+
 import { TAB_INDICATOR_SPRING } from '@/constants/motion';
+
 import { Glass } from '@/components/ui/Glass';
+
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 
 export interface SegmentedControlProps {
@@ -137,7 +148,7 @@ export function SegmentedControl({ options, selectedId, onChange, testID, varian
             accessibilityRole="tab"
             accessibilityLabel={option.label}
             accessibilityState={{ selected }}
-            onPress={() => { if (!selected) { haptics.selection(); onChange(option.id); } }}
+            onPress={() => { if (!selected) { haptic('select'); onChange(option.id); } }}
             style={[styles.segment, size === 'compact' && styles.segmentCompact]}
             testID={testID ? `${testID}-${option.id}` : undefined}
           >
@@ -270,7 +281,7 @@ function UnderlineTabs({
             key={option.id}
             option={option}
             selected={selected}
-            onPress={() => { if (!selected) { haptics.selection(); onChange(option.id); } }}
+            onPress={() => { if (!selected) { haptic('select'); onChange(option.id); } }}
             onLabelRef={(node) => { textRefs.current[option.id] = node; }}
             onLabelLayout={() => handleTabLayout(option.id)}
             testID={testID ? `${testID}-${option.id}` : undefined}

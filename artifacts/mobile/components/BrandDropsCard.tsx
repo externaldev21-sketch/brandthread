@@ -10,10 +10,17 @@
  */
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { useRouter } from 'expo-router';
+
 import { Icon } from '@/components/ui/Icon';
+
+import { Feather } from '@expo/vector-icons';
+
 import { useApi } from '@/lib/api';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
 interface BrandDropsCardProps {

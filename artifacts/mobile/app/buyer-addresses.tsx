@@ -1,24 +1,43 @@
-import { hapticDestructiveConfirm, hapticSuccess, hapticToggle } from '@/lib/haptics';
+import { hapticDestructiveConfirm, hapticSuccess, hapticToggle, haptics } from '@/lib/haptics';
+
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useRouter } from 'expo-router';
+
 import { FONT, COMP } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useApi } from '@/lib/api';
+
 import { useAuth } from '@clerk/expo';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Button, Card, IconButton } from '@/components/ui';
+
 import { EmptyState } from '@/components/BrandthreadUI';
-import { haptics } from '@/lib/haptics';
+
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
 import { PREVIEW_CHECKOUT_ADDRESS, PREVIEW_CHECKOUT_CONTACT } from '@/lib/previewCheckout';
 
 /**
@@ -180,7 +199,6 @@ export default function BuyerAddressesScreen() {
       } else if (editingId) {
         await api.buyer.addresses.update(editingId, body);
       }
-      haptics.success();
       await load();
       handleCancel();
     } catch (e: any) {
@@ -195,7 +213,7 @@ export default function BuyerAddressesScreen() {
       { text: 'Keep', style: 'cancel' },
       { text: 'Delete address', style: 'destructive', onPress: async () => {
         try {
-          hapticDestructiveConfirm();
+          
           if (localPreview) { setAddresses(prev => prev.filter(a => a.id !== id)); return; }
           await api.buyer.addresses.delete(id);
           await load();
@@ -208,7 +226,7 @@ export default function BuyerAddressesScreen() {
 
   const handleSetDefault = async (id: string) => {
     try {
-      hapticToggle();
+      
       if (localPreview) { setAddresses(prev => prev.map(a => ({ ...a, isDefault: a.id === id }))); return; }
       await api.buyer.addresses.setDefault(id);
       await load();

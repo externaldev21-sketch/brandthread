@@ -1,17 +1,31 @@
 import React, { useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+
 import { Image } from 'expo-image';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { Icon } from '@/components/ui/Icon';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+import { Feather } from '@expo/vector-icons';
+
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
 import { HapticSwitch } from '@/components/BrandthreadUI';
+
 import { useAppIconPreference, type AppIconPreference } from '@/contexts/AppIconContext';
+
 import { APP_THEME_PRESETS, type AppThemeId, type AppThemePreset, useAppTheme } from '@/contexts/AppThemeContext';
+
 import { APPEARANCE_ICON_IMAGES, APPEARANCE_THEME_IMAGES, preloadAppearanceAssets } from '@/lib/appearanceAssets';
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
 const presetById = (id: AppThemeId): AppThemePreset =>
@@ -29,13 +43,13 @@ export default function AppearanceScreen() {
 
   async function chooseTheme(id: AppThemeId) {
     if (id === theme.id) return;
-    haptics.selection();
+    haptic('select');
     await selectTheme(id);
   }
 
   async function chooseIcon(nextPreference: AppIconPreference) {
     if (nextPreference === preference) return;
-    haptics.selection();
+    haptic('select');
     await selectIcon(nextPreference);
   }
 

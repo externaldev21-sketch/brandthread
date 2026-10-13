@@ -9,18 +9,32 @@
  */
 import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useColors } from '@/hooks/useColors';
-import { haptics } from '@/lib/haptics';
-import { hapticToggle, hapticSelection } from '@/lib/haptics';
+
+import { haptics, hapticToggle, hapticSelection, haptic } from '@/lib/haptics';
+
+
 import { BORDER_SUBTLE, FONT, TEXT_DISABLED } from '@/lib/theme';
+
+
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII, radius } from '@/constants/radii';
+
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+
 import { minHitSlop } from '@/lib/hitSlop';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { DISABLED_OPACITY } from '@/constants/states';
 
 export interface ChipProps {
@@ -70,7 +84,7 @@ export function Chip({
       accessibilityLabel={accessibilityLabel ?? (count !== undefined ? `${label}, ${count}` : label)}
       accessibilityState={{ selected, disabled: !!disabled }}
       disabled={disabled}
-      onPress={() => { haptics.selection(); onPress(); }}
+      onPress={() => { haptic('select'); onPress(); }}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       // Drawn 34pt (32pt quick-reply) tall — pad the touch area to 44pt.

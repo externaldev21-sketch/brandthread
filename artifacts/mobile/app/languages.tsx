@@ -4,16 +4,28 @@
  */
 import React, { useState, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+
 import { useFocusEffect } from 'expo-router';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useApi } from '@/lib/api';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { SUCCESS, SUCCESS_DIM, FONT, FS, RADIUS } from '@/lib/theme';
+
 import { useSellerShell } from '@/contexts/SellerShellContext';
+
 import { isSellerDevPreview } from '@/lib/devPreview';
+
 import { loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 interface LanguageOption {
@@ -70,7 +82,7 @@ export default function LanguagesScreen() {
 
   async function selectLanguage(code: string) {
     if (code === storeLanguage) return;
-    haptics.selection();
+    haptic('select');
     setSaving(code);
     try {
       if (isBuyer) {

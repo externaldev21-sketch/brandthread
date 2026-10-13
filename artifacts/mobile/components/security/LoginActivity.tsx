@@ -5,27 +5,46 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFocusEffect, useRouter } from 'expo-router';
+
 import { useAuth } from '@clerk/expo';
+
 import { haptics } from '@/lib/haptics';
+
 import { FONT } from '@/lib/theme';
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { useApi } from '@/lib/api';
+
 import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Button } from '@/components/ui/Button';
+
 import { ThemedRefreshControl } from '@/components/ui/ThemedRefreshControl';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
+
 import { apiErrorMessage } from '@/lib/safety';
+
 import type { AccountSession } from '@/lib/safetyTypes';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
+
 import { describeUserAgent } from '@/lib/deviceLabel';
+
 import { fmtRelativeDay } from '@/lib/format';
 
 /**
@@ -125,7 +144,6 @@ export default function LoginActivity() {
             setBusyId(session.id);
             try {
               await api.auth.revokeSession(session.id);
-              haptics.success();
               setSessions((prev) => prev.filter((row) => row.id !== session.id));
             } catch (err) {
               Alert.alert('Couldn’t sign out that device', apiErrorMessage(err, 'Try again.'));
@@ -151,7 +169,6 @@ export default function LoginActivity() {
             setBusyId('others');
             try {
               await api.auth.revokeOtherSessions();
-              haptics.success();
               setSessions((prev) => prev.filter((row) => row.current));
             } catch (err) {
               Alert.alert('Couldn’t sign out other devices', apiErrorMessage(err, 'Try again.'));

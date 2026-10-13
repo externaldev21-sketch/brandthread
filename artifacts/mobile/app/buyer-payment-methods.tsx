@@ -3,24 +3,36 @@
  * Lists and manages saved Stripe payment methods.
  */
 import React, { useState, useCallback } from 'react';
-import {
-  View, Text, ScrollView, StyleSheet,
-  ActivityIndicator, Alert,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFocusEffect } from 'expo-router';
+
 import { useApi } from '@/lib/api';
+
 import { FONT } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useAuth } from '@clerk/expo';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Button, Card, IconButton } from '@/components/ui';
+
 import { EmptyState } from '@/components/BrandthreadUI';
+
 import { haptics } from '@/lib/haptics';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
 
 interface PaymentMethod {
@@ -81,7 +93,6 @@ export default function BuyerPaymentMethodsScreen() {
 
   async function setDefault(pm: PaymentMethod) {
     if (pm.isDefault || settingDefault) return;
-    haptics.selection();
     setSettingDefault(pm.id);
     try {
       await api.reviews.setDefaultPaymentMethod(pm.id);
@@ -102,7 +113,6 @@ export default function BuyerPaymentMethodsScreen() {
         {
           text: 'Remove card', style: 'destructive',
           onPress: async () => {
-            haptics.warning();
             setRemoving(pm.id);
             try {
               await api.reviews.removePaymentMethod(pm.id) as any;

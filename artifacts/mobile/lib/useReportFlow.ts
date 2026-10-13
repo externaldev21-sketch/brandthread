@@ -7,11 +7,14 @@
  * optionally block the owner -> done.
  */
 import { useState } from 'react';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { useApi } from '@/lib/api';
-import {
-  REPORT_REASONS, apiErrorMessage, buildReportPayload, reportNoteError, TARGET_LABELS,
-} from '@/lib/safety';
+
+import { REPORT_REASONS, apiErrorMessage, buildReportPayload, reportNoteError, TARGET_LABELS } from '@/lib/safety';
+
 import type { ReportReasonId, ReportTargetType } from '@/lib/safetyTypes';
 
 export type ReportStep = 'reason' | 'details' | 'done';
@@ -52,7 +55,7 @@ export function useReportFlow({ targetType, targetId, ownerId }: ReportFlowInput
   }
 
   function chooseReason(id: ReportReasonId) {
-    haptics.selection();
+    haptic('select');
     setReason(id);
     setError(null);
     setStep('details');
@@ -81,11 +84,11 @@ export function useReportFlow({ targetType, targetId, ownerId }: ReportFlowInput
           // confirmation step.
         }
       }
-      haptics.success();
+      
       setStep('done');
     } catch (err) {
       setError(apiErrorMessage(err, 'We couldn’t send your report. Check your connection and try again.'));
-      haptics.error();
+      haptic('error');
     } finally {
       setSubmitting(false);
     }
@@ -97,7 +100,6 @@ export function useReportFlow({ targetType, targetId, ownerId }: ReportFlowInput
     try {
       await api.social.block(ownerId);
       setBlocked(true);
-      haptics.success();
     } catch (err) {
       setError(apiErrorMessage(err, 'We couldn’t block this account. Try again.'));
     } finally {

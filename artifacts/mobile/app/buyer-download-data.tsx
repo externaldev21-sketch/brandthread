@@ -1,17 +1,30 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { File, Paths } from 'expo-file-system';
+
 import * as Sharing from 'expo-sharing';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useApi } from '@/lib/api';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { Button, Card, ListRow, StickyBottomCTA } from '@/components/ui';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { EmailExportSection } from '@/components/security/EmailExportSection';
 
 type DataCategory = { key: string; label: string; sub: string; icon: IconName; selected: boolean };
@@ -34,7 +47,6 @@ export default function BuyerDownloadData() {
   const [loading, setLoading] = useState(false);
 
   function toggleCat(key: string) {
-    haptics.selection();
     setCategories(prev => prev.map(c => c.key === key ? { ...c, selected: !c.selected } : c));
   }
 
@@ -54,11 +66,11 @@ export default function BuyerDownloadData() {
       } else {
         Alert.alert('Export ready', 'Your data is ready. Save it or send it anywhere.');
       }
-      haptics.success();
+      
       setRequestedAt(data.exportedAt);
       setRequested(true);
     } catch (err: any) {
-      haptics.error();
+      haptic('error');
       Alert.alert('Export failed', "Couldn't prepare your data. Try again.");
     } finally {
       setLoading(false);

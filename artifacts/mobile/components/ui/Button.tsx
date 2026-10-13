@@ -11,24 +11,36 @@
  * Checkout pill, SSENSE "ADD TO BAG" block, Gymshark stacked pills.
  */
 import React from 'react';
-import {
-  ActivityIndicator, Animated, Platform, Pressable, PressableProps,
-  StyleProp, StyleSheet, Text, View, ViewStyle,
-} from 'react-native';
+import { ActivityIndicator, Animated, Platform, Pressable, PressableProps, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+
 import type { GestureResponderEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { useColors } from '@/hooks/useColors';
+
 import { haptics } from '@/lib/haptics';
+
 import { COMP, FILL_ELEVATED, FONT, RED } from '@/lib/theme';
+
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { radius } from '@/constants/radii';
+
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+
 import { DISABLED_OPACITY } from '@/constants/states';
+
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+
 import { minHitSlop } from '@/lib/hitSlop';
+
 import { splitButtonStyle } from '@/lib/buttonStyle';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive';
@@ -107,7 +119,7 @@ export function Button({
 
   const handlePress = (event: GestureResponderEvent) => {
     if (isDisabled) return;
-    if (variant === 'destructive') haptics.warning();
+    if (variant === 'destructive') 
     onPress(event);
   };
 

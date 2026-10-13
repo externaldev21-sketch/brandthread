@@ -6,22 +6,40 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, Alert, useWindowDimensions } from 'react-native';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT } from '@/lib/theme';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { EmptyState } from '@/components/BrandthreadUI';
+
 import { StickyBottomCTA } from '@/components/ui';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { useApi, type HighlightPickerStory } from '@/lib/api';
+
 import { isPreviewDemoMode } from '@/lib/devPreview';
+
 import { previewHighlightPickerStories } from '@/lib/previewHighlights';
 
 const GAP = 2;
@@ -83,7 +101,7 @@ export default function BuyerHighlightStories() {
   useFocusEffect(load);
 
   const toggle = (storyId: string) => {
-    haptics.selection();
+    haptic('select');
     setSelected((prev) => {
       const next = new Set(prev);
       next.has(storyId) ? next.delete(storyId) : next.add(storyId);
@@ -100,7 +118,6 @@ export default function BuyerHighlightStories() {
       const toRemove = [...existing.entries()].filter(([storyId]) => !selected.has(storyId));
       for (const storyId of toAdd) await api.social.addHighlightItem(highlightId, storyId);
       for (const [, itemId] of toRemove) await api.social.removeHighlightItem(highlightId, itemId);
-      haptics.success();
       goBackOr(router);
     } catch {
       Alert.alert('Could not save', 'Your highlight was not updated. Try again.');

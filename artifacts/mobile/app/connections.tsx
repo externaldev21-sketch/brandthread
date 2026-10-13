@@ -25,29 +25,55 @@
  */
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
+
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
+
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { FONT, FS, SP, RADIUS, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
+
+
 import { useUser } from '@clerk/expo';
+
 import { useApi } from '@/hooks/useApi';
+
 import { ListSkeleton } from '@/components/layout';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { EmptyState, PressableScale, SearchBar } from '@/components/BrandthreadUI';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { ErrorState } from '@/components/ui/ErrorState';
+
 import { showActionSheet } from '@/components/ui/ActionSheet';
+
 import { OptionSheet } from '@/components/ui/OptionSheet';
+
 import { haptics, hapticFollow, hapticDestructiveConfirm, hapticSuccess } from '@/lib/haptics';
+
+
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+
 import { profileHref } from '@/lib/profileNavigation';
+
 import { InteractionLayer, ProfileChip } from '@/components/profile/ProfileControls';
+
 import { setSellerFollowing, removeFollower } from '@/services/socialService';
+
 import { RemoveFollowerSheet, type RemoveFollowerPerson } from '@/components/social/RemoveFollowerSheet';
+
 import { CenteredToast } from '@/components/social/CenteredToast';
+
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+
 import { radius } from '@/constants/radii';
+
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 export type ConnectionsTab = 'followers' | 'following';
@@ -226,7 +252,6 @@ export default function ConnectionsScreen() {
     const setList = tab === 'followers' ? setFollowers : setFollowing;
     setFollowPending((prev) => new Set(prev).add(row.id));
     setList((prev) => prev.map((u) => (u.id === row.id ? { ...u, isFollowing: false } : u)));
-    haptics.light();
     try {
       if (row.accountType === 'seller') await setSellerFollowing(row.id, false);
       else await api.social.unfollow(row.id);
@@ -257,7 +282,6 @@ export default function ConnectionsScreen() {
   const handleConfirmRemove = useCallback(async () => {
     const row = removeTarget;
     if (!row) return;
-    haptics.warning();
     setRemoving(true);
     try {
       await removeFollower(row.id);

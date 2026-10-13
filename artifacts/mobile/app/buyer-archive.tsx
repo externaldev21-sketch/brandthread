@@ -3,26 +3,34 @@
  * Tap navigates to the post viewer; long-press opens a restore/delete action sheet.
  */
 import React, { useCallback, useState } from 'react';
-import {
-  View, Text, StyleSheet, TouchableOpacity, useWindowDimensions,
-  FlatList, RefreshControl, Modal,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, FlatList, RefreshControl, Modal } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFocusEffect, useRouter } from 'expo-router';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { LinearGradient } from 'expo-linear-gradient';
-import {
-  BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+
+import { BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { getMyPosts, unarchivePost, deletePost } from '@/services/socialService';
+
 import type { BuyerPost } from '@/services/socialTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { showActionSheet } from '@/components/ui/ActionSheet';
+
 import { EmptyState } from '@/components/BrandthreadUI';
+
 import { radius } from '@/constants/radii';
+
 import { minHitSlop } from '@/lib/hitSlop';
 
 const GAP = SP.xs;
@@ -62,12 +70,12 @@ export default function BuyerArchive() {
 
   const handleRestore = async (post: BuyerPost) => {
     await unarchivePost(post.id);
-    haptics.success();
+    
     await loadData();
   };
 
   const handleDelete = async (post: BuyerPost) => {
-    haptics.warning();
+    
     await deletePost(post.id);
     await loadData();
   };
@@ -94,7 +102,7 @@ export default function BuyerArchive() {
         style={styles.cell}
         onPress={() => { router.push(`/buyer-post-viewer?${qs}` as never); }}
         onLongPress={() => {
-          haptics.rigid();
+          haptic('longPress');
           showActionSheet(item.caption || 'Archived post', undefined, [
             { text: 'Restore to profile', onPress: () => { void handleRestore(item); } },
             { text: 'Delete permanently', style: 'destructive', onPress: () => { void handleDelete(item); } },

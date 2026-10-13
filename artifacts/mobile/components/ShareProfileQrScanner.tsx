@@ -13,14 +13,21 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 
 import { FONT, FS, ICON, RADIUS, SP, TEXT_SECONDARY } from '@/lib/theme';
+
 import { parseProfileDeepLink } from '@/lib/shareProfile';
+
 import { haptics } from '@/lib/haptics';
+
 import { radius } from '@/constants/radii';
 
 interface ShareProfileQrScannerProps {
@@ -50,7 +57,6 @@ export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
     const username = parseProfileDeepLink(result.data);
     if (!username) return; // Not a Brandthread profile QR — ignore, keep scanning.
     setHandled(true);
-    haptics.success();
     onClose();
     router.push(`/u/${username}` as never);
   }, [handled, onClose, router]);

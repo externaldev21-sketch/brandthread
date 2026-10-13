@@ -38,6 +38,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+
 import ReanimatedAnimated, {
   Easing,
   useSharedValue,
@@ -47,12 +48,21 @@ import ReanimatedAnimated, {
   interpolate,
 } from 'react-native-reanimated';
 import { Icon } from '@/components/ui/Icon';
+
+import { Feather } from '@expo/vector-icons';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { Glass } from '@/components/ui/Glass';
+
 import { TABULAR_NUMS } from '@/constants/typography';
+
 import { FONT, ON_DARK } from '@/lib/theme';
+
 import { RADII } from '@/constants/radii';
+
 import { a11yHidden } from '@/lib/a11yHidden';
+
 import { formatMoney } from '@/lib/format';
 
 export interface ShopSideTabTag {

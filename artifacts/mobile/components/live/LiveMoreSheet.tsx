@@ -11,11 +11,17 @@
  */
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { SheetRise } from '@/components/motion/SheetRise';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+
 import { haptics, hapticLight } from '@/lib/haptics';
 
 function Row({
@@ -39,7 +45,9 @@ function Row({
   );
 }
 import { Sheet } from '@/components/ui/BottomSheet';
+
 import { MenuBlocks } from '@/components/ui/MenuSheet';
+
 import { radius } from '@/constants/radii';
 
 function ToggleRow({
@@ -53,7 +61,7 @@ function ToggleRow({
 }) {
   return (
     <Pressable
-      onPress={() => { haptics.selection(); onToggle(); }}
+      onPress={() => {  onToggle(); }}
       style={styles.row}
       accessibilityRole="switch"
       accessibilityState={{ checked: value }}

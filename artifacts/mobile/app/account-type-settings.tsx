@@ -13,20 +13,43 @@
  * one public account.
  */
 import React from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { ScreenHeader } from '@/components/ScreenHeader';
-import { Button, Icon, ListRow } from '@/components/ui';
+
+
+
+import { Feather } from '@expo/vector-icons';
+
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { haptic } from '@/lib/haptics';
+
+import { useApi } from '@/lib/api';
+
+import { FONT, FS, SP, RADIUS, ICON, TEXT } from '@/lib/theme';
+
 import { useColors } from '@/hooks/useColors';
+
+import { useAuth } from '@clerk/expo';
+
+
+import { ScreenHeader } from '@/components/ScreenHeader';
+
+import { Button, Icon, ListRow } from '@/components/ui';
+
+
 import { useScreenBottomInset } from '@/hooks/useScreenBottomInset';
+
 import { useLinkedProfiles } from '@/hooks/useLinkedProfiles';
+
 import { useRole } from '@/contexts/RoleContext';
-import { SP, TEXT } from '@/lib/theme';
-import {
-  addProfileLabel, otherRole, roleExistsMessage, type ProfileRole,
-} from '@/lib/linkedProfiles';
+
+
+import { addProfileLabel, otherRole, roleExistsMessage, type ProfileRole } from '@/lib/linkedProfiles';
 
 function roleLabel(role: ProfileRole | null): string {
   return role === 'seller' ? 'Seller' : role === 'buyer' ? 'Buyer' : '';

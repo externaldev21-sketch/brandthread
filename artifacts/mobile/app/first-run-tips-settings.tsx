@@ -8,14 +8,24 @@
  */
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+
 import { useRouter } from 'expo-router';
+
 import { useColors } from '@/hooks/useColors';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
+
 import { ConfirmSheet } from '@/components/settings/SettingsKit';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+
 import { useFirstRunTipsController } from '@/contexts/FirstRunTipsContext';
 
 export default function FirstRunTipsSettingsScreen() {
@@ -37,7 +47,6 @@ export default function FirstRunTipsSettingsScreen() {
     setReplaying(true);
     try {
       await controller.replayTips();
-      haptics.success();
       setReplayedAt(Date.now());
     } finally {
       setReplaying(false);
@@ -64,7 +73,7 @@ export default function FirstRunTipsSettingsScreen() {
           </View>
 
           <PressableScale
-            onPress={() => setReplayVisible(true)}
+            onPress={() => { haptic('sheet'); setReplayVisible(true); }}
             style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border, marginTop: SP.sm }]}
             accessibilityRole="button"
             accessibilityLabel="Replay tips"

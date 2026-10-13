@@ -1,23 +1,32 @@
 import * as Haptics from 'expo-haptics';
 import React, { useMemo, useRef, useState } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Linking, Alert, ActivityIndicator, Modal,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Linking, Alert, ActivityIndicator, Modal } from 'react-native';
+
 import { Icon, type IconName } from '@/components/ui/Icon';
+
+import { Feather } from '@expo/vector-icons';
+
+import { haptic } from '@/lib/haptics';
+
 import { useApi } from '@/lib/api';
+
 import { useUser } from '@clerk/expo';
+
 import { SupportChatModal } from '@/components/SupportChatBubble';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useAfterModalDismiss } from '@/hooks/useAfterModalDismiss';
+
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import {
-  BrandthreadCard, SearchBar, SectionHeader, FilterChip, FormInput,
-  PrimaryButton, EmptyState, SheetHandle, NavigationCard,
-} from '@/components/BrandthreadUI';
+
+import { BrandthreadCard, SearchBar, SectionHeader, FilterChip, FormInput, PrimaryButton, EmptyState, SheetHandle, NavigationCard } from '@/components/BrandthreadUI';
 
 type Category = 'General' | 'Billing' | 'Account' | 'Bug' | 'Feature';
 
@@ -173,7 +182,7 @@ export default function HelpScreen() {
                     icon="help-circle"
                     label={faq.q}
                     description={faq.category}
-                    onPress={() => { setArticle(faq); }}
+                    onPress={() => { haptic('sheet'); setArticle(faq); }}
                   />
                 ))}
               </View>
@@ -190,7 +199,7 @@ export default function HelpScreen() {
                       key={c.key}
                       style={[s.categoryCard, categoryW !== undefined && { width: categoryW }]}
                       activeOpacity={0.85}
-                      onPress={() => { setActiveCategory(c.key); }}
+                      onPress={() => { haptic('select'); setActiveCategory(c.key); }}
                     >
                       <View style={[s.categoryIconWrap, { backgroundColor: theme.accent + '18' }]}>
                         <Icon name={c.icon} size={ICON.md} color={theme.accent} />
@@ -242,7 +251,7 @@ export default function HelpScreen() {
                   icon="file-text"
                   label={faq.q}
                   description={faq.category}
-                  onPress={() => { setArticle(faq); }}
+                  onPress={() => { haptic('sheet'); setArticle(faq); }}
                 />
               ))}
             </View>

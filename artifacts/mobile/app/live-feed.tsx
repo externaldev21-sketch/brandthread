@@ -1,4 +1,5 @@
-import { hapticLight } from '@/lib/haptics';
+import { hapticLight, haptics, hapticFollow, haptic } from '@/lib/haptics';
+
 /**
  * Live Feed — the full-screen LIVE viewer opened from the header's TV glyph
  * on Threads Home. Its own route (fullScreenModal, fade — see app/_layout.tsx
@@ -17,48 +18,75 @@ import { hapticLight } from '@/lib/haptics';
  * the real "nobody is live" empty state, not fake viewer counts/chat.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  View, Text, StyleSheet, FlatList, Platform, Pressable, Share, ActivityIndicator,
-  AccessibilityInfo, useWindowDimensions,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, Platform, Pressable, Share, ActivityIndicator, AccessibilityInfo, useWindowDimensions } from 'react-native';
+
 import { Asset } from 'expo-asset';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import { demoRunwayVideoUri } from '@/lib/demoMedia';
+
 import { getLiveViewerPrefs, setLiveViewerPrefs } from '@/lib/live/liveViewerPrefs';
+
 import type { StyleProp, ViewStyle, ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useRouter } from 'expo-router';
+
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
+
 import { Image as ExpoImage } from 'expo-image';
+
 import ReanimatedAnimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useApi } from '@/lib/api';
+
 import { PressableScale } from '@/components/BrandthreadUI';
+
 import { FeedToastProvider, useFeedToast } from '@/components/EngagementButton';
-import { haptics, hapticFollow } from '@/lib/haptics';
+
+
+
 import { formatCents } from '@/lib/money';
+
 import { formatCompactCount } from '@/lib/compactFormat';
+
 import { FONT, FS, RADIUS, FG, TEXT_SECONDARY } from '@/lib/theme';
+
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
+
 import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
+
 import { LiveMoreSheet } from '@/components/live/LiveMoreSheet';
+
 import { LiveEmptyState } from '@/components/live/LiveEmptyState';
+
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
+
 import { SHEET_TIMING } from '@/constants/motion';
+
 import { goBackOr } from '@/lib/navigation/goBackOr';
+
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
+
 import { isPreviewDemoMode } from '@/lib/devPreview';
+
 import { buildCanonicalLiveUrl } from '@/lib/shareLive';
+
 import Composer from '@/components/ui/Composer';
 import { radius } from '@/constants/radii';
+
 import { useUser } from '@clerk/expo';
+
 import { apiErrorMessage } from '@/lib/safety';
-import {
-  confirmLiveChatLine, latestLiveChatCursor, liveCommentsToLines, mergeLiveChat, type LiveChatLine,
-} from '@/lib/live/liveFeedChat';
+
+import { confirmLiveChatLine, latestLiveChatCursor, liveCommentsToLines, mergeLiveChat, type LiveChatLine } from '@/lib/live/liveFeedChat';
 
 // Same sample fashion footage the For You feed uses in dev preview, reused
 // here (not modified, not shared state) so a preview room shows a real
@@ -268,6 +296,7 @@ export default function LiveFeedScreen() {
 
   function buy(room: LiveRoom) {
     if (!room.productId) return;
+    haptic('sheet');
     if (room.isSample) {
       setShopSelection(previewLiveFeedProduct(room));
       return;
@@ -703,13 +732,13 @@ function LiveRoomPage({
         <PressableScale style={styles.railBtn} onPress={handleShare} accessibilityRole="button" accessibilityLabel="Share this live">
           <Icon name="share" size={26} color="#fff" style={styles.railIconShadow} />
         </PressableScale>
-        <PressableScale style={styles.railBtn} onPress={() => setThreadCashOpen(true)} accessibilityRole="button" accessibilityLabel="Send Thread Cash">
+        <PressableScale style={styles.railBtn} onPress={() => { haptic('sheet'); setThreadCashOpen(true); }} accessibilityRole="button" accessibilityLabel="Send Thread Cash">
           {/* ThreadCashBillIcon, not the full <ThreadCashBill/> — below its
               ~32pt threshold the full bill's art just turns to mush, which is
               why the gift icon effectively vanished from the rail before. */}
           <ThreadCashBillIcon size={26} />
         </PressableScale>
-        <PressableScale style={styles.railBtn} onPress={() => setMoreOpen(true)} accessibilityRole="button" accessibilityLabel="More options">
+        <PressableScale style={styles.railBtn} onPress={() => { haptic('sheet'); setMoreOpen(true); }} accessibilityRole="button" accessibilityLabel="More options">
           <Icon name="more-vertical" size={26} color="#fff" style={styles.railIconShadow} />
         </PressableScale>
       </View>

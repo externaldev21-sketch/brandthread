@@ -1,42 +1,64 @@
-import { hapticPrimaryAction } from '@/lib/haptics';
+import { hapticPrimaryAction, haptics, haptic } from '@/lib/haptics';
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { relativeTime } from '@/lib/activity';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  View, Text, ScrollView, FlatList,
-  Alert, StyleSheet, Dimensions, Share, useWindowDimensions,
-} from 'react-native';
+
+import { View, Text, ScrollView, FlatList, Alert, StyleSheet, Dimensions, Share, useWindowDimensions } from 'react-native';
+
 import { FontAwesome } from '@expo/vector-icons';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { useFocusEffect } from 'expo-router';
-import { useRouter } from 'expo-router';
+
+import { useFocusEffect, useRouter } from 'expo-router';
+
+
 import { useReportSheet } from '@/components/safety/ReportSheet';
+
 import { useAuth, useUser } from '@clerk/expo';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { PressableScale, FeedSkeleton, EmptyState } from '@/components/BrandthreadUI';
+
 import { Header } from '@/components/layout';
+
 import { IconButton, Snackbar, ErrorState } from '@/components/ui';
+
 import { useColors } from '@/hooks/useColors';
-import {
-  ICON, FONT,
-} from '@/lib/theme';
+
+import { ICON, FONT } from '@/lib/theme';
+
 import { TYPE_SCALE } from '@/constants/typography';
+
 import { useScrollReset } from '@/hooks/useScrollReset';
+
 import { SPACING } from '@/constants/spacing';
+
 import { RADII } from '@/constants/radii';
-import { haptics } from '@/lib/haptics';
-import {
-  MY_USER_ID, subscribeSocial, saveItem, createOrGetConversation, getStories,
-} from '@/services/socialService';
+
+
+
+import { MY_USER_ID, subscribeSocial, saveItem, createOrGetConversation, getStories } from '@/services/socialService';
+
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
+
 import type { Friendship, Story, BuyerPost } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+
 import { enqueueEngagementRetry, ensureEngagementRetryPump, isRetryableFailure } from '@/lib/engagementRetryQueue';
+
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
 import { PREVIEW_STORIES, PREVIEW_FOLLOWING, PREVIEW_FRIEND_ACTIVITY } from '@/lib/previewFriends';
+
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+
 import { crispPx } from '@/lib/crispPixel';
+
 import { fmtRelativeDay } from '@/lib/format';
 
 type ApiFollowing = {
@@ -306,7 +328,7 @@ export default function FriendsScreen() {
   }, []);
 
   function handleLike(post: BuyerPost) {
-    haptics.light();
+    if (!post.likedByMe) haptic('like');
     // Optimistic update
     setFeedPosts(prev =>
       prev.map(p =>
@@ -336,7 +358,6 @@ export default function FriendsScreen() {
   }
 
   function handleRepost(postId: string) {
-    haptics.light();
     setFeedPosts(prev =>
       prev.map(p =>
         p.id === postId
@@ -353,7 +374,7 @@ export default function FriendsScreen() {
   }
 
   function handleSave(post: BuyerPost) {
-    haptics.light();
+    if (!savedIds.has(post.id)) haptic('save');
     const wasSaved = savedIds.has(post.id);
     setSavedIds(prev => {
       const next = new Set(prev);
@@ -563,7 +584,7 @@ export default function FriendsScreen() {
           illustration="friends"
           title="Find your crew"
           description="Add friends to see what they're copping, saving, and dropping."
-          action={{ label: 'Find friends', onPress: () => { hapticPrimaryAction(); router.push('/buyer-friend-requests' as never); } }}
+          action={{ label: 'Find friends', onPress: () => {  router.push('/buyer-friend-requests' as never); } }}
           compact={compactEmpty}
         />
       )}

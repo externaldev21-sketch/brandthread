@@ -1,5 +1,7 @@
 import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
-import { hapticSuccessAction } from '@/lib/haptics';
+
+import { hapticSuccessAction, haptics, haptic } from '@/lib/haptics';
+
 /**
  * Buyer Live — viewer screen for an active live stream.
  * Joins the Agora channel as audience. Falls back to a demo/placeholder
@@ -7,46 +9,69 @@ import { hapticSuccessAction } from '@/lib/haptics';
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, StyleSheet, TextInput,
-  ScrollView, Platform, ActivityIndicator,
-  Alert, Share, useWindowDimensions,
-} from 'react-native';
+
+import { View, Text, StyleSheet, TextInput, ScrollView, Platform, ActivityIndicator, Alert, Share, useWindowDimensions } from 'react-native';
+
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+
 import * as ExpoLinking from 'expo-linking';
 import { buildLiveUrl } from '@/lib/shareLinks';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { loadAgoraModule } from '@/lib/agoraAvailability';
+
 import { useApi } from '@/lib/api';
+
 import { track } from '@/lib/analytics';
+
 import { pickDefaultAddress, prefillDelivery } from '@/lib/liveCheckoutPrefill';
+
 import { useUser } from '@clerk/expo';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { useScrollToEndOnContentChange } from '@/hooks/useScrollToEndOnContentChange';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  BG, BORDER, FG, MUTED, SUBTLE, RED,
-  FONT, FS, SP, RADIUS, TEXT_SECONDARY,
-} from '@/lib/theme';
+
+import { BG, BORDER, FG, MUTED, SUBTLE, RED, FONT, FS, SP, RADIUS, TEXT_SECONDARY } from '@/lib/theme';
+
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
+
 import * as WebBrowser from 'expo-web-browser';
 import { currentCheckoutReturnUrls, hostedCheckoutVerdict } from '@/lib/checkoutReturn';
+
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { apiErrorMessage, confirmBlock, reportHref } from '@/lib/safety';
+
 import { PressableScale } from '@/components/BrandthreadUI';
+
 import { IconButton } from '@/components/ui/IconButton';
+
 import { Snackbar } from '@/components/ui/Snackbar';
-import { haptics } from '@/lib/haptics';
+
+
+
 import Composer from '@/components/ui/Composer';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
+
 import { useLiveModeration } from '@/lib/live/useLiveModeration';
+
 import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
+
 import { radius } from '@/constants/radii';
+
 import { LiveCohostSplit } from '@/components/live/LiveCohostSplit';
+
 import { LivePurchaseToast, useLivePurchaseToasts } from '@/components/live/LivePurchaseToast';
+
 import type { LiveCohostPerson } from '@/lib/live/moderationTypes';
 import { formatMoney } from '@/lib/format';
 
@@ -514,11 +539,12 @@ function BuyerLiveNativeScreen() {
         return;
       }
       if (verification?.paymentStatus !== 'paid') {
+        if (verification?.declineReason) haptic('error');
         setCheckoutError(verification?.declineReason ?? 'Payment is still pending. Please check your orders shortly.');
         return;
       }
       track('checkout_completed', { flow: 'live', item_count: 1 });
-      hapticSuccessAction();
+      haptic('purchaseSuccess');
       setOrderSnackbar(verification.orderNumber
         ? `Order ${verification.orderNumber} confirmed`
         : 'Order confirmed');
@@ -644,7 +670,7 @@ function BuyerLiveNativeScreen() {
             {productTags.map(tag => (
               <PressableScale
                 key={tag.productId}
-                onPress={() => { openPurchase(tag); }}
+                onPress={() => { haptic('sheet'); openPurchase(tag); }}
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityLabel={`Shop ${tag.productName}, ${formatMoney(tag.priceCents)}`}
@@ -712,7 +738,7 @@ function BuyerLiveNativeScreen() {
               <Text style={s.purchaseTitle} numberOfLines={1}>{purchaseTag.productName}</Text>
             </View>
             <PressableScale
-              onPress={() => { setPurchaseTag(null); }}
+              onPress={() => { haptic('sheet'); setPurchaseTag(null); }}
               style={s.purchaseClose}
               hitSlop={6}
               accessibilityRole="button"
@@ -744,7 +770,7 @@ function BuyerLiveNativeScreen() {
                     <PressableScale
                       key={variant.id}
                       disabled={!available}
-                      onPress={() => { haptics.selection(); setSelectedVariantId(variant.id); }}
+                      onPress={() => { haptic('select'); setSelectedVariantId(variant.id); }}
                       accessibilityRole="button"
                       accessibilityState={{ selected: selectedVariantId === variant.id, disabled: !available }}
                       style={[

@@ -1,39 +1,54 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  AccessibilityInfo, ActivityIndicator, Alert, Animated, LayoutAnimation,
-  Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, UIManager, View, useWindowDimensions,
-} from 'react-native';
+
+import { AccessibilityInfo, ActivityIndicator, Alert, Animated, LayoutAnimation, Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, UIManager, View, useWindowDimensions } from 'react-native';
+
 import { CachedImage } from '@/components/CachedImage';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { pickRouteParam } from '@/lib/routeParamAliases';
+
 import { Icon } from '@/components/ui/Icon';
+
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { haptics } from '@/lib/haptics';
+
+import { haptics, haptic } from '@/lib/haptics';
+
+
 import { useApi } from '@/lib/api';
+
 import { useColors } from '@/hooks/useColors';
+
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED,
-  SUCCESS, FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
-import {
-  ClaimedRemainingLabel,
-  TimeRemainingLabel,
-  URGENCY_UNITS_THRESHOLD,
-} from '@/components/CommerceSignal';
+
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED, SUCCESS, FONT, FS, SP, RADIUS } from '@/lib/theme';
+
+import { ClaimedRemainingLabel, TimeRemainingLabel, URGENCY_UNITS_THRESHOLD } from '@/components/CommerceSignal';
+
 import { ShopProductSheet } from '@/components/ShopProductSheet';
+
 import { EmptyState } from '@/components/BrandthreadUI';
+
 import { ScreenHeader } from '@/components/ScreenHeader';
+
 import { ErrorState } from '@/components/ui/ErrorState';
+
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
+
 import { isWellFormedDropId } from '@/lib/dropId';
+
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { buildCanonicalDropUrl } from '@/lib/shareDrop';
+
 import { computeCountdownParts, type CountdownParts } from '@/lib/dropCountdown';
+
 import { crispPx } from '@/lib/crispPixel';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -409,7 +424,6 @@ export default function BuyerDropDetail() {
         ? await api.publicDrops.unsubscribe(dropId)
         : await api.publicDrops.subscribe(dropId);
       setSubscribed(result.subscribed);
-      haptics.light();
     } catch {
       Alert.alert('Sign in to get drop alerts', 'Create or sign in to your buyer account, then tap Notify me again.');
     } finally {
@@ -442,6 +456,7 @@ export default function BuyerDropDetail() {
       return;
     }
 
+    haptic('sheet');
     // postId is only used by ShopProductSheet/cartFlight for attribution and
     // flight-animation bookkeeping, never as a server-side post lookup — a
     // stable synthetic id is safe here.
