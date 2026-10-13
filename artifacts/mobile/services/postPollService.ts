@@ -63,11 +63,10 @@ function request(postId: string) {
   timer ??= setTimeout(() => { void flush(); }, 30);
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The poll on this post (undefined while loading, null when there is none). */
 export function usePostPoll(postId: string | null | undefined): Entry {
-  const valid = !!postId && UUID_RE.test(postId);
+  const valid = !!postId;
   useEffect(() => { if (valid) request(postId!); }, [valid, postId]);
   return useSyncExternalStore(
     (l) => { listeners.add(l); return () => { listeners.delete(l); }; },
