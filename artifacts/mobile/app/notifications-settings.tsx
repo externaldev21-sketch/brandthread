@@ -6,7 +6,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { ScrollView, View, Text, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -16,6 +16,7 @@ import { ListRow } from '@/components/ui';
 import { QuietHoursRow, type QuietHoursPreset } from '@/components/notifications/QuietHoursRow';
 import { Card } from '@/components/ui/Card';
 import { SPACING } from '@/constants/spacing';
+import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 
 type Role = 'buyer' | 'seller';
 
@@ -57,6 +58,8 @@ export default function NotificationsSettingsScreen() {
   const [promotionalPush, setPromotionalPush] = useState(false);
   const [quietHours, setQuietHours] = useState<{ start: string | null; end: string | null }>({ start: null, end: null });
   const [categories, setCategories] = useState<Record<string, boolean>>({});
+  // Opt-in SMS order updates: the row only exists when the server has Twilio keys.
+  const [sms, setSms] = useState<{ available: boolean; enabled: boolean }>({ available: false, enabled: false });
 
   const rows = role === 'buyer' ? BUYER_ROWS : SELLER_ROWS;
 
@@ -76,6 +79,13 @@ export default function NotificationsSettingsScreen() {
       })
       .catch(() => {/* fallback to push on, quiet hours off */});
   }, []);
+
+  useFocusEffect(React.useCallback(() => {
+    if ((isBuyerDevPreview() || isSellerDevPreview()) && !isPreviewDemoMode()) return;
+    api.notificationPrefs.sms.get()
+      .then((data) => setSms({ available: data.available, enabled: data.enabled }))
+      .catch(() => setSms({ available: false, enabled: false }));
+  }, [api]));
 
   async function handleMasterToggle(value: boolean) {
     hapticToggle();
@@ -200,6 +210,21 @@ export default function NotificationsSettingsScreen() {
               chevron
               onPress={() => router.push('/notification-channels' as never)}
             />
+            {role === 'buyer' && sms.available ? (
+              <>
+                <View style={[s.rowDivider, { backgroundColor: colors.border }]} />
+                <ListRow
+                  testID="sms-settings-row"
+                  icon="message-square"
+                  title="Text messages"
+                  subtitle="Order updates"
+                  subtitleNumberOfLines={1}
+                  value={sms.enabled ? 'On' : 'Off'}
+                  chevron
+                  onPress={() => router.push('/sms-order-updates' as never)}
+                />
+              </>
+            ) : null}
           </Card>
         </View>
 
