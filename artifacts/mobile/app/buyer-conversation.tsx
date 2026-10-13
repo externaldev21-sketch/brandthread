@@ -24,6 +24,7 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
   getConversation, createOrGetConversation, getMessages,
   sendMessage, retryMessage, addReaction, deleteMessageForMe,
+  sendMessageWithOutbox, discardUnsentMessage, LOCAL_MESSAGE_ID_PREFIX,
   markConversationRead, subscribeSocial,
   setConversationTheme, setConversationDisappearing,
   MY_USER_ID, MY_NAME, MY_INITIALS, MY_COLOR,
@@ -42,6 +43,8 @@ import {
   useAudioPlayerStatus,
 } from 'expo-audio';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { useChatDraft } from '@/hooks/useChatDraft';
+import { classifyNetworkError } from '@/lib/networkNotice';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import Composer from '@/components/ui/Composer';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
@@ -289,6 +292,7 @@ export default function BuyerConversationScreen() {
   const callLog = useCallLog(conv?.id ?? params.id ?? '');
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
+  useChatDraft(conv?.id, text, setText);
   const { showUndo } = useUndoToast();
   const textInputRef = useRef<TextInput>(null);
   // Request-mode UI state (see the bottom RequestActionPanel below):
@@ -1458,17 +1462,48 @@ export default function BuyerConversationScreen() {
       return;
     }
 
+    // The message shows right away with the clock receipt. If the
+    // connection drops it stays in the thread as "Tap to retry" (it's kept
+    // in this chat's cache, so it survives a refresh or relaunch) instead of
+    // vanishing behind an alert.
+    const outgoing: Message = {
+      id: `${LOCAL_MESSAGE_ID_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      conversationId: conv.id,
+      fromId: myId,
+      fromName: 'You',
+      fromInitials: MY_INITIALS,
+      fromColor: theme.accent,
+      text: t,
+      attachment: att ?? undefined,
+      replyToId: replyingTo?.id,
+      replyPreview: replyingTo?.text,
+      replyToAuthorName: replyingTo?.fromName,
+      reactions: [],
+      status: 'sending',
+      ts: Date.now(),
+      deletedForMe: false,
+    };
+    setMessages((prev) => [...prev, outgoing]);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
     setIsSending(true);
     try {
-      await sendMessage(conv.id, t, att ?? undefined, replyingTo?.id);
+      await sendMessageWithOutbox(conv.id, outgoing);
       const msgs = await getMessages(conv.id);
       setMessages(msgs);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
     } catch (e) {
-      Alert.alert('Message not sent', apiErrorMessage(e, 'Please check your connection and try again.'));
-      setText(t);
-      setSelectedAttachment(att);
-      setReplyTo(replyingTo);
+      if (classifyNetworkError(e) !== null) {
+        setMessages((prev) => prev.map((m) => (m.id === outgoing.id ? { ...m, status: 'failed' } : m)));
+      } else {
+        // A real rejection (blocked, not allowed, moderation): retrying would
+        // fail the same way, so the text goes back in the box as before.
+        await discardUnsentMessage(conv.id, outgoing.id);
+        setMessages((prev) => prev.filter((m) => m.id !== outgoing.id));
+        Alert.alert('Message not sent', apiErrorMessage(e, 'Please check your connection and try again.'));
+        setText(t);
+        setSelectedAttachment(att);
+        setReplyTo(replyingTo);
+      }
     } finally {
       setIsSending(false);
     }

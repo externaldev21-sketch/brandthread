@@ -36,6 +36,7 @@ import {
   useAudioPlayerStatus,
 } from 'expo-audio';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { useChatDraft } from '@/hooks/useChatDraft';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import Composer from '@/components/ui/Composer';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
@@ -270,6 +271,7 @@ export default function SellerConversationScreen() {
   const [conv, setConv] = useState<ConvView | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState('');
+  useChatDraft(id, text, setText);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isUploading, setIsUploading]         = useState(false);
