@@ -6,7 +6,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useApi } from '@/lib/api';
 import { useTeamRole } from '@/hooks/useTeamRole';
@@ -131,7 +131,6 @@ export default function TeamScreen() {
   };
 
   const openInvite = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setInviteEmail('');
     setInviteRole('viewer');
     setInviteResult(null);
@@ -169,7 +168,6 @@ export default function TeamScreen() {
   };
 
   const handleRegenerate = async (m: any) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setRegeneratingId(m.id);
     try {
       const res = await api.team.regenerateInvite(m.id);
@@ -190,19 +188,16 @@ export default function TeamScreen() {
   };
 
   const copyLink = async (url: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(url);
     Alert.alert('Link copied', 'The invite link is on your clipboard.');
   };
 
   const shareLink = async (url: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try { await Share.share({ message: `Join my team on Brandthread: ${url}` }); } catch { /* cancelled */ }
   };
 
   const dismissExpiredInvite = (member: any) => {
     if (currentRole !== 'owner') return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(
       'Dismiss expired invite',
       `${member.name ?? member.email} will be removed from your expired invites.`,
@@ -212,6 +207,7 @@ export default function TeamScreen() {
           text: 'Dismiss',
           style: 'destructive',
           onPress: async () => {
+            haptics.warning();
             setDismissingId(member.id);
             try {
               await api.team.remove(member.id);
@@ -248,7 +244,7 @@ export default function TeamScreen() {
       <TouchableOpacity
         key={m.id}
         activeOpacity={0.7}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/users?id=${m.id}` as never); }}
+        onPress={() => { router.push(`/users?id=${m.id}` as never); }}
         style={[styles.memberRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
       >
         <View style={styles.memberLeft}>
@@ -461,7 +457,7 @@ export default function TeamScreen() {
                 {INVITE_ROLES.map(r => (
                   <TouchableOpacity
                     key={r.key}
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setInviteRole(r.key); }}
+                    onPress={() => { haptics.selection(); setInviteRole(r.key); }}
                     activeOpacity={0.8}
                     style={[
                       styles.rolePillWrap,
@@ -478,7 +474,7 @@ export default function TeamScreen() {
               </View>
               <View style={styles.modalActions}>
                 <TouchableOpacity onPress={() => setInviteVisible(false)} activeOpacity={0.7} style={styles.modalCancel}>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 14, fontFamily: 'Inter_500Medium' }}>Cancel</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 14, fontFamily: FONT.medium }}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleInvite}
@@ -544,49 +540,49 @@ export default function TeamScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
+  sectionTitle: { fontSize: 17, fontFamily: FONT.semibold, marginBottom: 12 },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
-  addBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  addBtnText: { fontSize: 13, fontFamily: FONT.semibold },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   memberRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   memberLeft: { position: 'relative' },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  avatarText: { fontSize: 14, fontFamily: FONT.bold },
   onlineDot: { width: 10, height: 10, borderRadius: 5, position: 'absolute', bottom: 0, right: 0, borderWidth: 2 },
   memberInfo: { flex: 1 },
-  memberName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  memberAccess: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  memberName: { fontSize: 14, fontFamily: FONT.semibold },
+  memberAccess: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   linkBtn: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   dismissBtn: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   expiredSection: { borderRadius: 14, borderWidth: 1, marginBottom: 24, overflow: 'hidden' },
   expiredHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
   expiredTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  expiredTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  expiredTitle: { fontSize: 14, fontFamily: FONT.semibold },
   workflowRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
-  workflowLabel: { fontSize: 14, fontFamily: 'Inter_400Regular' },
-  workflowVal: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  workflowLabel: { fontSize: 14, fontFamily: FONT.regular },
+  workflowVal: { fontSize: 13, fontFamily: FONT.medium },
   logRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   logDot: { width: 6, height: 6, borderRadius: 3 },
   logInfo: { flex: 1 },
-  logAction: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  logMeta: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  logAction: { fontSize: 13, fontFamily: FONT.medium },
+  logMeta: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   loadMoreBtn: { padding: 14, alignItems: 'center', borderTopWidth: 1 },
-  loadMoreText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  loadMoreText: { fontSize: 13, fontFamily: FONT.semibold },
   secRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  secLabel: { fontSize: 14, fontFamily: 'Inter_500Medium' },
-  secSub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  inviteInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 14 },
+  secLabel: { fontSize: 14, fontFamily: FONT.medium },
+  secSub: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
+  inviteInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: FONT.regular, marginTop: 14 },
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 },
   modalCard: { borderRadius: 16, borderWidth: 1, padding: 20 },
-  modalTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
-  modalSub: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 6, lineHeight: 18 },
+  modalTitle: { fontSize: 17, fontFamily: FONT.semibold },
+  modalSub: { fontSize: 13, fontFamily: FONT.regular, marginTop: 6, lineHeight: 18 },
   roleRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
   rolePill: { flex: 1, borderWidth: 1.5, borderRadius: 12, padding: 12 },
   roleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
   rolePillWrap: { width: '47%', borderWidth: 1.5, borderRadius: 12, padding: 12 },
-  rolePillTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  rolePillSub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  rolePillTitle: { fontSize: 14, fontFamily: FONT.semibold },
+  rolePillSub: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   modalActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 },
   modalCancel: { paddingHorizontal: 8, paddingVertical: 7, marginRight: 'auto' },
   successIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 10 },

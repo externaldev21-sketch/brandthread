@@ -5,7 +5,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { FONT, FS } from '@/lib/theme';
 import { getProjects } from '@/services/designService';
@@ -57,12 +57,10 @@ export default function AIStudioScreen() {
   useFocusEffect(useCallback(() => { loadProjects(); }, [loadProjects]));
 
   function openProject(project: DesignProject) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push(`/design-canvas?id=${project.id}` as never);
   }
 
   function openCanvas(preset: SizePreset) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setNewCanvasVisible(false);
     router.push({
       pathname: '/design-canvas',
@@ -75,7 +73,6 @@ export default function AIStudioScreen() {
     if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to import artwork.'); return; }
     const res = await ImagePicker.launchImageLibraryAsync({ quality: 0.9, allowsEditing: false });
     if (!res.canceled) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       router.push({
         pathname: '/design-canvas',
         params: { label: 'Imported', dims: SCREEN_SIZE.dims, ratio: String(SCREEN_SIZE.ratio), imageUri: res.assets[0].uri },
@@ -88,7 +85,6 @@ export default function AIStudioScreen() {
     if (!perm.granted) { Alert.alert('Permission needed', 'Allow camera access to take a photo.'); return; }
     const res = await ImagePicker.launchCameraAsync({ quality: 0.9, allowsEditing: true });
     if (!res.canceled) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       router.push({
         pathname: '/design-canvas',
         params: { label: 'Photo', dims: SCREEN_SIZE.dims, ratio: String(SCREEN_SIZE.ratio), imageUri: res.assets[0].uri },
@@ -106,7 +102,7 @@ export default function AIStudioScreen() {
           <TouchableOpacity
             style={[styles.modeBtn, mode === 'ai' && { backgroundColor: colors.card }]}
             activeOpacity={0.8}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('ai'); }}
+            onPress={() => { haptics.selection(); setMode('ai'); }}
           >
             <Feather name="zap" size={13} color={mode === 'ai' ? colors.primary : colors.mutedForeground} />
             <Text style={[styles.modeBtnText, { color: mode === 'ai' ? colors.foreground : colors.mutedForeground }]}>AI Generate</Text>
@@ -114,7 +110,7 @@ export default function AIStudioScreen() {
           <TouchableOpacity
             style={[styles.modeBtn, mode === 'manual' && { backgroundColor: colors.card }]}
             activeOpacity={0.8}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('manual'); }}
+            onPress={() => { haptics.selection(); setMode('manual'); }}
           >
             <Feather name="edit-3" size={13} color={mode === 'manual' ? colors.primary : colors.mutedForeground} />
             <Text style={[styles.modeBtnText, { color: mode === 'manual' ? colors.foreground : colors.mutedForeground }]}>Manual Design</Text>
@@ -140,7 +136,7 @@ export default function AIStudioScreen() {
             <TouchableOpacity
               style={[styles.newCanvasBtn, { backgroundColor: colors.primary }]}
               activeOpacity={0.8}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setNewCanvasVisible(true); }}
+              onPress={() => { setNewCanvasVisible(true); }}
             >
               <Feather name="plus" size={18} color={colors.primaryForeground} />
             </TouchableOpacity>
@@ -195,7 +191,6 @@ export default function AIStudioScreen() {
         <TouchableOpacity
           key={tool.label}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             if (tool.label === 'AI Clothing Mockups') {
               router.push('/ai-mockup-chat' as never);
               return;

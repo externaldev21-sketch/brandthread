@@ -4,12 +4,16 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
 import { SaveHeart } from '@/components/SaveHeart';
-import { hapticPrimaryAction } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+import { openContextMenu } from '@/lib/contextMenu';
+import { buildProductUrl } from '@/lib/shareLinks';
+import { copyLink, shareLink } from '@/lib/shareActions';
+import { savedProducts, toggleSavedProduct } from '@/lib/saved/savedProducts';
+import { haptics } from '@/lib/haptics';
 
 // Fixed 4:5 aspect ratio for every card so the grid never has uneven row
 // heights — no per-image aspect-ratio measurement.
@@ -39,10 +43,43 @@ export function ProductTile({ item, accent: _accent, onPress, width }: {
   const styles = makeStyles(theme);
   const scale = React.useRef(new Animated.Value(1)).current;
 
+  // Long-press: the Instagram grid preview menu — the product enlarged over a
+  // blurred screen with Save / Share / Copy link under it; tapping the
+  // preview opens the product. Only for real products (with a share URL).
+  const productId = item.productId ?? item.id;
+  const url = typeof item.priceCents === 'number' ? buildProductUrl(productId) : null;
+  const openMenu = () => {
+    if (!url) return;
+    const saved = savedProducts.has(productId);
+    const price = typeof item.priceCents === 'number' ? formatCents(item.priceCents) : null;
+    openContextMenu({
+      preview: {
+        imageUri: item.imageUri,
+        aspectRatio: GRID_CARD_ASPECT,
+        title: item.name,
+        subtitle: [item.brand, price].filter(Boolean).join(' · '),
+      },
+      onPreviewPress: onPress,
+      items: [
+        {
+          key: 'save', label: saved ? 'Remove from saved' : 'Save', icon: 'bookmark',
+          onPress: () => {
+            haptics.light();
+            void toggleSavedProduct({ productId, title: item.name, brand: item.brand, priceCents: item.priceCents });
+          },
+        },
+        { key: 'share', label: 'Share', icon: 'share', onPress: () => { void shareLink(url, `${item.name} on Brandthread`); } },
+        { key: 'copy', label: 'Copy link', icon: 'link', onPress: () => { void copyLink(url); } },
+      ],
+    });
+  };
+
   return (
     <View style={{ width }}>
     <Pressable
-      onPress={() => { hapticPrimaryAction(); onPress(); }}
+      onPress={() => onPress()}
+      onLongPress={url ? openMenu : undefined}
+      delayLongPress={350}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       accessibilityRole="button"

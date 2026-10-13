@@ -14,7 +14,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi, type AccessInviteCode, type AccessWaitlist } from '@/lib/api';
@@ -137,7 +137,7 @@ export default function AdminInvitesScreen() {
     setBusy('generate');
     try {
       const made = await api.access.admin.createInvites({ count: qty, maxUses: perCode });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      haptics.success();
       say(`${made.codes.length} ${made.codes.length === 1 ? 'code' : 'codes'} generated`);
       await load(true);
     } catch (err) {
@@ -162,7 +162,7 @@ export default function AdminInvitesScreen() {
     setBusy(item.id);
     try {
       const res = await api.access.admin.inviteFromWaitlist(item.id);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      haptics.success();
       await Clipboard.setStringAsync(res.code).catch(() => {});
       say('Invited. Code copied');
       await load(true);
@@ -225,7 +225,7 @@ export default function AdminInvitesScreen() {
               return (
                 <PressableScale
                   key={key}
-                  onPress={() => { Haptics.selectionAsync().catch(() => {}); setTab(key); }}
+                  onPress={() => { haptics.selection(); setTab(key); }}
                   style={[s.segmentItem, active && s.segmentItemActive]}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}

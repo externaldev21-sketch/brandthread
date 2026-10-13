@@ -18,10 +18,9 @@
 import React from 'react';
 import { Animated, Image, Text, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { EngagementButton } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
-import { hapticLight } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, GOLD, ON_DARK } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
@@ -146,7 +145,7 @@ export function RightActionRail({
           style={avatarHit.boostStyle}
           onLayout={avatarHit.onLayout}
           activeOpacity={0.8}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onOpenCreator(); }}
+          onPress={() => onOpenCreator()}
           accessibilityRole="button"
           accessibilityLabel={`View ${creator}'s profile`}
         >
@@ -205,7 +204,7 @@ export function RightActionRail({
               disabled={!!engagement?.following}
               accessibilityRole="button"
               accessibilityLabel={`Follow ${creator}`}
-              onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onFollow(); }}
+              onPress={async () => { haptics.light(); await onFollow(); }}
               testID={`follow-btn-${testIdBase}`}
             >
               <Feather
@@ -247,7 +246,7 @@ export function RightActionRail({
           // same tick EngagementButton's tapSpring kicks off (both happen
           // before `onLike` is awaited), so the haptic and the icon's
           // squash-overshoot-settle spring read as one moment.
-          onPress={async () => { hapticLight(); await onLike(); }}
+          onPress={async () => { haptics.light(); await onLike(); }}
           tapSpring
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           testID={`like-btn-${testIdBase}`}
@@ -280,7 +279,7 @@ export function RightActionRail({
         style={styles.actionContent}
         rotateAnim={repostSpin}
         scaleAnim={repostScale}
-        onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onRepost(); }}
+        onPress={async () => { haptics.light(); await onRepost(); }}
         hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
         testID={`repost-btn-${testIdBase}`}
       />
@@ -299,7 +298,7 @@ export function RightActionRail({
         style={styles.actionContent}
         translateYAnim={saveDrop}
         scaleAnim={saveScale}
-        onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onSave(); }}
+        onPress={async () => { haptics.light(); await onSave(); }}
         hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
         testID={`save-btn-${testIdBase}`}
       />

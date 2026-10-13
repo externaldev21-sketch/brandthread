@@ -62,7 +62,8 @@ describe('seller screens make no protected API call when signed out / Clerk not 
     expect(s).toContain('isSellerDevPreview() && (!authLoaded || !isSignedIn || !userId)');
     before(s, 'const fetchStatus = useCallback', 'if (isSellerPreview)', 'api.seller.subscription.status()');
     for (const fn of ['handleChangePlan', 'handleOpenPortal', 'handleRestore']) {
-      before(s, `async function ${fn}`, 'if (isSellerPreview) return;', 'haptic()');
+      // The preview guard is the handler's first statement, ahead of any billing call.
+      expect(s).toMatch(new RegExp(`async function ${fn}\\([^)]*\\) \\{\\s*if \\(isSellerPreview\\) return;`));
     }
   });
 

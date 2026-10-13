@@ -144,7 +144,7 @@ import { radius } from '@/constants/radii';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const FONT_FAMILIES = ['System', 'serif', 'monospace', 'Inter_400Regular', 'Georgia'];
+const FONT_FAMILIES = ['System', 'serif', 'monospace', FONT.regular, 'Georgia'];
 
 // BrushDef/duplicateBrush/deleteBrush/nextActiveBrushAfterDelete now live in
 // lib/brushLibraryModel.ts (dependency-free, so they're unit-testable under

@@ -29,6 +29,7 @@ import productVariantsRouter from "./product-variants";
 import catalogPublicRouter from "./catalog-public";
 import sellerHubRouter from "./seller-hub";
 import pushRouter from "./push";
+import liveActivitiesRouter from "./liveActivities";
 import aiRouter from "./ai";
 import aiCreditsRouter from "./ai-credits";
 import aiHelpersRouter from "./ai-helpers";
@@ -254,6 +255,7 @@ router.use("/product-variants", tc, productVariantsRouter);
 router.use("/catalog-public",   catalogPublicRouter);
 router.use("/seller-hub",      tc, sellerHubRouter);
 router.use("/push",            pushRouter);
+router.use("/live-activities", liveActivitiesRouter); // iOS Live Activity APNs tokens; requireAuth per route, no team context
 router.use("/notification-prefs", notificationPrefsRouter);
 router.use("/ai",              tc, aiSafetyGuard("ai-chat", { mode: "chat" }), aiRouter);
 

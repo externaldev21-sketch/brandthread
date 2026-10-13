@@ -8,10 +8,9 @@
  * extra insurance when a cover video is actually playing.
  */
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { hapticLight } from '@/lib/haptics';
 import { FONT, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { InteractionLayer } from './ProfileControls';
@@ -33,7 +32,7 @@ export function ProfileAccountSwitcher({
   return (
     <PressableScale
       style={styles.switcher}
-      onPress={() => { hapticLight(); onPress(); }}
+      onPress={() => { onPress(); }}
       activeOpacity={0.75}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -62,7 +61,8 @@ export function ProfileTopBarIcon({
   testID,
 }: {
   name: keyof typeof Feather.glyphMap;
-  onPress: () => void;
+  /** Receives the press event so a ⋯ button can anchor its pull-down menu. */
+  onPress: (event?: GestureResponderEvent) => void;
   accessibilityLabel: string;
   accessibilityHint?: string;
   badge?: boolean;
@@ -71,7 +71,7 @@ export function ProfileTopBarIcon({
   const { theme } = useAppTheme();
   return (
     <Pressable
-      onPress={() => { hapticLight(); onPress(); }}
+      onPress={(event) => { onPress(event); }}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}

@@ -32,7 +32,7 @@ import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
-import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 
 const { width: W } = Dimensions.get('window');
 const GAP = SPACING.xs;
@@ -60,7 +60,7 @@ function TilePressable({ onPress, onLongPress, accessibilityLabel, children, sty
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      onPress={() => { hapticLight(); onPress(); }}
+      onPress={() => onPress()}
       onLongPress={onLongPress}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
@@ -178,7 +178,7 @@ export default function BuyerSaved() {
       }
       const result = await addToCart({ product, variant, quantity: 1 });
       if (result.success) {
-        hapticSuccessAction();
+        haptics.light();
         setActionsFor(null);
       } else {
         Alert.alert('Cannot Add to Cart', result.message ?? 'Please try again.');

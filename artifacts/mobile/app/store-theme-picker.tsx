@@ -9,7 +9,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -66,7 +66,7 @@ export default function StoreThemePicker() {
               await applyTheme(themeId, presetId);
               setCurrentThemeId(themeId);
               setPreviewingThemeId(null);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              haptics.success();
               if (andNavigate) {
                 router.push('/store-editor' as never);
               }
@@ -91,7 +91,6 @@ export default function StoreThemePicker() {
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => {
-            Haptics.selectionAsync();
             setPreviewingThemeId(item.id);
             setSelectedPresetId(item.presets[0]?.paletteId ?? null);
           }}
@@ -139,7 +138,6 @@ export default function StoreThemePicker() {
             <TouchableOpacity
               style={styles.previewBtn}
               onPress={() => {
-                Haptics.selectionAsync();
                 setPreviewingThemeId(item.id);
                 setSelectedPresetId(item.presets[0]?.paletteId ?? null);
               }}
@@ -168,7 +166,7 @@ export default function StoreThemePicker() {
     <View style={styles.root}>
       <ScreenHeader
         title="Storefront Theme"
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+        onBack={() => { goBackOr(router); }}
       />
 
       {/* Thread Theme */}
@@ -250,7 +248,7 @@ export default function StoreThemePicker() {
                     key={preset.paletteId}
                     style={[styles.presetChip, isSelected && styles.presetChipActive]}
                     onPress={() => {
-                      Haptics.selectionAsync();
+                      haptics.selection();
                       setSelectedPresetId(preset.paletteId);
                     }}
                   >

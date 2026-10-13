@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import {
   BG, CARD, BORDER, FG, MUTED,
   FONT, FS, SP, RADIUS, GRAD_PRIMARY,
@@ -65,7 +65,7 @@ function SizeSelector({
           <TouchableOpacity
             key={opt}
             style={[s.sizeBubble, selected === opt && s.sizeBubbleActive]}
-            onPress={() => { Haptics.selectionAsync(); onSelect(opt); }}
+            onPress={() => { haptics.selection(); onSelect(opt); }}
           >
             <Text style={[s.sizeBubbleText, selected === opt && s.sizeBubbleTextActive]}>{opt}</Text>
           </TouchableOpacity>
@@ -102,12 +102,12 @@ export default function ShoppingPreferences() {
     // Persist selected style categories alongside other preferences
     await patchBuyerSettings({ styleCategories: Array.from(selectedCats) });
     setHasChanges(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     goBackOr(router);
   }
 
   function toggleCat(key: string) {
-    Haptics.selectionAsync();
+    haptics.selection();
     setSelectedCats(prev => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);

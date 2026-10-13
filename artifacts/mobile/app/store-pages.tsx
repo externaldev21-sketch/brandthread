@@ -9,7 +9,6 @@ import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -277,7 +276,7 @@ export default function StorePagesScreen() {
     <View style={styles.root}>
       <ScreenHeader
         title={mode === 'new' ? 'New Page' : 'Edit Page'}
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('list'); }}
+        onBack={() => setMode('list')}
       />
 
       <ScrollView

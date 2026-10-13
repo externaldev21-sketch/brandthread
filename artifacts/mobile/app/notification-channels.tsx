@@ -11,9 +11,9 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ListRow } from '@/components/ui/ListRow';
 import { QuietHoursRow, type QuietHoursPreset } from '@/components/notifications/QuietHoursRow';
+import { quietHoursBody } from '@/lib/deviceTimeZone';
 import { Card } from '@/components/ui/Card';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { hapticToggle } from '@/lib/haptics';
 import { BUYER_NOTIFICATION_TYPES, SELLER_NOTIFICATION_TYPES } from '@/lib/notificationTypes';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -46,7 +46,6 @@ export default function NotificationChannelsScreen() {
   }, []);
 
   const change = useCallback(async (channel: Channel, key: string, value: boolean) => {
-    hapticToggle();
     const prior = channels;
     setChannels({ ...channels, [channel]: { ...channels[channel], [key]: value } });
     try {
@@ -62,7 +61,7 @@ export default function NotificationChannelsScreen() {
     setQuietHours({ start: preset.start, end: preset.end });
     try {
       await api.notificationPrefs.update({
-        quietHours: preset.start && preset.end ? { start: preset.start, end: preset.end } : null,
+        quietHours: quietHoursBody(preset.start, preset.end),
       });
     } catch {
       setQuietHours(prior);

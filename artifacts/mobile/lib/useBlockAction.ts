@@ -6,13 +6,13 @@
 import { useCallback } from 'react';
 import { useApi } from '@/lib/api';
 import { confirmBlock, type BlockSubject } from '@/lib/safety';
-import { hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 
 export function useBlockAction(): (subject: BlockSubject) => Promise<boolean> {
   const api = useApi();
   return useCallback(async (subject: BlockSubject) => {
     const done = await confirmBlock(subject, api.social.block);
-    if (done) hapticSuccess();
+    if (done) haptics.success();
     return done;
   }, [api]);
 }

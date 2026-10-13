@@ -26,7 +26,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -122,7 +121,6 @@ export function BuyNowFlow({
     if (!product || !variant || !defaultAddress) return;
     setPhase('paying');
     setError('');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
     try {
       const cart = await getCart();
       await createBuyNowSession(product, variant, quantity, cart);

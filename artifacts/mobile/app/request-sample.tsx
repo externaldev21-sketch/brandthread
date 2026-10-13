@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 import { COMP, FONT, ICON } from '@/lib/theme';
 import {
@@ -72,7 +72,7 @@ export default function RequestSampleScreen() {
         currentStep: 5,
       });
       await submitQuoteRequest(draft.id);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       Alert.alert(
         'Sample request sent',
         `Your request is now visible to ${manufacturer.name}.`,
@@ -94,7 +94,7 @@ export default function RequestSampleScreen() {
       <View style={styles.root}>
         <ScreenHeader
           title="Request Sample"
-          onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+          onBack={() => { goBackOr(router); }}
         />
         <EmptyState
           icon="alert-circle"
@@ -112,7 +112,7 @@ export default function RequestSampleScreen() {
     <View style={styles.root}>
       <ScreenHeader
         title="Request Sample"
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+        onBack={() => { goBackOr(router); }}
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Field label="Product type">

@@ -21,7 +21,7 @@ import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
@@ -578,7 +578,7 @@ function SourceChip({ label, active, onPress, colors, theme }: any) {
   return (
     <TouchableOpacity
       style={[s.sourceChip, { backgroundColor: colors.elevated, borderColor: colors.border }, active && { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      onPress={() => { haptics.selection(); onPress(); }}
       accessibilityRole="radio"
       accessibilityState={{ checked: active }}
     >
@@ -591,7 +591,7 @@ function Chip({ label, active, onPress, colors, theme }: any) {
   return (
     <TouchableOpacity
       style={[s.chip, { backgroundColor: colors.elevated, borderColor: colors.border }, active && { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      onPress={() => { haptics.selection(); onPress(); }}
       accessibilityRole="radio"
       accessibilityState={{ checked: active }}
     >

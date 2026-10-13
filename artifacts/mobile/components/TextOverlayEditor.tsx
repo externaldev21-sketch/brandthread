@@ -23,7 +23,7 @@ import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type {
@@ -144,7 +144,6 @@ export function TextOverlayEditor({
   function handleDone() {
     const trimmed = text.trim();
     if (!trimmed) { onCancel(); return; }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onDone({
       id: editingOverlay?.id ?? genId(),
       text: trimmed,
@@ -159,14 +158,14 @@ export function TextOverlayEditor({
   }
 
   function cycleAlign() {
-    Haptics.selectionAsync();
+    haptics.selection();
     const order: TextOverlayAlign[] = ['left', 'center', 'right'];
     const next = order[(order.indexOf(align) + 1) % order.length];
     setAlign(next);
   }
 
   function cycleBgStyle() {
-    Haptics.selectionAsync();
+    haptics.selection();
     const order: TextOverlayBgStyle[] = ['none', 'semi', 'solid'];
     const next = order[(order.indexOf(bgStyle) + 1) % order.length];
     setBgStyle(next);
@@ -313,7 +312,7 @@ export function TextOverlayEditor({
                 return (
                   <TouchableOpacity
                     key={fp.key}
-                    onPress={() => { Haptics.selectionAsync(); setFontStyle(fp.key); }}
+                    onPress={() => { haptics.selection(); setFontStyle(fp.key); }}
                     style={[es.fontChip, active && es.fontChipActive]}
                     activeOpacity={0.75}
                     accessibilityLabel={`Font style: ${fp.label}`}
@@ -346,7 +345,7 @@ export function TextOverlayEditor({
                 key={c}
                 color={c}
                 selected={color === c}
-                onPress={() => { Haptics.selectionAsync(); setColor(c); }}
+                onPress={() => { haptics.selection(); setColor(c); }}
               />
             ))}
           </ScrollView>
@@ -456,7 +455,7 @@ export function OverlayChip({
       <Pressable
         onPress={onTap}
         onLongPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          haptics.warning();
           onDelete();
         }}
         delayLongPress={500}

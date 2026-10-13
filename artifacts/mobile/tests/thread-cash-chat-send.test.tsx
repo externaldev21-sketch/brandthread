@@ -60,6 +60,9 @@ vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(async () => {}),
   NotificationFeedbackType: { Success: 'success' },
 }));
+vi.mock('@/lib/haptics', () => ({
+  haptics: { selection: vi.fn(), light: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn(), rigid: vi.fn() },
+}));
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'test-uuid' }));
 vi.mock('@/lib/appLock', () => ({
   authenticateForAppLock: vi.fn(async () => ({ success: true, cancelled: false })),

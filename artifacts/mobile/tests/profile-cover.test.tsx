@@ -43,7 +43,7 @@ vi.mock('expo-video', () => ({
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 vi.mock('@expo/vector-icons', () => ({ Feather: () => null }));
 vi.mock('@/hooks/useApi', () => ({ useApi: () => apiMock }));
-vi.mock('@/lib/haptics', () => ({ hapticLight: vi.fn(), hapticSelection: vi.fn() }));
+vi.mock('@/lib/haptics', () => ({ hapticLight: vi.fn(), hapticSelection: vi.fn(), haptics: { selection: vi.fn(), light: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn(), rigid: vi.fn() } }));
 vi.mock('@/lib/profileEvents', () => ({ emitProfileEvent: vi.fn() }));
 vi.mock('@/components/BrandthreadUI', () => ({
   PressableScale: ({ children, ...rest }: any) => React.createElement('Pressable', rest, typeof children === 'function' ? children({ pressed: false }) : children),

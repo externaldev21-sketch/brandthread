@@ -22,7 +22,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import {
   MY_USER_ID, subscribeSocial, saveItem, createOrGetConversation, getStories,
 } from '@/services/socialService';
@@ -291,7 +291,7 @@ export default function FriendsScreen() {
   }, []);
 
   function handleLike(post: BuyerPost) {
-    hapticPrimaryAction();
+    haptics.light();
     // Optimistic update
     setFeedPosts(prev =>
       prev.map(p =>
@@ -311,7 +311,7 @@ export default function FriendsScreen() {
   }
 
   function handleRepost(postId: string) {
-    hapticPrimaryAction();
+    haptics.light();
     setFeedPosts(prev =>
       prev.map(p =>
         p.id === postId
@@ -327,7 +327,7 @@ export default function FriendsScreen() {
   }
 
   function handleSave(post: BuyerPost) {
-    hapticPrimaryAction();
+    haptics.light();
     const wasSaved = savedIds.has(post.id);
     setSavedIds(prev => {
       const next = new Set(prev);
@@ -350,7 +350,6 @@ export default function FriendsScreen() {
   }
 
   function handleNotInterested(post: BuyerPost) {
-    hapticSelection();
     setFeedPosts(prev => prev.filter(p => p.id !== post.id));
     showSnackbar('Post hidden');
   }
@@ -408,7 +407,7 @@ export default function FriendsScreen() {
         <PressableScale
           style={s.storyItem}
           accessibilityLabel="Add to your story"
-          onPress={() => { hapticPrimaryAction(); router.push('/buyer-story-create' as never); }}
+          onPress={() => router.push('/buyer-story-create' as never)}
         >
           {/* The badge sits outside the avatar's own clipped circle — nesting
               it inside (with the circle's `overflow: hidden`) clipped it down
@@ -437,7 +436,6 @@ export default function FriendsScreen() {
               style={s.storyItem}
               accessibilityLabel={`${story.authorName}'s story`}
               onPress={() => {
-                hapticPrimaryAction();
                 router.push(
                   `/buyer-story-viewer?storyId=${story.id}&allStoryIds=${allStoryIds.join(',')}` as never,
                 );
@@ -465,7 +463,7 @@ export default function FriendsScreen() {
         <View style={{ marginBottom: SPACING.sm }}>
           <View style={s.sectionHeader}>
             <Text style={[TYPE_SCALE.headline, s.sectionTitle, { color: palette.foreground }]}>Following</Text>
-            <PressableScale onPress={() => { hapticPrimaryAction(); router.push('/buyer-friend-requests' as never); }}>
+            <PressableScale onPress={() => router.push('/buyer-friend-requests' as never)}>
               <Text style={[TYPE_SCALE.callout, s.seeAll, { color: theme.accent }]}>See all</Text>
             </PressableScale>
           </View>
@@ -482,7 +480,6 @@ export default function FriendsScreen() {
                 <PressableScale
                   style={s.followingItemTap}
                   onPress={() => {
-                    hapticPrimaryAction();
                     router.push({
                       pathname: '/buyer-other-profile' as any,
                       params: { userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color },
@@ -500,7 +497,7 @@ export default function FriendsScreen() {
                   style={[s.msgBubble, { backgroundColor: theme.accentDim }]}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   accessibilityLabel={`Message ${f.name}`}
-                  onPress={() => { hapticPrimaryAction(); handleMessageFriend({ userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color } as any); }}
+                  onPress={() => { handleMessageFriend({ userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color } as any); }}
                 >
                   <Feather name="message-circle" size={14} color={theme.accent} />
                 </PressableScale>
@@ -513,7 +510,7 @@ export default function FriendsScreen() {
       {/* Section header */}
       <View style={s.sectionHeader}>
         <Text style={[TYPE_SCALE.headline, s.sectionTitle, { color: palette.foreground }]}>Friend activity</Text>
-        <PressableScale onPress={() => { hapticPrimaryAction(); router.navigate('/(buyer)/discover' as never); }}>
+        <PressableScale onPress={() => router.navigate('/(buyer)/discover' as never)}>
           <Text style={[TYPE_SCALE.callout, s.seeAll, { color: theme.accent }]}>See all</Text>
         </PressableScale>
       </View>
@@ -525,7 +522,7 @@ export default function FriendsScreen() {
           illustration="friends"
           title="Find your crew"
           description="Add friends to see what they're copping, saving, and dropping."
-          action={{ label: 'Find friends', onPress: () => { hapticPrimaryAction(); router.push('/buyer-friend-requests' as never); } }}
+          action={{ label: 'Find friends', onPress: () => router.push('/buyer-friend-requests' as never) }}
         />
       )}
     </>
@@ -545,7 +542,7 @@ export default function FriendsScreen() {
             <PressableScale
               key={f.id}
               style={s.friendItem}
-              onPress={() => { hapticPrimaryAction(); handleMessageFriend(f); }}
+              onPress={() => handleMessageFriend(f)}
             >
               <View style={[s.avatar48, { backgroundColor: f.color }]}>
                 <Text style={[TYPE_SCALE.callout, s.avatar48Text]}>{f.initials}</Text>

@@ -14,7 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
-import { hapticSuccessAction, hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { identityOrNone } from '@/lib/animationUtils';
 import { FONT, RED } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE, TypeRoleName } from '@/constants/typography';
@@ -60,7 +60,7 @@ export function HeartToggle({ liked, onChange, size = 22, accessibilityLabel, on
         // tap on the heart also bubbles to the DOM and fires the outer
         // Pressable's onPress, navigating away instead of just toggling.
         e.stopPropagation?.();
-        hapticSuccessAction();
+        haptics.light();
         onChange(!liked);
       }}
       onLongPress={(e) => { e.stopPropagation?.(); onLongPress?.(); }}
@@ -121,7 +121,7 @@ export function FollowMorphButton({
       accessibilityLabel={following ? `${followingLabel}, tap to unfollow` : followLabel}
       accessibilityState={{ selected: following, disabled: !!disabled }}
       disabled={disabled}
-      onPress={() => { hapticToggle(); onChange(!following); }}
+      onPress={() => { haptics.light(); onChange(!following); }}
     >
       <Animated.View style={[styles.followBtn, small && styles.followBtnSmall, animatedStyle, disabled && styles.followBtnDisabled, style]}>
         <Animated.Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold }, labelStyle, textStyle]}>

@@ -1,15 +1,15 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { hasNoActionNeeded, type DashboardActionCounts } from '@/lib/sellerDashboardStats';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
 interface ActionRowConfig {
   key: keyof DashboardActionCounts;
-  icon: React.ComponentProps<typeof Feather>['name'];
+  icon: IconName;
   title: (count: number) => string;
   subtitle: string;
   route: string;
@@ -38,10 +38,10 @@ export function SellerDashboardActionNeeded({
 
   return (
     <View testID="seller-dashboard-action-needed">
-      <Text style={[styles.sectionHeader, { color: theme.muted }]}>Needs attention</Text>
+      <Text style={[styles.sectionHeader, { color: theme.text }]}>Needs attention</Text>
       {allCaughtUp ? (
         <View style={styles.caughtUpRow} testID="seller-dashboard-all-caught-up">
-          <Feather name="check-circle" size={16} color={theme.success} />
+          <Icon name="check-circle" size={16} color={theme.success} />
           <Text style={[styles.caughtUpText, { color: theme.muted }]}>You’re all caught up</Text>
         </View>
       ) : (
@@ -57,13 +57,13 @@ export function SellerDashboardActionNeeded({
                 accessibilityLabel={row.title(count)}
               >
                 <View style={[styles.iconWrap, { backgroundColor: theme.cardElevated }]}>
-                  <Feather name={row.icon} size={16} color={theme.text} />
+                  <Icon name={row.icon} size={16} color={theme.text} />
                 </View>
                 <View style={styles.copy}>
                   <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{row.title(count)}</Text>
                   <Text style={[styles.subtitle, { color: theme.muted }]} numberOfLines={1}>{row.subtitle}</Text>
                 </View>
-                <Feather name="chevron-right" size={18} color={theme.subtle} />
+                <Icon name="chevron-right" size={18} color={theme.subtle} />
               </PressableScale>
             );
           })}
@@ -74,11 +74,11 @@ export function SellerDashboardActionNeeded({
 }
 
 const styles = StyleSheet.create({
+  // Section header: sentence case, 17 semibold, white (BRANDTHREAD_DESIGN.md).
   sectionHeader: {
-    fontFamily: FONT.bold,
-    fontSize: FS.xs,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    fontFamily: FONT.semibold,
+    fontSize: 17,
+    lineHeight: 22,
     marginBottom: SP.sm,
   },
   caughtUpRow: {

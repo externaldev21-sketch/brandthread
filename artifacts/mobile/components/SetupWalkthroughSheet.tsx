@@ -14,7 +14,6 @@ import Animated from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -66,14 +65,12 @@ export default function SetupWalkthroughSheet({
   const total = requiredTaskCount(setupState);
 
   const handleClose = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const next = await dismissWelcome(userId);
     onSetupStateChange(next);
     onClose();
   }, [onClose, onSetupStateChange, userId]);
 
   const openTask = useCallback(async (task: SetupTask) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const next = await markSetupStarted(userId);
     onSetupStateChange(next);
     onClose();

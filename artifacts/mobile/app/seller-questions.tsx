@@ -8,7 +8,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
@@ -114,7 +114,7 @@ export default function SellerQuestionsScreen() {
   const onAnswered = (id: string, body: string) => {
     setItems(prev => (prev ?? []).map(q => q.id === id ? { ...q, answer: { id: q.answer?.id ?? id, body, createdAt: new Date().toISOString() } } : q));
     setToast('Answer posted');
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
   };
 
   return (

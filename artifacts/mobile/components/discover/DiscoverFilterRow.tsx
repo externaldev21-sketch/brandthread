@@ -2,7 +2,7 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
@@ -49,7 +49,7 @@ export function DiscoverFilterRow({
               style={[styles.pill, isActive && styles.pillActive]}
               onPress={() => {
                 if (isActive) return;
-                hapticToggle();
+                haptics.selection();
                 onChange(filter.key);
               }}
               activeOpacity={0.8}
