@@ -955,6 +955,8 @@ export interface PublicPairedProduct {
   isPreOrder: boolean;
   available: boolean;
   variants: Array<{ id: string; size: string | null; color: string | null; priceCents: number; stock: number }>;
+  /** 'curated' = seller-paired; 'auto' = same-brand complementary fill. */
+  source?: 'curated' | 'auto';
 }
 /** An active seller bundle holding a product (GET /api/bundles/public/product/:id). Prices are what checkout charges. */
 export interface PublicProductBundle {
