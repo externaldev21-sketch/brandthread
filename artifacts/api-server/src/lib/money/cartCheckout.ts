@@ -35,6 +35,7 @@ import { effectiveUnitPrice } from "../pricing/salesRuntime";
 import { CheckoutPlanError, resolveChargePlan } from "./checkoutPlan";
 import { destinationApplicationFeeCents } from "./fees";
 import { resolveSellerPlatformFeeBps } from "../planPerks";
+import { resolveAuctionLinePrice } from "../liveAuctions";
 
 export const CART_CHECKOUT_KIND = "cart_checkout";
 /** Stripe's minimum USD card charge. */
@@ -143,7 +144,7 @@ export type PricedGroup = {
 
 export async function priceCartGroup(input: {
   buyerId: string;
-  items: Array<{ variantId: string; productId: string; quantity: number }>;
+  items: Array<{ variantId: string; productId: string; quantity: number; auctionId?: string }>;
   discountCode?: string | null;
   /** Live stream the buyer is shopping from (live-only discount codes). */
   liveStreamId?: string | null;
@@ -186,7 +187,12 @@ export async function priceCartGroup(input: {
     const variantLabel = [row.size, row.color].filter(Boolean).join(" / ");
     // Automatic sale (lib/pricing/sales.ts): the sale price is the authoritative
     // charge, and discount codes apply on top of it.
-    const unitCents = (await effectiveUnitPrice({
+    // A live-auction win is charged the winning price; a piece held by an
+    // auction can't be bought any other way (throws AuctionError).
+    const auctionPrice = await resolveAuctionLinePrice({
+      buyerId: input.buyerId, productId: item.productId, variantId: item.variantId, quantity: item.quantity, auctionId: item.auctionId ?? null,
+    });
+    const unitCents = auctionPrice ? auctionPrice.priceCents : (await effectiveUnitPrice({
       productId: item.productId, sellerId: row.sellerId, priceCents: row.priceCents, compareAtPriceCents: row.compareAtPriceCents,
     })).priceCents;
     items.push({

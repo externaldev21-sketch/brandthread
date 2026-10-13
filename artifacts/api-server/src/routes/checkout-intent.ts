@@ -41,6 +41,7 @@ import {
 import { paymentIntentMethodParams, paymentMethodTypesFor } from "../lib/payments/bnpl";
 import { bnplMethodsForCart } from "../lib/payments/sellerPaymentSettings";
 import { StockReservationError, releaseStockReservation, reserveStock } from "../lib/money/stockReservation";
+import { AuctionError, recordAuctionCheckout } from "../lib/liveAuctions";
 import { applyGiftCardToGroup, trimGiftCardsForMinimumCharge } from "../lib/giftCards/checkout";
 import { GiftCardError, claimCard, giftCentsForCheckouts, reserveForCheckout } from "../lib/giftCards/service";
 
@@ -68,6 +69,8 @@ const itemSchema = z.object({
   variantId: requestPrimitives.uuid,
   productId: requestPrimitives.uuid,
   quantity: z.coerce.number().int().min(1).max(100),
+  /** Paying for a live auction you won: the winning price comes from the server (lib/liveAuctions.ts). */
+  auctionId: z.string().uuid().optional(),
 });
 const addressSchema = z.object({
   recipientName: requestPrimitives.shortText,
@@ -206,6 +209,10 @@ function stripeFor(res: Response): ReturnType<typeof requireStripe> | null {
 }
 
 function sendError(res: Response, error: unknown): boolean {
+  if (error instanceof AuctionError) {
+    res.status(error.status).json({ error: error.message, code: error.code });
+    return true;
+  }
   if (error instanceof GiftCardError) {
     res.status(error.status).json({ error: error.message, code: error.code });
     return true;
@@ -368,6 +375,13 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
       }
     });
   };
+
+  // Auction wins: link the checkout so the paid order closes the auction.
+  for (let i = 0; i < rows.length; i++) {
+    for (const item of body.groups[i]?.items ?? []) {
+      if (item.auctionId) await recordAuctionCheckout(rows[i].id, item.auctionId, buyerId);
+    }
+  }
 
   // ── One PaymentIntent for the cart ────────────────────────────────────────
   let intent;

@@ -374,6 +374,8 @@ import liveModerationRouter from "./live-moderation";
 import liveCohostRouter from "./live-cohost";
 router.use("/live",                      tc, liveModerationRouter);
 router.use("/live",                      tc, liveCohostRouter);
+import liveAuctionsRouter from "./live-auctions";
+router.use("/live",                      tc, liveAuctionsRouter); // Auctions for 1-of-1s (live_auctions flag) — before liveRouter's /:id
 router.use("/live",                      tc, liveCommerceRouter); // Pin / live codes / scheduled — before liveRouter so /scheduled/* never hits /:id
 router.use("/live",                      tc, liveRouter);
 import liveReplaysRouter from "./live-replays";
