@@ -68,6 +68,7 @@ import { initBuyerProfile } from '@/lib/buyerProfile';
 import { WebAppShell } from '@/components/web/WebAppShell';
 import { PhoneFrameSafeArea } from '@/components/web/PhoneFrameSafeArea';
 import StoreContextBanner from '@/components/StoreContextBanner';
+import PackerRouteGuard from '@/components/PackerRouteGuard';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
 import OfflineBanner from '@/components/OfflineBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
@@ -1339,6 +1340,7 @@ function RootLayoutNav() {
       <Pressable onPress={dismissKeyboardUnlessTextInput} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
           <AppStack />
+          <PackerRouteGuard />
         </View>
       </Pressable>
       <StatusBarMask />

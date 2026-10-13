@@ -16,6 +16,7 @@ interface Props {
 function roleLabel(role?: string): string {
   if (role === 'manager') return 'Manager';
   if (role === 'staff')   return 'Staff';
+  if (role === 'packer')  return 'Packer';
   if (role === 'owner')   return 'Owner';
   return role ?? 'Team member';
 }

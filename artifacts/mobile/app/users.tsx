@@ -26,9 +26,9 @@ function fmtDate(iso: string | null) {
 
 const ROLE_LABEL: Record<string, string> = {
   owner: 'Owner', admin: 'Admin', finance: 'Finance', orders: 'Orders', marketing: 'Marketing', viewer: 'Viewer',
-  manager: 'Manager', staff: 'Staff',
+  manager: 'Manager', staff: 'Staff', packer: 'Packer',
 };
-const INVITE_ROLES = ['admin', 'finance', 'orders', 'marketing', 'viewer'] as const;
+const INVITE_ROLES = ['admin', 'finance', 'orders', 'packer', 'marketing', 'viewer'] as const;
 
 export default function UsersScreen() {
   const colors = useColors();

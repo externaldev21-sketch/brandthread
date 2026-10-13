@@ -14,6 +14,7 @@ const DEFAULT_ROLES = [
   { key: 'admin', name: 'Admin', group: 'Organization', description: 'Products, orders, inventory, analytics, customers, marketing, payouts and team', staffCount: 0 },
   { key: 'finance', name: 'Finance', group: 'Store', description: 'Balance, payouts, transactions and statements', staffCount: 0 },
   { key: 'orders', name: 'Orders', group: 'Store', description: 'Orders, fulfillment and inventory', staffCount: 0 },
+  { key: 'packer', name: 'Packer', group: 'Store', description: "Sees orders to pack and ship. No sales, payouts, customers' contact details or store settings.", staffCount: 0 },
   { key: 'marketing', name: 'Marketing', group: 'Store', description: 'Ads, boosts and discount codes', staffCount: 0 },
   { key: 'viewer', name: 'Viewer', group: 'Store', description: 'Read-only analytics and store data', staffCount: 0 },
 ];
