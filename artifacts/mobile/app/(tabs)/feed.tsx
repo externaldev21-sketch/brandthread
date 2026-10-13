@@ -25,6 +25,7 @@ import {
 } from '@/services/socialService';
 import { confirmSponsoredImpression } from '@/services/sponsoredService';
 import type { SellerThreadPost } from '@/services/socialService';
+import { getThreadsFirstPage } from '@/services/threadsFollowedFirst';
 import * as Haptics from 'expo-haptics';
 import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -2266,7 +2267,10 @@ export default function FeedScreen({
       }
     } else setFeedRefreshing(true);
     try {
-      const page = await getThreadPostsPage(initialCursor, THREAD_PAGE_SIZE, feedTab);
+      // Threads, buyer: new posts from followed brands lead the first page.
+      const page = feedTab === 'for-you' && isBuyerSurface
+        ? await getThreadsFirstPage(initialCursor, THREAD_PAGE_SIZE)
+        : await getThreadPostsPage(initialCursor, THREAD_PAGE_SIZE, feedTab);
       if (feedGenerationRef.current !== generation) return;
       const rows = page.posts;
       const mapped = (Array.isArray(rows) ? rows : [])
@@ -2289,7 +2293,7 @@ export default function FeedScreen({
         else setFeedRefreshing(false);
       }
     }
-  }, [feedTab, creatorSource, creatorId, creatorStartPostId, creatorExactPost]);
+  }, [feedTab, creatorSource, creatorId, creatorStartPostId, creatorExactPost, isBuyerSurface]);
 
   const loadMoreFeed = useCallback(async () => {
     if (feedLoadingMoreRef.current || !feedHasMoreRef.current || feedLoading || feedRefreshing) return;
