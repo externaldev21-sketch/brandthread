@@ -14,6 +14,8 @@ import {
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { Snackbar } from '@/components/ui/Snackbar';
+import { pinPostWithReplacePrompt, unpinPost } from '@/services/postPinService';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -88,12 +90,21 @@ export default function ContentScreen() {
   // real, permanent empty library instead of a retryable outage.
   const [loadError, setLoadError] = useState(false);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
+  // Pin to your profile (Instagram): pinned post ids + the confirmation toast.
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
+  const [pinToast, setPinToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pinToast) return;
+    const t = setTimeout(() => setPinToast(null), 2500);
+    return () => clearTimeout(t);
+  }, [pinToast]);
 
   const loadContent = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
     try {
       const posts = await getSellerPosts();
+      setPinnedIds(new Set(posts.filter((post) => post.pinnedAt).map((post) => post.id)));
       setContent(posts.map((post): ContentPost => ({
         id: post.id,
         type: post.contentType as ContentType,
@@ -216,6 +227,20 @@ export default function ContentScreen() {
           }
         },
       },
+      ...(post.status === 'published' ? [{
+        text: pinnedIds.has(post.id) ? 'Unpin from profile' : 'Pin to your profile',
+        onPress: async () => {
+          const wasPinned = pinnedIds.has(post.id);
+          try {
+            const result = wasPinned ? await unpinPost(post.id) : await pinPostWithReplacePrompt(post.id);
+            if (!result) return;
+            setPinnedIds(new Set(result.pins));
+            setPinToast(wasPinned ? 'Post unpinned' : 'Post pinned to your profile');
+          } catch {
+            Alert.alert(wasPinned ? 'Post not unpinned' : 'Post not pinned', 'Check your connection and try again.');
+          }
+        },
+      }] : []),
       {
         text: 'Delete',
         style: 'destructive',
@@ -437,6 +462,7 @@ export default function ContentScreen() {
         )}
       />
       <AIBrainFAB context={{ screen: 'content' as const }} bottomOffset={0} />
+      <Snackbar visible={!!pinToast} message={pinToast ?? ''} onDismiss={() => setPinToast(null)} />
     </View>
   );
 }

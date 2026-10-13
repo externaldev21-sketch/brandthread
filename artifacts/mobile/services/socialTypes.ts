@@ -89,6 +89,8 @@ export interface BuyerPost {
   repostedByMe: boolean;
   isArchived: boolean;
   isDraft: boolean;
+  /** Set when the author pinned it to their profile (shown first, with a pin glyph). */
+  pinnedAt?: string | null;
   /** Set when this post quotes another; null/absent otherwise. */
   quotedPost?: QuotedPostSummary | null;
   quotesCount?: number;

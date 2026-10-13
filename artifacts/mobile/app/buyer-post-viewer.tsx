@@ -13,7 +13,7 @@ import {
   TextInput, Modal, Share, Animated, useWindowDimensions, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
@@ -42,6 +42,8 @@ import { requestContextualPushPermission } from '@/lib/contextualPushPermission'
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { CaptionSpans } from '@/components/social/CaptionText';
+import { Snackbar } from '@/components/ui/Snackbar';
+import { pinPostWithReplacePrompt, unpinPost } from '@/services/postPinService';
 import { CaptionsOverlay, type CaptionSegment } from '@/components/social/CaptionsOverlay';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useCaptionsPreference, useReadyCaptionTrack } from '@/lib/captions';
@@ -190,6 +192,29 @@ export default function BuyerPostViewer() {
   }>();
 
   const [post, setPost] = useState<BuyerPost | null>(null);
+  const [pinBusy, setPinBusy] = useState(false);
+  const [pinToast, setPinToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pinToast) return;
+    const t = setTimeout(() => setPinToast(null), 2500);
+    return () => clearTimeout(t);
+  }, [pinToast]);
+  const togglePin = async () => {
+    if (!post || pinBusy) return;
+    const wasPinned = !!post.pinnedAt;
+    setPinBusy(true);
+    try {
+      const result = wasPinned ? await unpinPost(post.id) : await pinPostWithReplacePrompt(post.id);
+      if (!result) return;
+      Haptics.selectionAsync();
+      setPost((prev) => (prev ? { ...prev, pinnedAt: wasPinned ? null : (result.pinnedAt ?? new Date().toISOString()) } : prev));
+      setPinToast(wasPinned ? 'Post unpinned' : 'Post pinned to your profile');
+    } catch {
+      setPinToast(wasPinned ? "Couldn't unpin. Try again." : "Couldn't pin. Try again.");
+    } finally {
+      setPinBusy(false);
+    }
+  };
   const [comments, setComments] = useState<Comment[]>([]);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
@@ -501,6 +526,22 @@ export default function BuyerPostViewer() {
           </View>
         ) : null}
 
+        {/* Owner-only: Pin to your profile (Instagram) — published posts only */}
+        {isOwner && post && !post.isDraft ? (
+          <View style={{ paddingHorizontal: SP.md, marginTop: SP.lg }}>
+            <TouchableOpacity
+              style={s.captionsBtn}
+              onPress={() => { void togglePin(); }}
+              disabled={pinBusy}
+              accessibilityRole="button"
+              testID="toggle-pin"
+            >
+              <MaterialCommunityIcons name={post.pinnedAt ? 'pin-off-outline' : 'pin-outline'} size={16} color={FG} />
+              <Text style={s.captionsBtnText}>{post.pinnedAt ? 'Unpin from profile' : 'Pin to your profile'}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* Owner-only danger zone */}
         {isOwner && (
           <View style={{ paddingHorizontal: SP.md, marginTop: SP.lg }}>
@@ -556,6 +597,7 @@ export default function BuyerPostViewer() {
           </TouchableOpacity>
         </ModalSafeArea>
       </Modal>
+      <Snackbar visible={!!pinToast} message={pinToast ?? ''} onDismiss={() => setPinToast(null)} />
     </View>
   );
 }

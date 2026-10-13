@@ -5,7 +5,7 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/layout';
@@ -32,6 +32,8 @@ export interface ProfileGridItem {
   slideCount?: number;
   /** Owner-only lifecycle label, e.g. Draft / Scheduled. */
   statusLabel?: string;
+  /** Pinned to the author's profile (Instagram pushpin glyph, top-right). */
+  pinned?: boolean;
 }
 
 function kindOf(type: string | undefined): ProfileGridItem['kind'] {
@@ -57,6 +59,7 @@ export function gridItemFromThreadPost(post: SellerThreadPost): ProfileGridItem 
     slideCount: post.slides?.length ?? (post.mediaUris?.length > 1 ? post.mediaUris.length : undefined),
     surface: post.surface,
     statusLabel,
+    pinned: !!post.pinnedAt,
   };
 }
 
@@ -71,6 +74,7 @@ export function gridItemFromBuyerPost(post: BuyerPost): ProfileGridItem {
     caption: post.caption ?? '',
     likesCount: post.likesCount,
     productCount: 0,
+    pinned: !!post.pinnedAt,
   };
 }
 
@@ -79,6 +83,7 @@ function tileLabel(item: ProfileGridItem): string {
   const parts = [`Play ${noun}`];
   if (typeof item.viewsCount === 'number') parts.push(`${formatCompactCount(item.viewsCount)} views`);
   if (item.productCount > 0) parts.push(`${item.productCount} product${item.productCount === 1 ? '' : 's'} tagged`);
+  if (item.pinned) parts.push('Pinned');
   if (item.statusLabel) parts.push(item.statusLabel);
   if (item.caption) parts.push(item.caption.slice(0, 80));
   return parts.join(', ');
@@ -146,7 +151,12 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
               colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.72)']} // theme-exempt: legibility scrim over media
               style={styles.scrim}
             />
-            {(item.slideCount ?? 0) > 1 || item.kind !== 'video' ? (
+            {item.pinned ? (
+              // Instagram: a pinned tile shows only the pushpin in the top-right corner.
+              <View style={styles.pinBadge} pointerEvents="none" testID={`profile-tile-pinned-${item.id}`}>
+                <MaterialCommunityIcons name="pin" size={16} color="#FFFFFF" /* theme-exempt: over media */ style={styles.pinGlyph} />
+              </View>
+            ) : (item.slideCount ?? 0) > 1 || item.kind !== 'video' ? (
               <View style={styles.kindBadge} pointerEvents="none">
                 <Feather name={(item.slideCount ?? 0) > 1 || item.kind === 'slideshow' ? 'layers' : 'image'} size={11} color="#FFFFFF" /* theme-exempt: over media */ />
               </View>
@@ -192,6 +202,11 @@ const styles = StyleSheet.create({
   placeholder: { alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: SP.sm },
   placeholderCaption: { fontFamily: FONT.medium, fontSize: FS.xs, textAlign: 'center', lineHeight: 15 },
   scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '50%' },
+  pinBadge: { position: 'absolute', top: 5, right: 5, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
+  pinGlyph: {
+    transform: [{ rotate: '45deg' }],
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3, // theme-exempt: legibility over media
+  },
   kindBadge: {
     position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11,
     backgroundColor: 'rgba(0,0,0,0.45)', // theme-exempt: scrim over media
