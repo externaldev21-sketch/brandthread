@@ -5,6 +5,7 @@ import { Platform, type TextStyle } from 'react-native';
 import { useApi } from '@/lib/api';
 import { isProductionPreviewHost } from '@/lib/devPreview';
 import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
+import { secondaryText } from '@/lib/whiteOver';
 
 export type AppThemeId =
   | 'monochrome' | 'purple' | 'olive' | 'navy' | 'champagne' | 'black' | 'silver'
@@ -39,7 +40,7 @@ const palette = (
   background, surface, card, cardElevated: card,
   surfaceGlass: `${surface}E8`, cardGlass: `${card}E8`, cardElevatedGlass: `${card}F2`,
   border: '#C0C0C047', borderSubtle: '#C0C0C024',
-  text: '#FFFFFF', muted: '#C0C0C0', subtle: '#B0B0B0',
+  text: '#FFFFFF', muted: secondaryText(background, [background, surface, card], 0.6, 4.9), subtle: secondaryText(background, [background, surface, card], 0.56, 4.6),
   accent, accentLight: accent, accentDim: `${accent}2E`, onAccent,
   secondary: accent, secondaryDim: `${accent}24`,
   primaryGradient, heroGradient, glowGradient, tabBarBackground: `${background}F5`,

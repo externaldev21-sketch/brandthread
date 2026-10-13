@@ -5,6 +5,7 @@
  * "seen" bookkeeping. Slide/story stepping itself reuses lib/storyViewerNav.
  */
 import type { StoryMentionItem } from '@/services/socialTypes';
+import { formatHandle } from '@/lib/handle';
 
 /** One ring on the rail: every live mention story from the same tagger. */
 export interface MentionRing {
@@ -91,8 +92,7 @@ export function isMentionExpired(item: Pick<StoryMentionItem, 'story'>, now: num
 
 /** "@handle" with exactly one leading @ (server handles arrive both ways). */
 export function atHandle(handle: string): string {
-  const bare = handle.replace(/^@+/, '');
-  return bare ? `@${bare}` : '';
+  return formatHandle(handle);
 }
 
 /** Short ring label: the handle, else the first name. */
