@@ -13,6 +13,7 @@ import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { purgeAuthorFromFeedPostsCache } from '@/lib/feedPostsCache';
 import { queryClient } from '@/lib/queryClient';
 import { MY_AVATAR_COLOR, pickAvatarColor } from '@/lib/avatarColors';
+import { track } from '@/lib/analytics';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
   Friendship, FriendshipStatus, FriendRequest, FriendSuggestion,
@@ -1730,6 +1731,7 @@ export async function saveItem(
   const k = K();
   try {
     const saved = await serviceRequest<SavedItem>('/api/buyer/saved', { method: 'POST', body: JSON.stringify(params) });
+    track('item_saved', { item_type: params.type });
     options?.onRemoteSaved?.();
     notify();
     return saved;
