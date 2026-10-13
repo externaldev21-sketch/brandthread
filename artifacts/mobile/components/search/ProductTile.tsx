@@ -109,7 +109,7 @@ export function ProductTile({ item, accent: _accent, onPress, width }: {
       <Animated.View style={[styles.card, { width, transform: [{ scale }] }]}>
         <View ref={mediaRef} collapsable={false} style={[styles.media, { width, height: width / GRID_CARD_ASPECT, backgroundColor: item.color }]}>
           {item.imageUri ? (
-            <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" fallbackLabel={item.name ?? ''} />
           ) : (
             <View style={styles.fallback}>
               <Text style={styles.fallbackInitials}>{item.initials}</Text>

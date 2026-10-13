@@ -44,6 +44,7 @@ import { suggestedPostsSnoozed } from "../lib/interactionSettings";
 import { remixCredits } from "../lib/remix";
 import { productReadAccess } from "../lib/productPreviewAccess";
 import { loadPublicProductTrust } from "../lib/publicProductTrust";
+import { goneProductBody } from "../lib/goneProduct";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -463,7 +464,21 @@ router.get("/products/:id", async (req, res) => {
     const access = productReadAccess(row, row && row.status !== "active" ? optionalViewerId(req) : null);
     if (access === "hidden") {
       res.setHeader("Cache-Control", "no-store");
-      res.status(404).json({ error: "Product not found" });
+      // Gone (archived/deleted/unpublished): name the brand so the app can
+      // link to it. Blocked pairs still get a plain 404.
+      const [gone] = await db
+        .select({ ownerId: products.ownerId, status: products.status })
+        .from(products)
+        .where(and(eq(products.id, req.params.id), notBlockedWith(viewerId, products.ownerId)))
+        .limit(1);
+      const [owner] = gone && gone.status !== "draft"
+        ? await db
+          .select({ clerkId: users.clerkId, brandName: users.brandName, displayName: users.displayName, deletedAt: users.deletedAt })
+          .from(users)
+          .where(eq(users.clerkId, gone.ownerId))
+          .limit(1)
+        : [];
+      res.status(404).json(goneProductBody(owner));
       return;
     }
     const product = row!;
