@@ -43,6 +43,7 @@ import { bnplMethodsForCart } from "../lib/payments/sellerPaymentSettings";
 import { StockReservationError, releaseStockReservation, reserveStock } from "../lib/money/stockReservation";
 import { applyGiftCardToGroup, trimGiftCardsForMinimumCharge } from "../lib/giftCards/checkout";
 import { GiftCardError, claimCard, giftCentsForCheckouts, reserveForCheckout } from "../lib/giftCards/service";
+import { giftColumns, giftSchema, moderateGift } from "../lib/giftOptions";
 
 const router = Router();
 
@@ -108,6 +109,8 @@ const createSchema = z.object({
   clientIdempotencyKey: z.string().trim().min(8).max(120),
   /** Keep the card on the buyer's Stripe customer for next time (the hosted flow always did). */
   saveCard: z.boolean().optional(),
+  /** "Gift this": a gift receipt with prices hidden, with an optional note. */
+  gift: giftSchema.optional(),
 });
 
 type GroupBreakdown = {
@@ -258,6 +261,11 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
   const key = body.clientIdempotencyKey;
   const stripe = stripeFor(res);
   if (!stripe) return;
+  const giftCheck = moderateGift(body.gift);
+  if (!giftCheck.ok) {
+    res.status(422).json({ error: giftCheck.reason, code: "CONTENT_REJECTED" });
+    return;
+  }
 
   // ── Retried pay attempt: hand back the same intent ────────────────────────
   const likeKey = key.replace(/[\\%_]/g, (ch) => `\\${ch}`);
@@ -335,6 +343,7 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
           shippingCents: group.shippingCents,
           taxCents: group.taxCents,
           stripeTaxCalculationId: group.calculationId,
+          ...giftColumns(body.gift),
         }).returning();
         await reserveStock(tx, row.id, group.items.map((item) => ({
           variantId: item.variantId, quantity: item.quantity, productName: item.productName,

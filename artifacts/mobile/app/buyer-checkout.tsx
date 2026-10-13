@@ -87,6 +87,8 @@ import {
 } from '@/components/checkout/PaymentSection';
 import { PromoCodeSection } from '@/components/checkout/PromoCodeSection';
 import { GiftCardSection } from '@/components/checkout/GiftCardSection';
+import { GiftOptionRow } from '@/components/checkout/GiftOptionRow';
+import { giftOptionBody, resetGiftOption } from '@/lib/checkout/giftOptionStore';
 import { ThreadCashSection } from '@/components/checkout/ThreadCashSection';
 import { OrderSummarySection } from '@/components/checkout/OrderSummarySection';
 import { CheckoutTermsLine } from '@/components/checkout/CheckoutTermsLine';
@@ -454,6 +456,7 @@ export default function BuyerCheckoutScreen() {
         address: who.address,
         idempotencyKey: base.idempotencyKey,
         saveCard: true,
+        ...giftOptionBody(),
       }));
       startedRef.current = started;
       // Remember the intent so a restart can find the orders it produced.
@@ -529,6 +532,7 @@ export default function BuyerCheckoutScreen() {
       { valueCents: started.amountCents, currency: base.summary.currency },
     );
     await removeCartItems(base.deliveryGroups.flatMap(group => group.items.map(item => item.id)));
+    resetGiftOption();
     await saveAddressIfAsked(who);
     startedRef.current = null;
     await persist({ ...base, paidGroups, step: 'confirmation' }, who);
@@ -711,6 +715,7 @@ export default function BuyerCheckoutScreen() {
                 phone: contact.phone!,
               },
               clientIdempotencyKey: `${current.idempotencyKey}_${group.sellerId}`,
+              ...giftOptionBody(),
               ...(current.loyaltyRedemption && current.deliveryGroups.length === 1
                 ? { loyaltyToken: current.loyaltyRedemption.token }
                 : {}),
@@ -749,6 +754,7 @@ export default function BuyerCheckoutScreen() {
                 phone: contact.phone!,
               },
               clientIdempotencyKey: `${current.idempotencyKey}_${group.sellerId}`,
+              ...giftOptionBody(),
             },
           );
         }
@@ -828,6 +834,7 @@ export default function BuyerCheckoutScreen() {
       if (!unresolved.length) {
         await removeCartItems(current.deliveryGroups.flatMap(group => group.items.map(item => item.id)));
       }
+      resetGiftOption();
       await saveAddressIfAsked({ address, contact });
       await persist({ ...current, paidGroups, step: 'confirmation' });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1059,6 +1066,7 @@ export default function BuyerCheckoutScreen() {
             canSaveAddresses={!!isSignedIn}
             showErrors={false}
           />
+          <GiftOptionRow />
 
           <PaymentSection
             path={payment.path}

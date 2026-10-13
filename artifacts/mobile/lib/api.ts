@@ -1773,6 +1773,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             discountCode?: string;
             /** Live the buyer is shopping from (required for live-only codes). */
             liveStreamId?: string;
+            /** "Gift this": a gift receipt with prices hidden. */
+            gift?: { to?: string; from?: string; message?: string };
           },
         ) =>
           trackAfter(post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
@@ -1787,6 +1789,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             ...(opts.threadCashToken       ? { threadCashToken:       opts.threadCashToken       } : {}),
             ...(opts.discountCode          ? { discountCode:          opts.discountCode          } : {}),
             ...(opts.liveStreamId          ? { liveStreamId:          opts.liveStreamId          } : {}),
+            ...(opts.gift                  ? { gift:                  opts.gift                  } : {}),
           }), [['checkout_started', { flow: 'hosted', item_count: items.length }]]),
         /** Verify payment status after Stripe redirect.
          *  Returns { status, paymentStatus, amountTotal, orderId?, orderNumber?, declineReason? }. */
@@ -1885,6 +1888,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
               state: string; zip: string; country?: string; phone: string;
             };
             clientIdempotencyKey?: string;
+            gift?: { to?: string; from?: string; message?: string };
           },
         ) => post<{ sessionId: string; url: string; guestAccessToken: string }>('/api/guest/checkout/session', {
           items,

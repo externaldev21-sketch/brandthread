@@ -50,6 +50,7 @@ import {
 } from "../lib/buyerCancellationPolicy";
 import { consumeBuyerAddressListFailure } from "./release-test-control";
 import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
+import { giftColumns, giftResponse, giftSchema, moderateGift } from "../lib/giftOptions";
 
 const router = Router();
 router.use(requireAuth);
@@ -92,6 +93,7 @@ const checkoutBodySchema = z.object({
   threadCashToken: z.string().trim().min(1).max(512).optional(),
   discountCode: z.string().trim().min(1).max(64).optional(),
   liveStreamId: requestPrimitives.uuid.nullable().optional(),
+  gift: giftSchema.optional(),
 }).passthrough();
 const addressSuggestionQuerySchema = z.object({
   q: z.string().trim().min(3).max(160),
@@ -502,6 +504,11 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       items, successUrl, cancelUrl, contactEmail, contactPhone, shippingAddress,
       clientIdempotencyKey, dropId, loyaltyToken, threadCashToken, discountCode, liveStreamId,
     } = req.body;
+    const giftCheck = moderateGift(req.body.gift);
+    if (!giftCheck.ok) {
+      res.status(422).json({ error: giftCheck.reason, code: "CONTENT_REJECTED" });
+      return;
+    }
 
     // ── Thread Cash ─────────────────────────────────────────────────────
     // Platform-funded reward credit: a DISCOUNT on a card purchase, never a
@@ -1063,6 +1070,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       } : {}),
       ...(validatedShipping ? { shippingAddress: validatedShipping } : {}),
       ...(hasKey ? { clientIdempotencyKey } : {}),
+      ...giftColumns(req.body.gift),
     };
     let checkoutRecord: { id: string } | undefined;
     try {
@@ -1425,6 +1433,10 @@ router.get("/orders/:id", async (req, res) => {
         cancellationReason:      orders.cancellationReason,
         cancellationNotes:       orders.cancellationNotes,
         createdAt:               orders.createdAt,
+        isGift:                  orders.isGift,
+        giftTo:                  orders.giftTo,
+        giftFrom:                orders.giftFrom,
+        giftMessage:             orders.giftMessage,
         ...deliveryColumns,
       })
       .from(orders)
@@ -1453,6 +1465,7 @@ router.get("/orders/:id", async (req, res) => {
       cancellationNotes: isCustomerVisible ? row.cancellationNotes : null,
       isCustomerVisible,
       items,
+      ...giftResponse(row),
       delivery: await loadBuyerDelivery(row.id, row),
     });
   } catch (err) {

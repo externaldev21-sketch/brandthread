@@ -422,6 +422,11 @@ export interface Order {
   fulfillmentType: FulfillmentType;
   riskLevel: RiskLevel;
   riskFlags: RiskFlag[];
+  /**
+   * "Gift this" (checkout): null/absent when the order is not a gift. A gift
+   * order's packing slip prints as a gift receipt with prices hidden.
+   */
+  gift?: { to: string | null; from: string | null; message: string | null } | null;
   /** Seller-only Stripe Radar summary from GET /api/orders/:id (`risk`). */
   sellerRisk?: { level: 'normal' | 'elevated' | 'highest'; score?: number | null; reviewed?: boolean; flags: { code: string; label: string; severity: 'info' | 'medium' | 'high' }[] } | null;
   customer: OrderCustomer;
@@ -513,6 +518,8 @@ export interface BuyerDelivery {
 // ─── Buyer view ───────────────────────────────────────────────────────────────
 
 export interface BuyerOrderView {
+  /** "Gift this" (checkout): null/absent when the order is not a gift. */
+  gift?: { to: string | null; from: string | null; message: string | null } | null;
   id: string;
   orderNumber: string;
   sellerId: string;

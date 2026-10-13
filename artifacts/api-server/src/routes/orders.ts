@@ -19,6 +19,7 @@ import { withRiskView } from "../lib/risk/orderRisk";
 import { shipItems } from "../lib/delivery/deliveryState";
 import { notifyBuyerPreparing } from "../lib/delivery/notifications";
 import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
+import { giftResponse } from "../lib/giftOptions";
 
 const router = Router();
 router.use(requireAuth);
@@ -369,7 +370,7 @@ router.get("/:id", async (req, res) => {
     fulfilledByPartner: shopifyLink.status === "sent" && Boolean(order.trackingNumber),
   } : null;
 
-  res.json({ ...withRiskView(order), items, customer, shopifyFulfillment });
+  res.json({ ...withRiskView(order), items, customer, shopifyFulfillment, ...giftResponse(order) });
 });
 
 // Recognized cancellation reasons — kept in sync with mobile orderTypes.ts

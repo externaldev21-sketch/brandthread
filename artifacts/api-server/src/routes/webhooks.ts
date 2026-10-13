@@ -978,6 +978,10 @@ export async function handleCheckoutPaid(
         stripeCheckoutSessionId: sessionId,
         ...(shippingAddress && { shippingAddress }),
         ...(dropId ? { dropId } : {}),
+        // "Gift this": every order of the session (one per seller) carries it.
+        ...(csRecord.isGift ? {
+          isGift: true, giftTo: csRecord.giftTo, giftFrom: csRecord.giftFrom, giftMessage: csRecord.giftMessage,
+        } : {}),
       })
       .returning();
     createdOrderId = order.id;

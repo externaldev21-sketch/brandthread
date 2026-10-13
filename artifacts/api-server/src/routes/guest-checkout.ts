@@ -19,6 +19,7 @@ import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneW
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
 import { recordCheckoutAttribution } from "../lib/growth/attribution";
+import { giftColumns, giftSchema, moderateGift } from "../lib/giftOptions";
 
 const router = Router();
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -55,6 +56,7 @@ const guestCheckoutSchema = z.object({
   shippingAddress: shippingAddressSchema,
   clientIdempotencyKey: z.string().trim().min(8).max(160),
   dropId: requestPrimitives.uuid.nullable().optional(),
+  gift: giftSchema.optional(),
 }).passthrough();
 const guestVerifyParamsSchema = z.object({ sessionId: requestPrimitives.id });
 const guestVerifyBodySchema = z.object({
@@ -104,6 +106,8 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
   try {
     const stripe = requireStripe();
     const { items, successUrl, cancelUrl, contactEmail, contactPhone, shippingAddress, clientIdempotencyKey, dropId } = req.body ?? {};
+    const giftCheck = moderateGift(req.body?.gift);
+    if (!giftCheck.ok) return res.status(422).json({ error: giftCheck.reason, code: "CONTENT_REJECTED" });
     const email = typeof contactEmail === "string" ? contactEmail.trim().toLowerCase() : "";
     if (!emailPattern.test(email)) return res.status(400).json({ error: "A valid contactEmail is required" });
     const phone = typeof contactPhone === "string" ? contactPhone.trim() : "";
@@ -268,6 +272,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
         platformFeeCents: money.platformFeeCents,
         platformFeeBps,
         processingFeeEstimateCents: money.processingFeeEstimateCents,
+        ...giftColumns(req.body.gift),
       }).returning({ id: checkoutSessions.id });
     } catch (error: any) {
       // A concurrent duplicate request lost the DB uniqueness race. Reuse only

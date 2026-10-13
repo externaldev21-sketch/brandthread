@@ -14,6 +14,18 @@ import { ShopifyAdminClient } from "./adminClient";
 import { decryptSecret } from "../shopifyCrypto";
 import { logger } from "../logger";
 
+/** A gift order asks the fulfiller for a gift receipt (prices hidden) and carries the note. */
+export function giftNoteForShopify(order: { isGift?: boolean | null; giftTo?: string | null; giftFrom?: string | null; giftMessage?: string | null }): string {
+  if (!order.isGift) return "";
+  const lines = [
+    "Gift order: pack a gift receipt with prices hidden.",
+    order.giftTo ? `To: ${order.giftTo}` : "",
+    order.giftFrom ? `From: ${order.giftFrom}` : "",
+    order.giftMessage ? `Gift message: ${order.giftMessage}` : "",
+  ].filter(Boolean);
+  return `\n${lines.join("\n")}`;
+}
+
 export async function forwardOrderToShopifyIfLinked(orderId: string): Promise<void> {
   const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
   if (!order) return;
@@ -65,7 +77,7 @@ export async function forwardOrderToShopifyIfLinked(orderId: string): Promise<vo
     const { order: created } = await client.createOrder({
       line_items: lineItems,
       financial_status: "paid",
-      note: `Brandthread order #${order.orderNumber}${partial ? " (partial — only Brandthread-linked items included)" : ""}`,
+      note: `Brandthread order #${order.orderNumber}${partial ? " (partial — only Brandthread-linked items included)" : ""}${giftNoteForShopify(order)}`,
       tags: "brandthread",
       email: email ?? undefined,
       send_receipt: false,

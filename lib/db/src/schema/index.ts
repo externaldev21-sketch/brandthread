@@ -546,6 +546,12 @@ export const orders = pgTable('orders', {
   // 0 none, 1 = 5 days, 2 = 2 days, 3 = 12 hours warning already sent.
   deadlineWarningLevel: integer('deadline_warning_level').notNull().default(0),
   trackingPolledAt: timestamp('tracking_polled_at', { withTimezone: true }),
+  // "Gift this" (migration 534): copied from the checkout session. A gift
+  // order's packing slip prints as a gift receipt with prices hidden.
+  isGift: boolean('is_gift').notNull().default(false),
+  giftTo: text('gift_to'),
+  giftFrom: text('gift_from'),
+  giftMessage: text('gift_message'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -773,6 +779,11 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   taxCents: integer('tax_cents'),
   stripeTaxCalculationId: text('stripe_tax_calculation_id'),
   stripePaymentIntentId: text('stripe_payment_intent_id'),
+  // "Gift this" (migration 534): copied onto every order this session creates.
+  isGift: boolean('is_gift').notNull().default(false),
+  giftTo: text('gift_to'),
+  giftFrom: text('gift_from'),
+  giftMessage: text('gift_message'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   paymentIntentIdx: index('checkout_sessions_payment_intent_idx').on(t.stripePaymentIntentId),
