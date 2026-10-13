@@ -9,7 +9,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -182,34 +182,25 @@ export default function ProductVideoScreen() {
 }
 
 function Preview({ video, s, colors }: { video: ProductVideoInfo; s: ReturnType<typeof makeStyles>; colors: ReturnType<typeof useColors> }) {
-  const [playing, setPlaying] = useState(false);
+  // Plays on its own, muted, with no play button (less-AI pass, item 49);
+  // the poster shows until the first frame.
   const length = formatVideoLength(video.durationMs);
   return (
     <View style={s.preview}>
-      {playing && video.videoUrl ? (
-        <Player uri={video.videoUrl} />
-      ) : (
-        <>
-          {video.posterUrl ? <CachedImage source={{ uri: video.posterUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
-          <TouchableOpacity
-            style={s.playWrap}
-            disabled={!video.videoUrl}
-            onPress={() => setPlaying(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Play preview"
-          >
-            <View style={s.play}><Feather name="play" size={22} color={colors.foreground} style={{ marginLeft: 2 }} /></View>
-          </TouchableOpacity>
-          {length ? <View style={s.length}><Text style={s.lengthText}>{length}</Text></View> : null}
-        </>
-      )}
-      {!video.posterUrl && !playing ? <Feather name="video" size={28} color={colors.mutedForeground} /> : null}
+      {video.posterUrl ? <CachedImage source={{ uri: video.posterUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
+      {video.videoUrl ? <Player uri={video.videoUrl} /> : null}
+      {length ? <View style={s.length}><Text style={s.lengthText}>{length}</Text></View> : null}
+      {!video.posterUrl && !video.videoUrl ? <Feather name="video" size={28} color={colors.mutedForeground} /> : null}
     </View>
   );
 }
 
 function Player({ uri }: { uri: string }) {
-  const player = useVideoPlayer(uri, (p) => { p.loop = true; p.muted = true; p.play(); });
+  const focused = useIsFocused();
+  const player = useVideoPlayer(uri, (p) => { p.loop = true; p.muted = true; });
+  useEffect(() => {
+    if (focused) player.play(); else player.pause();
+  }, [focused, player]);
   return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />;
 }
 
@@ -228,8 +219,6 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
     aspectRatio: 4 / 5, maxHeight: 420, width: '100%', borderRadius: RADIUS.md, overflow: 'hidden',
     backgroundColor: c.card, alignItems: 'center', justifyContent: 'center',
   },
-  playWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  play: { width: 56, height: 56, borderRadius: 28, backgroundColor: c.background, alignItems: 'center', justifyContent: 'center' },
   length: { position: 'absolute', left: SP.sm, bottom: SP.sm, backgroundColor: c.foreground, borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 3 },
   lengthText: { color: c.background, fontSize: FS.xs, fontFamily: FONT.semibold },
   progressWrap: { gap: SP.xs },
