@@ -4,7 +4,7 @@
  * Tapping the stock text opens the quick stock editor, same as the grid card.
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -28,9 +28,7 @@ interface Props {
 export function productRowStockLabel(product: Product): string {
   if (product.inventory?.trackQuantity === false) return 'Not tracked';
   const stock = totalStockAcrossVariants(product);
-  const variants = product.variants?.length ?? 0;
-  const base = stock === 0 ? 'Out of stock' : `${stock} in stock`;
-  return variants > 1 ? `${base} · ${variants} variants` : base;
+  return stock === 0 ? 'Out of stock' : `${stock.toLocaleString('en-US')} in stock`;
 }
 
 export const ProductRow = React.memo(function ProductRow({ product, onPress, onPressIn, onMore, onEditStock }: Props) {
@@ -42,11 +40,13 @@ export const ProductRow = React.memo(function ProductRow({ product, onPress, onP
 
   return (
     <View style={[styles.row, { borderBottomColor: theme.borderSubtle }]} testID={`product-row-${product.id}`}>
-      <PressableScale
-        style={styles.main}
+      {/* Plain Pressable (pressed = dim) so the row itself can flex; PressableScale
+          puts its style on an inner view and the row would shrink to its content. */}
+      <Pressable
+        style={({ pressed }) => [styles.main, pressed && styles.pressed]}
         onPress={() => onPress(product)}
         onPressIn={onPressIn ? () => onPressIn(product) : undefined}
-        activeScale={0.99}
+        accessibilityRole="button"
         accessibilityLabel={`${product.name}, ${PRODUCT_LIST_STATUS_LABEL[status]}, ${price}`}
       >
         <View style={[styles.thumb, { backgroundColor: theme.surfaceGlass, borderColor: theme.borderSubtle }]}>
@@ -61,19 +61,19 @@ export const ProductRow = React.memo(function ProductRow({ product, onPress, onP
           <View style={styles.metaRow}>
             <Text style={[styles.price, { color: theme.text }]} numberOfLines={1}>{price}</Text>
             <Text style={[styles.dot, { color: theme.muted }]}>·</Text>
-            <PressableScale
+            <Pressable
               onPress={() => onEditStock(product)}
               hitSlop={{ top: 12, bottom: 12, left: 4, right: 8 }}
-              noMinHeight
+              accessibilityRole="button"
               accessibilityLabel={`Edit stock for ${product.name}, ${stockLabel}`}
-              style={styles.stockWrap}
+              style={({ pressed }) => [styles.stockWrap, pressed && styles.pressed]}
             >
               <Text style={[styles.stock, { color: theme.muted }]} numberOfLines={1}>{stockLabel}</Text>
-            </PressableScale>
+            </Pressable>
           </View>
         </View>
         <ProductStatusChip status={status} testID={`product-status-${product.id}`} />
-      </PressableScale>
+      </Pressable>
       <PressableScale
         style={styles.more}
         onPress={() => onMore(product)}
@@ -99,6 +99,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     minWidth: 0,
   },
+  pressed: { opacity: 0.85 },
   thumb: {
     width: PRODUCT_ROW_THUMB,
     height: PRODUCT_ROW_THUMB,
@@ -129,6 +130,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   price: {
+    flexShrink: 0,
     fontFamily: FONT.medium,
     fontSize: FS.sm,
     lineHeight: 18,

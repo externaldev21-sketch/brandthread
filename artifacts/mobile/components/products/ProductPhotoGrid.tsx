@@ -7,7 +7,7 @@
  * the screen that owns the media list.
  */
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -86,25 +86,27 @@ export function ProductPhotoGrid({ items, max, onAdd, onPressItem, onLongPressIt
             </View>
           )}
           {!m.busy && m.error && (
-            <PressableScale
-              style={[styles.overlay, { backgroundColor: scrim }]}
+            // Plain Pressable: absolute positioning has to sit on the pressable itself.
+            <Pressable
+              style={({ pressed }) => [styles.overlay, { backgroundColor: scrim }, pressed && styles.pressed]}
               onPress={() => onRetry(m.id, m.error as 'upload' | 'cutout')}
+              accessibilityRole="button"
               accessibilityLabel={m.error === 'upload' ? 'Retry photo upload' : 'Retry background removal'}
             >
               <Feather name="refresh-cw" size={16} color={theme.text} />
               <Text style={[styles.retryText, { color: theme.text }]}>{m.error === 'upload' ? 'Retry upload' : 'Retry cutout'}</Text>
-            </PressableScale>
+            </Pressable>
           )}
 
-          <PressableScale
-            style={[styles.remove, { backgroundColor: scrim }]}
+          <Pressable
+            style={({ pressed }) => [styles.remove, { backgroundColor: scrim }, pressed && styles.pressed]}
             onPress={() => onRemove(m.id)}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            noMinHeight
+            accessibilityRole="button"
             accessibilityLabel="Remove photo"
           >
             <Feather name="x" size={14} color={theme.text} />
-          </PressableScale>
+          </Pressable>
 
           {items.length > 1 && (
             <View style={styles.reorder}>
@@ -178,13 +180,14 @@ const styles = StyleSheet.create({
     fontSize: FS.xs,
     lineHeight: 14,
   },
+  pressed: { opacity: 0.85 },
   coverTag: {
     position: 'absolute',
-    left: SP.xs,
-    bottom: SP.xs,
+    top: SP.xs,
+    left: SP.xs + 20 + SP.xs,
     borderRadius: RADIUS.xs,
     paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingVertical: 3,
   },
   coverText: {
     fontFamily: FONT.semibold,

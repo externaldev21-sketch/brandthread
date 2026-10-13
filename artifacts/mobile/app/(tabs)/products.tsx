@@ -937,15 +937,15 @@ export default function ProductsScreen() {
       )}
 
       {/* Add product — floating, bottom-right, always above the tab bar. */}
-      <PressableScale
-        style={[s.fab, { bottom: tabBar.occupiedHeight + SP.sm, right: gridGutter }]}
+      <Pressable
+        style={({ pressed }) => [s.fab, { bottom: tabBar.occupiedHeight + SP.sm, right: gridGutter }, pressed && s.fabPressed]}
         onPress={() => { hapticPrimaryAction(); router.push('/add-product' as never); }}
         accessibilityRole="button"
         accessibilityLabel="Add product"
         testID="products-add-fab"
       >
         <Feather name="plus" size={ICON.lg} color={theme.background} />
-      </PressableScale>
+      </Pressable>
 
       {/* Action sheet */}
       <ActionSheet
@@ -1043,6 +1043,7 @@ const createStyles = (theme: any) => {
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
   },
+  fabPressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
   });
 };
 

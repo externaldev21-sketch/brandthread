@@ -1050,7 +1050,9 @@ export default function AddProductScreen() {
   // background cutout, …), × removes, chevrons move a photo earlier/later.
   function displayableUri(uri: string | undefined): string | null {
     if (!uri) return null;
-    return (uri.startsWith('http') || uri.startsWith('file') || uri.startsWith('ph://') || uri.startsWith('asset-library://') || uri.startsWith('content://') || uri.startsWith('/objects/')) ? uri : null;
+    // blob:/data: are what the web picker returns; a leading "/" is a
+    // same-origin bundled asset (web) — both render fine in <Image>.
+    return (uri.startsWith('http') || uri.startsWith('file') || uri.startsWith('ph://') || uri.startsWith('asset-library://') || uri.startsWith('content://') || uri.startsWith('/') || uri.startsWith('blob:') || uri.startsWith('data:image/')) ? uri : null;
   }
 
   function renderPhotos() {
@@ -1603,7 +1605,7 @@ export default function AddProductScreen() {
                 const v = localVariants.find(x => x.id === row.id);
                 return (
                   <TextInput
-                    style={[s.variantInput, s.variantSkuInput]}
+                    style={s.variantSkuInput}
                     value={v?.sku ?? ''}
                     onChangeText={txt => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === row.id ? { ...x, sku: txt } : x))}
                     placeholder="SKU (optional)"
@@ -2435,7 +2437,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
   },
-  variantSkuInput: { flex: 0, height: 36, marginTop: SP.sm },
+  variantSkuInput: {
+    height: 36, marginTop: SP.sm, backgroundColor: SURFACE,
+    borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
+  },
 
   // Review step: live preview cards
   previewCard: { padding: 0, overflow: 'hidden' },
