@@ -16,6 +16,8 @@ const SIGNED_IN_ONLY_PREFIXES = [
   'buyer/notifications', 'buyer/payment-methods', 'buyer/saved', 'buyer/collections',
   'buyer/recently-viewed', 'buyer/cart', 'buyer/checkout/payment-intent',
   'feed/for-you', 'feed/events', 'loyalty', 'thread-cash',
+  // Photo replies in comments (upload is moderated + stored)
+  'comment-media',
 ];
 
 function normalize(path: string): string {

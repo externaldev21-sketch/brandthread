@@ -60,6 +60,8 @@ import { activeMentionQuery, insertMentionHandle, type CommentMentionRef } from 
 import { getPreviewActivityForComment } from '@/lib/previewActivity';
 import { AppleEmoji, QUICK_REACTION_EMOJI } from '@/lib/appleEmoji';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { CommentPhotoButton, CommentPhotoDraft, CommentPhotoView, useCommentPhotoDraft } from '@/components/comments/CommentPhoto';
+import { createComment } from '@/services/commentMediaService';
 
 const MAX_COMMENT_LENGTH = 1000;
 // Links the comment list's KeyboardGestureArea to the composer's TextInput
@@ -312,12 +314,14 @@ function CommentRow({
             <Text style={s.replyContext}>Replying to {comment.parentAuthorName}</Text>
           ) : null}
 
-          <MentionText
-            body={comment.body}
-            mentions={comment.mentions}
-            style={[s.commentText, comment.pendingReview && s.commentTextHeld]}
-            onPressMention={onPressMention}
-          />
+          {comment.body ? (
+            <MentionText
+              body={comment.body}
+              mentions={comment.mentions}
+              style={[s.commentText, comment.pendingReview && s.commentTextHeld]}
+              onPressMention={onPressMention}
+            />
+          ) : null}
 
           {comment.creatorLiked && !isCreator ? (
             <View style={s.creatorLikedBadge}>
@@ -333,6 +337,8 @@ function CommentRow({
             </View>
           ) : null}
         </PressableScale>
+
+        {comment.media ? <CommentPhotoView media={comment.media} compact={comment.isReply} /> : null}
 
         {/* Time and Reply are two plain-text-height children of the same
             centered flex row — no per-item padding/margin, no minHeight box
@@ -793,9 +799,12 @@ export default function BuyerPostCommentsScreen() {
   }, [api, loadingMore, meta.nextCursor, postId]);
 
   const postComment = useCallback(
-    (text: string, parentId?: string | null) => api.comments.create(postId, text, parentId),
+    (text: string, parentId?: string | null, mediaId?: string | null) => (mediaId
+      ? createComment(postId, { body: text, parentId, mediaId })
+      : api.comments.create(postId, text, parentId)),
     [api, postId],
   );
+  const photo = useCommentPhotoDraft(showToast);
 
   const handleLike = async (comment: Row) => {
     const liked = !comment.likedByMe;
@@ -903,7 +912,9 @@ export default function BuyerPostCommentsScreen() {
 
   const handleSend = async () => {
     const text = inputText.trim();
-    if (!text || sending) return;
+    const photoDraft = photo.draft;
+    const media = photo.media;
+    if ((!text && !media) || sending || photo.uploading || photo.blocked) return;
     setSending(true);
     setSendError(null);
     setHeldNotice(null);
@@ -923,6 +934,7 @@ export default function BuyerPostCommentsScreen() {
       isMine: true,
       canDelete: true,
       pendingReview: false,
+      media,
       replies: [],
       isReply: !!parent,
       parentAuthorName: parent?.author.name,
@@ -942,6 +954,7 @@ export default function BuyerPostCommentsScreen() {
     }
     setInputText('');
     setReplyingTo(null);
+    photo.clear();
 
     if (isPreviewPost) {
       // Local-only: no server round trip, the optimistic comment IS the
@@ -956,7 +969,7 @@ export default function BuyerPostCommentsScreen() {
     }
 
     try {
-      const created = await postComment(text, parent ? (parent.parentId ?? parent.id) : null);
+      const created = await postComment(text, parent ? (parent.parentId ?? parent.id) : null, media?.id);
       if (created.moderation.status === 'held') {
         setHeldNotice(created.moderation.message ?? 'Your comment is in review. Only you can see it for now.');
       }
@@ -971,6 +984,7 @@ export default function BuyerPostCommentsScreen() {
       setCommentsSynced(prev => prev.filter(c => c.id !== optimistic.id));
       setInputText(text);
       setReplyingTo(parent);
+      if (photoDraft && apiErrorCode(error) !== 'MEDIA_NOT_FOUND') photo.restore(photoDraft);
       const code = apiErrorCode(error);
       setSendError(
         code === 'CONTENT_REJECTED' || code === 'ACCOUNT_SUSPENDED' || code === 'BLOCKED' || code === 'COMMENTS_DISABLED'
@@ -1316,7 +1330,10 @@ export default function BuyerPostCommentsScreen() {
                 value={inputText}
                 onChangeText={setInputText}
                 onSend={handleSend}
-                canSend={inputText.trim().length > 0 && !sending}
+                canSend={(inputText.trim().length > 0 || !!photo.media) && !sending && !photo.uploading && !photo.blocked}
+                topSlot={photo.draft ? (
+                  <CommentPhotoDraft draft={photo.draft} onRemove={() => { hapticLight(); photo.clear(); }} onRetry={photo.retry} />
+                ) : null}
                 placeholder={replyingTo ? `Reply to ${replyingTo.author.name}…` : 'Add comment…'}
                 accessibilityLabel="Comment"
                 maxLength={MAX_COMMENT_LENGTH}
@@ -1325,6 +1342,12 @@ export default function BuyerPostCommentsScreen() {
                 leftAccessory={<Avatar uri={myAvatar} initials={myInitials} size={32} ring={false} backgroundColor="#2a2a2a" />}
                 rightAccessory={(
                   <>
+                    <CommentPhotoButton
+                      style={s.inputTool}
+                      color={MUTED}
+                      disabled={photo.uploading}
+                      onPress={() => { hapticLight(); void photo.pick(); }}
+                    />
                     <PressableScale
                       style={s.inputTool}
                       onPress={() => { hapticLight(); inputRef.current?.focus(); }}
