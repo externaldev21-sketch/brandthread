@@ -43,7 +43,16 @@ export interface ThreadComment {
   creatorLiked?: boolean;
   /** Server-verified @mentions in `body`. */
   mentions?: { userId: string; handle: string }[];
+  /** Photo reply attached to this comment (POST /api/comment-media/upload). */
+  media?: CommentMedia | null;
   replies: ThreadComment[];
+}
+
+export interface CommentMedia {
+  id: string;
+  url: string;
+  width: number;
+  height: number;
 }
 
 export interface CommentThread {

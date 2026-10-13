@@ -18,6 +18,8 @@ const SIGNED_IN_ONLY_PREFIXES = [
   'feed/for-you', 'feed/events', 'loyalty', 'thread-cash',
   // Account-scoped seller/buyer records synced from local caches
   'product-drafts', 'support/problem-reports',
+  // Photo replies in comments (upload is moderated + stored)
+  'comment-media',
 ];
 
 function normalize(path: string): string {

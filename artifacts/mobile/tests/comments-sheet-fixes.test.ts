@@ -229,9 +229,11 @@ describe('Comment composer uses the shared slim Composer', () => {
     expect(block).toContain('accessibilityLabel="Mention someone"');
   });
 
-  it('links the KeyboardGestureArea to the input and only sends with text', () => {
+  it('links the KeyboardGestureArea to the input and only sends with text or a ready photo', () => {
     expect(comments).toContain('nativeID={COMMENT_INPUT_NATIVE_ID}');
-    expect(comments).toContain('canSend={inputText.trim().length > 0 && !sending}');
+    // Photo replies: a photo-only comment may send, but never while the
+    // photo is still uploading or was blocked by screening.
+    expect(comments).toContain('canSend={(inputText.trim().length > 0 || !!photo.media) && !sending && !photo.uploading && !photo.blocked}');
   });
 
   it('uses a 32pt avatar with an explicit dark fill, not the theme-elevated color that used to be indistinguishable from the composer background', () => {

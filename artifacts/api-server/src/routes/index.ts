@@ -82,6 +82,7 @@ import feedRouter from "./feed";
 import reportsRouter from "./reports";
 import accountStatusRouter from "./account-status";
 import postCommentsRouter from "./post-comments";
+import commentMediaRouter from "./comment-media";
 import moderationRouter from "./moderation";
 import safetyRouter from "./safety";
 import interactionSettingsRouter from "./interaction-settings";
@@ -418,6 +419,7 @@ router.use("/product-qa",                tc, productQaRouter);
 // Comments are attributed to the person writing them, so they are mounted
 // ahead of the team-context posts router.
 router.use("/posts",                     postCommentsRouter);
+router.use("/comment-media",             commentMediaRouter);
 router.use("/posts",                     postCaptionsRouter);
 router.use("/posts",                     tc, postsRouter);
 router.use("/upload-sessions",           uploadSessionsRouter); // resumable chunked uploads; owned by the signed-in person, no tc
