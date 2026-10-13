@@ -28,6 +28,17 @@ export const SELLER_DASHBOARD_GLASS = 'rgba(0, 0, 0, 0.54)'; // black dashboard 
 export const SELLER_DASHBOARD_GLASS_ELEVATED = 'rgba(0, 0, 0, 0.68)'; // black elevated dashboard panels, silver-bordered
 
 
+// ─── Elevation (Dev, Oct 13: "one elevation system, nothing else") ──────────
+// Page #000 → cards and sheets #1C1C1E → inputs #2C2C2E (iOS dark system
+// grouped backgrounds). Supersedes the "never a grey fill" note above for
+// cards, sheets, inputs and toasts.
+export const ELEVATION = {
+  background: '#000000',
+  card: '#1C1C1E',
+  sheet: '#1C1C1E',
+  input: '#2C2C2E',
+} as const;
+
 // ─── Borders ─────────────────────────────────────────────────────────────────
 // Surfaces are black fill + thin silver border, never a grey fill. Borders
 // stay translucent on purpose (they sit on top of varying card/image content).

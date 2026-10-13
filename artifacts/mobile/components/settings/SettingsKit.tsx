@@ -346,7 +346,7 @@ function makeCardStyles(colors: Colors) {
     sectionFooter: { fontSize: 11, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 8, marginLeft: 2, lineHeight: 15 },
 
     // Row
-    row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 14, minHeight: 52 },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 16, minHeight: 52 },
     rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     rowIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
     rowCopy: { flex: 1, minWidth: 0 },

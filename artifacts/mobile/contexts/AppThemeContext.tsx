@@ -22,6 +22,8 @@ export type AppThemePreset = {
   glowGradient: readonly [string, string, ...string[]];
   tabBarBackground: string; success: string; warning: string; error: string;
   shadowColor: string;
+  /** Text fields / search bars — one step above cards. */
+  input: string;
 };
 
 export function getOnAccentTextStyle(theme: AppThemePreset): TextStyle {
@@ -44,10 +46,15 @@ const palette = (
   secondary: accent, secondaryDim: `${accent}24`,
   primaryGradient, heroGradient, glowGradient, tabBarBackground: `${background}F5`,
   ...status, shadowColor: '#000000',
+  input: card,
 });
 const STATUS = { success: '#7FF0B0', warning: '#FFD580', error: '#FFB4B4' } as const;
-// Black, white, and silver: pure black bg/surface/card, white accent.
-const MONOCHROME = palette('#000000', '#000000', '#000000', '#FFFFFF', '#000000', ['#FFFFFF', '#FFFFFF'], ['#000000', '#000000'], ['#FFFFFF0F', '#FFFFFF03'], STATUS);
+// Black, white, and silver with one elevation system (Dev, Oct 13): page
+// #000, cards and sheets #1C1C1E, inputs #2C2C2E — nothing else.
+const MONOCHROME: Palette = {
+  ...palette('#000000', '#000000', '#1C1C1E', '#FFFFFF', '#000000', ['#FFFFFF', '#FFFFFF'], ['#000000', '#000000'], ['#FFFFFF0F', '#FFFFFF03'], STATUS),
+  input: '#2C2C2E',
+};
 const PRESET_PALETTES: Record<Exclude<AppThemeId, 'monochrome'>, Palette> = {
   purple: palette('#281235', '#321844', '#3B1B4B', '#D990FF', '#190A24', ['#A24EDD', '#D990FF'], ['#281235', '#5A2670'], ['#A24EDD44', '#A24EDD0A'], STATUS),
   olive: palette('#2C311E', '#353B25', '#3B4129', '#C9D8A7', '#1C2113', ['#8D9B70', '#C9D8A7'], ['#2C311E', '#59633B'], ['#A5B38844', '#A5B3880A'], STATUS),

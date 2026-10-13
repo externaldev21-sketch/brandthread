@@ -11,15 +11,25 @@
  * `showActionSheet` gives call sites the same `{ text, onPress, style }[]`
  * shape `Alert.alert` takes, so a call site converts by swapping the import,
  * and renders a real themed bottom sheet on every platform (including web).
+ *
+ * Confirmations are always a bottom action sheet, never a centered alert
+ * (Dev, Oct 13). `installConfirmationSheets()` (called once from
+ * app/_layout.tsx) routes every `Alert.alert` that has 2+ buttons through
+ * `presentActionSheet`: the native iOS action sheet (ActionSheetIOS) on iOS,
+ * this themed bottom sheet on Android and web. One-button notices are left
+ * to the platform.
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { a11yModalProps } from '@/lib/a11y/modal';
-import { Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActionSheetIOS, Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetHandle, PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { ELEVATION, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { hapticLight } from '@/lib/haptics';
+import { isConfirmationAlert, toIOSActionSheetOptions } from '@/lib/confirmationSheet';
+
+export { isConfirmationAlert, toIOSActionSheetOptions };
 
 export type ActionSheetButton = {
   text: string;
@@ -54,7 +64,7 @@ export function ActionSheetHost() {
   return (
     <Modal visible={!!state} transparent animationType="fade" onRequestClose={close}>
       <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="Close menu">
-        <Pressable {...a11yModalProps()} style={[styles.sheet, { backgroundColor: theme.card, paddingBottom: insets.bottom + SP.md }]} onPress={() => {}}>
+        <Pressable {...a11yModalProps()} style={[styles.sheet, { backgroundColor: ELEVATION.sheet, paddingBottom: insets.bottom + SP.md }]} onPress={() => {}}>
           <SheetHandle />
           {(state?.title || state?.message) && (
             <View style={styles.header}>
@@ -98,26 +108,52 @@ function registerActionSheetHost(fn: typeof hostOpen) {
   hostOpen = fn;
 }
 
-/**
- * Drop-in replacement for `Alert.alert(title, message, buttons)`.
- *
- * On iOS/Android this just calls the real, platform-native `Alert.alert` —
- * unchanged behavior there. On web, where `Alert.alert` is a silent no-op,
- * it renders the themed sheet from `<ActionSheetHost />` (mounted once near
- * the app root, in app/_layout.tsx) instead.
- */
-export function showActionSheet(title: string | undefined, message: string | undefined, buttons: ActionSheetButton[]): void {
-  if (Platform.OS !== 'web') {
-    Alert.alert(title ?? '', message, buttons);
+/** Bottom action sheet on every platform: native on iOS, themed sheet elsewhere. */
+export function presentActionSheet(title: string | undefined, message: string | undefined, buttons: ActionSheetButton[]): void {
+  const list = buttons.length ? buttons : [{ text: 'Cancel', style: 'cancel' as const }];
+  if (Platform.OS === 'ios') {
+    ActionSheetIOS.showActionSheetWithOptions(
+      toIOSActionSheetOptions(title, message, list),
+      (index) => list[index]?.onPress?.(),
+    );
     return;
   }
   if (!hostOpen) {
-    // Host not mounted yet (e.g. called before first render finishes) —
-    // fail safe rather than silently doing nothing.
+    // Host not mounted yet — fall back to the platform alert rather than
+    // silently dropping the confirmation.
     if (__DEV__) console.warn('[ActionSheet] shown before <ActionSheetHost /> mounted');
+    originalAlert?.(title ?? '', message, list);
     return;
   }
-  hostOpen(title, message, buttons);
+  hostOpen(title, message, list);
+}
+
+/**
+ * Drop-in replacement for `Alert.alert(title, message, buttons)` — always a
+ * bottom action sheet (see presentActionSheet).
+ */
+export function showActionSheet(title: string | undefined, message: string | undefined, buttons: ActionSheetButton[]): void {
+  presentActionSheet(title, message, buttons);
+}
+
+type AlertFn = typeof Alert.alert;
+let originalAlert: AlertFn | null = null;
+
+/**
+ * Route every confirmation `Alert.alert` (2+ buttons) to a bottom action
+ * sheet. Idempotent; call once at startup.
+ */
+export function installConfirmationSheets(): void {
+  if (originalAlert) return;
+  originalAlert = Alert.alert.bind(Alert);
+  const patched: AlertFn = (title, message, buttons, options) => {
+    if (isConfirmationAlert(buttons)) {
+      presentActionSheet(title || undefined, message || undefined, buttons as ActionSheetButton[]);
+      return;
+    }
+    originalAlert!(title, message, buttons, options);
+  };
+  Alert.alert = patched;
 }
 
 const styles = StyleSheet.create({
