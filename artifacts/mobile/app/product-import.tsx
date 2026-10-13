@@ -19,6 +19,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { ProductImportPreview } from '@/components/products/ProductImportPreview';
+import { useProductLimitSheet } from '@/components/products/ProductLimitSheet';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 
 function methodIcon(method: string): keyof typeof Feather.glyphMap {
@@ -42,6 +43,7 @@ export default function ProductImportScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const productLimit = useProductLimitSheet();
 
   const [selectedMethod, setSelectedMethod] = useState<'csv' | 'shopify' | 'manual' | null>(null);
 
@@ -110,6 +112,8 @@ export default function ProductImportScreen() {
       setResult(res);
       void loadProviders();
     } catch (error) {
+      // Nothing was imported because the plan is full: close the review and show what unlocks.
+      if (productLimit.showFor(error)) { setReviewOpen(false); return; }
       setReviewError(messageOf(error));
     } finally {
       setReviewBusy(false);
@@ -186,6 +190,7 @@ export default function ProductImportScreen() {
         ],
       );
     } catch (e: any) {
+      if (productLimit.showFor(e)) return;
       Alert.alert('Error', e?.message ?? 'Import failed. Please try again.');
     } finally {
       setImporting(false);
@@ -435,6 +440,7 @@ export default function ProductImportScreen() {
         onCommit={() => { void commitReview(); }}
         onViewProducts={() => { setReviewOpen(false); router.push('/(tabs)/products' as never); }}
       />
+      {productLimit.sheet}
     </View>
   );
 }

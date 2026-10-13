@@ -17,6 +17,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
 import { HapticSwitch, PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
 import { showActionSheet } from '@/components/ui/ActionSheet';
+import { useProductLimitSheet } from '@/components/products/ProductLimitSheet';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -58,6 +59,7 @@ export default function ProductsBulkEditScreen() {
   const s = useMemo(() => makeStyles(theme), [theme]);
   const router = useRouter();
   const api = useApi();
+  const productLimit = useProductLimitSheet();
   const { isLoaded, isSignedIn } = useAuth();
   const tabBar = useTabBarMetrics();
   const topInset = useHeaderTopInset();
@@ -132,6 +134,7 @@ export default function ProductsBulkEditScreen() {
       setSelected(new Set());
       void load();
     } catch (err) {
+      if (productLimit.showFor(err)) return;
       setError(bulkErrorMessage(err, 'Could not update these products. Nothing was changed.'));
     } finally {
       setBusy(false);
@@ -165,6 +168,7 @@ export default function ProductsBulkEditScreen() {
       setSelected(new Set());
       void load();
     } catch (err) {
+      if (productLimit.showFor(err)) return;
       setError(bulkErrorMessage(err, 'Could not duplicate these products. Nothing was changed.'));
     } finally {
       setBusy(false);
@@ -286,6 +290,7 @@ export default function ProductsBulkEditScreen() {
           </View>
         </View>
       )}
+      {productLimit.sheet}
     </View>
   );
 }
