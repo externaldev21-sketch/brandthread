@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, Redirect, Route, Switch, useLocation } from "wouter";
 import { Show, useClerk } from "@clerk/react";
-import { Activity, Banknote, Cpu, Gift, LayoutDashboard, Megaphone, Menu, ScrollText, ShieldAlert, ShoppingBag, Sparkles, Users } from "lucide-react";
+import { Activity, Banknote, Cpu, Gift, LayoutDashboard, Megaphone, Menu, ScrollText, ShieldAlert, Power, ShoppingBag, Sparkles, Users } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import NotFound from "@/pages/not-found";
@@ -19,6 +19,7 @@ import AnnouncementsPage from "./pages/announcements";
 import InvitesPage from "./pages/invites";
 import PromotionsPage from "./pages/promotions";
 import AuditPage from "./pages/audit";
+import KillSwitchesPage from "./pages/kill-switches";
 
 const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
@@ -31,6 +32,7 @@ const NAV = [
   { href: "/admin/featured", label: "Featured", icon: Activity },
   { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
   { href: "/admin/invites", label: "Invite codes", icon: Gift },
+  { href: "/admin/kill-switches", label: "Kill switches", icon: Power },
   { href: "/admin/audit", label: "Audit log", icon: ScrollText },
 ];
 
@@ -115,6 +117,7 @@ function Gate() {
         <Route path="/admin/featured" component={FeaturedPage} />
         <Route path="/admin/announcements" component={AnnouncementsPage} />
         <Route path="/admin/invites" component={InvitesPage} />
+        <Route path="/admin/kill-switches" component={KillSwitchesPage} />
         <Route path="/admin/audit" component={AuditPage} />
         <Route><Redirect to="/admin" /></Route>
       </Switch>
