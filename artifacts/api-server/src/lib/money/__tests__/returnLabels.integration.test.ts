@@ -127,6 +127,30 @@ describe("prepaid return labels", () => {
     await expectLedgerBalanced();
   });
 
+  it("refunds the partial amount the seller chose when the label is first scanned", async () => {
+    const { seller, returnId } = await seedReturn();
+    carrierSaysYes();
+    const bought = await call(app.base, "POST", `/api/return-labels/${returnId}`, seller, { returnAddress: address, parcel, refundAmountCents: 2_000 });
+    expect(bought.status).toBe(201);
+    const [approved] = await db.select().from(returns).where(eq(returns.id, returnId));
+    expect(approved).toMatchObject({ status: "approved", refundOnScan: true, refundAmountCents: 2_000 });
+
+    const [label] = await db.select().from(shippingLabels).where(eq(shippingLabels.returnId, returnId));
+    expect(await handleReturnLabelTracking(label.id, "in_transit")).toEqual({ refunded: true });
+    const [after] = await db.select().from(returns).where(eq(returns.id, returnId));
+    expect(after).toMatchObject({ status: "refunded", refundAmountCents: 2_000 });
+    await expectLedgerBalanced();
+  });
+
+  it("rejects a refund amount that is not a positive whole number of cents", async () => {
+    const { seller, returnId } = await seedReturn();
+    for (const refundAmountCents of [0, -5, 12.5, "1000"]) {
+      const res = await call(app.base, "POST", `/api/return-labels/${returnId}`, seller, { returnAddress: address, parcel, refundAmountCents });
+      expect(res.status).toBe(400);
+    }
+    expect((await db.select().from(returns).where(eq(returns.id, returnId)))[0].refundAmountCents).toBeNull();
+  });
+
   it("refuses another seller's return and invalid input", async () => {
     const { returnId } = await seedReturn();
     const stranger = await seedSeller("retlabel-other");

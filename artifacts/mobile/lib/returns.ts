@@ -10,6 +10,7 @@
  */
 import { RETURN_REASON_OPTIONS } from '@/services/cartTypes';
 import { refundExpectedLabel } from '@/lib/refundEta';
+import { parseDecimalToCents } from '@/lib/money';
 
 export type ReturnStatusKey = 'pending' | 'approved' | 'denied' | 'refunded';
 export type ReturnViewer = 'buyer' | 'seller';
@@ -72,6 +73,8 @@ export interface ReturnView {
   returnLabelUrl?: string | null;
   returnCarrier?: string | null;
   returnTrackingNumber?: string | null;
+  /** Approved; wait for the first carrier scan before refunding. */
+  refundOnScan?: boolean;
 }
 
 const STATUSES: ReturnStatusKey[] = ['pending', 'approved', 'denied', 'refunded'];
@@ -105,10 +108,49 @@ export function adaptReturnRow(row: any): ReturnView {
     sellerResponse: row?.sellerResponse ?? null,
     createdAt: row?.createdAt ?? new Date(0).toISOString(),
     updatedAt: row?.updatedAt ?? row?.createdAt ?? new Date(0).toISOString(),
+    refundOnScan: row?.refundOnScan === true,
     returnLabelUrl: typeof row?.returnLabelUrl === 'string' && row.returnLabelUrl ? row.returnLabelUrl : null,
     returnCarrier: typeof row?.returnCarrier === 'string' && row.returnCarrier ? row.returnCarrier : null,
     returnTrackingNumber: typeof row?.returnTrackingNumber === 'string' && row.returnTrackingNumber ? row.returnTrackingNumber : null,
   };
+}
+
+/**
+ * The seller's refund amount field: "24.99" → 2499. Must be more than $0 and
+ * no more than what the order can refund.
+ */
+export function parseRefundAmount(text: string, maxCents: number): { cents: number } | { error: string } {
+  const cents = parseDecimalToCents(text.replace(/^\$/, ''));
+  if (cents == null || cents <= 0) return { error: 'Enter an amount, like 24.99.' };
+  if (maxCents > 0 && cents > maxCents) return { error: 'That’s more than this order can refund.' };
+  return { cents };
+}
+
+/**
+ * The server's error text from an ApiError body. Routes answer either
+ * `{ error: "…" }` or `{ error: { message, code } }`; anything else → fallback.
+ */
+export function apiErrorMessage(err: unknown, fallback: string): string {
+  const raw = (err as { body?: unknown } | null)?.body;
+  if (typeof raw !== 'string' || !raw) return fallback;
+  try {
+    const error = JSON.parse(raw)?.error;
+    if (typeof error === 'string' && error.trim()) return error;
+    if (error && typeof error.message === 'string' && error.message.trim()) return error.message;
+  } catch { /* not JSON */ }
+  return fallback;
+}
+
+/**
+ * Toast after a one-tap approve from the returns list. The server answers
+ * "refunded" once the refund went through; "approved" means it was approved
+ * but the refund didn't confirm (open the return to retry).
+ */
+export function quickApproveMessage(response: any, money: (cents: number) => string): string {
+  if (response?.status === 'refunded') {
+    return typeof response.refundAmountCents === 'number' ? `Refunded ${money(response.refundAmountCents)}` : 'Refunded';
+  }
+  return 'Approved. Open the return to retry the refund.';
 }
 
 export function returnReasonLabel(key: string): string {
@@ -153,8 +195,13 @@ export function statusLabel(status: ReturnStatusKey): string {
 }
 
 /** The status screen's headline for each side. */
-export function returnHeadline(view: Pick<ReturnView, 'status' | 'buyerName' | 'sellerName' | 'refundAmountCents' | 'sellerResponse' | 'orderNumber'> & { updatedAt?: string; refundMethod?: RefundMethodKey }, viewer: ReturnViewer, money: (cents: number) => string): { title: string; body: string } {
+export function returnHeadline(view: Pick<ReturnView, 'status' | 'buyerName' | 'sellerName' | 'refundAmountCents' | 'sellerResponse' | 'orderNumber'> & { updatedAt?: string; refundMethod?: RefundMethodKey; refundOnScan?: boolean }, viewer: ReturnViewer, money: (cents: number) => string): { title: string; body: string } {
   const amount = view.refundAmountCents != null ? money(view.refundAmountCents) : null;
+  if (view.status === 'approved' && view.refundOnScan) {
+    return viewer === 'buyer'
+      ? { title: 'Return approved', body: 'Send it back with the prepaid label. Your refund is issued as soon as the carrier scans it.' }
+      : { title: 'Approved, refund on first scan', body: `${amount ? `The refund of ${amount}` : 'The refund'} is issued when the carrier first scans ${view.buyerName}’s parcel.` };
+  }
   switch (view.status) {
     case 'pending':
       return viewer === 'buyer'

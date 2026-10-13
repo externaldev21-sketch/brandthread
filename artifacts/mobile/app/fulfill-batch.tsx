@@ -17,8 +17,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptic } from '@/lib/haptics';
 
 import * as Sharing from 'expo-sharing';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-
+import { PackingSlipSheet } from '@/components/orders/PackingSlipSheet';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { BrandthreadCard, PrimaryButton, SecondaryButton, SectionHeader } from '@/components/BrandthreadUI';
@@ -254,6 +254,10 @@ export default function FulfillBatchScreen() {
     advance();
   }
 
+  // Bulk packing slips: one page per selected order. Mounted on first open.
+  const [showPackingSlips, setShowPackingSlips] = useState(false);
+  const [packingSlipsMounted, setPackingSlipsMounted] = useState(false);
+
   const successCount = results.filter(r => r.ok).length;
   const failCount = results.length - successCount;
   const current = queue[position] ?? null;
@@ -397,12 +401,17 @@ export default function FulfillBatchScreen() {
               </>
             )}
 
+            <SecondaryButton
+              label="Print packing slips"
+              icon="file-text"
+              onPress={() => { setPackingSlipsMounted(true); setShowPackingSlips(true); }}
+              disabled={running !== null || orders.length === 0}
+            />
             <Button label="Done" variant="secondary" onPress={() => router.replace('/(tabs)/orders')} fullWidth />
           </>
         )}
       </ScrollView>
       )}
-
       <FulfillSheet
         visible={!!current}
         order={current}
@@ -410,6 +419,9 @@ export default function FulfillBatchScreen() {
         onSubmit={handleSubmit}
         batch={current ? { index: position, total: queue.length, onSkip: handleSkip } : undefined}
       />
+      {packingSlipsMounted ? (
+        <PackingSlipSheet visible={showPackingSlips} orders={orders} onClose={() => setShowPackingSlips(false)} />
+      ) : null}
     </View>
   );
 }

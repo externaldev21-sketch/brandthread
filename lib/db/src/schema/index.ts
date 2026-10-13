@@ -765,9 +765,13 @@ export const shippingLabelQuotes = pgTable('shipping_label_quotes', {
   ownerId: text('owner_id').notNull(),
   providerShipmentId: text('provider_shipment_id').notNull(),
   providerRateId: text('provider_rate_id').notNull(),
+  /** 'shippo' | 'easypost' — the provider the label is bought from (migration 275). */
+  provider: text('provider').notNull().default('shippo'),
   carrier: text('carrier').notNull(),
   service: text('service').notNull(),
   priceCents: integer('price_cents').notNull(),
+  /** The provider's published retail price, when it gives one; null = unknown (migration 275). */
+  retailPriceCents: integer('retail_price_cents'),
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({

@@ -397,6 +397,7 @@ router.get("/:id", async (req, res) => {
   if (!order) { res.status(404).json({ error: "Not found" }); return; }
   const items = await withItemImageUrls(await withItemProductIds(
     await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
+    { sku: true },
   ));
 
   // Resolve customer: prefer the customers record, fall back to the buyer's user row

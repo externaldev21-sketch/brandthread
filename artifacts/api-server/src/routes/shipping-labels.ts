@@ -7,7 +7,8 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { z } from "@workspace/api-zod";
 import { addressInput, bodyObject, idParams, parcelDimension, validateInput } from "../lib/commerceValidation";
 import { requireRole, teamContext } from "../middlewares/requireRole";
-import { createShipment, findTransaction, purchaseTransaction, refundTransaction } from "../lib/shippo";
+// Rates from every enabled provider (Shippo, plus EasyPost when configured); see labelProviders.
+import { createShipment, purchaseLabel, refundLabel } from "../lib/shipping/labelProviders";
 import { parcelInputError, suggestParcel } from "../lib/parcelSuggestion";
 import { isPendingProviderPurchase } from "../lib/shippingOperationPolicy";
 import {
@@ -126,14 +127,16 @@ router.post("/:orderId/rates", requireRole("staff"), validateInput({ params: ord
       }],
     });
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-    await db.insert(shippingLabelQuotes).values(shipment.rates.map((rate) => ({
+    if (shipment.rates.length) await db.insert(shippingLabelQuotes).values(shipment.rates.map((rate) => ({
       orderId: order.id,
       ownerId,
-      providerShipmentId: shipment.object_id,
+      providerShipmentId: rate.shipment_id ?? shipment.object_id,
       providerRateId: rate.object_id,
+      provider: rate.label_provider,
       carrier: rate.provider,
       service: rate.servicelevel?.name ?? rate.servicelevel?.token ?? "Shipping",
       priceCents: cents(rate.amount),
+      retailPriceCents: rate.retail_price_cents,
       expiresAt,
     }))).onConflictDoNothing();
     res.json({
@@ -142,6 +145,10 @@ router.post("/:orderId/rates", requireRole("staff"), validateInput({ params: ord
         id: rate.object_id, carrier: rate.provider, service: rate.servicelevel?.name ?? rate.servicelevel?.token ?? "Shipping",
         priceCents: cents(rate.amount), currency: rate.currency, estimatedDays: rate.estimated_days,
         estimatedDelivery: rate.duration_terms, trackingIncluded: true, insuranceIncluded: false,
+        provider: rate.label_provider,
+        // Only a retail price the provider published; never estimated.
+        retailPriceCents: rate.retail_price_cents,
+        savingsCents: rate.retail_price_cents != null ? Math.max(0, rate.retail_price_cents - cents(rate.amount)) : null,
       })),
     });
   } catch (err: any) {
@@ -303,6 +310,7 @@ router.post("/:orderId/purchase", requireRole("staff"), validateInput({ params: 
 
       [label] = await tx.insert(shippingLabels).values({
         orderId: order.id, ownerId, idempotencyKey, providerRateId: rateId, itemIds,
+        provider: quote.provider,
         providerShipmentId: quote.providerShipmentId,
         carrier: quote.carrier, service: quote.service,
         priceCents, status: "purchasing", previousOrderStatus: order.status,
@@ -349,8 +357,9 @@ router.post("/:orderId/purchase", requireRole("staff"), validateInput({ params: 
       }
 
       const providerReference = `brandthread-label/${label.id}`;
-      const transaction = await findTransaction(providerReference)
-        ?? await purchaseTransaction(label.providerRateId, providerReference);
+      const transaction = await purchaseLabel({
+        provider: label.provider, rateId: label.providerRateId, shipmentId: label.providerShipmentId, reference: providerReference,
+      });
       if (transaction.status !== "SUCCESS") {
         if (isPendingProviderPurchase(transaction.status)) {
           throw Object.assign(new Error("Carrier label purchase is still pending"), {
@@ -425,6 +434,9 @@ router.post("/:orderId/purchase", requireRole("staff"), validateInput({ params: 
     }
     if (label.itemIds && label.status === "active" && label.trackingNumber) {
       await shipLabelledItems(label.orderId, ownerId, label.itemIds, label.trackingNumber, label.carrier ?? null);
+    } else if (label.provider === "easypost" && label.status === "active" && label.trackingNumber) {
+      // Shippo registers its own labels for tracking updates; an EasyPost label is registered like typed-in tracking.
+      void registerTrackingWithCarrier(label.orderId, label.carrier ?? null, label.trackingNumber);
     }
     // A generated tracking number releases a preorder's funds (per order);
     // an in-stock order's label cost is recovered from the seller's balance.
@@ -497,7 +509,7 @@ router.post("/:orderId/:labelId/void", requireRole("staff"), validateInput({ par
   const providerTransactionId = label.providerTransactionId ?? label.provider_transaction_id;
   if (!providerTransactionId) return void res.status(409).json({ error: "Label cannot be voided" });
   try {
-    const refund = await refundTransaction(providerTransactionId);
+    const refund = await refundLabel({ provider: label.provider, transactionId: providerTransactionId });
     const pending = refund.status !== "SUCCESS";
     const updated = await db.transaction(async (tx) => {
       const [next] = await tx.update(shippingLabels).set({

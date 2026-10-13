@@ -35,6 +35,18 @@ describe("withItemProductIds", () => {
     expect(items[0]).toMatchObject({ id: "line-1", productName: "Order Item Tee" });
   });
 
+  it("adds the SKU only when asked (seller order detail, for packing slips)", async () => {
+    const lines = [
+      { id: "line-1", variantId, productName: "Order Item Tee" },
+      { id: "line-2", variantId: null, productName: "Deleted variant" },
+    ];
+    const withSku = await withItemProductIds(lines, { sku: true });
+    expect(withSku.map((item) => item.sku)).toEqual([`oip-${suffix}`, null]);
+    const plain = await withItemProductIds(lines);
+    expect(plain.every((item) => !("sku" in item))).toBe(true);
+    expect((await withItemProductIds([lines[1]], { sku: true }))[0].sku).toBeNull();
+  });
+
   it("returns an empty list unchanged", async () => {
     expect(await withItemProductIds([])).toEqual([]);
   });

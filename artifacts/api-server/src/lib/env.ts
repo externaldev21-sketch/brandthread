@@ -52,6 +52,8 @@ const OPTIONAL_VARS = [
   "AGORA_RECORDING_S3_VENDOR",
   "AGORA_RECORDING_PUBLIC_URL_BASE",
   "GOOGLE_MAPS_API_KEY",
+  // Second discounted-label provider next to Shippo; labels stay Shippo-only without it.
+  "EASYPOST_API_KEY",
   "RESEND_API_KEY",
   "RESEND_FROM_EMAIL",
   "MAIL_FROM",
