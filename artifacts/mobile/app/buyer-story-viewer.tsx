@@ -1341,7 +1341,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   seenByInitials: {
     color: ON_DARK,
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: FONT.bold,
   },
   seenByText: {

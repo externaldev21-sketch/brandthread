@@ -40,5 +40,5 @@ const styles = StyleSheet.create({
   },
   topLeft: { top: 6, left: 6 },
   bottomLeft: { bottom: 6, left: 6 },
-  label: { color: MEDIA.foreground, fontSize: 11, lineHeight: 12, fontWeight: '600', fontFamily: FONT.semibold },
+  label: { color: MEDIA.foreground, fontSize: 11, lineHeight: 13, fontWeight: '600', fontFamily: FONT.semibold },
 });

@@ -149,7 +149,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  countText: { color: theme.background, fontFamily: FONT.bold, fontSize: 10 },
+  countText: { color: theme.background, fontFamily: FONT.bold, fontSize: 11 },
   label: { marginTop: SP.xs + 2, maxWidth: '100%', color: theme.muted, fontFamily: FONT.medium, fontSize: FS.meta },
   labelUnseen: { color: theme.text },
 });
