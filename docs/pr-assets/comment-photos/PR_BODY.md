@@ -91,10 +91,10 @@ API (`cd artifacts/api-server && TEST_DATABASE_URL=postgres://postgres:postgres@
   - Deleting the comment cascades to the photo row.
 - `src/lib/__tests__/commentMedia.test.ts`: URL prefix and input parsing.
 - Re-run unchanged: `post-comments-pin-mentions`, `ugc-safety`, `activity-events`, `connectivity-commerce-social`, `social-audit-foryou`, `drops-role-gate`.
-- Result: RESULTS_API
+- Result: **8 files, 73 tests passed** (17 of them new: 12 integration + 5 unit).
 
 Mobile:
-- `pnpm exec vitest run lib/__tests__/commentPhoto.test.ts` covers sizing, MIME and the guest guard. Result: RESULTS_MOBILE
+- `pnpm exec vitest run lib/__tests__/commentPhoto.test.ts` covers sizing, MIME and the guest guard. **6 passed**.
 - Related existing suites re-run. `components/inline-feedback.test.ts` (2 tests) and `tests/screen-header-migration-lint.test.ts` (2 tests) fail **on origin/dev too**. Their regexes and allowlists don't match dev's current files, and none of the flagged files are ones I added.
 
 Typecheck: `tsc --noEmit` in api-server gives 0 errors. Mobile gives 0 errors.
