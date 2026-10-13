@@ -88,6 +88,7 @@ import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
 import { productTransitionKey } from '@/lib/tileTransition';
 import { deliveryPromiseLine } from '@/lib/deliveryGuarantee';
 import { useStockInfo, variantStockLine } from '@/lib/stockInfo';
+import { PayLaterLine } from '@/components/products/PayLaterLine';
 import { ApiError } from '@/lib/networkNotice';
 
 type ThemeAliases = {
@@ -1299,6 +1300,7 @@ export default function BuyerProductDetailScreen() {
             {hasDiscount && <Text style={s.savings}>Save {fmtPrice(savingsAmt)}</Text>}
           </View>
           <ProductShippingLine shipping={product.sellerShipping} />
+          <PayLaterLine sellerId={product.sellerId} priceCents={variantPrice} />
 
           {!sellerPreview && <LaunchCountdown productId={product.id} onLaunchingChange={setLaunching} />}
 
