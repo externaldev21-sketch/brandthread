@@ -49,7 +49,6 @@ import { buildPreviewSellerAnalytics } from '@/lib/previewSellerChartData';
 import { formatCents } from '@/lib/money';
 import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
 import { computeMetricChange } from '@/lib/sellerMetricChange';
-import { useCountUp } from '@/lib/useCountUp';
 import {
   countOrderReturns,
   deriveHubStats,
@@ -685,13 +684,9 @@ export default function SellerHomeCommerceDashboard({
 
   const isEmptyChart = newSeller || buckets.every((b) => b.totalCents === 0 && b.orderCount === 0 && b.visitorCount === 0);
   const activeValue = scrubIndex !== null && series[scrubIndex] != null ? series[scrubIndex] : metricAggregate.current;
-  const heroDisplay = useCountUp(Math.round(activeValue), scrubIndex === null);
-  // The delta line is computed instantly from metricAggregate (no animation),
-  // but the hero number above it counts up over ~650ms — showing the delta
-  // before the count-up settles would briefly (or, if requestAnimationFrame
-  // stalls, not-so-briefly) show a total and a delta that don't agree. Only
-  // reveal the delta once the displayed hero number has actually caught up.
-  const heroSettled = heroDisplay === Math.round(activeValue);
+  // Shown as-is: count-up motion is reserved for the first-sale moment (less-AI
+  // pass, item 82), so the hero number and its delta always agree on screen.
+  const heroDisplay = Math.round(activeValue);
   const scrubLabel = scrubIndex !== null ? labels[scrubIndex] : null;
 
   const periodLabel = PERIOD_LABEL[range];
@@ -807,7 +802,7 @@ export default function SellerHomeCommerceDashboard({
                   // message is shown once, in the chart itself; this blank
                   // line only holds the hero's height so nothing jumps.
                   <Text style={[styles.heroDelta, { color: theme.muted }]}>{' '}</Text>
-                ) : deltaLine && scrubIndex === null && heroSettled ? (
+                ) : deltaLine && scrubIndex === null ? (
                   <Text
                     style={[
                       styles.heroDelta,
