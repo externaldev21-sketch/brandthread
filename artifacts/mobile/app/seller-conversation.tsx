@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useUser } from '@clerk/expo';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, ONLINE_GREEN } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi, type SellerQuickReply } from '@/lib/api';
 import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
@@ -67,6 +67,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   formatDate as sharedFormatDate, formatTime, groupFlags,
   groupCornerRadii, lastOwnMessageId, messagePreviewText,
+  BUBBLE_RADIUS, BUBBLE_TAIL_RADIUS, SENT_BUBBLE, SENT_BUBBLE_TEXT, RECEIVED_BUBBLE, RECEIVED_BUBBLE_TEXT,
+  activeStatusLine,
 } from '@/lib/chatGrouping';
 import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
 import { ReplyBanner } from '@/components/chat/ReplyBanner';
@@ -90,6 +92,11 @@ interface Participant {
   initials: string; color: string; accountType: string;
   /** Chat details > Nicknames: the current viewer's nickname for them, if set. */
   nickname?: string;
+  /** Public profile photo, when they have one. */
+  avatarUri?: string;
+  /** Activity status — sent only when both people share it. */
+  isOnline?: boolean;
+  lastSeenAt?: string;
 }
 interface ConvView {
   id: string; type: string; participants: Participant[];
@@ -551,10 +558,12 @@ export default function SellerConversationScreen() {
   // and bubble colors for both participants. Null = the app's existing
   // default monochrome look, completely unchanged.
   const convTheme = getConversationTheme(conv?.themeId);
-  const sentBubbleColor = convTheme?.sentBubble ?? PURPLE;
-  const sentTextColor = convTheme?.sentText ?? ON_DARK;
-  const receivedBubbleColor = convTheme?.receivedBubble ?? CARD;
-  const receivedTextColor = convTheme?.receivedText ?? FG;
+  // Same default bubbles as the buyer's side of the thread (white sent,
+  // #262628 received); a chat theme still overrides both.
+  const sentBubbleColor = convTheme?.sentBubble ?? SENT_BUBBLE;
+  const sentTextColor = convTheme?.sentText ?? SENT_BUBBLE_TEXT;
+  const receivedBubbleColor = convTheme?.receivedBubble ?? RECEIVED_BUBBLE;
+  const receivedTextColor = convTheme?.receivedText ?? RECEIVED_BUBBLE_TEXT;
   const messagingBlocked = messaging.blockedByMe || messaging.unavailable;
   // New every-role-pair DM/message-request routing: `conv.isRequest` and
   // `requestedBy` are the same for every viewer (conversation-level, not
@@ -639,6 +648,22 @@ export default function SellerConversationScreen() {
       },
       me: { id: myId, name: myName, initials: myInitials, color: PURPLE },
     });
+  }
+
+  // "Active now" / "Active 3h ago" — the server only sends this when both
+  // people share their activity status.
+  const activeLine = activeStatusLine(other);
+
+  function openOtherProfile() {
+    if (!other) return;
+    const qs = new URLSearchParams({
+      userId: other.userId,
+      name: other.name,
+      handle: other.handle ?? '',
+      initials: other.initials ?? '',
+      color: other.color ?? '',
+    });
+    router.push(('/buyer-other-profile?' + qs.toString()) as never);
   }
 
   // ── Chat details ───────────────────────────────────────────────────────────────
@@ -1336,6 +1361,8 @@ export default function SellerConversationScreen() {
           <ChatAttachmentCard
             theme={theme}
             isMe={isOwn}
+            bubbleColor={isOwn ? sentBubbleColor : receivedBubbleColor}
+            bubbleTextColor={isOwn ? sentTextColor : receivedTextColor}
             imageUri={isProduct ? att.uri : undefined}
             icon={isProduct ? 'shopping-bag' : 'package'}
             iconColor={PURPLE}
@@ -1400,12 +1427,13 @@ export default function SellerConversationScreen() {
               s.bubble,
               {
                 backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor,
-                borderColor: isOwn ? sentBubbleColor : BORDER,
+                // Filled, no outline — same as the buyer's view.
+                borderColor: isOwn ? sentBubbleColor : receivedBubbleColor,
                 // Shared corner-grouping math (lib/chatGrouping.ts) — the
-                // shared edge between grouped bubbles is tightened, every
-                // outer corner stays fully rounded, matching the buyer's
-                // own thread view of this same conversation.
-                ...groupCornerRadii(isOwn, isFirstInGroup, isLastInGroup, RADIUS.lg, 4),
+                // shared edge between grouped bubbles is tightened, the last
+                // bubble of a group gets the 4pt tail corner, matching the
+                // buyer's own thread view of this same conversation.
+                ...groupCornerRadii(isOwn, isFirstInGroup, isLastInGroup, BUBBLE_RADIUS, BUBBLE_TAIL_RADIUS, BUBBLE_TAIL_RADIUS),
               },
             ]}
             accessibilityHint="Touch and hold to react or see more options"
@@ -1428,8 +1456,8 @@ export default function SellerConversationScreen() {
                 app/buyer-conversation.tsx, so a thread reads identically from
                 both sides. */}
             {msg.replyToId && !removed ? (
-              <View style={[s.replyQuote, { borderLeftColor: isOwn ? ON_DARK : PURPLE }]}>
-                <Text style={[s.replyQuoteText, { color: isOwn ? `${ON_DARK}CC` : MUTED }]} numberOfLines={1}>
+              <View style={[s.replyQuote, { borderLeftColor: isOwn ? sentTextColor : PURPLE }]}>
+                <Text style={[s.replyQuoteText, { color: isOwn ? `${sentTextColor}CC` : MUTED }]} numberOfLines={1}>
                   {msg.replyPreview ?? messagePreviewText(messages.find(m => m.id === msg.replyToId) ?? {})}
                 </Text>
               </View>
@@ -1459,13 +1487,13 @@ export default function SellerConversationScreen() {
                 this was chosen over tap-to-reveal). */}
             {isLastInGroup && (
               <View style={s.bubbleMeta}>
-                <Text style={[s.bubbleTime, { color: isOwn ? `${ON_DARK}B0` : MUTED }]}>
+                <Text style={[s.bubbleTime, { color: isOwn ? `${sentTextColor}B0` : MUTED }]}>
                   {formatTime(msg.ts)}
                 </Text>
                 {isOwn && msg.status !== 'failed' && (
                   <View style={s.receiptChecks}>
-                    <Feather name="check" size={11} color={isRead ? ON_DARK : `${ON_DARK}B0`} />
-                    {isRead && <Feather name="check" size={11} color={ON_DARK} style={{ marginLeft: -7 }} />}
+                    <Feather name="check" size={11} color={isRead ? sentTextColor : `${sentTextColor}B0`} />
+                    {isRead && <Feather name="check" size={11} color={sentTextColor} style={{ marginLeft: -7 }} />}
                   </View>
                 )}
               </View>
@@ -1607,16 +1635,24 @@ export default function SellerConversationScreen() {
             <PressableScale
               style={s.headerCenterRow}
               disabled={!other || !id}
-              onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+              // Instagram: avatar + name open their profile.
+              onPress={() => { hapticPrimaryAction(); openOtherProfile(); }}
               testID="seller-conversation-header-name"
               accessibilityRole="button"
-              accessibilityLabel={`${displayName} — chat details`}
+              accessibilityLabel={`${displayName} — view profile`}
             >
               {other && (
-                <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE }]}>
-                  <Text style={s.headerAvatarInitials}>
-                    {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
-                  </Text>
+                <View>
+                  <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE }]}>
+                    {other.avatarUri ? (
+                      <CachedImage source={{ uri: other.avatarUri }} style={s.headerAvatarImage} />
+                    ) : (
+                      <Text style={s.headerAvatarInitials}>
+                        {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+                  {other.isOnline ? <View style={s.headerOnlineDot} testID="seller-conversation-online-dot" /> : null}
                 </View>
               )}
               <View style={s.headerCenter}>
@@ -1627,7 +1663,9 @@ export default function SellerConversationScreen() {
                     existing subtitle slot there to reuse before now. */}
                 {conv?.otherTyping
                   ? <Text style={s.headerHandle} numberOfLines={1}>typing…</Text>
-                  : (other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null)}
+                  : activeLine
+                    ? <Text style={s.headerHandle} numberOfLines={1}>{activeLine}</Text>
+                    : (other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null)}
               </View>
             </PressableScale>
           </View>
@@ -1681,6 +1719,9 @@ export default function SellerConversationScreen() {
                 counterpart: { userId: other.userId, name: other.name },
                 messaging,
                 onChange: setMessaging,
+                // The header now opens the buyer's profile, so chat details
+                // lead this menu.
+                extraOptions: [{ text: 'Chat details', onPress: openChatDetails }],
               }); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
@@ -2496,6 +2537,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerAvatar: {
     width: 34, height: 34, borderRadius: 17,
     alignItems: 'center', justifyContent: 'center', marginRight: SP.sm,
+    overflow: 'hidden',
+  },
+  headerAvatarImage: { width: 34, height: 34 },
+  headerOnlineDot: {
+    position: 'absolute', right: SP.sm - 1, bottom: -1,
+    width: 11, height: 11, borderRadius: 6, borderWidth: 2,
+    backgroundColor: ONLINE_GREEN, borderColor: theme.background,
   },
   headerAvatarInitials: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
   // The actual flex/minWidth constraint has to live here, on a plain View —

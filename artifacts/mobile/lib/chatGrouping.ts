@@ -87,26 +87,39 @@ export function groupFlags(
 /** The rounded-corner radii for one bubble, IG-style: the corner touching
  *  an adjacent bubble in the same group (on the avatar-column side for a
  *  received bubble, the opposite side for a sent one) is tightened to
- *  `tight`; every outer/edge corner stays `full`. */
+ *  `tight`; every outer/edge corner stays `full`. With `tail`, the last
+ *  bubble of a group (or a lone bubble) also gets that radius on its
+ *  bottom corner on the sender's side — the small "tail" corner. */
 export function groupCornerRadii(
   isOwn: boolean,
   isFirstInGroup: boolean,
   isLastInGroup: boolean,
   full: number,
   tight = 6,
+  tail?: number,
 ): {
   borderTopLeftRadius: number;
   borderTopRightRadius: number;
   borderBottomRightRadius: number;
   borderBottomLeftRadius: number;
 } {
+  const tailCorner = tail !== undefined && isLastInGroup ? tail : null;
   return {
     borderTopLeftRadius: (!isOwn && !isFirstInGroup) ? tight : full,
     borderTopRightRadius: (isOwn && !isFirstInGroup) ? tight : full,
-    borderBottomRightRadius: (isOwn && !isLastInGroup) ? tight : full,
-    borderBottomLeftRadius: (!isOwn && !isLastInGroup) ? tight : full,
+    borderBottomRightRadius: isOwn ? (tailCorner ?? (!isLastInGroup ? tight : full)) : full,
+    borderBottomLeftRadius: !isOwn ? (tailCorner ?? (!isLastInGroup ? tight : full)) : full,
   };
 }
+
+/** Messages bubble spec (Instagram, reskinned): 18pt corners, a 4pt tail
+ *  corner on the last bubble of a group, white sent / #262628 received. */
+export const BUBBLE_RADIUS = 18;
+export const BUBBLE_TAIL_RADIUS = 4;
+export const SENT_BUBBLE = '#FFFFFF';
+export const SENT_BUBBLE_TEXT = '#000000';
+export const RECEIVED_BUBBLE = '#262628';
+export const RECEIVED_BUBBLE_TEXT = '#FFFFFF';
 
 export interface PreviewableMessage {
   text?: string | null;
@@ -162,4 +175,21 @@ export function lastOwnMessageId(messages: SeenableMessage[], myId: string): str
  *  must have read it (readAt set). */
 export function isSeenReceipt(msg: SeenableMessage, myId: string, lastOwnId: string | null): boolean {
   return msg.fromId === myId && msg.id === lastOwnId && !!msg.readAt;
+}
+
+/** Header line from the server's activity status: "Active now" while
+ *  they're online, "Active 3h ago" within the last day, else null. */
+export function activeStatusLine(
+  participant: { isOnline?: boolean; lastSeenAt?: string } | null | undefined,
+  now: number = Date.now(),
+): string | null {
+  if (!participant) return null;
+  if (participant.isOnline) return 'Active now';
+  if (!participant.lastSeenAt) return null;
+  const ts = new Date(participant.lastSeenAt).getTime();
+  if (Number.isNaN(ts)) return null;
+  const mins = Math.floor((now - ts) / 60_000);
+  if (mins < 0 || mins >= 24 * 60) return null;
+  if (mins < 60) return `Active ${Math.max(mins, 1)}m ago`;
+  return `Active ${Math.floor(mins / 60)}h ago`;
 }

@@ -6,6 +6,7 @@ import {
   formatDate,
   formatTime,
   groupCornerRadii,
+  activeStatusLine,
   groupFlags,
   isSeenReceipt,
   lastOwnMessageId,
@@ -225,3 +226,55 @@ describe('chatGrouping: messagePreviewText', () => {
     expect(messagePreviewText({})).toBe('Message');
   });
 });
+
+describe('chatGrouping: tail corner', () => {
+  const FULL = 18;
+  const TAIL = 4;
+
+  it('a lone sent bubble gets the 4pt tail at its bottom-right, received at bottom-left', () => {
+    expect(groupCornerRadii(true, true, true, FULL, TAIL, TAIL)).toEqual({
+      borderTopLeftRadius: FULL, borderTopRightRadius: FULL,
+      borderBottomRightRadius: TAIL, borderBottomLeftRadius: FULL,
+    });
+    expect(groupCornerRadii(false, true, true, FULL, TAIL, TAIL)).toEqual({
+      borderTopLeftRadius: FULL, borderTopRightRadius: FULL,
+      borderBottomRightRadius: FULL, borderBottomLeftRadius: TAIL,
+    });
+  });
+
+  it('only the last bubble of a group carries the tail', () => {
+    // first of a sent group: no tail, inner bottom corner tightened
+    expect(groupCornerRadii(true, true, false, FULL, TAIL, TAIL).borderBottomRightRadius).toBe(TAIL);
+    expect(groupCornerRadii(true, true, false, FULL, 6, TAIL).borderBottomRightRadius).toBe(6);
+    // last of a received group: tail at bottom-left, top-left tightened
+    expect(groupCornerRadii(false, false, true, FULL, 6, TAIL)).toEqual({
+      borderTopLeftRadius: 6, borderTopRightRadius: FULL,
+      borderBottomRightRadius: FULL, borderBottomLeftRadius: TAIL,
+    });
+  });
+
+  it('without a tail value nothing changes', () => {
+    expect(groupCornerRadii(true, true, true, FULL, 6)).toEqual({
+      borderTopLeftRadius: FULL, borderTopRightRadius: FULL,
+      borderBottomRightRadius: FULL, borderBottomLeftRadius: FULL,
+    });
+  });
+});
+
+describe('chatGrouping: activeStatusLine', () => {
+  const NOW = Date.parse('2026-10-13T12:00:00Z');
+  const ago = (mins: number) => new Date(NOW - mins * 60_000).toISOString();
+
+  it('reads Active now / Active Nm ago / Active Nh ago, nothing after a day', () => {
+    expect(activeStatusLine({ isOnline: true, lastSeenAt: ago(1) }, NOW)).toBe('Active now');
+    expect(activeStatusLine({ isOnline: false, lastSeenAt: ago(12) }, NOW)).toBe('Active 12m ago');
+    expect(activeStatusLine({ isOnline: false, lastSeenAt: ago(185) }, NOW)).toBe('Active 3h ago');
+    expect(activeStatusLine({ isOnline: false, lastSeenAt: ago(60 * 25) }, NOW)).toBeNull();
+  });
+
+  it('is null without presence data (hidden or unknown)', () => {
+    expect(activeStatusLine({ isOnline: false }, NOW)).toBeNull();
+    expect(activeStatusLine(null, NOW)).toBeNull();
+  });
+});
+

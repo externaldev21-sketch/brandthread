@@ -20,7 +20,7 @@ import { Chip } from '@/components/ui/Chip';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticSuccessAction, hapticSelection, hapticDestructiveConfirm, hapticToggle } from '@/lib/haptics';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, ONLINE_GREEN } from '@/lib/theme';
 import {
   getConversation, createOrGetConversation, getMessages,
   sendMessage, retryMessage, addReaction, deleteMessageForMe,
@@ -91,6 +91,8 @@ import { EMOJI_FONT_STACK } from '@/lib/appleEmoji';
 import {
   formatDate as sharedFormatDate, formatTime as sharedFormatTime,
   sameSenderClose, groupCornerRadii, lastOwnMessageId, messagePreviewText,
+  BUBBLE_RADIUS, BUBBLE_TAIL_RADIUS, SENT_BUBBLE, SENT_BUBBLE_TEXT, RECEIVED_BUBBLE, RECEIVED_BUBBLE_TEXT,
+  activeStatusLine,
 } from '@/lib/chatGrouping';
 import { radius } from '@/constants/radii';
 
@@ -605,27 +607,29 @@ export default function BuyerConversationScreen() {
   // and bubble colors for both participants. Null = Brandthread's existing
   // default monochrome look, completely unchanged.
   const convTheme = getConversationTheme(conv?.themeId);
-  const sentBubbleColor = convTheme?.sentBubble ?? theme.accent;
-  const sentTextColor = convTheme?.sentText ?? theme.onAccent;
-  const receivedBubbleColor = convTheme?.receivedBubble ?? theme.cardElevated;
-  const receivedTextColor = convTheme?.receivedText ?? theme.text;
+  // Default bubbles (Instagram, reskinned): white sent / black text,
+  // #262628 received / white text — the same in every app theme. A chat
+  // theme picked in Chat details still overrides both.
+  const sentBubbleColor = convTheme?.sentBubble ?? SENT_BUBBLE;
+  const sentTextColor = convTheme?.sentText ?? SENT_BUBBLE_TEXT;
+  const receivedBubbleColor = convTheme?.receivedBubble ?? RECEIVED_BUBBLE;
+  const receivedTextColor = convTheme?.receivedText ?? RECEIVED_BUBBLE_TEXT;
   const isDisabled = conv?.isFriendshipActive === false;
   // Request mode (Instagram-style): the composer is hidden and replaced with
   // the accept/block/delete bottom panel below until the recipient accepts.
   const isRequestMode = conv?.isRequest === true;
   const canSend = (text.trim().length > 0 || selectedAttachment != null) && !isDisabled && !isSending && !isRequestMode;
 
-  // Presence line under the header name. `isOnline`/`lastSeenAt` are the only
-  // presence signals ConversationParticipant carries; the backend does not
-  // currently populate them (see socialTypes.ts), so that part is simply
-  // omitted. "typing…" IS real for an ordinary conversation now — see
+  // Presence line under the header name: "Active now" / "Active 3h ago"
+  // from the server's activity status (isOnline/lastSeenAt — only sent when
+  // both people share it). "typing…" IS real for an ordinary conversation now — see
   // conv.otherTyping (PATCH/GET /api/conversations/:id/typing) — populated
   // the same way agentTyping is for the agent thread, just from the OTHER
   // human participant's own typing signal instead of a client-local flag.
   const isAgentConv = !!conv?.isOfficial || participant?.userId === BRANDTHREAD_AGENT_USER_ID;
   const statusLine = isAgentConv
     ? (agentTyping ? 'typing…' : 'AI assistant')
-    : (conv?.otherTyping ? 'typing…' : (participant?.isOnline ? 'Active now' : statusLineFor(participant)));
+    : (conv?.otherTyping ? 'typing…' : statusLineFor(participant));
   const headerTopPad = useHeaderTopInset();
   // Same reasoning at the bottom: react-native-web never fills in a real
   // bottom safe-area inset (no home-indicator polyfill), so insets.bottom
@@ -746,6 +750,10 @@ export default function BuyerConversationScreen() {
   // direct router.push to /seller-profile — see the pill's onPress below.
   function openParticipantProfile() {
     if (!participant) return;
+    if (participant.accountType === 'seller') {
+      router.push(('/seller-profile?id=' + encodeURIComponent(participant.userId)) as never);
+      return;
+    }
     const qs = new URLSearchParams({
       userId: participant.userId,
       name: participant.name,
@@ -1484,6 +1492,9 @@ export default function BuyerConversationScreen() {
     // takes the identical { text, onPress, style }[] shape and renders a
     // real themed bottom sheet on every platform.
     showActionSheet('Options', undefined, [
+      // The header now opens their profile (Instagram), so chat details
+      // (theme, nicknames, mute…) lead this menu.
+      { text: 'Chat details', onPress: openChatDetails },
       {
         text: 'Archive conversation',
         onPress: async () => {
@@ -1830,6 +1841,8 @@ export default function BuyerConversationScreen() {
           <ChatAttachmentCard
             theme={theme}
             isMe={isOwn}
+            bubbleColor={isOwn ? sentBubbleColor : receivedBubbleColor}
+            bubbleTextColor={isOwn ? sentTextColor : receivedTextColor}
             imageUri={isProduct ? att.uri : undefined}
             icon={isProduct ? 'shopping-bag' : 'package'}
             iconColor={theme.accent}
@@ -1939,12 +1952,12 @@ export default function BuyerConversationScreen() {
               {
                 backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor,
                 // IG-style grouping: the corner touching an adjacent bubble
-                // in the same group (same side as the avatar column) is
-                // reduced to 6pt; every outer corner stays the full 18pt.
-                // Shared with app/seller-conversation.tsx via chatGrouping.ts
-                // so a grouped run looks identical from both sides of the
-                // same thread.
-                ...groupCornerRadii(isOwn, isFirstInGroup, isLastInGroup, RADIUS.lg),
+                // in the same group is reduced to 4pt, the last bubble of a
+                // group gets a 4pt tail corner on the sender's side, every
+                // other corner stays the full 18pt. Shared with
+                // app/seller-conversation.tsx via chatGrouping.ts so a
+                // grouped run looks identical from both sides of the thread.
+                ...groupCornerRadii(isOwn, isFirstInGroup, isLastInGroup, BUBBLE_RADIUS, BUBBLE_TAIL_RADIUS, BUBBLE_TAIL_RADIUS),
                 alignSelf: isOwn ? 'flex-end' : 'flex-start',
                 shadowColor: theme.shadowColor,
                 shadowOffset: { width: 0, height: 2 },
@@ -1956,8 +1969,8 @@ export default function BuyerConversationScreen() {
           >
             {/* Quoted reply */}
             {msg.replyToId ? (
-              <View style={[s.replyQuote, { borderLeftColor: isOwn ? theme.onAccent : theme.accent }]}>
-                <Text style={[s.replyQuoteText, { color: isOwn ? `${theme.onAccent}CC` : theme.muted }]} numberOfLines={1}>
+              <View style={[s.replyQuote, { borderLeftColor: isOwn ? sentTextColor : theme.accent }]}>
+                <Text style={[s.replyQuoteText, { color: isOwn ? `${sentTextColor}CC` : theme.muted }]} numberOfLines={1}>
                   {msg.replyPreview ?? messagePreviewText(messages.find(m => m.id === msg.replyToId) ?? {})}
                 </Text>
               </View>
@@ -1974,16 +1987,16 @@ export default function BuyerConversationScreen() {
             {/* Inline bottom-right timestamp + read receipt (last bubble of a run) */}
             {isLastInGroup && (
               <View style={s.bubbleMeta}>
-                <Text style={[s.bubbleTime, { color: isOwn ? `${theme.onAccent}B0` : theme.muted }]}>
+                <Text style={[s.bubbleTime, { color: isOwn ? `${sentTextColor}B0` : theme.muted }]}>
                   {formatTime(msg.ts)}
                 </Text>
                 {isOwn && msg.status !== 'failed' && (
                   msg.status === 'sending' ? (
-                    <Feather name="clock" size={11} color={`${theme.onAccent}B0`} style={s.receiptIcon} />
+                    <Feather name="clock" size={11} color={`${sentTextColor}B0`} style={s.receiptIcon} />
                   ) : (
                     <View style={s.receiptChecks}>
-                      <Feather name="check" size={11} color={isRead ? theme.onAccent : `${theme.onAccent}B0`} />
-                      {isRead && <Feather name="check" size={11} color={theme.onAccent} style={{ marginLeft: -7 }} />}
+                      <Feather name="check" size={11} color={isRead ? sentTextColor : `${sentTextColor}B0`} />
+                      {isRead && <Feather name="check" size={11} color={sentTextColor} style={{ marginLeft: -7 }} />}
                     </View>
                   )
                 )}
@@ -2185,10 +2198,12 @@ export default function BuyerConversationScreen() {
               style={s.headerCenter}
               activeOpacity={participant ? 0.7 : 1}
               disabled={!participant}
-              onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+              // Instagram: the avatar + name open their profile; chat
+              // details stay on the header's info button.
+              onPress={() => { hapticPrimaryAction(); if (isAgentConv) openChatDetails(); else openParticipantProfile(); }}
               testID="conversation-header-name"
               accessibilityRole="button"
-              accessibilityLabel={`${displayName} — chat details`}
+              accessibilityLabel={isAgentConv ? `${displayName} — chat details` : `${displayName} — view profile`}
             >
               {participant && (
                 <View style={s.headerAvatarWrap} testID="conversation-avatar">
@@ -2197,11 +2212,15 @@ export default function BuyerConversationScreen() {
                       <BrandthreadLogo size={18} />
                     </View>
                   ) : (
-                    <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
-                      <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+                    <View style={[s.headerAvatarCircle, { backgroundColor: participant.color, overflow: 'hidden' }]}>
+                      {participant.avatarUri ? (
+                        <CachedImage source={{ uri: participant.avatarUri }} style={s.headerAvatarCircle} />
+                      ) : (
+                        <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+                      )}
                     </View>
                   )}
-                  {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
+                  {participant.isOnline && !isAgentConv && <View style={s.headerAvatarOnlineDot} testID="conversation-online-dot" />}
                 </View>
               )}
               <View style={s.headerTextCol}>
@@ -2217,7 +2236,7 @@ export default function BuyerConversationScreen() {
                   )}
                 </View>
                 {statusLine ? (
-                  <Text style={[s.headerStatusLine, { color: participant?.isOnline ? theme.success : theme.muted }]} numberOfLines={1}>
+                  <Text style={[s.headerStatusLine, { color: theme.muted }]} numberOfLines={1}>
                     {statusLine}
                   </Text>
                 ) : null}
@@ -2883,13 +2902,7 @@ export default function BuyerConversationScreen() {
 // ─── Presence line ────────────────────────────────────────────────────────────
 
 function statusLineFor(participant: ConversationParticipant | null): string | null {
-  if (!participant) return null;
-  if (participant.isOnline) return 'online';
-  if (participant.lastSeenAt) {
-    const ts = new Date(participant.lastSeenAt).getTime();
-    if (!Number.isNaN(ts)) return `last seen ${timeAgo(ts)} ago`;
-  }
-  return null;
+  return activeStatusLine(participant);
 }
 
 // ─── Double-tap heart burst ───────────────────────────────────────────────────
@@ -3163,7 +3176,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     width: 11,
     height: 11,
     borderRadius: 6,
-    backgroundColor: theme.success,
+    backgroundColor: ONLINE_GREEN,
     borderWidth: 2,
     borderColor: theme.background,
   },
