@@ -965,7 +965,7 @@ describe('Dev P0: a brand-new email never shows "this email already has an accou
 
     await submitNewEmail(renderer, 'taken@x.test');
     await tap(renderer, 'onboarding-email-switch');
-    expect(routerReplaceMock).toHaveBeenCalledWith('/sign-in');
+    expect(routerReplaceMock).toHaveBeenCalledWith('/sign-in?email=taken%40x.test');
   });
 });
 

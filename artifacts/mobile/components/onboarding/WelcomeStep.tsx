@@ -5,25 +5,28 @@
  * line and two buttons on plain black at the bottom. No glow, no gradient,
  * nothing laid over the video.
  *
- * The existing runway clip is streamed outside the JS bundle. A bundled poster
- * displays until a frame renders (and when offline or Reduce Motion is on).
+ * The six-second runway clip is bundled once on native and served as a small
+ * browser-compatible file on web. The poster displays until a real frame
+ * renders (and when offline or Reduce Motion is on).
  */
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
-import { demoRunwayVideoUri } from '@/lib/demoMedia';
 import { hapticLight } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PillButton } from './OnboardingUI';
 import { SPACE, TYPE, useOnboardingMotion } from './onboardingTokens';
 
-// The existing clip is served with byte ranges outside the JS bundle; the
-// poster is bundled so welcome remains usable while media is loading/offline.
-const WELCOME_VIDEO = demoRunwayVideoUri(2);
+// The source clip already exists in public/demo-media. Bundle that single MP4
+// on native so onboarding works offline; on web serve a small VP9/WebM version
+// for browsers without an H.264 decoder. Keep the poster until a real frame.
+const WELCOME_VIDEO = Platform.OS === 'web'
+  ? '/demo-media/onboarding_runway.webm'
+  : require('../../public/demo-media/fashion_runway_02.mp4');
 const WELCOME_POSTER = require('../../assets/videos/fashion_runway_02.jpg');
 
 /** Share of the screen the footage takes; the rest is the black CTA panel. */
