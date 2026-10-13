@@ -38,6 +38,9 @@ const OPTIONAL_VARS = [
   "AGORA_CUSTOMER_ID",
   "AGORA_CUSTOMER_SECRET",
   "AGORA_RECORDING_S3_BUCKET",
+  // Pop-up mode (in-person Tap to Pay via Stripe Terminal). "1" turns the
+  // /api/seller/terminal routes on; also needs STRIPE_SECRET_KEY.
+  "STRIPE_TERMINAL_ENABLED",
   "AGORA_RECORDING_S3_REGION",
   "AGORA_RECORDING_S3_ACCESS_KEY",
   "AGORA_RECORDING_S3_SECRET_KEY",

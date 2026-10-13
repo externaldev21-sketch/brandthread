@@ -49,6 +49,7 @@ import { stampDeliveryDeadlines } from "../lib/delivery/deliveryState";
 import { applyDisputePauseByDisputeId } from "../lib/delivery/disputePause";
 import { commitStockReservation, releaseStockReservation } from "../lib/money/stockReservation";
 import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
+import { finalizePopupSale, isPopupIntent, releasePopupSale } from "../lib/popup/popupSale";
 import {
   isOrderConfirmationEligibleStatus,
   sendOrderConfirmationEmail,
@@ -342,6 +343,9 @@ router.post("/stripe", async (req: Request, res: Response) => {
           await handleCartPaymentSucceeded(pi, event.id, new Date(event.created * 1000));
         } else if (pi.metadata?.kind === GIFT_CARD_PURCHASE_KIND) {
           await handleGiftCardPaymentSucceeded(pi);
+        } else if (isPopupIntent(pi)) {
+          // Pop-up mode (Tap to Pay): one in-person order, lib/popup/popupSale.ts.
+          await finalizePopupSale(pi, new Date(event.created * 1000));
         }
         break;
       }
@@ -350,6 +354,10 @@ router.post("/stripe", async (req: Request, res: Response) => {
         const pi = event.data.object as any;
         if (pi.metadata?.kind === CART_CHECKOUT_KIND) {
           await handleCartPaymentEnded(pi, event.type === "payment_intent.payment_failed");
+        } else if (isPopupIntent(pi) && event.type === "payment_intent.canceled") {
+          // A declined tap leaves the intent open for another try; only a
+          // cancelled pop-up sale gives its stock back.
+          await releasePopupSale(pi);
         }
         break;
       }
