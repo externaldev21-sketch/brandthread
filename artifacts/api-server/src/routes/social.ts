@@ -3,8 +3,8 @@
  *
  * POST   /api/social/follow              — follow a buyer   { userId }
  * DELETE /api/social/follow/:userId      — unfollow
- * GET    /api/social/following           — users I follow (?sort=default|latest|earliest)
- * GET    /api/social/followers           — users who follow me (isFollowingBack flag)
+ * GET    /api/social/following           — users I follow (?sort=default|latest|earliest, ?q=)
+ * GET    /api/social/followers           — users who follow me (isFollowingBack flag, ?q=)
  * GET    /api/social/status/:userId      — { isFollowing, isFollowedBy, isMutual }
  * GET    /api/social/profile/:userId     — public buyer profile + follow counts
  * GET    /api/social/search?q=&limit=    — search buyers by name / username
@@ -588,6 +588,10 @@ router.get("/profile/:userId", async (req, res) => {
     isPrivate: user.isPrivate === true,
     followRequested: !!reqRow,
     contentHidden: user.isPrivate === true && other !== myId && !isFollowing,
+    // Bio link (profile endpoint only — formatUser stays unchanged).
+    website: user.website ?? null,
+    // "Followed by …" line — only when looking at someone else.
+    ...(other !== myId ? { mutualFollowers: await mutualFollowersFor(myId, other) } : {}),
   });
 });
 
@@ -815,6 +819,59 @@ async function followersOfSet(userId: string, ids: string[]): Promise<Set<string
   return new Set(rows.map(r => r.followerId));
 }
 
+/**
+ * Optional `?q=` filter for the follower/following lists (Instagram's search
+ * field at the top of both tabs): case-insensitive, escaped substring match on
+ * the listed person's username / display name / name, applied in SQL so it
+ * composes with pagination.
+ */
+function listSearchCondition(q: unknown, userIdColumn: any) {
+  const term = normalizeSearchTerm(q);
+  if (!term) return undefined;
+  const pattern = containsSearchPattern(term);
+  return sql`EXISTS (
+    SELECT 1 FROM users lu
+    WHERE lu.clerk_id = ${userIdColumn}
+      AND (lu.username ILIKE ${pattern} OR lu.display_name ILIKE ${pattern} OR lu.name ILIKE ${pattern})
+  )`;
+}
+
+/**
+ * "Followed by maya, leo and 3 others" (Instagram profile header): people the
+ * viewer follows who also follow `targetId`, excluding anyone with a block
+ * either way with the viewer or the target and accounts not in good standing.
+ * Up to 3 users, most recent follow of the target first, plus the total count.
+ */
+export async function mutualFollowersFor(viewerId: string, targetId: string) {
+  const base = sql`
+    FROM follows mine
+    JOIN follows theirs
+      ON theirs.follower_id = mine.following_id
+     AND theirs.following_id = ${targetId}
+    JOIN users mu ON mu.clerk_id = mine.following_id
+    WHERE mine.follower_id = ${viewerId}
+      AND mine.following_id <> ${targetId}
+      AND mine.following_id <> ${viewerId}
+      AND mu.suspended_at IS NULL AND mu.deleted_at IS NULL AND mu.deletion_requested_at IS NULL
+      AND ${notBlockedWith(viewerId, sql`mine.following_id`)}
+      AND ${notBlockedWith(targetId, sql`mine.following_id`)}`;
+  const [countResult, userResult] = await Promise.all([
+    db.execute(sql`SELECT cast(count(*) as int) AS n ${base}`),
+    db.execute(sql`SELECT mu.clerk_id AS clerk_id ${base} ORDER BY theirs.created_at DESC LIMIT 3`),
+  ]);
+  const n = Number(((countResult as any).rows ?? [])[0]?.n ?? 0);
+  const ids = (((userResult as any).rows ?? []) as any[]).map((row) => String(row.clerk_id));
+  const userRows = ids.length ? await db.select().from(users).where(inArray(users.clerkId, ids)) : [];
+  const byId = new Map(userRows.map((u) => [u.clerkId, formatUser(u)]));
+  return {
+    users: ids.filter((id) => byId.has(id)).map((id) => {
+      const u = byId.get(id)!;
+      return { userId: u.userId, username: u.username, displayName: u.displayName ?? u.name, avatarUrl: u.avatarUrl };
+    }),
+    count: n,
+  };
+}
+
 // ─── GET /api/social/following ────────────────────────────────────────────────
 // Query params: ?userId=&limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
 // Without userId the list is the viewer's own.
@@ -832,7 +889,7 @@ router.get("/following", async (req, res) => {
   const orderClause = direction === "asc" ? asc(follows.createdAt) : desc(follows.createdAt);
   const rows = await db
     .select({ followingId: follows.followingId, createdAt: follows.createdAt })
-    .from(follows).where(eq(follows.followerId, ownerId))
+    .from(follows).where(and(eq(follows.followerId, ownerId), listSearchCondition(req.query.q, follows.followingId)))
     .orderBy(orderClause)
     .limit(limit).offset(offset);
   setPaginationHeaders(res, page.data, rows.length);
@@ -842,9 +899,9 @@ router.get("/following", async (req, res) => {
   const userRows = await db.select().from(users).where(inArray(users.clerkId, ids));
   const byId     = Object.fromEntries(userRows.map(u => [u.clerkId, u]));
   const iFollow  = ownerId === myId ? new Set(ids) : await viewerFollowsSet(myId, ids);
-  // Mutuals ("Follows you" tag): only meaningful on the viewer's own
-  // Following list — who among the people I follow also follows me back.
-  const followsMeSet = ownerId === myId ? await followersOfSet(myId, ids) : new Set<string>();
+  // "Follows you" tag: whether each listed person follows the viewer — on
+  // the viewer's own list and on anyone else's (Instagram shows it on both).
+  const followsMeSet = await followersOfSet(myId, ids);
 
   res.json(rows.map(r => ({
     ...(byId[r.followingId] ? formatUser(byId[r.followingId]) : {
@@ -870,7 +927,7 @@ router.get("/followers", async (req, res) => {
   const { limit, offset } = page.data;
   const rows = await db
     .select({ followerId: follows.followerId, createdAt: follows.createdAt })
-    .from(follows).where(eq(follows.followingId, ownerId))
+    .from(follows).where(and(eq(follows.followingId, ownerId), listSearchCondition(req.query.q, follows.followerId)))
     .orderBy(desc(follows.createdAt))
     .limit(limit).offset(offset);
   setPaginationHeaders(res, page.data, rows.length);
@@ -882,6 +939,7 @@ router.get("/followers", async (req, res) => {
 
   // Who the viewer already follows (on their own list: who they follow back)
   const iFollowBack = await viewerFollowsSet(myId, ids);
+  const followsMeSet = await followersOfSet(myId, ids);
 
   res.json(rows.map(r => ({
     ...(byId[r.followerId] ? formatUser(byId[r.followerId]) : {
@@ -892,6 +950,7 @@ router.get("/followers", async (req, res) => {
     followedAt:       r.createdAt,
     isFollowingBack:  iFollowBack.has(r.followerId),
     isFollowing:      iFollowBack.has(r.followerId),
+    followsMe:        followsMeSet.has(r.followerId),
   })));
 });
 

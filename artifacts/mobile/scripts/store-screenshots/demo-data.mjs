@@ -1176,9 +1176,32 @@ export function respond({ method, path, query, role, options = {} }) {
       {
         userId: 'demo-follower-2', name: 'Marcus Webb', username: 'marcusw', handle: '@marcusw',
         initials: 'MW', color: '#EC4899', accountType: 'buyer', followedAt: iso(1 * DAY + 2 * HOUR),
-        isFollowingBack: true, isFollowing: true,
+        isFollowingBack: true, isFollowing: true, followsMe: true,
       },
-    ];
+    ].filter((row) => !query.get('q') || `${row.name} ${row.username}`.toLowerCase().includes(query.get('q').toLowerCase()));
+  }
+  // Another buyer's profile: "Followed by …" line + bio link (user_priya),
+  // and the private-account lock (user_private_demo).
+  if ((match = p.match(/^\/social\/profile\/(user_priya|user_private_demo)$/))) {
+    const isPrivateDemo = match[1] === 'user_private_demo';
+    return {
+      userId: match[1], name: isPrivateDemo ? 'Rowan Hale' : 'Priya Nandan', displayName: isPrivateDemo ? 'Rowan Hale' : 'Priya Nandan',
+      username: isPrivateDemo ? 'rowanhale' : 'priyan', handle: isPrivateDemo ? '@rowanhale' : '@priyan',
+      bio: isPrivateDemo ? null : 'Vintage denim and slow fashion.', avatarUrl: null, accountType: 'buyer',
+      initials: isPrivateDemo ? 'RH' : 'PN', color: '#7A7A7A',
+      followersCount: 214, followingCount: 180, likesCount: 0, postsCount: 12,
+      isFollowing: false, isFollowedBy: false, isMutual: false, iBlockedThem: false,
+      isPrivate: isPrivateDemo, followRequested: false, contentHidden: isPrivateDemo,
+      website: isPrivateDemo ? null : 'https://priyan.studio',
+      mutualFollowers: {
+        users: [
+          { userId: 'user_theo', username: 'theomarsh', displayName: 'Theo Marsh', avatarUrl: null },
+          { userId: 'demo-follower-2', username: 'marcusw', displayName: 'Marcus Webb', avatarUrl: null },
+          { userId: 'demo-follower-1', username: 'priyashah', displayName: 'Priya Shah', avatarUrl: null },
+        ],
+        count: 5,
+      },
+    };
   }
   if ((match = p.match(/^\/public\/sellers\/([^/]+)$/))) {
     const brandKey = Object.keys(BRANDS).find((key) => BRANDS[key].clerkId === decodeURIComponent(match[1]));
