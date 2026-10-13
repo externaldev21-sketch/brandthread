@@ -24,6 +24,7 @@ interface SellerRisk {
 interface Inactive { days: number; sellers: { clerkId: string; name: string | null; username: string | null; lastActiveAt: string; daysInactive: number; activeProducts: number }[] }
 
 const pct = (r: number | null) => (r == null ? "—" : `${(r * 100).toFixed(r > 0 && r < 0.1 ? 1 : 0)}%`);
+const monthLabel = (ym: string) => new Date(`${ym}-01T12:00:00Z`).toLocaleString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
 const rate = (num: number, den: number) => (den > 0 ? num / den : null);
 const sellerName = (s: { name: string | null; username: string | null }) => (
   <span>{s.name ?? "Unnamed seller"}{s.username && <span className="ml-1.5 text-muted-foreground">@{s.username}</span>}</span>
@@ -98,7 +99,7 @@ function CohortSection() {
       <ErrorLine error={error} />
       <DataTable loading={isLoading} rows={data?.cohorts} rowKey={(r) => r.month} empty="No purchases in the last 6 months."
         columns={[
-          { header: "First purchase", cell: (r) => r.month, primary: true },
+          { header: "First purchase", cell: (r) => monthLabel(r.month), primary: true },
           { header: "Buyers", cell: (r) => r.buyers.toLocaleString(), className: "text-right tabular-nums" },
           { header: "Bought again within 30 days", cell: (r) => r.repeatBuyers.toLocaleString(), className: "text-right tabular-nums" },
           { header: "Repeat rate", cell: (r) => <span>{pct(r.repeatRate)}{r.maturing && <span className="ml-2"><Badge tone="outline">In progress</Badge></span>}</span>, className: "text-right tabular-nums" },

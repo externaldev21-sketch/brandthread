@@ -42,6 +42,7 @@ onboarding redirect).
 | Announcements | `GET/POST /admin/announcements` · `GET /admin/announcements/audience?audience=` |
 | Invite codes | `GET/POST /admin/invites` · `POST /admin/invites/:id/disable\|enable` |
 | Audit | `GET /admin/audit?actor=&action=&targetId=` |
+| Metrics | `GET /admin/metrics/today` (today vs the same time yesterday, in `ADMIN_REPORT_TIMEZONE`, default America/Chicago) · `/metrics/cohorts?months=` (30-day repeat rate by first-purchase month) · `/metrics/top?days=` (top sellers + products) · `/metrics/funnel?days=` (install → sign-up → first purchase) · `/metrics/seller-risk?days=` (refund / chargeback rate per seller, flagged above 2%) · `/metrics/inactive-sellers` (no sale, product edit, post or app open for 14+ days). Definitions: `lib/admin/launchMetrics.ts` |
 
 Nothing here deletes accounts or data, and nothing moves money: refunds and disputes are
 read-only views; rejecting a promotion stops it but the refund stays a deliberate step in Stripe.
