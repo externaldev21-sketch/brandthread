@@ -18,6 +18,7 @@ import { computeSellerRankingForToday, isSellerRankingCacheFresh } from "../jobs
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
+import { TREND_RECENT_HOURS, TREND_WINDOW_HOURS, rankSearchTrends, type RankedTrend } from "../lib/searchTrends";
 import { buildFacets, parseSearchFilters, type FacetRow } from "../lib/searchFilters";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
@@ -746,13 +747,14 @@ router.get("/search", async (req, res): Promise<void> => {
 
     // Author + like-count lookups for matched videos.
     const videoAuthorIds = [...new Set(videoPosts.map((v) => v.authorId))];
-    const videoAuthorMap = new Map<string, { name: string; handle: string; avatarUrl: string | null }>();
+    const videoAuthorMap = new Map<string, { name: string; handle: string; avatarUrl: string | null; accountType: string | null }>();
     if (videoAuthorIds.length > 0) {
       const authorRows = await db
         .select({
           clerkId: users.clerkId, displayName: users.displayName, brandName: users.brandName,
           username: users.username, name: users.name,
           profileImageUrl: users.profileImageUrl, avatarUrl: users.avatarUrl,
+          accountType: users.accountType,
         })
         .from(users)
         .where(inArray(users.clerkId, videoAuthorIds));
@@ -762,6 +764,7 @@ router.get("/search", async (req, res): Promise<void> => {
           name,
           handle: a.username ? `@${a.username}` : `@${name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 20)}`,
           avatarUrl: a.profileImageUrl ?? a.avatarUrl ?? null,
+          accountType: a.accountType ?? null,
         });
       });
     }
@@ -845,7 +848,7 @@ router.get("/search", async (req, res): Promise<void> => {
     for (const v of sortedVideos) {
       if (seen.has(v.id)) continue;
       seen.add(v.id);
-      const author = videoAuthorMap.get(v.authorId) ?? { name: "Member", handle: "@member", avatarUrl: null };
+      const author = videoAuthorMap.get(v.authorId) ?? { name: "Member", handle: "@member", avatarUrl: null, accountType: null };
       results.push({
         id:            v.id,
         kind:          "video",
@@ -857,6 +860,8 @@ router.get("/search", async (req, res): Promise<void> => {
         authorName:    author.name,
         authorHandle:  author.handle,
         authorAvatarUrl: author.avatarUrl,
+        // 'buyer' | 'seller' | 'both' — lets the client split buyer Fits from brand videos.
+        authorAccountType: author.accountType,
         color:         hashColor(v.authorId),
         initials:      mkInitials(author.name),
         likesCount:    videoLikesByPost.get(v.id) ?? 0,
@@ -994,6 +999,61 @@ router.get("/search/trending", async (req, res) => {
   }
 });
 
+// ─── GET /api/public/search/hot — ranked trending searches (Discover search) ──
+// The numbered "Trending" list under the Discover search bar (TikTok's "You
+// may like"): normalized queries from search_log over the last 72h, last 24h
+// weighted double, each with a real "hot"/"new" tag when the counts show it
+// (lib/searchTrends). No fallback filler: a quiet log returns an empty list
+// and the client shows trending brands/products instead. The result has no
+// viewer-specific data, so it is computed at most once per 10 minutes per
+// process and served with a matching public cache header.
+const HOT_SEARCH_TTL_MS = 10 * 60 * 1000;
+const HOT_SEARCH_MAX = 20;
+let hotSearchMemo: { at: number; value: RankedTrend[] } | null = null;
+
+/** Test hook: drop the in-process memo. */
+export function resetHotSearchMemo(): void { hotSearchMemo = null; }
+
+router.get("/search/hot", async (req, res) => {
+  try {
+    const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 10);
+    if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+      res.status(400).json({ error: "limit must be at least 1" }); return;
+    }
+    const lim = Math.min(parsedLimit, HOT_SEARCH_MAX);
+
+    if (!hotSearchMemo || Date.now() - hotSearchMemo.at > HOT_SEARCH_TTL_MS) {
+      const now = Date.now();
+      const since = new Date(now - TREND_WINDOW_HOURS * 60 * 60 * 1000);
+      const recentSince = new Date(now - TREND_RECENT_HOURS * 60 * 60 * 1000);
+      const rows = await db
+        .select({
+          term: searchLog.normalized,
+          recent: sql<number>`count(*) filter (where ${searchLog.createdAt} >= ${recentSince})::int`,
+          prior: sql<number>`count(*) filter (where ${searchLog.createdAt} < ${recentSince})::int`,
+        })
+        .from(searchLog)
+        .where(gte(searchLog.createdAt, since))
+        .groupBy(searchLog.normalized)
+        .orderBy(desc(count()))
+        .limit(200);
+      hotSearchMemo = {
+        at: now,
+        value: rankSearchTrends(
+          rows.map((r) => ({ term: r.term, recent: Number(r.recent), prior: Number(r.prior) })),
+          HOT_SEARCH_MAX,
+        ),
+      };
+    }
+
+    setPublicCacheHeaders(res, { maxAgeSeconds: 600, staleWhileRevalidateSeconds: 300 });
+    res.json({ windowHours: TREND_WINDOW_HOURS, queries: hotSearchMemo.value.slice(0, lim) });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch hot searches");
+    res.status(500).json({ error: "Failed to fetch hot searches" });
+  }
+});
+
 // ─── GET /api/public/search/recent — this buyer's own recent searches ─────────
 // Signed-in only (a client-side "recent" list is meaningless without an
 // identity to scope it to). Deduped by normalized query, most recent first.
@@ -1006,11 +1066,17 @@ router.get("/search/recent", requireAuth, async (req, res) => {
     }
     const lim = Math.min(parsedLimit, 30);
 
+    // One row per normalized term ("Hoodie" and "hoodie" are one recent
+    // search), showing the spelling the buyer used most recently.
     const rows = await db
-      .select({ query: searchLog.query, normalized: searchLog.normalized, createdAt: sql<Date>`max(${searchLog.createdAt})` })
+      .select({
+        query: sql<string>`(array_agg(${searchLog.query} order by ${searchLog.createdAt} desc))[1]`,
+        normalized: searchLog.normalized,
+        createdAt: sql<Date>`max(${searchLog.createdAt})`,
+      })
       .from(searchLog)
       .where(eq(searchLog.userId, userId))
-      .groupBy(searchLog.query, searchLog.normalized)
+      .groupBy(searchLog.normalized)
       .orderBy(desc(sql`max(${searchLog.createdAt})`))
       .limit(lim);
 
