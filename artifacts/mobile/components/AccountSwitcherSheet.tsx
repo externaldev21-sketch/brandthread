@@ -5,8 +5,8 @@
  * read as a broken, near-empty page whenever a device only had one active
  * Clerk session: just the two "Add account" rows, a boxed-square back
  * button, and a lot of blank space). Tapping @username on either profile
- * now opens this sheet instead — same solid `BottomSheet` primitive every
- * other sheet in the app uses (grabber, dismiss by tap-outside/swipe/X).
+ * now opens this sheet instead — the shared `Sheet` chrome every other
+ * sheet in the app uses (grabber, title row, dismiss by tap-outside/swipe/X).
  *
  * Layout/interaction reference: Instagram's "Switching accounts" flow — a
  * list of every signed-in account (avatar, @handle, a check on the current
@@ -27,18 +27,17 @@
  * to activate.
  */
 import React, { useEffect, useState } from 'react';
-import { Alert, View, Text, StyleSheet, Pressable } from 'react-native';
+import { ActivityIndicator, Alert, View, StyleSheet, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth, useClerk, useSessionList } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { Sheet, SHEET_GUTTER } from '@/components/ui/BottomSheet';
+import { OptionRadio } from '@/components/ui/OptionSheet';
 import { ListRow } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/hooks/useApi';
 import { SPACING } from '@/constants/spacing';
-import { TYPE_SCALE } from '@/constants/typography';
-import { FONT } from '@/lib/theme';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { useRole } from '@/contexts/RoleContext';
 import {
@@ -210,132 +209,104 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
     onClose();
   }
 
-  // One BottomSheet (one Modal); the sub-view swaps its content instead of
-  // stacking a second sheet — two sibling BottomSheets (each its own Modal)
+  // One Sheet (one Modal); the sub-view swaps its content and title instead
+  // of stacking a second sheet — two sibling sheets (each its own Modal)
   // fought each other on web: opening the second while the first's `visible`
   // flipped false raced its close animation and dropped both.
+  //
+  // Content copies Instagram's account switcher sheet: one row per account
+  // (avatar, @handle, account type) with a radio that's filled on the current
+  // account, then an "Add account" row below a divider.
   return (
-    <BottomSheet visible={visible} onClose={handleClose} testID="account-switcher-sheet">
+    <Sheet
+      visible={visible}
+      onClose={handleClose}
+      title={showAddAccount ? 'Add account' : 'Switch account'}
+      headerLeft={showAddAccount ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={() => setShowAddAccount(false)}
+        >
+          <Feather name="chevron-left" size={24} color={colors.foreground} />
+        </Pressable>
+      ) : undefined}
+      padded={false}
+      testID="account-switcher-sheet"
+    >
       {showAddAccount ? (
-        <>
-          <View style={s.header}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={() => setShowAddAccount(false)}
-            >
-              <Feather name="chevron-left" size={22} color={colors.mutedForeground} />
-            </Pressable>
-            <Text style={s.headerTitle}>Add account</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={handleClose}
-            >
-              <Feather name="x" size={22} color={colors.mutedForeground} />
-            </Pressable>
-          </View>
-          <View style={s.list}>
-            <ListRow
-              icon="log-in"
-              title="Log into existing account"
-              onPress={handleLogIntoExisting}
-              testID="account-switcher-log-into-existing"
-            />
-            <ListRow
-              icon="user-plus"
-              title="Create new account"
-              onPress={handleCreateNew}
-              testID="account-switcher-create-new"
-            />
-          </View>
-        </>
+        <View style={s.list}>
+          <ListRow
+            icon="log-in"
+            title="Log into existing account"
+            onPress={handleLogIntoExisting}
+            testID="account-switcher-log-into-existing"
+          />
+          <ListRow
+            icon="user-plus"
+            title="Create new account"
+            onPress={handleCreateNew}
+            testID="account-switcher-create-new"
+          />
+        </View>
       ) : (
-        <>
-          <View style={s.header}>
-            <Text style={s.headerTitle}>Switch account</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={handleClose}
-            >
-              <Feather name="x" size={22} color={colors.mutedForeground} />
-            </Pressable>
-          </View>
-
-          <View style={s.list}>
-            {accounts.map((account) => (
-              <ListRow
-                key={account.id}
-                avatar={{ uri: account.imageUri, name: account.displayName }}
-                title={account.handle}
-                subtitle={account.accountType}
-                disabled={!!switchingId || !!loggingOutId}
-                onPress={account.current ? undefined : () => handleSwitch(account)}
-                testID={`account-switcher-row-${account.id}`}
-                right={
-                  <View style={s.rowRight}>
-                    {switchingId === account.id || loggingOutId === account.id ? (
-                      <Feather name="loader" size={18} color={colors.mutedForeground} />
-                    ) : (
-                      <>
-                        {account.current && (
-                          <View style={[s.checkBadge, { backgroundColor: colors.primary }]}>
-                            <Feather name="check" size={13} color={colors.primaryForeground} />
-                          </View>
-                        )}
-                        {!isPreview && (
-                          <Pressable
-                            accessibilityRole="button"
-                            accessibilityLabel={`Log out ${account.handle}`}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                            disabled={!!switchingId || !!loggingOutId}
-                            onPress={() => handleLogOut(account)}
-                            style={s.logOutBtn}
-                          >
-                            <Feather name="log-out" size={16} color={colors.mutedForeground} />
-                          </Pressable>
-                        )}
-                      </>
-                    )}
-                  </View>
-                }
-              />
-            ))}
-          </View>
+        <View style={s.list}>
+          {accounts.map((account) => (
+            <ListRow
+              key={account.id}
+              avatar={{ uri: account.imageUri, name: account.displayName }}
+              title={account.handle}
+              subtitle={account.accountType}
+              selected={account.current}
+              disabled={!!switchingId || !!loggingOutId}
+              onPress={account.current ? undefined : () => handleSwitch(account)}
+              testID={`account-switcher-row-${account.id}`}
+              right={
+                <View style={s.rowRight}>
+                  {!isPreview && (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Log out ${account.handle}`}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      disabled={!!switchingId || !!loggingOutId}
+                      onPress={() => handleLogOut(account)}
+                      style={s.logOutBtn}
+                    >
+                      <Feather name="log-out" size={16} color={colors.mutedForeground} />
+                    </Pressable>
+                  )}
+                  {switchingId === account.id || loggingOutId === account.id ? (
+                    <ActivityIndicator size="small" color={colors.mutedForeground} />
+                  ) : (
+                    <OptionRadio selected={account.current} color={colors.foreground} />
+                  )}
+                </View>
+              }
+            />
+          ))}
 
           <View style={s.divider} />
 
           <ListRow
-            icon="plus-circle"
+            icon="plus"
             title="Add account"
             subtitle={atCap ? MAX_ACCOUNTS_MESSAGE : undefined}
             disabled={atCap}
             onPress={handleAddAccountPress}
             testID="account-switcher-add-account"
           />
-        </>
+        </View>
       )}
-    </BottomSheet>
+    </Sheet>
   );
 }
 
 function styles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
-    header: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingHorizontal: SPACING.md, paddingBottom: SPACING.sm,
-    },
-    headerTitle: { ...TYPE_SCALE.title2, fontFamily: FONT.semibold, color: colors.foreground },
-    list: { paddingHorizontal: SPACING.md },
+    list: { paddingHorizontal: SHEET_GUTTER },
     divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: SPACING.xs },
-    rowRight: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-    checkBadge: {
-      width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
-    },
+    rowRight: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
     logOutBtn: { padding: 2 },
   });
 }

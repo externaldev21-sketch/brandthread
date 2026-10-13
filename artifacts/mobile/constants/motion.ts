@@ -62,6 +62,24 @@ export const SHEET_CLOSE_EASING = SHEET_EASING;
  *  comfortably past any device's bottom inset so it's fully offscreen. */
 export const SHEET_OFFSCREEN_Y = 500;
 
+/** The shared sheet spring (`useSheetTransition`): open, snap-back after a
+ *  cancelled drag, and the velocity-carrying flick dismiss. Fast and firm
+ *  (~260ms to rest) with `overshootClamping` so it lands crisply without
+ *  overshooting its resting position. The rest-offscreen gap under the sheet
+ *  stays hidden, and nothing wobbles. The SHEET_* timing constants above stay
+ *  for the bespoke sheets (Studio menu, comments) that still use them. */
+export const SHEET_SPRING = {
+  damping: 24,
+  stiffness: 300,
+  mass: 1,
+  overshootClamping: true,
+} as const;
+/** Peak backdrop dim behind every shared sheet (fades 0 → this in sync with
+ *  the sheet's own position, including mid-drag). */
+export const SHEET_BACKDROP_OPACITY = 0.5;
+/** iOS-style rubber-band resistance when a sheet is dragged up past rest. */
+export const SHEET_RUBBER_BAND_LIMIT = 48;
+
 /** Sliding tab/segment indicators (e.g. the feed's top tab underline): a
  *  near-critically-damped spring (damping ratio ~1.1) so it glides to rest
  *  with no visible bounce/overshoot — sheets no longer use a spring at all

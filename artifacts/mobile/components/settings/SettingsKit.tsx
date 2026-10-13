@@ -6,10 +6,8 @@
  * visually identical (same premium "grouped iOS list" feel, same tokens,
  * same haptics) while their content differs.
  */
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
-  Animated,
-  Modal,
   StyleProp,
   StyleSheet,
   Text,
@@ -22,8 +20,9 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { hapticLight, hapticSelection } from '@/lib/haptics';
-import { PressableScale, SheetHandle, HapticSwitch } from '@/components/BrandthreadUI';
+import { hapticLight } from '@/lib/haptics';
+import { PressableScale, HapticSwitch } from '@/components/BrandthreadUI';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { radius } from '@/constants/radii';
 
@@ -265,47 +264,24 @@ export function ConfirmSheet({
 }) {
   const colors = useColors();
   const s = React.useMemo(() => makeCardStyles(colors), [colors]);
-  const translateY = useRef(new Animated.Value(40)).current;
-  const fade = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, speed: 18, bounciness: 4 }),
-        Animated.timing(fade, { toValue: 1, duration: 180, useNativeDriver: true }),
-      ]).start();
-    } else {
-      translateY.setValue(40);
-      fade.setValue(0);
-    }
-  }, [visible, translateY, fade]);
-
+  // Shared sheet chrome: title row + message, the confirm and cancel actions
+  // pinned above the home indicator. Dismissal is blocked while confirming.
+  const close = () => { if (!loading) onCancel(); };
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <View style={s.sheetBackdrop}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onCancel} />
-        <Animated.View style={[s.sheetCard, { opacity: fade, transform: [{ translateY }] }]}>
-          <SheetHandle />
-          <Text style={s.sheetTitle}>{title}</Text>
-          <Text style={s.sheetMessage}>{message}</Text>
-          <PressableScale
-            style={[s.sheetConfirmBtn, { backgroundColor: destructive ? colors.destructive : colors.primary }]}
-            onPress={() => {
-              hapticSelection();
-              onConfirm();
-            }}
-            disabled={loading}
-          >
-            <Text style={[s.sheetConfirmText, { color: destructive ? '#FFFFFF' : colors.primaryForeground }]}>
-              {loading ? 'Please wait…' : confirmLabel}
-            </Text>
-          </PressableScale>
-          <TouchableOpacity style={s.sheetCancelBtn} onPress={onCancel} disabled={loading}>
-            <Text style={s.sheetCancelText}>{cancelLabel}</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
-    </Modal>
+    <Sheet
+      visible={visible}
+      onClose={close}
+      title={title}
+      primaryAction={{
+        label: confirmLabel,
+        onPress: onConfirm,
+        loading,
+        variant: destructive ? 'destructive' : 'primary',
+      }}
+      secondaryAction={{ label: cancelLabel, onPress: close, disabled: loading }}
+    >
+      <Text style={s.sheetMessage}>{message}</Text>
+    </Sheet>
   );
 }
 
@@ -359,13 +335,6 @@ function makeCardStyles(colors: Colors) {
     rowSoonBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold, color: colors.mutedForeground, letterSpacing: 0.3 },
 
     // Confirm sheet
-    sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: (colors as any).overlay ?? 'rgba(0,0,0,0.68)' },
-    sheetCard: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: colors.border, borderBottomWidth: 0, paddingHorizontal: 22, paddingBottom: 36, paddingTop: 2 },
-    sheetTitle: { fontSize: 19, fontFamily: FONT.bold, color: colors.foreground, textAlign: 'center', marginTop: 10 },
-    sheetMessage: { fontSize: 14, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: 8, marginBottom: 22, lineHeight: 19, paddingHorizontal: 8 },
-    sheetConfirmBtn: { borderRadius: RADIUS.md, paddingVertical: 15, alignItems: 'center', marginBottom: 10 },
-    sheetConfirmText: { fontSize: FS.base, fontFamily: FONT.bold },
-    sheetCancelBtn: { paddingVertical: 13, alignItems: 'center' },
-    sheetCancelText: { fontSize: FS.base, fontFamily: FONT.semibold, color: colors.foreground },
+    sheetMessage: { fontSize: 14, fontFamily: FONT.regular, color: colors.mutedForeground, lineHeight: 19 },
   });
 }

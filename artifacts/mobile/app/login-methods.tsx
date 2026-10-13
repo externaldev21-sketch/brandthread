@@ -4,21 +4,21 @@
  */
 import React, { useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, Platform,
+  View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import QRCode from 'react-native-qrcode-svg';
-import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { FONT } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { hapticSuccess } from '@/lib/haptics';
 import { ListRow } from '@/components/ui/ListRow';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -138,6 +138,7 @@ export default function LoginMethods() {
       // Clerk updates passwordEnabled asynchronously. Reload before closing so
       // the removal guard can never run against stale account state.
       await user.reload();
+      hapticSuccess();
       setPasswordSetupOpen(false);
       setNewPassword('');
       setConfirmPassword('');
@@ -245,6 +246,7 @@ export default function LoginMethods() {
     setVerifying(true);
     try {
       await (user as any).verifyTOTP({ code: verifyCode.trim() });
+      hapticSuccess();
       setTotpModal(null);
       setVerifyCode('');
       Alert.alert('Two-factor authentication enabled', 'Your account is now protected with 2FA.');
@@ -446,163 +448,134 @@ export default function LoginMethods() {
         </ScrollView>
       )}
 
-      {/* Password setup sheet */}
-      <Modal
+      {/* Password setup sheet — Apple ID "Change password" sheet: two secure
+          fields, inline error, the action pinned above the keyboard. */}
+      <Sheet
         visible={passwordSetupOpen}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={closePasswordSetup}
+        onClose={closePasswordSetup}
+        title="Add a password"
+        testID="password-setup-sheet"
+        primaryAction={{
+          label: 'Add password',
+          onPress: savePassword,
+          loading: passwordSetupSaving,
+          testID: 'save-password-button',
+        }}
       >
-        <ModalSafeArea>
-        <View style={s.modal}>
-          <ScreenHeader
-            title="Add a password"
-            variant="modal"
-            onBack={closePasswordSetup}
-            backTestID="close-password-setup"
-          />
+        <Text style={s.passwordSetupIntro}>
+          Create a password so you can keep signing in if you disconnect your social account.
+        </Text>
 
-          <KeyboardAwareScrollViewCompat
-            contentContainerStyle={s.passwordSetupBody}
-            bottomOffset={80}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={s.passwordSetupIntro}>
-              Create a password so you can keep signing in if you disconnect your social account.
+        <Text style={s.passwordSetupLabel}>New password</Text>
+        <View style={s.passwordInputRow}>
+          <TextInput
+            testID="new-password-input"
+            style={s.passwordInput}
+            value={newPassword}
+            onChangeText={(value) => {
+              setNewPassword(value);
+              setPasswordSetupError('');
+            }}
+            placeholder="Minimum 8 characters"
+            placeholderTextColor={colors.subtle}
+            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="new-password"
+          />
+          <IconButton
+            name={showPassword ? 'eye-off' : 'eye'}
+            variant="plain"
+            size={18}
+            color={colors.mutedForeground}
+            style={s.passwordVisibilityButton}
+            onPress={() => setShowPassword((visible) => !visible)}
+            testID="toggle-password-visibility"
+            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+          />
+        </View>
+
+        <Text style={s.passwordSetupLabel}>Confirm password</Text>
+        <TextInput
+          testID="confirm-password-input"
+          style={s.passwordInputStandalone}
+          value={confirmPassword}
+          onChangeText={(value) => {
+            setConfirmPassword(value);
+            setPasswordSetupError('');
+          }}
+          placeholder="Enter it again"
+          placeholderTextColor={colors.subtle}
+          secureTextEntry={!showPassword}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="new-password"
+          onSubmitEditing={savePassword}
+          returnKeyType="done"
+        />
+
+        {passwordSetupError ? (
+          <View style={s.passwordErrorBox}>
+            <Feather name="alert-circle" size={14} color={colors.destructive} />
+            <Text testID="password-setup-error" style={s.passwordErrorText}>
+              {passwordSetupError}
             </Text>
+          </View>
+        ) : null}
+      </Sheet>
 
-            <Text style={s.passwordSetupLabel}>New password</Text>
-            <View style={s.passwordInputRow}>
-              <TextInput
-                testID="new-password-input"
-                style={s.passwordInput}
-                value={newPassword}
-                onChangeText={(value) => {
-                  setNewPassword(value);
-                  setPasswordSetupError('');
-                }}
-                placeholder="Minimum 8 characters"
-                placeholderTextColor={colors.subtle}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="new-password"
-              />
-              <IconButton
-                name={showPassword ? 'eye-off' : 'eye'}
-                variant="plain"
-                size={18}
-                color={colors.mutedForeground}
-                style={s.passwordVisibilityButton}
-                onPress={() => setShowPassword((visible) => !visible)}
-                testID="toggle-password-visibility"
-                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
-              />
-            </View>
+      {/* TOTP setup sheet — Instagram "Authentication app" setup: steps, QR,
+          setup key, code entry; the verify action pinned at the bottom. */}
+      <Sheet
+        visible={!!totpModal}
+        onClose={() => { setTotpModal(null); setVerifyCode(''); }}
+        title="Set up authenticator app"
+        testID="totp-setup-sheet"
+        primaryAction={{
+          label: 'Verify & enable 2FA',
+          onPress: handleVerifyTOTP,
+          disabled: verifyCode.length < 6,
+          loading: verifying,
+        }}
+      >
+        <Text style={s.modalStep}>1. Open your authenticator app (Google Authenticator, Authy, 1Password, etc.)</Text>
+        <Text style={s.modalStep}>2. Scan this code with your authenticator app, or enter the key below.</Text>
 
-            <Text style={s.passwordSetupLabel}>Confirm password</Text>
-            <TextInput
-              testID="confirm-password-input"
-              style={s.passwordInputStandalone}
-              value={confirmPassword}
-              onChangeText={(value) => {
-                setConfirmPassword(value);
-                setPasswordSetupError('');
-              }}
-              placeholder="Enter it again"
-              placeholderTextColor={colors.subtle}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="new-password"
-              onSubmitEditing={savePassword}
-              returnKeyType="done"
-            />
+        {totpModal?.uri ? (
+          // theme-exempt: QR codes need black modules on a white background to scan reliably
+          <View style={s.qrWrap}>
+            <QRCode value={totpModal.uri} size={180} backgroundColor="#FFFFFF" color="#000000" />
+          </View>
+        ) : null}
 
-            {passwordSetupError ? (
-              <View style={s.passwordErrorBox}>
-                <Feather name="alert-circle" size={14} color={colors.destructive} />
-                <Text testID="password-setup-error" style={s.passwordErrorText}>
-                  {passwordSetupError}
-                </Text>
-              </View>
-            ) : null}
-
-            <Button
-              testID="save-password-button"
-              label="Add password"
-              onPress={savePassword}
-              loading={passwordSetupSaving}
-              fullWidth
-              style={s.verifyBtn}
-            />
-          </KeyboardAwareScrollViewCompat>
+        <View style={s.secretBox}>
+          <Text style={[s.secretText, { color: colors.primary }]} selectable>{totpModal?.secret}</Text>
         </View>
-        </ModalSafeArea>
-      </Modal>
 
-      {/* TOTP setup modal */}
-      <Modal visible={!!totpModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setTotpModal(null); setVerifyCode(''); }}>
-        <ModalSafeArea>
-        <View style={s.modal}>
-          <ScreenHeader
-            title="Set up authenticator app"
-            variant="modal"
-            onBack={() => { setTotpModal(null); setVerifyCode(''); }}
-          />
+        <Text style={s.modalStep}>3. Enter the 6-digit code shown in your app:</Text>
 
-          <ScrollView contentContainerStyle={s.modalBody}>
-            <Text style={s.modalStep}>1. Open your authenticator app (Google Authenticator, Authy, 1Password, etc.)</Text>
-            <Text style={s.modalStep}>2. Scan this code with your authenticator app, or enter the key below.</Text>
+        <TextInput
+          style={s.codeInput}
+          value={verifyCode}
+          onChangeText={setVerifyCode}
+          placeholder="000000"
+          placeholderTextColor={colors.subtle}
+          keyboardType="number-pad"
+          maxLength={6}
+          textAlign="center"
+        />
 
-            {totpModal?.uri ? (
-              // theme-exempt: QR codes need black modules on a white background to scan reliably
-              <View style={s.qrWrap}>
-                <QRCode value={totpModal.uri} size={180} backgroundColor="#FFFFFF" color="#000000" />
-              </View>
-            ) : null}
-
-            <View style={s.secretBox}>
-              <Text style={[s.secretText, { color: colors.primary }]} selectable>{totpModal?.secret}</Text>
+        {totpModal?.backupCodes && totpModal.backupCodes.length > 0 && (
+          <>
+            <Text style={s.modalStep}>4. Save these backup codes somewhere safe:</Text>
+            <View style={s.backupCodesBox}>
+              {totpModal.backupCodes.map((code, i) => (
+                <Text key={i} style={s.backupCode} selectable>{code}</Text>
+              ))}
             </View>
-
-            <Text style={s.modalStep}>3. Enter the 6-digit code shown in your app:</Text>
-
-            <TextInput
-              style={s.codeInput}
-              value={verifyCode}
-              onChangeText={setVerifyCode}
-              placeholder="000000"
-              placeholderTextColor={colors.subtle}
-              keyboardType="number-pad"
-              maxLength={6}
-              textAlign="center"
-            />
-
-            {totpModal?.backupCodes && totpModal.backupCodes.length > 0 && (
-              <>
-                <Text style={s.modalStep}>4. Save these backup codes somewhere safe:</Text>
-                <View style={s.backupCodesBox}>
-                  {totpModal.backupCodes.map((code, i) => (
-                    <Text key={i} style={s.backupCode} selectable>{code}</Text>
-                  ))}
-                </View>
-              </>
-            )}
-
-            <Button
-              label="Verify & enable 2FA"
-              onPress={handleVerifyTOTP}
-              disabled={verifyCode.length < 6}
-              loading={verifying}
-              fullWidth
-              style={s.verifyBtn}
-            />
-          </ScrollView>
-        </View>
-        </ModalSafeArea>
-      </Modal>
+          </>
+        )}
+      </Sheet>
     </View>
   );
 }
@@ -676,9 +649,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
     color: colors.mutedForeground, lineHeight: 18,
   },
 
-  // TOTP modal
-  modal: { flex: 1, backgroundColor: colors.background },
-  modalBody: { paddingHorizontal: SPACING.md, paddingTop: SPACING.lg, paddingBottom: 40 },
+  // TOTP sheet
   modalStep: {
     ...TYPE_SCALE.footnote, color: colors.foreground,
     lineHeight: 22, marginBottom: SPACING.md,
@@ -713,12 +684,9 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
     backgroundColor: colors.elevated, borderRadius: 4,
     paddingHorizontal: SPACING.xxs + 2, paddingVertical: 3,
   },
-  verifyBtn: { marginTop: SPACING.xs },
-
-  passwordSetupBody: { paddingHorizontal: SPACING.md, paddingTop: SPACING.lg, paddingBottom: 40 },
   passwordSetupIntro: {
     ...TYPE_SCALE.footnote, color: colors.mutedForeground,
-    lineHeight: 21, marginBottom: SPACING.lg,
+    lineHeight: 21, marginBottom: SPACING.sm,
   },
   passwordSetupLabel: {
     fontSize: 11, fontFamily: FONT.semibold, color: colors.mutedForeground,

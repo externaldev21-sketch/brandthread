@@ -4,8 +4,7 @@
  * The owner sees Edit / Connect Bank Account / My Gigs / Deactivate.
  */
 import React, { useCallback, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, Modal, Platform, Linking } from 'react-native';
-import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -18,7 +17,7 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { centsAtBasisPoints, parseDecimalToCents } from '@/lib/money';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -365,99 +364,70 @@ export default function FreelancerProfileScreen() {
         </View>
       )}
 
-      {/* Hire modal */}
-      <Modal visible={hireVisible} transparent animationType="fade" onRequestClose={() => setHireVisible(false)}>
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <SheetRise style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Hire {freelancer.name}</Text>
-            <Text style={styles.modalSub}>
-              Payment is held by Brandthread and released when the job is done.
-            </Text>
+      {/* Hire sheet — shared chrome: title + close, form body, pay action
+          pinned above the keyboard. */}
+      <Sheet
+        visible={hireVisible}
+        onClose={() => setHireVisible(false)}
+        title={`Hire ${freelancer.name}`}
+        testID="hire-sheet"
+        primaryAction={{
+          label: priceCents >= 100 ? `Pay ${formatPrice(priceCents)}` : 'Pay with Stripe',
+          onPress: submitHire,
+          disabled: !hireValid,
+          loading: hiring,
+        }}
+      >
+        <Text style={styles.modalSub}>
+          Payment is held by Brandthread and released when the job is done.
+        </Text>
 
-            <TextInput
-              style={styles.input}
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Job title — e.g. Logo refresh for my drop"
-              placeholderTextColor={theme.subtle}
-              maxLength={200}
-            />
-            <TextInput
-              style={[styles.input, styles.multiline]}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Describe the work, deliverables, and timeline…"
-              placeholderTextColor={theme.subtle}
-              multiline
-              maxLength={5000}
-            />
-            <View style={styles.priceRow}>
-              <Text style={styles.pricePrefix}>$</Text>
-              <TextInput
-                style={[styles.input, { flex: 1, marginBottom: 0 }]}
-                value={priceText}
-                onChangeText={(v) => setPriceText(v.replace(/[^0-9.]/g, ''))}
-                placeholder="Agreed price"
-                placeholderTextColor={theme.subtle}
-                keyboardType="decimal-pad"
-              />
+        <TextInput
+          style={styles.input}
+          value={title}
+          onChangeText={setTitle}
+          placeholder="Job title — e.g. Logo refresh for my drop"
+          placeholderTextColor={theme.subtle}
+          maxLength={200}
+        />
+        <TextInput
+          style={[styles.input, styles.multiline]}
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Describe the work, deliverables, and timeline…"
+          placeholderTextColor={theme.subtle}
+          multiline
+          maxLength={5000}
+        />
+        <View style={styles.priceRow}>
+          <Text style={styles.pricePrefix}>$</Text>
+          <TextInput
+            style={[styles.input, { flex: 1, marginBottom: 0 }]}
+            value={priceText}
+            onChangeText={(v) => setPriceText(v.replace(/[^0-9.]/g, ''))}
+            placeholder="Agreed price"
+            placeholderTextColor={theme.subtle}
+            keyboardType="decimal-pad"
+          />
+        </View>
+
+        {priceCents >= 100 && (
+          <View style={styles.feeCard}>
+            <View style={styles.feeRow}>
+              <Text style={styles.feeLabel}>You pay</Text>
+              <Text style={styles.feeValue}>{formatPrice(priceCents)}</Text>
             </View>
-
-            {priceCents >= 100 && (
-              <View style={styles.feeCard}>
-                <View style={styles.feeRow}>
-                  <Text style={styles.feeLabel}>You pay</Text>
-                  <Text style={styles.feeValue}>{formatPrice(priceCents)}</Text>
-                </View>
-                <View style={styles.feeRow}>
-                  <Text style={styles.feeLabel}>Platform fee (5%)</Text>
-                  <Text style={styles.feeValue}>-{formatPrice(feeCents)}</Text>
-                </View>
-                <View style={[styles.feeRow, { marginTop: 2 }]}>
-                  <Text style={[styles.feeLabel, { color: theme.text }]}>Freelancer receives</Text>
-                  <Text style={[styles.feeValue, { color: theme.success }]}>{formatPrice(netCents)}</Text>
-                </View>
-              </View>
-            )}
-
-            <TouchableOpacity
-              activeOpacity={0.9}
-              disabled={!hireValid || hiring}
-              onPress={submitHire}
-            >
-              <LinearGradient
-                  colors={[theme.accent, theme.secondary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.hireBtn, (!hireValid || hiring) && { opacity: 0.4 }]}
-              >
-                {hiring ? (
-                  <ActivityIndicator color={theme.onAccent} size="small" />
-                ) : (
-                  <>
-                    <Feather name="lock" size={15} color={theme.onAccent} />
-                    <Text style={styles.hireBtnText}>
-                      {priceCents >= 100 ? `Pay ${formatPrice(priceCents)}` : 'Pay with Stripe'}
-                    </Text>
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.modalCancel}
-              activeOpacity={0.7}
-              onPress={() => setHireVisible(false)}
-            >
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </SheetRise>
-        </KeyboardAvoidingView>
-      </Modal>
+            <View style={styles.feeRow}>
+              <Text style={styles.feeLabel}>Platform fee (5%)</Text>
+              <Text style={styles.feeValue}>-{formatPrice(feeCents)}</Text>
+            </View>
+            <View style={[styles.feeRow, { marginTop: 2 }]}>
+              <Text style={[styles.feeLabel, { color: theme.text }]}>Freelancer receives</Text>
+              <Text style={[styles.feeValue, { color: theme.success }]}>{formatPrice(netCents)}</Text>
+            </View>
+          </View>
+        )}
+      </Sheet>
     </View>
   );
 }
@@ -534,18 +504,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     backgroundColor: theme.warning + '26', borderRadius: RADIUS.sm, padding: SP.md - 2,
   },
   notPayableText: { color: theme.warning, fontSize: FS.xs, fontFamily: FONT.medium, flex: 1 },
-  modalOverlay: { flex: 1, backgroundColor: theme.background + 'CC', justifyContent: 'flex-end' },
-  modalSheet: {
-    backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-    padding: SP.md + 4, paddingBottom: SP.xl,
-    borderWidth: 1, borderColor: theme.border,
-  },
-  modalHandle: {
-    width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border,
-    alignSelf: 'center', marginBottom: SP.md,
-  },
-  modalTitle: { color: theme.text, fontSize: FS.md, fontFamily: FONT.bold },
-  modalSub: { color: theme.muted, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 4, marginBottom: SP.md },
+  modalSub: { color: theme.muted, fontSize: FS.xs, fontFamily: FONT.regular, marginBottom: SP.md },
   input: {
     backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.sm,
     color: theme.text, fontSize: FS.sm, fontFamily: FONT.regular,
@@ -561,6 +520,4 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   feeRow: { flexDirection: 'row', justifyContent: 'space-between' },
   feeLabel: { color: theme.muted, fontSize: FS.xs, fontFamily: FONT.regular },
   feeValue: { color: theme.text, fontSize: FS.xs, fontFamily: FONT.semibold },
-  modalCancel: { alignItems: 'center', paddingVertical: SP.md },
-  modalCancelText: { color: theme.muted, fontSize: FS.sm, fontFamily: FONT.medium },
 });

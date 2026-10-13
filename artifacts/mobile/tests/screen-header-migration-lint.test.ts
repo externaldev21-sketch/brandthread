@@ -163,7 +163,6 @@ function isRouteFile(full: string, entry: string): boolean {
 const MODAL_INSETS_ALLOWLIST = new Set([
   'app/(tabs)/profile.tsx',
   'app/design-bg-replace.tsx',
-  'app/help.tsx',
   'components/PlanUpsellModal.tsx',
   'components/ProductReviewsSection.tsx',
   'components/SellerTutorialOverlay.tsx',
@@ -172,7 +171,6 @@ const MODAL_INSETS_ALLOWLIST = new Set([
   'components/chat/ThemePickerSheet.tsx',
   'components/discover/DiscoverSafetyMenu.tsx',
   'components/motion/SheetRise.tsx',
-  'components/settings/SettingsKit.tsx',
   'components/thread-cash/ChatAttachThreadCash.tsx',
 ]);
 
