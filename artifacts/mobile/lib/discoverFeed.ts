@@ -25,6 +25,7 @@ import { isPreviewCatalogEnabled } from '@/lib/previewCatalog';
 import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
 import { getPreviewDiscoverPosts, getPreviewBrandCards, getPreviewDiscoverPeople, getPreviewDrops } from '@/lib/previewDiscover';
 import { bannerStill, resolveProfileBanner } from '@/components/profile/profileBannerRules';
+import { parseAspectRatio } from '@/lib/discoverMasonry';
 
 export type DiscoverPostMedia = 'photo' | 'video' | 'slideshow';
 
@@ -53,6 +54,10 @@ export interface DiscoverPost {
   likedByMe?: boolean;
   savedByMe?: boolean;
   productTags?: DiscoverProductTag[];
+  /** Media width:height when the API sends it (posts store "9:16" etc.) — drives the masonry tile height. */
+  aspectRatio?: number;
+  /** Video length in seconds, only when the API sends it. */
+  durationSec?: number;
   createdAt: string;
 }
 
@@ -74,6 +79,8 @@ export interface DiscoverPersonSuggestion {
   color: string;
   avatarUrl?: string;
   reason: string;
+  /** Real mutual-follow count from /social/suggested, when sent. */
+  mutualCount?: number;
   isFollowing: boolean;
 }
 
@@ -161,6 +168,16 @@ interface PublicDropRow {
   live?: boolean | null;
 }
 
+/** Forward-compatible passthrough of media size/length — only set when the payload carries it. */
+function mediaShape(row: any): Pick<DiscoverPost, 'aspectRatio' | 'durationSec'> {
+  const out: Pick<DiscoverPost, 'aspectRatio' | 'durationSec'> = {};
+  const aspect = parseAspectRatio(row?.aspectRatio);
+  if (aspect) out.aspectRatio = aspect;
+  const duration = Number(row?.durationSec ?? row?.duration);
+  if (Number.isFinite(duration) && duration > 0) out.durationSec = duration;
+  return out;
+}
+
 /** Maps one row of `api.publicTrending.get()` into a brand/seller Discover tile. */
 function mapTrendingToPost(row: TrendingRow): DiscoverPost | null {
   if (!row?.id || !row?.brandId) return null;
@@ -182,6 +199,7 @@ function mapTrendingToPost(row: TrendingRow): DiscoverPost | null {
     // compatible passthrough for once a seller-tagged trending post exists,
     // so "Shop the look" only ever appears where a real tag is present.
     productTags: Array.isArray(row.productTags) ? row.productTags : undefined,
+    ...mediaShape(row),
     createdAt: new Date().toISOString(),
   };
 }
@@ -204,6 +222,7 @@ function mapFriendPostToPost(row: FriendActivityRow): DiscoverPost | null {
     commentsCount: row.commentsCount ?? 0,
     likedByMe: !!row.likedByMe,
     savedByMe: !!row.savedByMe,
+    ...mediaShape(row),
     createdAt: row.createdAt ?? new Date().toISOString(),
   };
 }
@@ -345,6 +364,7 @@ export async function composeDiscoverPeople({ getFriendSuggestions }: { getFrien
       color: r.color ?? colorFor(r.userId ?? r.name ?? ''),
       avatarUrl: r.avatarUrl,
       reason: r.reason ?? 'Suggested for you',
+      ...(typeof r.mutualCount === 'number' ? { mutualCount: r.mutualCount } : {}),
       isFollowing: !!r.isFollowing,
     }));
   } catch {
@@ -361,10 +381,12 @@ export async function composeDiscoverDrops({ api }: { api: DiscoverApi }): Promi
     drops = (Array.isArray(rows) ? rows : []).map((r: PublicDropRow) => ({
       id: r.id,
       name: r.name ?? r.title ?? 'Drop',
-      brandName: r.brandName ?? r.sellerDisplayName ?? 'Brand',
-      imageUri: r.imageUri ?? (r.images ?? [])[0],
+      // /api/public/drops sends `seller` + `heroImageUrl` + `isLive`; the
+      // flat fields are kept for older payloads.
+      brandName: r.brandName ?? r.sellerDisplayName ?? r.seller?.brandName ?? r.seller?.displayName ?? 'Brand',
+      imageUri: r.imageUri ?? r.heroImageUrl ?? (r.images ?? [])[0] ?? (r.products ?? [])[0]?.images?.[0],
       releaseAt: r.releaseAt ?? null,
-      live: !!r.live,
+      live: !!(r.live ?? r.isLive),
     }));
   } catch {
     // Preview backfill below.

@@ -16,7 +16,7 @@ import { useApi, type RecommendedBrand } from '@/lib/api';
 import { isPreviewDemoMode } from '@/lib/devPreview';
 import { readDismissed, shouldShowBrandsRow, writeDismissed } from '@/lib/brandsYouMightLike';
 import { SP } from '@/lib/theme';
-import { TYPE_SCALE } from '@/constants/typography';
+import { DiscoverSectionHeader } from './DiscoverSectionHeader';
 import { DiscoverEntityCard } from './DiscoverEntityCard';
 
 const CARD_WIDTH = 160;
@@ -61,18 +61,21 @@ export function BrandsYouMightLikeRow() {
 
   return (
     <View style={styles.wrap} testID="brands-you-might-like">
-      <View style={styles.headRow}>
-        <Text style={[TYPE_SCALE.headline, { color: theme.text }]}>Brands you might like</Text>
-        <PressableScale
-          onPress={() => { setDismissed(true); if (userId) void writeDismissed(userId); }}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss brands you might like"
-          style={styles.dismiss}
-          testID="brands-you-might-like-dismiss"
-        >
-          <Icon name="x" size={18} color={theme.muted} />
-        </PressableScale>
-      </View>
+      <DiscoverSectionHeader
+        title="Brands you might like"
+        style={styles.headRow}
+        trailing={(
+          <PressableScale
+            onPress={() => { setDismissed(true); if (userId) void writeDismissed(userId); }}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss brands you might like"
+            style={styles.dismiss}
+            testID="brands-you-might-like-dismiss"
+          >
+            <Icon name="x" size={18} color={theme.muted} />
+          </PressableScale>
+        )}
+      />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.track}>
         {brands.map((b) => (
           <View key={b.id} style={{ width: CARD_WIDTH }}>
@@ -94,7 +97,7 @@ export function BrandsYouMightLikeRow() {
 
 const styles = StyleSheet.create({
   wrap: { paddingTop: SP.sm, paddingBottom: SP.sm },
-  headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: SP.md, paddingRight: SP.xs },
+  headRow: { paddingLeft: SP.md, paddingRight: SP.xs, marginBottom: 0 },
   dismiss: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   track: { flexDirection: 'row', gap: 12, paddingHorizontal: SP.md, paddingTop: 2 },
 });

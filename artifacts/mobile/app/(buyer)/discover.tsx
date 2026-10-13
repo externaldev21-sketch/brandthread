@@ -357,6 +357,7 @@ export default function DiscoverScreen() {
       {filter === 'forYou' && (
         <DiscoverGrid
           ref={listRef as never}
+          layout="masonry"
           posts={forYouPosts}
           loading={forYouLoading}
           loadingMore={forYouLoadingMore}
@@ -425,7 +426,7 @@ export default function DiscoverScreen() {
           contentContainerStyle={{ gap: SP.sm, paddingBottom: tabBarClearance }}
           ListHeaderComponent={header}
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-          renderItem={({ item }) => <DiscoverBrandCard brand={item} />}
+          renderItem={({ item }) => <DiscoverBrandCard brand={item} variant="tile" />}
           ListEmptyComponent={brandsLoading ? (
             <ResponsiveContainer style={{ paddingHorizontal: SP.md, marginTop: SP.md }}>
               <ListSkeleton rows={3} />
@@ -443,9 +444,7 @@ export default function DiscoverScreen() {
           ref={listRef as never}
           data={people}
           keyExtractor={(p) => p.userId}
-          numColumns={2}
-          columnWrapperStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}
-          contentContainerStyle={{ gap: SP.sm, paddingBottom: tabBarClearance }}
+          contentContainerStyle={{ paddingBottom: tabBarClearance }}
           ListHeaderComponent={header}
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           renderItem={({ item }) => <DiscoverPersonCard person={item} />}

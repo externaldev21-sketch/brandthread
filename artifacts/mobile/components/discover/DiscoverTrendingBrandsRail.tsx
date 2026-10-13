@@ -12,6 +12,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SP, FONT } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { TYPE_SCALE } from '@/constants/typography';
+import { DiscoverSectionHeader } from './DiscoverSectionHeader';
 import { DiscoverBrandCard } from './DiscoverBrandCard';
 import type { DiscoverBrandCard as BrandCardData } from '@/lib/discoverFeed';
 
@@ -36,16 +37,7 @@ export function DiscoverTrendingBrandsRail({ brands, onSeeAll }: { brands: Brand
   if (brands.length === 0) return null;
   return (
     <View style={{ marginVertical: SP.md }}>
-      {onSeeAll ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: SP.md }}>
-          <Text style={[TYPE_SCALE.headline, { color: theme.text }]}>Trending Brands</Text>
-          <PressableScale onPress={onSeeAll} accessibilityRole="button" accessibilityLabel="See all trending brands" hitSlop={12} noMinHeight>
-            <Text style={[TYPE_SCALE.footnote, { color: theme.text, fontFamily: FONT.semibold }]}>See all</Text>
-          </PressableScale>
-        </View>
-      ) : (
-        <Text style={[TYPE_SCALE.headline, { color: theme.text, marginBottom: 10, paddingHorizontal: SP.md }]}>Trending Brands</Text>
-      )}
+      <DiscoverSectionHeader title="Trending Brands" onSeeAll={onSeeAll} style={{paddingHorizontal: SP.md}} />
       {/* Edge-to-edge scroller (gutter on the content, not the clip box) so
           the peeking card is cut by the screen edge, and snaps per card. */}
       <ScrollView
