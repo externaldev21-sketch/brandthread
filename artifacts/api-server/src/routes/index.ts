@@ -66,6 +66,7 @@ import postsRouter from "./posts";
 import postCaptionsRouter from "./post-captions";
 import feedRouter from "./feed";
 import reportsRouter from "./reports";
+import accountStatusRouter from "./account-status";
 import postCommentsRouter from "./post-comments";
 import moderationRouter from "./moderation";
 import safetyRouter from "./safety";
@@ -308,6 +309,7 @@ router.use("/posts",                     postCaptionsRouter);
 router.use("/posts",                     tc, postsRouter);
 router.use("/feed",                      feedRouter); // buyer-scoped (For You ranking + event ingestion); no tc
 router.use("/reports",                   reportsRouter);
+router.use("/account-status",            accountStatusRouter); // strikes + your reports (signed-in)
 router.use("/moderation",                auditModerationActions, moderationRouter);
 router.use("/admin",                     adminRouter); // platform admin dashboard API (users.role = admin)
 router.use("/safety",                    safetyRouter);
