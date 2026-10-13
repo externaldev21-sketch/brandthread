@@ -243,6 +243,32 @@ vi.mock('@/components/ui/OptionSheet', () => {
   };
 });
 
+// Per-device list/grid choice: nothing stored, so the screen opens in its
+// default (list) view.
+vi.mock('@react-native-async-storage/async-storage', () => ({
+  default: { getItem: vi.fn(async () => null), setItem: vi.fn(async () => undefined) },
+}));
+
+// The list view (default) renders ProductRow; it gets the same test double as
+// the grid card so both views are exercised by the same assertions.
+vi.mock('@/components/products/ProductRow', () => {
+  const React = require('react') as typeof import('react');
+  return {
+    ProductRow: ({ product, onPress, onMore }: {
+      product: Product;
+      onPress: (p: Product) => void;
+      onMore: (p: Product) => void;
+    }) =>
+      React.createElement(
+        'View',
+        { testID: `card-${product.id}` },
+        React.createElement('Text', null, product.name),
+        React.createElement('TouchableOpacity', { accessibilityLabel: `open-${product.id}`, onPress: () => onPress(product) }),
+        React.createElement('TouchableOpacity', { accessibilityLabel: `more-${product.id}`, onPress: () => onMore(product) }),
+      ),
+  };
+});
+
 vi.mock('@/components/products/ProductCard', () => {
   const React = require('react') as typeof import('react');
   return {
@@ -427,5 +453,29 @@ describe('seller products tab — "The Rack"', () => {
     });
     expect(restoreProductMock).toHaveBeenCalledWith('p-active');
     expect(getProductsMock.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('opens in the list view, switches to the grid from the header toggle, and adds from the floating button', async () => {
+    getProductsMock.mockResolvedValue([activeProduct]);
+    renderer = await renderScreen();
+
+    // List view by default; the header's former "+" slot now holds the view toggle.
+    expect(() => findByLabel(renderer!, 'Show as grid')).not.toThrow();
+    await act(async () => {
+      (findByLabel(renderer!, 'Show as grid').props as { onPress: () => void }).onPress();
+      await flushPromises();
+    });
+    expect(() => findByLabel(renderer!, 'Show as list')).not.toThrow();
+    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default as unknown as { setItem: ReturnType<typeof vi.fn> };
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith('bt.sellerProducts.viewMode', 'grid');
+
+    // Grid still renders the product (via ProductCard).
+    expect(renderer!.root.findAll(n => (n.type as unknown) === 'View' && (n.props as { testID?: string }).testID === 'card-p-active')).toHaveLength(1);
+
+    const fab = renderer!.root.findAll(n => (n.props as { testID?: string }).testID === 'products-add-fab')[0];
+    expect(fab).toBeTruthy();
+    expect((fab.props as { accessibilityLabel: string }).accessibilityLabel).toBe('Add product');
+    await act(async () => { (fab.props as { onPress: () => void }).onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/add-product');
   });
 });

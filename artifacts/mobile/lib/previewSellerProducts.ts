@@ -49,6 +49,8 @@ function buildProduct(opts: {
   variants?: SeedVariant[];
   /** Omitted entirely (undefined) means this product doesn't track per-variant options at all — a single, product-level stock count. */
   singleStock?: number;
+  /** More bundled posters after the cover, so the editor's photo grid shows an ordered set. */
+  extraPosterIndexes?: number[];
 }): Product {
   const id = `preview-product-${opts.index}`;
   const now = new Date(Date.now() - opts.index * 86_400_000).toISOString();
@@ -59,7 +61,14 @@ function buildProduct(opts: {
     isCover: true,
     sortOrder: 0,
     createdAt: now,
-  }];
+  }, ...(opts.extraPosterIndexes ?? []).map((posterIndex, i) => ({
+    id: `${id}-media-${i + 2}`,
+    type: 'image' as const,
+    uri: posterUri(posterIndex),
+    isCover: false,
+    sortOrder: i + 1,
+    createdAt: now,
+  }))];
 
   let options: Product['options'] = [];
   let variants: Product['variants'] = [];
@@ -139,6 +148,7 @@ export function getPreviewSellerProducts(): Product[] {
       category: 'Jacket',
       priceCents: 3800,
       posterIndex: 0,
+      extraPosterIndexes: [3, 4],
       variants: [
         { size: 'S', color: 'Black', qty: 24 }, // theme-exempt: catalog variant name, not app chrome
         { size: 'M', color: 'Black', qty: 31 }, // theme-exempt: catalog variant name, not app chrome

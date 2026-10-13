@@ -31,6 +31,9 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 
 import { StatusBadge, PressableScale } from '@/components/BrandthreadUI';
 
+
+import { deriveProductListStatus, PRODUCT_LIST_STATUS_LABEL } from '@/lib/productListStatus';
+import { ProductStatusChip } from './ProductStatusChip';
 import { CachedImage } from '@/components/CachedImage';
 
 import { ProductPhoto } from '@/components/media/ProductPhoto';
@@ -97,6 +100,7 @@ export const ProductCard = React.memo(function ProductCard({
   const stockLabel = stock === 0 ? 'Sold out' : stockStatusText;
   const flagColors = stockFlagColors(stockLevelKey === 'low_stock' ? 'low_stock' : 'out_of_stock', theme);
   const soldOut = stock === 0 && product.status !== 'archived';
+  const listStatus = deriveProductListStatus(product);
 
   const price = product.pricing.priceCents;
   const compare = product.pricing.compareAtPriceCents;
@@ -148,14 +152,14 @@ export const ProductCard = React.memo(function ProductCard({
               onPress={() => onPress(product)}
               onPressIn={onPressIn ? () => onPressIn(product) : undefined}
               activeScale={0.98}
-              accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatMoney(price)}`}
+              accessibilityLabel={`${product.name}, ${PRODUCT_LIST_STATUS_LABEL[listStatus]}, ${formatCents(price)}`}
             >
             <View style={{ height: imageHeight, width: '100%', opacity: soldOut ? 0.4 : 1 }}>
             <ProductPhoto uri={coverUri} name={product.name} style={s.image} recyclingKey={product.id} />
 
             {/* Status chip */}
-            <View style={[s.chipTopLeft, { backgroundColor: theme.background, borderRadius: RADIUS.pill }]}>
-              <StatusBadge label={statusLabel(product.status)} variant={statusVariant(product.status)} small />
+            <View style={s.chipTopLeft}>
+              <ProductStatusChip status={listStatus} onMedia testID={`product-status-${product.id}`} />
             </View>
             </View>
             </PressableScale>
@@ -271,7 +275,6 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   chipBottomLabel: {
     fontFamily: FONT.bold,
     fontSize: FS.xs,
-    color: '#FFFFFF',
     textAlign: 'center',
   },
   moreBtn: {

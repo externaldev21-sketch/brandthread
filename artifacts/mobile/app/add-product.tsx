@@ -75,6 +75,9 @@ import { isPreviewSellerProductId } from '@/lib/previewSellerProducts';
 import { buildServerVariants, sanitizeMoneyInput } from '@/lib/productSave';
 
 import { useApi } from '@/hooks/useApi';
+import { FormSection } from '@/components/products/FormSection';
+import { ProductPhotoGrid } from '@/components/products/ProductPhotoGrid';
+import { VariantTable } from '@/components/products/VariantTable';
 
 import { confirmPublishWithoutPayouts } from '@/lib/payoutReadinessPrompt';
 
@@ -345,10 +348,6 @@ export default function AddProductScreen() {
   // Photos row: 3 empty "Add photo" squares by default, growable one at a
   // time (up to 10) via the quiet "+" tile at the end — see renderPhotos().
   // Never allowed to drop below however many photos are already filled in.
-  const [photoSlotCount, setPhotoSlotCount] = useState(3);
-  // Measured width of the photos row, so the 3 default tiles + the "+" tile
-  // are 4 equal squares that span the full content width at any screen size.
-  const [photoRowWidth, setPhotoRowWidth] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [collections, setCollections] = useState<ProductCollection[]>([]);
@@ -1263,134 +1262,50 @@ export default function AddProductScreen() {
     ]);
   }
 
-  // Photo row per Dev's spec: true 1:1 square tiles, 3 empty "Add photo"
-  // slots by default (solid hairline border, no dashed placeholder look),
-  // then a quiet "+" tile that stages one more empty slot per tap (up to
-  // 10 total, then the "+" disappears). Filled slots show the photo edge
-  // to edge with a small remove X; the small chevrons reorder (no
-  // drag-list library yet, so reorder is tap-based, not a literal drag).
+  // Photo grid (Shopify iOS media grid): numbered tiles in listing order
+  // (1 = first), "Cover" on the cover photo, and a dashed "+ Add" tile until
+  // the 10-photo limit. Tap crops, hold opens more options (set cover,
+  // background cutout, …), × removes, chevrons move a photo earlier/later.
+  function displayableUri(uri: string | undefined): string | null {
+    if (!uri) return null;
+    // blob:/data: are what the web picker returns; a leading "/" is a
+    // same-origin bundled asset (web) — both render fine in <Image>.
+    return (uri.startsWith('http') || uri.startsWith('file') || uri.startsWith('ph://') || uri.startsWith('asset-library://') || uri.startsWith('content://') || uri.startsWith('/') || uri.startsWith('blob:') || uri.startsWith('data:image/')) ? uri : null;
+  }
+
   function renderPhotos() {
     const media = draftData.media ?? [];
-    const visibleSlotCount = Math.min(10, Math.max(photoSlotCount, media.length));
-    const canAddSlot = visibleSlotCount < 10;
-    const tileSize = photoRowWidth > 0 ? Math.floor((photoRowWidth - 3 * SP.sm) / 4) : 84;
-    const tileDims = { width: tileSize, height: tileSize };
     return (
-      <View style={{ gap: SP.sm }} onLayout={e => setPhotoRowWidth(e.nativeEvent.layout.width)}>
-        <View style={s.photoRowHeader}>
-          <Text style={s.photoRowTitle}>Photos</Text>
-          <Text style={s.photoRowCount}>{media.length}/10</Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.photoRowContent}>
-          {Array.from({ length: visibleSlotCount }, (_, idx) => {
-            const m = media[idx];
-            if (!m) {
-              return (
-                <TouchableOpacity
-                  key={`empty-${idx}`}
-                  style={[s.photoAddSlot, tileDims]}
-                  onPress={pickPhotos}
-                  accessibilityLabel="Add photo"
-                  accessibilityRole="button"
-                  testID="add-product-add-photos"
-                >
-                  <Icon name="camera" size={20} color={MUTED} />
-                  <Text style={s.photoAddSlotLabel}>Add photo</Text>
-                </TouchableOpacity>
-              );
-            }
-            const upload = mediaUpload[m.id];
-            const bgStatus = bgRemovalState[m.id];
-            const displayUri = m.useCutout && m.cutoutUri ? m.cutoutUri : m.uri;
-            return (
-              <TouchableOpacity
-                key={m.id}
-                style={[s.photoSlot, tileDims]}
-                onPress={() => openCropperFor(m)}
-                onLongPress={() => openPhotoActionsFor(m)}
-                accessibilityLabel={`Photo ${idx + 1}${m.isCover ? ', cover' : ''}. Tap to crop, hold for more options.`}
-                testID={`add-product-photo-${m.id}`}
-              >
-                {displayUri && (displayUri.startsWith('http') || displayUri.startsWith('file') || displayUri.startsWith('ph://') || displayUri.startsWith('asset-library://') || displayUri.startsWith('content://') || displayUri.startsWith('/objects/')) ? (
-                  <Image cachePolicy="memory-disk" source={{ uri: displayUri }} style={s.photoSlotImg} contentFit="cover" />
-                ) : (
-                  <View style={[s.photoSlotImg, s.photoSlotImgPlaceholder]}>
-                    <Icon name="image" size={20} color={MUTED} />
-                  </View>
-                )}
-                {m.isCover && (
-                  <View style={s.mediaCoverBadge}>
-                    <Text style={s.mediaCoverBadgeText}>Cover</Text>
-                  </View>
-                )}
-                {(upload?.status === 'uploading' || bgStatus === 'processing') && (
-                  <View style={s.mediaUploadOverlay}>
-                    <ActivityIndicator color={ON_DARK} />
-                  </View>
-                )}
-                {upload?.status === 'error' && (
-                  <TouchableOpacity style={s.mediaUploadOverlay} onPress={() => uploadMediaAsset(m)} accessibilityLabel="Retry photo upload">
-                    <Icon name="refresh-cw" size={16} color={ON_DARK} />
-                    <Text style={s.mediaRetryLabel}>Retry upload</Text>
-                  </TouchableOpacity>
-                )}
-                {bgStatus === 'failed' && upload?.status !== 'error' && (
-                  <TouchableOpacity style={s.mediaUploadOverlay} onPress={() => removeBackgroundForMedia(m)} accessibilityLabel="Retry background removal">
-                    <Icon name="refresh-cw" size={16} color={ON_DARK} />
-                    <Text style={s.mediaRetryLabel}>Retry cutout</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={s.mediaDeleteBtn}
-                  onPress={() => {
-                    const list = draftData.media ?? [];
-                    patchDraft({ media: list.filter(x => x.id !== m.id).map((x, i) => ({ ...x, sortOrder: i })) });
-                    setMediaUpload(prev => { const next = { ...prev }; delete next[m.id]; return next; });
-                    setBgRemovalState(prev => { const next = { ...prev }; delete next[m.id]; return next; });
-                  }}
-                  accessibilityLabel="Remove photo"
-                >
-                  <Icon name="x" size={12} color={ON_DARK} />
-                </TouchableOpacity>
-                <View style={s.mediaReorderRow}>
-                  <TouchableOpacity
-                    disabled={idx === 0}
-                    onPress={() => moveMedia(m.id, -1)}
-                    style={[s.mediaReorderBtn, idx === 0 && { opacity: 0.3 }]}
-                    accessibilityLabel="Move photo earlier"
-                  >
-                    <Icon name="chevron-left" size={12} color={ON_DARK} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    disabled={idx === media.length - 1}
-                    onPress={() => moveMedia(m.id, 1)}
-                    style={[s.mediaReorderBtn, idx === media.length - 1 && { opacity: 0.3 }]}
-                    accessibilityLabel="Move photo later"
-                  >
-                    <Icon name="chevron-right" size={12} color={ON_DARK} />
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-
-          {canAddSlot && (
-            <TouchableOpacity
-              style={[s.photoMoreSlot, tileDims]}
-              onPress={() => {  setPhotoSlotCount(c => Math.min(10, c + 1)); }}
-              // 40pt-wide tile: widen the tap area into the 8pt gap on its
-              // left only (5 = 4 + its 1pt border), so nothing extends past
-              // the end of the strip.
-              hitSlop={{ left: 5, right: 0, top: 0, bottom: 0 }}
-              accessibilityLabel="Add another photo slot"
-              accessibilityRole="button"
-              testID="add-product-add-slot"
-            >
-              <Icon name="plus" size={16} color={SUBTLE} />
-            </TouchableOpacity>
-          )}
-        </ScrollView>
-      </View>
+      <ProductPhotoGrid
+        max={10}
+        items={media.map(m => {
+          const upload = mediaUpload[m.id];
+          const bgStatus = bgRemovalState[m.id];
+          return {
+            id: m.id,
+            uri: displayableUri(m.useCutout && m.cutoutUri ? m.cutoutUri : m.uri),
+            isCover: !!m.isCover,
+            busy: upload?.status === 'uploading' || bgStatus === 'processing',
+            error: upload?.status === 'error' ? 'upload' as const : bgStatus === 'failed' ? 'cutout' as const : null,
+          };
+        })}
+        onAdd={pickPhotos}
+        onPressItem={id => { const m = media.find(x => x.id === id); if (m) openCropperFor(m); }}
+        onLongPressItem={id => { const m = media.find(x => x.id === id); if (m) openPhotoActionsFor(m); }}
+        onRemove={id => {
+          const list = draftData.media ?? [];
+          patchDraft({ media: list.filter(x => x.id !== id).map((x, i) => ({ ...x, sortOrder: i })) });
+          setMediaUpload(prev => { const next = { ...prev }; delete next[id]; return next; });
+          setBgRemovalState(prev => { const next = { ...prev }; delete next[id]; return next; });
+        }}
+        onMove={moveMedia}
+        onRetry={(id, kind) => {
+          const m = media.find(x => x.id === id);
+          if (!m) return;
+          if (kind === 'upload') void uploadMediaAsset(m);
+          else void removeBackgroundForMedia(m);
+        }}
+      />
     );
   }
 
@@ -1653,21 +1568,15 @@ export default function AddProductScreen() {
     );
   }
 
+  function addVariantOption() {
+    updateUnsavedState(setLocalOptions, prev => [...prev, {
+      id: uid(), type: 'size' as OptionType, name: 'Size', values: [], customInput: '',
+    }]);
+  }
+
   function renderVariants() {
     return (
       <>
-        <SectionHeader
-          title="Variants"
-          action={{
-            label: '+ Add options',
-            onPress: () => {
-                updateUnsavedState(setLocalOptions, prev => [...prev, {
-                  id: uid(), type: 'size' as OptionType, name: 'Size', values: [], customInput: '',
-                }]);
-            },
-          }}
-          style={s.sectionHdr}
-        />
         <Text style={s.sectionHelper}>Color, size and other choices buyers pick from.</Text>
 
         {localOptions.map((opt, idx) => (
@@ -1870,60 +1779,63 @@ export default function AddProductScreen() {
               </BrandthreadCard>
             )}
 
-            {localVariants.map(v => {
-              const selected = selectedVariantIds.has(v.id);
-              return (
-              <BrandthreadCard key={v.id} style={[s.variantRow, bulkEditMode && selected && { borderColor: BORDER_ACTIVE }]}>
-                <View style={s.variantTitleRow}>
-                  {bulkEditMode && (
-                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Select variant"
-                      onPress={() => setSelectedVariantIds(prev => {
-                        const next = new Set(prev);
-                        if (next.has(v.id)) next.delete(v.id); else next.add(v.id);
-                        return next;
-                      })}
-                      style={[s.variantCheckbox, selected && { backgroundColor: theme.accent, borderColor: theme.accent }]}
-                    >
-                      {selected && <Icon name="check" size={11} color={theme.onAccent} />}
-                    </TouchableOpacity>
-                  )}
-                  <Text style={s.variantTitle}>{v.title}</Text>
-                </View>
-                <View style={s.variantFields}>
+            {/* Variant table: one row per variant × inline Price and Stock
+                (SKU under the name). Same local state as before. */}
+            <VariantTable
+              testID="add-product-variant-table"
+              rows={localVariants.map(v => ({
+                id: v.id,
+                label: v.title,
+                price: v.price,
+                stock: variantQtys[v.id] ?? v.qty,
+                pricePlaceholder: priceStr || '0.00',
+                highlighted: bulkEditMode && selectedVariantIds.has(v.id),
+              }))}
+              onChangePrice={(id, txt) => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === id ? { ...x, price: txt } : x))}
+              onChangeStock={(id, txt) => updateUnsavedState(setVariantQtys, prev => ({ ...prev, [id]: txt }))}
+              renderLeading={bulkEditMode ? (row) => {
+                const selected = selectedVariantIds.has(row.id);
+                return (
+                  <TouchableOpacity
+                    onPress={() => setSelectedVariantIds(prev => {
+                      const next = new Set(prev);
+                      if (next.has(row.id)) next.delete(row.id); else next.add(row.id);
+                      return next;
+                    })}
+                    style={[s.variantCheckbox, selected && { backgroundColor: theme.accent, borderColor: theme.accent }]}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: selected }}
+                    accessibilityLabel={`Select ${row.label}`}
+                  >
+                    {selected && <Icon name="check" size={11} color={theme.onAccent} />}
+                  </TouchableOpacity>
+                );
+              } : undefined}
+              renderTrailing={(row) => (
+                <TouchableOpacity
+                  onPress={() => updateUnsavedState(setLocalVariants, prev => prev.filter(x => x.id !== row.id))}
+                  style={{ padding: SP.xs }}
+                  hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                  accessibilityLabel={`Remove ${row.label}`}
+                >
+                  <Icon name="trash-2" size={14} color={MUTED} />
+                </TouchableOpacity>
+              )}
+              renderBelow={(row) => {
+                const v = localVariants.find(x => x.id === row.id);
+                return (
                   <TextInput
-                    style={[s.variantInput, { flex: 1.3 }]}
-                    value={v.sku}
-                    onChangeText={txt => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === v.id ? { ...x, sku: txt } : x))}
-                    placeholder="SKU"
+                    style={s.variantSkuInput}
+                    value={v?.sku ?? ''}
+                    onChangeText={txt => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === row.id ? { ...x, sku: txt } : x))}
+                    placeholder="SKU (optional)"
                     placeholderTextColor={SUBTLE}
                     autoCapitalize="characters"
-                    returnKeyType="next"
+                    accessibilityLabel={`SKU for ${row.label}`}
                   />
-                  <TextInput
-                    style={[s.variantInput, { flex: 0.9 }]}
-                    value={displayPriceInput(v.price)}
-                    onChangeText={txt => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === v.id ? { ...x, price: sanitizePriceInput(txt) } : x))}
-                    placeholder="Price"
-                    placeholderTextColor={SUBTLE}
-                    keyboardType="decimal-pad"
-                    returnKeyType="next"
-                  />
-                  <TextInput
-                    style={[s.variantInput, { flex: 0.7 }]}
-                    value={variantQtys[v.id] ?? v.qty}
-                    onChangeText={txt => updateUnsavedState(setVariantQtys, prev => ({ ...prev, [v.id]: txt }))}
-                    placeholder="Stock"
-                    placeholderTextColor={SUBTLE}
-                    keyboardType="numeric"
-                    returnKeyType="done"
-                  />
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete variant" onPress={() => updateUnsavedState(setLocalVariants, prev => prev.filter(x => x.id !== v.id))} style={{ padding: 4 }}>
-                    <Icon name="trash-2" size={14} color={RED} />
-                  </TouchableOpacity>
-                </View>
-              </BrandthreadCard>
-              );
-            })}
+                );
+              }}
+            />
           </>
         )}
 
@@ -2334,34 +2246,43 @@ export default function AddProductScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={s.essentialSection}>
+          {/* Grouped sections, Shopify product-editor order. Same fields
+              and handlers as before, only grouped under headers. */}
+          <FormSection title="Media" meta={`${(draftData.media ?? []).length}/10`} testID="add-product-section-media">
             {renderPhotos()}
-            {renderBasicInfo()}
-            {renderPriceEssentials()}
-          </View>
+          </FormSection>
 
-          <View style={s.divider} />
-          <View
-            style={s.essentialSection}
-            onLayout={e => {
-              variantsSectionY.current = e.nativeEvent.layout.y;
-              if (pendingSectionScroll.current) scrollToVariantsSection();
-            }}
+          <FormSection title="Title & description" testID="add-product-section-details">
+            {renderBasicInfo()}
+          </FormSection>
+
+          <FormSection title="Pricing" testID="add-product-section-pricing">
+            {renderPriceEssentials()}
+          </FormSection>
+
+          <FormSection
+            title="Variants"
+            action={{ label: 'Add options', onPress: addVariantOption, testID: 'add-product-add-options' }}
+            testID="add-product-section-variants"
+
+ onLayout={e => {variantsSectionY.current = e.nativeEvent.layout.y; if (pendingSectionScroll.current) scrollToVariantsSection();}}
           >
             {renderVariants()}
-          </View>
+          </FormSection>
 
-          <View style={s.divider} />
-          <View style={s.essentialSection}>
-            <SectionHeader title="Inventory" style={s.sectionHdr} />
+          <FormSection title="Inventory" testID="add-product-section-inventory">
             {renderInventory()}
-          </View>
+          </FormSection>
 
-          <View style={s.divider} />
-          <View style={s.essentialSection}>
-            <SectionHeader title="Organization" style={s.sectionHdr} />
+          <FormSection title="Organization" testID="add-product-section-organization">
             {renderOrganization()}
-          </View>
+          </FormSection>
+
+          <Text style={s.moreDetailsHeader} accessibilityRole="header">More details</Text>
+          {/* The optional sections stay collapsible, grouped in one card. */}
+          <View style={s.moreDetailsGroup}>
+          {/* -1 hides the first row's top divider under the card border. */}
+          <View style={{ marginTop: -1 }}>
 
           <CollapsibleSection
             title="Profit"
@@ -2433,6 +2354,8 @@ export default function AddProductScreen() {
           >
             {renderReviewStep()}
           </CollapsibleSection>
+          </View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -2550,6 +2473,18 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   scrollContent: { paddingTop: SP.md },
 
   // Essential sections (always visible)
+  moreDetailsHeader: {
+    fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.semibold, color: MUTED,
+    marginHorizontal: SP.md + SP.xs, marginBottom: SP.sm,
+  },
+  moreDetailsGroup: {
+    marginHorizontal: SP.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: RADIUS.md,
+    backgroundColor: CARD,
+    overflow: 'hidden',
+  },
   essentialSection: {
     paddingHorizontal: SP.md,
     paddingBottom: SP.lg,
@@ -2751,6 +2686,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   variantFields: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
   variantInput: {
     flex: 1, height: 40, backgroundColor: SURFACE,
+    borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
+  },
+  variantSkuInput: {
+    height: 36, marginTop: SP.sm, backgroundColor: SURFACE,
     borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
   },

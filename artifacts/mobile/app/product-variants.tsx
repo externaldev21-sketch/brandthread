@@ -3,8 +3,9 @@ import { radius as ControlRadius } from '@/constants/radii';
  * Variants & stock — seller management screen for one product (?productId=).
  *
  * Modelled on Shopify admin mobile's product screens (Mobbin): an Options
- * section of value chips per option, a Variants list (name + SKU, stock pill
- * on the right, tap to expand price / SKU / low-stock level), then stock rules.
+ * section of value chips per option, a Variants table (one row per variant
+ * with inline Price and Stock; the chevron opens SKU / low-stock level), then
+ * stock rules.
  * Size and colour stay on the variant columns; fit and custom options are
  * stored server-side per variant (see routes/product-variants.ts).
  */
@@ -22,7 +23,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
-import { formatCents } from '@/lib/money';
+import { VariantTable } from '@/components/products/VariantTable';
 
 interface Axis { name: string; values: string[] }
 interface Variant {
@@ -360,53 +361,55 @@ export default function ProductVariantsScreen() {
                 </Pressable>
               ))}
             </View>
-            <BrandthreadCard style={[st.card, { paddingVertical: 0, gap: 0 }]}>
+            <BrandthreadCard style={[st.card, { gap: 0 }]}>
               {groups.map((group) => (
                 <View key={group.title || 'all'}>
                   {!!group.title && <Text style={st.groupTitle}>{group.title}</Text>}
-                  {group.rows.map(({ v, label }) => {
-                    const e = edits[v.id] ?? {};
-                    const open = expanded === v.id;
-                    const stockText = e.stock ?? String(v.stock);
-                    const shortLabel = groupByFirst ? variantValues(v, axes).slice(1).join(' / ') || label : label;
-                    const out = v.stock === 0; const low = !out && v.stock <= v.lowStockThreshold;
-                    return (
-                      <View key={v.id} style={st.variantRow}>
-                        <View style={st.rowBetween}>
-                          <Pressable style={{ flex: 1 }} onPress={() => setExpanded(open ? null : v.id)} accessibilityLabel={`${label}, ${open ? 'collapse' : 'edit details'}`}>
-                            <Text style={st.variantName} numberOfLines={1}>{shortLabel}</Text>
-                            <Text style={st.muted} numberOfLines={1}>
-                              {formatCents(v.priceCents)}{out ? ' · Sold out' : low ? ' · Low stock' : ''}
-                            </Text>
-                          </Pressable>
-                          <TextInput returnKeyType="done" style={st.stockPill} value={stockText} keyboardType="number-pad" selectTextOnFocus
-                            onChangeText={(t) => setEdit(v.id, { stock: t.replace(/[^0-9]/g, '') })} accessibilityLabel={`Stock for ${label}`} />
-                          <Pressable hitSlop={8} onPress={() => setExpanded(open ? null : v.id)} accessibilityLabel={`${open ? 'Collapse' : 'Edit'} ${label}`}>
-                            <Icon name={open ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={colors.mutedForeground} />
-                          </Pressable>
-                        </View>
-                        {open && (
-                          <View style={st.editGrid}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={st.fieldLabel}>Price</Text>
-                              <TextInput returnKeyType="done" style={st.input} value={e.price ?? centsToInput(v.priceCents)} keyboardType="decimal-pad"
-                                onChangeText={(t) => setEdit(v.id, { price: t })} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={st.fieldLabel}>Low-stock level</Text>
-                              <TextInput returnKeyType="done" style={st.input} value={e.low ?? String(v.lowStockThreshold)} keyboardType="number-pad"
-                                onChangeText={(t) => setEdit(v.id, { low: t.replace(/[^0-9]/g, '') })} />
-                            </View>
-                            <View style={{ flexBasis: '100%' }}>
-                              <Text style={st.fieldLabel}>SKU</Text>
-                              <TextInput returnKeyType="done" style={st.input} value={e.sku ?? v.sku} autoCapitalize="characters" autoCorrect={false}
-                                onChangeText={(t) => setEdit(v.id, { sku: t })} />
-                            </View>
+                  <VariantTable
+                    firstColumnLabel={group.title ? 'Option' : 'Variant'}
+                    rows={group.rows.map(({ v, label }) => {
+                      const e = edits[v.id] ?? {};
+                      const shortLabel = groupByFirst ? variantValues(v, axes).slice(1).join(' / ') || label : label;
+                      const out = v.stock === 0; const low = !out && v.stock <= v.lowStockThreshold;
+                      return {
+                        id: v.id,
+                        label: shortLabel,
+                        sublabel: out ? 'Sold out' : low ? 'Low stock' : undefined,
+                        price: e.price ?? centsToInput(v.priceCents),
+                        stock: e.stock ?? String(v.stock),
+                      };
+                    })}
+                    onChangePrice={(id, t) => setEdit(id, { price: t })}
+                    onChangeStock={(id, t) => setEdit(id, { stock: t })}
+                    renderTrailing={(row) => {
+                      const open = expanded === row.id;
+                      return (
+                        <Pressable hitSlop={8} onPress={() => setExpanded(open ? null : row.id)} accessibilityLabel={`${row.label}, ${open ? 'hide details' : 'SKU and low-stock level'}`}>
+                          <Icon name={open ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={colors.mutedForeground} />
+                        </Pressable>
+                      );
+                    }}
+                    renderBelow={(row) => {
+                      if (expanded !== row.id) return null;
+                      const v = variants.find((x) => x.id === row.id);
+                      if (!v) return null;
+                      const e = edits[v.id] ?? {};
+                      return (
+                        <View style={st.editGrid}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={st.fieldLabel}>SKU</Text>
+                            <TextInput returnKeyType="done" style={st.input} value={e.sku ?? v.sku} autoCapitalize="characters" autoCorrect={false}
+                              onChangeText={(t) => setEdit(v.id, { sku: t })} />
                           </View>
-                        )}
-                      </View>
-                    );
-                  })}
+                          <View style={{ flex: 1 }}>
+                            <Text style={st.fieldLabel}>Low-stock level</Text>
+                            <TextInput style={st.input} value={e.low ?? String(v.lowStockThreshold)} keyboardType="number-pad"
+                              onChangeText={(t) => setEdit(v.id, { low: t.replace(/[^0-9]/g, '') })} />
+                          </View>
+                        </View>
+                      );
+                    }}
+                  />
                 </View>
               ))}
             </BrandthreadCard>
@@ -511,10 +514,8 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   sortChipOn: { backgroundColor: c.foreground, borderColor: c.foreground },
   sortText: { fontFamily: FONT.medium, fontSize: FS.sm, color: c.mutedForeground },
   sortTextOn: { color: c.background },
-  groupTitle: { fontFamily: FONT.semibold, fontSize: FS.xs, color: c.mutedForeground, paddingTop: SP.md },
-  variantRow: { paddingVertical: SP.sm + 2, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
+  groupTitle: { fontFamily: FONT.semibold, fontSize: FS.xs, color: c.mutedForeground, letterSpacing: 0.6, textTransform: 'uppercase', paddingTop: SP.md },
   variantName: { fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground },
-  stockPill: { width: 68, flexShrink: 0, textAlign: 'center', fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground, borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 8 },
   editGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginTop: SP.sm },
   radioRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, paddingVertical: 6 },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: c.border, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
