@@ -7,6 +7,7 @@ import { db, manufacturers, sellerQuoteRequests, sellerRfqs } from "@workspace/d
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { resolveSampleRequestFields } from "../lib/sampleRequests";
 
 const router = Router();
 router.use(requireAuth);
@@ -115,6 +116,9 @@ router.post("/quote-requests", async (req, res) => {
   if (!["quote", "sample"].includes(type)) {
     return res.status(400).json({ error: "type must be quote or sample" });
   }
+  // Catalog product (must belong to this manufacturer), sizes, options, ship-to.
+  const sample = await resolveSampleRequestFields(manufacturerId, req.body ?? {});
+  if (!sample.ok) return res.status(400).json({ error: sample.error });
   if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 1)) {
     return res.status(400).json({ error: "quantity must be a positive integer" });
   }
@@ -140,6 +144,7 @@ router.post("/quote-requests", async (req, res) => {
       quantity,
       colorways,
       details,
+      ...sample.value,
       status: "submitted",
     })
     .returning();

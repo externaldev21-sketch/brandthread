@@ -26,7 +26,7 @@ export * from './productBulkSeo';
 export * from './promotions';
 export * from './sellerPushGiveaways';
 export * from './admin';
-import { manufacturers, sellerRfqs } from './manufacturers';
+import { manufacturers, manufacturerProducts, sellerRfqs } from './manufacturers';
 import { places } from './places';
 import { relations, sql } from 'drizzle-orm';
 
@@ -873,6 +873,21 @@ export const sellerQuoteRequests = pgTable('seller_quote_requests', {
   quantity:         integer('quantity'),
   colorways:        text('colorways'),
   details:          text('details'),
+  // Sample requests (migration 280): the catalog product asked about (must
+  // belong to manufacturerId), requested sizes, chosen catalog customization
+  // options, and the address the sample ships to. Null on free-form requests.
+  catalogProductId: uuid('catalog_product_id').references(() => manufacturerProducts.id, { onDelete: 'set null' }),
+  sizes:            text('sizes'),
+  sampleOptions:    json('sample_options').$type<string[]>(),
+  shipTo:           json('ship_to').$type<{
+    recipientName: string;
+    street: string;
+    line2: string | null;
+    city: string;
+    state: string | null;
+    postalCode: string;
+    country: string;
+  }>(),
   // 'submitted' | 'quoted' | 'accepted' | 'declined' | 'cancelled'
   status:           text('status').notNull().default('submitted'),
   quotedPriceCents: integer('quoted_price_cents'),
@@ -894,6 +909,7 @@ export const sellerQuoteRequests = pgTable('seller_quote_requests', {
   manufacturerIdx: index('seller_quote_requests_mfr_idx').on(table.manufacturerId),
   sellerIdx: index('seller_quote_requests_seller_idx').on(table.sellerId),
   rfqIdx: index('seller_quote_requests_rfq_idx').on(table.rfqId),
+  catalogProductIdx: index('seller_quote_requests_catalog_product_idx').on(table.catalogProductId),
 }));
 
 // ─── Relations ────────────────────────────────────────────────────────────────

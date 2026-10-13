@@ -19,6 +19,7 @@ import {
 } from "@workspace/db";
 import { eq, desc, and, sql, inArray, isNull } from "drizzle-orm";
 import crypto from "crypto";
+import { withCatalogProducts } from "../lib/sampleRequests";
 import {
   RegisterManufacturerBody,
   UpdateMyManufacturerProfileBody,
@@ -512,7 +513,7 @@ router.get("/me/quote-requests", async (req, res) => {
   const rows = await db.select().from(sellerQuoteRequests)
     .where(eq(sellerQuoteRequests.manufacturerId, mfr.id))
     .orderBy(desc(sellerQuoteRequests.createdAt));
-  return res.json(rows.map(serializeQuoteRequest));
+  return res.json(await withCatalogProducts(rows.map(serializeQuoteRequest)));
 });
 
 router.patch("/me/quote-requests/:id", async (req, res) => {
