@@ -63,7 +63,7 @@ export default function FreelancerProfileScreen() {
         setConnect(status ? { connected: status.connected, status: status.status } : null);
       }
     } catch (e) {
-      setError(apiErrorMessage(e));
+      setError(apiErrorMessage(e, "Couldn't load this profile. Try again."));
     } finally {
       setLoading(false);
     }
