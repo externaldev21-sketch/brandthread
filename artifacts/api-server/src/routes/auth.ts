@@ -75,6 +75,7 @@ import { LEGAL_ACCEPTANCE_SOURCES, recordLegalAcceptance, type LegalAcceptanceSo
 import { buildAccountDataExport } from "../lib/dataExport";
 import { decideUsernameChange, usernameNextChangeAt } from "../lib/usernameCooldown";
 import { hasRedeemedAccessCode, isInviteOnlyEnabled } from "../lib/access/inviteOnly";
+import { dbSignInDeps, recordSignIn } from "../lib/security/signInAlerts";
 
 const router = Router();
 
@@ -307,6 +308,8 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
       });
     }
     res.status(created ? 201 : 200).json({ ...user, deletionCancelled });
+    // New-device sign-in alert (lib/security/signInAlerts.ts); never delays or fails sync.
+    void noteSignIn(clerkUserId, getAuth(req).sessionId ?? null, req.log);
   } catch (err) {
     if ((err as any)?.statusCode === 410) {
       // A deleted profile whose login still owns another profile: the app
@@ -586,6 +589,16 @@ router.post("/legal-acceptance", requireAuth, validateRequest({ body: legalAccep
   }
   res.json({ termsVersion: version, termsAcceptedAt: acceptedAt.toISOString() });
 });
+
+async function noteSignIn(userId: string, sessionId: string | null, log?: { warn(o: object, m: string): void }) {
+  if (!sessionId) return;
+  try {
+    const session = await clerkClient.sessions.getSession(sessionId);
+    await recordSignIn(dbSignInDeps, { userId, sessionId, activity: session.latestActivity ?? null });
+  } catch (err) {
+    log?.warn({ err, userId }, "New-device sign-in check failed");
+  }
+}
 
 // ─── Sessions (Login Activity) ───────────────────────────────────────────────
 // Real Clerk sessions for the signed-in person, with the device, browser and

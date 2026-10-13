@@ -606,6 +606,8 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       // not the seller's /order-detail.
       if (isBuyerOrderNotification(row.type)) {
         return id ? buyerOrderHref(id, row.type) : '/(buyer)/orders';
+    case 'login_session':
+      return role === 'seller' ? '/login-activity' : '/buyer-login-activity';
       }
       return id ? `/order-detail?id=${q(id)}` : '/(tabs)/orders';
     case 'return':

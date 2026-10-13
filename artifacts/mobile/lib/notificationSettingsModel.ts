@@ -31,6 +31,13 @@ export interface SettingsPage {
 
 export const SETTINGS_PAGES: SettingsPage[] = [
   {
+    id: 'account-security',
+    title: 'Account security',
+    sections: [
+      { key: 'login_alerts', title: 'Login alerts', audience: false, example: 'A new device signs in to your account.' },
+    ],
+  },
+  {
     id: 'posts',
     title: 'Posts and comments',
     sections: [

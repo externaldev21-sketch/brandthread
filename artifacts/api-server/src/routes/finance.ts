@@ -53,6 +53,7 @@ const PAYOUTS_ON_HOLD = {
 } as const;
 import { heldOrderTimingRows, payoutHoldRule } from "../lib/delivery/payoutTiming";
 import { checkFirstPayout, IDENTITY_REQUIRED_MESSAGE } from "../lib/money/firstPayoutGate";
+import { requireSellerTwoFactor } from "../lib/security/sellerTwoFactor";
 
 const router = Router();
 router.use(requireAuth);
@@ -699,7 +700,7 @@ router.get("/statement.csv", requirePayoutsRead(), async (req, res) => {
 
 // ─── POST /api/finance/payout — manual bank payout ────────────────────────────
 
-router.post("/payout", requirePermission("payouts"), validateInput({ body: payoutBody }), async (req, res) => {
+router.post("/payout", requirePermission("payouts"), requireSellerTwoFactor(), validateInput({ body: payoutBody }), async (req, res) => {
   const sellerId = getSellerId(req);
   if (await denyIfAgeRestricted(sellerId, res)) return;
   if (await isPayoutHeld("seller", sellerId)) { res.status(409).json(PAYOUTS_ON_HOLD); return; }

@@ -32,6 +32,7 @@ import { useApi } from '@/lib/api';
 
 import { ApiError } from '@/lib/networkNotice';
 
+import { showPayoutGuard } from '@/lib/payoutGuards';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 
 import { hasPayoutsAccess, isManagerRole } from '@/lib/roleError';
@@ -144,6 +145,7 @@ export default function PayoutScheduleScreen() {
       );
       await load();
     } catch (error) {
+      if (showPayoutGuard(error, (route) => router.push(route as never))) return;
       const message = error instanceof ApiError && error.status < 500
         ? 'Stripe did not accept this schedule. Check your account and try again.'
         : 'Could not save your schedule. Try again.';
@@ -184,6 +186,7 @@ export default function PayoutScheduleScreen() {
                   cashoutKeyRef.current = null;
                 }
                 haptic('error');
+                if (showPayoutGuard(error, (route) => router.push(route as never))) return;
                 Alert.alert(
                   "Couldn't cash out",
                   error instanceof ApiError && error.code === 'BALANCE_CHANGED'

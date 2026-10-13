@@ -47,7 +47,7 @@ export default function NotificationSettingsPage() {
     api.notificationPrefs.get()
       .then((data) => {
         setRole(data.role);
-        setValues((data.pushTypes ?? {}) as Record<string, PushTypeValue>);
+        setValues({ ...data.pushTypes, login_alerts: data.categories.login_alerts === false ? 'off' : 'everyone' } as Record<string, PushTypeValue>);
         setPromotions(data.promotionalPush ?? false);
       })
       .catch(() => setRole((r) => r ?? (appRole === 'seller' ? 'seller' : 'buyer')));
@@ -63,6 +63,16 @@ export default function NotificationSettingsPage() {
   async function choose(section: SettingSection, value: PushTypeValue) {
     if (current(section) === value) return;
     hapticSelection();
+    if (section.key === 'login_alerts') {
+      const prior = values;
+      setValues({ ...values, login_alerts: value });
+      try {
+        await api.notificationPrefs.update({ categories: { login_alerts: value !== 'off' } });
+      } catch {
+        setValues(prior);
+      }
+      return;
+    }
     if (section.key === 'promotions') {
       const prior = promotions;
       setPromotions(value !== 'off');

@@ -104,6 +104,9 @@ export function notificationHref(rawData: unknown): string | null {
   if (data?.targetType === 'payout') {
     return '/payouts';
   }
+  if (data?.targetType === 'login_session') {
+    return '/login-activity';
+  }
   if (data?.targetType === 'seller_setup') {
     return sellerSetupHref(typeof data.targetId === 'string' ? data.targetId : null);
   }

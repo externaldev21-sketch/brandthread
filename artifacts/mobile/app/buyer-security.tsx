@@ -9,12 +9,14 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { SectionHeader } from '@/components/BrandthreadUI';
 import { Card, ListRow } from '@/components/ui';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useApi } from '@/lib/api';
 
 export default function BuyerSecurity() {
   const colors = useColors();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api = useApi();
   const [loginAlerts, setLoginAlerts] = useState(true);
   const [saveLogin, setSaveLogin] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -25,11 +27,16 @@ export default function BuyerSecurity() {
       setSaveLogin(loadedSettings.saveLoginInfo);
       setLoaded(true);
     });
-  }, []);
+    // The server sends the alerts (lib/security/signInAlerts.ts), so its value wins.
+    api.notificationPrefs.get()
+      .then((prefs) => { if (typeof prefs.categories?.login_alerts === 'boolean') setLoginAlerts(prefs.categories.login_alerts); })
+      .catch(() => {});
+  }, [api]);
 
   async function onToggleLoginAlerts(v: boolean) {
     setLoginAlerts(v);
     await patchBuyerSettings({ loginAlerts: v });
+    api.notificationPrefs.update({ categories: { login_alerts: v } }).catch(() => setLoginAlerts(!v));
   }
 
   async function onToggleSaveLogin(v: boolean) {

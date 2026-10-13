@@ -49,6 +49,8 @@ const BUYER_DEFAULTS = {
   return_updates: true,
   cart_reminders: true,
   seller_announcements: true,
+  // New-device sign-in alerts (lib/security/signInAlerts.ts).
+  login_alerts: true,
 };
 const SELLER_DEFAULTS = {
   new_orders: true,
@@ -65,6 +67,7 @@ const SELLER_DEFAULTS = {
   seller_announcements: true,
   /** Settings › Sounds & haptics › New order sound (see lib/push.ts resolvePushSound). */
   new_order_sound: true,
+  login_alerts: true,
 };
 
 /** The boolean category switches only (pushType:* values live in `pushTypes`). */

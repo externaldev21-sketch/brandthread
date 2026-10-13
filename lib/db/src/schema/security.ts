@@ -204,3 +204,22 @@ export const dataExportJobs = pgTable("data_export_jobs", {
   statusIdx: index("data_export_jobs_status_idx").on(table.status, table.requestedAt),
   tokenHashUniq: uniqueIndex("data_export_jobs_token_hash_uniq").on(table.downloadTokenHash).where(sql`download_token_hash IS NOT NULL`),
 }));
+
+/**
+ * One row per Clerk session the first time the app syncs on it (migration
+ * 522). `deviceKey` is a coarse device fingerprint (mobile/desktop + device
+ * type + browser) so a sign-in from a device kind the account has never used
+ * triggers a new-device alert, and signing in again on the same phone doesn't.
+ */
+export const signInEvents = pgTable("sign_in_events", {
+  sessionId: text("session_id").primaryKey(),
+  userId: text("user_id").notNull(),
+  deviceKey: text("device_key").notNull(),
+  deviceLabel: text("device_label").notNull(),
+  location: text("location"),
+  alerted: integer("alerted").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("sign_in_events_user_idx").on(table.userId, table.createdAt),
+  userDeviceIdx: index("sign_in_events_user_device_idx").on(table.userId, table.deviceKey),
+}));
