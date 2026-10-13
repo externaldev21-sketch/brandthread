@@ -21,6 +21,7 @@
  * always runs in parallel with the animation, never after it.
  */
 
+import { BG, ON_DARK } from '@/lib/theme';
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -30,7 +31,6 @@ import Animated, {
   interpolate,
   useAnimatedProps,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -76,7 +76,13 @@ export default function AppIntroSplash({ ready, children }: AppIntroSplashProps)
 }
 
 function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
-  const reducedMotion = useReducedMotion();
+  // Items 147 + 148: the launch screen is the mark on black and nothing
+  // else — the same frame as the native splash, held until the app is ready,
+  // then a plain fade. That is exactly the old Reduce Motion path, so every
+  // launch takes it now; the shoot-in, motion streaks, light sweep, thread
+  // draw, breathing pulse, letter-by-letter wordmark and zoom-through no
+  // longer play (the seller swipe glow is the app's only "wow" effect).
+  const reducedMotion = true;
   const [phase, setPhase] = useState<Phase>('pending');
   const [isFirstLaunch, setIsFirstLaunch] = useState(false);
   // The native splash is still covering the screen while this resolves, so
@@ -200,7 +206,9 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
 
       if (reducedMotion) {
         setPhase('enter');
-        logoOpacity.value = withTiming(1, { duration: 300 });
+        // Shown at once: the native splash already painted this exact frame,
+        // so hiding it is an invisible swap (no fade-in blink).
+        logoOpacity.value = 1;
         logoScale.value = 1;
         wordmarkProgress.value = 1;
         // The hold/reveal below still respects `ready`; just skip the theatrics.
@@ -271,7 +279,8 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
     <View style={StyleSheet.absoluteFill}>
       {children}
       <Animated.View
-        style={[styles.overlay, { backgroundColor: theme.background }, overlayStyle]}
+        // Always black, like the native splash — not the persisted theme tint.
+        style={[styles.overlay, { backgroundColor: BG }, overlayStyle]}
         pointerEvents="auto"
       >
         {isFirstLaunch && !reducedMotion && (
@@ -298,7 +307,7 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
             <BrandthreadLogo size={LOGO_BOX} tintColor={theme.accentLight} opacity={0.5} />
           </Animated.View>
           <Animated.View style={logoStyle}>
-            <BrandthreadLogo size={LOGO_BOX} tintColor={theme.accentLight} />
+            <BrandthreadLogo size={LOGO_BOX} tintColor={ON_DARK} />
           </Animated.View>
           {(phase === 'shine' || phase === 'hold' || phase === 'wordmark' || phase === 'reveal') &&
             !reducedMotion && (
@@ -318,22 +327,25 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
             )}
         </View>
 
-        {/* Anchored to the logo's own bottom edge (absolute, out of flow) so
-            reserving space for it never shifts the logo off the position the
-            native splash already painted. */}
-        <View style={styles.wordmarkRow} pointerEvents="none">
-          {WORDMARK.split('').map((char, index) => (
-            <WordmarkLetter
-              key={`${char}-${index}`}
-              char={char}
-              index={index}
-              total={WORDMARK.length}
-              progress={wordmarkProgress}
-              fade={wordmarkFade}
-              color={theme.text}
-            />
-          ))}
-        </View>
+        {/* No wordmark under the mark (item 147: the mark, nothing else).
+            When shown, it is anchored to the logo's own bottom edge (absolute,
+            out of flow) so it never shifts the logo off the native splash's
+            position. */}
+        {!reducedMotion && (
+          <View style={styles.wordmarkRow} pointerEvents="none">
+            {WORDMARK.split('').map((char, index) => (
+              <WordmarkLetter
+                key={`${char}-${index}`}
+                char={char}
+                index={index}
+                total={WORDMARK.length}
+                progress={wordmarkProgress}
+                fade={wordmarkFade}
+                color={theme.text}
+              />
+            ))}
+          </View>
+        )}
       </Animated.View>
     </View>
   );
