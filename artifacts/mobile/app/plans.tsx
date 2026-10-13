@@ -60,12 +60,12 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
 import { useTeamRole } from '@/hooks/useTeamRole';
-import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
-import { displayPriceFor } from '@/lib/sellerPlansDisplay';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import {
   ANNUAL_SAVINGS_LABEL, annualPackageFor, canOfferYearly, yearlyDisplayFor, type BillingInterval,
 } from '@/lib/billingInterval';
+import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
+import { displayPriceFor } from '@/lib/sellerPlansDisplay';
 import { commissionSummary, wantsProHighlight, DEMO_PERKS, type PerksResponse } from '@/lib/proPerks';
 import { isPreviewDemoMode, isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import {
@@ -462,7 +462,7 @@ export default function PlansScreen() {
         <SellerPaywallBullets theme={theme} bullets={BENEFIT_BULLETS} />
 
         <SellerPaywallSocialProof theme={theme} text="Trusted by independent brands building on Brandthread" />
-
+        {/* Monthly / Yearly (item 116) — sits right above the plan cards. */}
         {yearlyAvailable && (
           <SegmentedControl
             testID="seller-plans-interval"

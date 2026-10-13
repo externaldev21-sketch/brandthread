@@ -8,10 +8,6 @@
  *
  * All plans carry a 5% platform commission on sales.
  * New subscriptions start with a 5-day free trial (card collected upfront).
- *
- * Failed payments (item 115): the payment alert shows "Retry N of 3 on
- * <date>", then "Your plan is paused" after the last retry, with one
- * "Update card" button (lib/billingStatus.ts; Warby Parker's update-card card).
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -37,10 +33,10 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { getGrowthStudioTools, GROWTH_EXTRAS } from '@/lib/growthTools';
 import { useRevenueCat } from '@/lib/revenueCat';
-import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
-import { getSellerPlan, SELLER_PLANS } from '@/lib/sellerPlans';
 import { paymentAlertFor, type DunningSummary } from '@/lib/billingStatus';
 import { Button } from '@/components/ui/Button';
+import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
+import { getSellerPlan, SELLER_PLANS } from '@/lib/sellerPlans';
 import {
   getBillingRecoveryTarget,
   type SubscriptionBillingProvider,
@@ -267,6 +263,9 @@ export default function SubscriptionScreen() {
     : currentPlan.status === 'canceled' ? 'Cancelled'
     : 'Free';
 
+  // Failed payments (item 115): "Retry N of 3 on <date>", then "Your plan is
+  // paused" after the last retry, with one "Update card" button
+  // (lib/billingStatus.ts; layout from Warby Parker's update-card card).
   const perPeriod = currentPlan.period === 'year' ? '/yr' : '/mo';
   const paymentAlert = paymentAlertFor({
     status: currentPlan.status,
