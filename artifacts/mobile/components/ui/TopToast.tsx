@@ -7,7 +7,7 @@
  * Motion: one short slide-down on arrival — it tells you something just
  * happened. No other animation.
  */
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, PanResponder, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
@@ -43,6 +43,7 @@ export function TopToast({
   message, icon, thumbnailUri, actionLabel, onAction, onDismiss, durationMs, testID,
 }: TopToastProps) {
   const insets = useSafeAreaInsets();
+  const [hidden, setHidden] = useState(false);
   const enter = useRef(new Animated.Value(0)).current;
   const drag = useRef(new Animated.Value(0)).current;
   const dismissRef = useRef(onDismiss);
@@ -54,9 +55,9 @@ export function TopToast({
   }, [enter]);
 
   useEffect(() => {
-    if (!dismissRef.current) return undefined;
+    setHidden(false);
     const ms = durationMs ?? (hasAction ? TOAST_ACTION_DURATION_MS : TOAST_DURATION_MS);
-    const timer = setTimeout(() => dismissRef.current?.(), ms);
+    const timer = setTimeout(() => { setHidden(true); dismissRef.current?.(); }, ms);
     return () => clearTimeout(timer);
   }, [message, durationMs, hasAction]);
 
@@ -65,7 +66,10 @@ export function TopToast({
     onPanResponderMove: (_e, g) => drag.setValue(Math.min(0, g.dy)),
     onPanResponderRelease: (_e, g) => {
       if (g.dy < -TOAST_SWIPE_DISMISS) {
-        Animated.timing(drag, { toValue: -120, duration: 140, useNativeDriver: true }).start(() => dismissRef.current?.());
+        Animated.timing(drag, { toValue: -120, duration: 140, useNativeDriver: true }).start(() => {
+          setHidden(true);
+          dismissRef.current?.();
+        });
       } else {
         Animated.spring(drag, { toValue: 0, useNativeDriver: true }).start();
       }
@@ -76,6 +80,7 @@ export function TopToast({
     enter.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }),
     drag,
   );
+  if (hidden) return null;
   const leadIcon = icon ?? toastIconFor(message);
 
   return (
