@@ -32,6 +32,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { metaCampaignStatusVariant, metaCampaignStatusLabel, formatBudgetCents } from '@/services/metaAdsService';
 import type { MetaCampaign, MetaCampaignInsights } from '@/lib/api';
 import { radius } from '@/constants/radii';
+import { formatMoney } from '@/lib/format';
 
 type Row = MetaCampaign & { insights?: MetaCampaignInsights };
 
@@ -246,7 +247,7 @@ function CampaignCard({
   onEditBudget: () => void; onFixAndRelaunch: () => void;
 }) {
   const i = row.insights;
-  const money = (c?: number) => formatCents(c ?? 0);
+  const money = (c?: number) => formatMoney(c ?? 0);
   return (
     <BrandthreadCard>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: SP.sm }}>

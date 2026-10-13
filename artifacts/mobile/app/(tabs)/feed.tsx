@@ -50,7 +50,6 @@ import { SponsoredAdCard } from '@/components/ads/SponsoredAdCard';
 import { useFeedAds } from '@/hooks/useFeedAds';
 import { isSponsoredFeedItem, type SponsoredFeedItem } from '@/lib/feedAds';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
-import { formatCents } from '@/lib/money';
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
 import { FIRST_FRAME_FALLBACK_MS, pickPlaybackUri, remoteVideoUri, shouldRevealVideo, withVideoCaching } from '@/lib/videoPreload';
 import { useFeedVideoPreload } from '@/hooks/useFeedVideoPreload';
@@ -109,6 +108,7 @@ import { prefetchSellerOnPressIn } from '@/lib/detailPrefetch';
 /** Looped feed copies carry `<postId>__loopN` keys; every API call uses the real post id. */
 const feedPostId = (id: string) => id.replace(/__loop\d+$/, '');
 import { crispPx } from '@/lib/crispPixel';
+import { formatMoney } from '@/lib/format';
 
 /**
  * Scopes the feed player to one creator's videos (profile grid tap) or to the
@@ -306,7 +306,7 @@ function BuyerHighDemandPage({ pageWidth, pageHeight, bottomClearance = 100, top
                   <View style={{ alignItems: 'flex-end', gap: 4 }}>
                     {item.commerce.currentPriceCents != null && (
                       <Text style={[hdStyles.price, isUrgent && { color: theme.accent }]}>
-                        {formatCents(item.commerce.currentPriceCents)}
+                        {formatMoney(item.commerce.currentPriceCents)}
                       </Text>
                     )}
                     {isUrgent && (
@@ -1951,7 +1951,7 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
       ? `${post.sound.soundTitle} · ${post.sound.artist}`
       : `Original Sound · ${post.authorHandle.slice(1)}`,
     productName: tag?.productName ?? 'Shop Now',
-    productPrice: tag ? formatCents(tag.priceCents) : '',
+    productPrice: tag ? formatMoney(tag.priceCents) : '',
     productOriginalPrice: null,
     accentColor: post.authorColor,
     likes: post.likesCount,

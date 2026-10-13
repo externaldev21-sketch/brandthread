@@ -19,7 +19,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { DETAIL_STALE_TIME_MS, queryKeys } from '@/lib/queryClient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { formatCents } from '@/lib/money';
+import { formatMoney as formatCents } from '@/lib/format';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';

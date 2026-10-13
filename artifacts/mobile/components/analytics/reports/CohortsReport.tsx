@@ -12,7 +12,6 @@ import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useApi } from '@/lib/api';
-import { formatCents } from '@/lib/money';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import { monthLabel } from '@/lib/proPerks';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
@@ -24,6 +23,7 @@ import {
   AnalyticsBarChart, AnalyticsSkeleton, Card, CardDivider, SectionTitle,
 } from '@/components/analytics/AnalyticsKit';
 import { formatDollarsCompact } from '@/lib/compactFormat';
+import { formatMoney } from '@/lib/format';
 
 type Advanced = Awaited<ReturnType<ReturnType<typeof useApi>['analytics']['advanced']>>;
 
@@ -139,7 +139,7 @@ export default function CohortsReport() {
         >
           <Card>
             {[
-              ['Average lifetime value', formatCents(data.lifetime.averageLifetimeValueCents)],
+              ['Average lifetime value', formatMoney(data.lifetime.averageLifetimeValueCents)],
               ['Customers', data.lifetime.customers.toLocaleString()],
               ['Repeat rate, last 6 months', `${avgRepeat}%`],
             ].map(([label, value], i) => (
@@ -178,7 +178,7 @@ export default function CohortsReport() {
                   <Text style={[s.cell, s.monthCell, s.value]}>{monthLabel(c.month)}</Text>
                   <Text style={[s.cell, s.value]}>{c.customers}</Text>
                   <Text style={[s.cell, s.value]}>{c.repeatRate}%</Text>
-                  <Text style={[s.cell, s.revCell, s.value]}>{formatCents(c.revenueCents)}</Text>
+                  <Text style={[s.cell, s.revCell, s.value]}>{formatMoney(c.revenueCents)}</Text>
                 </View>
               </React.Fragment>
             ))}

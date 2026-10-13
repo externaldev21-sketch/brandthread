@@ -21,6 +21,7 @@ import {
 } from '@/lib/emailMarketing';
 import { getPreviewSellerProducts } from '@/lib/previewSellerProducts';
 import { FONT, FS, ICON, RADIUS } from '@/lib/theme';
+import { formatMoney } from '@/lib/format';
 
 type PickProduct = { id: string; name: string; image: string | null; priceCents: number | null };
 
@@ -231,7 +232,7 @@ export default function EmailCampaignComposeScreen() {
                     {p.image ? <Image cachePolicy="memory-disk" source={{ uri: p.image }} style={{ flex: 1 }} contentFit="cover" /> : null}
                   </View>
                   <Text numberOfLines={2} style={{ color: c.foreground, fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 6 }}>{p.name}</Text>
-                  {p.priceCents != null && <Text style={{ color: c.mutedForeground, fontFamily: FONT.regular, fontSize: FS.sm }}>${(p.priceCents / 100).toFixed(2)}</Text>}
+                  {p.priceCents != null && <Text style={{ color: c.mutedForeground, fontFamily: FONT.regular, fontSize: FS.sm }}>{formatMoney(p.priceCents)}</Text>}
                 </View>
               ))}
             </View>

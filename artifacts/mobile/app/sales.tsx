@@ -29,6 +29,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
 import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 import { EmptyState } from '@/components/layout';
+import { formatMoney } from '@/lib/format';
 
 type DiscountType = 'percent' | 'fixed';
 type Scope = 'store' | 'products' | 'collection';
@@ -72,7 +73,7 @@ const STATUS_LABEL: Record<SaleStatus, string> = {
 };
 
 function fmtValue(s: Pick<Sale, 'discountType' | 'value'>) {
-  return s.discountType === 'percent' ? `${s.value}% off` : `${formatCents(s.value)} off`;
+  return s.discountType === 'percent' ? `${s.value}% off` : `${formatMoney(s.value)} off`;
 }
 function fmtDate(iso: string | null) {
   if (!iso) return null;
@@ -156,7 +157,7 @@ export default function SalesScreen() {
 
   const valueCents = discType === 'fixed' ? parseDecimalToCents(fixedValue) : null;
   const pct = parseInt(percent, 10);
-  const summaryValue = discType === 'percent' ? `${Number.isFinite(pct) ? pct : 0}% off` : `${formatCents(valueCents ?? 0)} off`;
+  const summaryValue = discType === 'percent' ? `${Number.isFinite(pct) ? pct : 0}% off` : `${formatMoney(valueCents ?? 0)} off`;
   const summaryScope = scopeLabel({ scope, collection, productIds: selectedProductIds });
   const summaryDates = `${startDate ? `Starts ${startDate}` : 'Starts immediately'}${hasEnd && endDate ? ` · Ends ${endDate}` : ' · No end date'}`;
 

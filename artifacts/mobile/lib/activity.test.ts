@@ -278,11 +278,19 @@ describe('monochrome system titles', () => {
 
 describe('relativeTime', () => {
   const now = new Date(2026, 8, 24, 15, 0).getTime();
-  it('formats the notification style', () => {
-    expect(relativeTime(now - 20_000, now)).toBe('just now');
-    expect(relativeTime(now - 5 * 60_000, now)).toBe('5m ago');
-    expect(relativeTime(now - 3 * 3_600_000, now)).toBe('3h ago');
-    expect(relativeTime(now - 2 * 86_400_000, now)).toBe('2d ago');
+  it('formats the default style like fmtRelativeDay', () => {
+    expect(relativeTime(now - 20_000, now)).toBe('now');
+    expect(relativeTime(now - 5 * 60_000, now)).toBe('5m');
+    expect(relativeTime(now - 3 * 3_600_000, now)).toBe('3h');
+    expect(relativeTime(new Date(2026, 8, 23, 9, 0), now)).toBe('Yesterday');
+    expect(relativeTime(new Date(2026, 8, 4, 12, 0), now)).toBe('Sep 4');
+    expect(relativeTime(new Date(2025, 2, 4, 12, 0), now)).toBe('Mar 4, 2025');
+  });
+  it('never reads a slightly-future timestamp as a date', () => {
+    expect(relativeTime(now + 30_000, now)).toBe('now');
+  });
+  it('returns an empty string for an invalid date', () => {
+    expect(relativeTime('nope', now)).toBe('');
   });
   it('formats the compact style', () => {
     expect(relativeTime(now - 20_000, now, { compact: true })).toBe('now');

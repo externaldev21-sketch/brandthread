@@ -11,7 +11,6 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { FS, FONT, SP, COMP } from '@/lib/theme';
 import { useApi } from '@/hooks/useApi';
-import { formatCents } from '@/lib/money';
 import type { AdCampaign } from '@/lib/api';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { RetryRow } from '@/components/ui/RetryRow';
@@ -20,6 +19,7 @@ import { ListRow } from '@/components/ui/ListRow';
 import { SellerReferralRow } from '@/components/marketing/SellerReferralRow';
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { formatCompactCount } from '@/lib/compactFormat';
+import { formatMoney } from '@/lib/format';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -64,7 +64,7 @@ function campaignHasResults(s: AdCampaign['status']) {
 }
 
 function discountValueLabel(d: DiscountCode) {
-  return d.type === 'percentage' ? `${d.value}% off` : `${formatCents(d.value)} off`;
+  return d.type === 'percentage' ? `${d.value}% off` : `${formatMoney(d.value)} off`;
 }
 
 function discountExpiryLabel(d: DiscountCode) {
@@ -211,11 +211,11 @@ export default function MarketingScreen() {
               </View>
               {campaignHasResults(c.status) ? (
                 <Text style={[styles.campaignStat, { color: colors.mutedForeground }]}>
-                  <Text style={[styles.campaignRevenue, { color: colors.primary }]}>{formatCents(c.results?.spentCents ?? c.spentCents ?? 0)}</Text>
-                  {` of ${formatCents(c.budgetCents)}`}
+                  <Text style={[styles.campaignRevenue, { color: colors.primary }]}>{formatMoney(c.results?.spentCents ?? c.spentCents ?? 0)}</Text>
+                  {` of ${formatMoney(c.budgetCents)}`}
                 </Text>
               ) : (
-                <Text style={[styles.campaignRevenue, { color: colors.primary }]}>{formatCents(c.budgetCents)}</Text>
+                <Text style={[styles.campaignRevenue, { color: colors.primary }]}>{formatMoney(c.budgetCents)}</Text>
               )}
             </TouchableOpacity>
           ))}
@@ -283,7 +283,7 @@ export default function MarketingScreen() {
             {referrals == null
               ? 'Give $10, get $10 Thread Cash'
               : referrals.total > 0
-                ? `${referrals.total} ${referrals.total === 1 ? 'referral' : 'referrals'} · ${referrals.pointsEarned} pts${referrals.earnedCents > 0 ? ` · $${(referrals.earnedCents / 100).toFixed(0)} Thread Cash` : ''} earned`
+                ? `${referrals.total} ${referrals.total === 1 ? 'referral' : 'referrals'} · ${referrals.pointsEarned} pts${referrals.earnedCents > 0 ? ` · ${formatMoney(referrals.earnedCents)} Thread Cash` : ''} earned`
                 : 'No referrals yet'}
           </Text>
         </View>

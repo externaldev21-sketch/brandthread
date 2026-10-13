@@ -26,7 +26,6 @@ import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui/IconButton';
 import FollowButton from '@/components/social/FollowButton';
-import { formatCents } from '@/lib/money';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, SP, ON_DARK } from '@/lib/theme';
 import { radius } from '@/constants/radii';
@@ -40,6 +39,7 @@ import { discoverEngagementFor, discoverPostApiId, rememberDiscoverEngagement, t
 import { FeedToastProvider, useFeedToast } from '@/components/EngagementButton';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 import { TranslatableCaption } from '@/components/translation/CaptionTranslation';
+import { formatMoney } from '@/lib/format';
 
 function ActionButton({ icon, label, active, onPress }: {
   icon: IconName; label?: string; active?: boolean; onPress: () => void;
@@ -187,7 +187,7 @@ function ViewerPage({
           >
             <Icon name="shopping-bag" size={14} color="#000000" />
             <Text style={styles.shopPillText}>
-              Shop the look{post.productTags!.length > 1 ? ` · ${post.productTags!.length}` : ` · ${formatCents(post.productTags![0].priceCents)}`}
+              Shop the look{post.productTags!.length > 1 ? ` · ${post.productTags!.length}` : ` · ${formatMoney(post.productTags![0].priceCents)}`}
             </Text>
           </Pressable>
         )}

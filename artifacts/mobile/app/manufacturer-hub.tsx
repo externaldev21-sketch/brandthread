@@ -20,7 +20,6 @@ import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
 import { LinearGradient } from 'expo-linear-gradient';
-import { formatCents } from '@/lib/money';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { isSellerDevPreview, isPreviewDemoMode, isPreviewFreshMode } from '@/lib/devPreview';
@@ -48,6 +47,8 @@ import {
   ProductionOrder, ManufacturerConversation, PRODUCTION_STAGES,
 } from '@/services/manufacturerTypes';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { formatCents } from '@/lib/money';
+import { fmtRelativeDay } from '@/lib/format';
 
 import { ChipRow } from '@/components/ui/ChipRow';
 // ─── Tab config ───────────────────────────────────────────────────────────────
@@ -77,9 +78,8 @@ function fmtDate(iso?: string): string {
 }
 
 function timeAgo(iso?: string): string {
-  // Shared wording ("just now", "5m ago", "3d ago", then a date) and an
-  // empty string for missing/invalid timestamps (was "NaNd ago" / "412d ago").
-  return iso ? relativeTime(iso) : '';
+  if (!iso) return '';
+  return fmtRelativeDay(iso);
 }
 
 function relStatusVariant(status: ManufacturerRelationship['status']): 'success' | 'info' | 'warning' | 'neutral' | 'purple' | 'error' {

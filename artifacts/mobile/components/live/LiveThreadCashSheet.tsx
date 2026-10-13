@@ -23,7 +23,7 @@ import { randomUUID } from 'expo-crypto';
 import { Sheet } from '@/components/ui/BottomSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { formatCents } from '@/lib/money';
+import { formatMoney as formatCents } from '@/lib/format';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { isPreviewThreadCashEnabled, getPreviewThreadCashStatus, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';

@@ -25,7 +25,6 @@ import { visibleOrdersForBuyer } from '@/lib/buyerOrdersVisibility';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { getPreviewBuyerOrders as getPreviewDeliveryBuyerOrders, isPreviewOrderId } from '@/lib/previewOrders';
 import { getPreviewBuyerOrders as getPreviewCommerceBuyerOrders, isPreviewCommerceId } from '@/lib/previewCommerce';
-import { formatCents } from '@/lib/money';
 import { deliveryHeadline } from '@/lib/deliveryGuarantee';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
@@ -40,6 +39,7 @@ import { RetryRow } from '@/components/ui/RetryRow';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
 import { syncOrderActivities } from '@/lib/nativeSystem';
+import { formatMoney } from '@/lib/format';
 
 import { ChipRow } from '@/components/ui/ChipRow';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -219,7 +219,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
             <Text style={styles.preOrderText}>PRE-ORDER</Text>
           </View>
         )}
-        <Text style={styles.totalText}>{formatCents(order.payment.totalCents)}</Text>
+        <Text style={styles.totalText}>{formatMoney(order.payment.totalCents)}</Text>
       </View>
 
       {order.status === 'cancelled' && !autoRefunded && (

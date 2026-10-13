@@ -4,6 +4,7 @@
  * decides what a card is worth or where it can be spent.
  */
 import { formatCents } from '@/lib/money';
+import { fmtDate } from '@/lib/format';
 
 export type GiftCardStatus = 'pending_payment' | 'active' | 'void' | 'expired' | 'depleted';
 
@@ -68,7 +69,7 @@ export function giftCardStatusLabel(card: Pick<GiftCard, 'status' | 'expiresAt'>
     case 'depleted': return 'Fully used';
     case 'pending_payment': return 'Awaiting payment';
     default:
-      return card.expiresAt ? `Expires ${new Date(card.expiresAt).toLocaleDateString()}` : 'No expiry';
+      return card.expiresAt ? `Expires ${fmtDate(card.expiresAt)}` : 'No expiry';
   }
 }
 

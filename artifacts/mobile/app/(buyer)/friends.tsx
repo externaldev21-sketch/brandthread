@@ -37,6 +37,7 @@ import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { PREVIEW_STORIES, PREVIEW_FOLLOWING, PREVIEW_FRIEND_ACTIVITY } from '@/lib/previewFriends';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { crispPx } from '@/lib/crispPixel';
+import { fmtRelativeDay } from '@/lib/format';
 
 type ApiFollowing = {
   userId: string; name: string; username: string | null;
@@ -46,9 +47,7 @@ type ApiFollowing = {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function timeAgo(iso: string): string {
-  // Shared wording ("just now", "5m ago", "3d ago", then a date) and an
-  // empty string for missing/invalid timestamps (was "NaNd ago" / "412d ago").
-  return relativeTime(iso);
+  return fmtRelativeDay(iso);
 }
 
 // ─── Post Card ───────────────────────────────────────────────────────────────

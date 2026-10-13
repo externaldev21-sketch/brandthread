@@ -69,6 +69,7 @@ import { isPreviewDemoMode } from '@/lib/devPreview';
 import { getPreviewCatalog, isPreviewCatalogEnabled } from '@/lib/previewCatalog';
 import { previewCatalogToDiscoverItems } from '@/lib/discoverFeedPreview';
 import { VariantPickerSheet } from '@/components/buy-now/VariantPickerSheet';
+import { formatMoney } from '@/lib/format';
 
 // ─── Contract types (mirrors lib/api.ts discover.feed exactly) ────────────────
 
@@ -519,9 +520,9 @@ function DiscoverCard({
       <Text style={styles.productName} numberOfLines={2}>{item.productName}</Text>
 
       <View style={styles.priceRow}>
-        <Text style={[styles.price, TABULAR_NUMS]}>{formatCents(item.priceCents)}</Text>
+        <Text style={[styles.price, TABULAR_NUMS]}>{formatMoney(item.priceCents)}</Text>
         {hasDiscount && (
-          <Text style={[styles.comparePrice, TABULAR_NUMS]}>{formatCents(item.compareAtPriceCents!)}</Text>
+          <Text style={[styles.comparePrice, TABULAR_NUMS]}>{formatMoney(item.compareAtPriceCents!)}</Text>
         )}
       </View>
 

@@ -26,6 +26,7 @@ import { radius } from '@/constants/radii';
 import { EmptyState } from '@/components/layout';
 import { MissingItemState } from '@/components/states/MissingItemState';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+import { fmtRelativeDay } from '@/lib/format';
 
 import { ChipRow } from '@/components/ui/ChipRow';
 type StarFilter = 5 | 4 | 3 | 2 | 1 | null;
@@ -160,7 +161,7 @@ export default function ProductReviewsScreen() {
                     <StarRating rating={item.rating} size={12} />
                   </View>
                   <Text style={s.date}>
-                    {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {fmtRelativeDay(item.createdAt)}
                   </Text>
                 </View>
                 {fitChipText(item) && (

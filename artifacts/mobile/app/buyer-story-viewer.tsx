@@ -64,6 +64,7 @@ import { reshareGradientFromBackground } from '@/lib/storyReshare';
 import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, prevUser as navPrevUser, classifyGesture } from '@/lib/storyViewerNav';
 import { apiErrorMessage } from '@/lib/safety';
 import { crispPx } from '@/lib/crispPixel';
+import { fmtRelativeDay } from '@/lib/format';
 
 // Mirrors Instagram's own quick-reaction row (Mobbin: Instagram iOS story
 // viewer reply screen) — same 8 emoji, in the same order: laughing-crying,
@@ -85,9 +86,7 @@ const PREVIEW_STORY_VIEWERS = [
 ];
 
 function timeAgo(ms: number): string {
-  // Shared wording ("just now", "5m ago", "3d ago", then a date) and an
-  // empty string for missing/invalid timestamps (was "NaNd ago" / "412d ago").
-  return relativeTime(ms);
+  return fmtRelativeDay(ms);
 }
 
 function StorySlideVideo({ uri, paused }: { uri: string; paused: boolean }) {

@@ -7,13 +7,13 @@ import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { formatCents } from '@/lib/money';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { getPreviewSellerOverview } from '@/lib/previewAffiliate';
 import type { SellerCreator } from '@/lib/affiliateTypes';
 import { ActionButton, KeyStatRow, Pill, SectionTitle } from '@/components/affiliate/AffiliateUI';
+import { formatMoney } from '@/lib/format';
 
 export default function SellerCreatorDetailScreen() {
   const { theme } = useAppTheme();
@@ -71,9 +71,9 @@ export default function SellerCreatorDetailScreen() {
             <SectionTitle>Performance</SectionTitle>
             <KeyStatRow label="Clicks" value={String(c.stats.clicks)} />
             <KeyStatRow label="Orders" value={String(c.stats.orders)} />
-            <KeyStatRow label="Revenue" value={formatCents(c.stats.revenueCents)} />
-            <KeyStatRow label="Commission owed" value={formatCents(c.stats.pendingCents + c.stats.payableCents)} note={`${formatCents(c.stats.payableCents)} payable now`} />
-            <KeyStatRow label="Commission paid" value={formatCents(c.stats.paidCents)} last />
+            <KeyStatRow label="Revenue" value={formatMoney(c.stats.revenueCents)} />
+            <KeyStatRow label="Commission owed" value={formatMoney(c.stats.pendingCents + c.stats.payableCents)} note={`${formatMoney(c.stats.payableCents)} payable now`} />
+            <KeyStatRow label="Commission paid" value={formatMoney(c.stats.paidCents)} last />
 
             <SectionTitle>Commission</SectionTitle>
             <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, borderRadius: RADIUS.md, paddingHorizontal: SP.md, minHeight: 48, marginBottom: SP.sm }}>

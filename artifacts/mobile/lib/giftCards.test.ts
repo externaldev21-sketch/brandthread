@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  amountTextToCents, giftCardBalanceLine, giftCardMask, giftCardPurchaseIssue, spendableCards, type GiftCard,
+  amountTextToCents, giftCardBalanceLine, giftCardMask, giftCardPurchaseIssue, giftCardStatusLabel, spendableCards, type GiftCard,
 } from './giftCards';
 import { buildQuoteBody, paymentGroups, quoteTotals } from './checkoutPayment';
 
@@ -15,6 +15,11 @@ describe('gift card helpers', () => {
     const cards = [card({ id: 'a' }), card({ id: 'b', role: 'purchaser' }), card({ id: 'c', status: 'depleted' }), card({ id: 'd', sellerId: 's2' })];
     expect(spendableCards(cards, 's1').map(c => c.id)).toEqual(['a']);
     expect(spendableCards(cards).map(c => c.id)).toEqual(['a', 'd']);
+  });
+
+  it('shows the expiry as an absolute en-US date', () => {
+    expect(giftCardStatusLabel(card({ expiresAt: '2027-03-04T12:00:00Z' }))).toBe('Expires Mar 4, 2027');
+    expect(giftCardStatusLabel(card({}))).toBe('No expiry');
   });
 
   it('formats masks and balances', () => {

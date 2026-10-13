@@ -414,7 +414,7 @@ describe('PriceBadge — truthful price', () => {
   it('renders formatted price when currentPriceCents is provided', async () => {
     const r = await render(<PriceBadge currentPriceCents={18900} />);
     const texts = textContent(r);
-    expect(texts.some(t => t === '$189.00')).toBe(true);
+    expect(texts.some(t => t === '$189')).toBe(true);
     r.unmount();
   });
 
@@ -452,7 +452,7 @@ describe('CommerceSignalRow — composite signal', () => {
       <CommerceSignalRow showPrice currentPriceCents={13500} claimedUnits={0} remainingUnits={0} />,
     );
     const texts = textContent(r);
-    expect(texts.some(t => t === '$135.00')).toBe(true);
+    expect(texts.some(t => t === '$135')).toBe(true);
     r.unmount();
   });
 

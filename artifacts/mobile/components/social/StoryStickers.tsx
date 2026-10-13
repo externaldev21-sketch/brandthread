@@ -19,6 +19,7 @@ import type {
   StoryCountdownState, StoryOverlay, StoryPollState, StoryProductState, StoryQuestionState, StoryStickerState,
 } from '@/services/socialTypes';
 import { crispPx } from '@/lib/crispPixel';
+import { formatMoney } from '@/lib/format';
 
 export const STICKER = {
   paper: '#F5F5F5',
@@ -31,7 +32,7 @@ export const STICKER = {
 
 export type StickerMode = 'editor' | 'viewer';
 
-const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+const dollars = (cents: number) => formatMoney(cents);
 
 // ─── Poll ─────────────────────────────────────────────────────────────────────
 

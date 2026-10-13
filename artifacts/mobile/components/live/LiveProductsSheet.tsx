@@ -11,7 +11,7 @@ import { Sheet } from '@/components/ui/BottomSheet';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
-import { formatCents } from '@/lib/money';
+import { formatMoney as formatCents } from '@/lib/format';
 import { TABULAR_NUMS } from '@/constants/typography';
 import type { LiveProduct } from '@/lib/live/types';
 import { LIVE_RED } from './LiveAvatarRing';

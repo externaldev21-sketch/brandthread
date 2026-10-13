@@ -41,6 +41,7 @@ import { useColors } from '@/hooks/useColors';
 import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useBlockAction } from '@/lib/useBlockAction';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { fmtRelativeDay } from '@/lib/format';
 
 const CHIP_PAD = { paddingHorizontal: 14 } as const;
 
@@ -614,7 +615,7 @@ function BansModal({ visible, onClose, communityId, onUnbanned }: { visible: boo
             <View style={styles.row}>
               <View style={styles.copy}>
                 <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={1}>{item.name}</Text>
-                <Text style={[styles.sub, { color: colors.mutedForeground }]}>Banned {new Date(item.bannedAt).toLocaleDateString()}</Text>
+                <Text style={[styles.sub, { color: colors.mutedForeground }]}>Banned {fmtRelativeDay(item.bannedAt)}</Text>
               </View>
               <Button label="Unban" size="small" variant="secondary" style={CHIP_PAD} loading={busyId === item.userId} onPress={() => { void unban(item.userId); }} />
             </View>

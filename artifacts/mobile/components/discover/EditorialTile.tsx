@@ -7,7 +7,6 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
-import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
 import { SaveHeart } from '@/components/SaveHeart';
 import { SkeletonBlock } from '@/components/layout';
@@ -20,6 +19,7 @@ import { prefetchProductOnPressIn } from '@/lib/detailPrefetch';
 import { formatTimeRemaining } from '@/lib/countdown';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { crispPx } from '@/lib/crispPixel';
+import { formatMoney } from '@/lib/format';
 
 export interface EditorialTileItem {
   id: string;
@@ -52,7 +52,7 @@ export const EditorialTile = React.memo(function EditorialTile({ item, theme }: 
       }}
       onPressIn={() => prefetchProductOnPressIn(item.productId, item.imageUri)}
       accessibilityRole="button"
-      accessibilityLabel={`${item.name} by ${item.brand}${item.priceCents != null ? `, ${formatCents(item.priceCents)}` : ''}`}
+      accessibilityLabel={`${item.name} by ${item.brand}${item.priceCents != null ? `, ${formatMoney(item.priceCents)}` : ''}`}
       style={{ width: TILE_WIDTH }}
     >
       <LinearGradient
@@ -84,7 +84,7 @@ export const EditorialTile = React.memo(function EditorialTile({ item, theme }: 
       <Text style={[tile.brand, { color: theme.muted }]} numberOfLines={1}>{item.brand}</Text>
       {item.priceCents != null && (
         <Text style={[tile.price, TABULAR_NUMS, { color: theme.text }]}>
-          {formatCents(item.priceCents)}
+          {formatMoney(item.priceCents)}
         </Text>
       )}
     </Pressable>

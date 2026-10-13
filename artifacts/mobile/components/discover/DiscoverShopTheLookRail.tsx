@@ -11,11 +11,11 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { formatCents } from '@/lib/money';
 import { FONT, SP } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import type { DiscoverPost } from '@/lib/discoverFeed';
+import { formatMoney } from '@/lib/format';
 
 const CARD_WIDTH = 130;
 // 3:4 portrait (item 46) — consistent with every other Discover card/tile so
@@ -50,7 +50,7 @@ export function DiscoverShopTheLookRail({ posts, onPress }: { posts: DiscoverPos
               <Text style={[styles.name, { color: theme.text }]} numberOfLines={2}>
                 {tag.productName}{extra > 0 ? ` +${extra}` : ''}
               </Text>
-              <Text style={[styles.price, { color: theme.muted }]}>{formatCents(tag.priceCents)}</Text>
+              <Text style={[styles.price, { color: theme.muted }]}>{formatMoney(tag.priceCents)}</Text>
             </Pressable>
           );
         })}

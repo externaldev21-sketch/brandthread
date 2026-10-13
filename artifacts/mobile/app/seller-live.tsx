@@ -15,7 +15,6 @@ import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { FILL_ELEVATED, FONT, FS, SP, RADIUS, FG, TEXT_SECONDARY } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { formatCents } from '@/lib/money';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -34,6 +33,7 @@ import { LivePurchaseToast, useLivePurchaseToasts } from '@/components/live/Live
 import type { LiveCohostPerson } from '@/lib/live/moderationTypes';
 import { endLiveStreamActivity, startLiveStreamActivity, updateLiveStreamActivity } from '@/lib/nativeSystem';
 import { crispPx } from '@/lib/crispPixel';
+import { formatMoney } from '@/lib/format';
 
 
 // ─── Agora SDK (native-only, gracefully skipped on web/Expo Go) ───────────────
@@ -469,7 +469,7 @@ function SellerLiveNativeScreen() {
         <View style={[s.tipsRow, { paddingTop: headerTopInset + 78 }]} pointerEvents="none">
           <View style={[s.viewerBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]} testID="seller-live-tips-total">
             <Icon name="gift" size={13} color="#fff" />
-            <Text style={s.viewerText}>{formatCents(tipsTotalCents)} in tips</Text>
+            <Text style={s.viewerText}>{formatMoney(tipsTotalCents)} in tips</Text>
           </View>
         </View>
       )}
@@ -544,7 +544,7 @@ function SellerLiveNativeScreen() {
               >
                 <Icon name="shopping-bag" size={12} color={LIVE_RED} />
                 <Text style={s.productChipText} numberOfLines={1}>{tag.productName}</Text>
-                <Text style={s.productChipPrice}>{formatCents(tag.priceCents ?? 0)}</Text>
+                <Text style={s.productChipPrice}>{formatMoney(tag.priceCents ?? 0)}</Text>
                 {tag.highlighted && <Text style={s.featuredLabel}>FEATURED</Text>}
               </TouchableOpacity>
             ))}
@@ -629,7 +629,7 @@ function SellerLiveNativeScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={[s.pickerRowName, { color: FG }]} numberOfLines={1}>{p.name}</Text>
                        {typeof p.priceCents === 'number' && (
-                         <Text style={[s.pickerRowPrice, { color: MUTED }]}>{formatCents(p.priceCents)}</Text>
+                         <Text style={[s.pickerRowPrice, { color: MUTED }]}>{formatMoney(p.priceCents)}</Text>
                        )}
                     </View>
                     <View style={[s.checkbox, tagged && { backgroundColor: PURPLE, borderColor: PURPLE }]}>

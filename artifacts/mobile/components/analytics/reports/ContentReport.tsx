@@ -9,8 +9,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP } from '@/lib/theme';
-import { formatCents } from '@/lib/money';
-import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
+import { formatCompactCount } from '@/lib/compactFormat';
+import { formatMoney } from '@/lib/format';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { Card, CardDivider, PillTabs, SectionTitle, StatRow } from '@/components/analytics/AnalyticsKit';
 import { InsightFrame } from '@/components/analytics/InsightFrame';
@@ -73,7 +73,7 @@ export default function ContentReport() {
             <CardDivider />
             <StatRow label="Purchases" value={formatCompactCount(t!.purchases)} />
             <CardDivider />
-            <StatRow label="Revenue from posts" value={formatCentsCompact(t!.revenueCents)} changePct={data.deltas.revenuePct ?? undefined} />
+            <StatRow label="Revenue from posts" value={formatMoney(t!.revenueCents)} changePct={data.deltas.revenuePct ?? undefined} />
             <CardDivider />
             <StatRow label="Profile visits from posts" value={formatCompactCount(t!.profileVisits)} />
             {t!.avgWatchSeconds !== null && (<><CardDivider /><StatRow label="Average watch time" value={`${t!.avgWatchSeconds}s`} /></>)}
@@ -99,7 +99,7 @@ export default function ContentReport() {
                     icon={p.type === 'video' ? 'play-circle' : 'image'}
                     title={p.caption || `Untitled ${TYPE_LABEL[p.type].toLowerCase()}`}
                     subtitle={`${TYPE_LABEL[p.type]} · ${formatCompactCount(p.likes)} likes · ${formatCompactCount(p.saves)} saves`}
-                    value={sort === 'revenue' ? formatCents(p.revenueCents) : sort === 'likes' ? formatCompactCount(p.likes) : formatCompactCount(p.views)}
+                    value={sort === 'revenue' ? formatMoney(p.revenueCents) : sort === 'likes' ? formatCompactCount(p.likes) : formatCompactCount(p.views)}
                     valueLabel={sort === 'revenue' ? `${p.purchases} sold` : sort === 'likes' ? 'likes' : 'views'}
                     onPress={() => router.push(`/post-analytics?id=${encodeURIComponent(p.postId)}` as never)}
                   />

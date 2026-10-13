@@ -29,6 +29,7 @@ import type { MediaDraft, PostDetails, PublishInput } from '@/lib/createPost/typ
 import { CP, CreateHeader, PillButton, SubPage, tap } from '@/components/create-post/ui';
 import { formatCents } from '@/lib/money';
 import { crispPx } from '@/lib/crispPixel';
+import { formatMoney } from '@/lib/format';
 
 const MAX_PRODUCT_TAGS = 5;
 const isPreview = () => isSellerDevPreview() || isBuyerDevPreview();
@@ -156,7 +157,7 @@ function ProductsPage({ tags, onChange, onBack }: { tags: PostProductTag[]; onCh
               >
                 <View style={{ flex: 1 }}>
                   <Text style={s.rowLabel} numberOfLines={1}>{p.name}</Text>
-                  <Text style={s.rowValue}>{formatCents(p.pricing.priceCents)}</Text>
+                  <Text style={s.rowValue}>{formatMoney(p.pricing.priceCents)}</Text>
                 </View>
                 <View style={[s.check, on && s.checkOn]}>{on ? <Icon name="check" size={14} color={CP.black} /> : null}</View>
               </Pressable>

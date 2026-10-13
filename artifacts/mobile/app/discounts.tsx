@@ -37,7 +37,8 @@ import {
   FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { formatCents, parseDecimalToCents } from '@/lib/money';
+import { parseDecimalToCents } from '@/lib/money';
+import { formatMoney as formatCents } from '@/lib/format';
 import { PrimaryButton, HapticSwitch } from '@/components/BrandthreadUI';
 import { displayPriceInput, sanitizePriceInput } from '@/lib/priceInput';
 import { KeyboardStickyFooter } from '@/components/KeyboardStickyFooter';

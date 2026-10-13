@@ -15,11 +15,11 @@ import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { radius } from '@/constants/radii';
+import { formatMoney } from '@/lib/format';
 
 export function SellerThreadCashCard({
   balanceCents, cashableCents, promoCents, paused = false, loading, error, onReload, onCashOutPress,
@@ -77,7 +77,7 @@ export function SellerThreadCashCard({
       ) : (
         <>
           <Text style={[styles.balance, { color: THREAD_CASH_GREEN_MID }]} testID="seller-thread-cash-balance">
-            {formatCents(balanceCents ?? 0)}
+            {formatMoney(balanceCents ?? 0)}
           </Text>
           <Text style={[styles.subtitle, { color: theme.muted }]}>
             {/* Seller-earned Thread Cash (Live gifts, message payments) is cashable
@@ -85,7 +85,7 @@ export function SellerThreadCashCard({
                 buyer's reward credit, so say where it comes from rather than
                 offering a "$0.00" cash-out. */}
             {balanceCents
-              ? (cashOutValueCents != null ? `Cash out for ${formatCents(cashOutValueCents)}` : ' ')
+              ? (cashOutValueCents != null ? `Cash out for ${formatMoney(cashOutValueCents)}` : ' ')
               : 'Earned from Live gifts and messages'}
           </Text>
           {promoCents != null && (

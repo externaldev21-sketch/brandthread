@@ -23,6 +23,7 @@ import { Sheet } from '@/components/ui/BottomSheet';
 import { hapticSuccess } from '@/lib/haptics';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 import { createdProductIds, publishProducts } from '@/lib/bulkPublish';
+import { fmtRelativeDay } from '@/lib/format';
 
 function methodIcon(method: string): IconName {
   if (method === 'CSV') return 'file-text';
@@ -401,7 +402,7 @@ export default function ProductImportScreen() {
                   {run.filename || (run.source === 'etsy_api' ? 'Etsy shop' : 'Pasted CSV')}
                 </Text>
                 <Text style={s.historyDate}>
-                  {run.created} new · {run.updated} updated{run.failed + run.skipped > 0 ? ` · ${run.failed + run.skipped} not imported` : ''} · {new Date(run.createdAt).toLocaleDateString()}
+                  {run.created} new · {run.updated} updated{run.failed + run.skipped > 0 ? ` · ${run.failed + run.skipped} not imported` : ''} · {fmtRelativeDay(run.createdAt)}
                 </Text>
               </View>
             </View>

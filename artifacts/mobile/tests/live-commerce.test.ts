@@ -32,7 +32,8 @@ describe('pinnedProductIdFromRow', () => {
 describe('describeLiveCode', () => {
   it('reads plainly for each type', () => {
     expect(describeLiveCode({ type: 'percentage', value: 15 })).toBe('15% off');
-    expect(describeLiveCode({ type: 'fixed', value: 5 })).toBe('$5.00 off');
+    expect(describeLiveCode({ type: 'fixed', value: 5 })).toBe('$5 off');
+    expect(describeLiveCode({ type: 'fixed', value: 2.5 })).toBe('$2.50 off');
     expect(describeLiveCode({ type: 'free_shipping', value: 0 })).toBe('Free shipping');
   });
 });

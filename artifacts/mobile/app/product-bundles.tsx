@@ -25,7 +25,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
-import { formatCents } from '@/lib/money';
+import { formatMoney } from '@/lib/format';
 
 function BundleRow({ bundle, onPress }: { bundle: any; onPress: () => void }) {
   const savings = bundle.compareAtCents > bundle.bundlePriceCents
@@ -49,8 +49,8 @@ function BundleRow({ bundle, onPress }: { bundle: any; onPress: () => void }) {
         </View>
         <Text style={r.meta}>
           {bundle.itemCount ?? 0} item{(bundle.itemCount ?? 0) !== 1 ? 's' : ''} ·{' '}
-          {formatCents(bundle.bundlePriceCents)}
-          {savings > 0 ? ` · saves ${formatCents(savings)}` : ''}
+          {formatMoney(bundle.bundlePriceCents)}
+          {savings > 0 ? ` · saves ${formatMoney(savings)}` : ''}
         </Text>
         {bundle.sales?.setsSold > 0 ? (
           <Text style={r.meta} testID={`bundle-sales-${bundle.id}`}>

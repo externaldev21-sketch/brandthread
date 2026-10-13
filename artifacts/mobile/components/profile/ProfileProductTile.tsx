@@ -18,6 +18,7 @@ import { prefetchProductOnPressIn } from '@/lib/detailPrefetch';
 import type { ShopProduct } from '@/services/profileService';
 import { InteractionLayer } from './ProfileControls';
 import { PROFILE_GRID_GAP } from './profileLayout';
+import { formatMoney } from '@/lib/format';
 
 export const ProfileProductTile = React.memo(function ProfileProductTile({
   product, width, height, owner, onPress,
@@ -36,7 +37,7 @@ export const ProfileProductTile = React.memo(function ProfileProductTile({
     if (!owner) prefetchProductOnPressIn(product.id, product.imageUri);
   }, [owner, product.id, product.imageUri]);
   const soldOut = !product.inStock;
-  const price = product.priceCents > 0 ? formatCents(product.priceCents) : null;
+  const price = product.priceCents > 0 ? formatMoney(product.priceCents) : null;
   return (
     <View style={{ width, height, marginBottom: PROFILE_GRID_GAP }}>
       <PressableScale

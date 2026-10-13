@@ -24,9 +24,9 @@ import { RADII } from '@/constants/radii';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, SecondaryButton, NavigationCard, StatusBadge } from '@/components/BrandthreadUI';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
-import { formatCents } from '@/lib/money';
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { minHitSlop } from '@/lib/hitSlop';
+import { formatMoney } from '@/lib/format';
 
 // 'Continue setup →' is a 22pt-tall text link; section headers are 36pt tall.
 const CONTINUE_SETUP_HIT_SLOP = { ...minHitSlop({ height: 22 }), left: 8, right: 8 };
@@ -290,7 +290,7 @@ export default function MoreScreen() {
                         : item.badge;
                     const description = item.label === 'Payouts' && threadCash.balanceCents != null
                       // Short lead-in so the balance fits on the card's single line.
-                      ? `Payout history · ${formatCents(threadCash.balanceCents)} Thread Cash`
+                      ? `Payout history · ${formatMoney(threadCash.balanceCents)} Thread Cash`
                       : item.desc;
                     return (
                       <NavigationCard

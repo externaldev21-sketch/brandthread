@@ -36,6 +36,7 @@ import { reportNetworkError } from '@/lib/networkNotice';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { MissingItemState } from '@/components/states/MissingItemState';
+import { fmtRelativeDay, fmtDate } from '@/lib/format';
 
 import { ChipRow } from '@/components/ui/ChipRow';
 function useThemeAliases() {
@@ -407,7 +408,7 @@ function OverviewTab({ product, pricing, coverImage }: {
             right={<StatusBadge label={product.storeSettings.status.toUpperCase()} variant={product.storeSettings.status === 'active' ? 'success' : 'warning'} small />}
           />
           <View style={ov.divider} />
-          <InfoRow label="Last updated" value={new Date(product.updatedAt).toLocaleDateString()} icon="clock" />
+          <InfoRow label="Last updated" value={fmtRelativeDay(product.updatedAt)} icon="clock" />
           {product.storeSettings.seo.title && (
             <>
               <View style={ov.divider} />
@@ -964,7 +965,7 @@ function ProductionTab({ product, router }: { product: Product; router: ReturnTy
 
         {mfg.productionDeadline && (
           <Text style={pt.deadline}>
-            Est. completion: {formatCalendarDate(mfg.productionDeadline)}
+            Est. completion: {fmtDate(mfg.productionDeadline)}
           </Text>
         )}
         {mfg.unitsInProduction && (
@@ -1321,7 +1322,7 @@ function StoreTab({
               </View>
               {product.preorderSettings.estimatedShippingDate && (
                 <Text style={st.preorderSub}>
-                  Est. ship: {formatCalendarDate(product.preorderSettings.estimatedShippingDate)}
+                  Est. ship: {fmtDate(product.preorderSettings.estimatedShippingDate)}
                 </Text>
               )}
             </GradientCard>

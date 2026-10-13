@@ -9,8 +9,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP } from '@/lib/theme';
-import { formatCents } from '@/lib/money';
-import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
+import { formatCompactCount } from '@/lib/compactFormat';
+import { formatMoney } from '@/lib/format';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { Card, CardDivider, ProgressBar, SectionTitle } from '@/components/analytics/AnalyticsKit';
 import { InsightFrame } from '@/components/analytics/InsightFrame';
@@ -40,7 +40,7 @@ export default function ProductStatsReport() {
             { key: 'views', label: 'Product views', value: formatCompactCount(t!.views), changePct: data.deltas.viewsPct, featured: true },
             { key: 'carts', label: 'Added to cart', value: formatCompactCount(t!.addToCarts), changePct: data.deltas.addToCartsPct },
             { key: 'buys', label: 'Purchases', value: formatCompactCount(t!.purchases), changePct: data.deltas.purchasesPct },
-            { key: 'rev', label: 'Product revenue', value: formatCentsCompact(t!.revenueCents), changePct: data.deltas.revenuePct },
+            { key: 'rev', label: 'Product revenue', value: formatMoney(t!.revenueCents), changePct: data.deltas.revenuePct },
           ]} />
 
           <SectionTitle>Views</SectionTitle>
@@ -76,8 +76,8 @@ export default function ProductStatsReport() {
                   thumbnailUrl={p.imageUrl}
                   icon="shopping-bag"
                   title={p.name}
-                  subtitle={`${formatCompactCount(p.views)} views, ${p.addToCarts} carts, ${p.purchases} sold`}
-                  value={formatCents(p.revenueCents)}
+                  subtitle={`${formatCompactCount(p.views)} views · ${p.addToCarts} carts · ${p.purchases} sold`}
+                  value={formatMoney(p.revenueCents)}
                   valueLabel={p.viewToPurchasePct === null ? undefined : `${p.viewToPurchasePct}% conv.`}
                   onPress={() => router.push(`/product-detail?id=${encodeURIComponent(p.productId)}&tab=analytics` as never)}
                 />

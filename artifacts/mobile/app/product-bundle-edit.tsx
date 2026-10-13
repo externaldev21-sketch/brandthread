@@ -38,6 +38,7 @@ import { formatCents, integerPercent, parseDecimalToCents } from '@/lib/money';
 import { displayPriceInput, sanitizePriceInput } from '@/lib/priceInput';
 import { KeyboardStickyFooter } from '@/components/KeyboardStickyFooter';
 import { radius } from '@/constants/radii';
+import { formatMoney } from '@/lib/format';
 
 function centsToDecimalInput(cents: number | undefined): string {
   if (cents === undefined) return '';
@@ -241,9 +242,9 @@ export default function ProductBundleEditScreen() {
 
         {compareAtCents > 0 && bundlePriceCents > 0 && (
           <View style={s.savingsCard}>
-              <Text style={s.savingsLabel}>Individual total: {formatCents(compareAtCents)}</Text>
+              <Text style={s.savingsLabel}>Individual total: {formatMoney(compareAtCents)}</Text>
             {savings > 0
-              ? <Text style={s.savingsAmount}>Buyers save {formatCents(savings)} ({integerPercent(savings, compareAtCents)}%)</Text>
+              ? <Text style={s.savingsAmount}>Buyers save {formatMoney(savings)} ({integerPercent(savings, compareAtCents)}%)</Text>
               : <Text style={[s.savingsAmount, { color: RED }]}>Bundle should be cheaper than individual items</Text>
             }
           </View>
@@ -309,7 +310,7 @@ export default function ProductBundleEditScreen() {
               {(item.size || item.color) && (
                 <Text style={s.itemVariant}>{[item.size, item.color].filter(Boolean).join(' / ')}</Text>
               )}
-              <Text style={s.itemPrice}>{formatCents(item.priceCents ?? 0)}</Text>
+              <Text style={s.itemPrice}>{formatMoney(item.priceCents ?? 0)}</Text>
             </View>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove item" onPress={() => removeItem(item.id)} style={s.removeBtn}>
               <Icon name="trash-2" size={14} color={RED} />
@@ -334,7 +335,7 @@ export default function ProductBundleEditScreen() {
                   activeOpacity={0.7}
                 >
                   <Text style={s.catalogName}>{p.name}</Text>
-                  <Text style={s.catalogPrice}>{formatCents(p.variants?.[0]?.priceCents ?? 0)}</Text>
+                  <Text style={s.catalogPrice}>{formatMoney(p.variants?.[0]?.priceCents ?? 0)}</Text>
                 </TouchableOpacity>
               ))
             )}

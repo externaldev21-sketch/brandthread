@@ -32,7 +32,6 @@ import {
   FONT, FS, SP, RADIUS, TEXT_SECONDARY,
 } from '@/lib/theme';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
-import { formatCents } from '@/lib/money';
 import * as WebBrowser from 'expo-web-browser';
 import { currentCheckoutReturnUrls, hostedCheckoutVerdict } from '@/lib/checkoutReturn';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
@@ -49,6 +48,7 @@ import { radius } from '@/constants/radii';
 import { LiveCohostSplit } from '@/components/live/LiveCohostSplit';
 import { LivePurchaseToast, useLivePurchaseToasts } from '@/components/live/LivePurchaseToast';
 import type { LiveCohostPerson } from '@/lib/live/moderationTypes';
+import { formatMoney } from '@/lib/format';
 
 // ─── Agora SDK (native-only) ──────────────────────────────────────────────────
 const AgoraModule = loadAgoraModule();
@@ -647,12 +647,12 @@ function BuyerLiveNativeScreen() {
                 onPress={() => { openPurchase(tag); }}
                 activeOpacity={0.8}
                 accessibilityRole="button"
-                accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
+                accessibilityLabel={`Shop ${tag.productName}, ${formatMoney(tag.priceCents)}`}
                 style={[s.productChip, { backgroundColor: 'rgba(0,0,0,0.7)' }]}
               >
                 <Icon name="shopping-bag" size={12} color={LIVE_RED} />
                 <Text style={s.productChipName} numberOfLines={1}>{tag.productName}</Text>
-                <Text style={s.productChipPrice}>{formatCents(tag.priceCents)}</Text>
+                <Text style={s.productChipPrice}>{formatMoney(tag.priceCents)}</Text>
               </PressableScale>
             ))}
           </ScrollView>
@@ -730,7 +730,7 @@ function BuyerLiveNativeScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <Text style={s.purchasePrice}>
-                {formatCents(
+                {formatMoney(
                   (purchaseProduct?.variants ?? []).find((variant: any) => variant.id === selectedVariantId)?.priceCents
                     ?? purchaseTag.priceCents,
                 )}

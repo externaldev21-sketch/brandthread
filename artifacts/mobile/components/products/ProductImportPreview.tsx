@@ -7,6 +7,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { StatusBadge } from '@/components/BrandthreadUI';
 import type { ImportCommitResult, ImportPreview } from '@/lib/productImportTypes';
+import { formatMoney } from '@/lib/format';
 
 type Props = {
   visible: boolean;
@@ -24,7 +25,7 @@ type Props = {
   published?: number | null;
 };
 
-const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const money = (cents: number) => formatMoney(cents);
 
 export function ProductImportPreview({ visible, preview, result, busy, error, onClose, onCommit, onViewProducts, onPublishCreated, publishing = false, published = null }: Props) {
   const { theme } = useAppTheme();
