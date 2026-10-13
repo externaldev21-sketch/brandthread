@@ -9,7 +9,7 @@ vi.mock("../../lib/push", () => ({
   }),
 }));
 
-import { db, notificationsFeed, users } from "@workspace/db";
+import { db, notificationsFeed, sellerSubscriptionDunning, users } from "@workspace/db";
 import { handleInvoicePaymentFailed } from "../webhooks";
 
 const sellerId = `clerk_subscription_failure_${process.pid}`;
@@ -26,6 +26,7 @@ afterEach(async () => {
         eq(notificationsFeed.targetId, invoiceId),
       ),
     );
+  await db.delete(sellerSubscriptionDunning).where(eq(sellerSubscriptionDunning.clerkUserId, sellerId));
   await db.delete(users).where(eq(users.clerkId, sellerId));
 });
 
@@ -40,6 +41,7 @@ describe("failed subscription invoice recovery notification", () => {
           eq(notificationsFeed.targetId, invoiceId),
         ),
       );
+    await db.delete(sellerSubscriptionDunning).where(eq(sellerSubscriptionDunning.clerkUserId, sellerId));
     await db.delete(users).where(eq(users.clerkId, sellerId));
     await db.insert(users).values({
       clerkId: sellerId,
