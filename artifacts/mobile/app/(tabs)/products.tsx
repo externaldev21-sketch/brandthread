@@ -23,6 +23,8 @@ import { useScrollReset } from '@/hooks/useScrollReset';
 import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProductCard } from '@/components/products/ProductCard';
+import { ProductRow } from '@/components/products/ProductRow';
+import { loadProductsViewMode, saveProductsViewMode, DEFAULT_PRODUCTS_VIEW_MODE, type ProductsViewMode } from '@/lib/productsViewMode';
 import { StockEditorSheet } from '@/components/products/StockEditorSheet';
 import { getProducts, getProductStats, getProduct, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct, updateProduct } from '@/services/productService';
 import { Product, ProductFilter } from '@/services/productTypes';
@@ -416,6 +418,27 @@ function SortModal({
   );
 }
 
+const FAB_CLEARANCE = 64; // 56pt button + 8pt gap
+
+// ─── List skeleton ───────────────────────────────────────────────────────────
+
+function ListRowsSkeleton() {
+  const { theme } = useAppTheme();
+  return (
+    <View testID="products-list-skeleton" style={{ paddingHorizontal: SP.md }}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }}>
+          <View style={{ width: 56, height: 56, borderRadius: RADIUS.sm, backgroundColor: theme.surfaceGlass }} />
+          <View style={{ flex: 1, gap: SP.sm }}>
+            <View style={{ height: 12, width: '60%', borderRadius: RADIUS.xs, backgroundColor: theme.surfaceGlass }} />
+            <View style={{ height: 12, width: '35%', borderRadius: RADIUS.xs, backgroundColor: theme.surfaceGlass }} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProductsScreen() {
@@ -459,6 +482,22 @@ export default function ProductsScreen() {
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // List (Shopify-style rows) or grid, remembered on this device.
+  const [viewMode, setViewMode] = useState<ProductsViewMode>(DEFAULT_PRODUCTS_VIEW_MODE);
+  useEffect(() => {
+    let cancelled = false;
+    void loadProductsViewMode().then((mode) => { if (!cancelled) setViewMode(mode); });
+    return () => { cancelled = true; };
+  }, []);
+  const toggleViewMode = useCallback(() => {
+    hapticToggle();
+    setViewMode((prev) => {
+      const next: ProductsViewMode = prev === 'grid' ? 'list' : 'grid';
+      void saveProductsViewMode(next);
+      return next;
+    });
+  }, []);
+  const isGrid = viewMode === 'grid';
 
   const showPreviewOnlyFeedback = useCallback(() => {
     Alert.alert('Sign in required', 'Sign in to manage products.');
@@ -740,6 +779,17 @@ export default function ProductsScreen() {
   }, [previewOnly, queryClient]);
 
   const renderProduct = useCallback(({ item }: { item: Product }) => (
+    !isGrid ? (
+      <View style={{ paddingHorizontal: gridGap / 2 }}>
+        <ProductRow
+          product={item}
+          onPress={openProduct}
+          onPressIn={onProductPressIn}
+          onMore={openActionSheet}
+          onEditStock={openStockEditor}
+        />
+      </View>
+    ) : (
     <View style={{ paddingHorizontal: gridGap / 2 }}>
       <ProductCard
         product={item}
@@ -752,7 +802,8 @@ export default function ProductsScreen() {
         onEditStock={openStockEditor}
       />
     </View>
-  ), [openProduct, onProductPressIn, openActionSheet, openStockEditor, cardWidth, gridGap]);
+    )
+  ), [isGrid, openProduct, onProductPressIn, openActionSheet, openStockEditor, cardWidth, gridGap]);
 
   const keyExtractor = useCallback((item: Product) => item.id, []);
 
@@ -784,7 +835,8 @@ export default function ProductsScreen() {
   // bottom padding, letting the last row sit under the floating tab bar — a
   // real DOM footer of that height guarantees the scrollable area actually
   // extends past the bar.
-  const ListFooter = useMemo(() => <View style={{ height: tabBar.occupiedHeight }} />, [tabBar.occupiedHeight]);
+  // + FAB_CLEARANCE so the last row also clears the floating add button.
+  const ListFooter = useMemo(() => <View style={{ height: tabBar.occupiedHeight + FAB_CLEARANCE }} />, [tabBar.occupiedHeight]);
 
   const ListEmpty = useMemo(() => {
     const copy = emptyCopy[filter] ?? emptyCopy.all;
@@ -814,9 +866,9 @@ export default function ProductsScreen() {
         titleAccessibilityLabel="Products, choose a view"
         actions={[
           {
-            icon: 'plus',
-            onPress: () => router.push('/add-product' as never),
-            accessibilityLabel: 'Add product',
+            icon: isGrid ? 'list' : 'grid',
+            onPress: toggleViewMode,
+            accessibilityLabel: isGrid ? 'Show as list' : 'Show as grid',
           },
           {
             icon: 'more-horizontal',
@@ -862,7 +914,9 @@ export default function ProductsScreen() {
       {/* ── Product grid ── */}
       {loading && sortedProducts.length === 0 ? (
         <View style={[s.listContent, { paddingHorizontal: gridGutter }]}>
-          <GridSkeleton columns={gridColumns} cardWidth={cardWidth} rows={3} gap={gridGap} />
+          {isGrid
+            ? <GridSkeleton columns={gridColumns} cardWidth={cardWidth} rows={3} gap={gridGap} />
+            : <ListRowsSkeleton />}
         </View>
       ) : (
         <FlashList
@@ -870,8 +924,8 @@ export default function ProductsScreen() {
           data={sortedProducts}
           keyExtractor={keyExtractor}
           renderItem={renderProduct}
-          numColumns={gridColumns}
-          key={`cols-${gridColumns}`}
+          numColumns={isGrid ? gridColumns : 1}
+          key={isGrid ? `cols-${gridColumns}` : 'list'}
           ListHeaderComponent={ListHeader}
           ListFooterComponent={ListFooter}
           ListEmptyComponent={ListEmpty}
@@ -881,6 +935,17 @@ export default function ProductsScreen() {
           onRefresh={handleRefresh}
         />
       )}
+
+      {/* Add product — floating, bottom-right, always above the tab bar. */}
+      <PressableScale
+        style={[s.fab, { bottom: tabBar.occupiedHeight + SP.sm, right: gridGutter }]}
+        onPress={() => { hapticPrimaryAction(); router.push('/add-product' as never); }}
+        accessibilityRole="button"
+        accessibilityLabel="Add product"
+        testID="products-add-fab"
+      >
+        <Feather name="plus" size={ICON.lg} color={theme.background} />
+      </PressableScale>
 
       {/* Action sheet */}
       <ActionSheet
@@ -961,6 +1026,22 @@ const createStyles = (theme: any) => {
   // List / grid
   listContent: {
     paddingBottom: SP.xl,
+  },
+
+  // Floating add button: solid text-colour disc (white on dark themes).
+  fab: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: FG,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: theme.shadowColor,
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
   });
 };
