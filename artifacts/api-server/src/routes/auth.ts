@@ -41,6 +41,7 @@ import { LEGAL_ACCEPTANCE_SOURCES, recordLegalAcceptance, type LegalAcceptanceSo
 import { buildAccountDataExport } from "../lib/dataExport";
 import { decideUsernameChange, usernameNextChangeAt } from "../lib/usernameCooldown";
 import { hasRedeemedAccessCode, isInviteOnlyEnabled } from "../lib/access/inviteOnly";
+import { assignFoundingSellerNumber } from "../lib/foundingSellers";
 
 const router = Router();
 const usernameSchema = z.string().trim().regex(/^[a-zA-Z0-9_]{3,30}$/);
@@ -691,6 +692,9 @@ router.post(
           },
         } as const;
       }
+
+      // Founding Seller badge: the first 100 sellers get #1..#100 (no-op once full).
+      if (accountType === "seller") await assignFoundingSellerNumber(tx, clerkUserId);
 
       const [updated] = await tx
         .update(users)

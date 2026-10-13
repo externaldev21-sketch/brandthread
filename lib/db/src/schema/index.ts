@@ -214,6 +214,10 @@ export const users = pgTable('users', {
   // Internal App Review demo account (migration 240). Never purged by the
   // test-data tooling; seeded by scripts/seedReviewAccounts.ts.
   isReviewAccount: boolean('is_review_account').notNull().default(false),
+  // "Founding Seller #N" (migration 271): 1..100, unique, assigned once when
+  // an account first completes seller onboarding while fewer than 100 are
+  // taken (api-server lib/foundingSellers.ts). Never reassigned or reused.
+  foundingSellerNumber: integer('founding_seller_number'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

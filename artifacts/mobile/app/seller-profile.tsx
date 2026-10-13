@@ -56,6 +56,7 @@ import { Snackbar } from '@/components/ui/Snackbar';
 import { ListRow } from '@/components/ui/ListRow';
 import { hapticLight, hapticMedium, hapticSuccessAction } from '@/lib/haptics';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
+import { FoundingSellerBadge, foundingSellerNumberOf } from '@/components/profile/FoundingSellerBadge';
 import {
   ProfileButton, ProfileChip, ProfileGlassButton, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
@@ -102,6 +103,8 @@ interface SellerView {
   likesCount: number | null;
   followersCount: number | null;
   followingCount: number | null;
+  /** "Founding Seller #N" (first 100 sellers), else null. */
+  foundingSellerNumber: number | null;
 }
 
 function initialsOf(name: string): string {
@@ -136,6 +139,7 @@ function toSellerView(profile: any, fallbackId: string): SellerView {
     likesCount: typeof profile?.likesCount === 'number' ? profile.likesCount : null,
     followersCount: typeof profile?.followersCount === 'number' ? profile.followersCount : null,
     followingCount: typeof profile?.followingCount === 'number' ? profile.followingCount : null,
+    foundingSellerNumber: foundingSellerNumberOf(profile?.foundingSellerNumber),
   };
 }
 
@@ -640,6 +644,7 @@ export default function SellerProfileScreen() {
       location={seller.location}
       onOpenWebsite={(url) => { void Linking.openURL(url); }}
     >
+      <FoundingSellerBadge number={seller.foundingSellerNumber} />
       {seller.category ? <ProfileChip label={seller.category} icon="tag" /> : null}
       {rating && rating.totalCount > 0 ? <ProfileChip label={`${rating.avgRating.toFixed(1)} · ${rating.totalCount} reviews`} icon="star" /> : null}
       {caps.showPlanChip && plan ? (
