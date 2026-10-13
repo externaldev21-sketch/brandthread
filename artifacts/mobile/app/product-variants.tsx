@@ -22,6 +22,7 @@ import {
 import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
+import { HelpLink } from '@/components/help/HelpLink';
 
 interface Axis { name: string; values: string[] }
 interface Variant {
@@ -345,6 +346,7 @@ export default function ProductVariantsScreen() {
         )}
 
         <SectionHeader title={`VARIANTS (${variants.length})`} style={st.sh} />
+        <HelpLink article="variants-stock" />
         {variants.length === 0 ? (
           <BrandthreadCard style={st.card}>
             <Text style={st.emptyTitle}>No variants yet</Text>

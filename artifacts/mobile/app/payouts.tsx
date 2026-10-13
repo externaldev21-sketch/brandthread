@@ -281,12 +281,12 @@ function PayoutsScreenContent() {
           <Text style={styles.balanceHeroAmount}>{availFmt}</Text>
         )}
         <Text style={styles.balanceHeroSub}>{loadError ? '—' : `Next payout ${nextDate}`}</Text>
+        <HelpLink article="payouts" style={{ marginTop: SP.xs }} />
         <View style={styles.balanceDivider} />
         <View style={styles.balancePendingRow}>
           <Text style={styles.balancePendingLabel}>Pending</Text>
           <Text style={styles.balancePendingAmount}>{loadError ? '—' : pendFmt}</Text>
         </View>
-        <HelpLink article="payouts" style={{ marginTop: SP.sm }} />
       </View>
 
       {!isPreview && (
