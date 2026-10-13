@@ -19,6 +19,7 @@ import { haptics, haptic } from '@/lib/haptics';
 
 import { FONT, ON_DARK_MUTED } from '@/lib/theme';
 
+import { hapticToggle } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 
 import { SPACING } from '@/constants/spacing';
@@ -174,7 +175,9 @@ export function SegmentedControl({ options, selectedId, onChange, testID, varian
 // measured from TikTok: the bar sits tight to the glyph baseline, not below
 // the tab's padded touch target.
 const UNDERLINE_GAP = 6;// Underline thickness — thin, fully rounded caps.
-const UNDERLINE_HEIGHT = 2.5;
+const UNDERLINE_HEIGHT = 2;
+// 60% white for the unselected underline tab (V7).
+const UNDERLINE_UNSELECTED = 'rgba(255,255,255,0.6)';
 
 /**
  * Plain-text TikTok-style tab bar: no pill/background at all, each label
@@ -336,13 +339,11 @@ function UnderlineTab({
         style={[
           styles.underlineLabel,
           {
-            fontFamily: selected ? FONT.bold : FONT.medium,
-            // Solid opaque grey, not a translucent white — a
-            // sub-1-alpha text color subpixel-antialiases against
-            // whatever's behind it (varies as the feed's video plays),
-            // which reads as a soft/smudgy mid-grey instead of a crisp
-            // silver. See lib/theme.ts's ON_DARK_MUTED doc comment.
-            color: selected ? '#FFFFFF' : ON_DARK_MUTED,
+            // Less-AI pass (V7, Dev's spec for the feed's "Following /
+            // Threads" switcher, TikTok For You): selected = white 17pt
+            // semibold, unselected = 60% white.
+            fontFamily: selected ? FONT.semibold : FONT.medium,
+            color: selected ? '#FFFFFF' : UNDERLINE_UNSELECTED,
           },
         ]}
         numberOfLines={1}
@@ -377,10 +378,12 @@ const styles = StyleSheet.create({
   // instead of overflowing past its own bounds and visually colliding
   // with whatever sits beside it.
   underlineRoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexShrink: 1, minWidth: 0 },
-  underlineSegment: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, flexShrink: 1, minWidth: 0 },
+  // 10pt each side (was 12) so the 17pt labels (V7) still fit between the
+  // feed's top-row icons on 360pt-wide phones.
+  underlineSegment: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, flexShrink: 1, minWidth: 0 },
   underlineLabel: {
-    fontSize: 15, lineHeight: 18,
-    textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+    fontSize: 17, lineHeight: 21,
+    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   // `left: 0` is load-bearing, not decorative: on web, an absolutely
   // positioned flex child with no inset (left/right/top/bottom) of its own

@@ -1,7 +1,7 @@
 /**
- * Structure tests for the shop trigger (a compact dark-glass "Shop" pill
- * living inside CaptionBlock's bottom-left stack, directly above the
- * creator name, that glides out into a name/price strip on tap — see
+ * Structure tests for the shop trigger (a frosted dark product chip —
+ * thumbnail, name, price or "Sold out", chevron — living inside
+ * CaptionBlock's bottom-left stack, directly above the creator name; see
  * components/buyer-feed/ShopSideTab.tsx) and the fix that makes its
  * price/thumbnail real: the server never sent a tagged product's price or
  * image through the feed/detail routes, so the trigger always showed $0.00
@@ -23,18 +23,26 @@ const postsRoute = readFileSync(resolve(__dirname, '../../api-server/src/routes/
 const shopTab = readFileSync(resolve(__dirname, '../components/buyer-feed/ShopSideTab.tsx'), 'utf8');
 const previewCatalog = readFileSync(resolve(__dirname, '../lib/previewCatalog.ts'), 'utf8');
 
-describe('Shop trigger — pill in the caption stack, no count badge, no blur/shimmer', () => {
-  it('is a pill inside CaptionBlock\'s stack that expands on tap — not a rotated edge tab with a count badge', () => {
+describe('Product tag chip — in the caption stack, product shown directly (less-AI pass V4/V10)', () => {
+  it('is a static chip inside CaptionBlock\'s stack — thumbnail, name, price (or Sold out), chevron; no expand step, no count badge', () => {
     expect(feed).toContain('ShopSideTab');
     expect(shopTab).toContain('function ShopTagPill(');
-    expect(shopTab).toContain('function useShopTagPill(');
+    expect(shopTab).not.toContain('function useShopTagPill(');
+    expect(shopTab).not.toContain('withTiming');
     expect(shopTab).toContain('styles.thumb');
+    expect(shopTab).toContain('const THUMB_SIZE = 24;');
+    expect(shopTab).toContain('tagPriceLabel(tag.priceCents, soldOut)');
     expect(shopTab).not.toContain('<BlurView');
+    expect(shopTab).toContain('noBlur');
     expect(shopTab).not.toContain('styles.shimmer');
-    // No product-count badge anywhere on the resting state.
     expect(shopTab).not.toContain('countBadge');
     expect(shopTab).not.toContain("rotate: '-90deg'");
     expect(feed).not.toContain('mediaTagName');
+  });
+
+  it('sold-out state comes from the real public stock-info endpoint, not from fixture data', () => {
+    expect(feed).toContain('useProductSoldOut(item.productTags?.[0]?.productId, isActive || preload)');
+    expect(feed).toContain('soldOut={tagSoldOut}');
   });
 
   it('shows the real product thumbnail when available, falling back to a bag icon', () => {
@@ -43,25 +51,14 @@ describe('Shop trigger — pill in the caption stack, no count badge, no blur/sh
   });
 });
 
-describe('Expanded pill tap target — whole strip opens the sheet, no stray clipboard write', () => {
-  it('the name/price/thumbnail area and the chevron share ONE TouchableOpacity, not a separate per-element handler', () => {
-    // Exactly one TouchableOpacity in this file — the one wrapping both the
-    // collapsed ("Shop") and expanded (thumbnail/name/price/chevron)
-    // content — so a tap anywhere on the expanded strip (not just the
-    // chevron) always runs the same onPress. A second TouchableOpacity/
-    // Pressable around just the name or thumbnail would let that area
-    // disagree with the strip's own open-the-sheet behavior (e.g. collapse
-    // instead of open) — see this file's module comment for the PR #343
-    // redesign this guards against regressing.
+describe('Chip tap target — the whole chip opens the sheet, no stray clipboard write', () => {
+  it('the thumbnail, name, price and chevron share ONE TouchableOpacity that opens the sheet', () => {
     const touchableOpens = (shopTab.match(/<TouchableOpacity\b/g) ?? []).length;
     expect(touchableOpens).toBe(1);
-    expect(shopTab).toContain("onPress={expanded ? onPress : expand}");
-    // The chevron and the name/price Text must never carry their own
-    // onPress — they're plain decorative/inert children of the shared
-    // TouchableOpacity above.
+    expect(shopTab).toContain('onPress={onPress}');
     expect(shopTab).not.toMatch(/<Text style=\{styles\.name\}[^>]*onPress/);
     expect(shopTab).not.toMatch(/<View style=\{styles\.thumb\}[^>]*onPress/);
-    expect(shopTab).toContain('<Icon name="chevron-right" size={12} color={ON_DARK} pointerEvents="none" />');
+    expect(shopTab).toContain('<Icon name="chevron-right" size={14} color={ON_DARK} pointerEvents="none" />');
   });
 
   it('never reads or writes the clipboard — no legitimate reason for a copy action on this pill', () => {

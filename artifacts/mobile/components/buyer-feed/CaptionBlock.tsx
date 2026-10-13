@@ -172,7 +172,7 @@ export function CaptionBlock({
       )}
 
       <TouchableOpacity
-        style={creatorHit.boostStyle}
+        style={[creatorHit.boostStyle, styles.leftAligned]}
         onLayout={creatorHit.onLayout}
         activeOpacity={0.8}
         onPress={() => {  onOpenCreator(); }}
@@ -198,7 +198,7 @@ export function CaptionBlock({
       ) : null}
 
       <TouchableOpacity
-        style={captionHit.boostStyle}
+        style={[captionHit.boostStyle, styles.leftAligned]}
         onLayout={captionHit.onLayout}
         onPress={() => caption.length > CAPTION_MORE_CHARS && onToggleCaptionExpanded()}
         activeOpacity={caption.length > CAPTION_MORE_CHARS ? 0.7 : 1}
@@ -251,10 +251,18 @@ const styles = StyleSheet.create({
   // the screen-edge ShopSideTab now) — minHeight shrunk by its old 44pt-tall
   // pill + 12pt gap (56pt) accordingly, so there's no leftover reserved
   // space where it used to sit.
+  //
+  // maxWidth 75% (less-AI pass, V3): the stack never runs under the right
+  // action rail, whatever the screen width.
   root: {
-    position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: CAPTION_BLOCK_HEIGHT,
+    position: 'absolute', left: 16, right: 84, maxWidth: '75%', bottom: 26, minHeight: CAPTION_BLOCK_HEIGHT,
     justifyContent: 'flex-end',
   },
+  // useHitAreaBoost centers a boosted control's content (alignItems:
+  // 'center'); on the full-width name/caption rows that pulled the creator
+  // name and a short caption to the middle of the stack on web. These rows
+  // must stay left-aligned like the rest of the stack.
+  leftAligned: { alignItems: 'stretch' },
   rootWithRepost: { minHeight: CAPTION_BLOCK_HEIGHT_WITH_REPOST },
   // 8px gap above the creator name (or repost row) below it — see the
   // module comment's `topSlot` note.

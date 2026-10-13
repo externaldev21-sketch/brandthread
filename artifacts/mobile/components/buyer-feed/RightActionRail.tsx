@@ -48,6 +48,13 @@ import { useLiveStreamForHost } from '@/lib/live/useLiveDirectory';
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 
 import { crispPx } from '@/lib/crispPixel';
+// Less-AI visual pass (V1/V2, TikTok For You — Mobbin
+// https://mobbin.com/screens/e8a9730d-ff55-4ed9-b969-3918178bdf4a): 28pt
+// glyphs, 12pt counts under each, 18pt between items. The rail's bottom edge
+// is placed by feed.tsx (RAIL_BOTTOM_GAP) so the last count's baseline lines
+// up with the caption block's last line.
+export const RAIL_ICON_SIZE = 28;
+export const RAIL_ITEM_GAP = 18;
 
 export interface RailEngagement {
   liked?: boolean;
@@ -242,7 +249,7 @@ export function RightActionRail({
         <EngagementButton
           icon="heart"
           solidIcon="heart"
-          iconSize={26}
+          iconSize={RAIL_ICON_SIZE}
           count={formatCount(engagement?.likes ?? 0)}
           value={engagement?.likes ?? 0}
           active={engagement?.liked ?? false}
@@ -276,14 +283,14 @@ export function RightActionRail({
         accessibilityRole="button"
         accessibilityLabel={`Comments, ${commentsCount}`}
       >
-        <FontAwesome name="commenting" size={26} color={ON_DARK} style={styles.iconShadow} />
+        <FontAwesome name="commenting" size={RAIL_ICON_SIZE} color={ON_DARK} style={styles.iconShadow} />
         <Text style={styles.count}>{formatCount(commentsCount)}</Text>
       </TouchableOpacity>
 
       <EngagementButton
         icon="repeat"
         solidIcon="retweet"
-        iconSize={26}
+        iconSize={RAIL_ICON_SIZE}
         count={formatCount(engagement?.reposts ?? 0)}
         active={engagement?.reposted ?? false}
         activeColor={accentColor}
@@ -302,6 +309,7 @@ export function RightActionRail({
         solidIcon="bookmark"
         iconSize={26}
         // Plain count, no roll: only like counts animate (polish #69).
+        iconSize={RAIL_ICON_SIZE}
         count={formatCount(engagement?.saves ?? saves)}
         active={engagement?.saved ?? false}
         // Monochrome like the heart: outline → solid white, no gold.
@@ -326,7 +334,7 @@ export function RightActionRail({
         accessibilityLabel="Share post"
         onPress={onShare}
       >
-        <FontAwesome name="share" size={26} color={ON_DARK} style={styles.iconShadow} />
+        <FontAwesome name="share" size={RAIL_ICON_SIZE} color={ON_DARK} style={styles.iconShadow} />
         <Text style={styles.count}>{formatCount(shares)}</Text>
       </TouchableOpacity>
     </Animated.View>
@@ -339,37 +347,34 @@ const styles = StyleSheet.create({
   // stands out): 38pt avatar, 26pt icon glyphs, 12pt rhythm between items,
   // 8pt right inset. (PR #133.)
   rail: {
-    position: 'absolute', right: 10, width: 38, alignItems: 'center', gap: 14,
+    position: 'absolute', right: 10, width: 38, alignItems: 'center', gap: RAIL_ITEM_GAP,
   },
   // marginBottom bumped 2 -> 6 (self-audit find #1): the follow badge now
   // hangs 13.5pt below the avatar's own bottom edge (see followBadge's own
   // math below), which only left ~2.5pt of clearance to the heart button
   // beneath it at the rail's default 14pt gap — tight enough to read as
   // crowded. This adds breathing room without moving the avatar itself.
-  avatarWrap: { alignItems: 'center', marginBottom: 6 },
+  // marginBottom 8 = how far the follow "+" hangs below the avatar (half its
+  // 16pt height), so the heart sits a full RAIL_ITEM_GAP below the badge.
+  avatarWrap: { alignItems: 'center', marginBottom: 8 },
   avatar: {
     width: 38, height: 38, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
     borderWidth: crispPx(1.5), borderColor: ON_DARK,
+    // 2px white ring (V2).
+    borderWidth: 2, borderColor: ON_DARK,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
   },
   // fontSize bumped FS.xs (11) -> FS.sm (self-audit find #2): two-letter
   // initials read small and cramped centered in the 38pt circle at 11pt.
   avatarText: { fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
   // 16pt, black-on-white (not the seller's own accent color, which could
-  // wash out or clash against any given video), positioned BELOW the ring
-  // (TikTok-style) rather than on top of it.
-  //
-  // The math (avatar 38pt, LiveHostRing's ringGap 1.5 / ringWidth 2 above):
-  //   ring outer radius  = avatar/2 + ringGap + ringWidth = 19 + 1.5 + 2 = 22.5
-  //   ring outer bottom  = avatar center-y (19) + 22.5 = 41.5
-  //   badge center-y     = ring outer bottom + 2         = 43.5
-  //   badge top          = badge center-y - badge/2 (8)  = 35.5
-  //   badge bottom       = badge center-y + badge/2 (8)  = 51.5
-  //   `bottom` offset from the avatar's own bottom (38)  = -(51.5 - 38) = -13.5
-  // avatarWrap centers its children (alignItems: 'center'), which is what
-  // centers this horizontally too since no left/right is set.
+  // wash out or clash against any given video). V2 (less-AI pass): sits
+  // half off the avatar's own bottom edge (TikTok) — its center is the
+  // avatar's bottom edge, so `bottom` is minus half the badge (16 / 2).
+  // Hidden while the creator is live (see `isLive` above). avatarWrap
+  // centers its children, which centers this horizontally too.
   followBadge: {
-    position: 'absolute', bottom: -13.5, width: 16, height: 16, borderRadius: RADII.pill,
+    position: 'absolute', bottom: -8, width: 16, height: 16, borderRadius: RADII.pill,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: crispPx(1.5), borderColor: '#000',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
@@ -386,6 +391,10 @@ const styles = StyleSheet.create({
   btn: { minWidth: 38, alignItems: 'center', gap: 3 },
   actionContent: { width: 38, alignItems: 'center', gap: 3 },
   likeWrap: { width: 38, alignItems: 'center', justifyContent: 'center' },
+  likeRing: {
+    position: 'absolute', top: 2, width: 36, height: 36, borderRadius: RADII.pill,
+    borderWidth: 2, borderColor: '#EF4444',
+  },
   // 12pt semibold, pure white, one shared shadow — identical to
   // EngagementButton's own `count` style (components/EngagementButton.tsx)
   // so like/repost/save (EngagementButton-driven) and comment/share (plain,

@@ -60,7 +60,7 @@ import { enqueueEngagementRetry, isRetryableFailure, setEngagementRetryExecutor,
 
 import { computeJustDroppedDrops, type FollowedDrop } from '@/lib/justDroppedDrops';
 
-import { useApi } from '@/lib/api';
+import { useApi, type RecommendedBrand } from '@/lib/api';
 
 import { useSettled } from '@/lib/animationUtils';
 
@@ -162,6 +162,8 @@ import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { finishedVideoIds, loadFinishedVideos, markVideoFinished, reachedEnd, withoutFinished } from '@/lib/finishedVideos';
 
 import { useDataSaverSetting } from '@/hooks/useDataSaverSetting';
+import { useProductSoldOut } from '@/hooks/useProductSoldOut';
+import { DiscoverEntityCard } from '@/components/discover/DiscoverEntityCard';
 import { a11yHidden } from '@/lib/a11yHidden';
 
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
@@ -207,12 +209,31 @@ const THREAD_PAGE_SIZE = 30;
 //     sound row) — see the PR description for the exact numbers; this was
 //     tuned from the code's own layout constants, not a rendered screen.
 //   - CAPTION_BOTTOM_GAP: >=12pt from the sound line to the bar's top.
-const RAIL_BOTTOM_GAP = 24;
+const CAPTION_BOTTOM_GAP = 10;
+// Less-AI pass (V1): the rail's bottom is aligned to the caption block's
+// last line — the share count's baseline sits on the sound line's baseline
+// (TikTok For You, Mobbin:
+// https://mobbin.com/screens/e8a9730d-ff55-4ed9-b969-3918178bdf4a). Both
+// stacks are bottom-anchored to the same `bottomClearance`; the 3pt is the
+// difference between the sound text's baseline inside its 24pt pill (~7.5pt
+// up) and the 12pt count's baseline inside its 15pt line box (~4.5pt up).
+const RAIL_BOTTOM_GAP = CAPTION_BOTTOM_GAP + 3;
+// Less-AI pass (V6): the 2pt progress line sits on the very bottom edge of
+// the video, just above the floating tab bar's top pixel (track center this
+// far above `barTopInset`), not on the padded chrome line above it.
+const PROGRESS_ABOVE_BAR = 6;
+// How long the paused play glyph stays before fading (V9).
+const PAUSE_GLYPH_HOLD_MS = 600;
+// Less-AI pass (V5): the bottom gradient only covers the caption area —
+// the caption stack's usual height (product chip + name + 2-line caption +
+// sound line) plus a short fade above it.
+const CAPTION_SCRIM_HEIGHT = 190;
 
 // Top chrome rhythm — measured from TikTok's For You feed (Mobbin refs cited
 // in the PR): one row (icons + centered Following/Threads switcher) raised
 // as high as the safe area allows.
-const TOP_TABS_ROW_HEIGHT = 34;
+// 44pt (less-AI pass, V8): LIVE, cart and search share one 44pt row.
+const TOP_TABS_ROW_HEIGHT = 44;
 // How many times a feed's content repeats (under unique keys) once it has
 // no more real pages behind it, so scrolling never dead-ends or shows an
 // end card — see the `canLoopFeed`/`displayItems` comment below.
@@ -876,8 +897,58 @@ function isJustDroppedItem(item: unknown): item is JustDroppedRailItem {
   return !!item && typeof item === 'object' && (item as JustDroppedRailItem)._isJustDropped === true;
 }
 
+// ─── End of feed: brands to follow (less-AI pass, V12) ────────────────────────
+interface FeedEndItem {
+  _isFeedEnd: true;
+  id: string;
+  brands: RecommendedBrand[];
+}
+function isFeedEndItem(item: unknown): item is FeedEndItem {
+  return !!item && typeof item === 'object' && (item as FeedEndItem)._isFeedEnd === true;
+}
+
 // Union of all possible displayable items in the FlatList
-type FeedItem = SpotlightItem | LiveStreamFeedItem | BuyerDemandPageItem | JustDroppedRailItem | SponsoredFeedItem;
+type FeedItem = SpotlightItem | LiveStreamFeedItem | BuyerDemandPageItem | JustDroppedRailItem | SponsoredFeedItem | FeedEndItem;
+/**
+ * Where the real For You content runs out: a row of brands to follow from
+ * the buyer's own recommendations (GET /api/buyer/recommended-brands — the
+ * same source as Discover's "Brands you might like"), each with its real
+ * Follow button, instead of nothing/a text line. Only inserted when that
+ * endpoint returns brands; otherwise the feed simply continues.
+ */
+function FeedEndRecommendationsPage({
+  brands, pageWidth, pageHeight, onOpenBrand,
+}: {
+  brands: RecommendedBrand[];
+  pageWidth: number;
+  pageHeight: number;
+  onOpenBrand: (brand: RecommendedBrand) => void;
+}) {
+  const { theme } = useAppTheme();
+  return (
+    <View
+      style={{ width: pageWidth, height: pageHeight, backgroundColor: theme.background, justifyContent: 'center' }}
+      testID="feed-end-recommendations"
+    >
+      <Text style={[styles.feedEndTitle, { color: theme.text }]} accessibilityRole="header">Brands to follow</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.feedEndScroller} contentContainerStyle={styles.feedEndTrack}>
+        {brands.map((brand) => (
+          <View key={brand.id} style={styles.feedEndCard}>
+            <DiscoverEntityCard
+              id={brand.sellerId}
+              name={brand.name}
+              imageUri={brand.logoUrl ?? undefined}
+              verified={brand.verified}
+              subline={brand.reason}
+              fallbackIcon="shopping-bag"
+              onPress={() => onOpenBrand(brand)}
+            />
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
 
 function JustDroppedRailPage({
   drops, pageWidth, pageHeight, bottomClearance, onOpenDrop, onSeeAll,
@@ -1315,9 +1386,22 @@ function LiveVideoVisual({
   // Kept mounted (opacity-only), not conditionally rendered — conditional
   // mount/unmount can only pop the pause glyph in, never fade it out on
   // release, since it's gone from the tree the instant `paused` flips back.
+  //
+  // Less-AI pass (V9): on pause the large translucent play glyph appears,
+  // holds 0.6s, then fades out — it tells the buyer the tap paused the
+  // video, then gets out of the way. Resuming hides it straight away.
   const pauseOverlayOpacity = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(pauseOverlayOpacity, { toValue: paused ? 1 : 0, duration: 180, useNativeDriver: true }).start();
+    pauseOverlayOpacity.stopAnimation();
+    if (!paused) {
+      Animated.timing(pauseOverlayOpacity, { toValue: 0, duration: 120, useNativeDriver: true }).start();
+      return;
+    }
+    Animated.sequence([
+      Animated.timing(pauseOverlayOpacity, { toValue: 1, duration: 120, useNativeDriver: true }),
+      Animated.delay(PAUSE_GLYPH_HOLD_MS),
+      Animated.timing(pauseOverlayOpacity, { toValue: 0, duration: 240, useNativeDriver: true }),
+    ]).start();
   }, [paused, pauseOverlayOpacity]);
   // `playingChange`'s `isPlaying: true` (used alone, previously) fires the
   // instant `player.play()` is *called* — on web this is wired to the
@@ -1473,8 +1557,8 @@ function LiveVideoVisual({
           nativeControls={false}
           onFirstFrameRender={() => setFirstFrameRendered(true)}
         />
-        <Animated.View style={[styles.pauseOverlay, { opacity: pauseOverlayOpacity }]} pointerEvents="none">
-          <FontAwesome name="play" size={56} color={ON_DARK} />
+        <Animated.View style={[styles.pauseOverlay, { opacity: pauseOverlayOpacity }]} pointerEvents="none" testID="feed-pause-glyph">
+          <FontAwesome name="play" size={72} color={ON_DARK} style={styles.pauseGlyph} />
         </Animated.View>
       </View>
       {captions && isActive ? (
@@ -1636,6 +1720,9 @@ function SpotlightPageImpl({
     return () => clearTimeout(timer);
   }, [isActive, item.productTags?.length, reduceMotion, shopTagOpacity]);
   const onVideoFinished = useCallback(() => markVideoFinished(feedPostId(item.id)), [item.id]);
+  // Real sold-out state for the tagged product chip (V10) — asked only for
+  // the active page and its neighbours, cached per product.
+  const tagSoldOut = useProductSoldOut(item.productTags?.[0]?.productId, isActive || preload);
   // Real rendered height of the caption/sound stack below — see
   // CaptionBlock's `onHeightChange` and ScrubProgressBar's own comment.
   // Starts at the taller of the two nominal minimums so the very first
@@ -1825,7 +1912,12 @@ function SpotlightPageImpl({
                 posterPriority={isFirstItem ? 'high' : undefined}
                 fallbackColor={item.accentColor}
                 immersive={immersive}
-                progressBottom={immersive ? bottomClearance : undefined}
+                // V6: on the video's very bottom edge, just above the tab
+                // bar's top pixel (the creator player has no tab bar, so
+                // it keeps the chrome line).
+                progressBottom={immersive
+                  ? (hasTabBar && videoFrameInset != null ? videoFrameInset + PROGRESS_ABOVE_BAR - 1 : bottomClearance)
+                  : undefined}
                 // Drag-time scrub bubble must clear the WHOLE caption/sound
                 // stack (see ScrubProgressBar's comment) — its top edge is
                 // this same bottomClearance anchor plus CAPTION_BOTTOM_GAP
@@ -2027,6 +2119,7 @@ function SpotlightPageImpl({
               extraCount={Math.max(0, item.productTags.length - 1)}
               onPress={() => onShopTag(item, item.productTags![0])}
               state={shopTagPillState}
+              soldOut={tagSoldOut}
             />
           </Animated.View>
         )}
@@ -2215,10 +2308,18 @@ export default function FeedScreen({
   // topBar's own paddingTop plus that one row's height — single source of
   // truth so BuyerHighDemandPage's content never renders underneath it
   // (see styles.topBar / styles.buyerTopRow below).
-  const buyerHeaderHeight = previewTopInset + 4 + TOP_TABS_ROW_HEIGHT + 6;
-  // Cart sits beside LIVE, away from the right edge. Narrow phones use a
-  // tighter gap and gutter so the centered tabs still clear both 24pt icons.
-  const topRowIconGap = windowWidth < 350 ? 8 : 14;
+  //
+  // V8 (less-AI pass): the row is 44pt tall; its top padding drops by the
+  // same 5pt its half-height grew, so the icons/tabs' center line (and
+  // buyerHeaderHeight below) stays where it was.
+  const buyerTopRowPaddingTop = Math.max(0, previewTopInset - 1);
+  const buyerHeaderHeight = buyerTopRowPaddingTop + TOP_TABS_ROW_HEIGHT + 1;
+  // Cart sits beside LIVE, away from the right edge. 20pt between 24pt
+  // glyphs = each icon's 44pt touch box (hitSlop of half the gap each side)
+  // tiles exactly against its neighbour — LIVE, cart and search all get the
+  // same 44x44 target and the same spacing. Narrow phones use a tighter gap
+  // and gutter so the centered tabs still clear both 24pt icons.
+  const topRowIconGap = windowWidth < 350 ? 8 : 20;
   const topRowSideGutter = windowWidth < 350 ? 12 : 16;
   // Guard width for the centered tabs (buyerTabSwitcherWrap below): the
   // left cluster is 2 icons (LIVE, cart), the right is search alone.
@@ -2686,6 +2787,18 @@ export default function FeedScreen({
     return () => { active = false; };
   }, [api, isBuyerSurface]);
 
+  // End-of-feed brands to follow (V12) — the buyer's real recommendations;
+  // an empty or failed response leaves the end page out entirely.
+  const [feedEndBrands, setFeedEndBrands] = useState<RecommendedBrand[]>([]);
+  useEffect(() => {
+    if (!isBuyerSurface || isCreatorFeed || !userId) { setFeedEndBrands([]); return; }
+    let active = true;
+    api.buyer.recommendedBrands(12)
+      .then((res) => { if (active) setFeedEndBrands(Array.isArray(res?.brands) ? res.brands : []); })
+      .catch(() => { if (active) setFeedEndBrands([]); });
+    return () => { active = false; };
+  }, [api, isBuyerSurface, isCreatorFeed, userId]);
+
   // Add engagement entries for newly loaded seller posts
   useEffect(() => {
     if (sellerFeedPosts.length === 0) return;
@@ -2826,19 +2939,25 @@ export default function FeedScreen({
   // filter is active (a filtered result set has a real, meaningful end) or
   // to the single-creator/product player (a deliberate end there is fine).
   const canLoopFeed = !searchQuery.trim() && !feedHasMore && filteredContentItems.length > 1 && !isCreatorFeed;
+  // End of the real For You content (V12): the brands-to-follow page goes
+  // right after the last real post, once — the loop (above) then carries on
+  // after it as before.
+  const showFeedEnd = feedTab === 'for-you' && !searchQuery.trim() && !feedHasMore && !isCreatorFeed
+    && filteredContentItems.length > 0 && feedEndBrands.length > 0;
   const displayItems: FeedItem[] = useMemo(() => {
     const base = feedAds.items as FeedItem[];
     // Repeats skip videos already watched to the end when anything else is
     // left to show (#147); the loop itself still never dead-ends.
     const repeatBase = canLoopFeed ? withoutFinished(base.filter(item => !isSponsoredFeedItem(item)), finishedVideoIds()) as FeedItem[] : base;
+    const endPage: FeedItem[] = showFeedEnd ? [{_isFeedEnd: true, id: "feed-end-recommendations", brands: feedEndBrands}] : [];
     const content = canLoopFeed
       ? Array.from({ length: FEED_LOOP_REPEAT }, (_, cycle) => (
-          cycle === 0 ? base : repeatBase.map(item => ({ ...item, id: `${item.id}__loop${cycle}` }))
+          cycle === 0 ? [...base, ...endPage] : repeatBase.map(item => ({ ...item, id: `${item.id}__loop${cycle}` }))
         )).flat()
-      : base;
+      : [...base, ...endPage];
     if (!buyerMode) return content;
     return [DEMAND_PAGE_SENTINEL, ...content];
-  }, [buyerMode, feedAds.items, canLoopFeed]);
+  }, [buyerMode, feedAds.items, canLoopFeed, showFeedEnd, feedEndBrands]);
   useScreenInteractive('feed', !feedLoading || displayItems.length > 0);
 
   // buyerOffset: used to compute correct isActive for video playback when the
@@ -3469,6 +3588,16 @@ export default function FeedScreen({
               />
             );
           }
+          if (isFeedEndItem(item)) {
+            return (
+              <FeedEndRecommendationsPage
+                brands={item.brands}
+                pageWidth={pageWidth}
+                pageHeight={pageHeight}
+                onOpenBrand={(brand) => router.push(`/seller-profile?id=${encodeURIComponent(brand.sellerId)}&src=feed` as never)}
+              />
+            );
+          }
           if (isJustDroppedItem(item)) {
             return (
               <JustDroppedRailPage
@@ -3563,11 +3692,13 @@ export default function FeedScreen({
             locations={[0, 0.5, 1]}
             style={[styles.topScrim, { height: 140 }]}
           />
+          {/* V5 (less-AI pass): one soft black 0 → 60% gradient sized to
+              the caption area only (chrome anchor + caption stack + a short
+              fade above it), not a fixed 260pt band. */}
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.42)', 'rgba(0,0,0,0.6)']}
-            locations={[0, 0.35, 0.7, 1]}
-            style={[styles.bottomScrim, { height: 260 }]}
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.6)']}
+            style={[styles.bottomScrim, { height: bottomClearance + CAPTION_BOTTOM_GAP + CAPTION_SCRIM_HEIGHT }]}
           />
           <LinearGradient
             pointerEvents="none"
@@ -3627,7 +3758,7 @@ export default function FeedScreen({
           style={[
             styles.topBar,
             {
-              paddingTop: previewTopInset + 4,
+              paddingTop: buyerTopRowPaddingTop,
               // Add the real safe-area inset on top of the device-width
               // gutter so no top-row icon ever reaches a notch or edge.
               paddingLeft: topRowSideGutter + insets.left,
@@ -3665,7 +3796,7 @@ export default function FeedScreen({
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Live"
-                hitSlop={{ top: 4, bottom: 4, left: 10, right: topRowIconGap / 2 }}
+                hitSlop={{ top: 0, bottom: 0, left: topRowIconGap / 2, right: topRowIconGap / 2 }}
                 testID="buyer-home-live"
               >
                 <Icon name="tv" size={24} color={ON_DARK} />
@@ -3679,7 +3810,7 @@ export default function FeedScreen({
                   }}
                   accessibilityRole="button"
                   accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
-                  hitSlop={{ top: 4, bottom: 4, left: topRowIconGap / 2, right: 7 }}
+                  hitSlop={{ top: 0, bottom: 0, left: topRowIconGap / 2, right: topRowIconGap / 2 }}
                   testID="buyer-home-cart-icon"
                 >
                   <Icon name="shopping-cart" size={24} color={ON_DARK} />
@@ -3731,7 +3862,7 @@ export default function FeedScreen({
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Search"
-                hitSlop={{ top: 4, bottom: 4, left: 10, right: 10 }}
+                hitSlop={{ top: 0, bottom: 0, left: topRowIconGap / 2, right: topRowIconGap / 2 }}
                 testID="buyer-home-search-icon"
               >
                 <Icon name="search" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
@@ -3907,6 +4038,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: SCREEN_BG },
 
   pauseOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+  // Translucent (V9) — reads as a state cue over the frame, not a button.
+  pauseGlyph: { opacity: 0.55, marginLeft: 8 },
   mediaPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#17131D' },
   heartBurst: { position: 'absolute', width: HEART_BURST_SIZE, height: HEART_BURST_SIZE },
   heartBurstHidden: { left: -9999, top: -9999 },
@@ -3928,7 +4061,9 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.25)',
   },
   progressFill: {
-    height: '100%', borderRadius: RADII.pill, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.9)',
+    // Solid white fill on the dim (25%) track (V6).
+    height: '100%', borderRadius: RADII.pill, overflow: 'hidden', backgroundColor: '#FFFFFF',
+    shadowColor: '#fff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 4,
   },
   scrubBubble: {
     position: 'absolute', minWidth: 40, alignItems: 'center',
@@ -4012,7 +4147,9 @@ const styles = StyleSheet.create({
   // button above, same pattern as the rest of this row) — sized to match
   // the icons exactly so the per-cluster width math in the PR description
   // (icons + topRowIconGap) is exact, not padded by an oversized button box.
-  buyerTopIconBtn: { width: 24, height: 36, alignItems: 'center', justifyContent: 'center' },
+  // 44pt tall (V8) — the full row height — so every icon's vertical touch
+  // target is 44 without hitSlop.
+  buyerTopIconBtn: { width: 24, height: TOP_TABS_ROW_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   // Full 44x44 touch target — used by the creator-profile-videos player's
   // simpler back/cart top bar (isCreatorFeed), distinct from the compact
   // buyer Threads Home top row above which needs to fit more controls.
@@ -4145,7 +4282,13 @@ const styles = StyleSheet.create({
   },
   commentSendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 
-  notifRow: { fontSize: 13, fontFamily: FONT.regular, color: FG, paddingBottom: 14 },
+  notifRow: { fontSize: 13.5, fontFamily: FONT.regular, color: FG, paddingBottom: 14 },
+  feedEndTitle: { fontSize: FS.lg, fontFamily: FONT.bold, paddingHorizontal: SP.md, marginBottom: SP.md },
+  // flexGrow 0 + flex-start: the row keeps its cards' own height and stays
+  // vertically centered on the page instead of stretching to fill it.
+  feedEndScroller: { flexGrow: 0 },
+  feedEndTrack: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: SP.md },
+  feedEndCard: { width: 150 },
   feedFooter: {
     width: '100%', height: 72, alignItems: 'center', justifyContent: 'center', gap: 10,
     backgroundColor: '#000000',
