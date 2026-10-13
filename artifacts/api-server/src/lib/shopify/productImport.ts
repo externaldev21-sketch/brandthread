@@ -7,11 +7,14 @@ import { and, eq, inArray, ne } from "drizzle-orm";
 import { db, products, productVariants, shopifyProductLinks } from "@workspace/db";
 import { ShopifyAdminClient } from "./adminClient";
 import { toBrandthreadProduct, deterministicSku } from "../shopifyImport";
+import { checkListingIntegrity } from "../listingIntegrity";
 
 export type ImportSummary = {
   imported: number;
   updated: number;
   skipped: Array<{ shopifyProductId: string; reason: string }>;
+  /** Imported as drafts because the text names a protected brand or counterfeit term. */
+  held?: Array<{ shopifyProductId: string; terms: string[] }>;
 };
 
 /** Reuses the seller's own SKU when it is free; otherwise falls back to a deterministic one (SKUs are globally unique). */
@@ -46,6 +49,10 @@ export async function importShopifyProducts(params: {
       const { product } = await client.getProduct(shopifyProductId);
       const normalized = toBrandthreadProduct(product);
       const existingLink = linkByShopifyId.get(shopifyProductId);
+      const integrityHits = await checkListingIntegrity(params.ownerId, normalized);
+      if (integrityHits) {
+        (summary.held ??= []).push({ shopifyProductId, terms: integrityHits.map((h) => h.term) });
+      }
 
       if (existingLink) {
         // ── Update in place ────────────────────────────────────────────────
@@ -55,6 +62,8 @@ export async function importShopifyProducts(params: {
           category: normalized.category,
           images: normalized.images,
           tags: normalized.tags,
+          // A re-import that brings in blocked words takes the listing down to a draft.
+          ...(integrityHits ? { status: "draft" } : {}),
           updatedAt: new Date(),
         }).where(eq(products.id, existingLink.brandthreadProductId));
 
@@ -102,7 +111,7 @@ export async function importShopifyProducts(params: {
         name: normalized.name,
         description: normalized.description,
         category: normalized.category,
-        status: params.publishStatus,
+        status: integrityHits ? "draft" : params.publishStatus,
         images: normalized.images,
         tags: normalized.tags,
       }).returning({ id: products.id });
