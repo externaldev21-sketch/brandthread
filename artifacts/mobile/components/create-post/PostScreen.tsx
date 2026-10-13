@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT } from '@/lib/theme';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
-import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { getTaggableProducts } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import type { PostProductTag, PostVisibility } from '@/services/types';
@@ -32,6 +32,7 @@ import { crispPx } from '@/lib/crispPixel';
 import { formatMoney } from '@/lib/format';
 import { PollPage } from '@/components/create-post/PollPage';
 import { formatPollLength } from '@/lib/postPolls';
+import { insertMentionLabel, MAX_PRODUCT_MENTIONS, splitProductMentions, type PostProductMention } from '@/lib/captionMentions';
 
 const MAX_PRODUCT_TAGS = 5;
 const isPreview = () => isSellerDevPreview() || isBuyerDevPreview();
@@ -171,6 +172,68 @@ function ProductsPage({ tags, onChange, onBack }: { tags: PostProductTag[]; onCh
   );
 }
 
+/**
+ * "Mention a product" — TikTok's caption picker pattern (search list, tap to
+ * insert): picking one of your products writes its name into the caption at
+ * the cursor; readers can tap that name to open the product.
+ */
+function ProductMentionPage({ mentions, onPick, onRemove, onBack }: {
+  mentions: PostProductMention[]; onPick: (p: Product) => void; onRemove: (m: PostProductMention) => void; onBack: () => void;
+}) {
+  const [products, setProducts] = useState<Product[] | null>(null);
+  const [query, setQuery] = useState('');
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => {
+    // Signed-out preview has no catalog; the demo preview (?demo=1) uses its local demo products.
+    if (isPreview() && !isPreviewDemoMode()) { setProducts([]); return; }
+    let live = true;
+    getTaggableProducts().then((p) => { if (live) setProducts(p); }).catch(() => { if (live) setProducts([]); });
+    return () => { live = false; };
+  }, []);
+  const shown = (products ?? []).filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()));
+  return (
+    <SubPage title="Mention a product" onBack={onBack} testID="mention-products-page">
+      <View style={s.search}>
+        <Feather name="search" size={18} color={CP.silverDim} />
+        <TextInput value={query} onChangeText={setQuery} placeholder="Search your products" placeholderTextColor={CP.silverDim} style={s.searchInput} testID="mention-products-search" />
+      </View>
+      {note ? <Text style={[s.hintCenter, { color: CP.white }]}>{note}</Text> : null}
+      {products === null ? <ActivityIndicator color={CP.white} style={{ marginTop: 40 }} /> : shown.length === 0 ? (
+        <View style={s.emptyWrap}>
+          <Text style={s.emptyTitle}>{(products ?? []).length === 0 ? 'No products to mention yet' : 'No matches'}</Text>
+          <Text style={s.emptyBody}>{(products ?? []).length === 0 ? 'Add a product to your store and you can mention it here.' : 'Try a different search.'}</Text>
+        </View>
+      ) : (
+        <ScrollView keyboardShouldPersistTaps="handled">
+          {shown.map((p) => {
+            const current = mentions.find((m) => m.productId === p.id);
+            return (
+              <Pressable
+                key={p.id}
+                style={s.productRow}
+                accessibilityRole="button"
+                testID={`mention-product-${p.id}`}
+                onPress={() => {
+                  tap();
+                  if (current) { onRemove(current); setNote(null); return; }
+                  if (mentions.length >= MAX_PRODUCT_MENTIONS) { setNote(`You can mention up to ${MAX_PRODUCT_MENTIONS} products.`); return; }
+                  onPick(p);
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={s.rowLabel} numberOfLines={1}>{p.name}</Text>
+                  <Text style={s.rowValue}>{formatCents(p.pricing.priceCents)}</Text>
+                </View>
+                <View style={[s.check, !!current && s.checkOn]}>{current ? <Feather name="check" size={14} color={CP.black} /> : null}</View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+    </SubPage>
+  );
+}
+
 function VisibilityPage({ visibility, noun, onChange, onBack }: {
   visibility: PostVisibility; noun: string; onChange: (v: PostVisibility) => void; onBack: () => void;
 }) {
@@ -195,7 +258,11 @@ function VisibilityPage({ visibility, noun, onChange, onBack }: {
   );
 }
 
-function OptionsPage({ visibility, onChange, onBack }: { visibility: PostVisibility; onChange: (v: PostVisibility) => void; onBack: () => void }) {
+function OptionsPage({ visibility, onChange, onBack, bts, onBts }: {
+  visibility: PostVisibility; onChange: (v: PostVisibility) => void; onBack: () => void;
+  /** Sellers only: "Behind the scenes" label. Omitted for buyers. */
+  bts?: boolean; onBts?: (v: boolean) => void;
+}) {
   const items: Array<{ key: 'allowComments' | 'allowReposts' | 'showLikeCount' | 'allowDownloads'; label: string }> = [
     { key: 'allowComments', label: 'Allow comments' },
     { key: 'allowReposts', label: 'Allow reposts' },
@@ -210,6 +277,12 @@ function OptionsPage({ visibility, onChange, onBack }: { visibility: PostVisibil
           <HapticSwitch value={visibility[it.key] !== false} onValueChange={(v: boolean) => onChange({ ...visibility, [it.key]: v })} testID={`option-${it.key}`} accessibilityLabel={it.label} />
         </View>
       ))}
+      {onBts ? (
+        <View style={s.productRow}>
+          <Text style={[s.rowLabel, { flex: 1 }]}>Behind the scenes</Text>
+          <HapticSwitch value={!!bts} onValueChange={(v: boolean) => onBts(v)} testID="option-bts" accessibilityLabel="Behind the scenes" />
+        </View>
+      ) : null}
     </SubPage>
   );
 }
@@ -392,7 +465,7 @@ export function PostScreen({
   const [confirmExit, setConfirmExit] = useState(false);
   const input = useRef<TextInput>(null);
   const [cursor, setCursor] = useState(details.caption.length);
-  const [page, setPage] = useState<null | 'products' | 'visibility' | 'options' | 'schedule' | 'cover' | 'people' | 'poll'>(null);
+  const [page, setPage] = useState<null | 'products' | 'visibility' | 'options' | 'schedule' | 'cover' | 'people' | 'poll' | 'mentions'>(null);
   const [people, setPeople] = useState<MentionPerson[]>([]);
   const noun = mode === 'thread' ? 'thread' : 'post';
   const token = activeToken(details.caption, cursor);
@@ -434,6 +507,25 @@ export function PostScreen({
   }
 
   const mentionCount = tokens.filter((t) => t.kind === 'mention').length;
+  const productMentions = (details.productMentions ?? []).filter((m) => details.caption.includes(m.label));
+  function pickMentionProduct(p: Product) {
+    const r = insertMentionLabel(details.caption, cursor, p.name, CAPTION_MAX);
+    if (r.text === details.caption) return;
+    onDetails({
+      ...details,
+      caption: r.text,
+      productMentions: [...productMentions, { productId: p.id, label: p.name, name: p.name, priceCents: p.pricing.priceCents }],
+    });
+    setCursor(r.cursor);
+    setPage(null);
+  }
+  function removeMentionProduct(m: PostProductMention) {
+    const at = details.caption.indexOf(m.label);
+    const caption = at < 0 ? details.caption
+      : (details.caption.slice(0, at) + details.caption.slice(at + m.label.length)).replace(/ {2,}/g, ' ').trim();
+    onDetails({ ...details, caption, productMentions: productMentions.filter((x) => x.productId !== m.productId) });
+    setCursor(caption.length);
+  }
   const scheduled = details.scheduledAt ? new Date(details.scheduledAt) : null;
   const postLabel = scheduled ? 'Schedule' : 'Post';
 
@@ -445,9 +537,13 @@ export function PostScreen({
           <View style={s.captionRow}>
             <View style={s.captionBox}>
               <Text style={[s.captionText, s.mirror]} pointerEvents="none" aria-hidden>
-                {details.caption.length === 0 ? '' : tokens.map((t, i) => (
+                {details.caption.length === 0 ? '' : tokens.map((t, i) => (t.kind === 'text' && productMentions.length > 0 ? (
+                  <Text key={i}>{splitProductMentions(t.text, productMentions).map((m, j) => (
+                    <Text key={j} style={m.kind === 'product' ? s.tokenText : undefined}>{m.text}</Text>
+                  ))}</Text>
+                ) : (
                   <Text key={i} style={t.kind === 'text' ? undefined : s.tokenText}>{t.text}</Text>
-                ))}
+                )))}
               </Text>
               <TextInput
                 ref={input}
@@ -491,6 +587,9 @@ export function PostScreen({
           {isSeller ? (
             <OptionRow icon="tag" label="Tag products" value={details.productTags.length ? `${details.productTags.length} tagged` : undefined} onPress={() => setPage('products')} testID="row-products" />
           ) : null}
+          {isSeller ? (
+            <OptionRow icon="shopping-bag" label="Mention a product" value={productMentions.length ? `${productMentions.length} in caption` : undefined} onPress={() => setPage('mentions')} testID="row-mention-products" />
+          ) : null}
           <OptionRow
             icon={(details.visibility.isPublic ?? true) ? 'globe' : 'lock'}
             label={isPost ? 'Audience' : (details.visibility.isPublic ?? true) ? `Everyone can view this ${noun}` : `Only you can view this ${noun}`}
@@ -524,7 +623,8 @@ export function PostScreen({
       {confirmExit ? <DiscardPage onSave={() => { setConfirmExit(false); onSubmit(true); }} onDiscard={() => { setConfirmExit(false); onDiscard(); }} onKeep={() => setConfirmExit(false)} /> : null}
       {page === 'products' ? <ProductsPage tags={details.productTags} onChange={(productTags) => onDetails({ ...details, productTags })} onBack={() => setPage(null)} /> : null}
       {page === 'visibility' ? <VisibilityPage visibility={details.visibility} noun={noun} onChange={(visibility) => onDetails({ ...details, visibility })} onBack={() => setPage(null)} /> : null}
-      {page === 'options' ? <OptionsPage visibility={details.visibility} onChange={(visibility) => onDetails({ ...details, visibility })} onBack={() => setPage(null)} /> : null}
+      {page === 'options' ? <OptionsPage visibility={details.visibility} onChange={(visibility) => onDetails({ ...details, visibility })} onBack={() => setPage(null)} bts={details.bts} onBts={isSeller ? (bts) => onDetails({ ...details, bts }) : undefined} /> : null}
+      {page === 'mentions' ? <ProductMentionPage mentions={productMentions} onPick={pickMentionProduct} onRemove={removeMentionProduct} onBack={() => setPage(null)} /> : null}
       {page === 'schedule' ? <SchedulePage value={details.scheduledAt} onChange={(scheduledAt) => onDetails({ ...details, scheduledAt })} onBack={() => setPage(null)} /> : null}
       {page === 'cover' && media?.kind === 'slides' ? <SlideCoverPage media={media} onPick={(coverIndex) => onMedia({ ...media, coverIndex })} onBack={() => setPage(null)} /> : null}
       {page === 'cover' && media?.kind === 'video' ? (

@@ -37,6 +37,8 @@ import { createThreadFeedCursor, getSellerFollowStates, getThreadPostsPage, setS
 import { confirmSponsoredImpression } from '@/services/sponsoredService';
 
 import { getThreadsFirstPage } from '@/services/threadsFollowedFirst';
+import type { SellerThreadPost } from '@/services/socialService';
+import { BTS_LABEL_TEXT, type PostProductMention } from '@/lib/captionMentions';
 import * as Haptics from 'expo-haptics';
 import { isPreviewDemoMode, isBuyerDevPreview } from '@/lib/devPreview';
 
@@ -485,8 +487,23 @@ interface SpotlightItem {
   allowDownloads?: boolean;
   /** Seller's "Allow reposts" post option (missing = allowed). */
   allowReposts?: boolean;
+  /** Caption labels linked to the seller's products (tappable in the caption). */
+  productMentions?: PostProductMention[];
+  /** Post labels, e.g. 'bts' → "Behind the scenes" line above the caption. */
+  labels?: string[];
 }
 type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
+
+/** A caption product mention opens the same Shop sheet as a product tag, scoped to just the mentioned product (straight to its detail). */
+function mentionShopTarget(item: SpotlightItem, mention: PostProductMention): [SpotlightItem, SpotlightProductTag] {
+  const tag: SpotlightProductTag = item.productTags?.find((t) => t.productId === mention.productId) ?? {
+    productId: mention.productId,
+    productName: mention.name ?? mention.label,
+    priceCents: mention.priceCents ?? 0,
+    imageUri: mention.imageUri,
+  };
+  return [{ ...item, productTags: [tag] }, tag];
+}
 
 const SOUND_PREF_KEY = 'bt:feed-sound-on:v1';
 
@@ -2088,6 +2105,9 @@ function SpotlightPageImpl({
         verified={!!item.verified}
         sponsored={item.sponsored}
         remixCredit={item.remixCredit}
+        postLabel={item.labels?.includes('bts') ? BTS_LABEL_TEXT : undefined}
+        productMentions={item.productMentions}
+        onProductMention={(mention) => onShopTag(...mentionShopTarget(item, mention))}
         caption={item.caption}
         sound={item.sound}
         soundOn={soundOn}
@@ -2185,6 +2205,8 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     sponsoredBoostId: post.sponsoredBoostId,
     allowDownloads: post.visibility?.allowDownloads !== false,
     allowReposts: post.visibility?.allowReposts !== false,
+    productMentions: post.productMentions,
+    labels: post.labels,
   };
 }
 

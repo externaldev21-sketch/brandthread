@@ -13,6 +13,7 @@ import { extractHashtags } from '@/lib/createPost/caption';
 import type { PublishInput } from '@/lib/createPost/types';
 import { createSellerPost, updateSellerPost, type SellerThreadPost } from '@/services/socialService';
 import type { useApi } from '@/lib/api';
+import { syncPostExtras } from '@/services/postExtrasService';
 
 type Api = ReturnType<typeof useApi>;
 
@@ -160,6 +161,7 @@ export async function publishCreatePost({ api, input, editId, onProgress, signal
         postStatus: isDraft ? 'draft' : details.scheduledAt ? 'scheduled' : 'published',
       })
     : await createSellerPost(values);
+  await syncPostExtras(post.id, details, { editing: !!editId });
   onProgress(1, 'saving');
   return post;
 }

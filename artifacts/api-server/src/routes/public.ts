@@ -3,6 +3,7 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { attachQuoteData } from "../lib/quotedPosts";
+import { attachPostExtras } from "../lib/postExtras";
 import { Router } from "express";
 import { locationsByPlaceId } from "../lib/places";
 import { publicCoverFields } from "../lib/profileCover";
@@ -2072,7 +2073,7 @@ router.get("/posts", async (req, res) => {
       ...stateFor(p.id),
     }));
 
-    return res.json(await attachQuoteData(baseResult, viewerId));
+    return res.json(await attachPostExtras(await attachQuoteData(baseResult, viewerId)));
   } catch (err) {
     req.log.error({ err }, "Failed to fetch public posts");
     return res.status(500).json({ error: "Failed to fetch posts" });

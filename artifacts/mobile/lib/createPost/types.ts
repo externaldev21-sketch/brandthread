@@ -3,6 +3,7 @@ import type { SlideCrop } from '@/lib/createPost/crop';
 import type { Adjust } from '@/lib/createPost/adjust';
 import type { PostProductTag, PostVisibility } from '@/services/types';
 import type { PollDraft } from '@/lib/postPolls';
+import type { PostProductMention } from '@/lib/captionMentions';
 
 /** One item from the device library (or, on web, a file the user chose). */
 export interface PickedAsset {
@@ -61,6 +62,10 @@ export interface PostDetails {
   scheduledAt: string | null;
   /** Thread poll (X-style), attached right after the Thread is created. */
   poll?: PollDraft | null;
+  /** Seller only: caption labels linked to their own products (lib/captionMentions.ts). */
+  productMentions?: PostProductMention[];
+  /** Seller only: "Behind the scenes" label. */
+  bts?: boolean;
 }
 
 export interface PublishInput {
