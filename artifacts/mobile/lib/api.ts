@@ -3176,6 +3176,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         maxUses?: number | null;
         singleUse?: boolean;
         oneUsePerCustomer?: boolean;
+        maxUsesPerCustomer?: number | null;
+        scheduleTimeZone?: string | null;
         startsAt?: string | null;
         expiresAt?: string | null;
         /** Live-only code: valid only for this stream, while it is live. */
@@ -3188,6 +3190,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         minOrderCents?: number;
         maxUses?: number | null;
         oneUsePerCustomer?: boolean;
+        maxUsesPerCustomer?: number | null;
+        scheduleTimeZone?: string | null;
         appliesTo?: 'entire_store' | 'specific_products' | 'collections';
         productIds?: string[];
         collectionIds?: string[];
@@ -3207,12 +3211,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       create: (data: {
         name: string; discountType: 'percent' | 'fixed'; value: number;
         scope: 'store' | 'products' | 'collection'; productIds?: string[]; collection?: string | null;
-        startsAt?: string | null; endsAt?: string | null; active?: boolean;
+        startsAt?: string | null; endsAt?: string | null; active?: boolean; scheduleTimeZone?: string | null;
       }) => post<any>('/api/sales', data),
       update: (id: string, data: Partial<{
         name: string; discountType: 'percent' | 'fixed'; value: number;
         scope: 'store' | 'products' | 'collection'; productIds: string[]; collection: string | null;
-        startsAt: string | null; endsAt: string | null; active: boolean;
+        startsAt: string | null; endsAt: string | null; active: boolean; scheduleTimeZone: string | null;
       }>) => patch<any>(`/api/sales/${id}`, data),
       delete: (id: string) => del<any>(`/api/sales/${id}`),
     },

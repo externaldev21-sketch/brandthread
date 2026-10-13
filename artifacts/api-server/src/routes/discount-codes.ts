@@ -1,10 +1,11 @@
 import { Router } from "express";
-import { db, discountCodes, discountCodeUses, liveStreams, products, shopifyImportCollections } from "@workspace/db";
+import { db, discountCodes, discountCodeUses, liveStreams, products, shopifyImportCollections, users } from "@workspace/db";
 import { broadcastToRoom } from "../ws/liveHub";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requirePermission } from "../middlewares/requireRole";
 import { validateDiscountCode, DiscountValidationError } from "../lib/discounts";
+import { parseInstant, parseTimeZone } from "../lib/scheduleWindow";
 import crypto from "crypto";
 
 const router = Router();
@@ -15,8 +16,11 @@ const VALID_APPLIES_TO = ["entire_store", "specific_products", "collections"] as
 
 /** Validates the newer optional rules shared by create + update; returns an error message or null. */
 async function validateExtensions(sellerId: string, v: {
-  appliesTo?: string; collectionIds?: unknown; maxUsesPerCustomer?: unknown; minQuantity?: unknown;
+  appliesTo?: string; collectionIds?: unknown; maxUsesPerCustomer?: unknown; minQuantity?: unknown; maxUses?: unknown;
 }): Promise<string | null> {
+  if (v.maxUses != null && (!Number.isInteger(v.maxUses) || (v.maxUses as number) < 1)) {
+    return "maxUses must be a whole number of at least 1";
+  }
   if (v.appliesTo === "collections") {
     const ids = Array.isArray(v.collectionIds) ? v.collectionIds.filter((id): id is string => typeof id === "string") : [];
     if (ids.length === 0) return "collectionIds must be a non-empty array when appliesTo is collections";
@@ -33,6 +37,31 @@ async function validateExtensions(sellerId: string, v: {
     return "minQuantity must be a whole number of 0 or more";
   }
   return null;
+}
+
+type ScheduleValues = { startsAt?: Date | null; expiresAt?: Date | null; scheduleTimeZone?: string | null };
+
+/**
+ * Active dates + the seller's time zone, for create (existing = null) and
+ * update. Returns the column values to write, or an error message.
+ */
+function scheduleUpdates(
+  body: { startsAt?: unknown; expiresAt?: unknown; scheduleTimeZone?: unknown },
+  existing: { startsAt: Date | null; expiresAt: Date | null } | null,
+): { error: string } | { values: ScheduleValues } {
+  const startsAt = parseInstant(body.startsAt);
+  const expiresAt = parseInstant(body.expiresAt);
+  const zone = parseTimeZone(body.scheduleTimeZone);
+  if (startsAt === "invalid" || expiresAt === "invalid") return { error: "startsAt / expiresAt must be valid dates" };
+  if (zone === "invalid") return { error: "scheduleTimeZone must be an IANA time zone, e.g. America/New_York" };
+  const effStart = startsAt === undefined ? existing?.startsAt ?? null : startsAt;
+  const effEnd = expiresAt === undefined ? existing?.expiresAt ?? null : expiresAt;
+  if (effStart && effEnd && effEnd.getTime() <= effStart.getTime()) return { error: "expiresAt must be after startsAt" };
+  const values: ScheduleValues = {};
+  if (startsAt !== undefined) values.startsAt = startsAt;
+  if (expiresAt !== undefined) values.expiresAt = expiresAt;
+  if (zone !== undefined) values.scheduleTimeZone = zone;
+  return { values };
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -123,7 +152,9 @@ router.post("/", requirePermission("marketing"), async (req, res) => {
       maxUsesPerCustomer,
       minQuantity,
       liveStreamId,
+      scheduleTimeZone,
     } = req.body as {
+      scheduleTimeZone?: string | null;
       firstOrderOnly?: boolean;
       collectionIds?: string[];
       maxUsesPerCustomer?: number | null;
@@ -177,9 +208,16 @@ router.post("/", requirePermission("marketing"), async (req, res) => {
       }
     }
 
-    const extError = await validateExtensions(sellerId, { appliesTo: scope, collectionIds, maxUsesPerCustomer, minQuantity });
+    const extError = await validateExtensions(sellerId, {
+      appliesTo: scope, collectionIds, maxUsesPerCustomer, minQuantity, maxUses: singleUse ? null : maxUses,
+    });
     if (extError) {
       res.status(400).json({ error: extError });
+      return;
+    }
+    const schedule = scheduleUpdates({ startsAt, expiresAt, scheduleTimeZone }, null);
+    if ("error" in schedule) {
+      res.status(400).json({ error: schedule.error });
       return;
     }
 
@@ -252,8 +290,9 @@ router.post("/", requirePermission("marketing"), async (req, res) => {
         collectionIds: scope === "collections" && Array.isArray(collectionIds) ? collectionIds : [],
         maxUsesPerCustomer: maxUsesPerCustomer ?? null,
         minQuantity: minQuantity ?? 0,
-        startsAt: startsAt ? new Date(startsAt) : null,
-        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        startsAt: schedule.values.startsAt ?? null,
+        expiresAt: schedule.values.expiresAt ?? null,
+        scheduleTimeZone: schedule.values.scheduleTimeZone ?? null,
         active: true,
         liveStreamId: scopedLiveStreamId,
       })
@@ -345,8 +384,9 @@ router.patch("/:id", requirePermission("marketing"), async (req, res) => {
     const { id } = req.params;
     const {
       active, expiresAt, startsAt, minOrderCents, maxUses, oneUsePerCustomer,
-      appliesTo, productIds, value, firstOrderOnly, collectionIds, maxUsesPerCustomer, minQuantity,
+      appliesTo, productIds, value, firstOrderOnly, collectionIds, maxUsesPerCustomer, minQuantity, scheduleTimeZone,
     } = req.body as {
+      scheduleTimeZone?: string | null;
       firstOrderOnly?: boolean;
       collectionIds?: string[];
       maxUsesPerCustomer?: number | null;
@@ -364,8 +404,24 @@ router.patch("/:id", requirePermission("marketing"), async (req, res) => {
 
     const updates: Record<string, unknown> = {};
     if (active !== undefined) updates.active = active;
-    if (expiresAt !== undefined) updates.expiresAt = expiresAt ? new Date(expiresAt) : null;
-    if (startsAt !== undefined) updates.startsAt = startsAt ? new Date(startsAt) : null;
+    if (startsAt !== undefined || expiresAt !== undefined || scheduleTimeZone !== undefined) {
+      // The end must stay after the start, so compare against whichever side isn't being changed.
+      const [current] = await db
+        .select({ startsAt: discountCodes.startsAt, expiresAt: discountCodes.expiresAt })
+        .from(discountCodes)
+        .where(and(eq(discountCodes.id, id), eq(discountCodes.sellerId, sellerId)))
+        .limit(1);
+      if (!current) {
+        res.status(404).json({ error: "Discount code not found" });
+        return;
+      }
+      const schedule = scheduleUpdates({ startsAt, expiresAt, scheduleTimeZone }, current);
+      if ("error" in schedule) {
+        res.status(400).json({ error: schedule.error });
+        return;
+      }
+      Object.assign(updates, schedule.values);
+    }
     if (minOrderCents !== undefined) updates.minOrderCents = minOrderCents;
     if (maxUses !== undefined) updates.maxUses = maxUses;
     if (oneUsePerCustomer !== undefined) updates.oneUsePerCustomer = oneUsePerCustomer;
@@ -376,10 +432,10 @@ router.patch("/:id", requirePermission("marketing"), async (req, res) => {
     if (collectionIds !== undefined) updates.collectionIds = Array.isArray(collectionIds) ? collectionIds : [];
     if (maxUsesPerCustomer !== undefined) updates.maxUsesPerCustomer = maxUsesPerCustomer;
     if (minQuantity !== undefined) updates.minQuantity = minQuantity;
-    if (appliesTo === "collections" || collectionIds !== undefined || maxUsesPerCustomer !== undefined || minQuantity !== undefined) {
+    if (appliesTo === "collections" || collectionIds !== undefined || maxUsesPerCustomer !== undefined || minQuantity !== undefined || maxUses !== undefined) {
       const extError = await validateExtensions(sellerId, {
         appliesTo: appliesTo === "collections" ? appliesTo : undefined,
-        collectionIds, maxUsesPerCustomer, minQuantity,
+        collectionIds, maxUsesPerCustomer, minQuantity, maxUses,
       });
       if (extError) {
         res.status(400).json({ error: extError });
@@ -424,11 +480,18 @@ router.get("/:id/uses", async (req, res) => {
       res.status(404).json({ error: "Discount code not found" });
       return;
     }
-    const uses = await db
-      .select()
+    const rows = await db
+      .select({ use: discountCodeUses, displayName: users.displayName, name: users.name, username: users.username })
       .from(discountCodeUses)
-      .where(eq(discountCodeUses.discountCodeId, id));
-    res.json(uses);
+      .leftJoin(users, eq(users.clerkId, discountCodeUses.customerKey))
+      .where(eq(discountCodeUses.discountCodeId, id))
+      .orderBy(desc(discountCodeUses.usedAt));
+    // Same row shape as before, plus who redeemed it (buyer's name, or the guest's email).
+    res.json(rows.map((r) => ({
+      ...r.use,
+      customerName: r.displayName || r.name || (r.username ? `@${r.username}` : null)
+        || (r.use.customerKey.startsWith("guest:") ? r.use.customerKey.slice("guest:".length) : null),
+    })));
   } catch (err) {
     req.log.error({ err, discountCodeId: req.params.id }, "Failed to list discount code uses");
     res.status(500).json({ error: "Internal server error" });
