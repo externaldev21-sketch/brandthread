@@ -43,7 +43,7 @@ export function RetryRow({ label = "Couldn't load", onRetry, style, testID }: Re
       noMinHeight
     >
       <Icon name="refresh-cw" size={14} color={colors.mutedForeground} />
-      <Text style={[TYPE_SCALE.footnote, styles.text, { color: colors.mutedForeground }]} numberOfLines={1}>
+      <Text style={[TYPE_SCALE.footnote, styles.text, { color: colors.mutedForeground }]} numberOfLines={2}>
         {label} — Tap to retry
       </Text>
     </PressableScale>

@@ -112,7 +112,7 @@ export default function ThreadCashHistoryScreen() {
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[styles.label, { color: theme.text }]} numberOfLines={1}>{historyLabel(entry)}</Text>
-                  <Text style={[styles.date, { color: theme.subtle }]} numberOfLines={1}>
+                  <Text style={[styles.date, { color: theme.subtle }]} numberOfLines={2}>
                     {fmtDate(entry.createdAt)}
                     {entry.note ? ` · ${entry.note}` : ''}
                   </Text>

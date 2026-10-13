@@ -502,7 +502,7 @@ export function PrimaryButton({
         ) : (
           <>
             {icon && <Icon name={icon} size={ICON.sm} color={disabled ? TEXT_DISABLED : foreground} />}
-            <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, disabled ? { color: TEXT_DISABLED, fontSize: small ? FS.sm : FS.base } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]} numberOfLines={1}>{label}</Text>
+            <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, disabled ? { color: TEXT_DISABLED, fontSize: small ? FS.sm : FS.base } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{label}</Text>
           </>
         )}
       </LinearGradient>
@@ -552,7 +552,7 @@ export function SecondaryButton({ label, onPress, icon, disabled, small, style, 
       style={[sbS.root, { height: h, borderColor: resolvedAccent + '55', backgroundColor: resolvedAccent + '14' }, style]}
     >
       {icon && <Icon name={icon} size={ICON.sm} color={resolvedAccent} />}
-      <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[sbS.label, { fontSize: small ? FS.sm : FS.base, color: resolvedAccent }]} numberOfLines={1}>{label}</Text>
+      <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[sbS.label, { fontSize: small ? FS.sm : FS.base, color: resolvedAccent }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{label}</Text>
     </PressableScale>
   );
 }
@@ -898,7 +898,7 @@ export function SectionHeader({ title, action, style }: SectionHeaderProps) {
   return (
     <View style={[shS.root, style]}>
       <View style={shS.titleWrap}>
-        <Text accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[shS.title, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
+        <Text accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[shS.title, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail" adjustsFontSizeToFit minimumFontScale={0.8}>{title}</Text>
       </View>
       {action && (
         <PressableScale

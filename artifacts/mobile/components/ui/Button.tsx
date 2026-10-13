@@ -170,7 +170,7 @@ export function Button({
             {/* An icon-only button passes label="" (with an accessibilityLabel)
                 — no empty Text, so the icon sits dead centre. */}
             {label ? (
-              <Text style={[styles.label, labelType, { color: variantStyle.fg }]} numberOfLines={1} maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}>
+              <Text style={[styles.label, labelType, { color: variantStyle.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}>
                 {label}
               </Text>
             ) : null}

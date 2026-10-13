@@ -146,11 +146,13 @@ export function ScreenHeader({
               maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}
               style={[styles.title, { color: colors.foreground, opacity: compactTitleOpacity }]}
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
             >
               {title}
             </Animated.Text>
           ) : (
-            <Text testID="screen-header-title" {...({ dataSet: { variant } } as object)} accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>{title}</Text>
+            <Text testID="screen-header-title" {...({ dataSet: { variant } } as object)} accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.title, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{title}</Text>
           )}
         </View>
 

@@ -143,7 +143,7 @@ export default function BuyerInviteScreen() {
           <View style={styles.codeCard}>
             <Text style={styles.codeLabel}>Your invite code</Text>
             {invite ? <PressableScale style={styles.codeRow} onPress={copyCode} accessibilityLabel="Copy invite code">
-              <Text style={styles.codeText}>{invite.code}</Text>
+              <Text style={styles.codeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{invite.code}</Text>
               <View style={styles.copyPill}>
                 <Icon name="copy" size={14} color={theme.text} />
                 <Text style={styles.copyPillText}>Copy</Text>
@@ -243,7 +243,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, marginBottom: SP.sm,
   },
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
-  codeText: { fontSize: 34, fontFamily: FONT.bold, color: theme.text },
+  codeText: { flexShrink: 1, fontSize: 34, fontFamily: FONT.bold, color: theme.text },
   copyPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: theme.accentDim, paddingHorizontal: 14, paddingVertical: SP.sm, borderRadius: RADIUS.pill,
