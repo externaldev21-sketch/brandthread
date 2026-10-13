@@ -28,6 +28,10 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { HapticSwitch, PrimaryButton } from '@/components/BrandthreadUI';
+import { useAuth, useUser } from '@clerk/expo';
+import { useApi } from '@/lib/api';
+import { collectAppDiagnostics } from '@/lib/appDiagnostics';
+import { buildProblemReportTicket } from '@/lib/problemReportTicket';
 
 export default function BuyerProblemReportScreen() {
   const { theme } = useAppTheme();
@@ -38,6 +42,9 @@ export default function BuyerProblemReportScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const api = useApi();
+  const { isSignedIn } = useAuth();
+  const { user } = useUser();
 
   const [order, setOrder] = useState<BuyerOrderView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,6 +85,21 @@ export default function BuyerProblemReportScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSubmitting(true);
     try {
+      // Send it to the support queue with app/device details attached. Signed-out
+      // previews never call the protected endpoint and keep the local copy only.
+      const email = user?.primaryEmailAddress?.emailAddress;
+      if (isSignedIn && email) {
+        await api.support.submitTicket(buildProblemReportTicket({
+          type: problemType as BuyerProblemType,
+          description,
+          contactedSeller,
+          orderId: order?.id,
+          orderNumber: order?.orderNumber,
+          email,
+          name: user?.fullName || user?.username || email,
+          diagnostics: collectAppDiagnostics(),
+        }));
+      }
       await createProblemReport({
         orderId: order?.id,
         orderNumber: order?.orderNumber,

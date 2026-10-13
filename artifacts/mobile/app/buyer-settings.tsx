@@ -16,6 +16,9 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { SectionHeader } from '@/components/BrandthreadUI';
 import { Card, ListRow } from '@/components/ui';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { collectAppDiagnostics, formatAppVersion } from '@/lib/appDiagnostics';
+
+const APP_VERSION_LABEL = formatAppVersion(collectAppDiagnostics());
 
 export default function BuyerSettingsScreen() {
   const colors = useColors();
@@ -111,7 +114,7 @@ export default function BuyerSettingsScreen() {
           </View>
         ))}
 
-        <Text style={s.version}>Brandthread v1.0.0</Text>
+        <Text style={s.version}>Brandthread v{APP_VERSION_LABEL}</Text>
       </ScrollView>
 
       <ConfirmSheet
