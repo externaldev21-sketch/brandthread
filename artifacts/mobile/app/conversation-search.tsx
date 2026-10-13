@@ -3,7 +3,7 @@
  * Real search: hits the message list filtered to this conversationId only
  * (GET /api/conversations/:id/messages?q=...), never a global search.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
@@ -21,6 +21,8 @@ import type { Message } from '@/services/socialTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
+const SEARCH_DEBOUNCE_MS = 250;
+
 export default function ConversationSearchScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(), []);
@@ -35,26 +37,39 @@ export default function ConversationSearchScreen() {
   const [loading, setLoading] = useState(false);
   const isPreview = isPreviewConversationId(params.id);
 
-  async function runSearch(q: string) {
+  // Typing fires one search after a short pause, not one per keystroke, and a
+  // slower earlier response can never overwrite the latest query's results.
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestSearch = useRef(0);
+  useEffect(() => () => { if (searchTimer.current) clearTimeout(searchTimer.current); }, []);
+
+  function runSearch(q: string) {
     setQuery(q);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
     const trimmed = q.trim();
-    if (!trimmed) { setResults([]); return; }
+    const searchId = ++latestSearch.current;
+    if (!trimmed) { setResults([]); setLoading(false); return; }
     setLoading(true);
+    searchTimer.current = setTimeout(() => { void search(trimmed, searchId); }, SEARCH_DEBOUNCE_MS);
+  }
+
+  async function search(trimmed: string, searchId: number) {
+    let next: Message[] = [];
     try {
       if (isPreview) {
         const all = getPreviewMessages(params.id);
-        setResults(all.filter((m) => m.text.toLowerCase().includes(trimmed.toLowerCase())));
+        next = all.filter((m) => m.text.toLowerCase().includes(trimmed.toLowerCase()));
       } else if (params.role === 'seller') {
-        const msgs = await api.conversations.searchMessages(params.id, trimmed);
-        setResults(msgs as Message[]);
+        next = (await api.conversations.searchMessages(params.id, trimmed)) as Message[];
       } else {
-        setResults(await searchConversationMessages(params.id, trimmed));
+        next = await searchConversationMessages(params.id, trimmed);
       }
     } catch {
-      setResults([]);
-    } finally {
-      setLoading(false);
+      next = [];
     }
+    if (searchId !== latestSearch.current) return;
+    setResults(next);
+    setLoading(false);
   }
 
   return (

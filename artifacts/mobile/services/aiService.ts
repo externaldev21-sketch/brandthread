@@ -19,6 +19,11 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
+
+/** Non-streaming AI chat replies can take a while; still never hang forever. */
+const AI_REQUEST_TIMEOUT_MS = 90_000;
+const AI_STREAM_TIMEOUT_MS = 120_000;
 import {
   AIMessage, AISession, AIScreenContext, AIChatRequest,
   AIChatResponse, AIActionCard, AISettings, AISuggestion,
@@ -214,7 +219,7 @@ async function callAI(
     throw new Error('Sign in to use Brandthread AI.');
   }
 
-  const res = await fetch(`${apiBase}/api/v1/ai/chat`, {
+  const res = await fetchWithTimeout(`${apiBase}/api/v1/ai/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -222,7 +227,7 @@ async function callAI(
     },
     body: JSON.stringify(request),
     signal,
-  });
+  }, AI_REQUEST_TIMEOUT_MS);
 
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) {
@@ -336,6 +341,16 @@ function callAIStream(
       settled = true;
       cleanup();
       reject(new Error("Couldn't reach Brandthread AI."));
+    };
+
+    // A stalled stream ends in an error the chat can show, not an endless
+    // typing indicator.
+    xhr.timeout = AI_STREAM_TIMEOUT_MS;
+    xhr.ontimeout = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('Brandthread AI took too long to answer. Please try again.'));
     };
 
     xhr.open('POST', `${apiBase}/api/v1/ai/chat/stream`);
@@ -619,7 +634,7 @@ export async function getAISuggestions(
   // Try real API suggestions first
   if (!isSellerDevPreview() && apiBase && authToken) {
     try {
-      const res = await fetch(`${apiBase}/api/v1/ai/suggestions`, {
+      const res = await fetchWithTimeout(`${apiBase}/api/v1/ai/suggestions`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
