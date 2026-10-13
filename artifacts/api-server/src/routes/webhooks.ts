@@ -1303,8 +1303,11 @@ export async function handleCheckoutPaid(
             targetId: createdOrderId,
             targetType: "order",
             targetImageUrl: productThumbnail(firstItem?.images),
-            pushSound: "order-received.wav",
+            // Must match the file registered in app.json (assets/sounds/order_received.wav).
+            pushSound: "order_received.wav",
             pushChannelId: "orders",
+            // Registered on the device with a "Ship now" action (app/_layout.tsx).
+            pushCategoryId: "new_order",
           });
           // The buyer's side of the same event (guest checkouts have no feed).
           if (buyerId) {
