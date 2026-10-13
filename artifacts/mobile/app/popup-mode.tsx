@@ -242,7 +242,7 @@ export default function PopupModeScreen() {
         <Text style={styles.bigAmount}>{formatCents(totalCents)}</Text>
         <Feather name="wifi" size={40} color={theme.text} style={styles.contactless} />
         <Text style={styles.stateTitle}>Hold card near top of iPhone</Text>
-        <SecondaryButton label="Cancel" onPress={cancelTap} style={styles.stateButton} />
+        <View style={styles.stateButton}><SecondaryButton label="Cancel" onPress={cancelTap} /></View>
       </>,
     );
   } else if (phase.kind === 'paid') {
@@ -252,13 +252,14 @@ export default function PopupModeScreen() {
         <Text style={styles.bigAmount}>{formatCents(phase.amountCents)}</Text>
         <Text style={styles.stateTitle}>Paid</Text>
         {phase.orderNumber ? <Text style={styles.stateBody}>Order {phase.orderNumber}</Text> : null}
-        <PrimaryButton label="New sale" onPress={resetSale} style={styles.stateButton} />
+        <View style={styles.stateButton}><PrimaryButton label="New sale" onPress={resetSale} /></View>
         {phase.orderId ? (
-          <SecondaryButton
-            label="View order"
-            onPress={() => router.push(`/order-detail?id=${encodeURIComponent(phase.orderId!)}` as never)}
-            style={styles.stateButtonSecondary}
-          />
+          <View style={styles.stateButtonSecondary}>
+            <SecondaryButton
+              label="View order"
+              onPress={() => router.push(`/order-detail?id=${encodeURIComponent(phase.orderId!)}` as never)}
+            />
+          </View>
         ) : null}
       </>,
     );
@@ -267,7 +268,7 @@ export default function PopupModeScreen() {
       <>
         <Feather name="smartphone" size={36} color={theme.muted} />
         <Text style={styles.stateTitle}>{unavailableTitle}</Text>
-        <SecondaryButton label="Back to sale" onPress={() => setPhase({ kind: 'cart' })} style={styles.stateButton} />
+        <View style={styles.stateButton}><SecondaryButton label="Back to sale" onPress={() => setPhase({ kind: 'cart' })} /></View>
       </>,
     );
   } else if (phase.kind === 'location') {
@@ -275,8 +276,8 @@ export default function PopupModeScreen() {
       <>
         <Feather name="map-pin" size={36} color={theme.muted} />
         <Text style={styles.stateTitle}>Add your pop-up address</Text>
-        <PrimaryButton label="Add location" onPress={() => { setPhase({ kind: 'cart' }); router.push('/locations' as never); }} style={styles.stateButton} />
-        <SecondaryButton label="Back to sale" onPress={() => setPhase({ kind: 'cart' })} style={styles.stateButtonSecondary} />
+        <View style={styles.stateButton}><PrimaryButton label="Add location" onPress={() => { setPhase({ kind: 'cart' }); router.push('/locations' as never); }} /></View>
+        <View style={styles.stateButtonSecondary}><SecondaryButton label="Back to sale" onPress={() => setPhase({ kind: 'cart' })} /></View>
       </>,
     );
   } else if (phase.kind === 'failed') {
@@ -284,8 +285,8 @@ export default function PopupModeScreen() {
       <>
         <Feather name="alert-circle" size={36} color={theme.muted} />
         <Text style={styles.stateTitle}>{phase.message}</Text>
-        <PrimaryButton label="Try again" onPress={charge} style={styles.stateButton} />
-        <SecondaryButton label="Back to sale" onPress={() => setPhase({ kind: 'cart' })} style={styles.stateButtonSecondary} />
+        <View style={styles.stateButton}><PrimaryButton label="Try again" onPress={charge} /></View>
+        <View style={styles.stateButtonSecondary}><SecondaryButton label="Back to sale" onPress={() => setPhase({ kind: 'cart' })} /></View>
       </>,
     );
   } else if (load.kind === 'ready' && !load.status.paymentsReady) {
@@ -293,7 +294,7 @@ export default function PopupModeScreen() {
       <>
         <Feather name="credit-card" size={36} color={theme.muted} />
         <Text style={styles.stateTitle}>Set up payouts to take payments</Text>
-        <PrimaryButton label="Set up payouts" onPress={() => router.push('/payouts' as never)} style={styles.stateButton} />
+        <View style={styles.stateButton}><PrimaryButton label="Set up payouts" onPress={() => router.push('/payouts' as never)} /></View>
       </>,
     );
   } else if (load.kind === 'ready' && load.products.length === 0 && cart.length === 0) {
@@ -301,7 +302,7 @@ export default function PopupModeScreen() {
       <>
         <Feather name="package" size={36} color={theme.muted} />
         <Text style={styles.stateTitle}>No in-stock products</Text>
-        <PrimaryButton label="Add product" onPress={() => router.push('/add-product' as never)} style={styles.stateButton} />
+        <View style={styles.stateButton}><PrimaryButton label="Add product" onPress={() => router.push('/add-product' as never)} /></View>
       </>,
     );
   } else {
@@ -449,8 +450,8 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg, gap: SP.sm },
   stateTitle: { fontSize: FS.md, fontFamily: FONT.semibold, color: theme.text, textAlign: 'center', marginTop: SP.sm },
   stateBody: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center' },
-  stateButton: { alignSelf: 'stretch', marginTop: SP.lg },
-  stateButtonSecondary: { alignSelf: 'stretch', marginTop: SP.sm },
+  stateButton: { alignSelf: 'stretch', width: '100%', marginTop: SP.lg },
+  stateButtonSecondary: { alignSelf: 'stretch', width: '100%', marginTop: SP.sm },
   bigAmount: { fontSize: 44, fontFamily: FONT.bold, color: theme.text, marginTop: SP.md, fontVariant: ['tabular-nums'] },
   contactless: { transform: [{ rotate: '90deg' }], marginTop: SP.lg },
 
