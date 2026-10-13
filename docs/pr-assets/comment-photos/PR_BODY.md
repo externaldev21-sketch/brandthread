@@ -95,7 +95,7 @@ API (`cd artifacts/api-server && TEST_DATABASE_URL=postgres://postgres:postgres@
 
 Mobile:
 - `pnpm exec vitest run lib/__tests__/commentPhoto.test.ts` covers sizing, MIME and the guest guard. **6 passed**.
-- Related existing suites re-run. `components/inline-feedback.test.ts` (2 tests) and `tests/screen-header-migration-lint.test.ts` (2 tests) fail **on origin/dev too**. Their regexes and allowlists don't match dev's current files, and none of the flagged files are ones I added.
+- Related existing suites re-run. `components/inline-feedback.test.ts` (2 tests) and `tests/screen-header-migration-lint.test.ts` (2 tests) fail **on origin/dev too**. Their regexes and allowlists don't match dev's current files, and none of the flagged files are ones I added. `tests/a11y-icon-only-lint.test.ts` (1) and `tests/no-hardcoded-theme-color-lint.test.ts` (2) also fail on origin/dev, and none of my files are flagged.
 
 Typecheck: `tsc --noEmit` in api-server gives 0 errors. Mobile gives 0 errors.
 
