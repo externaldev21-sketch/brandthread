@@ -31,6 +31,8 @@ export default function TaxRegionAddScreen() {
   const api = useApi();
   const tabBarMetrics = useTabBarMetrics(2);
   const isPreview = useTaxPreview();
+  // Read on first render: the router drops `&demo=1` from the URL right after.
+  const [demo] = useState(() => isPreviewDemoMode());
 
   const [info, setInfo] = useState<TaxRegistrationsInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,7 +44,7 @@ export default function TaxRegionAddScreen() {
 
   const load = useCallback(async () => {
     if (isPreview) {
-      setInfo(isPreviewDemoMode() ? DEMO_TAX_REGISTRATIONS : null);
+      setInfo(demo ? DEMO_TAX_REGISTRATIONS : null);
       setLoading(false);
       return;
     }
@@ -53,7 +55,7 @@ export default function TaxRegionAddScreen() {
       setLoadError(true);
     }
     setLoading(false);
-  }, [api, isPreview]);
+  }, [api, isPreview, demo]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -100,6 +102,7 @@ export default function TaxRegionAddScreen() {
           <FlatList
             data={options}
             keyExtractor={(item) => item.code}
+            style={{ flex: 1 }}
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}

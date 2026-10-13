@@ -32,6 +32,8 @@ export default function TaxRegionsScreen() {
   const api = useApi();
   const tabBarMetrics = useTabBarMetrics(2);
   const isPreview = useTaxPreview();
+  // Read on first render: the router drops `&demo=1` from the URL right after.
+  const [demo] = useState(() => isPreviewDemoMode());
   const toast = useScreenToast();
 
   const [info, setInfo] = useState<TaxRegistrationsInfo | null>(null);
@@ -41,7 +43,7 @@ export default function TaxRegionsScreen() {
 
   const load = useCallback(async () => {
     if (isPreview) {
-      setInfo(isPreviewDemoMode() ? DEMO_TAX_REGISTRATIONS : null);
+      setInfo(demo ? DEMO_TAX_REGISTRATIONS : null);
       setLoadError(false);
       setLoading(false);
       return;
@@ -53,7 +55,7 @@ export default function TaxRegionsScreen() {
       setLoadError(true);
     }
     setLoading(false);
-  }, [api, isPreview]);
+  }, [api, isPreview, demo]);
 
   useFocusEffect(useCallback(() => {
     void load();
@@ -108,6 +110,7 @@ export default function TaxRegionsScreen() {
             data={rows}
             keyExtractor={(item) => item.id}
             ListHeaderComponent={header}
+            style={{ flex: 1 }}
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}

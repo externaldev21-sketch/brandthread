@@ -57,10 +57,11 @@ const PAYOUT_SCHEDULE = {
   policy: { mode: 'hold', enforced: false, instantFeeBps: FEE_BPS, instantMinFeeCents: 50 },
 };
 
+let ORIGIN = '*';
 function json(route, body, status = 200) {
   return route.fulfill({
     status, contentType: 'application/json',
-    headers: { 'access-control-allow-origin': route.request().headers().origin ?? '*', 'access-control-allow-credentials': 'true' },
+    headers: { 'access-control-allow-origin': ORIGIN, 'access-control-allow-credentials': 'true' },
     body: JSON.stringify(body),
   });
 }
@@ -90,26 +91,57 @@ async function overflowCheck(page, label) {
   console.log(`overflow[${label}]:`, issues.length ? JSON.stringify(issues) : 'none');
 }
 
+/**
+ * The harness signs the demo seller in, but in the seller web preview the
+ * API client refuses every request (lib/api.ts rejectSellerPreviewApiRequest),
+ * so these screens are shown the way the preview really shows them: signed
+ * out, with `&demo=1` data (isPreviewDemoMode). This runs after the Clerk
+ * stub and empties its session.
+ */
+const SIGNED_OUT = () => {
+  const c = window.Clerk;
+  if (!c) return;
+  const client = { id: 'client_demo', sessions: [], activeSessions: [], lastActiveSessionId: null, signIn: {}, signUp: {} };
+  c.session = null;
+  c.user = null;
+  c.client = client;
+  c.__internal_lastEmittedResources = { client, session: null, user: null, organization: null };
+  c.addListener = (listener) => { listener({ client, session: null, user: null, organization: null }); return () => undefined; };
+};
+
+/** Client-side navigation that keeps `&demo=1` (router.push drops the query). */
+async function go(page, route) {
+  await page.evaluate((url) => { history.pushState(history.state, '', url); dispatchEvent(new PopStateEvent('popstate')); }, `${route}?bt_preview=seller&demo=1`);
+}
+
 async function waitFor(page, route, ready) {
   for (let attempt = 0; attempt < 6; attempt++) {
     try {
       await ready().waitFor({ timeout: 12_000 });
       return;
     } catch (error) {
-      if (attempt === 5) throw error;
-      await page.evaluate((url) => { history.pushState(history.state, '', url); dispatchEvent(new PopStateEvent('popstate')); }, `${route}?bt_preview=seller`);
+      if (attempt === 5) { await page.screenshot({ path: path.join(OUT, `debug-${route.replace(/\//g, '')}.png`) }); throw error; }
+      await page.evaluate((url) => { history.pushState(history.state, '', url); dispatchEvent(new PopStateEvent('popstate')); }, `${route}?bt_preview=seller&demo=1`);
     }
   }
 }
 
 async function run() {
   const server = await serveBuild(BUILD);
+  ORIGIN = server.origin;
   const browser = await launchBrowser();
   const images = await ensureDemoImages(browser, path.join(WORK_DIR, 'demo-images'));
   const device = { viewport: VIEWPORT, scale: 2, isMobile: true, userAgent: UA };
   try {
     const { context, page, activity } = await openContext(browser, { device, role: 'seller', origin: server.origin, images });
+    await context.addInitScript(SIGNED_OUT);
     let added = false;
+    if (process.env.DEBUG_API) {
+      page.on('request', (r) => { if (!r.url().includes('/_expo/') && !r.url().includes('/assets/')) console.log('  req', r.method(), r.url().slice(0, 120)); });
+      page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log('  console', m.type(), m.text().slice(0, 200)); });
+      page.on('pageerror', (e) => console.log('  pageerror', String(e).slice(0, 200)));
+      page.on('requestfailed', (r) => { if (r.url().includes('api.brandthread.test')) console.log('  failed', r.url(), r.failure()?.errorText); });
+    }
     await context.route(`${API}/**`, async (route) => {
       const request = route.request();
       if (request.method() === 'OPTIONS') return route.fallback();
@@ -130,25 +162,27 @@ async function run() {
       return route.fallback();
     });
 
-    await openScreen(page, activity, server.origin, 'seller', '/taxes-duties');
+    await openScreen(page, activity, server.origin, 'seller', '/taxes-duties', { extraQuery: '&demo=1' });
     await waitFor(page, '/taxes-duties', () => page.getByText('Collect sales tax', { exact: true }));
     await waitForQuietNetwork(activity, 900, 15_000);
     await page.waitForTimeout(800);
     await shot(page, '01-taxes-duties-top');
-    await page.getByText('Tax regions and registrations', { exact: true }).scrollIntoViewIfNeeded();
-    await page.waitForTimeout(500);
+    if (MODE === 'after') await page.getByTestId('taxes-duties-regions').scrollIntoViewIfNeeded();
+    else await page.getByText('Not available directly in-app yet', { exact: true }).scrollIntoViewIfNeeded();
+    await page.mouse.wheel(0, 260);
+    await page.waitForTimeout(600);
     await shot(page, '02-taxes-duties-regions-row');
     await overflowCheck(page, 'taxes-duties');
 
     if (MODE === 'after') {
-      await page.getByTestId('taxes-duties-regions').click();
-      await waitFor(page, '/tax-regions', () => page.getByText('Head office', { exact: true }));
+      await go(page, '/tax-regions');
+      await waitFor(page, '/tax-regions', () => page.getByTestId('tax-regions-head-office'));
       await waitForQuietNetwork(activity, 900, 15_000);
       await page.waitForTimeout(800);
       await shot(page, '03-tax-regions');
       await overflowCheck(page, 'tax-regions');
 
-      await page.getByTestId('tax-regions-add').click();
+      await go(page, '/tax-region-add');
       await waitFor(page, '/tax-region-add', () => page.getByTestId('tax-region-option-US-FL'));
       await page.waitForTimeout(800);
       await shot(page, '04-add-region');
@@ -158,12 +192,7 @@ async function run() {
       await page.waitForTimeout(400);
       await shot(page, '05-add-region-selected');
       await overflowCheck(page, 'add-region');
-      await page.getByTestId('tax-region-add-confirm').click();
-      await waitFor(page, '/tax-regions', () => page.getByText('Florida added'));
-      await page.waitForTimeout(500);
-      await shot(page, '06-region-added-toast');
-
-      await page.getByTestId('tax-regions-head-office').click();
+      await go(page, '/tax-head-office');
       await waitFor(page, '/tax-head-office', () => page.getByText('Street address', { exact: true }));
       await waitForQuietNetwork(activity, 900, 15_000);
       await page.waitForTimeout(800);
@@ -171,7 +200,7 @@ async function run() {
       await overflowCheck(page, 'head-office');
     }
 
-    await openScreen(page, activity, server.origin, 'seller', '/payout-schedule');
+    await openScreen(page, activity, server.origin, 'seller', '/payout-schedule', { extraQuery: '&demo=1' });
     await waitFor(page, '/payout-schedule', () => page.getByText('When you get paid', { exact: true }));
     await waitForQuietNetwork(activity, 900, 15_000);
     await page.waitForTimeout(800);

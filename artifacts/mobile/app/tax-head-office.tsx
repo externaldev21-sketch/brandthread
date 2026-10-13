@@ -30,6 +30,8 @@ export default function TaxHeadOfficeScreen() {
   const api = useApi();
   const tabBarMetrics = useTabBarMetrics(2);
   const isPreview = useTaxPreview();
+  // Read on first render: the router drops `&demo=1` from the URL right after.
+  const [demo] = useState(() => isPreviewDemoMode());
   const params = useLocalSearchParams<{ enable?: string }>();
   const enabling = params.enable === '1';
 
@@ -41,7 +43,7 @@ export default function TaxHeadOfficeScreen() {
 
   const load = useCallback(async () => {
     if (isPreview) {
-      if (isPreviewDemoMode()) setDraft(draftFromHeadOffice(DEMO_TAX_REGISTRATIONS.headOffice));
+      if (demo) setDraft(draftFromHeadOffice(DEMO_TAX_REGISTRATIONS.headOffice));
       setLoading(false);
       return;
     }
@@ -50,7 +52,7 @@ export default function TaxHeadOfficeScreen() {
       setDraft(draftFromHeadOffice(info.headOffice));
     } catch { /* start from an empty form */ }
     setLoading(false);
-  }, [api, isPreview]);
+  }, [api, isPreview, demo]);
 
   useEffect(() => { void load(); }, [load]);
 
