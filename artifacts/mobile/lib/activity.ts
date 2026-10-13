@@ -73,7 +73,7 @@ export interface ActivitySection<T = ActivityItem> {
   items: T[];
 }
 
-export type ActivityFilter = 'all' | 'orders' | 'social';
+export type ActivityFilter = 'all' | 'orders' | 'social' | 'money';
 
 export const ACTIVITY_PAGE_SIZE = 30;
 
@@ -349,9 +349,34 @@ export function unreadRowTint(background: string): string {
 
 // ─── Classification ───────────────────────────────────────────────────────────
 
-/** Mirrors the server's `filter=orders` definition in notifications-feed.ts. */
-const ORDER_CATEGORIES = new Set(['orders', 'order', 'payout', 'payouts', 'payment', 'production', 'returns', 'disputes', 'money']);
+/**
+ * The Activity Center's three groups — Orders / Social / Money — mirror the
+ * server's `filter=orders|social|money` definitions in notifications-feed.ts.
+ * Money wins over the other two so the groups never overlap: a payout, a
+ * refund or a Thread Cash credit is Money even when it was published under an
+ * "orders", "returns", "production" or "social" category.
+ */
+const ORDER_CATEGORIES = new Set(['orders', 'order', 'production', 'returns', 'disputes']);
 const ORDER_TYPES = new Set(['low_stock', 'out_of_stock']);
+const MONEY_CATEGORIES = new Set(['payout', 'payouts', 'payment', 'finance', 'subscription']);
+/**
+ * Money rows actually published to notifications_feed (grep publishNotification
+ * / insert(notificationsFeed) in artifacts/api-server/src): payouts
+ * (finance.ts, webhooks.ts), manufacturer payments & payout readiness
+ * (webhooks.ts, sample-orders.ts), refunds (returns.ts, returnLabels.ts,
+ * lib/delivery/notifications.ts), Thread Cash and referral rewards
+ * (activityEvents.ts, threadCash/expiry.ts) and subscription billing
+ * (jobs/sellerTrialReminder.ts).
+ */
+export const MONEY_ACTIVITY_TYPES: readonly string[] = [
+  'payout_sent', 'payout_setup_restricted',
+  'manufacturer_payment_received', 'manufacturer_payment_reversed',
+  'manufacturer_payouts_ready', 'manufacturer_payouts_restricted',
+  'return_refunded', 'order_auto_refunded', 'order_auto_refunded_seller',
+  'thread_cash_received', 'thread_cash_expiring', 'referral_reward', 'referral_joined',
+  'subscription_trial_day_4', 'subscription_trial_will_end',
+];
+const MONEY_TYPES = new Set(MONEY_ACTIVITY_TYPES);
 
 /**
  * Order updates published to the BUYER (routes/orders.ts, webhooks-shippo,
@@ -390,7 +415,10 @@ export function buyerOrderHref(id: string, type?: string | null): string {
 // Activity Center's purposes.
 const SOCIAL_TYPES = new Set(['price_drop', 'back_in_stock', 'waitlist_restock', 'product_restocked', 'new_product']);
 
-export function activityKind(item: Pick<ActivityItem, 'category' | 'type'>): 'orders' | 'social' | 'other' {
+export type ActivityGroup = 'orders' | 'social' | 'money' | 'other';
+
+export function activityKind(item: Pick<ActivityItem, 'category' | 'type'>): ActivityGroup {
+  if (MONEY_CATEGORIES.has(item.category) || MONEY_TYPES.has(item.type)) return 'money';
   if (ORDER_CATEGORIES.has(item.category) || ORDER_TYPES.has(item.type)) return 'orders';
   if (item.category === 'social' || SOCIAL_TYPES.has(item.type)) return 'social';
   return 'other';
@@ -408,7 +436,7 @@ export function matchesFilter(item: Pick<ActivityItem, 'category' | 'type'>, fil
  * Same set for buyers and sellers: the feed is per account, not per role,
  * so every category below can show up in either mode.
  */
-export type ActivityChip = 'all' | 'follows' | 'likes' | 'comments' | 'orders' | 'thread_cash';
+export type ActivityChip = 'all' | 'follows' | 'likes' | 'comments' | 'orders' | 'money';
 
 export const ACTIVITY_CHIPS: readonly { key: ActivityChip; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -416,28 +444,32 @@ export const ACTIVITY_CHIPS: readonly { key: ActivityChip; label: string }[] = [
   { key: 'likes', label: 'Likes' },
   { key: 'comments', label: 'Comments' },
   { key: 'orders', label: 'Orders' },
-  { key: 'thread_cash', label: 'Thread Cash' },
+  { key: 'money', label: 'Money' },
 ];
 
 const FOLLOW_TYPES = new Set(['new_follower']);
 const LIKE_TYPES = new Set(['post_like', 'story_like', 'comment_like']);
 const COMMENT_TYPES = new Set(['post_comment', 'comment_reply', 'mention', 'story_mention']);
-const THREAD_CASH_TYPES = new Set(['thread_cash_received', 'referral_joined', 'referral_reward']);
 
-/** Which chip an item belongs to; 'other' rows (reposts, drops…) show under All only. */
+/**
+ * Which chip an item belongs to; 'other' rows (reposts, drops…) show under All
+ * only. Money (payouts, payments, refunds, Thread Cash, billing) is checked
+ * first, so it is a superset of the old Thread Cash chip.
+ */
 export function activityCategory(item: Pick<ActivityItem, 'category' | 'type'>): Exclude<ActivityChip, 'all'> | 'other' {
-  if (activityKind(item) === 'orders') return 'orders';
+  const kind = activityKind(item);
+  if (kind === 'money') return 'money';
+  if (kind === 'orders') return 'orders';
   if (FOLLOW_TYPES.has(item.type)) return 'follows';
   if (LIKE_TYPES.has(item.type)) return 'likes';
   if (COMMENT_TYPES.has(item.type)) return 'comments';
-  if (THREAD_CASH_TYPES.has(item.type)) return 'thread_cash';
   return 'other';
 }
 
 /**
- * Whether an item shows under a chip. "All" is the social feed: order,
- * payout and inventory updates stay under "Orders" so shopping noise doesn't
- * sit between likes and follows.
+ * Whether an item shows under a chip. "All" leaves out order and inventory
+ * updates (they stay under "Orders" so shopping noise doesn't sit between
+ * likes and follows); Money rows — Thread Cash, payouts, refunds — show.
  */
 export function matchesActivityChip(item: Pick<ActivityItem, 'category' | 'type'>, chip: ActivityChip): boolean {
   const category = activityCategory(item);
@@ -472,15 +504,17 @@ export function activityChipEmpty(chip: ActivityChip, role: 'buyer' | 'seller' |
     case 'likes': return { icon: 'heart', title: 'No likes yet', message: "When someone likes your posts or stories, you'll see it here." };
     case 'comments': return { icon: 'message-circle', title: 'No comments yet', message: 'Comments, replies and mentions of you will show up here.' };
     case 'orders': return seller
-      ? { icon: 'package', title: 'No orders yet', message: 'When someone buys from your store, new orders and payout updates will show up here.', action: shareStore }
+      ? { icon: 'package', title: 'No orders yet', message: 'When someone buys from your store, new orders and shipping updates will show up here.', action: shareStore }
       : { icon: 'package', title: 'No order updates yet', message: 'Shipping and delivery updates for your orders will show up here.', action: { label: 'Start shopping', href: '/(buyer)/discover' } };
-    case 'thread_cash': return {
-      icon: 'dollar-sign', title: 'No Thread Cash yet', message: "When someone sends you Thread Cash, you'll see it here.",
-      // The Thread Cash screen itself (where a Thread Cash row also opens) —
-      // not /thread-explainer, which is onboarding-only and bounces anyone
-      // who has already seen it (and every seller) elsewhere.
-      action: { label: 'Open Thread Cash', href: '/thread-cash' },
-    };
+    case 'money': return seller
+      ? { icon: 'dollar-sign', title: 'No money updates yet', message: 'Payouts, refunds, Thread Cash and billing updates will show up here.', action: { label: 'Open payouts', href: '/payouts' } }
+      : {
+        icon: 'dollar-sign', title: 'No money updates yet', message: 'Refunds, Thread Cash and payments will show up here.',
+        // The Thread Cash screen itself (where a Thread Cash row also opens) —
+        // not /thread-explainer, which is onboarding-only and bounces anyone
+        // who has already seen it (and every seller) elsewhere.
+        action: { label: 'Open Thread Cash', href: '/thread-cash' },
+      };
     default: return seller
       ? { icon: 'activity', title: 'No activity yet', message: 'New followers, likes and comments on your posts, and order updates will show up here.', action: shareStore }
       : { icon: 'activity', title: 'No activity yet', message: 'When people follow you, like or comment on your posts, or send you Thread Cash, it will show up here.', action: findPeople };

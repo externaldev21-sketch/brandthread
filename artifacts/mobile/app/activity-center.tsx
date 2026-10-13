@@ -1,6 +1,8 @@
 /**
  * Activity — Threads-style: a pill filter row (All/Follows/Likes/Comments/
- * Thread Cash/Orders) over a single plain-background feed.
+ * Orders/Money) over a single plain-background feed. Orders, Social
+ * (Follows/Likes/Comments) and Money (payouts, payments, refunds, Thread
+ * Cash, billing) never overlap — see activityKind in lib/activity.ts.
  *
  * Buyers see follows/follow-backs, likes on posts/videos/stories/highlights,
  * comments, replies, mentions, reposts, Thread Cash received, order updates
@@ -8,7 +10,7 @@
  * the same feed plus sales/payouts/inventory alerts. Both read the same
  * per-user notifications feed that powers push notifications (GET
  * /api/buyer/notifications), paged 30 at a time — see lib/activityEvents.ts
- * (api-server) for what writes to it. The "All" chip excludes order/payout
+ * (api-server) for what writes to it. The "All" chip excludes order
  * items (shopping noise doesn't belong next to likes/follows); the "Orders"
  * chip shows them as ordinary rows in the same list, no separate summary card.
  *

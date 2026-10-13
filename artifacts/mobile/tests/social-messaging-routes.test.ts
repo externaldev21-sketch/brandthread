@@ -131,7 +131,7 @@ describe('activityHref() targets', () => {
 });
 
 describe('activityChipEmpty() call-to-action targets', () => {
-  const chips = ['all', 'follows', 'likes', 'comments', 'orders', 'thread_cash'] as const;
+  const chips = ['all', 'follows', 'likes', 'comments', 'orders', 'money'] as const;
   const cases = (['buyer', 'seller'] as const).flatMap((role) => chips.map((chip) => [chip, role] as const));
 
   it.each(cases)('the %s empty state (%s) never links to a missing screen', (chip, role) => {

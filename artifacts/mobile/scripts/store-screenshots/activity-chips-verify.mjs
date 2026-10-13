@@ -44,7 +44,7 @@ const MARKERS = {
   follows: 'Fola Follower', likePost: 'Lina Liker', likeStory: 'Stella Story', comment: 'Cory Commenter',
   mention: 'Mo Mention', threadCash: 'Tia Cash', repost: 'Remy Repost', shipped: 'Order #1042', delivered: 'Order #1038',
 };
-const CHIPS = ['all', 'follows', 'likes', 'comments', 'orders', 'thread_cash'];
+const CHIPS = ['all', 'follows', 'likes', 'comments', 'orders', 'money'];
 
 async function installFakeApi(context, getFeed) {
   const norm = (pathname) => `/api${pathname.replace(/^\/api\/v1/, '').replace(/^\/api/, '')}`;
@@ -99,10 +99,10 @@ async function run(browser, images, origin, role) {
   feed = FULL_FEED.filter((row) => row.type !== 'thread_cash_received' && row.category !== 'orders');
   await openActivity(page.getByText('Fola Follower'));
   await settle(600);
-  await page.getByTestId('activity-chip-thread_cash').click();
+  await page.getByTestId('activity-chip-money').click();
   await settle();
-  await shot('07-thread-cash-empty');
-  results.threadCashEmpty = await page.getByTestId('activity-empty-thread_cash').isVisible();
+  await shot('07-money-empty');
+  results.moneyEmpty = await page.getByTestId('activity-empty-money').isVisible();
   await page.getByTestId('activity-chip-orders').click();
   await settle();
   await shot('08-orders-empty');
