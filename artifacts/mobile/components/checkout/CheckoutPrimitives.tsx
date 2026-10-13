@@ -13,15 +13,14 @@
  */
 import React, { useMemo, useState } from 'react';
 import {
-  FlatList, Modal, Platform, StyleSheet, Text, TextInput, View,
+  Platform, StyleSheet, Text, TextInput, View,
   type StyleProp, type TextInputProps, type ViewStyle,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { IconButton } from '@/components/ui';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { COMP, FONT, FS, SP } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
+import { RegionPickerSheet } from './RegionPickerSheet';
 
 /** The checkout's palette, derived from the active app theme. */
 export function useCheckoutColors() {
@@ -220,10 +219,11 @@ export type PickerOption = { value: string; label: string };
 
 /**
  * A field that opens a list to pick from (state, country). Looks like
- * CheckoutField; the list is a full-height sheet with the same flat rows.
+ * CheckoutField; the list is a bottom sheet over the form
+ * (RegionPickerSheet): searchable, likely value first, A–Z with a scrubber.
  */
 export function PickerField({
-  label, value, options, onChange, error, showError, placeholder, style, testID,
+  label, value, options, onChange, error, showError, placeholder, style, testID, sheetTitle, suggested, suggestedLabel,
 }: {
   label: string;
   value: string;
@@ -234,10 +234,14 @@ export function PickerField({
   placeholder?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  /** The sheet's title (defaults to the label). */
+  sheetTitle?: string;
+  /** The likely choice, listed first. */
+  suggested?: PickerOption | null;
+  suggestedLabel?: string;
 }) {
   const { ck, styles } = useCheckoutStyles();
   const [open, setOpen] = useState(false);
-  const insets = useSafeAreaInsets();
   const selected = options.find(option => option.value === value);
   const visibleError = error && showError ? error : undefined;
   return (
@@ -258,32 +262,17 @@ export function PickerField({
         <Feather name="chevron-down" size={16} color={ck.muted} />
       </PressableScale>
       <FieldMessage error={visibleError} />
-      <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
-        <View style={[styles.sheet, { paddingTop: Platform.OS === 'web' ? Math.max(insets.top, 54) : SP.sm }]}>
-          <View style={styles.sheetHeader}>
-            <IconButton name="x" variant="plain" onPress={() => setOpen(false)} accessibilityLabel={`Close ${label} list`} />
-            <Text style={styles.sheetTitle}>{label}</Text>
-            <View style={{ width: COMP.minTouchTarget }} />
-          </View>
-          <FlatList
-            data={options}
-            keyExtractor={option => option.value}
-            initialNumToRender={20}
-            bounces={false}
-            overScrollMode="never"
-            contentContainerStyle={{ paddingHorizontal: GUTTER, paddingBottom: Math.max(insets.bottom, SP.sm) + SP.lg }}
-            renderItem={({ item, index }) => (
-              <OptionRow
-                selected={item.value === value}
-                title={item.label}
-                onPress={() => { onChange(item.value); setOpen(false); }}
-                last={index === options.length - 1}
-                testID={`${testID ?? 'picker'}-${item.value}`}
-              />
-            )}
-          />
-        </View>
-      </Modal>
+      <RegionPickerSheet
+        visible={open}
+        title={sheetTitle ?? label}
+        options={options}
+        value={value}
+        suggested={suggested}
+        suggestedLabel={suggestedLabel}
+        onSelect={onChange}
+        onClose={() => setOpen(false)}
+        testID={testID ? `${testID}-picker` : undefined}
+      />
     </View>
   );
 }

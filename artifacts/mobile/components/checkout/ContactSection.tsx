@@ -10,16 +10,18 @@ import { SP } from '@/lib/theme';
 import { CheckoutField, CheckoutSection } from './CheckoutPrimitives';
 
 export function ContactSection({
-  contact, onChange, showErrors, first,
+  contact, onChange, showErrors, first, bare,
 }: {
   contact: Partial<CheckoutContact>;
   onChange: (next: Partial<CheckoutContact>) => void;
   showErrors: boolean;
   first?: boolean;
+  /** Inside a sheet that already says "Contact": no heading or divider. */
+  bare?: boolean;
 }) {
   const errors = getCheckoutContactErrors(contact);
   return (
-    <CheckoutSection title="Contact" first={first} testID="checkout-contact">
+    <CheckoutSection title={bare ? undefined : 'Contact'} first={first || bare} testID="checkout-contact">
       <CheckoutField
         label="Email"
         value={contact.email ?? ''}

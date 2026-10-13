@@ -163,10 +163,20 @@ export function ExpressSection({ children, visible }: { children: React.ReactNod
   );
 }
 
+/** The Apple Pay / Google Pay mark on the Payment option row (identifies the method; not a button). */
+function WalletRowMark({ kind }: { kind: WalletKind }) {
+  return (
+    <View style={walletStyles.rowMark} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <Ionicons name={kind === 'google' ? 'logo-google' : 'logo-apple'} size={kind === 'google' ? 12 : 14} color={WALLET_FG} style={kind === 'apple' ? { marginTop: -2 } : undefined} />
+      <Text style={walletStyles.rowMarkText}>Pay</Text>
+    </View>
+  );
+}
+
 // ─── PAYMENT ─────────────────────────────────────────────────────────────────
 
 export function PaymentSection({
-  path, savedCards, selectedCard, onSelectCard, onCardComplete, sellerCount, bnplAvailable,
+  path, savedCards, selectedCard, onSelectCard, onCardComplete, sellerCount, bnplAvailable, wallet,
 }: {
   path: PaymentPath;
   savedCards: SavedCard[];
@@ -177,6 +187,11 @@ export function PaymentSection({
   sellerCount: number;
   /** Web, every seller opted in, amount eligible: offer Klarna / Afterpay next to saved cards. */
   bnplAvailable?: boolean;
+  /**
+   * Apple Pay / Google Pay, listed first and selected by default when the
+   * device has it (Shop). Cards are the fallback rows below it.
+   */
+  wallet?: { kind: WalletKind; selected: boolean; onSelect: () => void; onSelectCard: () => void } | null;
 }) {
   const ck = useCheckoutColors();
   const styles = useMemo(() => makeStyles(ck), [ck]);
@@ -211,42 +226,67 @@ export function PaymentSection({
   }
 
   const showBnplRow = !!bnplAvailable && savedCards.length > 0;
-  const showNewCard = savedCards.length === 0 || selectedCard === NEW_CARD || (showBnplRow && selectedCard === BNPL);
+  const walletSelected = !!wallet?.selected;
+  const cardSelected = (id: string) => !walletSelected && selectedCard === id;
+  const pickCard = (id: string) => { wallet?.onSelectCard(); onSelectCard(id); };
+  const showNewCard = !walletSelected
+    && (savedCards.length === 0 || selectedCard === NEW_CARD || (showBnplRow && selectedCard === BNPL));
   return (
     <CheckoutSection title="Payment" testID="checkout-payment">
+      {wallet && wallet.kind !== 'express' ? (
+        <View accessibilityRole="radiogroup">
+          <OptionRow
+            selected={walletSelected}
+            onPress={wallet.onSelect}
+            title={WALLET_NAMES[wallet.kind]}
+            lines={[wallet.kind === 'google' ? 'Pay with your Google account' : 'Pay with Face ID or your passcode']}
+            leading={<WalletRowMark kind={wallet.kind} />}
+            testID="checkout-pay-wallet"
+          />
+          {savedCards.length === 0 ? (
+            <OptionRow
+              selected={!walletSelected}
+              onPress={() => pickCard(NEW_CARD)}
+              title="Credit or debit card"
+              last={walletSelected}
+              testID="checkout-pay-card"
+            />
+          ) : null}
+        </View>
+      ) : null}
       {savedCards.length > 0 ? (
         <View accessibilityRole="radiogroup">
           {savedCards.map(card => (
             <OptionRow
               key={card.id}
-              selected={selectedCard === card.id}
-              onPress={() => onSelectCard(card.id)}
+              selected={cardSelected(card.id)}
+              onPress={() => pickCard(card.id)}
               title={`${brandLabel(card.brand)} •••• ${card.last4}`}
               lines={[`${card.isDefault ? 'Default · ' : ''}${expiry(card)}`]}
               testID={`checkout-saved-card-${card.id}`}
             />
           ))}
           <OptionRow
-            selected={selectedCard === NEW_CARD}
-            onPress={() => onSelectCard(NEW_CARD)}
+            selected={cardSelected(NEW_CARD)}
+            onPress={() => pickCard(NEW_CARD)}
             title="Use a new card"
-            last={selectedCard !== NEW_CARD && !showBnplRow}
+            last={!cardSelected(NEW_CARD) && !showBnplRow}
             testID="checkout-new-card"
           />
           {showBnplRow ? (
             <OptionRow
-              selected={selectedCard === BNPL}
-              onPress={() => onSelectCard(BNPL)}
+              selected={cardSelected(BNPL)}
+              onPress={() => pickCard(BNPL)}
               title="Klarna or Afterpay"
               lines={['Pay over time']}
-              last={selectedCard !== BNPL}
+              last={!cardSelected(BNPL)}
               testID="checkout-bnpl"
             />
           ) : null}
         </View>
       ) : null}
       {showNewCard ? (
-        <View style={savedCards.length > 0 ? styles.cardEntryUnderRows : undefined}>
+        <View style={savedCards.length > 0 || wallet ? styles.cardEntryUnderRows : undefined}>
           <CardEntry onCompleteChange={onCardComplete} />
         </View>
       ) : null}
@@ -287,6 +327,11 @@ const walletStyles = StyleSheet.create({
   // The platform's own typeface, not Inter (see the module comment).
   walletLead: { fontFamily: SYSTEM_FONT, fontWeight: '500', fontSize: FS.base + 1, color: WALLET_FG },
   walletText: { fontFamily: SYSTEM_FONT, fontWeight: '600', fontSize: FS.md + 1, letterSpacing: -0.2, color: WALLET_FG },
+  rowMark: {
+    flexDirection: 'row', alignItems: 'center', gap: 2, height: 24, minWidth: 44, paddingHorizontal: 6,
+    borderRadius: 5, backgroundColor: WALLET_BG, justifyContent: 'center',
+  },
+  rowMarkText: { fontFamily: SYSTEM_FONT, fontWeight: '600', fontSize: 12, color: WALLET_FG },
 });
 
 function makeStyles(ck: CheckoutColors) {

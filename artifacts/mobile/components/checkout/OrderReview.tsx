@@ -1,15 +1,16 @@
 /**
- * GOAT's "Order review", 1:1 and reskinned
- * (https://mobbin.com/flows/c34f9bac-a2d5-4cf8-a371-800e7329649d, step 3):
- * the product summary (name, size, quantity, photo on the right), the
- * shipping options as side-by-side selectable cards (arrival + price, the
- * selected one with a white border), then chevron rows ("Ship to …",
- * "Payment"), the Total with its breakdown, and the small legal line with
- * the Buyer Protection link. The page (app/buyer-checkout.tsx) keeps all
+ * "Order review", laid out like the Shop app's Review & Pay
+ * (Mobbin 469375d4-5ee8-450a-80ca-30582b5e7b38), reskinned black / white /
+ * silver: the product summary, Shipping as one full-width row per store
+ * ("Free shipping · Arrives Oct 16–20"; a radio list only when a store
+ * offers 2+ ways to ship), the Contact / Ship to rows (name above the full
+ * one-line address; each opens a sheet), Payment, the price breakdown ending
+ * in the Total, and one legal line under Pay: "Protected by Buyer
+ * Protection · Returns Policy". The page (app/buyer-checkout.tsx) keeps all
  * the payment logic; these only draw it.
  */
-import React, { useMemo } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
@@ -20,7 +21,10 @@ import { FONT, FS, SP } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { GUARANTEE_DAYS } from '@/lib/deliveryGuarantee';
 import { LEGAL_DOCUMENTS } from '@/content/legal';
-import { groupDeliveryWindow } from './OrderSummarySection';
+import { buyerProtectionLines } from '@/content/buyerProtection';
+import { addressOneLine } from '@/lib/addressFormat';
+import { BottomSheet } from '@/components/ui/BottomSheet';
+import { shippingLine } from '@/lib/checkoutDelivery';
 import { useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
 
 type Group = CheckoutSession['deliveryGroups'][number];
@@ -58,46 +62,88 @@ export function ReviewItems({ session }: { session: CheckoutSession }) {
   );
 }
 
-// ─── Shipping option cards ────────────────────────────────────────────────────
+// ─── Shipping (Shop: one full-width row per store) ─────────────────────────────
 
+/**
+ * Each store as a row: its name, then "Free shipping · Arrives Oct 16–20".
+ * Rows are informational. Only a store that actually offers 2+ ways to ship
+ * gets a radio list to choose from.
+ */
 export function ShippingOptions({
-  session, quotedGroups,
+  session, quotedGroups, onSelectMethod, today,
 }: {
   session: CheckoutSession;
   quotedGroups?: Array<{ sellerId: string; shippingCents: number; processingDays: number | null }>;
+  /** Called when a store offers several methods and the buyer picks one. */
+  onSelectMethod?: (sellerId: string, methodId: string) => void;
+  /** For tests and screenshots; defaults to now. */
+  today?: Date;
 }) {
   const ck = useCheckoutColors();
   const s = useMemo(() => makeStyles(ck), [ck]);
   return (
     <View style={s.section} testID="order-review-shipping">
-      {session.deliveryGroups.map((group: Group) => {
+      <Text style={s.sectionLabel}>Shipping</Text>
+      {session.deliveryGroups.map((group: Group, index) => {
         const quoted = quotedGroups?.find(q => q.sellerId === group.sellerId);
+        const isPreOrder = group.hasPreOrder;
+        const methods = group.availableMethods;
+        const lineFor = (method: Group['availableMethods'][number], selected: boolean) => shippingLine({
+          priceCents: selected && quoted ? quoted.shippingCents : method.priceCents,
+          processingDays: selected && quoted ? quoted.processingDays : (method.estimatedDays > 0 ? method.estimatedDays : null),
+          isPreOrder: isPreOrder || !!method.isPreOrderEstimate,
+        }, today);
+        if (methods.length === 0) {
+          return (
+            <View key={group.sellerId} style={[s.shipRow, index > 0 && s.rule]} testID={`order-review-ship-${group.sellerId}`}>
+              <Text style={s.shipStore} numberOfLines={1}>{group.sellerName}</Text>
+              <Text style={s.shipLine}>No delivery option from {group.sellerName} yet. Try again in a moment.</Text>
+            </View>
+          );
+        }
+        if (methods.length === 1 || !onSelectMethod) {
+          const method = methods.find(m => m.id === group.selectedMethodId) ?? methods[0];
+          const line = lineFor(method, true);
+          return (
+            <View
+              key={group.sellerId}
+              style={[s.shipRow, index > 0 && s.rule]}
+              accessible
+              accessibilityLabel={`${group.sellerName}: ${line}`}
+              testID={`order-review-ship-${group.sellerId}`}
+            >
+              <Text style={s.shipStore} numberOfLines={1}>{group.sellerName}</Text>
+              <Text style={s.shipLine} testID={`order-review-ship-line-${group.sellerId}`}>{line}</Text>
+            </View>
+          );
+        }
         return (
-          <View key={group.sellerId} style={s.shipGroup}>
-            {session.deliveryGroups.length > 1 && <Text style={s.shipFrom}>{group.sellerName}</Text>}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.cards}>
-              {group.availableMethods.length === 0 ? (
-                <View style={[s.card, s.cardIdle]}>
-                  <Text style={s.cardMeta}>No delivery option from {group.sellerName} yet. Try again in a moment.</Text>
-                </View>
-              ) : group.availableMethods.map(method => {
+          <View key={group.sellerId} style={[s.shipRow, index > 0 && s.rule]} testID={`order-review-ship-${group.sellerId}`}>
+            <Text style={s.shipStore} numberOfLines={1}>{group.sellerName}</Text>
+            <View accessibilityRole="radiogroup" style={s.shipChoices}>
+              {methods.map(method => {
                 const selected = method.id === group.selectedMethodId;
-                const price = selected && quoted ? quoted.shippingCents : method.priceCents;
                 return (
-                  <View
+                  <Pressable
                     key={method.id}
-                    style={[s.card, selected ? s.cardSelected : s.cardIdle]}
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`${method.service}, ${groupDeliveryWindow(group, quoted?.processingDays ?? null)}, ${price === 0 ? 'free shipping' : `${formatCents(price)} shipping`}`}
-                    testID={`order-review-ship-${method.id}`}
+                    onPress={() => { if (!selected) onSelectMethod(group.sellerId, method.id); }}
+                    style={s.shipChoice}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    accessibilityLabel={`${method.service || 'Standard'}, ${lineFor(method, selected)}`}
+                    testID={`order-review-ship-${group.sellerId}-${method.id}`}
                   >
-                    <Text style={s.cardTitle}>{method.service || 'Standard'}</Text>
-                    <Text style={s.cardMeta}>{groupDeliveryWindow(group, quoted?.processingDays ?? null)}</Text>
-                    <Text style={s.cardPrice}>{price === 0 ? 'Free shipping' : `+${formatCents(price)} shipping`}</Text>
-                  </View>
+                    <View style={[s.radio, { borderColor: selected ? ck.text : ck.subtle }]}>
+                      {selected ? <View style={s.radioDot} /> : null}
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={s.shipMethod} numberOfLines={1}>{method.service || 'Standard'}</Text>
+                      <Text style={s.shipLine}>{lineFor(method, selected)}</Text>
+                    </View>
+                  </Pressable>
                 );
               })}
-            </ScrollView>
+            </View>
           </View>
         );
       })}
@@ -142,10 +188,47 @@ export function ReviewRow({
   );
 }
 
-/** "1226 University Dr, Menlo Park, CA" — or null while the address is incomplete. */
+/** "141 Prince St, New York, NY 10012" — or null while the address is incomplete (lib/addressFormat). */
 export function addressSummary(address: Partial<CheckoutAddress>): string | null {
-  if (!address.line1 || !address.city) return null;
-  return [address.line1, address.city, address.state].filter(Boolean).join(', ');
+  return addressOneLine(address);
+}
+
+/**
+ * Shop's Review & Pay row, with the label above so the whole address fits
+ * on one line: "Ship to", then the name, then "141 Prince St, New York, NY
+ * 10012", chevron on the right. Tapping opens the matching sheet.
+ */
+export function ReviewDetailRow({
+  label, title, detail, placeholder, onPress, testID,
+}: {
+  label: string;
+  title?: string | null;
+  detail?: string | null;
+  /** Shown when there's nothing yet ("Add address"). */
+  placeholder: string;
+  onPress: () => void;
+  testID?: string;
+}) {
+  const ck = useCheckoutColors();
+  const s = useMemo(() => makeStyles(ck), [ck]);
+  const empty = !title && !detail;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={s.detailRow}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}, ${empty ? placeholder : [title, detail].filter(Boolean).join(', ')}`}
+      testID={testID}
+    >
+      <View style={s.detailCopy}>
+        <Text style={s.detailLabel}>{label}</Text>
+        {empty ? <Text style={s.detailTitle}>{placeholder}</Text> : null}
+        {title ? <Text style={s.detailTitle} numberOfLines={1}>{title}</Text> : null}
+        {detail ? <Text style={s.detailText} numberOfLines={1} testID={testID ? `${testID}-detail` : undefined}>{detail}</Text> : null}
+      </View>
+      <Icon name="chevron-right" size={17} color={ck.text} />
+    </Pressable>
+  );
 }
 
 /** The Apple Pay / Google Pay mark GOAT puts on its Payment row. */
@@ -186,36 +269,69 @@ export function ReviewTotals({
   );
   return (
     <View style={s.totals} testID="checkout-price-breakdown">
-      <View style={s.totalRow}>
-        <Text style={s.totalLabel}>Total</Text>
-        <Text style={s.totalValue} testID="checkout-total">{formatCents(totals.totalCents)}</Text>
-      </View>
-      {line(`Item subtotal (${itemCount})`, formatCents(totals.subtotalCents))}
-      {line('Shipping', totals.shippingCents === 0 ? 'Free' : formatCents(totals.shippingCents))}
+      {line(`Subtotal (${itemCount} ${itemCount === 1 ? 'item' : 'items'})`, formatCents(totals.subtotalCents), 'checkout-subtotal-line')}
+      {line('Shipping', totals.shippingCents === 0 ? 'Free' : formatCents(totals.shippingCents), 'checkout-shipping-line')}
       {line('Estimated tax', taxNote ?? formatCents(totals.taxCents), 'checkout-tax-line')}
       {totals.promoCents > 0 ? line('Discount', `−${formatCents(totals.promoCents)}`, 'checkout-discount-line') : null}
       {totals.rewardsCents > 0 ? line('Points', `−${formatCents(totals.rewardsCents)}`) : null}
       {totals.threadCashCents > 0 ? line('Thread Cash', `−${formatCents(totals.threadCashCents)}`, 'checkout-thread-cash-line') : null}
       {giftCardCents > 0 ? line('Gift card', `−${formatCents(giftCardCents)}`) : null}
+      <View style={s.totalRow}>
+        <Text style={s.totalLabel}>Total</Text>
+        <Text style={s.totalValue} testID="checkout-total">{formatCents(totals.totalCents)}</Text>
+      </View>
     </View>
   );
 }
 
 // ─── Legal line ───────────────────────────────────────────────────────────────
 
+/**
+ * One line under Pay: "Protected by Buyer Protection · Returns Policy".
+ * Buyer Protection opens a short sheet (the Buyer Protection Policy): the
+ * Terms' purchase protection, quoted verbatim, and the delivery guarantee
+ * (refunded automatically if not delivered within 15 days, 60 for
+ * pre-orders).
+ */
 export function ReviewLegal({ preorder }: { preorder: boolean }) {
   const ck = useCheckoutColors();
   const s = useMemo(() => makeStyles(ck), [ck]);
   const router = useRouter();
-  const days = preorder ? GUARANTEE_DAYS.preorder : GUARANTEE_DAYS.regular;
+  const [open, setOpen] = useState(false);
   return (
-    <Text style={s.legal} testID="order-review-legal">
-      By proceeding, you agree to the{' '}
-      <Text style={s.link} onPress={() => router.push(LEGAL_DOCUMENTS.terms.route as never)} accessibilityRole="link">Buyer Protection Policy</Text>
-      {' '}and the{' '}
-      <Text style={s.link} onPress={() => router.push(LEGAL_DOCUMENTS['refund-policy'].route as never)} accessibilityRole="link">Returns Policy</Text>
-      . Not delivered within {days} days? You’re refunded automatically.
-    </Text>
+    <>
+      <Text style={s.legal} numberOfLines={1} testID="order-review-legal">
+        Protected by{' '}
+        <Text style={s.link} onPress={() => setOpen(true)} accessibilityRole="link" testID="order-review-buyer-protection">Buyer Protection</Text>
+        {' · '}
+        <Text style={s.link} onPress={() => router.push(LEGAL_DOCUMENTS['refund-policy'].route as never)} accessibilityRole="link">Returns Policy</Text>
+      </Text>
+      <BuyerProtectionSheet visible={open} preorder={preorder} onClose={() => setOpen(false)} />
+    </>
+  );
+}
+
+function BuyerProtectionSheet({ visible, preorder, onClose }: { visible: boolean; preorder: boolean; onClose: () => void }) {
+  const ck = useCheckoutColors();
+  const s = useMemo(() => makeStyles(ck), [ck]);
+  const router = useRouter();
+  return (
+    <BottomSheet visible={visible} onClose={onClose} testID="buyer-protection-sheet">
+      <View style={s.sheetBody}>
+        <Text style={s.sheetTitle} accessibilityRole="header">Buyer Protection Policy</Text>
+        <Text style={s.sheetText}>
+          Not delivered within {GUARANTEE_DAYS.regular} days{preorder ? ` (${GUARANTEE_DAYS.preorder} for pre-orders)` : ''}? You’re refunded automatically.
+        </Text>
+        {buyerProtectionLines({ preorder }).map(text => <Text key={text} style={s.sheetText}>{text}</Text>)}
+        <Text
+          style={[s.sheetText, s.link]}
+          onPress={() => { onClose(); router.push(LEGAL_DOCUMENTS.terms.route as never); }}
+          accessibilityRole="link"
+        >
+          Read the Terms of Service
+        </Text>
+      </View>
+    </BottomSheet>
   );
 }
 
@@ -230,15 +346,15 @@ const makeStyles = (ck: CheckoutColors) => StyleSheet.create({
   thumbFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1C1C1E' },
 
   section: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: ck.divider, paddingVertical: SP.md },
-  shipGroup: { gap: SP.xs },
-  shipFrom: { fontFamily: FONT.medium, fontSize: FS.sm, color: ck.muted },
-  cards: { gap: SP.sm },
-  card: { width: 200, minHeight: 112, borderRadius: 12, padding: SP.md, gap: 4, justifyContent: 'space-between' },
-  cardSelected: { borderWidth: 1.5, borderColor: '#FFFFFF' },
-  cardIdle: { borderWidth: StyleSheet.hairlineWidth, borderColor: ck.fieldBorder },
-  cardTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, color: ck.text },
-  cardMeta: { fontFamily: FONT.regular, fontSize: FS.sm, color: ck.muted },
-  cardPrice: { fontFamily: FONT.medium, fontSize: FS.sm, color: ck.text, ...TABULAR_NUMS },
+  sectionLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, color: ck.muted, marginBottom: SP.xs },
+  shipRow: { paddingVertical: SP.sm + 2, gap: 3 },
+  shipStore: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
+  shipLine: { fontFamily: FONT.regular, fontSize: FS.sm, color: ck.muted, ...TABULAR_NUMS },
+  shipChoices: { marginTop: SP.xs },
+  shipChoice: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, minHeight: 52, paddingVertical: SP.xs },
+  shipMethod: { fontFamily: FONT.medium, fontSize: FS.base, color: ck.text },
+  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: ck.text },
 
   rowWrap: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: ck.divider },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 56 },
@@ -248,7 +364,10 @@ const makeStyles = (ck: CheckoutColors) => StyleSheet.create({
   rowBody: { paddingBottom: SP.md },
 
   totals: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: ck.divider, paddingVertical: SP.md, gap: 6 },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  totalRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: SP.xs, paddingTop: SP.sm + 2, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: ck.divider,
+  },
   totalLabel: { fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text },
   totalValue: { fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text, ...TABULAR_NUMS },
   line: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -256,5 +375,16 @@ const makeStyles = (ck: CheckoutColors) => StyleSheet.create({
   lineValue: { fontFamily: FONT.regular, fontSize: FS.sm, color: ck.muted, ...TABULAR_NUMS },
 
   legal: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17, color: ck.muted, textAlign: 'center' },
+  detailRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 56, paddingVertical: SP.sm + 4,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: ck.divider,
+  },
+  detailCopy: { flex: 1, minWidth: 0, gap: 2 },
+  detailLabel: { fontFamily: FONT.regular, fontSize: FS.sm, color: ck.muted, marginBottom: 2 },
+  detailTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
+  detailText: { fontFamily: FONT.regular, fontSize: FS.sm, color: ck.text },
+  sheetBody: { paddingHorizontal: SP.md, paddingBottom: SP.lg, gap: SP.sm + 2 },
+  sheetTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text, marginBottom: SP.xs },
+  sheetText: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, color: ck.muted },
   link: { color: ck.text, textDecorationLine: 'underline' },
 });
