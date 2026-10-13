@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { formatCents } from '@/lib/money';
+import { ApproxPrice } from '@/components/intl/ApproxPrice';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
@@ -1059,6 +1060,8 @@ export default function BuyerProductDetailScreen() {
             {hasDiscount && <Text style={s.comparePrice}>{fmtPrice(variantCompare!)}</Text>}
             {hasDiscount && <Text style={s.savings}>Save {fmtPrice(savingsAmt)}</Text>}
           </View>
+          {/* Intl #107: approximate price in the buyer's display currency (nothing when USD / off). */}
+          <ApproxPrice cents={variantPrice} style={{ marginTop: -SP.sm, marginBottom: SP.md }} />
 
           <LaunchCountdown productId={product.id} onLaunchingChange={setLaunching} />
 

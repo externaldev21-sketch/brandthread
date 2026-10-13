@@ -110,6 +110,11 @@ export const users = pgTable('users', {
   // ISO-3166 alpha-2 country the seller ships from. Used to resolve which
   // shipping zone is "domestic" for that seller (see shippingZones).
   sellerShipFromCountry: text('seller_ship_from_country').notNull().default('US'),
+  // Optional ship-from postal code, used only to quote live carrier rates
+  // for 'calculated' shipping zones (migration 625).
+  sellerShipFromPostalCode: text('seller_ship_from_postal_code'),
+  // Buyer's display currency (ISO 4217). Display only; charges stay USD (migration 625).
+  displayCurrency: text('display_currency'),
   // Public profile link (bio website)
   website: text('website'),
   // Seller storefront metadata (Edit Profile — Store Details section)
@@ -461,6 +466,10 @@ export const orders = pgTable('orders', {
   // remain explicit integer-cent values so tax is never inferred from
   // shipping or a locally configured rate.
   taxCents: integer('tax_cents').notNull().default(0),
+  // Duties & import taxes collected at checkout for a DDP shipping zone
+  // (migration 625). Part of totalCents; passed through to the seller, who
+  // remits them to the carrier with the DDP label.
+  dutiesCents: integer('duties_cents').notNull().default(0),
   grossChargedCents: integer('gross_charged_cents').notNull().default(0),
   paidAt: timestamp('paid_at'),
   notes: text('notes'),
@@ -771,6 +780,9 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   amountTotalCents: integer('amount_total_cents'),
   shippingCents: integer('shipping_cents'),
   taxCents: integer('tax_cents'),
+  // DDP duties & import taxes for this group (migration 625); part of amountTotalCents.
+  dutiesCents: integer('duties_cents').notNull().default(0),
+  dutiesQuoteId: text('duties_quote_id'),
   stripeTaxCalculationId: text('stripe_tax_calculation_id'),
   stripePaymentIntentId: text('stripe_payment_intent_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -2629,3 +2641,15 @@ export * from './comments';
 export * from './hashtags';
 export * from './captions';
 export * from './places';
+
+// ─── FX reference rates (intl #107, migration 625) ────────────────────────────
+// Display-only conversion of USD prices. Cached from an ECB-based feed.
+export const fxRates = pgTable('fx_rates', {
+  baseCurrency: text('base_currency').notNull(),
+  currency: text('currency').notNull(),
+  rate: numeric('rate', { precision: 20, scale: 10 }).notNull(),
+  rateDate: text('rate_date'),
+  fetchedAt: timestamp('fetched_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.baseCurrency, t.currency] }),
+}));

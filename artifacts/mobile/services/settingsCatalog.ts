@@ -16,6 +16,8 @@ export interface SettingsCatalogItem {
   audience: SettingsAudience;
   /** Row is shown but not yet interactive (e.g. an upcoming feature slot). */
   soon?: boolean;
+  /** Intl #107: only shown while the server's display-currency rates are on (FX_RATES_ENABLED). */
+  requiresFx?: boolean;
 }
 
 export interface SettingsCatalogGroup {
@@ -50,6 +52,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Orders and returns', description: 'View purchases, returns, and order support', aliases: ['orders', 'purchases', 'refunds', 'returns'], icon: 'package', route: '/(buyer)/orders', audience: 'buyer' },
       { label: 'Shopping preferences', description: 'Sizes, fit, favorite categories, and recommendations', aliases: ['shopping', 'sizes', 'fit', 'recommendations'], icon: 'shopping-bag', route: '/shopping-preferences', audience: 'buyer' },
+      { label: 'Currency', description: 'See approximate prices in your currency', aliases: ['currency', 'euro', 'pound', 'exchange rate', 'convert', 'region'], icon: 'dollar-sign', route: '/currency', audience: 'buyer', requiresFx: true },
       { label: 'My sizes', description: 'Sizes and measurements', aliases: ['sizes', 'size', 'measurements', 'fit', 'height'], icon: 'maximize-2', route: '/buyer-my-sizes', audience: 'buyer' },
     ],
   },

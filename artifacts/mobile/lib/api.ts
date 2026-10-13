@@ -3283,13 +3283,20 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<any>(`/api/shipping-rates/calculate?sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}`),
     },
     /** Shipping zones — worldwide zone-based rates (domestic / country / rest-of-world), replacing the single flat rate above. */
+    /** Intl #107: display-only currency (charges stay USD). */
+    fx: {
+      rates: () => get<{ enabled: boolean; available?: boolean; base: string; date?: string | null; rates: Record<string, number> }>('/api/fx/rates'),
+      getDisplayCurrency: () => get<{ displayCurrency: string | null }>('/api/fx/display-currency'),
+      setDisplayCurrency: (displayCurrency: string) =>
+        patch<{ displayCurrency: string }>('/api/fx/display-currency', { displayCurrency }),
+    },
     shippingZones: {
       list: () => get<any[]>('/api/shipping-zones'),
       create: (data: {
         name: string;
         zoneType: 'domestic' | 'country' | 'rest_of_world';
         countries?: string[];
-        pricingModel?: 'flat' | 'weight_tiered';
+        pricingModel?: 'flat' | 'weight_tiered' | 'calculated';
         flatRateCents?: number;
         freeAboveCents?: number | null;
         processingDays?: number;
@@ -3303,9 +3310,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       delete: (id: string) => del<any>(`/api/shipping-zones/${encodeURIComponent(id)}`),
       setWeightTiers: (id: string, tiers: Array<{ minWeightGrams: number; maxWeightGrams: number | null; rateCents: number }>) =>
         put<any>(`/api/shipping-zones/${encodeURIComponent(id)}/weight-tiers`, { tiers }),
-      getSettings: () => get<{ shipFromCountry: string }>('/api/shipping-zones/settings'),
+      /** Intl #108/#109: the optional fields appear only while their server flags are on. */
+      getSettings: () => get<{ shipFromCountry: string; liveRatesAvailable?: boolean; shipFromPostalCode?: string | null; dutiesAtCheckout?: boolean }>('/api/shipping-zones/settings'),
       updateSettings: (shipFromCountry: string) =>
         patch<{ shipFromCountry: string }>('/api/shipping-zones/settings', { shipFromCountry }),
+      updateShipFromPostalCode: (shipFromPostalCode: string) =>
+        patch<{ shipFromPostalCode: string | null }>('/api/shipping-zones/settings', { shipFromPostalCode }),
       resolve: (sellerId: string, country: string, subtotalCents: number, weightGrams = 0) =>
         get<any>(`/api/shipping-zones/resolve?sellerId=${encodeURIComponent(sellerId)}&country=${encodeURIComponent(country)}&subtotalCents=${subtotalCents}&weightGrams=${weightGrams}`),
     },
@@ -3608,6 +3618,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         complianceNote: string;
         chargeShippingTax: boolean;
         chargeVat: boolean;
+        /** Intl #109: present (true) only while duties at checkout are switched on server-side. */
+        dutiesAtCheckout?: boolean;
       }>('/api/taxes/status'),
       enable:    () => post<any>('/api/taxes/enable', {}),
       config:    (data: { stripeTaxEnabled?: boolean; collectDuties?: boolean; chargeShippingTax?: boolean; chargeVat?: boolean; taxCalculationMode?: string }) =>

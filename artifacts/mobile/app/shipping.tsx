@@ -21,7 +21,8 @@ import { radius } from '@/constants/radii';
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 type ZoneType = 'domestic' | 'country' | 'rest_of_world';
-type PricingModel = 'flat' | 'weight_tiered';
+// 'calculated' (intl #108): live carrier rates, offered only while the server enables them.
+type PricingModel = 'flat' | 'weight_tiered' | 'calculated';
 type Duties = 'ddp' | 'dap';
 
 interface WeightTier {
@@ -119,6 +120,7 @@ function zoneRateSummary(zone: ShippingZone): string {
     const cheapest = [...tiers].sort((a, b) => a.rateCents - b.rateCents)[0];
     return `From ${formatCents(cheapest.rateCents)} · ${tiers.length} tier${tiers.length === 1 ? '' : 's'}`;
   }
+  if (zone.pricingModel === 'calculated') return `Live carrier rates · ${formatCents(zone.flatRateCents)} fallback`;
   return zone.flatRateCents === 0 ? 'Free' : formatCents(zone.flatRateCents);
 }
 
@@ -141,6 +143,11 @@ export default function ShippingScreen() {
   const [zonesLoading, setZonesLoading] = useState(true);
   const [shipFromCountry, setShipFromCountry] = useState('US');
   const [shipFromDraft, setShipFromDraft] = useState('US');
+  // Intl #108/#109: server flags (absent = off) and the ship-from postal code live rates need.
+  const [liveRatesAvailable, setLiveRatesAvailable] = useState(false);
+  const [dutiesAtCheckout, setDutiesAtCheckout] = useState(false);
+  const [shipFromPostal, setShipFromPostal] = useState('');
+  const [shipFromPostalDraft, setShipFromPostalDraft] = useState('');
   const [shipFromEditing, setShipFromEditing] = useState(false);
   const [savingShipFrom, setSavingShipFrom] = useState(false);
 
@@ -169,6 +176,10 @@ export default function ShippingScreen() {
     ]).then(([zoneRows, settings, presetRes, rateRows]) => {
       setZones(Array.isArray(zoneRows) ? zoneRows : []);
       setShipFromCountry(settings?.shipFromCountry ?? 'US');
+      setLiveRatesAvailable((settings as { liveRatesAvailable?: boolean })?.liveRatesAvailable === true);
+      setDutiesAtCheckout((settings as { dutiesAtCheckout?: boolean })?.dutiesAtCheckout === true);
+      setShipFromPostal((settings as { shipFromPostalCode?: string | null })?.shipFromPostalCode ?? '');
+      setShipFromPostalDraft((settings as { shipFromPostalCode?: string | null })?.shipFromPostalCode ?? '');
       setShipFromDraft(settings?.shipFromCountry ?? 'US');
       setPresets(Array.isArray(presetRes?.presets) ? presetRes.presets : []);
       setLegacyRates(Array.isArray(rateRows) ? rateRows : []);
@@ -322,6 +333,10 @@ export default function ShippingScreen() {
         saved = await completeSetupTaskAfter('shipping_rates', () => api.shippingZones.update(zoneForm.id!, payload));
       } else {
         saved = await completeSetupTaskAfter('shipping_rates', () => api.shippingZones.create(payload));
+      }
+      if (zoneForm.pricingModel === 'calculated' && shipFromPostalDraft.trim().toUpperCase() !== shipFromPostal) {
+        const postalRes = await api.shippingZones.updateShipFromPostalCode(shipFromPostalDraft.trim());
+        setShipFromPostal(postalRes?.shipFromPostalCode ?? '');
       }
       if (zoneForm.pricingModel === 'weight_tiered') {
         const tierRes = await api.shippingZones.setWeightTiers(saved.id, tiersPayload);
@@ -791,22 +806,42 @@ export default function ShippingScreen() {
 
           <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Pricing</Text>
           <View style={styles.segmentRow}>
-            {(['flat', 'weight_tiered'] as PricingModel[]).map(m => (
+            {([
+              'flat', 'weight_tiered',
+              ...(liveRatesAvailable && zoneForm.zoneType !== 'domestic' ? ['calculated'] : []),
+            ] as PricingModel[]).map(m => (
               <TouchableOpacity
                 key={m}
                 onPress={() => setZoneForm(f => ({ ...f, pricingModel: m }))}
                 style={[styles.segment, { borderColor: colors.border }, zoneForm.pricingModel === m && { backgroundColor: colors.primary, borderColor: colors.primary }]}
               >
                 <Text style={[styles.segmentText, { color: zoneForm.pricingModel === m ? colors.primaryForeground : colors.foreground }]}>
-                  {m === 'flat' ? 'Flat rate' : 'Weight-based'}
+                  {m === 'flat' ? 'Flat rate' : m === 'calculated' ? 'Calculated' : 'Weight-based'}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          {zoneForm.pricingModel === 'flat' ? (
+          {zoneForm.pricingModel !== 'weight_tiered' ? (
             <>
-              <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Flat rate</Text>
+              {zoneForm.pricingModel === 'calculated' && (
+                <>
+                  <Text style={[styles.rateSub, { color: colors.mutedForeground, marginTop: 4 }]}>
+                    Buyers pay the carrier’s live rate to their address. The fallback rate applies when a live rate isn’t available.
+                  </Text>
+                  <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Ship-from ZIP / postal code</Text>
+                  <TextInput
+                    value={shipFromPostalDraft}
+                    onChangeText={setShipFromPostalDraft}
+                    placeholder="10001"
+                    autoCapitalize="characters"
+                    placeholderTextColor={colors.mutedForeground}
+                    style={[styles.sheetInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                    testID="zone-ship-from-postal"
+                  />
+                </>
+              )}
+              <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>{zoneForm.pricingModel === 'calculated' ? 'Fallback flat rate' : 'Flat rate'}</Text>
               <TextInput
                 value={zoneForm.flatRate}
                 onChangeText={t => setZoneForm(f => ({ ...f, flatRate: t }))}
@@ -933,7 +968,9 @@ export default function ShippingScreen() {
                     ))}
                   </View>
                   <Text style={[styles.rateSub, { color: colors.mutedForeground, marginTop: 4 }]}>
-                    DAP: the buyer pays duties/customs on delivery. DDP: duties are prepaid at checkout. Informational only — no live customs calculation.
+                    {dutiesAtCheckout
+                      ? 'DAP: the buyer pays duties/customs on delivery. DDP: duties and import taxes are calculated and charged at checkout, then added to your payout.'
+                      : 'DAP: the buyer pays duties/customs on delivery. DDP: duties are prepaid at checkout. Informational only — no live customs calculation.'}
                   </Text>
                 </>
               )}

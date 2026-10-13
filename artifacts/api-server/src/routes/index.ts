@@ -86,6 +86,7 @@ import financeRouter from "./finance";
 import financeStatementsRouter from "./finance-statements";
 import { financeFeesRouter, publicFeeScheduleRouter } from "./fees";
 import taxesRouter from "./taxes";
+import fxRouter from "./fx";
 import sellerPaymentSettingsRouter from "./seller-payment-settings";
 import teamRouter from "./team";
 import { requireRole, teamContext } from "../middlewares/requireRole";
@@ -168,6 +169,7 @@ const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use("/fx",             fxRouter); // GET /rates public (display-only currency, intl #107); /display-currency authed per route
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)

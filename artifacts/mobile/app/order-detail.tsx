@@ -274,6 +274,8 @@ export function adaptApiOrder(raw: any): Order {
        discountTotalCents:      Math.max(0, raw.discountAmountCents ?? 0),
        shippingTotalCents:      shippingCents,
        taxTotalCents:           0,
+       // Intl #109: DDP duties collected at checkout, passed through in the payout.
+       dutiesCents:             Math.max(0, raw.dutiesCents ?? 0),
        totalCents,
       // Payment was received for active/shipped/delivered; held in limbo for refund_pending
        amountPaidCents:         isRefundPending ? 0 : (uiStatus === 'cancelled' || uiStatus === 'refunded') ? 0 : totalCents,
@@ -1364,6 +1366,7 @@ function PaymentTab({ order }: { order: Order }) {
         {p.discountTotalCents > 0 && <InfoRow label="Discounts" value={`-${usd(p.discountTotalCents)}`} />}
         <InfoRow label="Shipping" value={usd(p.shippingTotalCents)} />
         <InfoRow label="Tax" value={usd(p.taxTotalCents)} />
+        {(p.dutiesCents ?? 0) > 0 && <InfoRow label="Duties & import taxes" value={usd(p.dutiesCents ?? 0)} />}
         <View style={s.divider} />
         <InfoRow label="Total" value={usd(p.totalCents)} bold />
         <FeesRow payment={p} />

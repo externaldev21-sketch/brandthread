@@ -24,7 +24,7 @@ import { View } from 'react-native';
 import { loadStripe } from '@stripe/stripe-js/pure';
 import type { Stripe, StripeElements, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements, ExpressCheckoutElement, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
-import { MIN_CARD_CHARGE_CENTS_CLIENT, type CartQuote, type WalletContact } from '@/lib/checkoutPayment';
+import { MIN_CARD_CHARGE_CENTS_CLIENT, quoteDutiesCents, type CartQuote, type WalletContact } from '@/lib/checkoutPayment';
 import { useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
 import {
   stripePublishableKey,
@@ -221,12 +221,14 @@ const ElementsPaymentController = React.forwardRef<PaymentControllerApi>(functio
 
 // ─── Apple Pay / Google Pay ──────────────────────────────────────────────────
 
-function sheetLines(amountCents: number, shippingCents: number, taxCents: number) {
-  // Items + tax + the shipping rate add up to exactly the amount.
+function sheetLines(amountCents: number, shippingCents: number, taxCents: number, dutiesCents = 0) {
+  // Items + tax + duties + the shipping rate add up to exactly the amount.
   return {
     lineItems: [
-      { name: 'Items', amount: Math.max(0, amountCents - shippingCents - taxCents) },
+      { name: 'Items', amount: Math.max(0, amountCents - shippingCents - taxCents - dutiesCents) },
       ...(taxCents > 0 ? [{ name: 'Tax', amount: taxCents }] : []),
+      // Intl #109: DDP duties, only when the quote carries them.
+      ...(dutiesCents > 0 ? [{ name: 'Duties & import taxes', amount: dutiesCents }] : []),
     ],
     shippingRates: [{ id: 'seller-shipping', displayName: 'Shipping', amount: shippingCents }],
   };
@@ -277,7 +279,8 @@ function ElementsExpressPay({ amountCents, shippingCents, quote, createIntent, o
           const ship = next.groups.reduce((sum, group) => sum + group.shippingCents, 0);
           const tax = next.groups.reduce((sum, group) => sum + group.taxCents, 0);
           elements.update({ amount: Math.max(MIN_CARD_CHARGE_CENTS_CLIENT, next.amountCents) });
-          event.resolve(sheetLines(next.amountCents, ship, tax));
+          const duties = quoteDutiesCents(next);
+          event.resolve(sheetLines(next.amountCents, ship, tax, duties));
         }}
         onConfirm={async event => {
           if (!stripe || !elements) {

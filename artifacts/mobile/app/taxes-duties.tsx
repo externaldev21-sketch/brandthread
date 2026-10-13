@@ -17,6 +17,8 @@ export default function TaxesDutiesScreen() {
   const [stripeTaxEnabled,   setStripeTaxEnabled]   = useState(false);
   const [providerConfigured, setProviderConfigured] = useState(false);
   const [chargeShippingTax,  setChargeShippingTax]  = useState(false);
+  // Intl #109: the server says when duties are collected at checkout (DUTIES_AT_CHECKOUT_ENABLED).
+  const [dutiesAtCheckout,   setDutiesAtCheckout]   = useState(false);
   const [annualReport,       setAnnualReport]       = useState<any>(null);
 
   const [savingTax,      setSavingTax]      = useState(false);
@@ -29,6 +31,7 @@ export default function TaxesDutiesScreen() {
       setStripeTaxEnabled(cfg.stripeTaxEnabled ?? false);
       setProviderConfigured(cfg.providerConfigured ?? false);
       setChargeShippingTax(cfg.chargeShippingTax ?? false);
+      setDutiesAtCheckout(cfg.dutiesAtCheckout === true);
     } catch { /* keep defaults if the config can't be reached */ }
     try {
       setAnnualReport(await api.taxes.forms1099());
@@ -202,10 +205,21 @@ export default function TaxesDutiesScreen() {
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="globe" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available yet</Text>
-              <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Brandthread doesn't calculate or collect customs duties at checkout. International orders currently ship DAP by default — buyers may be responsible for duties and import fees charged on delivery.
-              </Text>
+              {dutiesAtCheckout ? (
+                <>
+                  <Text style={[styles.rowLabel, { color: colors.foreground }]}>Collected at checkout for DDP zones</Text>
+                  <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
+                    For shipping zones set to Prepaid (DDP), buyers pay duties and import taxes at checkout. The amount is added to your payout so you can pay the carrier when you ship. Zones set to Buyer pays (DAP) are unchanged.
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available yet</Text>
+                  <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
+                    Brandthread doesn't calculate or collect customs duties at checkout. International orders currently ship DAP by default — buyers may be responsible for duties and import fees charged on delivery.
+                  </Text>
+                </>
+              )}
             </View>
           </View>
         </View>
