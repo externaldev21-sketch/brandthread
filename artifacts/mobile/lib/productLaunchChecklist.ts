@@ -136,6 +136,34 @@ export function buildDemoLaunchChecklist(): ProductLaunchChecklist {
   return { items, readyCount: items.filter((i) => i.done).length, total: items.length, blockers: [], canSchedule: true, imageCount: 2, followerCount: 1240 };
 }
 
+/** Only with `&demo=1` on the web preview: two scheduled launches and an unscheduled product. */
+export function buildDemoLaunches(now: Date = new Date()) {
+  const day = 24 * 3600 * 1000;
+  const at = (days: number, hour: number) => { const d = new Date(now.getTime() + days * day); d.setHours(hour, 0, 0, 0); return d.toISOString(); };
+  const img = (n: string) => `https://cdn.brandthread.test/demo/${n}.jpg`;
+  return {
+    launches: [
+      { productId: 'demo-launch-1', name: 'Heavyweight Hoodie — Ember', imageUrl: img('hoodie-ember'), status: 'active', launchAt: at(5, 19), launchedAt: null, notifyFollowers: true, alertCount: 38, readiness: { readyCount: 6, total: 9, blockers: [] as string[] } },
+      { productId: 'demo-launch-2', name: 'Field Shell Jacket — Rust', imageUrl: img('jacket-rust'), status: 'active', launchAt: at(8, 10), launchedAt: null, notifyFollowers: false, alertCount: 4, readiness: { readyCount: 4, total: 9, blockers: ['price', 'payouts'] } },
+    ],
+    products: [
+      { id: 'demo-launch-1', name: 'Heavyweight Hoodie — Ember', images: [img('hoodie-ember')], status: 'active' },
+      { id: 'demo-launch-2', name: 'Field Shell Jacket — Rust', images: [img('jacket-rust')], status: 'active' },
+      { id: 'demo-launch-3', name: 'Utility Cargo Pant — Rust', images: [img('cargo-rust')], status: 'active' },
+    ],
+  };
+}
+
+/** `&demo=1` checklist per demo product: warnings only, or blocked on price + payouts. */
+export function buildDemoChecklistFor(productId: string): ProductLaunchChecklist {
+  const base = buildDemoLaunchChecklist();
+  if (productId !== 'demo-launch-2') return base;
+  const open: LaunchCheckId[] = ['price', 'description', 'shipping', 'payouts', 'followers'];
+  const blockers: LaunchCheckId[] = ['price', 'payouts'];
+  const items = base.items.map((i) => ({ id: i.id, done: !open.includes(i.id), blocking: blockers.includes(i.id) }));
+  return { ...base, items, readyCount: items.filter((i) => i.done).length, blockers, canSchedule: false, imageCount: 4 };
+}
+
 /** Only with `&demo=1` on the web preview. */
 export function buildDemoBestTime(timeZone: string): BestTimeResponse {
   const grid = Array.from({ length: 7 }, (_, wd) => Array.from({ length: 24 }, (_, h) => {

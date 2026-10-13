@@ -14,7 +14,6 @@ import {
   ActivityIndicator, Alert, Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
@@ -28,7 +27,7 @@ import { LaunchChecklistSection } from '@/components/products/LaunchChecklistSec
 import { BestTimeSuggestion } from '@/components/products/BestTimeSuggestion';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import {
-  buildDemoBestTime, buildDemoLaunchChecklist, nextSlotWallClock, withLiveChecks,
+  buildDemoBestTime, buildDemoChecklistFor, buildDemoLaunches, nextSlotWallClock, withLiveChecks,
   type ActiveSlot, type ProductLaunchChecklist,
 } from '@/lib/productLaunchChecklist';
 import { listSupportedTimeZones, zonedTimeToUtc } from '@/lib/dropSchedule';
@@ -42,11 +41,6 @@ type Launch = {
 type Draft = { date: string; time: string; zone: string; notifyFollowers: boolean };
 type EditTarget = { productId: string; name: string; existing: Launch | null; draft?: Draft };
 
-/** Signed-out web preview never calls the seller API (payout-schedule.tsx pattern). */
-function useSignedOutPreview() {
-  const { isLoaded, isSignedIn, userId } = useAuth();
-  return isSellerDevPreview() && (!isLoaded || !isSignedIn || !userId);
-}
 type SellerProduct = { id: string; name: string; images?: string[]; status?: string };
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
@@ -81,7 +75,9 @@ export default function ProductLaunchesScreen() {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [l, p] = await Promise.all([
+      // The web seller preview never calls the API (lib/api rejects it); demo rows only with &demo=1.
+      const demo = isSellerDevPreview() ? (isPreviewDemoMode() ? buildDemoLaunches() : { launches: [], products: [] }) : null;
+      const [l, p] = demo ? [demo.launches, demo.products] : await Promise.all([
         api.productLaunches.list(),
         (api.products.list() as Promise<any>).catch(() => []),
       ]);
@@ -253,26 +249,26 @@ function LaunchEditor({
   const [zoneFilter, setZoneFilter] = useState('');
   const [notifyFollowers, setNotifyFollowers] = useState(draft?.notifyFollowers ?? existing?.notifyFollowers ?? false);
   const [saving, setSaving] = useState(false);
-  const signedOutPreview = useSignedOutPreview();
+  const preview = isSellerDevPreview();
   const [checklist, setChecklist] = useState<ProductLaunchChecklist | null>(null);
   const [bestSlot, setBestSlot] = useState<ActiveSlot | null>(null);
 
   const loadChecklist = useCallback(async () => {
-    if (signedOutPreview) { setChecklist(isPreviewDemoMode() ? buildDemoLaunchChecklist() : null); return; }
+    if (preview) { setChecklist(isPreviewDemoMode() ? buildDemoChecklistFor(target.productId) : null); return; }
     try { setChecklist(await api.productLaunches.checklist(target.productId)); }
     catch { setChecklist(null); }
-  }, [api, signedOutPreview, target.productId]);
+  }, [api, preview, target.productId]);
   React.useEffect(() => { loadChecklist(); }, [loadChecklist]);
 
   // Best time follows the zone being edited in, so the suggestion reads in that zone's wall clock.
   React.useEffect(() => {
     let live = true;
-    if (signedOutPreview) { setBestSlot(isPreviewDemoMode() ? buildDemoBestTime(zone).top[0] ?? null : null); return; }
+    if (preview) { setBestSlot(isPreviewDemoMode() ? buildDemoBestTime(zone).top[0] ?? null : null); return; }
     api.productLaunches.bestTime(zone)
       .then((r) => { if (live) setBestSlot(r.status === 'ok' ? r.top[0] ?? null : null); })
       .catch(() => { if (live) setBestSlot(null); });
     return () => { live = false; };
-  }, [api, signedOutPreview, zone]);
+  }, [api, preview, zone]);
 
   const liveLaunchAt = useMemo(() => {
     const parts = parseWallClock(date, time);
