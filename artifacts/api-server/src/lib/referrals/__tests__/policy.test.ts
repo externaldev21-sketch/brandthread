@@ -37,8 +37,8 @@ function input(overrides: {
 }
 
 describe("decideQualification", () => {
-  it("rewards the inviter $10 for the invitee's first qualifying order", () => {
-    expect(decideQualification(input())).toEqual({ action: "reward", amountCents: 1000 });
+  it("rewards the inviter $5 for the invitee's first qualifying order", () => {
+    expect(decideQualification(input())).toEqual({ action: "reward", amountCents: 500 });
   });
 
   it("never pays twice for one referral", () => {

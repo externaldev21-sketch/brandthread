@@ -276,7 +276,7 @@ export default function MarketingScreen() {
           <Text style={[styles.referralTitle, { color: colors.foreground }]}>Invite and earn</Text>
           <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>
             {referrals == null
-              ? 'Give $10, get $10 Thread Cash'
+              ? 'Give $5, get $5 Thread Cash'
               : referrals.total > 0
                 ? `${referrals.total} ${referrals.total === 1 ? 'referral' : 'referrals'} · ${referrals.pointsEarned} pts${referrals.earnedCents > 0 ? ` · $${(referrals.earnedCents / 100).toFixed(0)} Thread Cash` : ''} earned`
                 : 'No referrals yet'}

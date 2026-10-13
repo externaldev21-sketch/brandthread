@@ -763,7 +763,7 @@ export async function handleCheckoutPaid(
   if (existing) {
     await recordPaidPhysicalOrder(existing);
     await awardPurchasePoints(existing);
-    await qualifyReferralForOrderSafe(existing.id); // referral: inviter's $10 on first paid order (idempotent)
+    await qualifyReferralForOrderSafe(existing.id); // referral: inviter's Thread Cash on first paid order (idempotent)
     try {
       await sendOrderConfirmationForOrder(existing.id);
     } catch (err) {
@@ -1354,7 +1354,7 @@ export async function handleCheckoutPaid(
         logger.error({ err, orderId: createdOrderId }, "Thread Cash seller top-up failed");
       }
 
-      await qualifyReferralForOrderSafe(createdOrderId); // referral: inviter's $10 on first paid order (idempotent)
+      await qualifyReferralForOrderSafe(createdOrderId); // referral: inviter's Thread Cash on first paid order (idempotent)
 
       // One-page checkout: pay the seller their share now (separate charges
       // and transfers). A failure is retried by webhook redelivery and the

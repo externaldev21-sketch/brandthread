@@ -80,14 +80,14 @@ afterAll(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
-describe("referral program: give $10 / get $10 Thread Cash", () => {
+describe("referral program: give $5 / get $5 Thread Cash", () => {
   it("generates a code, returns the new link and tracks public link clicks without PII", async () => {
     const { status, body } = await call("GET", "/code", inviterId);
     expect(status).toBe(200);
     code = body.code;
     expect(code).toMatch(/^[A-Z2-9]{6}$/);
     expect(body.link).toBe(`https://brandthread.app/invite/${code}`);
-    expect(body.shareText).toContain("$10 Thread Cash");
+    expect(body.shareText).toContain("$5 Thread Cash");
 
     const click = await call("GET", `/invite/${code.toLowerCase()}`);
     expect(click.status).toBe(200);
@@ -99,15 +99,15 @@ describe("referral program: give $10 / get $10 Thread Cash", () => {
     expect(stats.body.clicks).toBe(1);
   });
 
-  it("gives the invitee $10 on joining and the inviter 500 points (unchanged), exactly once", async () => {
+  it("gives the invitee $5 on joining and the inviter 500 points (unchanged), exactly once", async () => {
     const first = await call("POST", "/apply", friendA, { code });
     expect(first.status).toBe(200);
-    expect(first.body).toMatchObject({ ok: true, inviterId, inviteeRewardCents: 1000 });
+    expect(first.body).toMatchObject({ ok: true, inviterId, inviteeRewardCents: 500 });
 
     const again = await call("POST", "/apply", friendA, { code });
     expect(again.status).toBe(409);
 
-    expect(await balance(friendA)).toBe(1000);
+    expect(await balance(friendA)).toBe(500);
     expect(await balance(inviterId)).toBe(0); // inviter waits for the first paid order
     const points = await db.select().from(loyaltyPoints)
       .where(and(eq(loyaltyPoints.buyerId, inviterId), eq(loyaltyPoints.source, "referral")));
@@ -127,7 +127,7 @@ describe("referral program: give $10 / get $10 Thread Cash", () => {
     expect(await balance(veteran)).toBe(0);
   });
 
-  it("pays the inviter $10 once, on the invitee's first qualifying order", async () => {
+  it("pays the inviter $5 once, on the invitee's first qualifying order", async () => {
     const { qualifyReferralForOrder } = await import("../../lib/referrals/rewards");
 
     // Below the minimum: nothing happens.
@@ -143,16 +143,16 @@ describe("referral program: give $10 / get $10 Thread Cash", () => {
       qualifyReferralForOrder(real), qualifyReferralForOrder(real), qualifyReferralForOrder(real),
     ]);
     expect(results.filter((r) => r.rewarded)).toHaveLength(1);
-    expect(await balance(inviterId)).toBe(1000);
+    expect(await balance(inviterId)).toBe(500);
 
     // A later order or webhook redelivery never pays again.
     const later = await placeOrder(friendA, 9000);
     expect(await qualifyReferralForOrder(later)).toMatchObject({ rewarded: false });
     expect(await qualifyReferralForOrder(real)).toMatchObject({ rewarded: false });
-    expect(await balance(inviterId)).toBe(1000);
+    expect(await balance(inviterId)).toBe(500);
 
     const [ref] = await db.select().from(referrals).where(eq(referrals.inviteeId, friendA));
-    expect(ref).toMatchObject({ status: "rewarded", inviterRewardCents: 1000, qualifyingOrderId: real });
+    expect(ref).toMatchObject({ status: "rewarded", inviterRewardCents: 500, qualifyingOrderId: real });
     const [credit] = await db.select().from(threadCashEntries).where(eq(threadCashEntries.buyerId, inviterId));
     expect(credit).toMatchObject({ source: "referral", idempotencyKey: `referral:${friendA}:inviter` });
 
@@ -164,7 +164,7 @@ describe("referral program: give $10 / get $10 Thread Cash", () => {
     // Put the inviter at the cap with 50 already-rewarded referrals.
     const fillers = Array.from({ length: 49 }, (_, i) => `ref-filler-${suffix}-${i}`);
     await db.insert(referrals).values(fillers.map((id) => ({
-      inviterId, inviteeId: id, inviteCode: code, status: "rewarded", inviterRewardCents: 1000,
+      inviterId, inviteeId: id, inviteCode: code, status: "rewarded", inviterRewardCents: 500,
     })));
     try {
       expect((await call("POST", "/apply", friendB, { code })).status).toBe(200);
@@ -173,10 +173,10 @@ describe("referral program: give $10 / get $10 Thread Cash", () => {
       expect(await qualifyReferralForOrder(orderId)).toEqual({ rewarded: false, reason: "capped" });
       const [ref] = await db.select().from(referrals).where(eq(referrals.inviteeId, friendB));
       expect(ref.status).toBe("capped");
-      expect(await balance(inviterId)).toBe(1000);
+      expect(await balance(inviterId)).toBe(500);
 
       const stats = await call("GET", "/stats", inviterId);
-      expect(stats.body.earnedCents).toBe(50_000);
+      expect(stats.body.earnedCents).toBe(25_000);
       expect(stats.body.referrals.find((r: any) => r.inviteeId === friendB).status).toBe("capped");
     } finally {
       await db.delete(referrals).where(inArray(referrals.inviteeId, fillers));
@@ -187,7 +187,7 @@ describe("referral program: give $10 / get $10 Thread Cash", () => {
     expect((await call("POST", "/apply", friendC, { code })).status).toBe(200);
     const stats = await call("GET", "/stats", inviterId);
     expect(stats.status).toBe(200);
-    expect(stats.body).toMatchObject({ total: 3, earnedCents: 1000, pendingCents: 1000, pointsEarned: 1500 });
+    expect(stats.body).toMatchObject({ total: 3, earnedCents: 500, pendingCents: 500, pointsEarned: 1500 });
     const statuses = Object.fromEntries(stats.body.referrals.map((r: any) => [r.inviteeId, r.status]));
     expect(statuses).toMatchObject({ [friendA]: "rewarded", [friendB]: "capped", [friendC]: "pending" });
   });
