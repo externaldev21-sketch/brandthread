@@ -62,7 +62,7 @@ export default function VacationModeScreen() {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
-        vacationMode ? 'Vacation Mode Active' : 'Store Reopened',
+        vacationMode ? '🏖 Vacation Mode Active' : '✅ Store Reopened',
         vacationMode
           ? 'Buyers will see an away banner on your storefront. New orders are paused.'
           : 'Your store is open again. Buyers can place new orders.',
