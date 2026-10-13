@@ -407,6 +407,8 @@ export default function SellerInboxScreen() {
     const wasMuted = !!c.mutedUntil;
     setConvs((current) => current.map((row) => (row.id === c.id
       ? { ...row, mutedUntil: wasMuted ? undefined : '9999-12-31T00:00:00.000Z' } : row)));
+    // Seeded preview threads have no server row: local state only.
+    if (isSellerPreviewConversationId(c.id)) return;
     try {
       await muteConversation(c.id, wasMuted ? null : -1);
     } catch {

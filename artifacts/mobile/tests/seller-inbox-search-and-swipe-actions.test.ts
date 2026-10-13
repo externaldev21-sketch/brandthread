@@ -45,7 +45,7 @@ describe('seller-inbox.tsx: swipe actions', () => {
   });
 
   it('reuses services/socialService.ts mutations rather than a parallel implementation', () => {
-    expect(src).toContain("import { markConversationRead, archiveConversation, muteUser, setConversationPinned } from '@/services/socialService';");
+    expect(src).toContain("import { markConversationRead, archiveConversation, muteConversation, setConversationPinned } from '@/services/socialService';");
   });
 
   it('a seeded preview conversation updates local state only, never hitting the network', () => {
