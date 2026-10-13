@@ -34,6 +34,8 @@ import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { allPreviewSellerOrders } from '@/lib/previewSellerOrders';
 import { sellerCountdown } from '@/lib/deliveryGuarantee';
 import { DeadlineChip } from '@/components/orders/SellerDelivery';
+import { OrderStatusDot } from '@/components/orders/OrderStatusDot';
+import { isOrderLate } from '@/lib/orderLate';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
@@ -103,48 +105,6 @@ function fmtTime(iso: string): string {
 
 function fmtMoney(cents: number): string {
   return formatCents(cents);
-}
-
-function getPaymentColor(status: string, theme: any): string {
-  switch (status) {
-    case 'paid': return theme.text;
-    case 'pending': case 'authorized': return theme.muted;
-    case 'refunded': case 'partially_refunded': case 'failed': case 'voided': return theme.error;
-    default: return theme.muted;
-  }
-}
-
-function getFulfillmentColor(status: string, theme: any): string {
-  switch (status) {
-    case 'unfulfilled': return theme.text;
-    case 'partially_fulfilled': case 'fulfilled': case 'manufacturer_pending': return theme.muted;
-    default: return theme.muted;
-  }
-}
-
-function getPaymentLabel(status: string): string {
-  switch (status) {
-    case 'paid': return 'Paid';
-    case 'pending': return 'Pending';
-    case 'authorized': return 'Authorized';
-    case 'refunded': return 'Refunded';
-    case 'partially_refunded': return 'Part. Refunded';
-    case 'failed': return 'Failed';
-    case 'voided': return 'Voided';
-    default: return status;
-  }
-}
-
-function getFulfillmentLabel(status: string): string {
-  switch (status) {
-    case 'unfulfilled': return 'To ship';
-    case 'partially_fulfilled': return 'Partial';
-    case 'fulfilled': return 'Fulfilled';
-    case 'manufacturer_pending': return 'Mfg Pending';
-    case 'returned': return 'Returned';
-    case 'cancelled': return 'Cancelled';
-    default: return status;
-  }
 }
 
 export function getCancellationReasonLabel(reason: string): string {
@@ -240,6 +200,7 @@ export function apiRowToOrder(row: any): OrderListOrder {
     deliveredAt: row.deliveredAt ?? null,
     autoRefundedAt: row.autoRefundedAt ?? null,
     disputePausedAt: row.disputePausedAt ?? null,
+    paidAt: row.paidAt ? (typeof row.paidAt === 'string' ? row.paidAt : new Date(row.paidAt).toISOString()) : null,
     currency: 'USD', tags: [],
     listItemCount: Number.isSafeInteger(row.itemCount) && row.itemCount >= 0 ? row.itemCount : undefined,
     listItemLabel: typeof row.dropName === 'string' && row.dropName.trim() ? row.dropName.trim() : undefined,
@@ -346,9 +307,6 @@ export function OrderRow({
       : firstItem.productName
     : order.listItemLabel ?? (itemCount > 0 ? `${itemCount} ${itemCount === 1 ? 'item' : 'items'}` : 'No items');
 
-  const payColor = getPaymentColor(order.paymentStatus, theme);
-  const fulColor = getFulfillmentColor(order.fulfillmentStatus, theme);
-
   return (
     <>
       <View style={[s.orderCard, selected && s.orderRowSelected, isHighRisk && s.orderRowRisk, isArchived && s.orderRowArchived]}>
@@ -430,14 +388,12 @@ export function OrderRow({
             accessibilityLabel={`View status for order ${order.orderNumber}`}
             style={{ flexDirection: 'row', alignItems: 'center', gap: SP.xs }}
           >
-          <View style={s.statusPill}>
-            <View style={[s.statusDot, { backgroundColor: payColor }]} />
-            <Text style={[s.statusText, { color: payColor }]}>{getPaymentLabel(order.paymentStatus)}</Text>
-          </View>
-          <View style={s.statusPill}>
-            <View style={[s.statusDot, { backgroundColor: fulColor }]} />
-            <Text style={[s.statusText, { color: fulColor }]}>{getFulfillmentLabel(order.fulfillmentStatus)}</Text>
-          </View>
+          <OrderStatusDot
+            status={order.status}
+            paymentStatus={order.paymentStatus}
+            late={isOrderLate(order)}
+            testID={`order-status-${order.id}`}
+          />
           {order.isPreOrder && (
             <View style={s.tagPill}>
               <Text style={s.tagText}>PRE-ORDER</Text>
@@ -446,13 +402,6 @@ export function OrderRow({
           {order.isManufacturerFulfilled && (
             <View style={[s.tagPill, { borderColor: STRONG + '44', backgroundColor: DIM }]}>
               <Text style={[s.tagText, { color: STRONG }]}>MFG</Text>
-            </View>
-          )}
-          {isArchived && order.cancellation?.reason && (
-            <View style={[s.tagPill, { borderColor: RED + '44', backgroundColor: RED_DIM }]}>
-              <Text style={[s.tagText, { color: RED }]}>
-                {getCancellationReasonLabel(order.cancellation.reason).toUpperCase()}
-              </Text>
             </View>
           )}
 
@@ -1469,20 +1418,6 @@ const createStyles = (theme: any) => {
     alignItems: 'center',
     gap: SP.xs,
     flexWrap: 'nowrap',
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  statusDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  statusText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
   },
   tagPill: {
     backgroundColor: DIM,

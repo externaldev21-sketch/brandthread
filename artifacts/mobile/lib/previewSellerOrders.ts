@@ -51,6 +51,11 @@ export interface PreviewSellerOrder {
   totalCents: number;
   subtotalCents: number;
   shippingCents: number;
+  /** Demo fee split, shaped like the API's recorded columns (see lib/orderReceipt.ts); all 0 while unpaid. */
+  taxCents: number;
+  platformFeeCents: number;
+  processingFeeChargedCents: number;
+  sellerNetCents: number;
   itemCount: number;
   customerName: string;
   customerEmail: string;
@@ -73,6 +78,16 @@ function dayIndex(y: number, m: number, d: number): number {
 }
 const EPOCH_DAY = Math.round(Date.UTC(2022, 0, 1) / DAY_MS);
 const HISTORY_DAYS = 1460;
+
+/**
+ * Demo-only fee split: Brandthread 5% and Stripe's US card rate (2.9% + 30c),
+ * rounded half-up like the server. Real orders read the recorded columns.
+ */
+function demoFees(totalCents: number): { platformFeeCents: number; processingFeeChargedCents: number; sellerNetCents: number } {
+  const platformFeeCents = Math.round(totalCents * 0.05);
+  const processingFeeChargedCents = Math.min(totalCents - platformFeeCents, Math.round(totalCents * 0.029) + 30);
+  return { platformFeeCents, processingFeeChargedCents, sellerNetCents: totalCents - platformFeeCents - processingFeeChargedCents };
+}
 
 function statusFor(ageMs: number, rand: number): PreviewSellerOrder['status'] {
   if (rand < 0.04 && ageMs > DAY_MS) return 'cancelled';
@@ -139,12 +154,15 @@ function generatedOrdersForDay(y: number, m: number, d: number, now: Date): Prev
     const customer = CUSTOMERS[Math.floor(rand() * CUSTOMERS.length)];
     const createdIso = created.toISOString();
     const shipped = status === 'shipped' || status === 'delivered';
+    const totalCents = subtotalCents + shippingCents;
+    const paid = status !== 'cancelled';
+    const fees = paid ? demoFees(totalCents) : { platformFeeCents: 0, processingFeeChargedCents: 0, sellerNetCents: 0 };
     out.push({
       id: `preview-demo-order-${idx}-${i}`,
       orderNumber: `BT-${(idx - EPOCH_DAY) * 10 + i + 1000}`,
       status, createdAt: createdIso, updatedAt: createdIso,
       paidAt: status === 'cancelled' ? null : createdIso,
-      totalCents: subtotalCents + shippingCents, subtotalCents, shippingCents, itemCount,
+      totalCents, subtotalCents, shippingCents, taxCents: 0, ...fees, itemCount,
       customerName: customer[0], customerEmail: `${customer[0].toLowerCase().replace(/[^a-z]+/g, '.')}@example.com`,
       shippingAddress: { name: customer[0], street: `${100 + Math.floor(rand() * 800)} Mercer Street`, city: customer[1], state: customer[2], zip: customer[3], country: 'US' },
       items,

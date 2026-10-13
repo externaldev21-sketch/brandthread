@@ -434,6 +434,10 @@ export interface Order {
    * Thread Cash. See sellerThreadCashPayout in lib/threadCashCheckout.ts.
    */
   threadCashPayout?: { lines: Array<{ key: string; label: string; cents: number; note?: string }>; payoutCents: number } | null;
+  /** Seller money receipt from the recorded fee split (lib/orderReceipt.ts). Absent on rows without it. */
+  receipt?: import('@/lib/orderReceipt').OrderReceipt;
+  /** Payment timestamp from the order row (drives the "Late" tag, lib/orderLate.ts). */
+  paidAt?: string | null;
   heldFunds?: HeldFundsRecord;
   shipments: Shipment[];
   trackingStatus?: TrackingStatus;

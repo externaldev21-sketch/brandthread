@@ -19,8 +19,6 @@ import { RADII, radius } from '@/constants/radii';
 import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
-import { useFeeSchedule } from '@/hooks/useFeeSchedule';
-import { quoteFromSchedule } from '@/lib/feeSchedule';
 import { adaptReturnRow, itemsTotalCents, returnReasonLabel as returnRequestReasonLabel, statusLabel as returnRequestStatusLabel, type ReturnView } from '@/lib/returns';
 import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
@@ -31,6 +29,10 @@ import { sellerThreadCashPayout } from '@/lib/threadCashCheckout';
 import { getGeneratedSellerOrder, isGeneratedSellerOrderId } from '@/lib/previewSellerOrders';
 import { useQueryClient } from '@tanstack/react-query';
 import { OrderRiskBadge } from '@/components/orders/OrderRiskBadge';
+import { OrderStatusDot } from '@/components/orders/OrderStatusDot';
+import { OrderReceipt } from '@/components/orders/OrderReceipt';
+import { isOrderLate } from '@/lib/orderLate';
+import { buildOrderReceipt } from '@/lib/orderReceipt';
 import { queryKeys } from '@/lib/queryClient';
 import { DELIVERY_CONFIRMED_BY_NOTE, formatLocalDate, sellerOrderConflictMessage, unshippedItems } from '@/lib/deliveryGuarantee';
 import { SellerDeliveryBanner, ShipItemsSheet } from '@/components/orders/SellerDelivery';
@@ -288,6 +290,8 @@ export function adaptApiOrder(raw: any): Order {
       payoutStatus:            isRefundPending ? 'held' : uiStatus === 'refunded' ? 'paid' : 'pending',
     },
     threadCashPayout: sellerThreadCashPayout(raw),
+    receipt: buildOrderReceipt(raw),
+    paidAt: typeof raw.paidAt === 'string' ? raw.paidAt : raw.paidAt ? new Date(raw.paidAt).toISOString() : null,
     shipments,
     trackingStatus: raw.trackingStatus ?? undefined,
     estimatedDelivery: raw.estimatedDelivery ?? undefined,
@@ -357,30 +361,6 @@ function fmtTime(iso: string) {
 }
 function usd(cents: number) {
   return formatCents(cents);
-}
-
-function orderStatusVariant(status: string): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
-  switch (status) {
-    case 'new': return 'info';
-    case 'processing': return 'warning';
-    case 'ready_to_ship': return 'purple';
-    case 'shipped': return 'info';
-    case 'delivered': return 'success';
-    case 'cancelled': return 'neutral';
-    case 'refunded': return 'neutral';
-    case 'disputed': return 'error';
-    default: return 'neutral';
-  }
-}
-
-function paymentVariant(status: string): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
-  switch (status) {
-    case 'paid': return 'success';
-    case 'pending': case 'authorized': return 'warning';
-    case 'refunded': case 'partially_refunded': return 'info';
-    case 'failed': case 'voided': return 'error';
-    default: return 'neutral';
-  }
 }
 
 function timelineColor(type: string, theme: ReturnType<typeof useAppTheme>['theme']): string {
@@ -1054,10 +1034,13 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
       <GradientCard glow style={s.heroCard}>
         <View style={s.heroRow}>
           <Text style={s.heroOrderNum}>{order.orderNumber}</Text>
-          <View style={s.badgeRow}>
-            <StatusBadge label={order.status.replace(/_/g, ' ').toUpperCase()} variant={orderStatusVariant(order.status)} />
-            <StatusBadge label={order.paymentStatus.replace(/_/g, ' ').toUpperCase()} variant={paymentVariant(order.paymentStatus)} />
-          </View>
+          <OrderStatusDot
+            status={order.status}
+            paymentStatus={order.paymentStatus}
+            late={isOrderLate(order)}
+            size="md"
+            testID="order-detail-status"
+          />
         </View>
         {order.customer.name ? <Text style={s.heroCustomer}>{order.customer.name}</Text> : null}
         <Text style={s.heroDate}>{fmt(order.createdAt)}</Text>
@@ -1082,6 +1065,42 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         )}
       </GradientCard>
 
+      {/* Line items summary */}
+      <View style={s.section}>
+        <SectionHeader title="Items" />
+        {order.lineItems.map(li => (
+          <BrandthreadCard
+            key={li.id}
+            style={s.lineItemCard}
+            onPress={li.productId ? () => router.push(productDetailHref(li.productId, { isOwner: true }) as never) : undefined}
+          >
+            <View style={s.lineItemRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.lineItemName}>{li.productName}</Text>
+                <Text style={s.lineItemVariant}>{li.variant}</Text>
+                {li.sku && <Text style={s.lineItemSku}>SKU: {li.sku}</Text>}
+                {(order.deliverBy || li.trackingNumber || li.refundedAt) ? (
+                  <Text style={s.lineItemVariant}>
+                    {li.refundedAt
+                      ? `Refunded ${formatLocalDate(li.refundedAt)}`
+                      : li.trackingNumber
+                        ? `${li.deliveredAt ? 'Delivered' : 'Shipped'} · ${[li.carrier, li.trackingNumber].filter(Boolean).join(' ')}`
+                        : `Not shipped${li.deliverBy ? ` · ship by ${formatLocalDate(li.deliverBy)}` : ''}`}
+                  </Text>
+                ) : null}
+              </View>
+              <View style={s.lineItemRight}>
+                <Text style={s.lineItemQty}>×{li.quantity}</Text>
+                <Text style={s.lineItemTotal}>{usd(li.totalCents)}</Text>
+              </View>
+              {li.productId ? <Feather name="chevron-right" size={ICON.sm} color={theme.muted} /> : null}
+            </View>
+          </BrandthreadCard>
+        ))}
+      </View>
+
+      {/* Shipping — where the order stands, then the fulfil/ship actions */}
+      <SectionHeader title="Shipping" />
       {/* Live status tracker — the visual centerpiece: where this order stands right now */}
       <BrandthreadCard style={s.timelineCard}>
         <OrderStatusTimeline status={order.status} />
@@ -1203,6 +1222,15 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         )}
       </View>
 
+
+      {/* Money — the receipt: item total, fees, your payout (lib/orderReceipt.ts) */}
+      {order.receipt ? (
+        <View style={s.section}>
+          <SectionHeader title="Payment" />
+          <OrderReceipt receipt={order.receipt} />
+        </View>
+      ) : null}
+
       {/* Risk Flags */}
       {order.riskFlags.length > 0 && (
         <View style={s.section}>
@@ -1231,39 +1259,6 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         </View>
       )}
 
-      {/* Line items summary */}
-      <View style={s.section}>
-        <SectionHeader title="Items" />
-        {order.lineItems.map(li => (
-          <BrandthreadCard
-            key={li.id}
-            style={s.lineItemCard}
-            onPress={li.productId ? () => router.push(productDetailHref(li.productId, { isOwner: true }) as never) : undefined}
-          >
-            <View style={s.lineItemRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.lineItemName}>{li.productName}</Text>
-                <Text style={s.lineItemVariant}>{li.variant}</Text>
-                {li.sku && <Text style={s.lineItemSku}>SKU: {li.sku}</Text>}
-                {(order.deliverBy || li.trackingNumber || li.refundedAt) ? (
-                  <Text style={s.lineItemVariant}>
-                    {li.refundedAt
-                      ? `Refunded ${formatLocalDate(li.refundedAt)}`
-                      : li.trackingNumber
-                        ? `${li.deliveredAt ? 'Delivered' : 'Shipped'} · ${[li.carrier, li.trackingNumber].filter(Boolean).join(' ')}`
-                        : `Not shipped${li.deliverBy ? ` · ship by ${formatLocalDate(li.deliverBy)}` : ''}`}
-                  </Text>
-                ) : null}
-              </View>
-              <View style={s.lineItemRight}>
-                <Text style={s.lineItemQty}>×{li.quantity}</Text>
-                <Text style={s.lineItemTotal}>{usd(li.totalCents)}</Text>
-              </View>
-              {li.productId ? <Feather name="chevron-right" size={ICON.sm} color={theme.muted} /> : null}
-            </View>
-          </BrandthreadCard>
-        ))}
-      </View>
     </View>
   );
 }
@@ -1337,19 +1332,6 @@ function CustomerTab({ order }: { order: Order }) {
 // TAB: PAYMENT
 // ═══════════════════════════════════════════════════════
 
-/** "Fees" row: the recorded fees for this order, else the schedule's estimate; hidden with neither. */
-function FeesRow({ payment: p }: { payment: Order['payment'] }) {
-  const schedule = useFeeSchedule();
-  const recorded = p.platformFeeCents + (p.processingFeeCents ?? 0);
-  let fees = recorded;
-  if (!recorded && schedule && p.totalCents > 0) {
-    const q = quoteFromSchedule(schedule, Math.max(0, p.subtotalCents - p.discountTotalCents), { shippingCents: p.shippingTotalCents });
-    fees = q.platformFeeCents + q.processingFeeCents;
-  }
-  if (!fees) return null;
-  return <InfoRow label="Fees" value={`-${usd(fees)}`} />;
-}
-
 function PaymentTab({ order }: { order: Order }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
@@ -1359,14 +1341,8 @@ function PaymentTab({ order }: { order: Order }) {
       {order.threadCashPayout ? <ThreadCashPayoutCard payout={order.threadCashPayout} /> : null}
 
       <SectionHeader title="Payment Breakdown" />
+      {order.receipt ? <OrderReceipt receipt={order.receipt} testID="payment-receipt" /> : null}
       <BrandthreadCard>
-        <InfoRow label="Subtotal" value={usd(p.subtotalCents)} />
-        {p.discountTotalCents > 0 && <InfoRow label="Discounts" value={`-${usd(p.discountTotalCents)}`} />}
-        <InfoRow label="Shipping" value={usd(p.shippingTotalCents)} />
-        <InfoRow label="Tax" value={usd(p.taxTotalCents)} />
-        <View style={s.divider} />
-        <InfoRow label="Total" value={usd(p.totalCents)} bold />
-        <FeesRow payment={p} />
         <InfoRow label="Amount Paid" value={usd(p.amountPaidCents)} valueColor={SUCCESS} />
         {p.amountRefundedCents > 0 && <InfoRow label="Amount Refunded" value={`-${usd(p.amountRefundedCents)}`} valueColor={RED} />}
         <InfoRow label="Amount Held" value={usd(p.amountHeldCents)} valueColor={ORANGE} />
