@@ -11,7 +11,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
-import { TYPE_SCALE } from '@/constants/typography';
+import { DiscoverSectionHeader } from './DiscoverSectionHeader';
 import FollowButton from '@/components/social/FollowButton';
 import type { DiscoverPersonSuggestion } from '@/lib/discoverFeed';
 
@@ -32,9 +32,7 @@ export function DiscoverPeopleRow({ people }: { people: DiscoverPersonSuggestion
   if (people.length === 0) return null;
   return (
     <View style={styles.section}>
-      <Text style={[TYPE_SCALE.headline, { color: theme.text, marginBottom: SP.sm, marginHorizontal: SP.md }]}>
-        People with your style
-      </Text>
+      <DiscoverSectionHeader title="People with your style" style={{ marginHorizontal: SP.md }} />
       <FlatList
         horizontal
         data={people}

@@ -334,8 +334,12 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/design-studio/SkiaDrawingCanvas.tsx',
   'components/design-studio/SvgDrawingCanvas.tsx',
   'components/design/BgRefineCanvas.tsx',
+  // Fixed white on a photo shade (price/duration/countdown chips over
+  // imagery) and the LIVE-red badge — theme-independent on purpose.
+  'components/discover/DiscoverDropRow.tsx',
   'components/discover/DiscoverEntityCard.tsx',
   'components/discover/DiscoverFilterRow.tsx',
+  'components/discover/DiscoverMasonryTile.tsx',
   'components/discover/DiscoverPager.tsx',
   'components/discover/DiscoverPeopleRow.tsx',
   'components/discover/DiscoverPostViewer.tsx',

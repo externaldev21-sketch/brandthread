@@ -1,10 +1,17 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
 import { DiscoverEntityCard } from './DiscoverEntityCard';
+import { DiscoverBrandTile } from './DiscoverBrandTile';
 import type { DiscoverBrandCard as BrandCardData } from '@/lib/discoverFeed';
 
-export function DiscoverBrandCard({ brand }: { brand: BrandCardData }) {
+/**
+ * `variant="tile"` is the Brands tab's banner + overlapping-avatar tile
+ * (DiscoverBrandTile); the default compact card stays for the rails and the
+ * Trending brands page.
+ */
+export function DiscoverBrandCard({ brand, variant = 'card' }: { brand: BrandCardData; variant?: 'card' | 'tile' }) {
   const router = useRouter();
+  if (variant === 'tile') return <DiscoverBrandTile brand={brand} />;
   return (
     <DiscoverEntityCard
       id={brand.id}

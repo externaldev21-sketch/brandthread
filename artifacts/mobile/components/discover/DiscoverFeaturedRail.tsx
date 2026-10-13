@@ -7,11 +7,10 @@
  * brands only appear with &demo=1.
  */
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useApi } from '@/hooks/useApi';
-import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
-import { TYPE_SCALE } from '@/constants/typography';
+import { DiscoverSectionHeader } from './DiscoverSectionHeader';
 import { isPreviewDemoMode } from '@/lib/devPreview';
 import { DiscoverBrandCard } from './DiscoverBrandCard';
 import type { DiscoverBrandCard as BrandCardData } from '@/lib/discoverFeed';
@@ -25,7 +24,6 @@ const DEMO_BRANDS: BrandCardData[] = [
 ];
 
 export function DiscoverFeaturedRail() {
-  const { theme } = useAppTheme();
   const api = useApi();
   const [brands, setBrands] = useState<BrandCardData[]>([]);
 
@@ -49,7 +47,7 @@ export function DiscoverFeaturedRail() {
   if (brands.length === 0) return null;
   return (
     <View style={{ marginTop: SP.sm, marginBottom: SP.md, paddingHorizontal: SP.md }} testID="discover-featured-rail">
-      <Text style={[TYPE_SCALE.headline, { color: theme.text, marginBottom: 10 }]}>Featured</Text>
+      <DiscoverSectionHeader title="Featured" />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.track}>
         {brands.map((brand) => (
           <View key={brand.id} style={{ width: CARD_WIDTH }}>

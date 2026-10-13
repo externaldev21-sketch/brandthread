@@ -143,6 +143,8 @@ function publicDrop(drop) {
     remainingUnits: products[0].remainingUnits,
     demandCount: products[0].demandCount,
     seller: { id: brand.id, brandName: brand.name, displayName: brand.name, avatarUrl: brand.avatar },
+    // Real /api/public/drops column (drops.heroImageUrl).
+    heroImageUrl: products[0]?.images?.[0] ?? null,
     products,
   };
 }
@@ -193,6 +195,42 @@ const TRENDING = [
   likesCount: row.likesCount, commentsCount: row.commentsCount, verified: !!row.verified,
   productTags: row.productTags,
 }));
+
+// ─── Discover (For You masonry / People / Drops) ─────────────────────────────
+// Buyer posts from friends, in the real /social/friends/activity shape
+// (mediaUrl + the post's stored aspectRatio text), so the For You masonry has
+// photos at real, varied ratios. `durationSec` on the videos is the one
+// forward-compatible field (like TRENDING's productTags) — the client reads
+// it defensively to show a duration on video tiles.
+const FRIEND_POSTS = [
+  { image: 'story-rust', aspectRatio: '9:16', type: 'video', durationSec: 27, caption: 'Rust jacket, city walk.' },
+  { image: 'look-mono', aspectRatio: '4:5', type: 'photo', caption: 'Mono fit check.' },
+  { image: 'hoodie-moss', aspectRatio: '1:1', type: 'photo', caption: 'Moss hoodie, finally.' },
+  { image: 'story-mono', aspectRatio: '2:3', type: 'photo', caption: 'Layers for the cold snap.' },
+  { image: 'runner-rust', aspectRatio: '3:4', type: 'photo', caption: 'Trail Runner 02 on the commute.' },
+  { image: 'story-hoodie', aspectRatio: '9:16', type: 'video', durationSec: 64, caption: 'Ember hoodie unboxing.' },
+  { image: 'cargo-rust', aspectRatio: '4:5', type: 'photo', caption: 'Rust cargo, weekend mode.' },
+  { image: 'jacket-onyx', aspectRatio: '3:4', type: 'slideshow', caption: 'Onyx anorak three ways.' },
+].map((post, i) => {
+  const people = [['Ava Chen', 'AC'], ['Sam Ortiz', 'SO'], ['Priya Nair', 'PN'], ['Leo Park', 'LP']];
+  const [name, initials] = people[i % people.length];
+  return {
+    id: `friend_post_${i + 1}`, authorId: `user_friend_${(i % people.length) + 1}`, authorName: name,
+    authorHandle: '@' + name.toLowerCase().replace(/\s+/g, ''), authorInitials: initials, authorColor: '#2A2A2E',
+    type: post.type, mediaUrl: img(post.image), aspectRatio: post.aspectRatio,
+    ...(post.durationSec ? { durationSec: post.durationSec } : {}),
+    caption: post.caption, likesCount: 4400 - i * 520, commentsCount: 12 - i, createdAt: iso((i + 1) * HOUR),
+  };
+});
+
+// /social/suggested — real shape (reason + mutualCount from the API's own
+// mutual-follow query); one has mutuals, the others don't.
+const SUGGESTED_PEOPLE = [
+  { userId: 'user_sugg_1', name: 'Mara Lind', handle: '@maralind', initials: 'ML', color: '#2A2A2E', reason: 'Followed by Ava Chen + 2 others', mutualCount: 3 },
+  { userId: 'user_sugg_2', name: 'Theo Grant', handle: '@theogrant', initials: 'TG', color: '#3A3A3F', reason: 'Followed by Sam Ortiz', mutualCount: 1 },
+  { userId: 'user_sugg_3', name: 'Noor Haddad', handle: '@noorhaddad', initials: 'NH', color: '#242428', reason: 'New on Brandthread', mutualCount: 0 },
+  { userId: 'user_sugg_4', name: 'Jules Moreau', handle: '@julesmoreau', initials: 'JM', color: '#333338', reason: 'Suggested for you', mutualCount: 0 },
+];
 
 // ─── Buyer Search screen (search / suggested / categories / people) ───────────
 
@@ -872,6 +910,8 @@ export function respond({ method, path, query, role, options = {} }) {
   if ((match = p.match(/^\/public\/drops\/([^/]+)$/))) return DROPS.map(publicDrop).find((d) => d.id === match[1]);
   if ((match = p.match(/^\/public\/drops\/[^/]+\/notify$/))) return { subscribed: false };
   if (p === '/public/trending') return { trending: TRENDING.slice(0, Number(query.get('limit') ?? 20)) };
+  // Real /api/public/trending/products shape ({ windowDays, products }) — feeds Discover's "Trending now".
+  if (p === '/public/trending/products') return { windowDays: 7, products: PUBLIC_PRODUCTS.slice(0, Number(query.get('limit') ?? 12)) };
   if (p === '/public/search') return publicSearch(query.get('q') ?? '');
   if (p === '/public/search/trending') return { trending: [{ term: 'Hoodies', type: 'category' }, { term: 'Northline Studio', type: 'brand' }, { term: 'trail runner', type: 'query' }, { term: 'Outerwear', type: 'category' }] };
   // Fixed demo recent-search rows (real /api/public/search/recent is
@@ -1074,8 +1114,8 @@ export function respond({ method, path, query, role, options = {} }) {
   // of these 404'd before the screen ever rendered. Real empty states (no
   // suggestions/activity/stories yet) rather than fabricated rows, since
   // none of these screens are the primary subject of a demo walkthrough.
-  if (p === '/social/suggested') return [];
-  if (p === '/social/friends/activity') return [];
+  if (p === '/social/suggested') return SUGGESTED_PEOPLE;
+  if (p === '/social/friends/activity') return FRIEND_POSTS;
   if (p === '/social/notes/following') return [];
   if (p === '/social/stories/following') return [];
   if (p === '/social/stories/me') return [];
@@ -1374,8 +1414,8 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/design-studio/projects') return [];
   if (p === '/moderation/me') return { flags: [], strikes: 0, restricted: false };
   if (p === '/social/blocks') return [];
-  if (p === '/social/suggested') return [];
-  if (p === '/social/friends/activity') return [];
+  if (p === '/social/suggested') return SUGGESTED_PEOPLE;
+  if (p === '/social/friends/activity') return FRIEND_POSTS;
   if (p === '/social/notes/following') return { notes: [] };
   if (p === '/social/stories/following') return { stories: [] };
   if (p === '/social/stories/me') return null;
