@@ -35,6 +35,7 @@ import { effectiveUnitPrice } from "../pricing/salesRuntime";
 import { CheckoutPlanError, resolveChargePlan } from "./checkoutPlan";
 import { destinationApplicationFeeCents } from "./fees";
 import { resolveSellerPlatformFeeBps } from "../planPerks";
+import { emptyMysteryBoxVariants } from "../mysteryBox";
 
 export const CART_CHECKOUT_KIND = "cart_checkout";
 /** Stripe's minimum USD card charge. */
@@ -178,6 +179,9 @@ export async function priceCartGroup(input: {
     if (row.status !== "active") throw new CartCheckoutError(400, "ITEM_UNAVAILABLE", `${row.productName} is no longer available.`);
     if (row.stock < item.quantity) {
       throw new CartCheckoutError(409, "OUT_OF_STOCK", `${row.productName} doesn't have enough stock left.`, { variantId: row.variantId });
+    }
+    if ((await emptyMysteryBoxVariants(db, [row.variantId])).length > 0) {
+      throw new CartCheckoutError(409, "MYSTERY_BOX_EMPTY", `${row.productName} is sold out.`, { variantId: row.variantId });
     }
     if (sellerId && row.sellerId !== sellerId) {
       throw new CartCheckoutError(400, "MIXED_SELLER_GROUP", "Each group must hold one seller's items.");
