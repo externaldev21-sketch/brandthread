@@ -36,6 +36,7 @@ import {
   validateScheduleInput,
 } from "../lib/money/payoutSchedule";
 import { assertBreakdownReconciles, buildPayoutBreakdown } from "../lib/money/payoutBreakdown";
+import { requireSellerTwoFactor } from "../lib/security/sellerTwoFactor";
 
 const router = Router();
 router.use(requireAuth);
@@ -593,7 +594,7 @@ router.get("/statement.csv", requirePayoutsRead(), async (req, res) => {
 
 // ─── POST /api/finance/payout — manual bank payout ────────────────────────────
 
-router.post("/payout", requirePermission("payouts"), async (req, res) => {
+router.post("/payout", requirePermission("payouts"), requireSellerTwoFactor(), async (req, res) => {
   const sellerId = getSellerId(req);
   if (await denyIfAgeRestricted(sellerId, res)) return;
   const { amount, currency, idempotencyKey } = req.body;
@@ -1075,7 +1076,7 @@ router.get("/payout-schedule", requirePayoutsRead(), async (req, res) => {
   }
 });
 
-router.patch("/payout-schedule", requirePermission("payouts"), async (req, res) => {
+router.patch("/payout-schedule", requirePermission("payouts"), requireSellerTwoFactor(), async (req, res) => {
   const sellerId = getSellerId(req);
   try {
     const parsed = validateScheduleInput(req.body);

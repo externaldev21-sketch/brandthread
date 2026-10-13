@@ -127,6 +127,11 @@ export function createNotificationResponseHandler(
       router.push(`/dispute-detail?disputeId=${encodeURIComponent(data.targetId)}`);
       return;
     }
+    if (data?.targetType === 'login_session') {
+      // New-device sign-in alert: open Login activity to review or sign it out.
+      router.push('/login-activity');
+      return;
+    }
     if (data?.targetType === 'payout') {
       router.push('/payouts');
       return;
