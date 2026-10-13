@@ -6,6 +6,7 @@ import { orderGrossCents, refundOrder, RefundError } from "../lib/money/refunds"
 import crypto from "crypto";
 import { reversePurchasePointsOnce } from "./loyalty";
 import { sendReturnStatusEmail } from "../lib/brandthreadEmail";
+import { loadStoreBrandingForOrderSafe } from "../lib/orderReceipt";
 import { isChannelEnabledForUser } from "../lib/notificationChannels";
 import { logger } from "../lib/logger";
 import { publishNotification } from "./notifications-feed";
@@ -149,6 +150,7 @@ async function notifyReturnStatus(returnId: string, status: "pending" | "approve
     status,
     refundAmountCents,
     sellerResponse,
+    store: await loadStoreBrandingForOrderSafe(row.orderId),
     idempotencyKey: `return-status/${returnId}/${status}`,
   });
   if (!sent) {

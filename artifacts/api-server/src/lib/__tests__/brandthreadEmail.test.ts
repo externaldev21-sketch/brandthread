@@ -19,7 +19,6 @@ import {
   sendBrandthreadEmail,
   sendManufacturerSignupEmail,
   sendAbandonedCartEmail,
-  sendOrderConfirmationEmail,
   sendOrderShippingEmail,
   sendPayoutEmail,
   sendReturnStatusEmail,
@@ -194,7 +193,8 @@ describe("Brandthread transactional email", () => {
       expect(body.html).toContain("&lt;img src=x onerror=alert(1)&gt;");
     });
 
-    it("uses one branded frame for every transactional email type", async () => {
+    // The order receipt has its own seller-branded layout (orderReceiptEmail.test.ts).
+    it("uses one branded frame for every other transactional email type", async () => {
       vi.stubEnv("RESEND_API_KEY", "test-key");
       const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 202 });
       vi.stubGlobal("fetch", fetchMock);
@@ -204,15 +204,6 @@ describe("Brandthread transactional email", () => {
         name: "Alex",
         accountType: "buyer",
         idempotencyKey: "welcome/user-1",
-      });
-      await sendOrderConfirmationEmail({
-        to: "buyer@example.com",
-        orderNumber: "BT-00001",
-        items: [{ productName: "Chrome Tee", quantity: 2, priceCents: 2500 }],
-        subtotalCents: 5000,
-        shippingCents: 0,
-        totalCents: 5000,
-        idempotencyKey: "order-confirmation/order-1",
       });
       await sendOrderShippingEmail({
         to: "buyer@example.com",
@@ -249,7 +240,7 @@ describe("Brandthread transactional email", () => {
         idempotencyKey: "team-invite/invite-1",
       });
 
-      expect(fetchMock).toHaveBeenCalledTimes(7);
+      expect(fetchMock).toHaveBeenCalledTimes(6);
       for (const [, request] of fetchMock.mock.calls) {
         const body = JSON.parse(request.body);
         expect(body.html).toContain('src="cid:brandthread-logo"');
