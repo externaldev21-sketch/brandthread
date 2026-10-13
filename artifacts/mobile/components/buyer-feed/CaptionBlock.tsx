@@ -49,6 +49,7 @@ export function CaptionBlock({
   style,
   onHeightChange,
   topSlot,
+  belowCaptionSlot,
   sponsored,
 }: {
   creator: string;
@@ -77,6 +78,8 @@ export function CaptionBlock({
    *  an 8px gap below it — see the module comment above. `undefined` when
    *  this post has no tagged product (no leftover gap in that case). */
   topSlot?: React.ReactNode;
+  /** Rendered right under the caption (a Thread's poll, components/social/PollCard). */
+  belowCaptionSlot?: React.ReactNode;
   /** Paid promotion (admin-approved boost) served in For You: shows the "Sponsored" label beside the brand name. */
   sponsored?: boolean;
 }) {
@@ -175,6 +178,8 @@ export function CaptionBlock({
         </Text>
       </TouchableOpacity>
 
+      {!!belowCaptionSlot && <View style={styles.belowCaptionWrap}>{belowCaptionSlot}</View>}
+
       <TouchableOpacity
         style={soundHit.boostStyle}
         onLayout={soundHit.onLayout}
@@ -211,6 +216,7 @@ const styles = StyleSheet.create({
   // 8px gap above the creator name (or repost row) below it — see the
   // module comment's `topSlot` note.
   topSlotWrap: { marginBottom: 8 },
+  belowCaptionWrap: { marginBottom: 10 },
   repostIdentity: {
     alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32, marginBottom: 12,
     flexDirection: 'row', alignItems: 'center', gap: 8,

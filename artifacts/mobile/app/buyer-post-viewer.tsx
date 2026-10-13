@@ -42,6 +42,7 @@ import { requestContextualPushPermission } from '@/lib/contextualPushPermission'
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { CaptionSpans } from '@/components/social/CaptionText';
+import { PollCard } from '@/components/social/PollCard';
 import { CaptionsOverlay, type CaptionSegment } from '@/components/social/CaptionsOverlay';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useCaptionsPreference, useReadyCaptionTrack } from '@/lib/captions';
@@ -365,6 +366,9 @@ export default function BuyerPostViewer() {
         {caption ? (
           <Text style={s.caption}><CaptionSpans text={caption} /></Text>
         ) : null}
+
+        {/* Thread poll (only present when the post has one — no layout change otherwise) */}
+        {post?.id ? <PollCard postId={post.id} style={{ paddingHorizontal: SP.md, paddingTop: SP.sm }} /> : null}
 
         {/* Quoted original (only present on quote reposts — no layout change otherwise) */}
         {post?.quotedPost ? (
