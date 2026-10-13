@@ -70,6 +70,7 @@ import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checko
 import { cashOutThreadCash, computeCashOutPayoutCents } from "../lib/threadCash/cashOut";
 import { stripe } from "../lib/stripe";
 import { liveTipsGate } from "../lib/liveTips";
+import weeklyQuestsRouter from "./thread-cash-weekly-quests";
 
 const router = Router();
 router.use(requireAuth);
@@ -600,5 +601,8 @@ router.post("/cash-out", requirePermission("payouts"), async (req, res) => {
     throw error;
   }
 });
+
+// ─── /api/thread-cash/weekly-quests ──────────────────────────────────────────
+router.use("/weekly-quests", weeklyQuestsRouter);
 
 export default router;
