@@ -235,6 +235,9 @@ describe("buyer profile — what a visitor can read", () => {
       "userId", "name", "username", "displayName", "bio", "avatarUrl", "accountType", "initials", "color", "handle",
       "coverVideoUrl", "coverPosterUrl", "followersCount", "followingCount", "likesCount", "postsCount", "isFollowing",
       "isFollowedBy", "isMutual", "iBlockedThem",
+      // Private-account state, the public bio link and the "Followed by …" line
+      // (people the VIEWER follows) are all safe to show a visitor.
+      "isPrivate", "followRequested", "contentHidden", "website", "mutualFollowers",
     ]);
     expect(Object.keys(body).filter((k) => !allowed.has(k))).toEqual([]);
   });
