@@ -24,9 +24,9 @@ interface ToggleGroup {
 
 const GROUPS: ToggleGroup[] = [
   {
-    title: 'Mobile notifications',
+    title: 'Mobile',
     rows: [
-      { key: 'criticalAlerts', label: 'Critical alerts', description: 'Issues like an expiring domain or a payment failure', default: true },
+      { key: 'criticalAlerts', label: 'Critical alerts', default: true },
       { key: 'fulfillments', label: 'Fulfillments', default: true },
       { key: 'newOrders', label: 'New orders', default: true },
       { key: 'setupTips', label: 'Setup tips', default: true },
@@ -34,14 +34,14 @@ const GROUPS: ToggleGroup[] = [
     ],
   },
   {
-    title: 'Notification badge',
+    title: 'Badge',
     subtitle: 'Only applies to unfulfilled orders.',
     rows: [
       { key: 'badgeNewOrders', label: 'New orders', default: false },
     ],
   },
   {
-    title: 'Account notifications',
+    title: 'Account',
     rows: [
       { key: 'securityUpdates', label: 'Security updates', default: true },
       { key: 'mfa', label: 'Multi-factor authentication', default: true },

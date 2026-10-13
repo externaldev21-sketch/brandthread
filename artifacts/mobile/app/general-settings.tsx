@@ -41,7 +41,7 @@ export default function GeneralSettingsScreen() {
       >
         {/* Business details — bound to the real seller profile, never fabricated */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Business details</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Business</Text>
           <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
             Your brand name and website, shown on your public store
           </Text>

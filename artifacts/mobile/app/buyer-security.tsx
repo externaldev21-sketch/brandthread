@@ -65,14 +65,12 @@ export default function BuyerSecurity() {
           <ListRow
             icon="bell"
             title="Login alerts"
-            subtitle="Get notified of new sign-ins"
             toggle={{ value: loginAlerts, onChange: onToggleLoginAlerts }}
           />
           <View style={s.divider} />
           <ListRow
             icon="save"
             title="Save login info"
-            subtitle="Stay signed in on this device"
             toggle={{ value: saveLogin, onChange: onToggleSaveLogin }}
           />
         </Card>
@@ -83,7 +81,6 @@ export default function BuyerSecurity() {
           <ListRow
             icon="key"
             title="Change password"
-            subtitle="Update your current password"
             chevron
             onPress={() => router.push('/change-password' as never)}
           />
@@ -91,7 +88,6 @@ export default function BuyerSecurity() {
           <ListRow
             icon="smartphone"
             title="Where you're logged in"
-            subtitle="Review active sessions"
             chevron
             onPress={() => router.push('/buyer-login-activity' as never)}
           />

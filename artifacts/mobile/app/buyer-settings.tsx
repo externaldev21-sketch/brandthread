@@ -97,7 +97,7 @@ export default function BuyerSettingsScreen() {
                   <ListRow
                     icon={item.icon}
                     title={item.label}
-                    subtitle={item.description}
+                    subtitle={item.action === 'delete-account' ? item.description : undefined}
                     destructive={item.destructive}
                     value={item.soon ? 'Soon' : undefined}
                     chevron={!item.soon}

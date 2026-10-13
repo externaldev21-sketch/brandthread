@@ -24,11 +24,11 @@ export default function SecurityScreen() {
     router.push('/login-activity' as any);
   }
 
-  const accountRows: Array<{ title: string; subtitle: string; label: string; route: string }> = [
-    { title: 'Password', subtitle: 'Change your password', label: 'Change', route: '/change-password' },
-    { title: 'Email address', subtitle: 'Change the email you sign in with', label: 'Change', route: '/change-email' },
+  const accountRows: Array<{ title: string; subtitle?: string; label: string; route: string }> = [
+    { title: 'Password', label: 'Change', route: '/change-password' },
+    { title: 'Email address', label: 'Change', route: '/change-email' },
     { title: 'Two-factor authentication', subtitle: 'App and backup codes', label: 'Manage', route: '/login-methods' },
-    { title: 'Download my data', subtitle: 'Export your store data', label: 'Open', route: '/seller-data-export' },
+    { title: 'Download my data', label: 'Open', route: '/seller-data-export' },
   ];
 
   return (
@@ -39,7 +39,6 @@ export default function SecurityScreen() {
         <View style={styles.rowBetween}>
           <View style={{ flex: 1, paddingRight: 12 }}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>User activity logs</Text>
-            <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>Monitor and review user activities</Text>
           </View>
           <Button label="View" variant="secondary" size="small" style={styles.rowBtn} onPress={viewActivityLog} />
         </View>
@@ -50,7 +49,7 @@ export default function SecurityScreen() {
           <View style={styles.rowBetween}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{row.title}</Text>
-              <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>{row.subtitle}</Text>
+              {row.subtitle ? <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>{row.subtitle}</Text> : null}
             </View>
             <Button
               label={row.label}
