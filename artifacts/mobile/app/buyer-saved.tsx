@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, FlatList, Alert, StyleSheet, Dimensions,
-  Modal, TextInput, Animated, Pressable,
-} from 'react-native';
+  Modal, TextInput, Animated, Pressable, Platform} from 'react-native';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -412,6 +412,8 @@ export default function BuyerSaved() {
       {/* ─ New collection ─ */}
       <Modal transparent animationType="fade" visible={newCollectionModal} onRequestClose={() => setNewCollectionModal(false)}>
         <ModalSafeArea>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={{ flex: 1 }}>
           <Pressable style={styles.backdrop} onPress={() => setNewCollectionModal(false)} accessibilityRole="button" accessibilityLabel="Close" />
           <View style={styles.centerModal} pointerEvents="box-none">
             <View style={styles.newCollectionCard}>
@@ -439,6 +441,8 @@ export default function BuyerSaved() {
               </View>
             </View>
           </View>
+            </View>
+          </KeyboardAvoidingView>
         </ModalSafeArea>
       </Modal>
     </View>
