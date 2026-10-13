@@ -8,7 +8,7 @@ import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Linking, Platfor
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
@@ -57,11 +57,11 @@ export default function AppLockSettingsScreen() {
     await saveAppLockSettings(next);
     setSettings(next);
     setBusy(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
   }
 
   async function chooseGrace(graceSeconds: GraceSeconds) {
-    Haptics.selectionAsync();
+    haptics.selection();
     const next = { ...settings, graceSeconds };
     setSettings(next);
     await saveAppLockSettings(next);

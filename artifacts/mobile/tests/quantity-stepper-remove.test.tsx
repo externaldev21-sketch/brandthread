@@ -21,7 +21,7 @@ vi.mock('react-native', () => ({
   StyleSheet: { create: (styles: unknown) => styles },
 }));
 vi.mock('@expo/vector-icons', () => ({ Feather: nativeComponent('Feather') }));
-vi.mock('@/lib/haptics', () => ({ hapticToggle: vi.fn() }));
+vi.mock('@/lib/haptics', () => ({ hapticToggle: vi.fn(), haptics: { selection: vi.fn(), light: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn(), rigid: vi.fn() } }));
 vi.mock('@/hooks/useColors', () => ({ useColors: () => ({ border: '#333', foreground: '#fff', mutedForeground: '#888' }) }));
 
 import { QuantityStepper } from '@/components/ui/QuantityStepper';

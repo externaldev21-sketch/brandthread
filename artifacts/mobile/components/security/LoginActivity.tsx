@@ -11,7 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
@@ -116,7 +116,7 @@ export default function LoginActivity() {
             setBusyId(session.id);
             try {
               await api.auth.revokeSession(session.id);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              haptics.success();
               setSessions((prev) => prev.filter((row) => row.id !== session.id));
             } catch (err) {
               Alert.alert('Couldn’t sign out that device', apiErrorMessage(err, 'Try again.'));
@@ -142,7 +142,7 @@ export default function LoginActivity() {
             setBusyId('others');
             try {
               await api.auth.revokeOtherSessions();
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              haptics.success();
               setSessions((prev) => prev.filter((row) => row.current));
             } catch (err) {
               Alert.alert('Couldn’t sign out other devices', apiErrorMessage(err, 'Try again.'));

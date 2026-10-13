@@ -78,7 +78,7 @@ export function ProductQuestionsSection({ productId, productName }: { productId:
 const s = StyleSheet.create({
   wrap: { paddingHorizontal: 16, paddingTop: 16, borderTopWidth: 1, marginBottom: 8 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  title: { fontSize: FS.sm, fontFamily: FONT.bold, textTransform: 'uppercase', letterSpacing: 0.8 },
+  title: { fontSize: FS.sm, fontFamily: FONT.bold, },
   seeAll: { fontSize: FS.sm, fontFamily: FONT.semibold },
   qa: { gap: 4, marginBottom: 14 },
   q: { fontSize: FS.base, fontFamily: FONT.semibold, lineHeight: 21 },

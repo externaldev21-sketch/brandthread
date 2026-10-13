@@ -19,7 +19,7 @@ import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
 import { useApi } from '@/hooks/useApi';
@@ -27,6 +27,7 @@ import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
 import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { getProducts, updateProduct } from '@/services/productService';
 import { Product, ProductMedia } from '@/services/productTypes';
+import { FONT } from '@/lib/theme';
 
 interface Photo {
   id: string;
@@ -68,7 +69,7 @@ export default function LifestyleImagesScreen() {
       if (!fileUri) return;
       const outcome = await saveImageToMediaLibrary(fileUri);
       if (outcome === 'saved') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        haptics.success();
         Alert.alert('Saved', 'Saved to Photos.');
       } else if (outcome === 'denied') {
         Alert.alert('Permission required', 'Allow photo library access to save this image.');
@@ -118,7 +119,7 @@ export default function LifestyleImagesScreen() {
       };
       const updated = await updateProduct(product.id, { media: [...existing, newMedia] });
       if (updated) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        haptics.success();
         Alert.alert('Added', `Added to "${product.name ?? 'product'}" media gallery.`);
       } else {
         Alert.alert("Couldn't update product", 'Try again.');
@@ -144,7 +145,6 @@ export default function LifestyleImagesScreen() {
       base64: true,
     });
     if (result.canceled) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const picked: Photo[] = result.assets
       .filter((a) => !!a.base64)
       .slice(0, MAX_PHOTOS - current.length)
@@ -171,13 +171,11 @@ export default function LifestyleImagesScreen() {
 
   function goToProductStep() {
     if (referencePhotos.length === 0) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setStep('product');
   }
 
   async function generate() {
     if (productPhotos.length === 0 || loading) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     setResultB64(null);
     setStep('result');
@@ -198,7 +196,6 @@ export default function LifestyleImagesScreen() {
   }
 
   function startOver() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setStep('reference');
     setReferencePhotos([]);
     setProductPhotos([]);
@@ -423,7 +420,7 @@ export default function LifestyleImagesScreen() {
                       <Feather name="package" size={20} color={colors.mutedForeground} />
                     </View>
                   )}
-                  <Text style={{ flex: 1, color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 14 }} numberOfLines={1}>
+                  <Text style={{ flex: 1, color: colors.foreground, fontFamily: FONT.semibold, fontSize: 14 }} numberOfLines={1}>
                     {item.name}
                   </Text>
                   <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
@@ -447,13 +444,13 @@ const styles = StyleSheet.create({
   stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   stepDot: { width: 10, height: 10, borderRadius: 5 },
   stepLine: { flex: 1, height: 1, marginHorizontal: 8 },
-  sectionTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 14, lineHeight: 17 },
+  sectionTitle: { fontSize: 16, fontFamily: FONT.bold, marginBottom: 4 },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 14, lineHeight: 17 },
   dropzone: {
     borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center',
     justifyContent: 'center', paddingVertical: 40, gap: 10,
   },
-  dropzoneTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  dropzoneTitle: { fontSize: 14, fontFamily: FONT.semibold },
   trayRow: { gap: 10, paddingVertical: 4 },
   trayThumbWrap: { position: 'relative' },
   trayThumb: { width: 72, height: 72, borderRadius: 12 },
@@ -465,18 +462,18 @@ const styles = StyleSheet.create({
     width: 72, height: 72, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed',
     alignItems: 'center', justifyContent: 'center',
   },
-  inputLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginTop: 20, marginBottom: 8 },
+  inputLabel: { fontSize: 12, fontFamily: FONT.semibold, marginTop: 20, marginBottom: 8 },
   input: {
-    borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular',
+    borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: FONT.regular,
     minHeight: 72, textAlignVertical: 'top',
   },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     borderRadius: 14, paddingVertical: 15,
   },
-  primaryBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  primaryBtnText: { fontSize: 14, fontFamily: FONT.semibold },
   secondaryBtn: { alignItems: 'center', paddingVertical: 10 },
-  secondaryBtnText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  secondaryBtnText: { fontSize: 13, fontFamily: FONT.regular },
   resultFrame: {
     aspectRatio: 1, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },

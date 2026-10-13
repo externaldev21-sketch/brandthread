@@ -9,6 +9,7 @@ import { logger } from "./logger";
 import { withRetry } from "./retry";
 import { isPromotionalPush, promoConsentAllows } from "./pushPolicy";
 import crypto from "node:crypto";
+import { inferNotificationCategoryId, withNotificationCategoryData } from "./notificationCategories";
 
 export interface PushPayload {
   title: string;
@@ -30,6 +31,11 @@ export interface PushPayload {
   kind?: "transactional" | "promotional";
   /** The user asked for this exact push (e.g. a per-drop "notify me"). */
   explicitRequest?: boolean;
+  /**
+   * Actionable notification category registered by the mobile app (see
+   * lib/notificationCategories.ts). Inferred from `data` when omitted.
+   */
+  categoryId?: string;
 }
 
 export type NotificationEventType = "receipt" | "open" | "tap";
@@ -116,6 +122,7 @@ export interface ExpoPushMessage {
   sound: string | null;
   badge?: number;
   channelId?: string;
+  categoryId?: string;
 }
 
 export function preferenceKey(accountType: string | null, category: PushEventCategory): string | null {
@@ -152,14 +159,16 @@ export function buildExpoPushMessages(
   tokens: { token: string }[],
   payload: PushPayload,
 ): ExpoPushMessage[] {
+  const categoryId = payload.categoryId ?? inferNotificationCategoryId(payload.data);
   return tokens.map((token) => ({
     to: token.token,
     title: payload.title,
     body: payload.body,
-    data: payload.data ?? {},
+    data: withNotificationCategoryData(payload.data ?? {}, categoryId),
     sound: payload.sound ?? "default",
     badge: payload.badge,
     channelId: payload.channelId,
+    ...(categoryId !== undefined ? { categoryId } : {}),
   }));
 }
 

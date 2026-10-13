@@ -4,7 +4,6 @@ import {
   useAudioRecorder, useAudioRecorderState, RecordingPresets,
   requestRecordingPermissionsAsync, setAudioModeAsync,
 } from 'expo-audio';
-import { hapticLight, hapticMedium } from '@/lib/haptics';
 
 /**
  * Instagram DM "Sending an audio message" flow (mobbin.com/flows/125d5a4c-
@@ -100,7 +99,6 @@ export function useVoiceRecorder(
       recorder.record();
       startedAtRef.current = Date.now();
       setPhase('recording');
-      hapticMedium();
       timerRef.current = setInterval(() => {
         const elapsed = Date.now() - startedAtRef.current;
         setElapsedMs(elapsed);
@@ -130,7 +128,6 @@ export function useVoiceRecorder(
     setPhase('locked');
     Animated.spring(dragY, { toValue: 0, useNativeDriver: true, ...ANIM_SPRING }).start();
     dragX.setValue(0);
-    hapticLight();
   }, [dragX, dragY]);
 
   const finish = useCallback(async () => {

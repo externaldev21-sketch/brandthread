@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, TextInput, StyleSheet, TextInputProps } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -47,7 +46,6 @@ export function CopyRow({ value, label = 'Copy link' }: { value: string; label?:
         accessibilityRole="button"
         accessibilityLabel={label}
         onPress={async () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
           await Clipboard.setStringAsync(value);
           setDone(true);
           setTimeout(() => setDone(false), 2000);

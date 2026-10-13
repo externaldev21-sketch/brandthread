@@ -15,7 +15,6 @@ import { formatCents } from '@/lib/money';
 import { FONT, SP } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
-import { hapticLight } from '@/lib/haptics';
 import type { DiscoverPost } from '@/lib/discoverFeed';
 
 const CARD_WIDTH = 130;
@@ -36,7 +35,7 @@ export function DiscoverShopTheLookRail({ posts, onPress }: { posts: DiscoverPos
           return (
             <Pressable
               key={post.id}
-              onPress={() => { hapticLight(); onPress(post); }}
+              onPress={() => { onPress(post); }}
               accessibilityRole="button"
               accessibilityLabel={`Shop ${tag.productName} from ${post.authorName}'s post`}
               style={{ width: CARD_WIDTH }}

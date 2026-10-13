@@ -84,7 +84,7 @@ vi.mock('@/services/socialService', () => ({
   setSellerFollowing: vi.fn().mockResolvedValue(undefined),
   removeFollower: vi.fn().mockResolvedValue({ followersCount: 0 }),
 }));
-vi.mock('@/lib/haptics', () => ({ hapticDestructiveConfirm: vi.fn() }));
+vi.mock('@/lib/haptics', () => ({ hapticDestructiveConfirm: vi.fn(), haptics: { selection: vi.fn(), light: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn(), rigid: vi.fn() } }));
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {

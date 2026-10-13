@@ -8,7 +8,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -317,7 +317,7 @@ export default function StoreNavScreen() {
     <View style={styles.root}>
       <ScreenHeader
         title="Navigation"
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+        onBack={() => goBackOr(router)}
       />
       <Text style={styles.headerSubtitle}>Set up your store's navigation menus.</Text>
 
@@ -330,7 +330,7 @@ export default function StoreNavScreen() {
             <TouchableOpacity
               key={tab.type}
               style={[styles.menuTab, isActive && styles.menuTabActive]}
-              onPress={() => { Haptics.selectionAsync(); if (menu) setActiveMenuId(menu.id); }}
+              onPress={() => { haptics.selection(); if (menu) setActiveMenuId(menu.id); }}
             >
               <Text style={[styles.menuTabText, isActive && styles.menuTabTextActive]}>
                 {tab.label}

@@ -14,7 +14,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
 import { ConfirmSheet } from '@/components/settings/SettingsKit';
-import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useFirstRunTipsController } from '@/contexts/FirstRunTipsContext';
 
@@ -27,7 +27,6 @@ export default function FirstRunTipsSettingsScreen() {
   const [replayedAt, setReplayedAt] = useState<number | null>(null);
 
   async function toggleSkipAll(value: boolean) {
-    hapticLight();
     if (value) controller.setSkipAllTips();
     // Turning it back off isn't a supported path here — "Skip all" is a
     // one-way suppress; "Replay tips" below is the real reset, which also
@@ -38,7 +37,7 @@ export default function FirstRunTipsSettingsScreen() {
     setReplaying(true);
     try {
       await controller.replayTips();
-      hapticSuccess();
+      haptics.success();
       setReplayedAt(Date.now());
     } finally {
       setReplaying(false);
@@ -72,7 +71,7 @@ export default function FirstRunTipsSettingsScreen() {
           </View>
 
           <PressableScale
-            onPress={() => { hapticLight(); setReplayVisible(true); }}
+            onPress={() => setReplayVisible(true)}
             style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border, marginTop: SP.sm }]}
             accessibilityRole="button"
             accessibilityLabel="Replay tips"

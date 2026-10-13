@@ -181,7 +181,7 @@ describe('StripeConnectWarning', () => {
     expect(api.seller.connect.onboard).toHaveBeenCalledTimes(1);
     expect(canOpenURLMock).toHaveBeenCalledWith(onboardingUrl);
     expect(openURLMock).toHaveBeenCalledWith(onboardingUrl);
-    expect(hapticMock).toHaveBeenCalledTimes(1);
+    expect(hapticMock).not.toHaveBeenCalled();
     renderer.unmount();
   });
 

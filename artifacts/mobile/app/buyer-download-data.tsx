@@ -9,7 +9,7 @@ import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button, Card, ListRow, StickyBottomCTA } from '@/components/ui';
-import { hapticError, hapticSuccess, hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { EmailExportSection } from '@/components/security/EmailExportSection';
@@ -34,7 +34,7 @@ export default function BuyerDownloadData() {
   const [loading, setLoading] = useState(false);
 
   function toggleCat(key: string) {
-    hapticToggle();
+    haptics.selection();
     setCategories(prev => prev.map(c => c.key === key ? { ...c, selected: !c.selected } : c));
   }
 
@@ -54,11 +54,11 @@ export default function BuyerDownloadData() {
       } else {
         Alert.alert('Export ready', 'Your data is ready. Save it or send it anywhere.');
       }
-      hapticSuccess();
+      haptics.success();
       setRequestedAt(data.exportedAt);
       setRequested(true);
     } catch (err: any) {
-      hapticError();
+      haptics.error();
       Alert.alert('Export failed', "Couldn't prepare your data. Try again.");
     } finally {
       setLoading(false);

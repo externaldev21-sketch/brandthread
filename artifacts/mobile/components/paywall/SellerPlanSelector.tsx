@@ -8,7 +8,7 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { weeklyEquivalentFor } from '@/lib/sellerPlansDisplay';
 import type { SellerPlanDefinition } from '@/lib/sellerPlans';
@@ -53,8 +53,6 @@ export function SellerPlanSelector({
   const hasHiddenPlans = !showAll && visiblePlans.length < plans.length;
   const isTopTier = (planId: string) => plans[plans.length - 1]?.id === planId;
 
-  function haptic() { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
-
   return (
     <View style={styles.section}>
       {visiblePlans.map((plan) => {
@@ -68,7 +66,7 @@ export function SellerPlanSelector({
           <TouchableOpacity
             key={plan.id}
             activeOpacity={0.85}
-            onPress={() => { haptic(); onSelect(plan.id); }}
+            onPress={() => { haptics.selection(); onSelect(plan.id); }}
             testID={`seller-plan-card-${plan.id}`}
             style={[
               styles.card,
@@ -137,7 +135,7 @@ export function SellerPlanSelector({
       {hasHiddenPlans && (
         <TouchableOpacity
           style={styles.viewAllRow}
-          onPress={() => { haptic(); setShowAll(true); }}
+          onPress={() => setShowAll(true)}
           testID="seller-plans-view-all"
         >
           <Text style={styles.viewAllText}>View all plans</Text>

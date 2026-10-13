@@ -9,7 +9,6 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
-import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 const DEFINITIONS: { key: string; icon: keyof typeof Feather.glyphMap; label: string }[] = [
@@ -73,7 +72,7 @@ export default function MetafieldsScreen() {
                 return (
                   <TouchableOpacity
                     key={def.key}
-                    onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+                    onPress={() => {}}
                     activeOpacity={0.7}
                     style={[s.row, i !== DEFINITIONS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
                   >
@@ -105,7 +104,7 @@ export default function MetafieldsScreen() {
             Metaobjects let you group fields and connect them to different parts of your store.
           </Text>
           <TouchableOpacity
-            onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+            onPress={() => {}}
             activeOpacity={0.7}
             style={[s.addMetaBtn, { borderColor: colors.primary, backgroundColor: colors.accent }]}
           >

@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming, Easing } from 'react-native-reanimated';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
@@ -10,6 +9,7 @@ import { formatCompactCount } from '@/lib/compactFormat';
 import { describeDashboardDelta } from '@/lib/sellerDashboardStats';
 import type { TrafficSource } from '@/lib/sellerHomeAnalytics';
 import { radius } from '@/constants/radii';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
 /**
  * Traffic sources — redesigned per Dev's direction (Mobbin references:
@@ -36,7 +36,7 @@ import { radius } from '@/constants/radii';
  * #499's hero-metric). Only the bar's fill width animates in on mount —
  * purely decorative, so it can never disagree with the number beside it.
  */
-const SOURCE_META: Record<TrafficSource, { label: string; icon: React.ComponentProps<typeof Feather>['name'] }> = {
+const SOURCE_META: Record<TrafficSource, { label: string; icon: IconName }> = {
   feed:     { label: 'Discover feed', icon: 'compass' },
   search:   { label: 'Search', icon: 'search' },
   profile:  { label: 'Your profile', icon: 'user' },
@@ -46,7 +46,7 @@ const SOURCE_ORDER: TrafficSource[] = ['feed', 'search', 'profile', 'external'];
 /** Decreasing white opacity per segment — "silver tones", not hues. */
 const SEGMENT_OPACITY: Record<TrafficSource, number> = { feed: 1, search: 0.7, profile: 0.45, external: 0.25 };
 
-type SourceRow = { key: TrafficSource; label: string; icon: React.ComponentProps<typeof Feather>['name']; count: number; sharePercent: number };
+type SourceRow = { key: TrafficSource; label: string; icon: IconName; count: number; sharePercent: number };
 
 function AnimatedSegment({ flexShare, opacity, isFirst, isLast, textColor }: { flexShare: number; opacity: number; isFirst: boolean; isLast: boolean; textColor: string }) {
   const width = useSharedValue(0);
@@ -122,7 +122,7 @@ export function SellerDashboardTrafficSources({
   return (
     <View testID="seller-dashboard-traffic-sources">
       <View style={styles.headerRow}>
-        <Text style={[styles.sectionHeader, { color: theme.muted }]}>Traffic sources</Text>
+        <Text style={[styles.sectionHeader, { color: theme.text }]}>Traffic sources</Text>
         <TouchableOpacity onPress={onSeeAll} accessibilityRole="button" accessibilityLabel="See all traffic analytics" hitSlop={8}>
           <Text style={[styles.seeAll, { color: theme.subtle }]}>See all</Text>
         </TouchableOpacity>
@@ -140,7 +140,7 @@ export function SellerDashboardTrafficSources({
             accessibilityRole="button"
             accessibilityLabel="Share your store"
           >
-            <Feather name="share" size={14} color={theme.text} />
+            <Icon name="share" size={14} color={theme.text} />
             <Text style={[styles.shareBtnText, { color: theme.text }]}>Share store</Text>
           </PressableScale>
         </View>
@@ -192,7 +192,7 @@ export function SellerDashboardTrafficSources({
                   accessibilityLabel={`${row.label}: ${row.count} visits, ${row.sharePercent}%`}
                 >
                   <View style={[styles.iconWrap, { backgroundColor: theme.cardElevated }]}>
-                    <Feather name={row.icon} size={14} color={theme.text} />
+                    <Icon name={row.icon} size={14} color={theme.text} />
                   </View>
                   <View style={styles.legendCopy}>
                     <Text style={[styles.sourceLabel, { color: theme.text, fontFamily: isTop ? FONT.semibold : FONT.medium }]} numberOfLines={1}>
@@ -222,11 +222,11 @@ export function SellerDashboardTrafficSources({
 
 const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },
+  // Section header: sentence case, 17 semibold, white (BRANDTHREAD_DESIGN.md).
   sectionHeader: {
-    fontFamily: FONT.bold,
-    fontSize: FS.xs,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    fontFamily: FONT.semibold,
+    fontSize: 17,
+    lineHeight: 22,
   },
   seeAll: {
     fontFamily: FONT.medium,

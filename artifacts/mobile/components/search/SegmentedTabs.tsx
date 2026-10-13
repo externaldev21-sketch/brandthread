@@ -2,7 +2,7 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { hapticToggle } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
@@ -57,7 +57,7 @@ export function SegmentedTabs({
               style={[styles.segment, isActive && styles.segmentActive]}
               onPress={() => {
                 if (isActive) return;
-                hapticToggle();
+                haptics.selection();
                 onChange(tab.key);
               }}
               activeOpacity={0.8}

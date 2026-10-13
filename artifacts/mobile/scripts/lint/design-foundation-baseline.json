@@ -1,0 +1,1700 @@
+{
+  "app/(buyer)/cart.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/(buyer)/edit-profile.tsx": {
+    "feather": 1
+  },
+  "app/(buyer)/friends.tsx": {
+    "feather": 1
+  },
+  "app/(buyer)/inbox.tsx": {
+    "feather": 1,
+    "uppercase": 2,
+    "letterSpacing": 3
+  },
+  "app/(buyer)/orders.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/(buyer)/profile.tsx": {
+    "feather": 1
+  },
+  "app/(tabs)/analytics.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/(tabs)/feed.tsx": {
+    "feather": 1
+  },
+  "app/(tabs)/following.tsx": {
+    "feather": 1,
+    "uppercase": 1
+  },
+  "app/(tabs)/marketing.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/(tabs)/more.tsx": {
+    "feather": 1,
+    "letterSpacing": 2
+  },
+  "app/(tabs)/orders.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 6
+  },
+  "app/(tabs)/products.tsx": {
+    "feather": 1
+  },
+  "app/(tabs)/profile.tsx": {
+    "feather": 1
+  },
+  "app/(tabs)/studio.tsx": {
+    "feather": 1
+  },
+  "app/+not-found.tsx": {
+    "feather": 1
+  },
+  "app/account-type-settings.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/account-type.tsx": {
+    "feather": 1
+  },
+  "app/activity-center.tsx": {
+    "feather": 1
+  },
+  "app/add-product.tsx": {
+    "feather": 1
+  },
+  "app/admin-invites.tsx": {
+    "letterSpacing": 1
+  },
+  "app/admin-reports.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/ai-brain.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/ai-brand-memory.tsx": {
+    "feather": 1
+  },
+  "app/ai-helper.tsx": {
+    "feather": 1
+  },
+  "app/ai-photography-chat.tsx": {
+    "feather": 1
+  },
+  "app/ai-settings.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/ai-studio.tsx": {
+    "feather": 1
+  },
+  "app/analytics-advanced.tsx": {
+    "feather": 1
+  },
+  "app/analytics-customers.tsx": {
+    "feather": 1
+  },
+  "app/analytics-export.tsx": {
+    "feather": 1
+  },
+  "app/analytics-goals.tsx": {
+    "feather": 1
+  },
+  "app/analytics-marketing.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/analytics-production.tsx": {
+    "feather": 1
+  },
+  "app/analytics-products.tsx": {
+    "feather": 1
+  },
+  "app/analytics-profit.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/analytics-store.tsx": {
+    "feather": 1
+  },
+  "app/appearance.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/billing.tsx": {
+    "feather": 1
+  },
+  "app/biometric-unlock.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/boost.tsx": {
+    "feather": 1
+  },
+  "app/brand.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-account-center.tsx": {
+    "feather": 1
+  },
+  "app/buyer-addresses.tsx": {
+    "feather": 1
+  },
+  "app/buyer-archive.tsx": {
+    "feather": 1
+  },
+  "app/buyer-blocked.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-checkout.tsx": {
+    "feather": 1
+  },
+  "app/buyer-close-friends.tsx": {
+    "feather": 1
+  },
+  "app/buyer-collection.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-conversation.tsx": {
+    "feather": 1
+  },
+  "app/buyer-download-data.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-drafts.tsx": {
+    "feather": 1
+  },
+  "app/buyer-drop-detail.tsx": {
+    "feather": 1,
+    "letterSpacing": 11
+  },
+  "app/buyer-friend-requests.tsx": {
+    "feather": 1
+  },
+  "app/buyer-gift-cards.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-highlight-stories.tsx": {
+    "feather": 1
+  },
+  "app/buyer-highlights-manager.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-invite.tsx": {
+    "feather": 1,
+    "uppercase": 2,
+    "letterSpacing": 3
+  },
+  "app/buyer-live.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 3
+  },
+  "app/buyer-muted.tsx": {
+    "feather": 1
+  },
+  "app/buyer-notifications.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-order-detail.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 5
+  },
+  "app/buyer-other-profile.tsx": {
+    "feather": 1
+  },
+  "app/buyer-payment-methods.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-personal-details.tsx": {
+    "feather": 1
+  },
+  "app/buyer-post-comments.tsx": {
+    "feather": 1
+  },
+  "app/buyer-post-viewer.tsx": {
+    "feather": 1
+  },
+  "app/buyer-problem-report.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-product-detail.tsx": {
+    "feather": 1,
+    "uppercase": 4,
+    "letterSpacing": 6
+  },
+  "app/buyer-qr-code.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-recently-watched.tsx": {
+    "feather": 1
+  },
+  "app/buyer-refund-request.tsx": {
+    "feather": 1,
+    "uppercase": 2,
+    "letterSpacing": 2
+  },
+  "app/buyer-report.tsx": {
+    "feather": 1,
+    "letterSpacing": 2
+  },
+  "app/buyer-restricted.tsx": {
+    "feather": 1
+  },
+  "app/buyer-return-request.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-saved.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-search.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-settings-detail.tsx": {
+    "feather": 1
+  },
+  "app/buyer-settings-menu.tsx": {
+    "feather": 1
+  },
+  "app/buyer-story-create.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/buyer-story-viewer.tsx": {
+    "feather": 1
+  },
+  "app/buyer-your-activity.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/c/[collectionId].tsx": {
+    "feather": 1
+  },
+  "app/call-screen.tsx": {
+    "feather": 1
+  },
+  "app/camera-capture.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/checkout.tsx": {
+    "feather": 1
+  },
+  "app/community-chat.tsx": {
+    "feather": 1
+  },
+  "app/community-create.tsx": {
+    "feather": 1
+  },
+  "app/community-members.tsx": {
+    "feather": 1
+  },
+  "app/community.tsx": {
+    "feather": 1
+  },
+  "app/connections.tsx": {
+    "feather": 1
+  },
+  "app/content.tsx": {
+    "feather": 1
+  },
+  "app/conversation-details.tsx": {
+    "feather": 1
+  },
+  "app/conversation-group-create.tsx": {
+    "feather": 1
+  },
+  "app/conversation-privacy-safety.tsx": {
+    "feather": 1
+  },
+  "app/conversation-search.tsx": {
+    "feather": 1
+  },
+  "app/creator-program.tsx": {
+    "letterSpacing": 1
+  },
+  "app/customer-accounts.tsx": {
+    "feather": 1
+  },
+  "app/customer-events.tsx": {
+    "feather": 1
+  },
+  "app/customer-orders.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/customer-privacy.tsx": {
+    "feather": 1
+  },
+  "app/customers.tsx": {
+    "feather": 1
+  },
+  "app/delete-account.tsx": {
+    "feather": 1,
+    "letterSpacing": 2
+  },
+  "app/design-ai-photoshoot.tsx": {
+    "feather": 1
+  },
+  "app/design-bg-removal.tsx": {
+    "feather": 1
+  },
+  "app/design-bg-replace.tsx": {
+    "feather": 1
+  },
+  "app/design-brand-assets.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/design-campaign.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/design-canvas.tsx": {
+    "feather": 1,
+    "uppercase": 3,
+    "letterSpacing": 3
+  },
+  "app/design-export.tsx": {
+    "feather": 1
+  },
+  "app/design-garment.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/design-mockup-preview.tsx": {
+    "feather": 1
+  },
+  "app/design-mockup-to-model.tsx": {
+    "feather": 1
+  },
+  "app/design-project.tsx": {
+    "feather": 1
+  },
+  "app/design-prompt-edit.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/design-templates.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/design-text-to-design.tsx": {
+    "feather": 1
+  },
+  "app/design-upload-sketch.tsx": {
+    "feather": 1
+  },
+  "app/design-versions.tsx": {
+    "feather": 1
+  },
+  "app/design.tsx": {
+    "feather": 1
+  },
+  "app/discounts.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 3
+  },
+  "app/dispute-detail.tsx": {
+    "feather": 1
+  },
+  "app/disputes.tsx": {
+    "feather": 1
+  },
+  "app/drafts.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/edit-profile.tsx": {
+    "feather": 1
+  },
+  "app/email-audience.tsx": {
+    "feather": 1
+  },
+  "app/email-campaign-compose.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/email-campaigns.tsx": {
+    "feather": 1
+  },
+  "app/fees.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/finance.tsx": {
+    "feather": 1
+  },
+  "app/find-friends-contacts.tsx": {
+    "feather": 1
+  },
+  "app/forgot-password.tsx": {
+    "feather": 1,
+    "letterSpacing": 2
+  },
+  "app/freelancer-apply.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/freelancer-jobs.tsx": {
+    "feather": 1
+  },
+  "app/freelancer-profile.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/fulfill-batch.tsx": {
+    "feather": 1
+  },
+  "app/fulfill-order.tsx": {
+    "feather": 1
+  },
+  "app/general-settings.tsx": {
+    "feather": 1
+  },
+  "app/gift-card-buy.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 2
+  },
+  "app/gift-cards-manage.tsx": {
+    "letterSpacing": 1
+  },
+  "app/giveaway.tsx": {
+    "feather": 1
+  },
+  "app/hashtag/[tag].tsx": {
+    "feather": 1
+  },
+  "app/help.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/integrations/index.tsx": {
+    "feather": 1
+  },
+  "app/integrations/klaviyo.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/integrations/shopify-fulfillment.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/invite-manufacturer.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/ip-report.tsx": {
+    "feather": 1
+  },
+  "app/languages.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/launch-checklist.tsx": {
+    "feather": 1
+  },
+  "app/launch-publish.tsx": {
+    "feather": 1
+  },
+  "app/lifestyle-images.tsx": {
+    "feather": 1
+  },
+  "app/link-in-bio.tsx": {
+    "feather": 1
+  },
+  "app/live-cohost.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/live-feed.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/live-moderation.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/live-replays.tsx": {
+    "feather": 1
+  },
+  "app/live.tsx": {
+    "feather": 1
+  },
+  "app/location/[placeId].tsx": {
+    "feather": 1
+  },
+  "app/locations.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/login-methods.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 3
+  },
+  "app/loyalty.tsx": {
+    "feather": 1,
+    "uppercase": 3,
+    "letterSpacing": 3
+  },
+  "app/manufacturer-compare.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/manufacturer-hub.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/manufacturer-messages.tsx": {
+    "feather": 1
+  },
+  "app/manufacturer-onboard.tsx": {
+    "feather": 1
+  },
+  "app/manufacturer-product.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/manufacturer-profile.tsx": {
+    "feather": 1
+  },
+  "app/meta-ads-connect.tsx": {
+    "feather": 1
+  },
+  "app/meta-ads-manage.tsx": {
+    "feather": 1
+  },
+  "app/meta-ads-setup.tsx": {
+    "feather": 1
+  },
+  "app/metafields.tsx": {
+    "feather": 1
+  },
+  "app/mobile-app-builder.tsx": {
+    "feather": 1
+  },
+  "app/muted-words.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/onboarding.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/order-detail.tsx": {
+    "feather": 1
+  },
+  "app/payments.tsx": {
+    "feather": 1,
+    "letterSpacing": 2
+  },
+  "app/payout-detail.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/payout-schedule.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/payout-setup.tsx": {
+    "feather": 1
+  },
+  "app/payouts.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/plans.tsx": {
+    "feather": 1
+  },
+  "app/post-analytics.tsx": {
+    "feather": 1
+  },
+  "app/product-bundle-edit.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/product-bundles.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/product-detail.tsx": {
+    "feather": 1
+  },
+  "app/product-import.tsx": {
+    "feather": 1
+  },
+  "app/product-launches.tsx": {
+    "feather": 1,
+    "letterSpacing": 2
+  },
+  "app/product-pairings.tsx": {
+    "feather": 1
+  },
+  "app/product-reviews.tsx": {
+    "feather": 1
+  },
+  "app/product-size-chart.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/product-store.tsx": {
+    "feather": 1
+  },
+  "app/product-variants.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/product-video.tsx": {
+    "feather": 1
+  },
+  "app/production-detail.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/products-bulk-edit.tsx": {
+    "feather": 1
+  },
+  "app/profile-products.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/quote-compare.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/quote-detail.tsx": {
+    "feather": 1,
+    "uppercase": 1
+  },
+  "app/quote-request.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/refund-detail.tsx": {
+    "feather": 1
+  },
+  "app/request-sample.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/return-detail.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 2
+  },
+  "app/rfq-compare.tsx": {
+    "feather": 1
+  },
+  "app/rfq-list.tsx": {
+    "feather": 1
+  },
+  "app/rfq-post.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/roles.tsx": {
+    "feather": 1
+  },
+  "app/sales.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/sample-detail.tsx": {
+    "feather": 1,
+    "uppercase": 2
+  },
+  "app/security.tsx": {
+    "letterSpacing": 1
+  },
+  "app/seller-conversation.tsx": {
+    "feather": 1
+  },
+  "app/seller-creator-detail.tsx": {
+    "letterSpacing": 1
+  },
+  "app/seller-creator-program.tsx": {
+    "feather": 1
+  },
+  "app/seller-data-export.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/seller-drop-create.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/seller-drop-preview.tsx": {
+    "feather": 1,
+    "letterSpacing": 3
+  },
+  "app/seller-drops.tsx": {
+    "feather": 1
+  },
+  "app/seller-go-live.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/seller-inbox.tsx": {
+    "feather": 1
+  },
+  "app/seller-live.tsx": {
+    "feather": 1,
+    "letterSpacing": 2
+  },
+  "app/seller-profile.tsx": {
+    "feather": 1
+  },
+  "app/seller-push-broadcast.tsx": {
+    "feather": 1
+  },
+  "app/seller-questions.tsx": {
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/seller-reviews.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/seller-schedule-live.tsx": {
+    "feather": 1
+  },
+  "app/seller-settings.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/seller-verification.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/setup.tsx": {
+    "feather": 1
+  },
+  "app/share-profile.tsx": {
+    "feather": 1
+  },
+  "app/share-store.tsx": {
+    "feather": 1
+  },
+  "app/shipping.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/shopify-import.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/shopping-preferences.tsx": {
+    "feather": 1
+  },
+  "app/sign-in.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/size-chart-template-apply.tsx": {
+    "feather": 1
+  },
+  "app/size-chart-template-edit.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/size-chart-templates.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/statements.tsx": {
+    "feather": 1
+  },
+  "app/store-ai-improve.tsx": {
+    "feather": 1,
+    "uppercase": 2,
+    "letterSpacing": 2
+  },
+  "app/store-builder.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 6
+  },
+  "app/store-collections.tsx": {
+    "feather": 1
+  },
+  "app/store-domain.tsx": {
+    "feather": 1,
+    "uppercase": 1
+  },
+  "app/store-editor.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/store-from-logo.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/store-from-moodboard.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/store-from-social.tsx": {
+    "feather": 1
+  },
+  "app/store-generate.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/store-generating.tsx": {
+    "feather": 1
+  },
+  "app/store-nav.tsx": {
+    "feather": 1
+  },
+  "app/store-pages.tsx": {
+    "feather": 1
+  },
+  "app/store-policies.tsx": {
+    "feather": 1
+  },
+  "app/store-preview.tsx": {
+    "feather": 1
+  },
+  "app/store-publish.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/store-sections.tsx": {
+    "feather": 1
+  },
+  "app/store-seo.tsx": {
+    "feather": 1
+  },
+  "app/store-setup-brand.tsx": {
+    "feather": 1
+  },
+  "app/store-theme-picker.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 3
+  },
+  "app/store-versions.tsx": {
+    "feather": 1
+  },
+  "app/story-mention-viewer.tsx": {
+    "feather": 1
+  },
+  "app/subscription.tsx": {
+    "feather": 1,
+    "uppercase": 2,
+    "letterSpacing": 3
+  },
+  "app/taxes-duties.tsx": {
+    "feather": 1
+  },
+  "app/team-invite.tsx": {
+    "feather": 1
+  },
+  "app/team.tsx": {
+    "feather": 1
+  },
+  "app/tech-pack-generator.tsx": {
+    "feather": 1
+  },
+  "app/thread-cash-history.tsx": {
+    "feather": 1
+  },
+  "app/thread-cash-ledger.tsx": {
+    "feather": 1
+  },
+  "app/thread-cash.tsx": {
+    "feather": 1
+  },
+  "app/thread-explainer.tsx": {
+    "feather": 1
+  },
+  "app/u/[username].tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "app/users.tsx": {
+    "feather": 1
+  },
+  "app/vacation-mode.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "app/waitlist-demand.tsx": {
+    "feather": 1
+  },
+  "components/AIBrainFAB.tsx": {
+    "feather": 1
+  },
+  "components/AccountSwitcherSheet.tsx": {
+    "feather": 1
+  },
+  "components/AddressAutocompleteInput.tsx": {
+    "feather": 1
+  },
+  "components/BrandDropsCard.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "components/BrandthreadUI.tsx": {
+    "letterSpacing": 2
+  },
+  "components/BuyerProtectionNote.tsx": {
+    "feather": 1
+  },
+  "components/CommerceSignal.tsx": {
+    "feather": 1,
+    "letterSpacing": 2
+  },
+  "components/DateRangePicker.tsx": {
+    "feather": 1
+  },
+  "components/EngagementButton.tsx": {
+    "feather": 1
+  },
+  "components/ErrorFallback.tsx": {
+    "feather": 1
+  },
+  "components/FeatureCard.tsx": {
+    "feather": 1
+  },
+  "components/FeedGestureGuide.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "components/FinanceMoneyFlow.tsx": {
+    "feather": 1
+  },
+  "components/GiveawayProfileCard.tsx": {
+    "feather": 1
+  },
+  "components/InlineFeedback.tsx": {
+    "feather": 1
+  },
+  "components/LaunchChecklistCard.tsx": {
+    "feather": 1
+  },
+  "components/MentionPickerSheet.tsx": {
+    "feather": 1
+  },
+  "components/NativeOnlyFeature.tsx": {
+    "feather": 1
+  },
+  "components/OfflineBanner.tsx": {
+    "feather": 1
+  },
+  "components/PlanUpsellModal.tsx": {
+    "feather": 1
+  },
+  "components/ProductReviewsSection.tsx": {
+    "feather": 1
+  },
+  "components/RecentlyViewedRow.tsx": {
+    "feather": 1
+  },
+  "components/RoleLockedView.tsx": {
+    "feather": 1
+  },
+  "components/SaveToCollectionSheet.tsx": {
+    "feather": 1
+  },
+  "components/SellerQuickActionsGrid.tsx": {
+    "feather": 1
+  },
+  "components/SellerStudioRadialMenu.tsx": {
+    "feather": 1
+  },
+  "components/SellerTutorialOverlay.tsx": {
+    "feather": 1
+  },
+  "components/SetupCelebration.tsx": {
+    "feather": 1
+  },
+  "components/SetupContinueBanner.tsx": {
+    "feather": 1
+  },
+  "components/SetupWalkthroughSheet.tsx": {
+    "feather": 1
+  },
+  "components/ShareProfileQrScanner.tsx": {
+    "feather": 1
+  },
+  "components/ShareProfileSheet.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "components/ShopProductSheet.tsx": {
+    "feather": 1
+  },
+  "components/SizeRecommendationBadge.tsx": {
+    "feather": 1
+  },
+  "components/StatCard.tsx": {
+    "feather": 1
+  },
+  "components/StoreContextBanner.tsx": {
+    "feather": 1
+  },
+  "components/StoryMentionSticker.tsx": {
+    "feather": 1
+  },
+  "components/StoryMentionViewerParts.tsx": {
+    "feather": 1
+  },
+  "components/StripeConnectWarning.tsx": {
+    "feather": 1
+  },
+  "components/StudioMenuHints.tsx": {
+    "feather": 1
+  },
+  "components/SupportChatBubble.tsx": {
+    "feather": 1
+  },
+  "components/SwipeActionRow.tsx": {
+    "feather": 1
+  },
+  "components/SwipeableActions.tsx": {
+    "feather": 1
+  },
+  "components/TextOverlayEditor.tsx": {
+    "feather": 1
+  },
+  "components/ThreadShareSheet.tsx": {
+    "feather": 1
+  },
+  "components/age/AgeNotices.tsx": {
+    "feather": 1
+  },
+  "components/ai-credits/AiCreditsChip.tsx": {
+    "feather": 1
+  },
+  "components/ai-credits/AiCreditsInlineNote.tsx": {
+    "feather": 1
+  },
+  "components/ai-tools/AiResultViewer.tsx": {
+    "feather": 1
+  },
+  "components/ai-tools/AiResultsGrid.tsx": {
+    "feather": 1
+  },
+  "components/ai-tools/AiSlimComposer.tsx": {
+    "feather": 1
+  },
+  "components/ai-tools/AiToolButtons.tsx": {
+    "feather": 1
+  },
+  "components/ai-tools/ReferencePhotoTiles.tsx": {
+    "feather": 1
+  },
+  "components/analytics/AnalyticsKit.tsx": {
+    "feather": 1
+  },
+  "components/analytics/AnalyticsReportsList.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "components/analytics/InsightCharts.tsx": {
+    "feather": 1
+  },
+  "components/buy-now/BuyNowFlow.tsx": {
+    "feather": 1
+  },
+  "components/buy-now/OrderSuccessSheet.tsx": {
+    "feather": 1
+  },
+  "components/buy-now/VariantPickerSheet.tsx": {
+    "feather": 1
+  },
+  "components/buyer-feed/CaptionBlock.tsx": {
+    "feather": 1
+  },
+  "components/buyer-feed/FeedTopBar.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "components/buyer-feed/HeartBurstParticles.tsx": {
+    "feather": 1
+  },
+  "components/buyer-feed/LongPressMenu.tsx": {
+    "feather": 1
+  },
+  "components/buyer-feed/RightActionRail.tsx": {
+    "feather": 1
+  },
+  "components/buyer-feed/ShopSideTab.tsx": {
+    "feather": 1
+  },
+  "components/calls/CallControls.tsx": {
+    "feather": 1
+  },
+  "components/calls/CallLogBubble.tsx": {
+    "feather": 1
+  },
+  "components/chat/ChatAttachmentCard.tsx": {
+    "feather": 1
+  },
+  "components/chat/ConversationSettingsSheet.tsx": {
+    "feather": 1
+  },
+  "components/chat/MediaUploadThumb.tsx": {
+    "feather": 1
+  },
+  "components/chat/MediaViewer.tsx": {
+    "feather": 1
+  },
+  "components/chat/ReactionOverlay.tsx": {
+    "feather": 1
+  },
+  "components/chat/ReplyBanner.tsx": {
+    "feather": 1
+  },
+  "components/chat/SwipeToReplyBubble.tsx": {
+    "feather": 1
+  },
+  "components/chat/ThemePickerSheet.tsx": {
+    "feather": 1
+  },
+  "components/chat/VideoMessageViewer.tsx": {
+    "feather": 1
+  },
+  "components/chat/VoiceMessageBubble.tsx": {
+    "feather": 1
+  },
+  "components/chat/VoiceRecordingBar.tsx": {
+    "feather": 1
+  },
+  "components/checkout/CheckoutPrimitives.tsx": {
+    "feather": 1
+  },
+  "components/checkout/GiftCardSection.tsx": {
+    "feather": 1
+  },
+  "components/checkout/OrderConfirmation.tsx": {
+    "feather": 1
+  },
+  "components/checkout/OrderSummarySection.tsx": {
+    "feather": 1
+  },
+  "components/checkout/PaymentSection.tsx": {
+    "feather": 1
+  },
+  "components/checkout/PromoCodeSection.tsx": {
+    "feather": 1
+  },
+  "components/checkout/ThreadCashSection.tsx": {
+    "feather": 1
+  },
+  "components/community-chat/CommunityComposer.tsx": {
+    "feather": 1
+  },
+  "components/community-chat/CommunityMessageRow.tsx": {
+    "feather": 1
+  },
+  "components/community-inbox/CommunityInboxRow.tsx": {
+    "feather": 1
+  },
+  "components/community/CommunityAvatar.tsx": {
+    "feather": 1
+  },
+  "components/community/GroupFormFields.tsx": {
+    "feather": 1
+  },
+  "components/community/VerifiedMark.tsx": {
+    "feather": 1
+  },
+  "components/create-post/CarouselEditor.tsx": {
+    "feather": 1
+  },
+  "components/create-post/CreateCamera.tsx": {
+    "feather": 1
+  },
+  "components/create-post/GalleryPicker.tsx": {
+    "feather": 1
+  },
+  "components/create-post/ModeBar.tsx": {
+    "letterSpacing": 1
+  },
+  "components/create-post/PostPicker.tsx": {
+    "feather": 1
+  },
+  "components/create-post/PostScreen.tsx": {
+    "feather": 1
+  },
+  "components/create-post/VideoEditor.tsx": {
+    "feather": 1
+  },
+  "components/create-post/ui.tsx": {
+    "feather": 1
+  },
+  "components/design-studio/BrushLibrary.tsx": {
+    "feather": 1
+  },
+  "components/design-studio/ColorPicker.tsx": {
+    "feather": 1,
+    "uppercase": 2,
+    "letterSpacing": 2
+  },
+  "components/design-studio/LayersPanel.tsx": {
+    "feather": 1
+  },
+  "components/discover/BrandsYouMightLikeRow.tsx": {
+    "feather": 1
+  },
+  "components/discover/DiscoverEntityCard.tsx": {
+    "feather": 1
+  },
+  "components/discover/DiscoverPager.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "components/discover/DiscoverPostViewer.tsx": {
+    "feather": 1
+  },
+  "components/discover/DiscoverSafetyMenu.tsx": {
+    "feather": 1
+  },
+  "components/discover/DiscoverSearchHeader.tsx": {
+    "feather": 1
+  },
+  "components/discover/DiscoverTileView.tsx": {
+    "feather": 1
+  },
+  "components/disputes/DisputeEvidenceFiles.tsx": {
+    "feather": 1
+  },
+  "components/disputes/DisputeTimeline.tsx": {
+    "feather": 1
+  },
+  "components/drops/DropsCalendar.tsx": {
+    "feather": 1
+  },
+  "components/feed/UploadProgressPill.tsx": {
+    "feather": 1
+  },
+  "components/first-run-tips/AnchoredCardTip.tsx": {
+    "letterSpacing": 1
+  },
+  "components/first-run-tips/FullScreenGuideTip.tsx": {
+    "letterSpacing": 1
+  },
+  "components/first-run-tips/GestureHintTip.tsx": {
+    "feather": 1
+  },
+  "components/first-run-tips/SpotlightTip.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "components/giftCards/GiftCardFace.tsx": {
+    "feather": 1
+  },
+  "components/growth/GrowthUI.tsx": {
+    "feather": 1
+  },
+  "components/inbox/ConversationPreview.tsx": {
+    "feather": 1
+  },
+  "components/inbox/InboxSwipeRow.tsx": {
+    "feather": 1
+  },
+  "components/layout/EmptyState.tsx": {
+    "feather": 1
+  },
+  "components/layout/EmptyStateBadge.tsx": {
+    "feather": 1
+  },
+  "components/legal/LegalAcceptanceGate.tsx": {
+    "feather": 1
+  },
+  "components/legal/LegalConsent.tsx": {
+    "feather": 1
+  },
+  "components/legal/LegalDocument.tsx": {
+    "feather": 1
+  },
+  "components/live/CohostStage.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "components/live/LiveAvatarRing.tsx": {
+    "letterSpacing": 1
+  },
+  "components/live/LiveCodesHostSheet.tsx": {
+    "feather": 1
+  },
+  "components/live/LiveCommentActionsSheet.tsx": {
+    "feather": 1
+  },
+  "components/live/LiveEmptyState.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "components/live/LiveModerationOverlays.tsx": {
+    "feather": 1
+  },
+  "components/live/LiveMoreSheet.tsx": {
+    "feather": 1
+  },
+  "components/live/LiveOverlays.tsx": {
+    "feather": 1,
+    "letterSpacing": 3
+  },
+  "components/live/LiveProductsSheet.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "components/live/LiveStreamOptionsSheet.tsx": {
+    "feather": 1
+  },
+  "components/live/LiveThreadCashSheet.tsx": {
+    "feather": 1
+  },
+  "components/manufacturer/OrderCardBubble.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "components/manufacturer/ProductionTimeline.tsx": {
+    "feather": 1
+  },
+  "components/manufacturer/RfqChatCards.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "components/media/MediaCropper.tsx": {
+    "feather": 1
+  },
+  "components/money/FeeBreakdown.tsx": {
+    "feather": 1
+  },
+  "components/notifications/NotificationBanner.tsx": {
+    "feather": 1
+  },
+  "components/onboarding/BrandsToFollowStep.tsx": {
+    "feather": 1
+  },
+  "components/onboarding/OnboardingUI.tsx": {
+    "feather": 1
+  },
+  "components/onboarding/SellerPlanRecommendationStep.tsx": {
+    "feather": 1,
+    "letterSpacing": 3
+  },
+  "components/onboarding/SizesStep.tsx": {
+    "feather": 1
+  },
+  "components/onboarding/onboardingTokens.ts": {
+    "letterSpacing": 1
+  },
+  "components/orders/DeliveryTracker.tsx": {
+    "feather": 1
+  },
+  "components/orders/OrderProgressTimeline.tsx": {
+    "feather": 1
+  },
+  "components/orders/OrderRiskBadge.tsx": {
+    "feather": 1
+  },
+  "components/orders/OrderStatusTimeline.tsx": {
+    "feather": 1
+  },
+  "components/orders/ReorderFlow.tsx": {
+    "feather": 1
+  },
+  "components/orders/SellerDelivery.tsx": {
+    "feather": 1
+  },
+  "components/orders/ShipmentTracking.tsx": {
+    "feather": 1
+  },
+  "components/paywall/SellerPaywallBullets.tsx": {
+    "feather": 1
+  },
+  "components/paywall/SellerPaywallHeadline.tsx": {
+    "letterSpacing": 1
+  },
+  "components/paywall/SellerPaywallOneTimeOffer.tsx": {
+    "letterSpacing": 1
+  },
+  "components/paywall/SellerPaywallSocialProof.tsx": {
+    "feather": 1
+  },
+  "components/paywall/SellerPlanSelector.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "components/paywall/SellerTrialTimeline.tsx": {
+    "feather": 1
+  },
+  "components/products/CompleteTheFit.tsx": {
+    "feather": 1
+  },
+  "components/products/LaunchCountdown.tsx": {
+    "feather": 1
+  },
+  "components/products/LaunchTimePicker.tsx": {
+    "feather": 1
+  },
+  "components/products/PreOrderShipBy.tsx": {
+    "feather": 1
+  },
+  "components/products/ProductCard.tsx": {
+    "feather": 1
+  },
+  "components/products/ProductImportPreview.tsx": {
+    "feather": 1
+  },
+  "components/products/ProductVideo.tsx": {
+    "feather": 1
+  },
+  "components/products/StockEditorSheet.tsx": {
+    "feather": 1
+  },
+  "components/profile/BrandHero.tsx": {
+    "feather": 1
+  },
+  "components/profile/ImageSourceSheet.tsx": {
+    "feather": 1
+  },
+  "components/profile/ProfileControls.tsx": {
+    "feather": 1
+  },
+  "components/profile/ProfileCover.tsx": {
+    "feather": 1
+  },
+  "components/profile/ProfileGridStates.tsx": {
+    "feather": 1
+  },
+  "components/profile/ProfileMenuSheet.tsx": {
+    "feather": 1
+  },
+  "components/profile/ProfileProductTile.tsx": {
+    "feather": 1
+  },
+  "components/profile/ProfileShell.tsx": {
+    "feather": 1
+  },
+  "components/profile/ProfileStoriesRow.tsx": {
+    "feather": 1
+  },
+  "components/profile/ProfileStoryAvatar.tsx": {
+    "feather": 1
+  },
+  "components/profile/ProfileTopBar.tsx": {
+    "feather": 1
+  },
+  "components/profile/ProfileVideoGrid.tsx": {
+    "feather": 1
+  },
+  "components/profile/ProfileVideoHeader.tsx": {
+    "feather": 1
+  },
+  "components/safety/DmSafety.tsx": {
+    "feather": 1
+  },
+  "components/safety/ReportSheet.tsx": {
+    "feather": 1
+  },
+  "components/search/BrandRow.tsx": {
+    "feather": 1
+  },
+  "components/search/FilterSheet.tsx": {
+    "feather": 1
+  },
+  "components/search/PersonRow.tsx": {
+    "feather": 1
+  },
+  "components/search/RecentSearchRow.tsx": {
+    "feather": 1
+  },
+  "components/search/TagRow.tsx": {
+    "feather": 1
+  },
+  "components/search/TrendingTags.tsx": {
+    "letterSpacing": 1
+  },
+  "components/search/VideoTile.tsx": {
+    "feather": 1
+  },
+  "components/security/AppLockGate.tsx": {
+    "feather": 1
+  },
+  "components/security/LoginActivity.tsx": {
+    "feather": 1,
+    "letterSpacing": 1
+  },
+  "components/security/SecurityFormKit.tsx": {
+    "feather": 1
+  },
+  "components/settings/SettingsKit.tsx": {
+    "letterSpacing": 1
+  },
+  "components/share-cards/BuyerShareCard.tsx": {
+    "feather": 1
+  },
+  "components/share-cards/SellerShareCard.tsx": {
+    "feather": 1
+  },
+  "components/share-cards/ShareCardFrame.tsx": {
+    "letterSpacing": 1
+  },
+  "components/social/CreateButton.tsx": {
+    "feather": 1
+  },
+  "components/social/FollowButton.tsx": {
+    "feather": 1
+  },
+  "components/social/LocationPicker.tsx": {
+    "feather": 1
+  },
+  "components/social/LocationTag.tsx": {
+    "feather": 1
+  },
+  "components/social/PostCarousel.tsx": {
+    "feather": 1
+  },
+  "components/social/PostGrid.tsx": {
+    "feather": 1
+  },
+  "components/social/QuotedPostCard.tsx": {
+    "feather": 1
+  },
+  "components/social/StoryStickerComposer.tsx": {
+    "feather": 1
+  },
+  "components/social/StoryStickers.tsx": {
+    "feather": 1,
+    "uppercase": 1,
+    "letterSpacing": 1
+  },
+  "components/social/StoryTray.tsx": {
+    "feather": 1
+  },
+  "components/splash/AppIntroSplash.tsx": {
+    "letterSpacing": 1
+  },
+  "components/store-setup/StoreSetupField.tsx": {
+    "feather": 1
+  },
+  "components/thread-cash/CashOutSheet.tsx": {
+    "feather": 1
+  },
+  "components/thread-cash/ChatAttachThreadCash.tsx": {
+    "feather": 1
+  },
+  "components/thread-cash/SellerThreadCashCard.tsx": {
+    "feather": 1
+  },
+  "components/thread-cash/ThreadCashStreakRow.tsx": {
+    "feather": 1
+  },
+  "components/ui/Composer.tsx": {
+    "feather": 1
+  },
+  "components/ui/Icon.tsx": {
+    "feather": 1
+  },
+  "components/ui/IconFillTransition.tsx": {
+    "feather": 1
+  },
+  "components/ui/MotionPrimitives.tsx": {
+    "feather": 1
+  },
+  "components/ui/OptionSheet.tsx": {
+    "feather": 1
+  },
+  "components/ui/QuantityStepper.tsx": {
+    "feather": 1
+  },
+  "components/ui/RetryRow.tsx": {
+    "feather": 1
+  },
+  "components/ui/Snackbar.tsx": {
+    "feather": 1
+  },
+  "components/ui/SuccessCheck.tsx": {
+    "feather": 1
+  },
+  "lib/featherNames.ts": {
+    "feather": 1
+  }
+}

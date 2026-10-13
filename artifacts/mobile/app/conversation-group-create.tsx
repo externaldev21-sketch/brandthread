@@ -13,7 +13,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, ICON } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
-import { hapticPrimaryAction, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/safety';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -59,7 +59,7 @@ export default function ConversationGroupCreateScreen() {
   }, [api]);
 
   function toggle(userId: string) {
-    hapticSelection();
+    haptics.selection();
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(userId)) next.delete(userId); else next.add(userId);
@@ -77,7 +77,7 @@ export default function ConversationGroupCreateScreen() {
           userId: c.userId, name: c.name, handle: c.handle, initials: c.initials, color: c.color, accountType: 'buyer',
         })),
       });
-      hapticSuccessAction();
+      haptics.success();
       const target = params.role === 'seller' ? '/seller-conversation' : '/buyer-conversation';
       router.replace((`${target}?id=${encodeURIComponent(conv.id)}`) as never);
     } catch (e) {
@@ -91,7 +91,7 @@ export default function ConversationGroupCreateScreen() {
     <View style={[s.root, { backgroundColor: theme.background }]}>
       <ScreenHeader
         title="New group"
-        onBack={() => { hapticPrimaryAction(); goBackOr(router); }}
+        onBack={() => { goBackOr(router); }}
         backTestID="group-create-back"
       />
 

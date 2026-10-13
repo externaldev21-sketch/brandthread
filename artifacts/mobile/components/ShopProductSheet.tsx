@@ -28,7 +28,7 @@ import ReanimatedAnimated, { useAnimatedStyle, useSharedValue } from 'react-nati
 import { LinearGradient } from 'expo-linear-gradient';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -544,7 +544,6 @@ export function ShopProductSheet({
   }
 
   function showCartSuccess(newCount: number) {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onCartUpdated?.(newCount);
     setShowAddedConfirmation(true);
     addedConfirmationTimer.current = setTimeout(() => {
@@ -711,7 +710,6 @@ export function ShopProductSheet({
   const pendingQuickAddRef = useRef<string | null>(null);
 
   function handleQuickAdd(idx: number) {
-    Haptics.selectionAsync();
     const tag = selection.tags[idx];
     if (!tag) return;
     if (idx === activeTagIdx) {
@@ -813,7 +811,7 @@ export function ShopProductSheet({
         setVariantError(result.message ?? 'Could not add to cart.');
         return;
       }
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      haptics.light();
       setPhase('added');
       void flyProductToCart(newCount);
     } catch {
@@ -834,7 +832,6 @@ export function ShopProductSheet({
       return;
     }
     setVariantError('');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setPhase('buying');
     try {
       const cart = await getCart();
@@ -868,7 +865,6 @@ export function ShopProductSheet({
   // (handleViewDetail, above, is what "View details" inside the DETAIL
   // step itself still uses for that).
   function openDetailStep(idx: number) {
-    Haptics.selectionAsync();
     if (idx !== activeTagIdx) setActiveTagIdx(idx);
     setVariantError('');
     setSheetStep('detail');
@@ -928,7 +924,7 @@ export function ShopProductSheet({
                 accentColor={accent}
                 recommended={option === sizeOption && sizeBadgeModel?.kind === 'recommend' && sizeBadgeModel.size === val.label}
                 onPress={() => {
-                  Haptics.selectionAsync();
+                  haptics.selection();
                   setSelections(prev => {
                     const updated = { ...prev, [option.id]: val.id };
                     const newVariant = findVariant(product, updated);
@@ -2145,8 +2141,6 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: theme.text,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
   },
   descriptionText: {
     fontSize: FS.sm,

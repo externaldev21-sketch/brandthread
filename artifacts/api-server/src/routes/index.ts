@@ -10,6 +10,7 @@ import ordersRouter from "./orders";
 import customersRouter from "./customers";
 import dropsRouter from "./drops";
 import analyticsRouter from "./analytics";
+import widgetSummaryRouter from "./widgetSummary";
 import analyticsInsightsRouter from "./analytics-insights";
 import integrationsRouter from "./integrations";
 import logoRouter from "./logo";
@@ -29,6 +30,7 @@ import productVariantsRouter from "./product-variants";
 import catalogPublicRouter from "./catalog-public";
 import sellerHubRouter from "./seller-hub";
 import pushRouter from "./push";
+import liveActivitiesRouter from "./liveActivities";
 import aiRouter from "./ai";
 import aiCreditsRouter from "./ai-credits";
 import aiHelpersRouter from "./ai-helpers";
@@ -232,6 +234,7 @@ router.use("/orders",          tc, ordersRouter);
 router.use("/customers",       tc, customersRouter);
 router.use("/drops",           tc, dropsRouter);
 router.use("/analytics/insights", tc, analyticsInsightsRouter);
+router.use("/analytics/widget-summary", tc, widgetSummaryRouter); // iOS seller widgets (nativeSurfaces flag)
 router.use("/analytics",       tc, analyticsRouter);
 router.use("/integrations",    tc, integrationsRouter);
 router.use("/shopify",         tc, shopifyRouter);
@@ -254,6 +257,7 @@ router.use("/product-variants", tc, productVariantsRouter);
 router.use("/catalog-public",   catalogPublicRouter);
 router.use("/seller-hub",      tc, sellerHubRouter);
 router.use("/push",            pushRouter);
+router.use("/live-activities", liveActivitiesRouter); // iOS Live Activity APNs tokens; requireAuth per route, no team context
 router.use("/notification-prefs", notificationPrefsRouter);
 router.use("/ai",              tc, aiSafetyGuard("ai-chat", { mode: "chat" }), aiRouter);
 

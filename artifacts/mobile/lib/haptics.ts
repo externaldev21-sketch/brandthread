@@ -1,44 +1,73 @@
 import * as Haptics from 'expo-haptics';
 
 /**
- * Haptics are intentionally best-effort: unsupported devices and web previews
- * should never turn a successful interaction into a rejected promise.
+ * The one haptics map for Brandthread, after Apple HIG "Playing haptics":
+ * every haptic answers a touch with a meaning, never decoration.
+ *
+ *   haptics.selection()  selection changed: chips, in-screen tabs/segments,
+ *                        pickers, size select, steppers, switches
+ *   haptics.light()      a light impact for a small, satisfying commit:
+ *                        like, save, follow, add to bag
+ *   haptics.success()    a task finished: order placed, product published,
+ *                        payment sent
+ *   haptics.warning()    a caution: confirming something destructive
+ *   haptics.error()      a task failed (HIG "error" notification)
+ *   haptics.rigid()      a long-press menu / preview just opened
+ *
+ * Plain button taps, navigation pushes, sheet opens and closes play nothing,
+ * exactly like system apps. Haptics are best-effort: web, unsupported
+ * devices and simulators must never turn a successful interaction into a
+ * rejected promise.
  */
+// Expo inlines EXPO_OS at build time; no react-native import keeps this
+// module safe in every test mock.
+const enabled = () => process.env.EXPO_OS !== 'web';
+
+function play(run: () => Promise<void>) {
+  if (!enabled()) return;
+  try {
+    void run().catch(() => {});
+  } catch {
+    // Native module missing (some preview shells) — stay silent.
+  }
+}
+
+export const haptics = {
+  selection: () => play(() => Haptics.selectionAsync()),
+  light: () => play(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)),
+  success: () => play(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)),
+  warning: () => play(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)),
+  error: () => play(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)),
+  rigid: () => play(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid)),
+} as const;
+
+export type HapticKind = keyof typeof haptics;
+
+// ─── Legacy names ─────────────────────────────────────────────────────────────
+// Kept so untouched call sites (and the seller tab bar / Studio menu, which
+// keep their own feel on purpose) still compile and behave as before. New
+// code uses `haptics.*` above.
+
 export function hapticLight() {
-  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  play(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
 }
 
 export function hapticMedium() {
-  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+  play(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
 }
 
-export function hapticSelection() {
-  void Haptics.selectionAsync().catch(() => {});
-}
+export const hapticSelection = haptics.selection;
+export const hapticSuccess = haptics.success;
+export const hapticError = haptics.error;
+export const hapticWarning = haptics.warning;
 
-export function hapticSuccess() {
-  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-}
-
-export function hapticError() {
-  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-}
-
-export function hapticWarning() {
-  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-}
-
-// ─── Semantic tokens (Phase 1 design system) ──────────────────────────────────
-// Named by *when* to use them, not by device API, so call sites read as intent
-// rather than as a raw Haptics call. See docs/design/brandthread-design-system.md.
-
-/** Primary action taps: buy now, checkout, submit, confirm. */
+/** @deprecated plain taps play nothing; use the `haptics` map. */
 export const hapticPrimaryAction = hapticLight;
-/** Toggles, pills, segmented controls, scrubbing through a list of options. */
-export const hapticToggle = hapticSelection;
-/** Add-to-bag, follow, order-placed — anything that should feel rewarding. */
-export const hapticSuccessAction = hapticSuccess;
-/** Destructive-confirm: delete, remove, cancel-order confirmations. */
-export const hapticDestructiveConfirm = hapticWarning;
-/** Bottom tab bar switch — a meaningful navigation change, not a selection tick. */
+/** @deprecated use `haptics.selection`. */
+export const hapticToggle = haptics.selection;
+/** @deprecated use `haptics.success` (or `haptics.light` for like/save/follow/bag). */
+export const hapticSuccessAction = haptics.success;
+/** @deprecated use `haptics.warning`. */
+export const hapticDestructiveConfirm = haptics.warning;
+/** Bottom tab bar switch — owned by the tab bars, left as-is. */
 export const hapticTabChange = hapticMedium;

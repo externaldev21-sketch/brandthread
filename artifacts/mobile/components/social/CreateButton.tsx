@@ -2,7 +2,6 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { radius } from '@/constants/radii';
@@ -25,7 +24,6 @@ export default function CreateButton({ onPress, label = 'Create', compact, testI
   const styles = React.useMemo(() => makeStyles(theme, compact), [theme, compact]);
 
   const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     onPress();
   };
 
