@@ -32,6 +32,7 @@ export const SELLER_PREF_KEYS = [
   "disputes",
   "subscription_trial",
   "inventory_alerts",
+  "goal_alerts",
 ] as const;
 
 /** Types whose email channel is off until the user opts in. */

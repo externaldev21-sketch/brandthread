@@ -40,6 +40,7 @@ const SELLER_DEFAULTS = {
   disputes: true,
   subscription_trial: true,
   inventory_alerts: true,
+  goal_alerts: true,
   seller_announcements: true,
 };
 

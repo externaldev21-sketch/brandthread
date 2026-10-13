@@ -17,6 +17,7 @@ export * from './communities';
 export * from './iapPromotions';
 export * from './sales';
 export * from './sellerAnalytics';
+export * from './sellerGoalAlerts';
 export * from './affiliate';
 export * from './liveCommerce';
 export * from './growth';

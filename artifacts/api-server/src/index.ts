@@ -18,6 +18,7 @@ import { startAffiliatePayoutsJob } from "./jobs/affiliatePayouts";
 import { startDeliveryDeadlinesJob } from "./jobs/deliveryDeadlines";
 import { startStoryCleanupJob } from "./jobs/storyCleanup";
 import { startAnalyticsRetentionJob } from "./jobs/analyticsRetention";
+import { startGoalAlertsJob } from "./jobs/goalAlerts";
 import { startAccountPurgeJob } from "./jobs/accountPurge";
 import { startDataExportJob } from "./jobs/dataExportJob";
 import { startPushReceiptCleanupJob } from "./jobs/pushReceiptCleanup";
@@ -87,6 +88,7 @@ const server = app.listen(port, (err) => {
   startDeliveryDeadlinesJob();
   startStoryCleanupJob();
   startAnalyticsRetentionJob();
+  startGoalAlertsJob();
   startAccountPurgeJob();
   startDataExportJob();
   startPushReceiptCleanupJob();

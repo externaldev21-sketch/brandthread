@@ -110,6 +110,48 @@ export function funnelRates(c: FunnelCounts) {
   };
 }
 
+export interface ProductFunnelCounts extends FunnelCounts { checkouts: number }
+
+/**
+ * One product's views → added to bag → reached checkout → purchased funnel.
+ * Step rates compare each step with the one before it; the `...OfViews` rates
+ * compare it with product views (Shopify's "Online store conversion rate"
+ * rows). Every rate is null when its denominator is 0.
+ */
+export function productFunnelRates(c: ProductFunnelCounts) {
+  return {
+    viewToCartPct: conversionPct(c.addToCarts, c.views),
+    cartToCheckoutPct: conversionPct(c.checkouts, c.addToCarts),
+    checkoutToPurchasePct: conversionPct(c.purchases, c.checkouts),
+    viewToCheckoutPct: conversionPct(c.checkouts, c.views),
+    viewToPurchasePct: conversionPct(c.purchases, c.views),
+  };
+}
+
+/**
+ * The best-selling option value (size or colour) from real order lines:
+ * most units, then most revenue, then alphabetical. Blank values never win.
+ */
+export function bestOption(rows: { value: unknown; units: number; revenueCents: number }[]): { value: string; units: number } | null {
+  const clean = rows
+    .map((r) => ({ value: typeof r.value === "string" ? r.value.trim() : "", units: Number(r.units) || 0, revenueCents: Number(r.revenueCents) || 0 }))
+    .filter((r) => r.value && r.units > 0);
+  const merged = new Map<string, { value: string; units: number; revenueCents: number }>();
+  for (const r of clean) {
+    const key = r.value.toLowerCase();
+    const m = merged.get(key);
+    if (m) { m.units += r.units; m.revenueCents += r.revenueCents; } else merged.set(key, { ...r });
+  }
+  const best = [...merged.values()].sort((a, b) => b.units - a.units || b.revenueCents - a.revenueCents || a.value.localeCompare(b.value))[0];
+  return best ? { value: best.value, units: best.units } : null;
+}
+
+/** The last `days` local calendar days ending with today, [start, end). */
+export function lastLocalDays(days: number, now: Date, tzOffsetMinutes: number): { start: Date; end: Date; step: BucketStep } {
+  const today = floorToLocalStep(now, DAY_MS, tzOffsetMinutes);
+  return { start: new Date(today.getTime() - (days - 1) * DAY_MS), end: new Date(today.getTime() + DAY_MS), step: "1 day" };
+}
+
 /**
  * k-anonymity: drop any bucket describing fewer than `k` distinct people.
  * Returns the kept buckets plus how many were hidden (counts only, never the

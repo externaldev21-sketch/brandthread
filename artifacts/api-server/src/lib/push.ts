@@ -52,7 +52,8 @@ export type PushEventCategory =
   | "live"
   | "cart"
   | "announcement"
-  | "giveaway";
+  | "giveaway"
+  | "goal";
 
 const PUSH_CATEGORY_BY_FEED_CATEGORY: Readonly<Record<string, PushEventCategory>> = {
   drop: "drop",
@@ -80,6 +81,9 @@ const PUSH_CATEGORY_BY_FEED_CATEGORY: Readonly<Record<string, PushEventCategory>
   announcements: "announcement",
   giveaway: "giveaway",
   giveaways: "giveaway",
+  // Seller analytics goal reached / behind pace (jobs/goalAlerts.ts).
+  goal: "goal",
+  goals: "goal",
 };
 
 /**
@@ -131,6 +135,7 @@ export function preferenceKey(accountType: string | null, category: PushEventCat
       fulfillment: "new_orders",
       social: "friend_activity",
       announcement: "seller_announcements",
+      goal: "goal_alerts",
     };
     return sellerPreferences[category] ?? null;
   }

@@ -25,12 +25,16 @@ import {
   GOAL_PERIODS,
   K_ANONYMITY_MIN,
   applyKAnonymity,
+  bestOption,
+  conversionPct,
   deltaPct,
   funnelRates,
   goalPacing,
   goalWindow,
+  lastLocalDays,
   locationLabel,
   parseInsightRange,
+  productFunnelRates,
   rangeLabel,
   rangeWindow,
   type BucketStep,
@@ -180,6 +184,123 @@ export async function loadProductStats(sellerId: string, w: RangeWindow) {
     },
     buckets: rowsOf(bucketRows).map((r) => ({ bucket: new Date(r.bucket).toISOString(), views: n(r.views), purchases: n(r.purchases) })),
     products,
+  };
+}
+
+// ─── One product's funnel ────────────────────────────────────────────────────
+
+/** Funnel counts for one product; product views are already seller-scoped by store_visits.seller_id. */
+async function singleProductCounts(sellerId: string, productId: string, w: { start: Date; end: Date }) {
+  const [viewRows, cartRows, checkoutRows, saleRows, returnRows] = await Promise.all([
+    db.execute(sql`
+      SELECT count(*)::int AS views, count(DISTINCT v.viewer_user_id)::int AS unique_viewers
+      FROM store_visits v
+      WHERE v.seller_id = ${sellerId} AND v.product_id = ${productId}::uuid AND ${between(sql`v.created_at`, w)}`),
+    db.execute(sql`
+      SELECT count(*)::int AS add_to_carts
+      FROM seller_product_events e
+      WHERE e.seller_id = ${sellerId} AND e.product_id = ${productId}::uuid AND e.event_type = 'add_to_cart' AND ${between(sql`e.created_at`, w)}`),
+    // Every checkout path (one-page, hosted, guest) persists one
+    // checkout_sessions row per seller group before payment starts, with the
+    // cart lines in `items`. A retry of the same attempt reuses its row.
+    db.execute(sql`
+      SELECT count(DISTINCT cs.id)::int AS checkouts
+      FROM checkout_sessions cs
+      CROSS JOIN LATERAL json_array_elements(cs.items) AS it(line)
+      JOIN product_variants pv ON pv.id::text = it.line->>'variantId' AND pv.product_id = ${productId}::uuid
+      WHERE cs.seller_id = ${sellerId} AND ${between(sql`cs.created_at`, w)}`),
+    db.execute(sql`
+      SELECT count(DISTINCT o.id)::int AS purchases,
+             coalesce(sum(oi.quantity), 0)::int AS units,
+             coalesce(sum(oi.quantity * oi.price_cents), 0)::int AS revenue_cents
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.id
+      JOIN product_variants pv ON pv.id = oi.variant_id AND pv.product_id = ${productId}::uuid
+      WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)}`),
+    // Units on return requests the seller has not denied, for this product's
+    // lines in orders placed in the window (lineItemId = order_items.id).
+    db.execute(sql`
+      SELECT coalesce(sum(CASE WHEN (ri.item->>'quantity') ~ '^[0-9]{1,6}$' THEN least(oi.quantity, (ri.item->>'quantity')::int) ELSE oi.quantity END), 0)::int AS returned_units
+      FROM returns r
+      CROSS JOIN LATERAL json_array_elements(r.requested_items) AS ri(item)
+      JOIN order_items oi ON oi.id::text = ri.item->>'lineItemId'
+      JOIN product_variants pv ON pv.id = oi.variant_id AND pv.product_id = ${productId}::uuid
+      JOIN orders o ON o.id = oi.order_id AND o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)}
+      WHERE r.seller_id = ${sellerId} AND r.status != 'denied'`),
+  ]);
+  const v = rowsOf(viewRows)[0] ?? {};
+  const s = rowsOf(saleRows)[0] ?? {};
+  const counts = {
+    views: n(v.views),
+    uniqueViewers: n(v.unique_viewers),
+    addToCarts: n(rowsOf(cartRows)[0]?.add_to_carts),
+    checkouts: n(rowsOf(checkoutRows)[0]?.checkouts),
+    purchases: n(s.purchases),
+    units: n(s.units),
+    revenueCents: n(s.revenue_cents),
+    returnedUnits: n(rowsOf(returnRows)[0]?.returned_units),
+  };
+  return counts;
+}
+
+export async function loadSingleProductStats(sellerId: string, productId: string, w: RangeWindow, tz: number, now: Date) {
+  const [meta] = rowsOf(await db.execute(sql`
+    SELECT p.id, p.name, coalesce(sum(pv.stock), 0)::int AS stock
+    FROM products p LEFT JOIN product_variants pv ON pv.product_id = p.id
+    WHERE p.id = ${productId}::uuid AND p.owner_id = ${sellerId}
+    GROUP BY p.id`));
+  if (!meta) return null;
+  const days = lastLocalDays(14, now, tz);
+  const [current, previous, dayRows, optionRows] = await Promise.all([
+    singleProductCounts(sellerId, productId, w),
+    w.previous ? singleProductCounts(sellerId, productId, w.previous) : null,
+    db.execute(sql`
+      SELECT series.bucket,
+        (SELECT coalesce(sum(oi.quantity * oi.price_cents), 0)::int FROM orders o JOIN order_items oi ON oi.order_id = o.id
+          JOIN product_variants pv ON pv.id = oi.variant_id AND pv.product_id = ${productId}::uuid
+          WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${inBucket(sql`o.created_at`, days.step)}) AS revenue_cents,
+        (SELECT coalesce(sum(oi.quantity), 0)::int FROM orders o JOIN order_items oi ON oi.order_id = o.id
+          JOIN product_variants pv ON pv.id = oi.variant_id AND pv.product_id = ${productId}::uuid
+          WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${inBucket(sql`o.created_at`, days.step)}) AS units
+      FROM ${series(days)} ORDER BY series.bucket`),
+    db.execute(sql`
+      SELECT pv.id AS variant_id, pv.size, pv.color,
+             coalesce(sum(oi.quantity), 0)::int AS units,
+             coalesce(sum(oi.quantity * oi.price_cents), 0)::int AS revenue_cents
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.id
+      JOIN product_variants pv ON pv.id = oi.variant_id AND pv.product_id = ${productId}::uuid
+      WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)}
+      GROUP BY pv.id, pv.size, pv.color`),
+  ]);
+  const options = rowsOf(optionRows).map((r) => ({ variantId: String(r.variant_id), size: r.size, color: r.color, units: n(r.units), revenueCents: n(r.revenue_cents) }));
+  const topVariant = [...options].filter((o) => o.units > 0)
+    .sort((a, b) => b.units - a.units || b.revenueCents - a.revenueCents || a.variantId.localeCompare(b.variantId))[0];
+  const stock = n(meta.stock);
+  const { returnedUnits, ...funnel } = current;
+  const p = previous;
+  return {
+    product: { id: String(meta.id), name: String(meta.name ?? "Product"), stock },
+    totals: {
+      ...funnel,
+      ...productFunnelRates(current),
+      returnedUnits,
+      returnRatePct: conversionPct(returnedUnits, current.units),
+      // Units sold in the window against units sold + what is still in stock.
+      sellThroughPct: conversionPct(current.units, current.units + Math.max(0, stock)),
+    },
+    previous: p ? { views: p.views, addToCarts: p.addToCarts, checkouts: p.checkouts, purchases: p.purchases, units: p.units, revenueCents: p.revenueCents } : null,
+    deltas: {
+      viewsPct: deltaPct(current.views, p?.views),
+      addToCartsPct: deltaPct(current.addToCarts, p?.addToCarts),
+      checkoutsPct: deltaPct(current.checkouts, p?.checkouts),
+      purchasesPct: deltaPct(current.purchases, p?.purchases),
+      revenuePct: deltaPct(current.revenueCents, p?.revenueCents),
+    },
+    revenueByDay: rowsOf(dayRows).map((r) => ({ bucket: new Date(r.bucket).toISOString(), revenueCents: n(r.revenue_cents), units: n(r.units) })),
+    bestVariantId: topVariant?.variantId ?? null,
+    bestSize: bestOption(options.map((o) => ({ value: o.size, units: o.units, revenueCents: o.revenueCents }))),
+    bestColor: bestOption(options.map((o) => ({ value: o.color, units: o.units, revenueCents: o.revenueCents }))),
   };
 }
 
@@ -406,7 +527,7 @@ export async function loadAudience(sellerId: string, w: RangeWindow) {
 
 // ─── Goals ───────────────────────────────────────────────────────────────────
 
-async function goalActual(sellerId: string, metric: GoalMetric, w: { start: Date; end: Date }): Promise<number> {
+export async function goalActual(sellerId: string, metric: GoalMetric, w: { start: Date; end: Date }): Promise<number> {
   switch (metric) {
     case "revenue": return n(rowsOf(await db.execute(sql`SELECT coalesce(sum(o.total_cents), 0)::int AS v FROM orders o WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)}`))[0]?.v);
     case "orders": return n(rowsOf(await db.execute(sql`SELECT count(*)::int AS v FROM orders o WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)}`))[0]?.v);
@@ -526,6 +647,17 @@ router.get("/products", async (req, res) => {
   try {
     const c = await ctx(req);
     res.json({ window: windowJson(c.window), ...(await loadProductStats(c.sellerId, c.window)) });
+  } catch (err) { fail(res, req, err, "product stats"); }
+});
+
+router.get("/products/:productId", async (req, res) => {
+  const productId = String(req.params.productId);
+  if (!UUID_RE.test(productId)) { res.status(404).json({ error: "Product not found" }); return; }
+  try {
+    const c = await ctx(req);
+    const stats = await loadSingleProductStats(c.sellerId, productId, c.window, c.tz, c.now);
+    if (!stats) { res.status(404).json({ error: "Product not found" }); return; }
+    res.json({ window: windowJson(c.window), ...stats });
   } catch (err) { fail(res, req, err, "product stats"); }
 });
 
