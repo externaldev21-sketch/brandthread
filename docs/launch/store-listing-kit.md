@@ -23,7 +23,7 @@ fails if a value goes over its limit or if the **Used** column here goes stale.
 | App name | 11 | 30 | App Store and Play | `app-store-metadata.md` |
 | Subtitle | 30 | 30 | App Store | `app-store-metadata.md` (at the limit, any edit must shorten it) |
 | Promotional text | 147 | 170 | App Store | `app-store-metadata.md` |
-| Keywords | 92 | 100 | App Store | `app-store-metadata.md` (no spaces after commas) |
+| Keywords | 96 | 100 | App Store | `app-store-metadata.md` (no spaces after commas) |
 | Short description | 72 | 80 | Google Play | `app-store-metadata.md` |
 | Long description | 1030 | 4000 | App Store and Play | `app-store-metadata.md` |
 

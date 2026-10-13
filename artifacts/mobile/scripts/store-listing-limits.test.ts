@@ -74,3 +74,27 @@ describe('store listing copy stays inside store limits', () => {
     }
   });
 });
+
+describe('store.config.json (EAS Metadata) matches the listing doc', () => {
+  const config = JSON.parse(fs.readFileSync(path.join(repoRoot, 'artifacts/mobile/store.config.json'), 'utf8'));
+  const info = config.apple.info['en-US'];
+
+  it('uses the same name, subtitle, promotional text, keywords and description', () => {
+    expect(info.title).toBe(tableValue('App name'));
+    expect(info.subtitle).toBe(tableValue('Subtitle'));
+    expect(info.promoText).toBe(tableValue('Promotional text'));
+    expect(info.keywords.join(',')).toBe(tableValue('Keywords'));
+    expect(info.description).toBe(blockquoteAfter('## Description (long form, both stores)'));
+  });
+
+  it('targets the launch search terms without wasting characters', () => {
+    const keywords: string[] = info.keywords;
+    expect(keywords).toEqual(expect.arrayContaining(['clothing brand', 'drops']));
+    expect(keywords.join(',').length).toBeLessThanOrEqual(100);
+    expect(new Set(keywords).size).toBe(keywords.length);
+    // Words in the name/subtitle are already indexed by Apple.
+    const indexed = `${info.title} ${info.subtitle}`.toLowerCase();
+    for (const k of keywords) expect(indexed.includes(k)).toBe(false);
+    expect(indexed).toContain('streetwear');
+  });
+});
