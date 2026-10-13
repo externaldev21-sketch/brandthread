@@ -37,6 +37,8 @@ function centsToInput(cents: number): string {
 export function RefundSheet({ visible, orderNumber, refundableCents, onCancel, onSubmit }: RefundSheetProps) {
   const { theme } = useAppTheme();
   const [amount, setAmount] = useState('');
+  const [method, setMethod] = useState<'original' | 'store_credit'>('original');
+  const [methodOpen, setMethodOpen] = useState(false);
   const [reason, setReason] = useState<SellerRefundReason | null>(null);
   const [note, setNote] = useState('');
   const [reasonOpen, setReasonOpen] = useState(false);
@@ -48,6 +50,8 @@ export function RefundSheet({ visible, orderNumber, refundableCents, onCancel, o
     if (!visible) return;
     requestIdRef.current = newRefundRequestId();
     setReason(null);
+    setMethod('original');
+    setMethodOpen(false);
     setNote('');
     setError(null);
     setBusy(false);
@@ -69,7 +73,7 @@ export function RefundSheet({ visible, orderNumber, refundableCents, onCancel, o
     setError(null);
     setBusy(true);
     try {
-      await onSubmit({ amountCents: parsed.cents, reason, ...(note.trim() ? { note: note.trim() } : {}), requestId: requestIdRef.current });
+      await onSubmit({ amountCents: parsed.cents, reason, ...(method === 'store_credit' ? { method } : {}), ...(note.trim() ? { note: note.trim() } : {}), requestId: requestIdRef.current });
     } catch (e: unknown) {
       setError(refundErrorMessage(e));
     } finally {
@@ -88,7 +92,7 @@ export function RefundSheet({ visible, orderNumber, refundableCents, onCancel, o
         <>
           {error ? <Text style={[TYPE_SCALE.footnote, { color: theme.error }]} accessibilityLiveRegion="polite">{error}</Text> : null}
           <Button
-            label={cents > 0 ? `Refund ${formatCents(cents)}` : 'Refund'}
+            label={method === 'store_credit' ? `Issue ${formatCents(cents)} store credit` : cents > 0 ? `Refund ${formatCents(cents)}` : 'Refund'}
             onPress={confirm}
             loading={busy}
             disabled={!parsed || !parsed.ok}
@@ -116,6 +120,17 @@ export function RefundSheet({ visible, orderNumber, refundableCents, onCancel, o
         ) : null}
       </SheetSection>
 
+      <SheetSection title="Refund method">
+        <SheetPickerField label="Method" placeholder="Choose a method" value={method === 'store_credit' ? 'Store credit' : 'Original payment'} onPress={() => setMethodOpen(true)} testID="seller-refund-method" />
+        <OptionSheet
+          visible={methodOpen}
+          title="Refund method"
+          options={[{ id: 'original', label: 'Original payment' }, { id: 'store_credit', label: 'Store credit' }]}
+          selectedId={method}
+          onSelect={(value) => { setMethod(value as 'original' | 'store_credit'); setMethodOpen(false); }}
+          onClose={() => setMethodOpen(false)}
+        />
+      </SheetSection>
       <SheetSection title="Reason for refund" last>
         <SheetPickerField
           label="Reason"

@@ -9,15 +9,15 @@ const pkg = (identifier: string, priceString = '$1') => ({ identifier, product: 
 
 describe('yearly billing (2 months free)', () => {
   it('charges 10 × monthly, matching the server', () => {
-    expect(annualPriceCents(plan('starter'))).toBe(29_000);
-    expect(annualPriceCents(plan('growth'))).toBe(79_000);
-    expect(annualPriceCents(plan('pro'))).toBe(199_000);
+    expect(annualPriceCents(plan('starter'))).toBe(19_990);
+    expect(annualPriceCents(plan('growth'))).toBe(49_000);
+    expect(annualPriceCents(plan('pro'))).toBe(129_000);
   });
 
   it('shows the yearly price and the per-month equivalent', () => {
-    expect(yearlyDisplayFor(plan('starter'))).toEqual({ price: '$290', period: '/yr', note: '$24.17/mo billed yearly' });
-    expect(yearlyDisplayFor(plan('growth'))).toEqual({ price: '$790', period: '/yr', note: '$65.83/mo billed yearly' });
-    expect(yearlyDisplayFor(plan('pro'))).toEqual({ price: '$1,990', period: '/yr', note: '$165.83/mo billed yearly' });
+    expect(yearlyDisplayFor(plan('starter'))).toEqual({ price: '$199.90', period: '/yr', note: '$16.66/mo billed yearly' });
+    expect(yearlyDisplayFor(plan('growth'))).toEqual({ price: '$490', period: '/yr', note: '$40.83/mo billed yearly' });
+    expect(yearlyDisplayFor(plan('pro'))).toEqual({ price: '$1,290', period: '/yr', note: '$107.50/mo billed yearly' });
   });
 
   it('offers yearly on native only when the offering has every annual package', () => {

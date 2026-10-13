@@ -40,10 +40,10 @@ export function isExpiringCreditSource(source: string, referenceId?: string | nu
  * can't be used to dodge expiry. Rows without a funding fall back to the
  * source rule above.
  */
-export function isExpiringCredit(source: string, funding?: string | null): boolean {
+export function isExpiringCredit(source: string, funding?: string | null, referenceId?: string | null): boolean {
   if (funding === "paid") return false;
   if (funding === "promo") return true;
-  return isExpiringCreditSource(source);
+  return isExpiringCreditSource(source, referenceId);
 }
 
 /** `expiryDays` as an active policy: a positive integer, else never. */

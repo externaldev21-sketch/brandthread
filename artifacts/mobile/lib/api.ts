@@ -1884,15 +1884,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         patch(`/api/orders/${id}/status`, { status, ...opts }),
       addTracking:    (id: string, body: unknown)  => patch(`/api/orders/${id}/tracking`, body),
       /** Seller's manual refund (Issue refund screen): to the original payment or as store credit. */
-      refund: (id: string, body: {
-        amountCents: number;
-        method: 'original' | 'store_credit';
-        clientRequestId: string;
-        note?: string;
-        items?: Array<{ lineItemId: string; quantity: number }>;
-        restock?: boolean;
-      }) => post<{ refundId: string; amountCents: number; method: 'original' | 'store_credit'; giftCardId: string | null; duplicate: boolean }>(
-        `/api/orders/${id}/refund`, body),
       /** Ship only the selected order items with their own tracking number. */
       addItemsTracking: (id: string, body: { itemIds: string[]; trackingNumber: string; carrier?: string; notifyCustomer?: false }) =>
         patch(`/api/orders/${id}/items-tracking`, body),

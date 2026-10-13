@@ -27,6 +27,6 @@ describe("Brands to follow: Dev's brands with their real products (item 54)", ()
   it('a featured brand is not repeated in the grid and joins Follow all', () => {
     expect(step).toContain('const gridBrands = brands.filter((b) => !featuredIds.has(b.sellerId));');
     expect(step).toContain('[...featured, ...gridBrands]');
-    expect(step).toContain('{gridBrands.map((brand, i) => {');
+    expect(step).toContain('{gridBrands.map((brand) => {');
   });
 });

@@ -110,15 +110,15 @@ describe("dunning status + config", () => {
 
 describe("annual plans (2 months free)", () => {
   it("prices a year at 10 × monthly", () => {
-    expect(planAmountCents("starter", "year")).toBe(29_000);
-    expect(planAmountCents("growth", "year")).toBe(79_000);
-    expect(planAmountCents("pro", "year")).toBe(199_000);
-    expect(planAmountCents("growth", "month")).toBe(7_900);
+    expect(planAmountCents("starter", "year")).toBe(19_990);
+    expect(planAmountCents("growth", "year")).toBe(49_000);
+    expect(planAmountCents("pro", "year")).toBe(129_000);
+    expect(planAmountCents("growth", "month")).toBe(4_900);
   });
 
   it("uses brandthread_<plan>_annual lookup keys with a yearly interval", () => {
-    expect(priceSpecFor("pro", "year")).toMatchObject({ lookupKey: "brandthread_pro_annual", amountCents: 199_000, interval: "year" });
-    expect(priceSpecFor("pro", "month")).toMatchObject({ lookupKey: "brandthread_pro_199_monthly", amountCents: 19_900, interval: "month" });
+    expect(priceSpecFor("pro", "year")).toMatchObject({ lookupKey: "brandthread_pro_annual", amountCents: 129_000, interval: "year" });
+    expect(priceSpecFor("pro", "month")).toMatchObject({ lookupKey: "brandthread_pro_199_monthly", amountCents: 12_900, interval: "month" });
   });
 
   it("maps annual lookup keys back to the same plans", () => {

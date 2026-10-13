@@ -396,7 +396,7 @@ export default function SubscriptionScreen() {
   const paymentAlertCard = paymentAlert && (
     <View style={styles.pastDueAlert} testID="seller-subscription-past-due-alert">
       <View style={styles.pastDueIcon}>
-        <Feather name="alert-circle" size={18} color={theme.error} />
+        <Icon name="alert-circle" size={18} color={theme.error} />
       </View>
       <View style={styles.pastDueCopy}>
         <Text style={styles.pastDueTitle}>{paymentAlert.title}</Text>

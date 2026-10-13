@@ -194,7 +194,7 @@ function ProductMentionPage({ mentions, onPick, onRemove, onBack }: {
   return (
     <SubPage title="Mention a product" onBack={onBack} testID="mention-products-page">
       <View style={s.search}>
-        <Feather name="search" size={18} color={CP.silverDim} />
+        <Icon name="search" size={18} color={CP.silverDim} />
         <TextInput value={query} onChangeText={setQuery} placeholder="Search your products" placeholderTextColor={CP.silverDim} style={s.searchInput} testID="mention-products-search" />
       </View>
       {note ? <Text style={[s.hintCenter, { color: CP.white }]}>{note}</Text> : null}
@@ -224,7 +224,7 @@ function ProductMentionPage({ mentions, onPick, onRemove, onBack }: {
                   <Text style={s.rowLabel} numberOfLines={1}>{p.name}</Text>
                   <Text style={s.rowValue}>{formatCents(p.pricing.priceCents)}</Text>
                 </View>
-                <View style={[s.check, !!current && s.checkOn]}>{current ? <Feather name="check" size={14} color={CP.black} /> : null}</View>
+                <View style={[s.check, !!current && s.checkOn]}>{current ? <Icon name="check" size={14} color={CP.black} /> : null}</View>
               </Pressable>
             );
           })}

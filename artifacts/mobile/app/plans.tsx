@@ -524,7 +524,6 @@ export default function PlansScreen() {
 
         <SellerPaywallBullets theme={theme} bullets={BENEFIT_BULLETS} />
 
-        <SellerPaywallSocialProof theme={theme} text="Trusted by independent brands building on Brandthread" />
         {/* Monthly / Yearly (item 116) — sits right above the plan cards. */}
         {yearlyAvailable && (
           <SegmentedControl

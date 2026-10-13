@@ -741,6 +741,8 @@ interface ApiPostProductTagRow {
  * not validated, so every field is optional and read defensively.
  */
 export interface ApiPostRow {
+  productMentions?: PostProductMention[];
+  labels?: string[];
   pinnedAt?: string | null;
   videoHlsUrl?: string | null;
   likedByMe?: boolean | null;

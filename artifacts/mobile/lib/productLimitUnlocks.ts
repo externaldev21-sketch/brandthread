@@ -23,8 +23,8 @@ type LimitedPlanId = 'starter' | 'growth' | 'pro';
 
 /** Mirrors PLAN_CATALOGUE[id].limits on the server. null = unlimited. */
 export const PLAN_LIMITS: Record<LimitedPlanId, { products: number | null; teamSeats: number | null }> = {
-  starter: { products: 25, teamSeats: 0 },
-  growth: { products: null, teamSeats: 3 },
+  starter: { products: 10, teamSeats: 1 },
+  growth: { products: 50, teamSeats: 3 },
   pro: { products: null, teamSeats: null },
 };
 

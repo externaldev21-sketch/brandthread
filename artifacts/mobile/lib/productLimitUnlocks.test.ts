@@ -45,15 +45,15 @@ describe('parseProductLimitHit', () => {
 });
 
 describe('buildProductLimitUnlocks', () => {
-  it('Starter at 25 → Growth: unlimited products, 3 seats, the Growth features, $79/mo', () => {
+  it('Starter at 25 → Growth: unlimited products, 3 seats, the Growth features, $49/mo', () => {
     const u = buildProductLimitUnlocks(parseProductLimitHit(limitError(starterAtCap))!)!;
     expect(u.title).toBe("You've reached 25 products");
     expect(u.cta).toBe('Upgrade to Growth');
-    expect(u.price).toBe('$79/mo');
+    expect(u.price).toBe('$49/mo');
     expect(u.href).toBe('/plans?highlight=growth&source=product-limit');
     expect(u.rows).toEqual([
-      { label: 'Unlimited products', now: 'Now 25' },
-      { label: '3 team seats', now: 'Now none' },
+      { label: 'Up to 50 products', now: 'Now 25' },
+      { label: '3 team seats', now: 'Now 1' },
       { label: 'AI logos, mockups, product photography, and lifestyle imagery' },
       { label: 'Background removal and replacement' },
       { label: 'Manufacturer Hub sourcing and production workflows' },
@@ -76,7 +76,7 @@ describe('buildProductLimitUnlocks', () => {
   it('Growth → Pro lists Pro seats and features', () => {
     const u = buildProductLimitUnlocks({ currentPlan: 'growth', requiredPlan: 'pro', limit: 50, nextLimit: null })!;
     expect(u.cta).toBe('Upgrade to Pro');
-    expect(u.price).toBe('$199/mo');
+    expect(u.price).toBe('$129/mo');
     expect(u.rows[0]).toEqual({ label: 'Unlimited products', now: 'Now 50' });
     expect(u.rows[1]).toEqual({ label: 'Unlimited team seats', now: 'Now 3' });
     expect(u.rows.map((r) => r.label)).toContain('Live shopping tools');

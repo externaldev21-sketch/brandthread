@@ -18,7 +18,6 @@ import { buildOrderStatusUpdate, orderStatusTransitionConflict } from "../lib/or
 import { logger } from "../lib/logger";
 import { sendOrderShippingEmail } from "../lib/brandthreadEmail";
 import { loadStoreBrandingForOrderSafe } from "../lib/orderReceipt";
-import { reserveStockForOrder, restoreStockForOrder } from "../lib/stockReservation";
 import { withRiskView } from "../lib/risk/orderRisk";
 import { reserveStockForOrder, restoreStockForOrder } from "../lib/stockReservation";
 import { nextOrderNumber } from "../lib/orderNumber";
@@ -750,7 +749,10 @@ router.get("/:id/refunds", async (req, res) => {
 // without cancelling the order (manager+). Body: { amountCents, reason, note?, requestId }
 router.post("/:id/refund", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const parsed = parseSellerRefundRequest(req.body);
+  const body = req.body ?? {};
+  const method = body.method ?? "original";
+  if (method !== "original" && method !== "store_credit") { res.status(400).json({ error: "method must be original or store_credit" }); return; }
+  const parsed = parseSellerRefundRequest({ ...body, reason: body.reason ?? "other", requestId: body.requestId ?? body.clientRequestId });
   if (!parsed.ok) { res.status(400).json({ error: parsed.error, code: parsed.code }); return; }
   const { amountCents, reason, note, requestId } = parsed.value;
 
@@ -767,6 +769,7 @@ router.post("/:id/refund", requireRole("manager"), async (req, res) => {
     result = await refundOrder({
       orderId: current.id,
       amountCents,
+      method,
       reason: "seller_refund",
       initiatedBy: actor.actorClerkId,
       idempotencyKey: `seller-refund/${current.id}/${requestId}`,
@@ -816,80 +819,13 @@ router.post("/:id/refund", requireRole("manager"), async (req, res) => {
 
   res.json({
     refund: result,
+    ...result,
     refundedCents: updated?.refundedCents ?? 0,
     refundableCents: updated ? refundableCentsOf(updated) : 0,
   });
 });
 
 // PATCH /api/orders/:id/tracking — fulfillment (staff+)
-// POST /:id/refund — the seller's manual refund from order detail (Issue
-// refund screen). Same refund service as everything else; the seller picks
-// how the buyer is paid back: their original payment or store credit at this
-// store (items 113/114). Thread Cash is the buyer's own choice (return
-// request), so it is not offered here. One refund per clientRequestId.
-const SELLER_REFUND_METHODS = new Set(["original", "store_credit"]);
-router.post("/:id/refund", requireRole("manager"), async (req, res) => {
-  const ownerId = (req as any).clerkUserId as string;
-  const { amountCents, method, note, clientRequestId, items, restock } = (req.body ?? {}) as {
-    amountCents?: unknown; method?: unknown; note?: unknown; clientRequestId?: unknown;
-    items?: unknown; restock?: unknown;
-  };
-  if (!Number.isSafeInteger(amountCents) || (amountCents as number) <= 0) {
-    res.status(400).json({ error: "amountCents must be a positive whole number of cents" }); return;
-  }
-  const refundMethod = method === undefined ? "original" : method;
-  if (typeof refundMethod !== "string" || !SELLER_REFUND_METHODS.has(refundMethod)) {
-    res.status(400).json({ error: "method must be 'original' or 'store_credit'" }); return;
-  }
-  if (typeof clientRequestId !== "string" || !/^[A-Za-z0-9_-]{8,80}$/.test(clientRequestId)) {
-    res.status(400).json({ error: "clientRequestId is required" }); return;
-  }
-  if (note !== undefined && (typeof note !== "string" || note.length > 500)) {
-    res.status(400).json({ error: "note must be 500 characters or fewer" }); return;
-  }
-  const restockLines = restock === true && Array.isArray(items)
-    ? items.flatMap((item: any) => (typeof item?.lineItemId === "string" && Number.isSafeInteger(item?.quantity) && item.quantity > 0
-      ? [{ lineItemId: item.lineItemId as string, quantity: item.quantity as number }] : []))
-    : [];
-  try {
-    const result = await refundOrder({
-      orderId: req.params.id,
-      amountCents: amountCents as number,
-      method: refundMethod as "original" | "store_credit",
-      reason: "seller_refund",
-      initiatedBy: reqActor(req).actorClerkId,
-      idempotencyKey: `seller-refund/${req.params.id}/${clientRequestId}`,
-      precondition: (order) => {
-        if (order.owner_id !== ownerId) throw new RefundError("Order not found", 404, "ORDER_NOT_FOUND");
-        if (order.status === "refund_pending") throw new RefundError("A refund is in progress for this order.", 409, "REFUND_IN_PROGRESS");
-      },
-      onSucceeded: async (tx, { order }) => {
-        if (restockLines.length === 0) return;
-        const lines = await tx.select({ id: orderItems.id, variantId: orderItems.variantId, quantity: orderItems.quantity })
-          .from(orderItems).where(eq(orderItems.orderId, order.id));
-        const back = restockLines.flatMap((wanted) => {
-          const line = lines.find((l) => l.id === wanted.lineItemId);
-          return line?.variantId ? [{ variantId: line.variantId, quantity: Math.min(wanted.quantity, line.quantity) }] : [];
-        });
-        if (back.length) await restoreStockForOrder(tx, back);
-      },
-    });
-    const actor = reqActor(req);
-    void logActivity(
-      actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
-      `Refunded $${(result.amountCents / 100).toFixed(2)}${result.method === "store_credit" ? " as store credit" : ""}`,
-      "order", req.params.id, { amountCents: result.amountCents, method: result.method, note: note ?? null },
-    );
-    res.status(result.duplicate ? 200 : 201).json(result);
-  } catch (err) {
-    if (err instanceof RefundError) {
-      if (err.status >= 500) req.log.error({ err, orderId: req.params.id }, "Seller refund failed");
-      res.status(err.status).json({ error: err.message, code: err.code }); return;
-    }
-    throw err;
-  }
-});
-
 router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const {

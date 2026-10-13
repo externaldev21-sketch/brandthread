@@ -18,6 +18,7 @@ export const SELLER_REFUND_REASONS = [
 export type SellerRefundReason = (typeof SELLER_REFUND_REASONS)[number]['key'];
 
 export interface SellerRefundRequest {
+  method?: 'original' | 'store_credit';
   amountCents: number;
   reason: SellerRefundReason;
   note?: string;
@@ -82,6 +83,7 @@ export function refundErrorMessage(err: unknown): string {
     try {
       const parsed = JSON.parse(raw) as { error?: unknown };
       if (typeof parsed.error === 'string') return parsed.error;
+      if (parsed.error && typeof parsed.error === 'object' && 'message' in parsed.error && typeof parsed.error.message === 'string') return parsed.error.message;
     } catch { /* not JSON */ }
   }
   return "The refund couldn't be processed. Nothing was charged back. Try again.";

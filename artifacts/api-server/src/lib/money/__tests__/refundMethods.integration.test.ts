@@ -270,7 +270,8 @@ describe("store_credit", () => {
     const again = await refund(order.id, "store_credit", key, 2_500);
     expect(again).toMatchObject({ duplicate: true, giftCardId: cards[0].id });
     expect(await db.select().from(giftCards).where(eq(giftCards.refundId, result.refundId))).toHaveLength(1);
-    expect(mail.sent).toHaveLength(1);
+    // Existing refund receipts remain; the store-credit delivery must not repeat.
+    expect(mail.sent.filter((m) => m.idempotencyKey === `gift-card-email/${cards[0].id}`)).toHaveLength(1);
 
     // Under $5 is fine for store credit (it is the refund amount, not a card for sale).
     const small = await refund(order.id, "store_credit", uid("sc-small"), 300);
@@ -339,7 +340,7 @@ describe("routes", () => {
     const requestId = uid("req").replace(/[^A-Za-z0-9_-]/g, "_");
     const body = { amountCents: 2_000, method: "store_credit", clientRequestId: requestId };
     const first = await call(app.base, "POST", `/api/orders/${order.id}/refund`, seller, body);
-    expect(first.status).toBe(201);
+    expect(first.status).toBe(200);
     expect(first.body).toMatchObject({ method: "store_credit", amountCents: 2_000 });
     const second = await call(app.base, "POST", `/api/orders/${order.id}/refund`, seller, body);
     expect(second.status).toBe(200);

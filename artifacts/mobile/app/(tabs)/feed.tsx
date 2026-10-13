@@ -37,7 +37,6 @@ import { createThreadFeedCursor, getSellerFollowStates, getThreadPostsPage, setS
 import { confirmSponsoredImpression } from '@/services/sponsoredService';
 
 import { getThreadsFirstPage } from '@/services/threadsFollowedFirst';
-import type { SellerThreadPost } from '@/services/socialService';
 import { BTS_LABEL_TEXT, type PostProductMention } from '@/lib/captionMentions';
 import * as Haptics from 'expo-haptics';
 import { isPreviewDemoMode, isBuyerDevPreview } from '@/lib/devPreview';

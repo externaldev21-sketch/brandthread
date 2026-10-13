@@ -288,13 +288,13 @@ describe("annual checkout", () => {
     expect(result.body.error).toMatch(/interval/);
   });
 
-  it("switches an active monthly plan to yearly in place, prorated, on a $790/yr price", async () => {
+  it("switches an active monthly plan to yearly in place, prorated, on a $490/yr price", async () => {
     calls.subscriptions.set(subscriptionId, { ...calls.subscriptions.get(subscriptionId), status: "active", pause_collection: null, metadata: {} });
     const result = await checkout({ planId: "growth", interval: "year" });
     expect(result.status).toBe(200);
     expect(result.body.updated).toBe(true);
     const price = calls.prices.find((p) => p.lookup_key === "brandthread_growth_annual");
-    expect(price).toMatchObject({ unit_amount: 79_000, recurring: { interval: "year" } });
+    expect(price).toMatchObject({ unit_amount: 49_000, recurring: { interval: "year" } });
     const update = calls.subscriptionUpdates.at(-1)!;
     expect(update.params.items[0].price).toBe(price.id);
     expect(update.params.proration_behavior).toBe("create_prorations");
@@ -304,7 +304,7 @@ describe("annual checkout", () => {
     const result = await checkout({ planId: "pro" });
     expect(result.status).toBe(200);
     expect(calls.prices.find((p) => p.lookup_key === "brandthread_pro_199_monthly")).toMatchObject({
-      unit_amount: 19_900, recurring: { interval: "month" },
+      unit_amount: 12_900, recurring: { interval: "month" },
     });
   });
 });

@@ -98,7 +98,6 @@ import { dunningAwareStatus } from "../lib/billing/dunning";
 import {
   applyDunningOnInvoicePaid, applyDunningOnPaymentFailed, applyDunningOnPaymentMethodUpdated, invoiceSubscriptionId as subscriptionIdOfInvoice,
 } from "../lib/billing/dunningWebhooks";
-import { recordDiscountCodeUse } from "../lib/discounts";
 import { attributeOrder as attributeAffiliateOrder } from "../lib/affiliate/service";
 import { recordDiscountCodeUse, releaseCheckoutDiscount } from "../lib/discounts";
 import { splitOrder, formatMoney } from "../lib/money/fees";

@@ -82,7 +82,7 @@ export function replayLots(entries: LedgerEntryLike[], expiryDays: number | null
         entryId: entry.id,
         source: entry.source,
         earnedAt: entry.createdAt,
-        expiresAt: isExpiringCredit(entry.source, entry.funding) ? computeExpiresAt(entry.createdAt, expiryDays) : null,
+        expiresAt: isExpiringCredit(entry.source, entry.funding, entry.referenceId) ? computeExpiresAt(entry.createdAt, expiryDays) : null,
         originalCents: entry.amountCents,
         remainingCents: entry.amountCents,
       });

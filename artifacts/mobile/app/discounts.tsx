@@ -310,11 +310,6 @@ export default function DiscountsScreen() {
     }
     // Start = start of the local start day, end = END of the local end day
     // (inclusive), and end must come after start.
-    const dates = resolveDiscountDates({ startKey: startDate, endKey: endDate, hasEnd });
-    if (!dates.ok) {
-      Alert.alert(dates.title, dates.message);
-      return;
-    }
 
     setSaving(true);
     try {
@@ -484,7 +479,7 @@ export default function DiscountsScreen() {
                 <View key={group.label}>
                   <Text style={s.groupLabel}>{group.label}</Text>
                   {group.items.map((d, i) => (
-            <DiscountRow key={d.id} d={d} first={i === 0} onPress={() => { haptic('sheet'); setActionFor(d); }} />
+            <DiscountRow key={d.id} d={d} first={i === 0} onPress={() => { haptic('sheet'); setActionFor(d); }} onViewUses={() => setRedemptionsFor(d)} />
                   ))}
                 </View>
               ))}
@@ -691,19 +686,7 @@ export default function DiscountsScreen() {
               onPress={handleSave}
               disabled={saving}
             />
-          </KeyboardStickyFooter>
-          <DayPickerSheet
-            visible={datePickerFor !== null}
-            title={datePickerFor === 'end' ? 'End date' : 'Start date'}
-            value={datePickerFor === 'end' ? endDate : startDate}
-            minKey={datePickerFor === 'end' && startDate && startDate > toDayKey(new Date()) ? startDate : toDayKey(new Date())}
-            onConfirm={(key) => {
-              if (datePickerFor === 'end') setEndDate(key);
-              else setStartDate(key);
-              setDatePickerFor(null);
-            }}
-            onClose={() => setDatePickerFor(null)}
-          />
+          </ScrollView>
         </SafeAreaProvider>
       </Modal>
 
@@ -744,13 +727,11 @@ export default function DiscountsScreen() {
   );
 }
 
-function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy, onViewUses }: {
+function DiscountRow({ d, first, onPress, onViewUses }: {
   d: DiscountCode;
+  first?: boolean;
+  onPress: () => void;
   onViewUses: () => void;
-  onEdit: () => void;
-  onTogglePause: () => void;
-  onDelete: () => void;
-  onCopy: () => void;
 }) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
