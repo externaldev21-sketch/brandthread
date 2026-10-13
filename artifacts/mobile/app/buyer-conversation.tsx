@@ -28,6 +28,7 @@ import {
   setConversationTheme, setConversationDisappearing,
   MY_USER_ID, MY_NAME, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
+import { canUnsend } from '@/lib/unsend';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
@@ -1602,6 +1603,19 @@ export default function BuyerConversationScreen() {
       .catch(() => {});
   }
 
+  // Long-press > Unsend (#166, Instagram): own message, under 10 minutes old,
+  // removed for everyone. Optimistic; the thread is refetched either way.
+  function sheetUnsend() {
+    const msg = activeSheetMsg;
+    closeMessageSheet();
+    if (!conv || !msg) return;
+    hapticDestructiveConfirm();
+    setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+    api.conversations.unsend(conv.id, msg.id)
+      .catch(() => { Alert.alert('Couldn’t unsend', 'Messages can be unsent for 10 minutes after sending.'); })
+      .finally(() => { getMessages(conv.id).then(setMessages).catch(() => {}); });
+  }
+
   function sheetReport() {
     const msg = activeSheetMsg;
     closeMessageSheet();
@@ -2833,10 +2847,13 @@ export default function BuyerConversationScreen() {
           [
             { key: 'reply', label: 'Reply', icon: 'corner-up-left', onPress: sheetReply },
             { key: 'copy', label: 'Copy', icon: 'copy', onPress: sheetCopy },
+            canUnsend(activeSheetMsg, isOwnSheetMsg && !isPreviewConversationId(conv?.id ?? ''))
+              ? { key: 'unsend', label: 'Unsend', icon: 'rotate-ccw', destructive: true, onPress: sheetUnsend }
+              : null,
             isOwnSheetMsg
               ? { key: 'delete', label: 'Delete for me', icon: 'trash-2', destructive: true, onPress: sheetDelete }
               : { key: 'report', label: 'Report message', icon: 'flag', destructive: true, onPress: sheetReport },
-          ] as ReactionOverlayMenuItem[]
+          ].filter(Boolean) as ReactionOverlayMenuItem[]
         ) : []}
         onClose={closeMessageSheet}
       />

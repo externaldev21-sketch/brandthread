@@ -84,6 +84,7 @@ const profileBodySchema = z.object({
 const privacyBodySchema = z.object({
   dmPrivacy: z.enum(["requests", "followers_only"]).optional(),
   isPrivate: z.boolean().optional(),
+  readReceipts: z.boolean().optional(),
 }).passthrough();
 const feedGesturesTipBodySchema = z.object({
   version: z.number().int().min(1),
@@ -1029,13 +1030,14 @@ router.get("/account-types", requireAuth, async (req, res) => {
 router.get("/privacy", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   const [user] = await db
-    .select({ dmPrivacy: users.dmPrivacy, isPrivate: users.isPrivate, accountType: users.accountType })
+    .select({ dmPrivacy: users.dmPrivacy, isPrivate: users.isPrivate, accountType: users.accountType, readReceipts: users.readReceiptsEnabled })
     .from(users)
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
   res.json({
     dmPrivacy: user?.dmPrivacy ?? "requests",
     isPrivate: user?.isPrivate ?? false,
+    readReceipts: user?.readReceipts ?? true,
     canBePrivate: user?.accountType === "buyer",
   });
 });
@@ -1045,7 +1047,7 @@ router.get("/privacy", requireAuth, async (req, res) => {
 // — add more fields here as the product grows.
 router.patch("/privacy", requireAuth, validateRequest({ body: privacyBodySchema }), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
-  const { dmPrivacy, isPrivate } = req.body as { dmPrivacy?: string; isPrivate?: boolean };
+  const { dmPrivacy, isPrivate, readReceipts } = req.body as { dmPrivacy?: string; isPrivate?: boolean; readReceipts?: boolean };
 
   const validDmPrivacy = ["requests", "followers_only"];
   if (dmPrivacy !== undefined && !validDmPrivacy.includes(dmPrivacy)) {
@@ -1055,6 +1057,7 @@ router.patch("/privacy", requireAuth, validateRequest({ body: privacyBodySchema 
 
   const updates: Record<string, any> = { updatedAt: new Date() };
   if (dmPrivacy !== undefined) updates.dmPrivacy = dmPrivacy;
+  if (readReceipts !== undefined) updates.readReceiptsEnabled = readReceipts;
 
   if (isPrivate !== undefined) {
     const outcome = await applyPrivateAccountToggle(clerkUserId, isPrivate, updates);
@@ -1072,9 +1075,9 @@ router.patch("/privacy", requireAuth, validateRequest({ body: privacyBodySchema 
     .update(users)
     .set(updates)
     .where(eq(users.clerkId, clerkUserId))
-    .returning({ dmPrivacy: users.dmPrivacy, isPrivate: users.isPrivate });
+    .returning({ dmPrivacy: users.dmPrivacy, isPrivate: users.isPrivate, readReceipts: users.readReceiptsEnabled });
 
-  res.json({ dmPrivacy: updated?.dmPrivacy ?? "requests", isPrivate: updated?.isPrivate ?? false });
+  res.json({ dmPrivacy: updated?.dmPrivacy ?? "requests", isPrivate: updated?.isPrivate ?? false, readReceipts: updated?.readReceipts ?? true });
 });
 
 // ─── GET /api/auth/feed-gestures-tip ──────────────────────────────────────────

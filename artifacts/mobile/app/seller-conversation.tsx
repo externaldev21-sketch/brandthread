@@ -39,6 +39,7 @@ import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import Composer from '@/components/ui/Composer';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { canUnsend } from '@/lib/unsend';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
 import * as Clipboard from 'expo-clipboard';
@@ -1191,6 +1192,19 @@ export default function SellerConversationScreen() {
     closeMessageSheet();
   }
 
+  // Long-press > Unsend (#166, Instagram): own message, under 10 minutes old,
+  // removed for everyone. Optimistic; the thread is refetched either way.
+  function sheetUnsend() {
+    const msg = activeSheetMsg;
+    closeMessageSheet();
+    if (!id || !msg) return;
+    hapticDestructiveConfirm();
+    setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+    api.conversations.unsend(id, msg.id)
+      .catch(() => { Alert.alert('Couldn’t unsend', 'Messages can be unsent for 10 minutes after sending.'); })
+      .finally(() => { api.conversations.messages(id, 100).then((m) => setMessages(m as Msg[])).catch(() => {}); });
+  }
+
   function sheetReport() {
     const msg = activeSheetMsg;
     closeMessageSheet();
@@ -2328,6 +2342,9 @@ export default function SellerConversationScreen() {
         menuItems={activeSheetMsg ? (
           [
             { key: 'copy', label: 'Copy', icon: 'copy', onPress: sheetCopy },
+            canUnsend(activeSheetMsg, isOwnSheetMsg)
+              ? { key: 'unsend', label: 'Unsend', icon: 'rotate-ccw', destructive: true, onPress: sheetUnsend }
+              : null,
             !isOwnSheetMsg && other
               ? { key: 'report', label: 'Report message', icon: 'flag', destructive: true, onPress: sheetReport }
               : null,
