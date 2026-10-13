@@ -115,7 +115,7 @@ export function ThreadShareSheet({
     try {
       await action();
     } catch {
-      onFeedback('Could not share this post. Try again.', 'error');
+      onFeedback("Couldn't share post. Try again.", 'error');
     } finally {
       actionInFlightRef.current = false;
       setBusy(null);
@@ -152,7 +152,7 @@ export function ThreadShareSheet({
     await runAction('copy', async () => {
       await Clipboard.setStringAsync(postUrl);
       onClose();
-      onFeedback('Link copied. Anyone who opens it can view this post.', 'info');
+      onFeedback('Link copied', 'info');
       recordShare();
     });
   }
@@ -214,7 +214,7 @@ export function ThreadShareSheet({
             ],
           );
         } else {
-          onFeedback('Photos permission is required to save this video.', 'error');
+          onFeedback('Allow Photos access to save this video.', 'error');
         }
         return;
       }
@@ -238,10 +238,10 @@ export function ThreadShareSheet({
       }
       await MediaLibrary.createAssetAsync(downloaded.uri);
       setSavingProgress(100);
-      onFeedback('Video saved to Photos.', 'info');
+      onFeedback('Saved to Photos', 'info');
     } catch (error) {
       if ((error as Error)?.name === 'AbortError') {
-        onFeedback('Video save cancelled.', 'info');
+        onFeedback('Save cancelled', 'info');
       } else {
         onFeedback("Couldn't save video. Try again.", 'error');
       }

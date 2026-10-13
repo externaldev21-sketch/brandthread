@@ -114,7 +114,7 @@ export default function StoreGeneratingScreen() {
         serviceCompleteRef.current = true;
         tryNavigate();
       } catch (err) {
-        setError('Generation failed. Please try again.');
+        setError("Couldn't build your store. Try again.");
       }
     })();
 

@@ -45,13 +45,13 @@ export default function EmailAudienceScreen() {
 
   const remove = (id: string, email: string) => {
     Alert.alert('Remove subscriber', `Remove ${email} from your list?`, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Keep', style: 'cancel' },
       {
-        text: 'Remove', style: 'destructive',
+        text: 'Remove subscriber', style: 'destructive',
         onPress: async () => {
           if (mode !== 'live') { setData((d) => d && { ...d, subscribers: d.subscribers.filter((s) => s.id !== id) }); return; }
           try { await api.emailMarketing.removeSubscriber(id); load(); }
-          catch { Alert.alert('Not removed', 'This address may have unsubscribed, which keeps it on the suppression list.'); }
+          catch { Alert.alert("Couldn't remove subscriber", 'If they unsubscribed, they stay on the suppression list. Otherwise, try again.'); }
         },
       },
     ]);

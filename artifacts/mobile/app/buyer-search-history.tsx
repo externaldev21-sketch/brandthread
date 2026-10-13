@@ -60,9 +60,9 @@ export default function BuyerSearchHistoryScreen() {
       'Clear search history?',
       "You're about to clear your search history. This can't be undone.",
       [
-        { text: 'Not now', style: 'cancel' },
+        { text: 'Keep', style: 'cancel' },
         {
-          text: 'Clear all',
+          text: 'Clear history',
           style: 'destructive',
           onPress: async () => {
             hapticDestructiveConfirm();

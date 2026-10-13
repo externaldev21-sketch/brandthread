@@ -209,7 +209,7 @@ export default function StoreFromLogoScreen() {
         setLogoUri(uri);
         setLogoBase64(b64);
       } catch {
-        Alert.alert('Could not prepare logo', 'Please choose the logo again and try once more.');
+        Alert.alert("Couldn't load logo", 'Choose it again.');
       } finally {
         setPreparingLogo(false);
       }
@@ -234,7 +234,7 @@ export default function StoreFromLogoScreen() {
       if (failure.kind === 'payload-too-large') {
         setAnalysisFailure(failure);
       } else {
-        Alert.alert('Analysis failed', 'Could not analyze logo. Please try again.');
+        Alert.alert("Couldn't read logo", 'Try again.');
       }
     } finally {
       setAnalyzing(false);

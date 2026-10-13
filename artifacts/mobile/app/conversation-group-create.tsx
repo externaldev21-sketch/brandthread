@@ -81,7 +81,7 @@ export default function ConversationGroupCreateScreen() {
       const target = params.role === 'seller' ? '/seller-conversation' : '/buyer-conversation';
       router.replace((`${target}?id=${encodeURIComponent(conv.id)}`) as never);
     } catch (e) {
-      Alert.alert('Couldn’t create group', apiErrorMessage(e, 'Please try again.'));
+      Alert.alert('Couldn’t create group', apiErrorMessage(e, 'Try again.'));
     } finally {
       setCreating(false);
     }

@@ -67,7 +67,7 @@ export default function SizeChartTemplateEditScreen() {
           if (live && p) { setName(p.name); setChart(p.chart); }
         }
       } catch {
-        if (live) Alert.alert('Could not load', 'Go back and try again.');
+        if (live) Alert.alert("Couldn't load template", 'Go back and try again.');
       } finally {
         if (live) setLoading(false);
       }
@@ -128,9 +128,9 @@ export default function SizeChartTemplateEditScreen() {
         Alert.alert('Saved', `Update the ${productCount} product${productCount === 1 ? '' : 's'} using this chart?`, [
           { text: 'Not now', style: 'cancel', onPress: () => goBackOr(router) },
           {
-            text: 'Update',
+            text: 'Update products',
             onPress: async () => {
-              try { await api.sizeChartTemplates.sync(id); } catch { Alert.alert('Could not update products'); }
+              try { await api.sizeChartTemplates.sync(id); } catch { Alert.alert("Couldn't update products", 'Try again from each product.'); }
               goBackOr(router);
             },
           },
@@ -139,7 +139,7 @@ export default function SizeChartTemplateEditScreen() {
       }
       goBackOr(router);
     } catch (e: any) {
-      Alert.alert('Could not save', e?.message?.includes('409') || /already/i.test(String(e?.message)) ? 'You already have a chart with that name.' : 'Check the chart and try again.');
+      Alert.alert("Couldn't save chart", e?.message?.includes('409') || /already/i.test(String(e?.message)) ? 'You already have a chart with that name.' : 'Check the chart and try again.');
     } finally {
       setSaving(false);
     }
@@ -148,12 +148,12 @@ export default function SizeChartTemplateEditScreen() {
   function remove() {
     if (!id) return;
     Alert.alert('Delete this size chart?', 'Products keep the chart they already have.', [
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Keep', style: 'cancel' },
       {
-        text: 'Delete', style: 'destructive',
+        text: 'Delete chart', style: 'destructive',
         onPress: async () => {
           try { await api.sizeChartTemplates.delete(id); goBackOr(router); }
-          catch { Alert.alert('Could not delete'); }
+          catch { Alert.alert("Couldn't delete chart", 'Try again.'); }
         },
       },
     ]);

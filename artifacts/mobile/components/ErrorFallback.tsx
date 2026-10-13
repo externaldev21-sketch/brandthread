@@ -61,11 +61,11 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
         </View>
 
         <Text style={[TYPE_SCALE.title1, styles.title, { color: colors.foreground }]}>
-          Something went wrong
+          This screen hit a problem
         </Text>
 
         <Text style={[TYPE_SCALE.body, styles.message, { color: colors.mutedForeground }]}>
-          Please try again, or head back home.
+          Try again, or head back home.
         </Text>
 
         <View style={styles.actions}>

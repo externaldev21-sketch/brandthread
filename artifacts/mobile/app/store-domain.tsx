@@ -85,7 +85,7 @@ export default function StoreDomainScreen() {
       await load();
       Alert.alert('Saved', 'Subdomain updated.');
     } catch {
-      Alert.alert('Error', 'Failed to update subdomain.');
+      Alert.alert("Couldn't update subdomain", 'Try again.');
     } finally {
       setSaving(false);
     }
@@ -101,7 +101,7 @@ export default function StoreDomainScreen() {
       const instructions = result?.verificationInstructions ?? `Add a TXT record _brandthread-verify.${newDomain} pointing to your verification token.`;
       Alert.alert('Domain Added', instructions);
     } catch {
-      Alert.alert('Error', 'Failed to connect domain. Check your internet connection and try again.');
+      Alert.alert("Couldn't connect domain", 'Try again.');
     }
   };
 
@@ -114,7 +114,7 @@ export default function StoreDomainScreen() {
       }
       await completeSetupTaskWhen('connect_domain', verifiedDomain?.verified === true);
       await load();
-      Alert.alert('Verified ✓', 'Your domain is verified and SSL is being issued.');
+      Alert.alert('Domain verified', 'Your domain is verified and SSL is being issued.');
     } catch {
       Alert.alert('Not verified yet', 'DNS changes can take up to 48 hours to propagate. Check your registrar and try again.');
     } finally {
@@ -123,10 +123,10 @@ export default function StoreDomainScreen() {
   };
 
   const handleRemoveDomain = async (domainId: string, domainName: string) => {
-    Alert.alert('Remove Domain?', `Remove ${domainName}?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert('Remove domain?', `Remove ${domainName}?`, [
+      { text: 'Keep', style: 'cancel' },
       {
-        text: 'Remove', style: 'destructive', onPress: async () => {
+        text: 'Remove domain', style: 'destructive', onPress: async () => {
           try {
             await (api as any).store.deleteDomain(domainId);
           } catch { /* best-effort */ }

@@ -45,7 +45,7 @@ export default function AnalyticsExportScreen() {
       const done = await saveExportFile(file);
       if (!done) Alert.alert('Export ready', 'Sharing is not available on this device.');
     } catch {
-      Alert.alert('Export failed', 'Could not generate the export. Check your connection and try again.');
+      Alert.alert('Export failed', 'Try again.');
     } finally { setBusy(false); }
   }
 

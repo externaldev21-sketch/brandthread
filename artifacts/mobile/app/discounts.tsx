@@ -370,9 +370,9 @@ export default function DiscountsScreen() {
 
   async function handleDelete(d: DiscountCode) {
     Alert.alert('Delete discount?', `Remove code "${d.code}"?`, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Keep', style: 'cancel' },
       {
-        text: 'Delete', style: 'destructive',
+        text: 'Delete code', style: 'destructive',
         onPress: async () => {
           setDiscounts(prev => prev.filter(x => x.id !== d.id));
           if (previewOnly) {

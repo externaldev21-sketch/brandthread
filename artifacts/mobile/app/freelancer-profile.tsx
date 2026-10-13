@@ -63,7 +63,7 @@ export default function FreelancerProfileScreen() {
         setConnect(status ? { connected: status.connected, status: status.status } : null);
       }
     } catch (e) {
-      setError(apiErrorMessage(e));
+      setError(apiErrorMessage(e, "Couldn't load this profile. Try again."));
     } finally {
       setLoading(false);
     }
@@ -82,7 +82,7 @@ export default function FreelancerProfileScreen() {
       await WebBrowser.openBrowserAsync(url);
       await load(); // refresh status after the browser closes
     } catch (e) {
-      Alert.alert('Could not start onboarding', apiErrorMessage(e));
+      Alert.alert("Couldn't open bank setup", apiErrorMessage(e));
     }
   };
 
@@ -93,7 +93,7 @@ export default function FreelancerProfileScreen() {
       [
         { text: 'Keep listing', style: 'cancel' },
         {
-          text: 'Deactivate',
+          text: 'Deactivate listing',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -101,7 +101,7 @@ export default function FreelancerProfileScreen() {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               goBackOr(router);
             } catch (e) {
-              Alert.alert('Failed', apiErrorMessage(e));
+              Alert.alert("Couldn't deactivate listing", apiErrorMessage(e));
             }
           },
         },
@@ -150,7 +150,7 @@ export default function FreelancerProfileScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       const code = apiErrorCode(e);
       Alert.alert(
-        code === 'FREELANCER_NOT_PAYABLE' ? 'Not available yet' : 'Could not create job',
+        code === 'FREELANCER_NOT_PAYABLE' ? 'Not available yet' : "Couldn't create job",
         apiErrorMessage(e),
       );
     } finally {

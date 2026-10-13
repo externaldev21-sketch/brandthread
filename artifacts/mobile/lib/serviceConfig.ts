@@ -51,7 +51,7 @@ async function fetchWithTimeout(
     return await fetch(url, { ...init, signal: controller.signal });
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new ApiError(408, JSON.stringify({ error: { message: 'Request timed out. Please try again.', code: 'timeout' } }));
+      throw new ApiError(408, JSON.stringify({ error: { message: 'Request timed out. Try again.', code: 'timeout' } }));
     }
     throw error;
   } finally {

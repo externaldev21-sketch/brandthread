@@ -44,7 +44,7 @@ export function ratingLabel(tenths: number | null | undefined): string | null {
   return (tenths / 10).toFixed(1);
 }
 
-const GENERIC_ERROR_FALLBACK = 'Something went wrong. Try again.';
+const GENERIC_ERROR_FALLBACK = 'Try again.';
 
 /**
  * Human-readable message from an api.ts error. Never surfaces the raw

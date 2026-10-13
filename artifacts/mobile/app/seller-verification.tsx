@@ -125,7 +125,7 @@ export default function SellerVerificationScreen() {
     try {
       const result = await (api as any).seller.verification.start();
       if (!result?.url) {
-        Alert.alert('Error', 'Could not start verification. Please try again.');
+        Alert.alert("Couldn't start verification", 'Try again.');
         return;
       }
 
@@ -133,8 +133,8 @@ export default function SellerVerificationScreen() {
       const canOpen = await Linking.canOpenURL(result.url);
       if (!canOpen) {
         Alert.alert(
-          'Cannot open browser',
-          'Please open this link manually:\n\n' + result.url,
+          "Couldn't open browser",
+          'Open this link yourself:\n\n' + result.url,
           [{ text: 'OK' }],
         );
         return;
@@ -156,7 +156,7 @@ export default function SellerVerificationScreen() {
           'We’re on it. Try again later or contact support.',
         );
       } else {
-        Alert.alert('Error', 'Could not start verification. Please try again later.');
+        Alert.alert("Couldn't start verification", 'Try again later.');
       }
     } finally {
       setStarting(false);
@@ -168,7 +168,7 @@ export default function SellerVerificationScreen() {
       'Start over?',
       'This will cancel your current verification attempt and let you try again with different documents.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep current', style: 'cancel' },
         {
           text: 'Start over',
           style: 'destructive',
@@ -178,7 +178,7 @@ export default function SellerVerificationScreen() {
               await (api as any).seller.verification.cancel();
               setState(prev => prev ? { ...prev, verificationStatus: 'unverified', sessionId: null } : prev);
             } catch {
-              Alert.alert('Error', 'Could not reset verification. Please try again.');
+              Alert.alert("Couldn't start over", 'Try again.');
             } finally {
               setCancelling(false);
             }

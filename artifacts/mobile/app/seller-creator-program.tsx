@@ -54,24 +54,24 @@ export default function SellerCreatorProgramScreen() {
     setData((d) => ({ ...d, program: { ...d.program, enabled } }));
     if (previewOnly) return;
     try { await api.affiliate.seller.saveProgram({ enabled }); }
-    catch { setData((d) => ({ ...d, program: { ...d.program, enabled: !enabled } })); flash("Couldn't update the program."); }
+    catch { setData((d) => ({ ...d, program: { ...d.program, enabled: !enabled } })); flash("Couldn't update the program. Try again."); }
   };
 
   const invite = async () => {
     setInviting(true);
     try {
-      if (previewOnly) { flash('Invites need a signed-in account.'); return; }
+      if (previewOnly) { flash('Sign in to invite'); return; }
       await api.affiliate.seller.invite(username.trim().replace(/^@/, ''));
       setUsername('');
       flash('Invite sent');
       await load();
-    } catch (e: any) { flash(e?.message ?? "Couldn't send the invite."); }
+    } catch (e: any) { flash(e?.message ?? "Couldn't send the invite. Try again."); }
     finally { setInviting(false); }
   };
 
   const approve = async (id: string) => {
     if (previewOnly) return;
-    try { await api.affiliate.seller.approve(id); await load(); } catch { flash("Couldn't approve."); }
+    try { await api.affiliate.seller.approve(id); await load(); } catch { flash("Couldn't approve. Try again."); }
   };
 
   const s = useMemo(() => StyleSheet.create({

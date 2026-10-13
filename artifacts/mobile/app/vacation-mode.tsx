@@ -62,14 +62,14 @@ export default function VacationModeScreen() {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
-        vacationMode ? '🏖 Vacation Mode Active' : '✅ Store Reopened',
+        vacationMode ? 'Vacation mode on' : 'Store reopened',
         vacationMode
           ? 'Buyers will see an away banner on your storefront. New orders are paused.'
           : 'Your store is open again. Buyers can place new orders.',
         [{ text: 'Done', onPress: () => goBackOr(router) }],
       );
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Could not save. Please try again.');
+      Alert.alert("Couldn't save", e?.message ?? 'Try again.');
     } finally {
       setSaving(false);
     }

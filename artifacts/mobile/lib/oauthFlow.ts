@@ -90,5 +90,5 @@ export function mapOAuthError(provider: string, error: unknown): string {
   ) {
     return `Couldn't connect to ${provider}. Check your internet and try again.`;
   }
-  return `${provider} sign-in failed. Please try again.`;
+  return `${provider} sign-in failed. Try again.`;
 }

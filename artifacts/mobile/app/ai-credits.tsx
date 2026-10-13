@@ -183,7 +183,7 @@ export default function AiCreditsScreen() {
       window.location.assign(url);
     } catch (e: any) {
       const cancelled = e?.userCancelled === true || /cancel/i.test(String(e?.message ?? ''));
-      if (!cancelled) Alert.alert('Purchase failed', 'Could not complete the purchase. Please try again.');
+      if (!cancelled) Alert.alert('Purchase failed', 'Try again.');
     } finally {
       setBuying(false);
     }

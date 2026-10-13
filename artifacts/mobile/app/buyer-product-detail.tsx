@@ -820,8 +820,8 @@ export default function BuyerProductDetailScreen() {
     try {
       await (api as any).waitlist.join(product.id, variant.id);
       setWaitlistJoined(true);
-      Alert.alert("You're on the waitlist", "We'll notify you the moment this drops back in stock.");
-    } catch { Alert.alert('Error', 'Could not join waitlist. Please try again.'); }
+      Alert.alert("You're on the waitlist", "We'll notify you the moment this restocks.");
+    } catch { Alert.alert("Couldn't join waitlist", 'Try again.'); }
     finally { setWaitlistLoading(false); }
   }
 
@@ -836,8 +836,8 @@ export default function BuyerProductDetailScreen() {
     try {
       await (api as any).buyer.reserve(product.id);
       setReserved(true);
-      Alert.alert('Reserved!', "Spot secured. We'll notify you once production is confirmed.");
-    } catch { Alert.alert('Error', 'Could not reserve. Please try again.'); }
+      Alert.alert('Reserved', "Spot secured. We'll notify you once production is confirmed.");
+    } catch { Alert.alert("Couldn't reserve your spot", 'Try again.'); }
     finally { setReserveLoading(false); }
   }
 
@@ -867,7 +867,7 @@ export default function BuyerProductDetailScreen() {
       if (addedBannerTimerRef.current) clearTimeout(addedBannerTimerRef.current);
       addedBannerTimerRef.current = setTimeout(() => setAddedToCart(false), 2500);
     } else {
-      Alert.alert('Cannot Add to Cart', result.message ?? 'Please try again.');
+      Alert.alert("Couldn't add to cart", result.message ?? 'Try again.');
     }
   }
 
@@ -921,7 +921,7 @@ export default function BuyerProductDetailScreen() {
       return;
     }
     if (!allSelected) {
-      Alert.alert('Select Options', 'Please select all options before continuing.');
+      Alert.alert('Choose options', 'Pick every option first.');
       return;
     }
     if (!variant) return;
@@ -936,8 +936,8 @@ export default function BuyerProductDetailScreen() {
           const status = await api.buyer.sellerPaymentStatus(sellerId);
           if (!status.ready) {
             Alert.alert(
-              'Payments Unavailable',
-              status.reason ?? 'This seller can\'t accept payments right now. Please try again later.',
+              'Payments unavailable',
+              status.reason ?? 'This seller can\'t accept payments right now. Try again later.',
               [{ text: 'OK' }],
             );
             setBuyingNow(false);
@@ -958,7 +958,7 @@ export default function BuyerProductDetailScreen() {
         router.push('/buyer-checkout?source=buynow' as never);
       }
     } catch (e) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      Alert.alert("Couldn't start checkout", 'Try again.');
     }
     setBuyingNow(false);
   }

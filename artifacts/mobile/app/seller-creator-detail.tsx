@@ -49,7 +49,7 @@ export default function SellerCreatorDetailScreen() {
     try {
       if (!previewOnly) await fn();
       if (leave) router.back(); else await load();
-    } catch (e: any) { setMsg(e?.message ?? 'Something went wrong.'); }
+    } catch (e: any) { setMsg(e?.message ?? "Couldn't save that change. Try again."); }
     finally { setBusy(null); }
   };
 

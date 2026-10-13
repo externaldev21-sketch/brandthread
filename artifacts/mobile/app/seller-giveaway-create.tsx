@@ -66,7 +66,7 @@ export default function SellerGiveawayCreate() {
       });
       router.replace(`/seller-giveaway-detail?id=${encodeURIComponent(g.id)}` as never);
     } catch (e: any) {
-      setError(e?.message || 'Could not create the giveaway.');
+      setError(e?.message || "Couldn't create the giveaway. Try again.");
     } finally { setBusy(false); }
   }
 

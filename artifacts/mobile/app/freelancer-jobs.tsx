@@ -119,7 +119,7 @@ export default function FreelancerJobsScreen() {
       await load();
     } catch (e) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Action failed', apiErrorMessage(e));
+      Alert.alert("Couldn't update job", apiErrorMessage(e));
     } finally {
       setBusyId(null);
     }
@@ -130,7 +130,7 @@ export default function FreelancerJobsScreen() {
       'Mark job complete?',
       `${formatPrice(job.freelancerPayoutCents)} will be transferred to your connected bank account.`,
       [
-        { text: 'Not yet', style: 'cancel' },
+        { text: 'Keep working', style: 'cancel' },
         { text: 'Complete & get paid', onPress: () => act(job, 'complete') },
       ],
     );

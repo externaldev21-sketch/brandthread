@@ -60,7 +60,7 @@ export default function AiBrandMemoryScreen() {
       setLocalMemory(m);
       Alert.alert('Brand memory rebuilt', 'Your brand profile has been derived from your products, posts, and store data.');
     } catch {
-      Alert.alert('Could not rebuild', 'There was a problem rebuilding brand memory. Try again.');
+      Alert.alert("Couldn't rebuild memory", 'Try again.');
     } finally {
       setRebuilding(false);
     }
@@ -79,9 +79,9 @@ export default function AiBrandMemoryScreen() {
       'Clear all memory',
       'This will reset all brand memory fields to their defaults. Are you sure?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep', style: 'cancel' },
         {
-          text: 'Clear',
+          text: 'Clear memory',
           style: 'destructive',
           onPress: () => {
             clearBrandMemory().then(m => {

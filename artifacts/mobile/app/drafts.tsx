@@ -150,9 +150,9 @@ export default function DraftsScreen() {
       'Discard draft?',
       `"${name}" will be permanently deleted.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep', style: 'cancel' },
         {
-          text: 'Discard',
+          text: 'Discard draft',
           style: 'destructive',
           onPress: async () => {
             await deleteDraft(draft.id);

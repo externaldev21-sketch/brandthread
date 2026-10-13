@@ -61,7 +61,7 @@ export default function LanguagesScreen() {
       await api.seller.updateSettings({ storeLanguage: code }) as any;
       setStoreLanguage(code);
     } catch {
-      Alert.alert('Error', 'Could not save language preference. Please try again.');
+      Alert.alert("Couldn't save language", 'Try again.');
     } finally {
       setSaving(null);
     }

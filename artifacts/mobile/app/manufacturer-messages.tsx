@@ -288,7 +288,7 @@ export default function ManufacturerMessagesScreen() {
       setPending([]);
       pendingOperations.current.complete(assets.length ? 'photo' : 'text', signature);
     } catch (error) {
-      if (!showUpgrade(error)) Alert.alert('Not sent', 'Your message didn\'t go through. Check your connection and tap send again.');
+      if (!showUpgrade(error)) Alert.alert('Message not sent', 'Tap send to try again.');
     } finally {
       setSending(false);
     }

@@ -117,7 +117,7 @@ function CounterOfferForm({
       });
       onSubmitted();
     } catch (e) {
-      Alert.alert('Error', 'Failed to submit counteroffer.');
+      Alert.alert("Couldn't send counteroffer", 'Try again.');
     } finally {
       setSubmitting(false);
     }
@@ -217,16 +217,16 @@ export default function QuoteDetailScreen() {
       'Accept Quote',
       'Are you sure you want to accept this quote? This will begin the production process.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Not yet', style: 'cancel' },
         {
-          text: 'Accept',
+          text: 'Accept quote',
           onPress: async () => {
             setActionLoading(true);
             try {
               await acceptQuote(quoteId!);
               await load();
             } catch (error) {
-              Alert.alert('Could not accept quote', error instanceof Error ? error.message : 'Refresh and try again.');
+              Alert.alert("Couldn't accept quote", error instanceof Error ? error.message : 'Refresh and try again.');
             } finally {
               setActionLoading(false);
             }
@@ -241,9 +241,9 @@ export default function QuoteDetailScreen() {
       'Decline Quote',
       'Are you sure you want to decline this quote?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep quote', style: 'cancel' },
         {
-          text: 'Decline',
+          text: 'Decline quote',
           style: 'destructive',
           onPress: async () => {
             setActionLoading(true);
@@ -251,7 +251,7 @@ export default function QuoteDetailScreen() {
               await declineQuote(quoteId!);
               goBackOr(router);
             } catch (error) {
-              Alert.alert('Could not decline quote', error instanceof Error ? error.message : 'Refresh and try again.');
+              Alert.alert("Couldn't decline quote", error instanceof Error ? error.message : 'Refresh and try again.');
             } finally {
               setActionLoading(false);
             }
@@ -270,7 +270,7 @@ export default function QuoteDetailScreen() {
       });
       router.push({ pathname: '/manufacturer-messages', params: { threadId: conv.id } } as any);
     } catch (error) {
-      Alert.alert('Could not open conversation', error instanceof Error ? error.message : 'Please try again.');
+      Alert.alert("Couldn't open conversation", error instanceof Error ? error.message : 'Try again.');
     }
   };
 
@@ -296,7 +296,7 @@ export default function QuoteDetailScreen() {
       });
       router.push({ pathname: '/sample-detail', params: { id: sample.id, paymentPrompt: '1' } } as any);
     } catch (err: any) {
-      Alert.alert('Could not start sample', err?.message ?? 'Please try again after refreshing the quote.');
+      Alert.alert("Couldn't start sample", err?.message ?? 'Refresh the quote and try again.');
     } finally {
       setActionLoading(false);
     }

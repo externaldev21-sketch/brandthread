@@ -488,8 +488,8 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
 
   const removeVariant = (variant: ProductVariant) => {
     Alert.alert('Remove variant?', `${variant.title} will no longer be sold.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => {
+      { text: 'Keep', style: 'cancel' },
+      { text: 'Remove variant', style: 'destructive', onPress: () => {
         (api as any).products?.updateVariant?.(product.id, variant.id, { status: 'inactive' })
           .then(() => {
             setProduct({

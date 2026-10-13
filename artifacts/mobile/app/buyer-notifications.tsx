@@ -368,7 +368,7 @@ export default function BuyerNotifications() {
   const handleClearRead = () => {
     Alert.alert('Clear read notifications', 'This will remove all read notifications.', [
       {
-        text: 'Clear',
+        text: 'Clear read',
         style: 'destructive',
         onPress: async () => {
           hapticDestructiveConfirm();
@@ -376,7 +376,7 @@ export default function BuyerNotifications() {
           await loadNotifs();
         },
       },
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Keep', style: 'cancel' },
     ]);
   };
 

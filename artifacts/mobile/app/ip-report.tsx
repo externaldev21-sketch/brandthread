@@ -48,7 +48,7 @@ export default function IpReportScreen() {
       await AsyncStorage.setItem(CASES_KEY, JSON.stringify(next));
       Alert.alert('Report submitted', `Your case reference is ${result.caseReference}. Keep it for status updates.`);
     } catch (error: any) {
-      Alert.alert('Could not submit report', error?.message ?? 'Please try again.');
+      Alert.alert("Couldn't submit report", error?.message ?? 'Try again.');
     } finally { setSubmitting(false); }
   };
   const refreshStatus = async (item: StoredCase) => {
@@ -57,7 +57,7 @@ export default function IpReportScreen() {
       const result = await api.ipCases.status(item.caseReference, item.statusToken);
       const next = cases.map(row => row.caseReference === item.caseReference ? { ...row, status: result.status } : row);
       setCases(next); await AsyncStorage.setItem(CASES_KEY, JSON.stringify(next));
-    } catch { Alert.alert('Unable to check status', 'Please try again later.'); }
+    } catch { Alert.alert("Couldn't check status", 'Try again later.'); }
     finally { setChecking(null); }
   };
   return <BrandthreadScreen>

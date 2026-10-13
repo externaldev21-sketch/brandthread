@@ -97,7 +97,7 @@ export default function LocationsScreen() {
       setModalVisible(false);
       await load();
     } catch {
-      Alert.alert('Error', 'Could not save location. Please try again.');
+      Alert.alert("Couldn't save location", 'Try again.');
     } finally {
       setSaving(false);
     }
@@ -105,15 +105,15 @@ export default function LocationsScreen() {
 
   async function handleDelete(loc: Location) {
     Alert.alert('Delete location', `Remove "${loc.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Keep', style: 'cancel' },
       {
-        text: 'Delete', style: 'destructive',
+        text: 'Delete location', style: 'destructive',
         onPress: async () => {
           try {
             await api.seller.deleteLocation(loc.id) as any;
             await load();
           } catch (e: any) {
-            Alert.alert('Cannot delete', e?.message ?? 'Please try again.');
+            Alert.alert("Couldn't delete location", e?.message ?? 'Try again.');
           }
         },
       },
