@@ -64,6 +64,8 @@ const PUBLIC_RULES: readonly Rule[] = [
   { methods: READ, pattern: new RegExp(`^reviews/(?:product|seller)/${SEG}$`) },
   { methods: READ, pattern: /^shipping-rates\/calculate$/ },
   { methods: READ, pattern: /^shipping-zones\/resolve$/ },
+  // Checkout ZIP autofill is public for guest buyers too.
+  { methods: READ, pattern: /^geo\/postal\/US\/\d{5}(?:-\d{4})?$/ },
   { methods: READ, pattern: new RegExp(`^team/invite/accept/${SEG}$`) },
 
   // IP / copyright reports can be filed by rights holders without an account.

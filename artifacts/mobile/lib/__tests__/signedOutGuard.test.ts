@@ -93,6 +93,15 @@ describe('signed-out API guard (lib/api.ts)', () => {
     expect(networkCalls()[0]).toContain('/api/v1/seller/profile');
   });
 
+  it('lets a guest checkout ZIP lookup reach its public endpoint', async () => {
+    const api = createApi(async () => null);
+    await expect(api.buyer.addresses.lookupPostal('10012')).resolves.toEqual({ fromNetwork: true });
+    expect(networkCalls()).toHaveLength(1);
+    expect(networkCalls()[0]).toContain('/api/v1/geo/postal/US/10012');
+    await expect(api.buyer.addresses.list()).rejects.toMatchObject({ status: 401 });
+    expect(networkCalls()).toHaveLength(1);
+  });
+
   it('a signed-in user on the dev web host is never mistaken for the preview', async () => {
     preview.role = 'seller';
     const api = createApi(async () => 'token');
