@@ -13,7 +13,7 @@ import {
   TextInput, Modal, Share, Animated, useWindowDimensions, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
@@ -43,6 +43,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { CaptionSpans } from '@/components/social/CaptionText';
 import { Snackbar } from '@/components/ui/Snackbar';
+import { PostOwnerSheet } from '@/components/social/PostOwnerSheet';
 import { pinPostWithReplacePrompt, unpinPost } from '@/services/postPinService';
 import { CaptionsOverlay, type CaptionSegment } from '@/components/social/CaptionsOverlay';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -193,6 +194,7 @@ export default function BuyerPostViewer() {
 
   const [post, setPost] = useState<BuyerPost | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
+  const [ownerSheetOpen, setOwnerSheetOpen] = useState(false);
   const [pinToast, setPinToast] = useState<string | null>(null);
   useEffect(() => {
     if (!pinToast) return;
@@ -341,7 +343,11 @@ export default function BuyerPostViewer() {
       <ScreenHeader
         title={authorName}
         onBack={() => goBackOr(router)}
-        actions={[{ icon: 'send', onPress: handleShare, accessibilityLabel: 'Share' }]}
+        actions={[
+          { icon: 'send', onPress: handleShare, accessibilityLabel: 'Share' },
+          // Owner ••• sheet (Instagram): Pin to your profile / Unpin from profile.
+          ...(canPin ? [{ icon: 'more-horizontal' as const, onPress: () => setOwnerSheetOpen(true), accessibilityLabel: 'More options' }] : []),
+        ]}
       />
       {tileExpandOverlay}
 
@@ -528,22 +534,6 @@ export default function BuyerPostViewer() {
           </View>
         ) : null}
 
-        {/* Owner-only: Pin to your profile (Instagram) — published posts only */}
-        {canPin && post ? (
-          <View style={{ paddingHorizontal: SP.md, marginTop: SP.lg }}>
-            <TouchableOpacity
-              style={s.captionsBtn}
-              onPress={() => { void togglePin(); }}
-              disabled={pinBusy}
-              accessibilityRole="button"
-              testID="toggle-pin"
-            >
-              <MaterialCommunityIcons name={post.pinnedAt ? 'pin-off-outline' : 'pin-outline'} size={16} color={FG} />
-              <Text style={s.captionsBtnText}>{post.pinnedAt ? 'Unpin from profile' : 'Pin to your profile'}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-
         {/* Owner-only danger zone */}
         {isOwner && (
           <View style={{ paddingHorizontal: SP.md, marginTop: SP.lg }}>
@@ -599,6 +589,7 @@ export default function BuyerPostViewer() {
           </TouchableOpacity>
         </ModalSafeArea>
       </Modal>
+      <PostOwnerSheet visible={ownerSheetOpen} onClose={() => setOwnerSheetOpen(false)} pinned={!!post?.pinnedAt} onTogglePin={() => { void togglePin(); }} />
       <Snackbar visible={!!pinToast} message={pinToast ?? ''} onDismiss={() => setPinToast(null)} />
     </View>
   );

@@ -6,8 +6,9 @@
  *   node scripts/f6-pinned-posts-screenshots.mjs --skip-build
  *
  * 01: a profile grid with three pinned posts first, pushpin glyph top-right.
- * 02-03: the owner's post viewer — "Pin to your profile", then pinned + toast.
- * 04: pinning a 4th post asks to replace the oldest pin (web confirm dialog text logged).
+ * 02: owner's post viewer with the ••• (More options) header button.
+ * 03/05: the ••• sheet with Pin to your profile / Unpin from profile; 04: pinned toast.
+ * Then pinning at the 3-pin cap asks to replace the oldest pin (web confirm text logged).
  * The pin endpoints and the pinned grid are faked with page routes.
  *
  * Output: docs/pr-assets/pinned-posts/ours/<NN-step>.png (repo root)
@@ -102,29 +103,44 @@ async function viewer(browser, origin, images) {
   });
   try {
     await openReliably(page, activity, origin, 'buyer', `/buyer-post-viewer?postId=${POST_ID}`);
-    await page.getByTestId('toggle-pin').waitFor({ timeout: 30_000 });
+    const more = page.getByRole('button', { name: 'More options' });
+    const pinRow = page.getByTestId('post-owner-sheet-pin');
+    await more.waitFor({ timeout: 30_000 });
     await waitForImages(page);
-    await page.getByTestId('toggle-pin').scrollIntoViewIfNeeded();
     await page.waitForTimeout(400);
-    await shot(page, '02-post-viewer-pin-action');
+    await shot(page, '02-post-viewer-more-button');
 
-    await page.getByTestId('toggle-pin').click();
+    await more.click();
+    await pinRow.waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(500);
+    await shot(page, '03-owner-sheet-pin');
+
+    await pinRow.click();
     await page.getByText('Post pinned to your profile').waitFor({ timeout: 10_000 });
-    await page.waitForTimeout(400);
-    await shot(page, '03-post-viewer-pinned-toast');
+    await page.waitForTimeout(500);
+    await shot(page, '04-post-viewer-pinned-toast');
 
-    // Unpin, then try again with 3 pins already used: the replace prompt appears.
-    await page.getByTestId('toggle-pin').click();
-    await page.getByText('Pin to your profile').waitFor({ timeout: 10_000 });
+    // Sheet now offers Unpin.
+    await more.click();
+    await page.getByText('Unpin from profile').waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(500);
+    await shot(page, '05-owner-sheet-unpin');
+    await pinRow.click();
+    await page.getByText('Post unpinned').waitFor({ timeout: 10_000 });
+
+    // With 3 pins already used, pinning asks to replace the oldest.
     state.full = true;
+    await page.waitForTimeout(400);
+    await more.click();
+    await pinRow.waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(400);
     const dialog = page.waitForEvent('dialog');
-    await page.getByTestId('toggle-pin').click();
+    await pinRow.click();
     const d = await dialog;
     console.log(`    replace prompt: ${JSON.stringify(d.message())}`);
     await d.accept();
     await page.getByText('Post pinned to your profile').waitFor({ timeout: 10_000 });
-    await page.waitForTimeout(300);
-    await shot(page, '04-post-viewer-replaced-oldest');
+    console.log('    replaced oldest pin: ok');
   } catch (error) {
     console.error(`  ✗ viewer: ${String(error?.message ?? error).split('\n')[0]}`);
     await shot(page, 'FAILED-viewer').catch(() => {});
