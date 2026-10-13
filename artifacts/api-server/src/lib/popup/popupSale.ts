@@ -287,7 +287,9 @@ export async function finalizePopupSale(pi: PopupIntent, paidAt: Date, options: 
         ...(oversold ? {} : {
           deliverBy: paidAt,
           deliveredAt: paidAt,
-          deliveryConfirmedBy: "in_person",
+          // The buyer took it in hand (orders_delivery_confirmed_by_valid
+          // allows carrier | buyer; source = 'popup' records it was in person).
+          deliveryConfirmedBy: "buyer",
           trackingStatus: "delivered",
           payoutReleaseAt: computePayoutReleaseAt(paidAt),
           fulfillmentPicked: true,
