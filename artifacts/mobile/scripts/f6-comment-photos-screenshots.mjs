@@ -57,6 +57,15 @@ function thread(extra = []) {
   };
 }
 
+async function scrollTop(page) {
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll('*')) {
+      if (el.scrollHeight > el.clientHeight + 4 && getComputedStyle(el).overflowY !== 'visible') el.scrollTop = 0;
+    }
+  });
+  await page.waitForTimeout(300);
+}
+
 async function shot(page, index, name) {
   mkdirSync(OUT, { recursive: true });
   const file = path.join(OUT, `${String(index).padStart(2, '0')}-${name}.png`);
@@ -88,12 +97,12 @@ async function main() {
     const name = route.request().url().includes('hoodie') ? 'hoodie-ember' : route.request().url().includes('mine') ? 'jacket-rust' : 'look-rust';
     return route.fulfill({ status: 200, contentType: 'image/jpeg', body: readFileSync(images[name]) });
   });
-  await page.route(`${API}/api/comment-media/upload`, async (route) => {
+  await page.route(`${API}/api/**/comment-media/upload`, async (route) => {
     if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     await new Promise((r) => setTimeout(r, 400));
     return json(route, { media: { id: 'm-new', url: `${STORAGE}/mine.jpg`, width: 900, height: 900 } }, 201);
   });
-  await page.route(`${API}/api/posts/${POST_ID}/comments**`, async (route) => {
+  await page.route(`${API}/api/**/posts/${POST_ID}/comments**`, async (route) => {
     const req = route.request();
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     if (req.method() === 'POST') {
@@ -111,10 +120,15 @@ async function main() {
   let i = 0;
   try {
     const target = `/buyer-post-comments?postId=${POST_ID}&postType=photo&postMediaUri=${encodeURIComponent(`${IMAGE_HOST}/demo/look-mono.jpg`)}`;
-    await openScreen(page, activity, origin, 'buyer', target);
-    await page.waitForSelector('[data-testid="comment-photo"]', { timeout: 20_000 });
+    for (let attempt = 0; ; attempt += 1) {
+      await openScreen(page, activity, origin, 'buyer', target);
+      const ok = await page.waitForSelector('[data-testid="comment-photo"]', { timeout: 12_000 }).then(() => true, () => false);
+      if (ok) break;
+      if (attempt >= 3) throw new Error('comments never loaded');
+    }
     await page.waitForTimeout(800);
     await waitForImages(page);
+    await scrollTop(page);
     await shot(page, ++i, 'comments-with-photos');
 
     // Expand the reply thread so the photo reply shows.
@@ -139,6 +153,7 @@ async function main() {
     await page.getByTestId('composer-send').click();
     await page.waitForTimeout(1200);
     await waitForImages(page);
+    await scrollTop(page);
     await shot(page, ++i, 'posted-photo-comment');
 
     await page.getByTestId('comment-photo').first().click();
