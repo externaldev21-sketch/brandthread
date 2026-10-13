@@ -386,6 +386,9 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
     }
     if (label.itemIds && label.status === "active" && label.trackingNumber) {
       await shipLabelledItems(label.orderId, ownerId, label.itemIds, label.trackingNumber, label.carrier ?? null);
+    } else if (label.provider === "easypost" && label.status === "active" && label.trackingNumber) {
+      // Shippo registers its own labels for tracking updates; an EasyPost label is registered like typed-in tracking.
+      void registerTrackingWithCarrier(label.orderId, label.carrier ?? null, label.trackingNumber);
     }
     // A generated tracking number releases a preorder's funds (per order);
     // an in-stock order's label cost is recovered from the seller's balance.

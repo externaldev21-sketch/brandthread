@@ -21,6 +21,7 @@ const shippoCreateShipment = vi.fn(async (..._args: any[]) => ({
 }));
 const shippoPurchase = vi.fn();
 const shippoRefund = vi.fn();
+const registerTrack = vi.fn(async (..._args: any[]) => {});
 
 vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (req: any, _res: unknown, next: () => void) => { req.clerkUserId = req.headers["x-test-user"]; next(); },
@@ -34,8 +35,8 @@ vi.mock("../../lib/shippo", () => ({
   purchaseTransaction: (...args: any[]) => shippoPurchase(...args),
   findTransaction: vi.fn(async () => null),
   refundTransaction: (...args: any[]) => shippoRefund(...args),
-  shippoCarrierToken: () => null,
-  registerTrack: vi.fn(),
+  shippoCarrierToken: (carrier: string | null) => (carrier ? carrier.toLowerCase() : null),
+  registerTrack: (...args: any[]) => registerTrack(...args),
   getTrack: vi.fn(),
 }));
 
@@ -199,6 +200,8 @@ describe("shipping label rates across providers", () => {
       provider: "easypost", status: "active", priceCents: 695, carrier: "USPS",
       trackingNumber: "9400100000000000000000", labelUrl: "https://easypost-files.example/label.pdf",
     });
+    // Shippo doesn't know this label: it is registered for tracking updates like typed-in tracking.
+    await vi.waitFor(() => expect(registerTrack).toHaveBeenCalledWith("usps", "9400100000000000000000", `brandthread-order/${orderId}`));
 
     epCalls.length = 0;
     const voided = await call(`/${bought.body.label.id}/void`, {});
