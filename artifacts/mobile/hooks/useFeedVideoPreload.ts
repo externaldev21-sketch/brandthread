@@ -20,9 +20,11 @@ export function useFeedVideoPreload(
   items: readonly PreloadCandidate[],
   activeIndex: number,
   enabled: boolean,
+  /** The viewer turned on "Use less cellular data": nothing is fetched ahead. */
+  userDataSaver = false,
 ): void {
   const managerRef = useRef<VideoPreloadManager | null>(null);
-  const active = enabled && Platform.OS !== 'web';
+  const active = enabled && !userDataSaver && Platform.OS !== 'web';
 
   useEffect(() => {
     if (!active) return undefined;

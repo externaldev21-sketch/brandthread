@@ -99,6 +99,7 @@ import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
+import { useDataSaverSetting } from '@/hooks/useDataSaverSetting';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
@@ -2958,7 +2959,10 @@ export default function FeedScreen({
     }),
     [displayItems],
   );
-  useFeedVideoPreload(preloadCandidates, activeIndex, Boolean(userId));
+  // "Use less cellular data" (#154): no videos fetched ahead of the one
+  // playing — neither the warm preloads nor the neighbouring pages' buffers.
+  const userDataSaver = useDataSaverSetting();
+  useFeedVideoPreload(preloadCandidates, activeIndex, Boolean(userId), userDataSaver);
 
   const viewabilityConfig = useRef(VERTICAL_PAGER_VIEWABILITY).current;
   // Buyer Home: chrome clearance for the rail/caption/scrub-bar, padded with
@@ -3173,7 +3177,7 @@ export default function FeedScreen({
             <SpotlightPage
               item={spotlight}
               isActive={contentIndex === activeContentIndex && !showNotifs}
-              preload={Math.abs(contentIndex - activeContentIndex) === 1}
+              preload={!userDataSaver && Math.abs(contentIndex - activeContentIndex) === 1}
               isFirstItem={contentIndex === 0}
                 pageWidth={pageWidth}
               pageHeight={pageHeight}
