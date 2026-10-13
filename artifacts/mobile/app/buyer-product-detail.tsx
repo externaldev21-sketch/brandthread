@@ -527,6 +527,8 @@ export default function BuyerProductDetailScreen() {
   const sizeBadgeModel = useSizeBadgeModel(product);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  // Set when the product 404s but the server named whose drop it was.
+  const [goneBrand, setGoneBrand] = useState<{ sellerId: string; sellerName: string } | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [qty, setQty] = useState(1);
@@ -590,6 +592,7 @@ export default function BuyerProductDetailScreen() {
 
     setLoading(true);
     setLoadFailed(false);
+    setGoneBrand(null);
     setSellerPaymentReady(null);
     setSellerPaymentReason(null);
 
@@ -634,6 +637,7 @@ export default function BuyerProductDetailScreen() {
             // A missing product (404) reads as not found; any other failure is a
             // load problem and gets a retry instead of a misleading dead end.
             if (!(loadError instanceof ApiError && loadError.status === 404) && !cancelled) setLoadFailed(true);
+            else if (!cancelled) setGoneBrand(goneBrandFrom(loadError as ApiError));
           }
         }
         // Dev-web preview only: a seeded `preview-product-*` has no catalog
@@ -757,13 +761,23 @@ export default function BuyerProductDetailScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
         <View style={{ height: GALLERY_HEIGHT, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: SP.lg }}>
-          <Feather name="alert-circle" size={ICON.xl} color={RED} />
-          <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.base, textAlign: 'center' }}>{loadFailed ? "Couldn't load this product" : 'Product not found'}</Text>
-          <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 }}>
-            {loadFailed ? 'Check your connection and try again.' : 'This product may be unavailable or the link may have expired.'}
-          </Text>
+          <Feather name={loadFailed ? 'alert-circle' : 'package'} size={ICON.xl} color={loadFailed ? RED : FG} />
+          <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.base, textAlign: 'center' }}>{loadFailed ? "Couldn't load this product" : 'This drop is gone'}</Text>
+          {loadFailed ? (
+            <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 }}>
+              Check your connection and try again.
+            </Text>
+          ) : null}
           {loadFailed ? (
             <Button label="Retry" onPress={() => setReloadTick((n) => n + 1)} variant="secondary" size="small" icon="refresh-cw" />
+          ) : goneBrand ? (
+            <Button
+              label={`Visit ${goneBrand.sellerName}`}
+              onPress={() => router.replace(profileHref({ userId: goneBrand.sellerId, accountType: 'seller' }) as never)}
+              variant="secondary"
+              size="small"
+              testID="product-gone-brand-link"
+            />
           ) : (
             <Button label="Go back" onPress={leaveProduct} variant="secondary" size="small" icon="chevron-left" />
           )}
@@ -1985,3 +1999,15 @@ const sz = StyleSheet.create({
   toggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.sm },
   label:  { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
 });
+
+/** Brand named by a "gone" product 404 (api-server lib/goneProduct.ts). */
+function goneBrandFrom(error: ApiError): { sellerId: string; sellerName: string } | null {
+  try {
+    const gone = (JSON.parse(error.body) as { gone?: { sellerId?: unknown; sellerName?: unknown } }).gone;
+    return gone && typeof gone.sellerId === 'string' && typeof gone.sellerName === 'string'
+      ? { sellerId: gone.sellerId, sellerName: gone.sellerName }
+      : null;
+  } catch {
+    return null;
+  }
+}

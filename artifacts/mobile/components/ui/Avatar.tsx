@@ -1,11 +1,12 @@
 /**
  * Brandthread Design System — Avatar (Phase 1)
  *
- * A round avatar with graceful initials fallback, built on the shared
+ * A round avatar with graceful initials fallback (no photo, or a photo that
+ * fails to load), built on the shared
  * CachedImage component (components/CachedImage.tsx) so caching/placeholder
  * behavior is consistent with the rest of the app.
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ImageStyle, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -28,11 +29,15 @@ function initialsFor(name?: string) {
 export function Avatar({ uri, name, size = 40, style }: AvatarProps) {
   const { theme } = useAppTheme();
   const dimension = { width: size, height: size, borderRadius: RADII.avatar };
+  // A photo that fails to load falls back to the same initials as no photo.
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [uri]);
 
-  if (uri) {
+  if (uri && !failed) {
     return (
       <CachedImage
         source={{ uri }}
+        onError={() => setFailed(true)}
         style={[dimension, style] as StyleProp<ImageStyle>}
         accessibilityLabel={name ? `${name}'s avatar` : 'Avatar'}
       />

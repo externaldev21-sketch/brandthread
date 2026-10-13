@@ -130,7 +130,7 @@ export const ProductCard = React.memo(function ProductCard({
             >
             <View style={{ height: imageHeight, width: '100%' }}>
             {coverUri ? (
-              <CachedImage source={{ uri: coverUri }} style={s.image} contentFit="cover" recyclingKey={product.id} />
+              <CachedImage source={{ uri: coverUri }} style={s.image} contentFit="cover" recyclingKey={product.id} fallbackLabel={product.name ?? ''} />
             ) : (
               <LinearGradient colors={gradColors} style={s.image} />
             )}
