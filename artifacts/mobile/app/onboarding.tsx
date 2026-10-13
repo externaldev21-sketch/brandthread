@@ -87,6 +87,7 @@ import { PENDING_DRAFT_KEY, parseDraft, resolveResumeStep, sanitizeDraftForStora
 
 import { EMPTY_SURVEY, hasSurveyAnswers, sanitizeDraftSurvey, saveBuyerSurvey, type OnboardingSurvey } from '@/lib/onboardingSurvey';
 import { TasteQuizStep } from '@/components/onboarding/TasteQuizStep';
+import { ProfileBuildCard, FlippingProfileCard } from '@/components/onboarding/ProfileBuildCard';
 import type { QuizSwipe } from '@/lib/tasteQuiz';
 
 import { Icon, Input } from '@/components/ui';
@@ -1318,6 +1319,12 @@ export default function OnboardingScreen() {
         testID={`onboarding-step-${flow ?? 'choose'}-${stepId}`}
         accessibilityLabel={`Onboarding ${flow ?? 'choose'} ${stepId.toLowerCase()}`}
       >
+        {['NAME', 'BRAND_NAME', 'USERNAME', 'PHOTO'].includes(stepId) && (
+          <ProfileBuildCard data={{ name: flow === 'seller' ? brandName || fullName : fullName, handle: username, photoUri }} onPickPhoto={() => { void pickPhoto(); }} />
+        )}
+        {stepId === 'WELCOME_USER' && (
+          <FlippingProfileCard data={{ name: fullName, handle: username, photoUri }} />
+        )}
         {renderStep()}
       </Animated.View>
     </View>
