@@ -1413,6 +1413,10 @@ export function respond({ method, path, query, role, options = {} }) {
   // for surfaces this fixture doesn't model yet.
   if ((match = p.match(/^\/returns\/([^/]+)$/))) return null;
   if ((match = p.match(/^\/disputes\/([^/]+)$/))) return null;
+  // Products tab badges (GET /api/products/sales-flags) and the bulk editor's
+  // collection filter (GET /api/sales/collections) — derived from the catalogue above.
+  if (p === '/products/sales-flags') return role === 'seller' ? { prod_nl_hoodie_bone: 'best_seller' } : {};
+  if (p === '/sales/collections') return role === 'seller' ? [...new Set(SELLER_PRODUCTS.map((product) => product.category))].sort() : [];
   if ((match = p.match(/^\/products\/([^/]+)$/))) return byId(SELLER_PRODUCTS)(match[1]) ?? null;
   if (p === '/taxes/status') return {
     stripeTaxEnabled: false, provider: 'stripe', providerConfigured: true, providerStatus: 'not_enabled',

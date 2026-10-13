@@ -32,6 +32,7 @@ import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
 import { Button, SegmentedControl } from '@/components/ui';
 import { StockFlag } from '@/components/products/StockFlag';
 import { showActionSheet } from '@/components/ui/ActionSheet';
+import { CollectionFilterRow } from '@/components/products/CollectionFilterRow';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -97,6 +98,7 @@ export default function ProductsBulkEditScreen() {
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
   const [status, setStatus] = useState<BulkStatusFilter>('all');
+  const [collection, setCollection] = useState('');
   const [items, setItems] = useState<BulkProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -140,7 +142,7 @@ export default function ProductsBulkEditScreen() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.productBulk.list({ q: debounced, status });
+      const res = await api.productBulk.list({ q: debounced, status, collection });
       setItems(res.items);
       setSelected(prev => new Set([...prev].filter(id => res.items.some(i => i.id === id))));
     } catch (err) {
@@ -148,7 +150,7 @@ export default function ProductsBulkEditScreen() {
     } finally {
       setLoading(false);
     }
-  }, [api, debounced, status, isLoaded, isSignedIn, preview, demo, catalog]);
+  }, [api, debounced, status, collection, isLoaded, isSignedIn, preview, demo, catalog]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -271,6 +273,7 @@ export default function ProductsBulkEditScreen() {
       <View style={s.chips}>
         <SegRow options={STATUS_CHIPS} value={status} onChange={setStatus} s={s} />
       </View>
+      <CollectionFilterRow value={collection} onChange={setCollection} enabled={isLoaded === true && isSignedIn === true && !isSellerDevPreview()} />
 
       <PressableScale
         style={s.selectAll}
@@ -300,7 +303,7 @@ export default function ProductsBulkEditScreen() {
         >
           {items.length === 0 && !loading ? (
             <View style={s.center}>
-              <Text style={s.emptyText}>{debounced || status !== 'all' ? 'No products match.' : 'No products yet.'}</Text>
+              <Text style={s.emptyText}>{debounced || status !== 'all' || collection ? 'No products match.' : 'No products yet.'}</Text>
             </View>
           ) : items.map(item => (
             <ProductRow key={item.id} item={item} checked={selected.has(item.id)} onPress={() => toggle(item.id)} theme={theme} s={s} />

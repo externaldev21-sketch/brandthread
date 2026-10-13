@@ -73,6 +73,8 @@ import { DEFAULT_PRODUCT_SORT, PRODUCT_SORT_OPTIONS, productSortLabel, productSo
 import { productEmptyCopy } from '@/lib/sellerLists/emptyCopy';
 
 import { SELLER_PRODUCTS_GESTURE } from '@/lib/firstRunTips/content';
+import { previewSalesFlags, type SalesFlagMap } from '@/lib/productSalesFlags';
+import { getProductSalesFlags } from '@/services/productSalesFlagsService';
 
 import { useApi } from '@/lib/api';
 
@@ -539,6 +541,7 @@ export default function ProductsScreen() {
     });
   }, []);
   const isGrid = viewMode === 'grid';
+  const [salesFlags, setSalesFlags] = useState<SalesFlagMap>({});
 
   const showPreviewOnlyFeedback = useCallback(() => {
     Alert.alert('Sign in required', 'Sign in to manage products.');
@@ -603,6 +606,7 @@ export default function ProductsScreen() {
           || product.category.toLowerCase().includes(query)),
       );
       setProducts(filtered);
+      setSalesFlags(previewSalesFlags(allProducts));
       setStats(getPreviewProductStats(allProducts));
       setLoading(false);
       return;
@@ -626,6 +630,7 @@ export default function ProductsScreen() {
       const list = Array.isArray(result) ? result : [];
       setProducts(previewOnlyRef.current ? localPreviewSaves(list) : list);
       loadedKeyRef.current = key;
+      getProductSalesFlags().then(setSalesFlags, () => {});
       await loadStats();
     } catch {
       if (!silent) setProducts([]);
@@ -871,10 +876,11 @@ export default function ProductsScreen() {
         onQuickArchive={handleQuickArchive}
         onQuickDelete={handleDelete}
         onEditStock={openStockEditor}
+        salesFlag={salesFlags[item.id]}
       />
     </View>
     )
-  ), [isGrid, openProduct, onProductPressIn, openActionSheet, openStockEditor, cardWidth, gridGap]);
+  ), [isGrid, openProduct, onProductPressIn, openActionSheet, openStockEditor, cardWidth, gridGap, salesFlags]);
 
   const keyExtractor = useCallback((item: Product) => item.id, []);
 
@@ -985,6 +991,7 @@ export default function ProductsScreen() {
           data={sortedProducts}
           keyExtractor={keyExtractor}
           renderItem={renderProduct}
+          extraData={salesFlags}
           numColumns={isGrid ? gridColumns : 1}
           key={isGrid ? `cols-${gridColumns}` : 'list'}
           ListHeaderComponent={ListHeader}

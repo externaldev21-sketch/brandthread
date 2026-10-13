@@ -315,6 +315,21 @@ describe("GET /products", () => {
     const bySku = await call(owner, `/products?q=ZJ-B-${suffix}`);
     expect(bySku.body.items).toHaveLength(1);
   });
+
+  it("filters by collection: category or tag name, case-insensitive", async () => {
+    const owner = `${seller}-coll`;
+    const tee = await seed(owner, "Coll Tee");
+    const hoodie = await seed(owner, "Coll Hoodie");
+    await seed(owner, "Coll Cap");
+    await db.update(products).set({ category: "Summer Drop" }).where(eq(products.id, tee));
+    await db.update(products).set({ tags: ["basics", " summer drop "] }).where(eq(products.id, hoodie));
+    const res = await call(owner, `/products?collection=${encodeURIComponent("summer drop")}`);
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(2);
+    expect(res.body.items.map((i: any) => i.name).sort()).toEqual(["Coll Hoodie", "Coll Tee"]);
+    const none = await call(owner, "/products?collection=nothing");
+    expect(none.body.items).toEqual([]);
+  });
 });
 
 describe("POST /stock", () => {
