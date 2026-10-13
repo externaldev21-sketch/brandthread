@@ -1374,7 +1374,7 @@ function PaymentTab({ order }: { order: Order }) {
       <SecondaryButton
         label="Download invoice"
         icon="file-text"
-        onPress={() => { shareInvoice(invoiceFromSellerOrder(order)).catch((err: any) => Alert.alert('Could not create invoice', err?.message ?? 'Please try again.')); }}
+        onPress={() => { shareInvoice(invoiceFromSellerOrder(order)).catch((err: any) => Alert.alert("Couldn't create invoice", err?.message ?? 'Try again.')); }}
       />
 
       {order.heldFunds && (

@@ -137,7 +137,7 @@ export default function ManufacturerProfileScreen() {
         setSaved(true);
       }
     } catch {
-      Alert.alert('Could not update favorite', 'Please try again.');
+      Alert.alert("Couldn't update favorite", 'Try again.');
     } finally {
       setActionLoading(false);
     }
@@ -154,7 +154,7 @@ export default function ManufacturerProfileScreen() {
       const conv = await getOrCreateConversation(id, { contextLabel: 'General' });
       router.push(('/manufacturer-messages?threadId=' + conv.id) as never);
     } catch {
-      Alert.alert('Could not open conversation', 'Please try again.');
+      Alert.alert("Couldn't open conversation", 'Try again.');
     }
   }
 

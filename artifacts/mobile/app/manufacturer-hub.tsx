@@ -1063,7 +1063,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
     if (rel.threadId) { go(rel.threadId); return; }
     getOrCreateConversation(rel.manufacturerId)
       .then((conv) => go(conv.id))
-      .catch((e) => { if (!showManufacturerUpgrade(e, router)) Alert.alert('Message unavailable', 'Could not open a conversation. Please try again.'); });
+      .catch((e) => { if (!showManufacturerUpgrade(e, router)) Alert.alert("Couldn't open conversation", 'Try again.'); });
   };
 
   if (loading && relationships.length === 0) {
@@ -1208,18 +1208,18 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   useFocusEffect(useCallback(() => { setLoading(true); load(); }, []));
 
   const handleAccept = (quote: Quote) => {
-    Alert.alert('Accept Quote', `Accept this quote for ${formatCents(quote.unitPriceCents)}/unit?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Accept', onPress: () => acceptQuote(quote.id).then(load)
-        .catch(() => Alert.alert('Quote update failed', 'Could not accept this quote. Refresh and try again.')) },
+    Alert.alert('Accept quote?', `Accept this quote for ${formatCents(quote.unitPriceCents)}/unit?`, [
+      { text: 'Not yet', style: 'cancel' },
+      { text: 'Accept quote', onPress: () => acceptQuote(quote.id).then(load)
+        .catch(() => Alert.alert("Couldn't accept quote", 'Refresh and try again.')) },
     ]);
   };
 
   const handleDecline = (quote: Quote) => {
-    Alert.alert('Decline Quote', 'Are you sure you want to decline this quote?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Decline', style: 'destructive', onPress: () => declineQuote(quote.id).then(load)
-        .catch(() => Alert.alert('Quote update failed', 'Could not decline this quote. Refresh and try again.')) },
+    Alert.alert('Decline quote?', 'Are you sure you want to decline this quote?', [
+      { text: 'Keep quote', style: 'cancel' },
+      { text: 'Decline quote', style: 'destructive', onPress: () => declineQuote(quote.id).then(load)
+        .catch(() => Alert.alert("Couldn't decline quote", 'Refresh and try again.')) },
     ]);
   };
 
@@ -1273,7 +1273,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
                 req={req}
                 manufacturerName={manufacturerNames[req.manufacturerId]}
                 onView={() => router.push((`/quote-detail?quoteId=${req.id}`) as never)}
-                onWithdraw={() => withdrawQuoteRequest(req.id).then(load).catch(() => Alert.alert('Quote update failed', 'Could not withdraw this request. Refresh and try again.'))}
+                onWithdraw={() => withdrawQuoteRequest(req.id).then(load).catch(() => Alert.alert("Couldn't withdraw request", 'Refresh and try again.'))}
               />
             ))}
           </>

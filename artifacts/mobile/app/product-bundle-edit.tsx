@@ -121,7 +121,7 @@ export default function ProductBundleEditScreen() {
         size:        variant?.size ?? null,
         color:       variant?.color ?? null,
       }]);
-    } catch { Alert.alert('Error', 'Could not add item to bundle.'); }
+    } catch { Alert.alert("Couldn't add to bundle", 'Try again.'); }
   }
 
   async function removeItem(itemId: string) {
@@ -164,21 +164,21 @@ export default function ProductBundleEditScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert('Saved', 'Bundle updated successfully.');
       }
-    } catch { Alert.alert('Error', 'Could not save bundle.'); }
+    } catch { Alert.alert("Couldn't save bundle", 'Try again.'); }
     finally { setSaving(false); }
   }
 
   async function deleteBundle() {
     Alert.alert('Delete bundle?', 'This bundle will be removed. Products are not affected.', [
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Keep', style: 'cancel' },
       {
-        text: 'Delete', style: 'destructive',
+        text: 'Delete bundle', style: 'destructive',
         onPress: async () => {
           setDeleting(true);
           try {
             await (api as any).bundles.delete(bundleId!);
             goBackOr(router);
-          } catch { Alert.alert('Error', 'Could not delete bundle.'); }
+          } catch { Alert.alert("Couldn't delete bundle", 'Try again.'); }
           finally { setDeleting(false); }
         },
       },

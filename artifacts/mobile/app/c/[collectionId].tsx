@@ -99,12 +99,12 @@ export default function PublicCollectionScreen() {
       <View style={[styles.root, styles.center, { paddingTop: headerTopInset }]}>
         <Feather name={state.kind === 'not_found' ? 'folder' : 'alert-circle'} size={40} color={MUTED} />
         <Text style={styles.messageTitle}>
-          {state.kind === 'not_found' ? 'Collection not found' : 'Something went wrong'}
+          {state.kind === 'not_found' ? 'Collection not found' : "Couldn't load collection"}
         </Text>
         <Text style={styles.messageDesc}>
           {state.kind === 'not_found'
             ? 'This collection may be private or no longer exists.'
-            : 'Please check your connection and try again.'}
+            : 'Check your connection and try again.'}
         </Text>
         <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace('/' as never)}>
           <Text style={styles.primaryBtnText}>Open Brandthread</Text>

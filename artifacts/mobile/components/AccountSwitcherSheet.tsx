@@ -152,7 +152,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
         ? "You'll stay logged into your other accounts."
         : undefined,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Stay', style: 'cancel' },
         {
           text: 'Log out', style: 'destructive',
           onPress: async () => {
@@ -163,7 +163,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
               // touching any other signed-in session.
               await clerk.signOut({ sessionId: account.id });
             } catch {
-              Alert.alert('Error', "Couldn't log out that account. Try again.");
+              Alert.alert("Couldn't log out", 'Try again.');
             } finally {
               setLoggingOutId(null);
             }

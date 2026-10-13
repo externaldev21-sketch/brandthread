@@ -116,7 +116,7 @@ export default function StatementsScreen() {
         }
       }
     } catch {
-      Alert.alert('Download failed', 'Could not download this statement. Check your connection and try again.');
+      Alert.alert('Download failed', 'Try again.');
     } finally {
       setBusy(null);
     }

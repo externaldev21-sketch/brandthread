@@ -103,9 +103,9 @@ export default function ProductionDetailScreen() {
     if (!order) return;
     Alert.alert('Decline this card?', 'The manufacturer will be told you passed. They can send a new card with a different price.', [
       { text: 'Keep it', style: 'cancel' },
-      { text: 'Decline', style: 'destructive', onPress: async () => {
+      { text: 'Decline card', style: 'destructive', onPress: async () => {
         setBusy('decline'); setActionError('');
-        try { await declineOrderCard(order.id); await load(true); } catch (e: any) { setActionError(e?.message ?? 'Could not decline. Try again.'); } finally { setBusy(null); }
+        try { await declineOrderCard(order.id); await load(true); } catch (e: any) { setActionError(e?.message ?? "Couldn't decline. Try again."); } finally { setBusy(null); }
       } },
     ]);
   };
@@ -116,7 +116,7 @@ export default function ProductionDetailScreen() {
       { text: 'Not yet', style: 'cancel' },
       { text: 'It arrived', onPress: async () => {
         setBusy('confirm'); setActionError('');
-        try { await confirmOrderDelivery(order.id); await load(true); } catch (e: any) { setActionError(e?.message ?? 'Could not confirm delivery. Try again.'); } finally { setBusy(null); }
+        try { await confirmOrderDelivery(order.id); await load(true); } catch (e: any) { setActionError(e?.message ?? "Couldn't confirm delivery. Try again."); } finally { setBusy(null); }
       } },
     ]);
   };

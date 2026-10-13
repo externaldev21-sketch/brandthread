@@ -48,7 +48,7 @@ export default function SizeChartTemplatesScreen() {
       await api.sizeChartTemplates.apply(t.id, [productId]);
       goBackOr(router);
     } catch {
-      Alert.alert('Could not apply', 'Try again in a moment.');
+      Alert.alert("Couldn't apply chart", 'Try again in a moment.');
     } finally {
       setApplying(null);
     }

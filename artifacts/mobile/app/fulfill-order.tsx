@@ -212,7 +212,7 @@ export default function FulfillOrderScreen() {
       setAddingPreset(false);
       setNewPreset({ name: '', weightOz: '', lengthIn: '', widthIn: '', heightIn: '' });
     } catch (err: any) {
-      Alert.alert('Could not save preset', err?.message ?? 'Please try again.');
+      Alert.alert("Couldn't save box", err?.message ?? 'Try again.');
     }
   }
 
@@ -222,7 +222,7 @@ export default function FulfillOrderScreen() {
       setPresets(prev => prev.filter(p => p.id !== id));
       setPackageChoice(prev => (prev?.kind === 'preset' && prev.presetId === id ? null : prev));
     } catch (err: any) {
-      Alert.alert('Could not delete preset', err?.message ?? 'Please try again.');
+      Alert.alert("Couldn't delete box", err?.message ?? 'Try again.');
     }
   }
 
@@ -275,7 +275,7 @@ export default function FulfillOrderScreen() {
     } catch (err: any) {
       Alert.alert(
         'Label not purchased',
-        err?.message ?? 'Could not purchase this label. You can enter tracking manually instead.',
+        err?.message ?? 'Try again, or enter tracking manually.',
       );
       setManualMode(true);
     } finally {
@@ -333,7 +333,7 @@ export default function FulfillOrderScreen() {
         router.replace('/(tabs)/orders');
       });
     } catch (err: any) {
-      Alert.alert('Could not mark shipped', err?.message ?? 'Please try again.');
+      Alert.alert("Couldn't mark shipped", err?.message ?? 'Try again.');
     } finally {
       setMarking(false);
     }
@@ -344,7 +344,7 @@ export default function FulfillOrderScreen() {
     try {
       await sharePackingSlip(order);
     } catch (err: any) {
-      Alert.alert('Could not create packing slip', err?.message ?? 'Please try again.');
+      Alert.alert("Couldn't create packing slip", err?.message ?? 'Try again.');
     }
   }
 
@@ -387,7 +387,7 @@ export default function FulfillOrderScreen() {
       'Void label',
       'Are you sure you want to void this label? This cannot be undone.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep label', style: 'cancel' },
         {
           text: 'Void label',
           style: 'destructive',
@@ -398,7 +398,7 @@ export default function FulfillOrderScreen() {
               setLabel(updated);
               if (updated.refundPending) Alert.alert('Void requested', 'The carrier is processing the label refund.');
             } catch (err: any) {
-              Alert.alert('Could not void label', err?.message ?? 'Try again later.');
+              Alert.alert("Couldn't void label", err?.message ?? 'Try again later.');
             }
           },
         },
@@ -529,9 +529,9 @@ export default function FulfillOrderScreen() {
                   <TouchableOpacity
                     key={p.id}
                     onPress={() => { Haptics.selectionAsync().catch(() => {}); setPackageChoice({ kind: 'preset', presetId: p.id }); }}
-                    onLongPress={() => Alert.alert('Delete preset', `Remove "${p.name}"?`, [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Delete', style: 'destructive', onPress: () => handleDeletePreset(p.id) },
+                    onLongPress={() => Alert.alert('Delete box?', `Remove "${p.name}"?`, [
+                      { text: 'Keep', style: 'cancel' },
+                      { text: 'Delete box', style: 'destructive', onPress: () => handleDeletePreset(p.id) },
                     ])}
                     style={[s.presetChip, active && { borderColor: ACCENT, backgroundColor: ACCENT_DIM }]}
                   >

@@ -65,11 +65,11 @@ export default function RfqCompareScreen() {
   async function handleAccept(quote: RfqQuote) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert('Accept quote', `Accept ${quote.manufacturerName}'s quote of ${formatCents(quote.quotedPriceCents ?? 0)}?`, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Not yet', style: 'cancel' },
       {
-        text: 'Accept', onPress: async () => {
+        text: 'Accept quote', onPress: async () => {
           setBusyId(quote.id);
-          try { await acceptQuote(quote.id); await load(); } catch { Alert.alert('Could not accept', 'Please try again.'); } finally { setBusyId(null); }
+          try { await acceptQuote(quote.id); await load(); } catch { Alert.alert("Couldn't accept quote", 'Try again.'); } finally { setBusyId(null); }
         },
       },
     ]);
@@ -77,11 +77,11 @@ export default function RfqCompareScreen() {
 
   function handleDecline(quote: RfqQuote) {
     Alert.alert('Decline quote', `Decline ${quote.manufacturerName}'s quote?`, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Keep quote', style: 'cancel' },
       {
-        text: 'Decline', style: 'destructive', onPress: async () => {
+        text: 'Decline quote', style: 'destructive', onPress: async () => {
           setBusyId(quote.id);
-          try { await declineQuote(quote.id); await load(); } catch { Alert.alert('Could not decline', 'Please try again.'); } finally { setBusyId(null); }
+          try { await declineQuote(quote.id); await load(); } catch { Alert.alert("Couldn't decline quote", 'Try again.'); } finally { setBusyId(null); }
         },
       },
     ]);

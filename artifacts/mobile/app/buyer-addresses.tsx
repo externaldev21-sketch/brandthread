@@ -128,22 +128,22 @@ export default function BuyerAddressesScreen() {
       await load();
       handleCancel();
     } catch (e: any) {
-      Alert.alert('Error', "Couldn't save this address. Try again.");
+      Alert.alert("Couldn't save address", 'Try again.');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    Alert.alert('Delete Address', 'Are you sure you want to remove this address?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
+    Alert.alert('Delete address?', 'Are you sure you want to remove this address?', [
+      { text: 'Keep', style: 'cancel' },
+      { text: 'Delete address', style: 'destructive', onPress: async () => {
         try {
           hapticDestructiveConfirm();
           await api.buyer.addresses.delete(id);
           await load();
         } catch {
-          Alert.alert('Error', 'Could not delete address.');
+          Alert.alert("Couldn't delete address", 'Try again.');
         }
       }}
     ]);
@@ -155,7 +155,7 @@ export default function BuyerAddressesScreen() {
       await api.buyer.addresses.setDefault(id);
       await load();
     } catch {
-      Alert.alert('Error', 'Could not set default address.');
+      Alert.alert("Couldn't set default address", 'Try again.');
     }
   };
 

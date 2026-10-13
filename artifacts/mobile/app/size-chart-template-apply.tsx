@@ -39,7 +39,7 @@ export default function SizeChartTemplateApplyScreen() {
         const visibleIds = new Set(activeRows.map((p) => p.id));
         setSelected(new Set(tpl.products.map((p) => p.id).filter((pid) => visibleIds.has(pid))));
       })
-      .catch(() => { if (live) Alert.alert('Could not load products'); })
+      .catch(() => { if (live) Alert.alert("Couldn't load products", 'Go back and try again.'); })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
   }, [api, id]);
@@ -63,7 +63,7 @@ export default function SizeChartTemplateApplyScreen() {
       await api.sizeChartTemplates.apply(id, [...selected]);
       goBackOr(router);
     } catch {
-      Alert.alert('Could not apply', 'Try again in a moment.');
+      Alert.alert("Couldn't apply template", 'Try again in a moment.');
     } finally {
       setApplying(false);
     }

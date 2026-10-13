@@ -64,7 +64,7 @@ export default function WaitlistDemandScreen() {
       [
         { text: 'Not yet', style: 'cancel' },
         {
-          text: 'Notify',
+          text: 'Notify waitlist',
           onPress: async () => {
             setSending(row.variantId);
             try { await api.waitlist.sellerNotify(row.variantId!); await load(true); }

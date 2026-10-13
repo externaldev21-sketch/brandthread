@@ -124,7 +124,7 @@ export default function DeleteAccountScreen() {
         setTyped('');
         setAcknowledged(false);
       } else {
-        setDeleteError(apiErrorMessage(err, 'We couldn’t schedule your account deletion. Please try again or contact support@brandthread.app.'));
+        setDeleteError(apiErrorMessage(err, 'We couldn’t schedule your account deletion. Try again, or email support@brandthread.app.'));
       }
     } finally {
       setDeleting(false);

@@ -380,7 +380,7 @@ export default function SellerInboxScreen() {
     try {
       await markConversationRead(c.id);
     } catch {
-      Alert.alert('Couldn’t mark as read', 'Please try again.');
+      Alert.alert('Couldn’t mark as read', 'Try again.');
     }
   }
 
@@ -395,7 +395,7 @@ export default function SellerInboxScreen() {
       }
     } catch {
       setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, isPinned: c.isPinned } : row)));
-      Alert.alert(nextPinned ? 'Couldn’t pin' : 'Couldn’t unpin', 'Please try again.');
+      Alert.alert(nextPinned ? 'Couldn’t pin' : 'Couldn’t unpin', 'Try again.');
     }
   }
 
@@ -408,7 +408,7 @@ export default function SellerInboxScreen() {
         initials: other.initials, color: other.color,
       });
     } catch {
-      Alert.alert('Couldn’t mute', 'Please try again.');
+      Alert.alert('Couldn’t mute', 'Try again.');
     }
   }
 
@@ -419,7 +419,7 @@ export default function SellerInboxScreen() {
       await archiveConversation(c.id);
     } catch {
       setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, isArchived: false } : row)));
-      Alert.alert('Couldn’t archive', 'Please try again.');
+      Alert.alert('Couldn’t archive', 'Try again.');
     }
   }
 
@@ -489,7 +489,7 @@ export default function SellerInboxScreen() {
       await blockSellerConversationRequestUser(c.id, other);
       setConvs((current) => current.filter((row) => row.id !== c.id));
     } catch {
-      Alert.alert('Couldn’t block', 'Please try again.');
+      Alert.alert('Couldn’t block', 'Try again.');
     }
   }
 

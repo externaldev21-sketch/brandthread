@@ -103,8 +103,8 @@ export default function StoreFromSocialScreen() {
         setScreenshotBase64s(prev => [...prev, ...imageBase64s]);
       } catch {
         Alert.alert(
-          'Could not prepare screenshots',
-          'Please choose the screenshots again and try once more.',
+          "Couldn't load screenshots",
+          'Choose them again.',
         );
       }
     }
@@ -143,7 +143,7 @@ export default function StoreFromSocialScreen() {
         setAnalysisFailure(failure);
       } else {
         // Keep the existing handling for non-size-related analysis failures.
-        Alert.alert('Analysis failed', 'Could not analyze screenshots. Try the mood board flow instead.');
+        Alert.alert("Couldn't read screenshots", 'Try again, or build from a mood board.');
       }
     } finally {
       setAnalyzing(false);
@@ -166,7 +166,7 @@ export default function StoreFromSocialScreen() {
       );
       router.push('/store-editor' as never);
     } catch {
-      Alert.alert('Generation failed', 'Could not generate store from posts. Please try again.');
+      Alert.alert("Couldn't build store", 'Try again.');
     } finally {
       setAnalyzing(false);
     }
@@ -182,7 +182,7 @@ export default function StoreFromSocialScreen() {
       await generateFromSocial(profileUrl.trim(), undefined, {});
       router.push('/store-editor' as never);
     } catch {
-      Alert.alert('Could not analyze', 'Check your URL and try again. You can also upload screenshots instead.');
+      Alert.alert("Couldn't read that link", 'Check the URL, or upload screenshots.');
       setActiveTab('upload');
     } finally {
       setAnalyzing(false);

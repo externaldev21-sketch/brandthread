@@ -45,7 +45,7 @@ export default function ConversationNicknamesScreen() {
       hapticSuccessAction();
       goBackOr(router);
     } catch (e) {
-      Alert.alert('Couldn’t save nickname', apiErrorMessage(e, 'Please try again.'));
+      Alert.alert('Couldn’t save nickname', apiErrorMessage(e, 'Try again.'));
     } finally {
       setSaving(false);
     }

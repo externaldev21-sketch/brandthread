@@ -55,7 +55,7 @@ export default function BuyerSettingsMenuScreen() {
 
   const handleSignOut = () => {
     Alert.alert('Sign out of Brandthread?', undefined, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Stay', style: 'cancel' },
       {
         text: 'Sign out',
         style: 'destructive',

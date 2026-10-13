@@ -83,7 +83,7 @@ export default function HelpScreen() {
       setSubject('');
       setTicketBody('');
     } catch {
-      Alert.alert('Error', 'Could not send your message. Please try again or email us directly.');
+      Alert.alert("Couldn't send your message", 'Try again, or email us directly.');
     } finally {
       setSubmitting(false);
     }

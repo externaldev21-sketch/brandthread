@@ -91,9 +91,9 @@ export default function AccountTypeSettingsScreen() {
       `Switch to ${accountInfo[selectedType].title}?`,
       'Switching account type will change the features available to you. You can switch back at any time.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep current', style: 'cancel' },
         {
-          text: 'Switch',
+          text: 'Switch account',
           onPress: async () => {
             setSaving(true);
             try {
@@ -105,7 +105,7 @@ export default function AccountTypeSettingsScreen() {
                 [{ text: 'OK', onPress: () => goBackOr(router, '/buyer-settings-menu') }],
               );
             } catch {
-              Alert.alert('Error', 'Could not update account type. Please try again.');
+              Alert.alert("Couldn't switch account type", 'Try again.');
             } finally {
               setSaving(false);
             }

@@ -78,7 +78,7 @@ export default function EmailCampaignComposeScreen() {
           setCtaLabel(cmp.body.cta?.label ?? ''); setCtaUrl(cmp.body.cta?.url ?? '');
         }
       } catch {
-        if (!off) Alert.alert('Something went wrong', "Couldn't load this campaign.");
+        if (!off) Alert.alert("Couldn't load campaign", 'Go back and open it again.');
       } finally { if (!off) setLoading(false); }
     })();
     return () => { off = true; };
@@ -130,8 +130,8 @@ export default function EmailCampaignComposeScreen() {
   const confirmSend = () => {
     const n = counts?.[audience] ?? 0;
     Alert.alert('Send campaign', `Send "${subject.trim()}" to ${n} ${n === 1 ? 'person' : 'people'} now?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Send', onPress: () => doSend() },
+      { text: 'Keep editing', style: 'cancel' },
+      { text: 'Send campaign', onPress: () => doSend() },
     ]);
   };
 

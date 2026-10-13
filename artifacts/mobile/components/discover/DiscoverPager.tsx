@@ -232,7 +232,7 @@ export function DiscoverPager() {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // A real confirmation beyond just the cart badge count changing.
       if (addedToastTimer.current) clearTimeout(addedToastTimer.current);
-      setAddedToast({ visible: true, message: `Added ${product.name} to your bag` });
+      setAddedToast({ visible: true, message: `Added ${product.name} to bag` });
       addedToastTimer.current = setTimeout(() => setAddedToast(t => ({ ...t, visible: false })), 2200);
     } catch {
       // Swallow — the per-card UI already shows its own busy/error affordance.

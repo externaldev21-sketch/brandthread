@@ -149,7 +149,7 @@ export default function StorePoliciesScreen() {
       closeEdit();
       Alert.alert('Saved', 'Policy saved successfully.');
     } catch {
-      Alert.alert('Error', 'Failed to save policy.');
+      Alert.alert("Couldn't save policy", 'Try again.');
     } finally {
       setSaving(false);
     }

@@ -251,7 +251,7 @@ export default function CameraCapture() {
         goBackOr(router);
       }
     } catch {
-      setCaptureError('Could not capture that photo. Please try again.');
+      setCaptureError("Couldn't take that photo. Try again.");
     }
   }, []);
 
@@ -362,7 +362,7 @@ export default function CameraCapture() {
               if (clips.length === 0) goBackOr(router);
               else Alert.alert('Discard clips?', 'Your recorded clips will be lost.', [
                 { text: 'Keep editing', style: 'cancel' },
-                { text: 'Discard', style: 'destructive', onPress: () => goBackOr(router) },
+                { text: 'Discard clips', style: 'destructive', onPress: () => goBackOr(router) },
               ]);
             }}
             accessibilityLabel="Close camera"

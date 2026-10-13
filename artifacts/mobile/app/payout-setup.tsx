@@ -87,7 +87,7 @@ export default function PayoutSetupScreen() {
       await WebBrowser.openBrowserAsync(link.url);
       await refresh();
     } catch (error: any) {
-      Alert.alert('Could not open Stripe', typeof error?.message === 'string' && error.message ? error.message : 'Please try again.');
+      Alert.alert("Couldn't open Stripe", typeof error?.message === 'string' && error.message ? error.message : 'Try again.');
     } finally {
       busy.current = false;
       setOpening(false);

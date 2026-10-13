@@ -251,7 +251,7 @@ export default function SellerDropCreate() {
   async function pickHero(kind: 'image' | 'video') {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permission required', 'Please allow access to your photo library in Settings.');
+      Alert.alert('Photo access needed', 'Allow photo library access in Settings.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -277,7 +277,7 @@ export default function SellerDropCreate() {
         setHeroImageUrl(null);
       }
     } catch {
-      Alert.alert('Upload failed', 'Could not upload that file. Please try again.');
+      Alert.alert('Upload failed', 'Try again.');
     } finally {
       setHeroUploading(false);
     }
@@ -349,7 +349,7 @@ export default function SellerDropCreate() {
         goBackOr(router);
       }
     } catch {
-      Alert.alert('Could not save', 'Please check the fields and try again.');
+      Alert.alert("Couldn't save drop", 'Try again.');
     } finally {
       setSaving(false);
     }
@@ -385,14 +385,14 @@ export default function SellerDropCreate() {
                         Alert.alert('Drop cancelled', 'Unshipped orders have been refunded.');
                         goBackOr(router);
                       } catch {
-                        Alert.alert("Couldn't cancel", 'Please try again.');
+                        Alert.alert("Couldn't cancel drop", 'Try again.');
                       }
                     },
                   },
                 ],
               );
             } else {
-              Alert.alert("Couldn't cancel", 'Please try again.');
+              Alert.alert("Couldn't cancel drop", 'Try again.');
             }
           } finally {
             setCancelling(false);

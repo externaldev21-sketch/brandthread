@@ -592,9 +592,9 @@ export default function AiBrainScreen() {
       'Clear conversation',
       'This will erase all messages in this session.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep', style: 'cancel' },
         {
-          text: 'Clear',
+          text: 'Clear chat',
           style: 'destructive',
           onPress: async () => {
             await clearSession(userId, storeContext);
@@ -654,8 +654,8 @@ export default function AiBrainScreen() {
           'Apply action',
           `Are you sure you want to apply "${msg.actionCard.title}"? This action is irreversible.`,
           [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Apply', style: 'destructive', onPress: doApply },
+            { text: 'Go back', style: 'cancel' },
+            { text: 'Apply change', style: 'destructive', onPress: doApply },
           ],
         );
       } else {

@@ -77,9 +77,9 @@ export default function ProductImportScreen() {
   useFocusEffect(useCallback(() => { void loadProviders(); }, [loadProviders]));
   useEffect(() => { void loadProviders(); }, [loadProviders]);
 
-  function messageOf(error: unknown): string {
+  function messageOf(error: unknown, fallback = "Couldn't import. Try again."): string {
     const raw = error instanceof Error ? error.message : '';
-    return raw.replace(/^API \d+:\s*/, '') || 'Something went wrong. Try again.';
+    return raw.replace(/^API \d+:\s*/, '') || fallback;
   }
 
   async function startReview(next: NonNullable<typeof pending>) {
@@ -93,7 +93,7 @@ export default function ProductImportScreen() {
       setPreview(next.kind === 'csv' ? await api.productImport.previewCsv(next.text) : await api.productImport.etsyPreview());
     } catch (error) {
       setReviewOpen(false);
-      Alert.alert('Import', messageOf(error));
+      Alert.alert("Couldn't load preview", messageOf(error, 'Try again.'));
     } finally {
       setReviewBusy(false);
     }
@@ -126,10 +126,10 @@ export default function ProductImportScreen() {
       if (picked.canceled || !picked.assets?.[0]) return;
       const asset = picked.assets[0];
       const text = await (asset.file ? asset.file.text() : fetch(asset.uri).then((r) => r.text()));
-      if (!text.trim()) { Alert.alert('Import', 'The file is empty.'); return; }
+      if (!text.trim()) { Alert.alert('File is empty', 'Choose a file with product rows.'); return; }
       void startReview({ kind: 'csv', text, filename: asset.name });
     } catch {
-      Alert.alert('Import', "We couldn't read that file.");
+      Alert.alert("Couldn't read file", 'Try another file.');
     }
   }
 
@@ -146,7 +146,7 @@ export default function ProductImportScreen() {
       await WebBrowser.openAuthSessionAsync(authorizeUrl);
       await loadProviders();
     } catch (error) {
-      Alert.alert('Etsy', messageOf(error));
+      Alert.alert("Couldn't connect Etsy", messageOf(error, 'Try again.'));
     } finally {
       setEtsyBusy(false);
     }
@@ -186,7 +186,7 @@ export default function ProductImportScreen() {
         ],
       );
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Import failed. Please try again.');
+      Alert.alert('Import failed', e?.message ?? 'Try again.');
     } finally {
       setImporting(false);
     }

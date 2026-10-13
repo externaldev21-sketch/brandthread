@@ -36,7 +36,7 @@ describe('Thread video sharing flow', () => {
   it('shows cancellable save progress above the bottom tab bar', () => {
     expect(source).toContain('{savingProgress}% Saving…');
     expect(source).toContain("abortRef.current?.abort()");
-    expect(source).toContain("onFeedback('Video save cancelled.'");
+    expect(source).toContain("onFeedback('Save cancelled'");
     expect(source).toContain('destination.delete()');
     expect(source).toContain('bottom: insets.bottom + 70');
   });

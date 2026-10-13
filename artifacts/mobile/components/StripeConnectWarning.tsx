@@ -101,14 +101,14 @@ export default function StripeConnectWarning({
     try {
       const data = await api.seller.connect.onboard();
       if (!data || typeof data.url !== 'string' || !/^https:\/\//i.test(data.url)) {
-        Alert.alert('Onboarding unavailable', 'Stripe did not provide a valid onboarding link. Please try again.');
+        Alert.alert("Couldn't open Stripe", "Stripe didn't send a setup link. Try again.");
         return;
       }
       const canOpen = await Linking.canOpenURL(data.url);
       if (!canOpen) throw new Error('Unable to open onboarding link');
       await Linking.openURL(data.url);
     } catch {
-      Alert.alert('Error', 'Could not open Stripe onboarding. Please try again.');
+      Alert.alert("Couldn't open Stripe", 'Try again.');
     } finally {
       setLoading(false);
     }
