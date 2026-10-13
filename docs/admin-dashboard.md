@@ -42,6 +42,7 @@ onboarding redirect).
 | Announcements | `GET/POST /admin/announcements` · `GET /admin/announcements/audience?audience=` |
 | Invite codes | `GET/POST /admin/invites` · `POST /admin/invites/:id/disable\|enable` |
 | Audit | `GET /admin/audit?actor=&action=&targetId=` |
+| Kill switches | `GET /admin/kill-switches` · `POST /admin/kill-switches/:key {enabled, reason}` for `liveEnabled`, `paymentsEnabled`, `aiEnabled` (rows in `feature_flags`). Off = new lives / checkouts / AI requests get `503 {code: LIVE_PAUSED / PAYMENTS_PAUSED / AI_PAUSED}` within ~10 s; webhooks, refunds and payouts are never paused. See `lib/killSwitches.ts` |
 
 Nothing here deletes accounts or data, and nothing moves money: refunds and disputes are
 read-only views; rejecting a promotion stops it but the refund stays a deliberate step in Stripe.
