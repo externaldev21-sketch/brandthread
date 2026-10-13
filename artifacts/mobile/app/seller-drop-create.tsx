@@ -198,7 +198,8 @@ export default function SellerDropCreate() {
   const [endTime, setEndTime] = useState('');
 
   const [earlyAccessEnabled, setEarlyAccessEnabled] = useState(false);
-  const [earlyAccessMinutes, setEarlyAccessMinutes] = useState('30');
+  const [earlyAccessMinutes, setEarlyAccessMinutes] = useState('60');
+  const [membersOnly, setMembersOnly] = useState(false);
 
   const [allProducts, setAllProducts] = useState<SellerProductRow[]>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
@@ -230,6 +231,7 @@ export default function SellerDropCreate() {
           setEarlyAccessEnabled(true);
           setEarlyAccessMinutes(String(data.earlyAccessMinutes));
         }
+        setMembersOnly(!!data.membersOnly);
         const assigned = new Set<string>((data.products ?? []).map((p: any) => p.id));
         setSelectedProductIds(assigned);
         setOriginalProductIds(assigned);
@@ -323,6 +325,7 @@ export default function SellerDropCreate() {
         heroVideoUrl,
         launchTimezone: timezone,
         earlyAccessMinutes: earlyMinutes,
+        membersOnly,
       };
 
       let effectiveDropId = dropId as string | undefined;
@@ -551,11 +554,21 @@ export default function SellerDropCreate() {
                   value={earlyAccessMinutes}
                   onChangeText={setEarlyAccessMinutes}
                   keyboardType="number-pad"
-                  placeholder="30"
+                  placeholder="60"
                   placeholderTextColor={theme.muted}
                 />
                 <Text style={{ color: theme.muted, fontSize: FS.sm }}>minutes before everyone else</Text>
               </View>
+            )}
+          </View>
+
+          <View style={styles.field}>
+            <View style={styles.rowBetween}>
+              <Text style={[styles.label, { color: theme.muted }]}>PAST BUYERS ONLY</Text>
+              <HapticSwitch value={membersOnly} onValueChange={setMembersOnly} testID="drop-members-only-toggle" />
+            </View>
+            {membersOnly && (
+              <Text style={{ color: theme.muted, fontSize: FS.sm, marginTop: 8 }}>Only people who've bought from you can buy</Text>
             )}
           </View>
 

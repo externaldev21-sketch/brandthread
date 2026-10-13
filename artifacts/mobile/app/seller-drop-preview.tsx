@@ -42,6 +42,7 @@ interface PreviewDrop {
   heroImageUrl?: string | null;
   heroVideoUrl?: string | null;
   earlyAccessMinutes?: number;
+  membersOnly?: boolean;
   products?: PreviewProduct[];
 }
 
@@ -133,6 +134,9 @@ export default function SellerDropPreview() {
             )}
             {!!drop.earlyAccessMinutes && (
               <Text style={styles.earlyAccess}>Followers get {drop.earlyAccessMinutes} min early access</Text>
+            )}
+            {!!drop.membersOnly && (
+              <Text style={styles.earlyAccess}>Past buyers only</Text>
             )}
           </View>
         </View>

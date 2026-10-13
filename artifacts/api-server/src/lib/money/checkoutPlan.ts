@@ -14,6 +14,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, drops, follows, products } from "@workspace/db";
 import { destinationApplicationFeeCents } from "./fees";
 import { isDropLive } from "./dropLaunch";
+import { isPastBuyer } from "./dropAudience";
 import type { DbExecutor } from "./ledger";
 import { payoutMode } from "../delivery/policy";
 import { unlaunchedProductIds } from "../productLaunch";
@@ -58,6 +59,7 @@ export async function resolveChargePlan(input: {
     deadline: drops.fulfillmentDeadlineAt,
     releaseAt: drops.releaseAt,
     earlyAccessMinutes: drops.earlyAccessMinutes,
+    membersOnly: drops.membersOnly,
   }).from(products)
     .leftJoin(drops, eq(drops.id, products.dropId))
     .where(inArray(products.id, ids));
@@ -73,6 +75,12 @@ export async function resolveChargePlan(input: {
   for (const drop of dropsById.values()) {
     if (drop.dropStatus && drop.dropStatus !== "active") {
       throw new CheckoutPlanError("This drop is not currently available.", 409, "DROP_NOT_ACTIVE");
+    }
+    if (drop.membersOnly && !(await isPastBuyer(input.buyerId, drop.dropOwnerId!, executor))) {
+      throw new CheckoutPlanError(
+        "This drop is only for people who've bought from this brand before.",
+        403, "DROP_MEMBERS_ONLY",
+      );
     }
     if (!drop.releaseAt) continue;
     const earlyAccessMinutes = drop.earlyAccessMinutes ?? 0;
