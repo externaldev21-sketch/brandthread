@@ -142,7 +142,7 @@ const s = StyleSheet.create({
   rowLabel: { fontSize: 15, fontFamily: FONT.semibold },
   countBadge: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 3 },
   countBadgeText: { fontSize: 11, fontFamily: FONT.semibold },
-  countText: { fontSize: 13, fontFamily: FONT.regular },
+  countText: { fontSize: 13, fontFamily: FONT.regular, fontVariant: ['tabular-nums'] },
   addMetaBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 16, paddingVertical: 12, alignSelf: 'flex-start' },
   addMetaBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
 });

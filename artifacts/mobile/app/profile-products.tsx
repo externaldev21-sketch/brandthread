@@ -232,7 +232,7 @@ function makeStyles(theme: AppThemePreset) {
     column: { flex: 1 },
     headerWrap: { alignSelf: 'stretch' },
     header: { paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.md, gap: SP.sm },
-    count: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted },
+    count: { fontVariant: ['tabular-nums'],  fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted },
     ownerRow: { flexDirection: 'row', gap: SP.sm },
     pad: { paddingHorizontal: SP.md },
     row: { gap: GAP, paddingHorizontal: SP.md, marginBottom: SP.md },
@@ -244,7 +244,7 @@ function makeStyles(theme: AppThemePreset) {
     soldOutVeil: { ...StyleSheet.absoluteFill, backgroundColor: `${theme.background}8C` },
     info: { paddingTop: SP.sm, paddingHorizontal: 2, gap: 3 },
     name: { fontFamily: FONT.semibold, fontSize: FS.sm, lineHeight: 18, color: theme.text },
-    price: { fontFamily: FONT.bold, fontSize: FS.sm, color: theme.text },
+    price: { fontFamily: FONT.bold, fontSize: FS.sm, color: theme.text, fontVariant: ['tabular-nums'] },
     stock: { fontFamily: FONT.medium, fontSize: FS.xs },
   });
 }

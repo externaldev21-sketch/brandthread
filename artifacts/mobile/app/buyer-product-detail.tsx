@@ -1291,7 +1291,7 @@ export default function BuyerProductDetailScreen() {
           <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
           {/* Price */}
           <View style={s.priceRow}>
-            <Text style={[s.price, hasDiscount ? s.priceSale : undefined]}>{formatCents(variantPrice)}</Text>
+            <Text style={s.price}>{formatCents(variantPrice)}</Text>
             {hasDiscount && <Text style={s.comparePrice}>{fmtPrice(variantCompare!)}</Text>}
             {hasDiscount && <Text style={s.savings}>Save {fmtPrice(savingsAmt)}</Text>}
           </View>
@@ -2295,9 +2295,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   sizeRowLabel: { flex: 1, fontSize: FS.base, fontFamily: FONT.medium, color: FG },
   sizeRowValue: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   promiseText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG, flexShrink: 1 },
-  price: { ...TYPE.heading, fontFamily: FONT.bold, color: FG },
+  price: { fontVariant: ['tabular-nums'],  ...TYPE.heading, fontFamily: FONT.bold, color: FG },
   priceSale: { color: SUCCESS },
-  comparePrice: { fontSize: FS.base, fontFamily: FONT.regular, color: SUBTLE, textDecorationLine: 'line-through' },
+  comparePrice: { fontVariant: ['tabular-nums'],  fontSize: FS.base, fontFamily: FONT.regular, color: SUBTLE, textDecorationLine: 'line-through' },
   savings: { fontSize: FS.sm, fontFamily: FONT.semibold, color: SUCCESS },
   preOrderCard: { backgroundColor: CYAN_DIM, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: `${CYAN}40`, marginBottom: SP.md, gap: 4 },
   preOrderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
@@ -2333,7 +2333,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   reviewDate: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, marginTop: 2 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   ratingAvg: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
-  ratingCount: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  ratingCount: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, fontVariant: ['tabular-nums'] },
   });
 };
 

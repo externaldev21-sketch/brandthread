@@ -144,7 +144,7 @@ const makeStyles = (palette: ReturnType<typeof useColors>) => StyleSheet.create(
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginLeft: 32 + SPACING.sm },
   note: { flexDirection: 'row', gap: 8, padding: SPACING.sm, backgroundColor: palette.card, borderRadius: 12, borderWidth: 1, borderColor: palette.border, alignItems: 'flex-start' },
   noteText: { flex: 1, ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 17 },
-  footerCount: { ...TYPE_SCALE.caption, color: palette.mutedForeground, textAlign: 'center' },
+  footerCount: { ...TYPE_SCALE.caption, color: palette.mutedForeground, textAlign: 'center', fontVariant: ['tabular-nums'] },
   successCard: { alignItems: 'center', paddingVertical: SPACING.xxl, gap: SPACING.md },
   successTitle: { ...TYPE_SCALE.title2, color: palette.foreground },
   successDate: { ...TYPE_SCALE.footnote, color: palette.mutedForeground },

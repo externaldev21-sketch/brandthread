@@ -176,7 +176,7 @@ export default function ProductQuestionsScreen() {
 const s = StyleSheet.create({
   root: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  count: { fontSize: FS.xl, fontFamily: FONT.bold },
+  count: { fontSize: FS.xl, fontFamily: FONT.bold, fontVariant: ['tabular-nums'] },
   product: { fontSize: FS.sm, fontFamily: FONT.medium, marginTop: 2, marginBottom: SP.md },
   askWrap: { marginTop: SP.sm },
   half: { flex: 1 },

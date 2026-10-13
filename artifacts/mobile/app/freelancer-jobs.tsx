@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
   jobSub: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 4 },
   jobDesc: { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 4 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.sm + 2 },
-  price: { color: FG, fontSize: FS.base, fontFamily: FONT.bold },
+  price: { color: FG, fontSize: FS.base, fontFamily: FONT.bold, fontVariant: ['tabular-nums'] },
   unpaidChip: {
     backgroundColor: ORANGE_DIM, paddingHorizontal: SP.sm, paddingVertical: 3,
     borderRadius: RADIUS.pill,

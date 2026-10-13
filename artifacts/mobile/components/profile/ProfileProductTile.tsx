@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   placeholder: { alignItems: 'center', justifyContent: 'center' },
   scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%' },
   caption: { position: 'absolute', left: SP.sm, right: SP.sm, bottom: SP.sm },
-  price: { fontFamily: FONT.bold, fontSize: FS.sm },
+  price: { fontFamily: FONT.bold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
   name: { fontFamily: FONT.regular, fontSize: FS.xs },
   editBadge: {
     position: 'absolute', top: SP.sm, right: SP.sm, width: 24, height: 24, borderRadius: 12,

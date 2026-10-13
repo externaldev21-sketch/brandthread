@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   label: { fontSize: FS.xs, fontFamily: FONT.medium, marginTop: SP.md, marginBottom: 6 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: FS.base, fontFamily: FONT.regular },
   multiline: { minHeight: 96, textAlignVertical: 'top' },
-  count: { fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'right', marginTop: 4, marginBottom: SP.sm },
+  count: { fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'right', marginTop: 4, marginBottom: SP.sm, fontVariant: ['tabular-nums'] },
   note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
   error: { fontSize: FS.sm, fontFamily: FONT.medium, marginTop: SP.md },
   banner: { flexDirection: 'row', gap: 10, alignItems: 'center', borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: SP.md },

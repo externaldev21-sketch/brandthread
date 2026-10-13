@@ -295,7 +295,7 @@ const s = StyleSheet.create({
   thumb: { width: 56, height: 56, borderRadius: RADIUS.sm },
   productName: { fontSize: FS.base, fontFamily: FONT.semibold },
   variantTitle: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  price: { fontSize: FS.base, fontFamily: FONT.bold },
+  price: { fontSize: FS.base, fontFamily: FONT.bold, fontVariant: ['tabular-nums'] },
   divider: { height: 1, marginBottom: SP.md },
   addressRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: SP.md },
   addressText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium },

@@ -1053,7 +1053,7 @@ const cellStyles = StyleSheet.create({
   savedSubtitle: { fontFamily: FONT.regular, fontSize: FS.xs },
   draftsTile: { borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
   draftsTitle: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  draftsCount: { fontFamily: FONT.regular, fontSize: FS.xs },
+  draftsCount: { fontFamily: FONT.regular, fontSize: FS.xs, fontVariant: ['tabular-nums'] },
   orderCard: {
     flexDirection: 'row', alignItems: 'center',
     borderWidth: 1, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm,

@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
   },
   viewerInitials: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
   viewerCountPill: { marginLeft: 6 },
-  viewerCountText: { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3 },
+  viewerCountText: { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3, fontVariant: ['tabular-nums'] },
 
   // Chat: capped at ~70% width so a long line never runs under the right
   // rail, no bubble on ordinary messages (plain text over video, TikTok
@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
   pinnedEyebrow: { color: ON_DARK_MUTED, fontFamily: FONT.bold, fontSize: FS.xs },
   pinnedName: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 1 },
   pinnedPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 1 },
-  pinnedPrice: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.sm },
+  pinnedPrice: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
   pinnedCompare: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: 11, textDecorationLine: 'line-through' },
   buyBtn: { height: 32, paddingHorizontal: 16, borderRadius: radius.sm, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   buyText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.sm },
@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
     width: RAIL_ICON_CIRCLE, height: RAIL_ICON_CIRCLE, borderRadius: RAIL_ICON_CIRCLE / 2,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
-  railCount: { color: '#fff', fontFamily: FONT.semibold, fontSize: 11, marginTop: 3, textShadowColor: 'rgba(0,0,0,0.45)', textShadowRadius: 3 },
+  railCount: { color: '#fff', fontFamily: FONT.semibold, fontSize: 11, marginTop: 3, textShadowColor: 'rgba(0,0,0,0.45)', textShadowRadius: 3, fontVariant: ['tabular-nums'] },
   railBadge: {
     position: 'absolute', top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 3,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',

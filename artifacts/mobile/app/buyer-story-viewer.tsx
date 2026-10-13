@@ -1462,6 +1462,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: 4,
   },
   likesCountText: {
+    fontVariant: ['tabular-nums'],
     color: ON_DARK,
     fontSize: FS.sm,
     fontFamily: FONT.medium,

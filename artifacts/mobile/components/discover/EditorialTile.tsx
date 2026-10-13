@@ -123,7 +123,7 @@ const tile = StyleSheet.create({
   countdownText: { fontSize: 11, fontFamily: FONT.semibold, color: '#FFFFFF' },
   name: { fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: 6 },
   brand: { fontSize: 12, fontFamily: FONT.regular, marginTop: 4 },
-  price: { fontSize: 13, fontFamily: FONT.semibold, marginTop: 4 },
+  price: { fontSize: 13, fontFamily: FONT.semibold, marginTop: 4, fontVariant: ['tabular-nums'] },
 });
 
 export function TileRailSkeleton() {

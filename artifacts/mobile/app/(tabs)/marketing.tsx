@@ -19,6 +19,7 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { ListRow } from '@/components/ui/ListRow';
 import { SellerReferralRow } from '@/components/marketing/SellerReferralRow';
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { formatCompactCount } from '@/lib/compactFormat';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -43,10 +44,7 @@ type ReferralStats = {
   earnedCents: number;
 };
 
-function formatCount(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return String(n);
-}
+const formatCount = formatCompactCount;
 
 function campaignStatusVariant(s: AdCampaign['status']) {
   if (s === 'active') return 'success';
@@ -373,7 +371,7 @@ const styles = StyleSheet.create({
   campaignName: { fontSize: FS.sm, fontFamily: FONT.semibold },
   campaignMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   campaignStat: { fontSize: FS.xs, fontFamily: FONT.regular },
-  campaignRevenue: { fontSize: FS.sm, fontFamily: FONT.bold },
+  campaignRevenue: { fontSize: FS.sm, fontFamily: FONT.bold, fontVariant: ['tabular-nums'] },
   discountRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   codeWrap: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   code: { fontSize: FS.meta, fontFamily: FONT.bold },

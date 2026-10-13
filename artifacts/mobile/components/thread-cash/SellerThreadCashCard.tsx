@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   title: { fontFamily: FONT.semibold, fontSize: FS.sm },
   historyBtn: { borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6 },
   historyBtnText: { fontFamily: FONT.medium, fontSize: FS.xs },
-  balance: { fontFamily: FONT.bold, fontSize: FS.h1, letterSpacing: -0.5 },
+  balance: { fontFamily: FONT.bold, fontSize: FS.h1, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
   subtitle: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
   splitBox: { borderTopWidth: 1, marginTop: SP.sm, paddingTop: SP.sm, gap: 6 },
   splitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },

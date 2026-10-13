@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCompactCount } from '@/lib/compactFormat';
+import { formatCompactCount, formatDollarsCompact } from '@/lib/compactFormat';
 
 describe('formatCompactCount', () => {
   it('shows exact values with commas under 10,000', () => {
@@ -40,5 +40,23 @@ describe('formatCompactCount', () => {
     expect(formatCompactCount(undefined)).toBe('0');
     expect(formatCompactCount(NaN)).toBe('0');
     expect(formatCompactCount(-5)).toBe('-5');
+  });
+});
+
+describe('formatDollarsCompact', () => {
+  it('shows whole dollars under $1,000', () => {
+    expect(formatDollarsCompact(0)).toBe('$0');
+    expect(formatDollarsCompact(84_249)).toBe('$842');
+  });
+
+  it('uses an uppercase K/M suffix at $1,000 and above', () => {
+    expect(formatDollarsCompact(120_000)).toBe('$1.2K');
+    expect(formatDollarsCompact(100_000)).toBe('$1K');
+    expect(formatDollarsCompact(1_240_000)).toBe('$12.4K');
+    expect(formatDollarsCompact(125_000_000)).toBe('$1.3M');
+  });
+
+  it('keeps the sign on negatives', () => {
+    expect(formatDollarsCompact(-120_000)).toBe('-$1.2K');
   });
 });

@@ -234,6 +234,6 @@ function styles(theme: AppThemePreset) {
     guarantee: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: SP.sm, textAlign: 'center' },
     refundHead: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
     refundTitle: { flex: 1, fontFamily: FONT.bold, fontSize: FS.base, color: theme.text },
-    refundAmount: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text, marginTop: SP.sm },
+    refundAmount: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text, marginTop: SP.sm, fontVariant: ['tabular-nums'] },
   });
 }

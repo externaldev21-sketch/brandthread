@@ -422,7 +422,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   historyIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   historyLabel: { fontSize: FS.sm, fontFamily: FONT.medium },
   historyDate: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  historyAmount: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'right' },
+  historyAmount: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'right', fontVariant: ['tabular-nums'] },
   ledgerRow: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 0, borderTopWidth: StyleSheet.hairlineWidth },
   rulesCard: { marginBottom: SP.lg, padding: 0, overflow: 'hidden' },
   ruleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, paddingVertical: SP.sm, paddingHorizontal: SP.md },

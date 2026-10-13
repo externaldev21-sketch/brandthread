@@ -540,8 +540,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   tileTitle: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, color: theme.text },
   tileSubtitle: { ...TYPE_SCALE.caption, color: palette.mutedForeground },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING.xxs, marginTop: 1 },
-  tilePrice: { ...TYPE_SCALE.footnote, fontFamily: FONT.bold, color: theme.text },
-  tileOldPrice: { ...TYPE_SCALE.caption, color: theme.subtle, textDecorationLine: 'line-through' },
+  tilePrice: { fontVariant: ['tabular-nums'],  ...TYPE_SCALE.footnote, fontFamily: FONT.bold, color: theme.text },
+  tileOldPrice: { fontVariant: ['tabular-nums'],  ...TYPE_SCALE.caption, color: theme.subtle, textDecorationLine: 'line-through' },
   input: {
     height: 48, borderRadius: RADII.chip, borderWidth: 1, borderColor: palette.border,
     backgroundColor: palette.elevated, paddingHorizontal: SPACING.md, color: theme.text, fontSize: TYPE_SCALE.body.fontSize,

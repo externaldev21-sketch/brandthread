@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
   expName: { fontSize: 13, fontFamily: FONT.medium },
   expMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   expDate: { fontSize: 11, fontFamily: FONT.regular },
-  expAmount: { fontSize: 15, fontFamily: FONT.semibold },
+  expAmount: { fontVariant: ['tabular-nums'],  fontSize: 15, fontFamily: FONT.semibold },
   docRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   docIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   docLabel: { flex: 1, fontSize: 15, fontFamily: FONT.regular },

@@ -65,5 +65,5 @@ const styles = StyleSheet.create({
   fallback: { alignItems: 'center', justifyContent: 'center' },
   fallbackText: { fontSize: 28, fontFamily: FONT.bold, color: '#FFFFFF' },
   name: { fontSize: 13, fontFamily: FONT.semibold, marginTop: 6 },
-  price: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
+  price: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2, fontVariant: ['tabular-nums'] },
 });

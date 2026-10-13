@@ -913,7 +913,7 @@ const styles = StyleSheet.create({
   productThumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#33303a', overflow: 'hidden' },
   productInfo: { flex: 1 },
   productName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 15 },
-  productPrice: { color: TEXT_SECONDARY, fontFamily: FONT.medium, fontSize: 13, marginTop: 2 },
+  productPrice: { fontVariant: ['tabular-nums'],  color: TEXT_SECONDARY, fontFamily: FONT.medium, fontSize: 13, marginTop: 2 },
   buyBtn: { height: 32, backgroundColor: '#fff', borderRadius: radius.sm, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   buyBtnText: { color: '#151517', fontFamily: FONT.bold, fontSize: FS.xs },
 

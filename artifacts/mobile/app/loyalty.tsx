@@ -263,7 +263,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   heroCard:       { margin: SP.md, padding: SP.xl, borderWidth: 1, borderRadius: RADIUS.xl, alignItems: 'center' },
   heroLabel:      { fontSize: FS.xs, fontFamily: FONT.semibold, marginBottom: SP.xs },
-  heroBalance:    { fontSize: FS.h1, fontFamily: FONT.bold, color: FG, lineHeight: 42 },
+  heroBalance:    { fontVariant: ['tabular-nums'],  fontSize: FS.h1, fontFamily: FONT.bold, color: FG, lineHeight: 42 },
   heroUnit:       { fontSize: FS.base, fontFamily: FONT.medium, marginBottom: SP.sm },
   heroValuePill:  { borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6, marginTop: SP.xs },
   heroValueText:  { fontSize: FS.sm, fontFamily: FONT.semibold },

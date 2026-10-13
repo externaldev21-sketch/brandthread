@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   tile: { gap: 4 },
   tileImage: { borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER },
   tileTitle: { color: FG, fontFamily: FONT.medium, fontSize: FS.sm, marginTop: 4 },
-  tilePrice: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs },
+  tilePrice: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, fontVariant: ['tabular-nums'] },
   messageTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.md, marginTop: SP.sm, textAlign: 'center' },
   messageDesc: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
   primaryBtn: { height: COMP.buttonHSm, borderRadius: radius.md, backgroundColor: FG, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg, alignSelf: 'center' },

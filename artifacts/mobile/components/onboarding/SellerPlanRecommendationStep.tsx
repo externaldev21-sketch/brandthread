@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: FS.xs, fontFamily: FONT.bold },
   planName: { color: '#FFF', fontSize: 22, fontFamily: FONT.bold, marginTop: 8 },
   tagline: { color: TEXT_TERTIARY, fontSize: 12, lineHeight: 17, fontFamily: FONT.regular, marginTop: 3 },
-  price: { color: '#FFF', fontSize: 28, fontFamily: FONT.bold, marginTop: 12 },
+  price: { fontVariant: ['tabular-nums'],  color: '#FFF', fontSize: 28, fontFamily: FONT.bold, marginTop: 12 },
   period: { color: TEXT_TERTIARY, fontSize: 12, fontFamily: FONT.regular },
   features: { gap: 9, marginTop: 14 },
   featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },

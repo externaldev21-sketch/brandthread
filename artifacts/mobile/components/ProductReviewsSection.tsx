@@ -302,7 +302,7 @@ const s = StyleSheet.create({
   summaryRow: { flexDirection: 'row', gap: 20, marginBottom: 16, alignItems: 'center' },
   avgBlock: { alignItems: 'flex-start', gap: 3 },
   avgNumber: { fontSize: FS.xxl, fontFamily: FONT.bold, color: FG },
-  countText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
+  countText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, fontVariant: ['tabular-nums'] },
   breakdownBlock: { flex: 1, gap: 4 },
   breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   breakdownLabel: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, width: 10 },

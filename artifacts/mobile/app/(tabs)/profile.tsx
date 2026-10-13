@@ -875,7 +875,7 @@ const s = StyleSheet.create({
   // Profile editor sheet
   inputLabel: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: SP.sm },
   bioLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.md },
-  characterCount: { color: MUTED, fontFamily: FONT.regular, fontSize: 11, marginBottom: SP.sm },
+  characterCount: { color: MUTED, fontFamily: FONT.regular, fontSize: 11, marginBottom: SP.sm, fontVariant: ['tabular-nums'] },
   textInput: {
     minHeight: 48, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
     backgroundColor: SURFACE, color: FG, fontFamily: FONT.regular, fontSize: FS.base,

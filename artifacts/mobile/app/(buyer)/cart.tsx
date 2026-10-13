@@ -106,7 +106,7 @@ const makeSavedItemStyles = (theme: AppThemePreset) => StyleSheet.create({
   img: { width: 56, height: 70, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   name: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   variant: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginBottom: 2 },
-  price: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
+  price: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4, fontVariant: ['tabular-nums'] },
   unavail: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.error, marginBottom: 4 },
   actions: { flexDirection: 'row', gap: SP.sm },
 });

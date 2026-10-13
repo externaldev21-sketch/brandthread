@@ -359,7 +359,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   itemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
   itemName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
   itemMeta: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 2 },
-  itemPrice: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
+  itemPrice: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text, fontVariant: ['tabular-nums'] },
 
   reason: { fontFamily: FONT.bold, fontSize: FS.base, color: theme.text },
   photo: { width: 84, height: 84, borderRadius: RADIUS.sm, marginRight: SP.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },

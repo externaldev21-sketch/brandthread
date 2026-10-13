@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
   thumb: { width: 54, height: 72, borderRadius: RADII.chip, borderWidth: StyleSheet.hairlineWidth },
   thumbFallback: { alignItems: 'center', justifyContent: 'center' },
   itemName: { fontFamily: FONT.semibold, fontSize: FS.base },
-  itemPrice: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  itemPrice: { fontFamily: FONT.semibold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
 
   helpRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, paddingVertical: SP.sm },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, minHeight: 48 },
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
   moreTile: { width: 96 },
   moreThumb: { width: 96, height: 128, borderRadius: RADII.chip, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 6 },
   moreName: { fontFamily: FONT.medium, fontSize: FS.sm },
-  morePrice: { fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 2 },
+  morePrice: { fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 2, fontVariant: ['tabular-nums'] },
 
   actions: { gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.sm, borderTopWidth: StyleSheet.hairlineWidth },
 });

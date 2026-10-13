@@ -242,6 +242,6 @@ const heroStyles = StyleSheet.create({
   },
   statDivider: { width: 1, height: 26, marginHorizontal: SP.md },
   statItem: { alignItems: 'center', paddingHorizontal: SP.sm },
-  statValue: { fontSize: FS.md, fontFamily: FONT.bold },
+  statValue: { fontSize: FS.md, fontFamily: FONT.bold, fontVariant: ['tabular-nums'] },
   statLabel: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
 });

@@ -47,6 +47,7 @@ import { DEFAULT_INSIGHT_RANGE, INSIGHT_RANGES, type InsightRange } from '@/serv
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_ANALYTICS_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
+import { formatDollarsCompact } from '@/lib/compactFormat';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,10 +71,7 @@ function changePct(current: number, previous: number, hasPrevious: boolean): num
   return Math.round(((current - previous) / previous) * 1000) / 10;
 }
 
-function formatChartDollars(cents: number): string {
-  const dollars = cents / 100;
-  return dollars >= 1000 ? `$${(dollars / 1000).toFixed(1)}k` : `$${dollars.toFixed(0)}`;
-}
+const formatChartDollars = formatDollarsCompact;
 
 const CHART_TITLE: Record<InsightRange, string> = {
   today: 'Revenue by hour', week: 'Revenue by day', month: 'Revenue by day', year: 'Revenue by month', all: 'Revenue',

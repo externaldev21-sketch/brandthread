@@ -598,8 +598,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.lg,
   },
   priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 6 },
-  price: { color: '#FFFFFF', ...TYPE_SCALE.title1 },
-  comparePrice: { color: TEXT_TERTIARY, ...TYPE_SCALE.body, textDecorationLine: 'line-through' },
+  price: { fontVariant: ['tabular-nums'],  color: '#FFFFFF', ...TYPE_SCALE.title1 },
+  comparePrice: { fontVariant: ['tabular-nums'],  color: TEXT_TERTIARY, ...TYPE_SCALE.body, textDecorationLine: 'line-through' },
   actionsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: SP.lg, marginTop: SP.lg },
   secondaryBtn: {
     flex: 1,

@@ -104,5 +104,5 @@ const styles = StyleSheet.create({
   liveChip: { alignSelf: 'flex-start', borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1, marginBottom: 3 },
   liveChipText: { fontFamily: FONT.bold, fontSize: 11 },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  price: { fontFamily: FONT.bold, fontSize: FS.sm, marginTop: 2 },
+  price: { fontVariant: ['tabular-nums'],  fontFamily: FONT.bold, fontSize: FS.sm, marginTop: 2 },
 });

@@ -321,7 +321,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], TILE_SIZE: n
   tileInfo: { paddingTop: SP.xs, gap: 1 },
   tileBrand: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium },
   tileTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
-  tilePrice: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
+  tilePrice: { fontVariant: ['tabular-nums'],  color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   tileOldPrice: { color: theme.subtle, fontFamily: FONT.medium, fontSize: FS.xs, textDecorationLine: 'line-through' },
   dropTag: { position: 'absolute', left: 6, top: 6, paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.pill, backgroundColor: theme.text },

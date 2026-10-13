@@ -2117,8 +2117,9 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     lineHeight: 23,
   },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  productPrice: { fontSize: 20, fontFamily: FONT.bold },
+  productPrice: { fontSize: 20, fontFamily: FONT.bold, fontVariant: ['tabular-nums'] },
   comparePrice: {
+    fontVariant: ['tabular-nums'],
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     color: theme.subtle,

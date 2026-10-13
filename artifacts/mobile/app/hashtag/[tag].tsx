@@ -251,7 +251,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   heroText: { flex: 1 },
   title: { ...TYPE_SCALE.title1, color: theme.text, fontFamily: FONT.bold },
   titleLong: { ...TYPE_SCALE.title2, fontFamily: FONT.bold, paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.sm },
-  count: { ...TYPE_SCALE.body, color: theme.muted, marginTop: 2 },
+  count: { ...TYPE_SCALE.body, color: theme.muted, marginTop: 2, fontVariant: ['tabular-nums'] },
   followRow: { paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.md, paddingBottom: SPACING.md },
   followBtn: { height: 38, borderRadius: ControlRadius.md, alignItems: 'center', justifyContent: 'center' },
   // Primary pill: inverted text/background so it is white-on-black in dark and black-on-white in light.

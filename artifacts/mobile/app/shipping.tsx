@@ -1096,7 +1096,7 @@ const styles = StyleSheet.create({
   returnReason: { fontSize: 11, fontFamily: FONT.regular },
   rateName: { fontSize: 13, fontFamily: FONT.semibold },
   rateSub: { fontSize: 11, fontFamily: FONT.regular },
-  rateAmount: { fontSize: 15, fontFamily: FONT.bold },
+  rateAmount: { fontVariant: ['tabular-nums'],  fontSize: 15, fontFamily: FONT.bold },
   shipFromRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowLabelStrong: { fontSize: 13, fontFamily: FONT.semibold },
   countryPill: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 8 },

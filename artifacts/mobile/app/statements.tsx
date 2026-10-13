@@ -272,7 +272,7 @@ const createStyles = (theme: AppThemePreset) => {
     centered: { justifyContent: 'center' },
     hero: { alignItems: 'center', paddingVertical: SP.sm, paddingBottom: SP.md },
     heroLabel: { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },
-    heroAmount: { color: text, fontSize: 40, fontFamily: FONT.bold, letterSpacing: -0.5, marginTop: 6 },
+    heroAmount: { color: text, fontSize: 40, fontFamily: FONT.bold, letterSpacing: -0.5, marginTop: 6, fontVariant: ['tabular-nums'] },
     heroSub: { color: muted, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 4 },
     card: { backgroundColor: card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: border, overflow: 'hidden' },
     sumRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: 10 },

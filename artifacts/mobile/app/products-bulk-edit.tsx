@@ -889,7 +889,7 @@ function makeStyles(theme: any) {
       borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
     },
     selectAllText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.base, color: theme.text },
-    count: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted },
+    count: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted, fontVariant: ['tabular-nums'] },
     row: {
       flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, paddingVertical: 12,
       borderBottomWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
@@ -908,7 +908,7 @@ function makeStyles(theme: any) {
       backgroundColor: theme.text, padding: SP.md, gap: SP.sm,
     },
     barTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    barCount: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.background },
+    barCount: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.background, fontVariant: ['tabular-nums'] },
     barActions: { flex: 1, flexDirection: 'row', gap: 6 },
     barBtn: {
       flex: 1, height: 40, paddingHorizontal: 12, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center',

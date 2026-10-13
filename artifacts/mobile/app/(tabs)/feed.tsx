@@ -327,7 +327,7 @@ const hdStyles = StyleSheet.create({
   avatar:   { width: 44, height: 44, borderRadius: RADIUS.xs, overflow: 'hidden' },
   name:     { fontSize: 13, fontFamily: FONT.semibold, color: FG },
   brand:    { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  price:    { fontSize: 13, fontFamily: FONT.bold, color: FG },
+  price:    { fontSize: 13, fontFamily: FONT.bold, color: FG, fontVariant: ['tabular-nums'] },
   skelRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
   skelAvatar: { width: 44, height: 44, borderRadius: RADIUS.xs, backgroundColor: SURFACE },
   skelLine: { height: 10, borderRadius: 4, backgroundColor: SURFACE },

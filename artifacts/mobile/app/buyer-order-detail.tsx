@@ -446,7 +446,7 @@ const rvs = StyleSheet.create({
     fontFamily: FONT.regular, fontSize: FS.sm,
     marginBottom: 4,
   },
-  charCount: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'right', marginBottom: SP.md },
+  charCount: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'right', marginBottom: SP.md, fontVariant: ['tabular-nums'] },
   chipRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md, flexWrap: 'wrap' },
   chip: { paddingHorizontal: 14, minHeight: 40, borderRadius: ControlRadius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   chipText: { fontFamily: FONT.semibold, fontSize: FS.meta },
@@ -1497,7 +1497,7 @@ const makeStyles = (theme: AppThemePreset) => {
     itemThumbFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardElevated },
     lineItemName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
     lineItemVariant: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
-    lineItemPrice: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.text },
+    lineItemPrice: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.text, fontVariant: ['tabular-nums'] },
 
     // Address
     addressLine: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 22 },
@@ -1506,7 +1506,7 @@ const makeStyles = (theme: AppThemePreset) => {
     divider: { height: 1, backgroundColor: theme.border, marginVertical: SP.sm },
     totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     totalLabel: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.text },
-    totalAmount: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.text },
+    totalAmount: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.text, fontVariant: ['tabular-nums'] },
     paymentNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: SP.sm, textAlign: 'center' },
 
     // Tracking

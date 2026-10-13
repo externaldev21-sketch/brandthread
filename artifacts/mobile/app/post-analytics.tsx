@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useColors } from '@/hooks/useColors';
 import { FS, FONT } from '@/lib/theme';
+import { formatCompactCount } from '@/lib/compactFormat';
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 
@@ -27,11 +28,7 @@ const DATE_RANGES: DateRange[] = ['7d', '14d', '30d', 'All'];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
-  return String(n);
-}
+const formatNumber = formatCompactCount;
 
 function formatRevenue(n: number): string {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

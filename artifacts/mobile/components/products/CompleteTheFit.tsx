@@ -227,7 +227,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   },
   addBtnDone: { backgroundColor: c.primary, borderColor: c.primary },
   name: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.foreground, lineHeight: 18, minHeight: 36 },
-  price: { fontSize: FS.sm, fontFamily: FONT.bold, color: c.foreground, marginTop: 2 },
+  price: { fontSize: FS.sm, fontFamily: FONT.bold, color: c.foreground, marginTop: 2, fontVariant: ['tabular-nums'] },
   error: { fontSize: FS.sm, fontFamily: FONT.medium, color: c.mutedForeground, marginTop: SP.sm },
   sheetLoading: { paddingVertical: SP.md },
   variantRow: {
@@ -235,5 +235,5 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
     minHeight: 48, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border,
   },
   variantTitle: { fontSize: FS.base, fontFamily: FONT.medium, color: c.foreground },
-  variantPrice: { fontSize: FS.base, fontFamily: FONT.semibold, color: c.foreground },
+  variantPrice: { fontSize: FS.base, fontFamily: FONT.semibold, color: c.foreground, fontVariant: ['tabular-nums'] },
 });

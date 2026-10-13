@@ -259,7 +259,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.sm },
   sectionTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: c.foreground },
-  count: { fontSize: FS.sm, fontFamily: FONT.medium, color: c.mutedForeground },
+  count: { fontSize: FS.sm, fontFamily: FONT.medium, color: c.mutedForeground, fontVariant: ['tabular-nums'] },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 72,
     paddingHorizontal: SP.md, paddingVertical: SP.sm,
