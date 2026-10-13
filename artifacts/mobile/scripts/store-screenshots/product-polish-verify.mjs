@@ -124,7 +124,7 @@ const SHOTS = {
     act: async (page) => {
       await page.getByRole('button', { name: 'Size chart' }).click();
       await page.waitForTimeout(400);
-      await page.getByTestId('size-chart-unit-toggle').getByText('cm', { exact: true }).click();
+      await page.getByTestId('size-chart-unit-toggle').getByText('Centimeters', { exact: true }).click();
       await scrollTo('size-chart-unit-toggle')(page);
     },
   },

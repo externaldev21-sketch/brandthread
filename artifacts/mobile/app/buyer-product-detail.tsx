@@ -1652,11 +1652,13 @@ function SizeChartViewer({ chart }: { chart: SizeChart }) {
   return (
     <View>
     {sellerUnit && (
-      <View style={{ alignSelf: 'flex-start', marginTop: SP.sm, minWidth: 128 }}>
+      <View style={{ alignSelf: 'flex-start', marginTop: SP.sm, minWidth: 200 }}>
+        {/* lululemon's size guide: underlined "Inches / Centimeters" tabs. */}
         <SegmentedControl
-          options={[{ id: 'in', label: 'in' }, { id: 'cm', label: 'cm' }]}
+          options={[{ id: 'in', label: 'Inches' }, { id: 'cm', label: 'Centimeters' }]}
           selectedId={shownUnit!}
           onChange={id => setUnit(id as ChartUnit)}
+          variant="underline"
           testID="size-chart-unit-toggle"
         />
       </View>
