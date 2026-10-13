@@ -40,6 +40,7 @@ import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import Composer from '@/components/ui/Composer';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { LinkPreviewCard } from '@/components/chat/LinkPreviewCard';
+import { CHAT_FOCUS_HIGHLIGHT_MS, messageRowIndex, takePendingChatFocus } from '@/lib/chatFocus';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
 import * as Clipboard from 'expo-clipboard';
@@ -1217,7 +1218,33 @@ export default function SellerConversationScreen() {
 
   // ── Render helpers ──────────────────────────────────────────────────────────
 
-  function renderItem({ item }: ListRenderItemInfo<ListRow>) {
+  // Search in chat → jump (#164): rows, and the found message's highlight.
+  const listRows = groupByDate(messages, callLog);
+  const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null);
+  const focusHoldRef = useRef<number | null>(null);
+  const focusScrollIdRef = useRef<string | null>(null);
+  useFocusEffect(useCallback(() => {
+    const target = takePendingChatFocus(id);
+    if (!target) return undefined;
+    const index = messageRowIndex(listRows as { type: string; msg?: { id: string } }[], target);
+    if (index < 0) return undefined;
+    focusHoldRef.current = messages.length;
+    focusScrollIdRef.current = target;
+    setFocusedMessageId(target);
+    requestAnimationFrame(() => flatListRef.current?.scrollToIndex({ index, viewPosition: 0.5, animated: false }));
+    const timer = setTimeout(() => setFocusedMessageId(null), CHAT_FOCUS_HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, listRows.length]));
+
+  function renderItem(info: ListRenderItemInfo<ListRow>) {
+    const row = renderRow(info);
+    return info.item.type === 'message' && info.item.msg.id === focusedMessageId
+      ? <View style={{ backgroundColor: theme.border }} testID="conversation-focused-message">{row}</View>
+      : row;
+  }
+
+  function renderRow({ item }: ListRenderItemInfo<ListRow>) {
     if (item.type === 'date') {
       return (
         <View style={s.dateWrap}>
@@ -1766,7 +1793,7 @@ export default function SellerConversationScreen() {
       ) : (
         <FlatList
           ref={flatListRef}
-          data={groupByDate(messages, callLog)}
+          data={listRows}
           keyExtractor={(item, i) => (
             item.type === 'date' ? `date-${item.date}-${i}`
               : item.type === 'call_log' ? `call-${item.entry.id}`
@@ -1777,7 +1804,20 @@ export default function SellerConversationScreen() {
           contentContainerStyle={s.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          onContentSizeChange={() => {
+            // Hold on a search result until a new message arrives (#164).
+            if (focusHoldRef.current !== null) {
+              if (messages.length <= focusHoldRef.current) return;
+              focusHoldRef.current = null;
+            }
+            flatListRef.current?.scrollToEnd({ animated: false });
+          }}
+          onScrollToIndexFailed={(info) => {
+            if (!focusScrollIdRef.current) return;
+            focusScrollIdRef.current = null;
+            flatListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+            setTimeout(() => flatListRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: false }), 60);
+          }}
         />
       )}
 

@@ -29,6 +29,7 @@ import {
   MY_USER_ID, MY_NAME, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
 import { LinkPreviewCard } from '@/components/chat/LinkPreviewCard';
+import { CHAT_FOCUS_HIGHLIGHT_MS, messageRowIndex, takePendingChatFocus } from '@/lib/chatFocus';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
@@ -1618,7 +1619,15 @@ export default function BuyerConversationScreen() {
 
   // ── Render list item ────────────────────────────────────────────────────────
 
-  function renderItem({ item }: ListRenderItemInfo<ListRow>) {
+  // Search in chat → jump (#164): the found message gets a brief highlight band.
+  function renderItem(info: ListRenderItemInfo<ListRow>) {
+    const row = renderRow(info);
+    return info.item.type === 'message' && info.item.msg.id === focusedMessageId
+      ? <View style={{ backgroundColor: theme.border }} testID="conversation-focused-message">{row}</View>
+      : row;
+  }
+
+  function renderRow({ item }: ListRenderItemInfo<ListRow>) {
     if (item.type === 'date') {
       // Plain small gray centered text, like Instagram/Threads — no pill.
       return (
@@ -2059,6 +2068,25 @@ export default function BuyerConversationScreen() {
   const visibleMessages = messages.filter(m => !m.deletedForMe);
   const listData = mergeCallLogRows(buildListRows(visibleMessages, unreadDividerId), callLog);
 
+  // Back from Search in chat with a result tapped: scroll to it, highlight it,
+  // and hold the list there (no auto-jump to the bottom) until a new message.
+  const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null);
+  const focusHoldRef = useRef<number | null>(null);
+  const focusScrollIdRef = useRef<string | null>(null);
+  useFocusEffect(useCallback(() => {
+    const target = takePendingChatFocus(conv?.id);
+    if (!target) return undefined;
+    const index = messageRowIndex(listData as { type: string; msg?: { id: string } }[], target);
+    if (index < 0) return undefined;
+    focusHoldRef.current = messages.length;
+    focusScrollIdRef.current = target;
+    setFocusedMessageId(target);
+    requestAnimationFrame(() => flatListRef.current?.scrollToIndex({ index, viewPosition: 0.5, animated: false }));
+    const timer = setTimeout(() => setFocusedMessageId(null), CHAT_FOCUS_HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conv?.id, listData.length]));
+
   useEffect(() => {
     if (!unreadDividerId || hasScrolledToUnreadRef.current) return;
     const idx = listData.findIndex(r => r.type === 'unread');
@@ -2385,11 +2413,22 @@ export default function BuyerConversationScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         onContentSizeChange={() => {
+          if (focusHoldRef.current !== null) {
+            if (messages.length <= focusHoldRef.current) return;
+            focusHoldRef.current = null;
+          }
           if (!unreadDividerId || hasScrolledToUnreadRef.current) {
             flatListRef.current?.scrollToEnd({ animated: false });
           }
         }}
-        onScrollToIndexFailed={() => {
+        onScrollToIndexFailed={(info) => {
+          // A search jump to a row that isn't measured yet: get close, retry once.
+          if (focusScrollIdRef.current) {
+            focusScrollIdRef.current = null;
+            flatListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+            setTimeout(() => flatListRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: false }), 60);
+            return;
+          }
           setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
         }}
         // Windowing kept at RN defaults (10/21) — the history stays performant
