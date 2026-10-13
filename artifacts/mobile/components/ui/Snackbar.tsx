@@ -62,7 +62,10 @@ export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction
       pointerEvents="box-none"
       style={[styles.root, topOffset !== undefined ? { top: topOffset } : { bottom: bottomOffset ?? Math.max(insets.bottom, SPACING.md) + SPACING.xl }, style]}
     >
-      <View style={[styles.pill, { backgroundColor: palette.elevated }]} accessibilityLiveRegion="polite">
+      <View
+        style={[styles.pill, { backgroundColor: palette.elevated }, topOffset !== undefined && { borderWidth: 1, borderColor: palette.border }]}
+        accessibilityLiveRegion="polite"
+      >
         {thumbnailUri && <Image source={{ uri: thumbnailUri }} style={styles.thumb} accessible={false} />}
         <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.footnote, styles.message, { color: palette.foreground }]} numberOfLines={2}>{message}</Text>
         {actionLabel && onAction && (
