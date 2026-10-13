@@ -44,6 +44,8 @@ import { fetchLiveCodes, describeLiveCode, type LiveCode } from '@/lib/live/live
 import { clearLiveCheckoutContext, getLiveCheckoutContext, setLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import type { LiveProduct, LiveStream } from '@/lib/live/types';
 import { fetchLiveBag } from '@/services/liveShoppingService';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import { previewFlashDeals } from '@/lib/live/previewLiveData';
 import {
   LiveChatList, LiveCommentBar, LiveHeartLayer, LiveHostPill, LivePinnedProductCard, LiveRail,
   type LiveHeartLayerHandle,
@@ -250,6 +252,8 @@ export default function LiveScreen() {
   const provider = useMemo(() => getLiveStreamProvider(), []);
   const pager = useLivePager(provider, { streamId: params.streamId ?? null, hostId: params.hostId ?? null });
   const { streams, activeIndex, setActiveIndex } = pager;
+  const streamsRef = useRef(streams);
+  streamsRef.current = streams;
 
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const pageWidth = viewport.width;
@@ -277,6 +281,17 @@ export default function LiveScreen() {
   useEffect(() => {
     setLiveCodes([]);
     setBagProducts(null);
+    if (bagStreamId && provider.id === 'preview' && isPreviewDemoMode()) {
+      // Demo preview only: a running flash deal and a co-host's piece, so the
+      // bag's timer + co-host rows are reviewable without a backend.
+      setLiveCodes(previewFlashDeals(Date.now()));
+      const host = streamsRef.current.find(x => x.id === bagStreamId);
+      const guest = streamsRef.current.find(x => x.id !== bagStreamId && x.products.length > 0);
+      if (host && guest) {
+        setBagProducts([...host.products, { ...guest.products[0], sellerId: guest.host.id, sellerName: guest.host.name }]);
+      }
+      return undefined;
+    }
     if (!bagStreamId || provider.id === 'preview') return undefined;
     let alive = true;
     setAppliedCode(getLiveCheckoutContext()?.streamId === bagStreamId ? getLiveCheckoutContext()?.code ?? null : null);
