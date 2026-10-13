@@ -168,6 +168,8 @@ const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+// Apple Wallet pre-order passes: status + signed download are public, the link route requires auth itself.
+router.use("/wallet",          walletPassesRouter);
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
@@ -378,6 +380,7 @@ router.use("/live",                      tc, liveCommerceRouter); // Pin / live 
 router.use("/live",                      tc, liveRouter);
 import liveReplaysRouter from "./live-replays";
 import liveTipsRouter from "./live-tips";
+import walletPassesRouter from "./walletPasses";
 router.use("/live-replays",              tc, liveReplaysRouter);
 router.use("/live-tips",                 tc, liveTipsRouter);
 
