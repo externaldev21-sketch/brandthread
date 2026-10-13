@@ -1,12 +1,12 @@
 /** One creator in the seller's program. Route: /seller-creator-detail?id=<affiliateId> */
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
@@ -14,6 +14,7 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { getPreviewSellerOverview } from '@/lib/previewAffiliate';
 import type { SellerCreator } from '@/lib/affiliateTypes';
 import { ActionButton, KeyStatRow, Pill, SectionTitle } from '@/components/affiliate/AffiliateUI';
+import { CommissionStepper } from '@/components/affiliate/CommissionStepper';
 
 export default function SellerCreatorDetailScreen() {
   const { theme } = useAppTheme();
@@ -27,7 +28,7 @@ export default function SellerCreatorDetailScreen() {
   const [creator, setCreator] = useState<SellerCreator | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [override, setOverride] = useState('');
+  const [rate, setRate] = useState(10);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -37,7 +38,7 @@ export default function SellerCreatorDetailScreen() {
       const overview = previewOnly ? getPreviewSellerOverview() : await api.affiliate.seller.overview();
       const c = overview.creators.find((x) => x.id === id) ?? null;
       setCreator(c);
-      setOverride(c?.hasOverride ? String(c.commissionPercent) : '');
+      if (c) setRate(c.commissionPercent);
       setError(false);
     } catch { setError(true); }
     finally { setLoading(false); }
@@ -76,21 +77,12 @@ export default function SellerCreatorDetailScreen() {
             <KeyStatRow label="Commission paid" value={formatCents(c.stats.paidCents)} last />
 
             <SectionTitle>Commission</SectionTitle>
-            <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, borderRadius: RADIUS.md, paddingHorizontal: SP.md, minHeight: 48, marginBottom: SP.sm }}>
-              <TextInput
-                value={override}
-                onChangeText={setOverride}
-                placeholder={`${c.commissionPercent} (program default)`}
-                placeholderTextColor={theme.muted}
-                keyboardType="decimal-pad"
-                style={{ flex: 1, fontFamily: FONT.regular, fontSize: FS.base, color: theme.text }}
-                accessibilityLabel="Commission override"
-              />
-              <Text style={{ fontFamily: FONT.medium, color: theme.muted }}>%</Text>
+            <View style={{ marginBottom: SP.sm }}>
+              <CommissionStepper label={c.hasOverride ? 'Commission for this creator' : 'Commission (program default)'} value={rate} onChange={setRate} testID="creator-commission-stepper" />
             </View>
             <View style={{ flexDirection: 'row', gap: SP.sm, marginBottom: SP.lg }}>
-              <ActionButton label="Save rate" flex loading={busy === 'rate'} disabled={override.trim() === '' || !Number.isFinite(Number(override))}
-                onPress={() => run('rate', () => api.affiliate.seller.update(c.id, { commissionPercent: Number(override) }))} />
+              <ActionButton label="Save rate" flex loading={busy === 'rate'} disabled={rate === c.commissionPercent}
+                onPress={() => run('rate', () => api.affiliate.seller.update(c.id, { commissionPercent: rate }))} />
               <ActionButton label="Use default" flex outline disabled={!c.hasOverride || busy === 'rate'}
                 onPress={() => run('rate', () => api.affiliate.seller.update(c.id, { commissionPercent: null }))} />
             </View>

@@ -291,6 +291,8 @@ export default function MarketingScreen() {
         <ListRow icon="link" title="Links" subtitle="Trackable links with clicks and sales" chevron onPress={() => router.push('/growth-links' as never)} />
         <ListRow icon="user" title="Link in bio" subtitle="Your shareable page" chevron onPress={() => router.push('/link-in-bio' as never)} />
         <ListRow icon="activity" title="Pixels" subtitle="Meta and TikTok" chevron onPress={() => router.push('/store-pixels' as never)} />
+        <ListRow icon="rss" title="Product feed" subtitle="Instagram, Facebook and TikTok catalogs" chevron onPress={() => router.push('/product-feed' as never)} />
+        <ListRow icon="grid" title="QR sticker" subtitle="Print for pop-ups" chevron onPress={() => router.push('/store-qr-sticker' as never)} />
       </View>
 
       {/* Email campaigns — list capture from the store site + campaign composer */}

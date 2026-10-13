@@ -11,7 +11,16 @@
  * Tax and shipping are never commissionable.
  */
 
-export const MAX_COMMISSION_BPS = 5000; // 50% ceiling a seller may set
+export const MAX_COMMISSION_BPS = 5000; // absolute ceiling any stored rate may hold
+/**
+ * The range a seller may SET for creator commission (program default and
+ * per-creator overrides): 5% to 10%. Rows saved before this range existed are
+ * left untouched; re-sending the unchanged stored value is still accepted so an
+ * unrelated settings save never fails or silently rewrites money settings.
+ */
+export const MIN_SELLER_COMMISSION_BPS = 500;
+export const MAX_SELLER_COMMISSION_BPS = 1000;
+export const COMMISSION_OUT_OF_RANGE = "COMMISSION_OUT_OF_RANGE";
 export const MAX_BUYER_DISCOUNT_BPS = 5000;
 export const DEFAULT_WINDOW_DAYS = 30;
 export const MAX_WINDOW_DAYS = 365;
@@ -23,6 +32,22 @@ export type CommissionStatus = "pending" | "payable" | "paid" | "reversed";
 export function isValidBps(bps: unknown, max = MAX_COMMISSION_BPS): bps is number {
   return typeof bps === "number" && Number.isInteger(bps) && bps >= 0 && bps <= max;
 }
+
+/**
+ * Whether a seller may save `bps` as a commission. In range is always fine;
+ * the only out-of-range value accepted is the one already stored (`current`),
+ * so legacy rates survive unrelated edits without being rewritten.
+ */
+export function isAllowedSellerCommission(bps: number, current?: number | null): boolean {
+  if (current != null && bps === current) return true;
+  return Number.isInteger(bps) && bps >= MIN_SELLER_COMMISSION_BPS && bps <= MAX_SELLER_COMMISSION_BPS;
+}
+
+export const commissionRangeError = () => ({
+  error: `Commission must be between ${MIN_SELLER_COMMISSION_BPS / 100}% and ${MAX_SELLER_COMMISSION_BPS / 100}%`,
+  code: COMMISSION_OUT_OF_RANGE,
+  details: { minPercent: MIN_SELLER_COMMISSION_BPS / 100, maxPercent: MAX_SELLER_COMMISSION_BPS / 100 },
+});
 
 /** A percent typed by a person (10, 12.5) to basis points; null when invalid. */
 export function percentToBps(percent: unknown): number | null {
