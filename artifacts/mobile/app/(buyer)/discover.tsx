@@ -155,6 +155,11 @@ export default function DiscoverScreen() {
   const [viewer, setViewer] = useState<{ posts: DiscoverPost[]; startIndex: number } | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [safetyMenuPost, setSafetyMenuPost] = useState<DiscoverPost | null>(null);
+  // Keeps the last post while the safety menu slides closed, so it animates
+  // out instead of unmounting the instant the selection clears.
+  const lastSafetyMenuPost = useRef<DiscoverPost | null>(null);
+  if (safetyMenuPost) lastSafetyMenuPost.current = safetyMenuPost;
+  const menuPost = safetyMenuPost ?? lastSafetyMenuPost.current;
 
   const fetchJustDropped = useCallback(async () => {
     setJustDroppedLoading(true);
@@ -441,28 +446,28 @@ export default function DiscoverScreen() {
         />
       )}
 
-      {safetyMenuPost && (
+      {menuPost && (
         <DiscoverSafetyMenu
-          visible
-          authorName={safetyMenuPost.authorName}
-          onNotInterested={() => removePostFromLists(safetyMenuPost.authorId, safetyMenuPost.id)}
+          visible={!!safetyMenuPost}
+          authorName={menuPost.authorName}
+          onNotInterested={() => removePostFromLists(menuPost.authorId, menuPost.id)}
           onMute={() => {
             muteUser({
-              userId: safetyMenuPost.authorId,
-              name: safetyMenuPost.authorName,
-              handle: safetyMenuPost.authorHandle,
-              initials: safetyMenuPost.authorInitials,
-              color: safetyMenuPost.authorColor,
+              userId: menuPost.authorId,
+              name: menuPost.authorName,
+              handle: menuPost.authorHandle,
+              initials: menuPost.authorInitials,
+              color: menuPost.authorColor,
             }).catch(() => {});
-            removePostFromLists(safetyMenuPost.authorId);
+            removePostFromLists(menuPost.authorId);
           }}
           onReport={() => {
             openReport({
               targetType: 'post',
-              targetId: safetyMenuPost.id,
+              targetId: menuPost.id,
               label: 'Post',
-              ownerId: safetyMenuPost.authorId,
-              ownerName: safetyMenuPost.authorName,
+              ownerId: menuPost.authorId,
+              ownerName: menuPost.authorName,
             });
           }}
           onClose={() => setSafetyMenuPost(null)}

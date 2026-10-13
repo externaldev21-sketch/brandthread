@@ -196,6 +196,11 @@ export default function BuyerSearchScreen() {
   const [viewer, setViewer] = useState<{ posts: DiscoverPost[]; startIndex: number } | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [safetyMenuPost, setSafetyMenuPost] = useState<DiscoverPost | null>(null);
+  // Keeps the last post while the safety menu slides closed, so it animates
+  // out instead of unmounting the instant the selection clears.
+  const lastSafetyMenuPost = useRef<DiscoverPost | null>(null);
+  if (safetyMenuPost) lastSafetyMenuPost.current = safetyMenuPost;
+  const menuPost = safetyMenuPost ?? lastSafetyMenuPost.current;
 
   const topPad = useHeaderTopInset();
 
@@ -776,20 +781,20 @@ export default function BuyerSearchScreen() {
           reduceMotion={null}
         />
       )}
-      {safetyMenuPost && (
+      {menuPost && (
         <DiscoverSafetyMenu
-          visible
-          authorName={safetyMenuPost.authorName}
+          visible={!!safetyMenuPost}
+          authorName={menuPost.authorName}
           onClose={() => setSafetyMenuPost(null)}
-          onNotInterested={() => { removePostFromLists(safetyMenuPost.authorId, safetyMenuPost.id); setSafetyMenuPost(null); }}
-          onMute={() => { removePostFromLists(safetyMenuPost.authorId); setSafetyMenuPost(null); }}
+          onNotInterested={() => { removePostFromLists(menuPost.authorId, menuPost.id); setSafetyMenuPost(null); }}
+          onMute={() => { removePostFromLists(menuPost.authorId); setSafetyMenuPost(null); }}
           onReport={() => {
             openReport({
               targetType: 'post',
-              targetId: safetyMenuPost.id,
+              targetId: menuPost.id,
               label: 'Post',
-              ownerId: safetyMenuPost.authorId,
-              ownerName: safetyMenuPost.authorName,
+              ownerId: menuPost.authorId,
+              ownerName: menuPost.authorName,
             });
             setSafetyMenuPost(null);
           }}
