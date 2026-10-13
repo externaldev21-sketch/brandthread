@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const { nativeComponent, api } = vi.hoisted(() => ({
+const { nativeComponent, api, auth } = vi.hoisted(() => ({
+  auth: { isSignedIn: true },
   nativeComponent: (name: string) => {
     function MockNativeComponent(props: Record<string, unknown>) {
       return React.createElement(name, props, props.children as React.ReactNode);
@@ -26,6 +27,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@expo/vector-icons', () => ({ Feather: nativeComponent('Feather') }));
 vi.mock('@/hooks/useApi', () => ({ useApi: () => api }));
+vi.mock('@clerk/expo', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/inputReset', () => ({ WEB_INPUT_RESET: {} }));
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({ theme: { text: '#fff', muted: '#aaa', subtle: '#777', border: '#333', background: '#000', cardElevated: '#111' } }),
@@ -70,6 +72,7 @@ const ROWS = [
 describe('AddressAutocompleteInput', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    auth.isSignedIn = true;
     api.buyer.addresses.autocomplete.mockReset();
     api.buyer.addresses.resolveSuggestion.mockReset();
   });
@@ -156,6 +159,29 @@ describe('AddressAutocompleteInput', () => {
     // Typing again clears it.
     type('350 Bedford Av');
     expect(byTestId('address-resolve-error')).toHaveLength(0);
+  });
+
+  it('signed out (guest checkout, the web preview): never calls the paid search, manual entry instead', async () => {
+    auth.isSignedIn = false;
+    api.buyer.addresses.autocomplete.mockResolvedValue(ROWS);
+    render();
+    type('141 Prince St');
+    await flush();
+    expect(api.buyer.addresses.autocomplete).not.toHaveBeenCalled();
+    expect(byTestId('address-search-error')).toHaveLength(0);
+    expect(allText()).toContain('Your ZIP code fills the city and state');
+  });
+
+  it('keeps the whole street as typed ("141 Prince St", not "141")', async () => {
+    api.buyer.addresses.autocomplete.mockResolvedValue([]);
+    render();
+    type('141');
+    type('141 Prince St');
+    await flush();
+    expect(input().props.value).toBe('141 Prince St');
+    // A one-line street field: the single-line autofill hint, not the multi-line one.
+    expect(input().props.autoComplete).toBe('address-line1');
+    expect(input().props.textContentType).toBe('streetAddressLine1');
   });
 
   it('maps server errors to states and copy', () => {

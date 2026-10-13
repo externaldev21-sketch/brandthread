@@ -8,7 +8,12 @@
  * right below (SHEIN / Yami / Vestiaire "Can't find it? Enter it manually"):
  *  - no matches            → "No matching addresses"
  *  - Places down / network → "Suggestions aren't loading" + Try again
- *  - Places not configured → "Address search is unavailable"
+ *  - Places not configured, or Google rejects the key (403: Places API (New)
+ *    not enabled, billing off, key restricted) → "Address search is
+ *    unavailable" (the server answers 503, so there's no pointless retry)
+ *  - signed out (guest checkout, the web preview) → no search at all: the
+ *    endpoint needs an account and Google bills per request, so the buyer
+ *    types the address in the fields below
  *  - picked place isn't a full street address (server 422) or fails to
  *    load → said inline under the list. (This used to be Alert.alert, which
  *    is a no-op on web, so web buyers got no feedback at all.)
@@ -28,6 +33,7 @@ import {
 } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 
+import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -75,6 +81,7 @@ export function AddressAutocompleteInput({
   onSelect: (address: AddressSelection) => void;
 }) {
   const api = useApi();
+  const { isSignedIn } = useAuth();
   const { theme } = useAppTheme();
   // The buyer checkout's language when used there (English elsewhere).
   const t = useCheckoutT();
@@ -92,7 +99,7 @@ export function AddressAutocompleteInput({
   useEffect(() => {
     const trimmed = query?.trim() ?? '';
     const generation = ++requestGeneration.current;
-    if (trimmed.length < MIN_ADDRESS_QUERY) {
+    if (trimmed.length < MIN_ADDRESS_QUERY || !isSignedIn) {
       setSuggestions([]);
       setStatus('idle');
       return;
@@ -114,7 +121,7 @@ export function AddressAutocompleteInput({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [api, country, query, attempt]);
+  }, [api, country, query, attempt, isSignedIn]);
 
   function handleChangeText(text: string) {
     setResolveError(null);
@@ -163,9 +170,12 @@ export function AddressAutocompleteInput({
           placeholder={t('Start typing your address')}
           placeholderTextColor={theme.subtle}
           autoCapitalize="words"
-          autoComplete="street-address"
-          textContentType="fullStreetAddress"
           returnKeyType="done"
+          // One line: the street only (address-line1). "street-address" /
+          // fullStreetAddress are multi-line hints that autofill can put
+          // the whole address, or just a fragment of it, into.
+          autoComplete="address-line1"
+          textContentType="streetAddressLine1"
           accessibilityLabel="Shipping address search"
           style={[styles.input, WEB_INPUT_RESET]}
         />
@@ -222,7 +232,11 @@ export function AddressAutocompleteInput({
       ) : null}
 
       {notice ? null : (
-        <Text style={styles.hint}>Choose a suggestion to fill city, state, postal code, and country. Powered by Google.</Text>
+        <Text style={styles.hint}>
+          {isSignedIn
+            ? 'Choose a suggestion to fill city, state, postal code, and country. Powered by Google.'
+            : 'Enter the street number and name. Your ZIP code fills the city and state.'}
+        </Text>
       )}
     </View>
   );

@@ -47,6 +47,7 @@ import { loadSellerCheckoutSettings, stripeCheckoutLocale } from "../lib/sellerC
 import { validateDiscountCode, DiscountValidationError, reserveDiscountCapacity } from "../lib/discounts";
 import { productsBeyondSellerPlan, SELLER_PLAN_LIMIT_CODE, SELLER_PLAN_LIMIT_MESSAGE } from "../lib/planGate";
 import { logger } from "../lib/logger";
+import { addressPlacesApiKey, classifyPlacesFailure } from "../lib/addressLookup";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
 import {
@@ -178,9 +179,10 @@ router.get(
   "/address-suggestions",
   validateRequest({ query: addressSuggestionQuerySchema }),
   async (req, res) => {
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    // GOOGLE_MAPS_API_KEY or GOOGLE_PLACES_API_KEY (lib/addressLookup.ts).
+    const apiKey = addressPlacesApiKey();
     if (!apiKey) {
-      res.status(503).json({ error: "Address suggestions are not configured" });
+      res.status(503).json({ error: "Address suggestions are not configured", code: "PLACES_NOT_CONFIGURED" });
       return;
     }
     try {
@@ -196,7 +198,12 @@ router.get(
           includedRegionCodes: [String(req.query.country ?? "US").toLowerCase()],
         }),
       });
-      if (!response.ok) throw new Error(`Google Places autocomplete failed with ${response.status}`);
+      if (!response.ok) {
+        const failure = classifyPlacesFailure(response.status, await response.json().catch(() => null));
+        logger.error({ googleStatus: response.status, detail: failure.detail, code: failure.code }, "Google Places autocomplete rejected the request");
+        res.status(failure.status).json({ error: "Address suggestions are temporarily unavailable", code: failure.code });
+        return;
+      }
       const body = await response.json() as any;
       const suggestions = Array.isArray(body?.suggestions)
         ? body.suggestions.flatMap((item: any) => {
@@ -218,9 +225,10 @@ router.get(
   "/address-suggestions/:placeId",
   validateRequest({ params: addressSuggestionParamsSchema }),
   async (req, res) => {
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    // GOOGLE_MAPS_API_KEY or GOOGLE_PLACES_API_KEY (lib/addressLookup.ts).
+    const apiKey = addressPlacesApiKey();
     if (!apiKey) {
-      res.status(503).json({ error: "Address suggestions are not configured" });
+      res.status(503).json({ error: "Address suggestions are not configured", code: "PLACES_NOT_CONFIGURED" });
       return;
     }
     try {
@@ -233,7 +241,12 @@ router.get(
           },
         },
       );
-      if (!response.ok) throw new Error(`Google Places details failed with ${response.status}`);
+      if (!response.ok) {
+        const failure = classifyPlacesFailure(response.status, await response.json().catch(() => null));
+        logger.error({ googleStatus: response.status, detail: failure.detail, code: failure.code }, "Google Places details rejected the request");
+        res.status(failure.status).json({ error: "Could not load that address", code: failure.code });
+        return;
+      }
       const body = await response.json() as any;
       const components = Array.isArray(body?.addressComponents) ? body.addressComponents : [];
       const getComponent = (types: string[], short = false) => {

@@ -80,8 +80,6 @@ vi.mock('react-native-gesture-handler', () => {
 });
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }) }));
 vi.mock('@/hooks/useHeaderTopInset', () => ({ useHeaderTopInset: () => 47 }));
-const { maskMock } = vi.hoisted(() => ({ maskMock: vi.fn() }));
-vi.mock('@/components/layout/ScreenChrome', () => ({ useSuppressStatusBarMask: maskMock }));
 vi.mock('@expo/vector-icons', () => ({ Feather: () => null }));
 vi.mock('@/lib/api', () => ({ useApi: () => apiMock }));
 vi.mock('@/hooks/useApi', () => ({ useApi: () => apiMock }));
@@ -465,18 +463,14 @@ describe('banner behind the status bar', () => {
     return renderer;
   };
 
-  it('while the banner covers the top it lifts the status-bar strip and turns the status bar light', () => {
-    maskMock.mockClear();
+  it('while the banner covers the top it turns the status bar light without a solid mask', () => {
     const renderer = renderHeader(true);
-    expect(maskMock).toHaveBeenLastCalledWith(true);
     expect(renderer.root.findAll((node) => (node.type as unknown) === 'StatusBar' && node.props.barStyle === 'light-content')).toHaveLength(1);
     renderer.unmount();
   });
 
-  it('scrolled past the banner, the strip is back (content never slides under the clock)', () => {
-    maskMock.mockClear();
+  it('scrolled past the banner, the banner no longer overrides status-bar appearance', () => {
     const renderer = renderHeader(false);
-    expect(maskMock).toHaveBeenLastCalledWith(false);
     expect(renderer.root.findAll((node) => (node.type as unknown) === 'StatusBar')).toHaveLength(0);
     renderer.unmount();
   });

@@ -67,6 +67,7 @@ describe('checkout never nests a pressable inside another pressable', () => {
 describe('checkout screen structure', () => {
   const screen = read('app/buyer-checkout.tsx');
   const primitives = read('components/checkout/CheckoutPrimitives.tsx');
+  const regionSheet = read('components/checkout/RegionPickerSheet.tsx');
 
   it('has a Checkout title and a close (X) button in an opaque bar below the notch', () => {
     expect(screen).toContain("header('Checkout', leaveCheckout, 'Close checkout')");
@@ -137,7 +138,7 @@ describe('checkout screen structure', () => {
   });
 
   it('never bounces its scroll views', () => {
-    const scrollViews = [screen, primitives]
+    const scrollViews = [screen, primitives, regionSheet]
       .flatMap(source => source.split(/<(?:ScrollView|FlatList)/).slice(1))
       // Skip type arguments like useRef<ScrollView>(null) — only JSX tags.
       .filter(chunk => /^\s/.test(chunk))

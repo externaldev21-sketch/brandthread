@@ -11,17 +11,19 @@ import { CheckoutField, CheckoutSection } from './CheckoutPrimitives';
 import { useCheckoutT } from './CheckoutLanguage';
 
 export function ContactSection({
-  contact, onChange, showErrors, first,
+  contact, onChange, showErrors, first, bare,
 }: {
   contact: Partial<CheckoutContact>;
   onChange: (next: Partial<CheckoutContact>) => void;
   showErrors: boolean;
   first?: boolean;
+  /** Inside a sheet that already says "Contact": no heading or divider. */
+  bare?: boolean;
 }) {
   const errors = getCheckoutContactErrors(contact);
   const t = useCheckoutT();
   return (
-    <CheckoutSection title={t('Contact')} first={first} testID="checkout-contact">
+    <CheckoutSection title={bare ? undefined : t('Contact')} first={first || bare} testID="checkout-contact">
       <CheckoutField
         label={t('Email')}
         value={contact.email ?? ''}

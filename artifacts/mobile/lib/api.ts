@@ -2141,6 +2141,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             postalCode: string;
             country: string;
           }>(`/api/buyer/address-suggestions/${encodeURIComponent(placeId)}`),
+        /** ZIP → city and state (public, no account needed): fills the checkout form as soon as a ZIP is typed. */
+        lookupPostal: (zip: string) =>
+          quietGet<{ postalCode: string; city: string; state: string; country: 'US' }>(`/api/geo/postal/US/${encodeURIComponent(zip)}`),
         create: (body: any) => post<any>('/api/buyer/addresses', body),
         update: (id: string, body: any) => patch<any>(`/api/buyer/addresses/${encodeURIComponent(id)}`, body),
         delete: (id: string) => del<void>(`/api/buyer/addresses/${encodeURIComponent(id)}`),
