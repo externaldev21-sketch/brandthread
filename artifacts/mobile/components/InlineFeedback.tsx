@@ -181,7 +181,7 @@ export function SectionError({ message, onRetry, style }: SectionErrorProps) {
   return (
     <View style={[se.root, style]}>
       <Feather name="wifi-off" size={13} color={colors.mutedForeground} />
-      <Text style={se.message} numberOfLines={1}>{message}</Text>
+      <Text style={se.message} numberOfLines={2}>{message}</Text>
       <TouchableOpacity
         onPress={onRetry}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

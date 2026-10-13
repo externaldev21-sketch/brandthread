@@ -575,8 +575,8 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
                       </View>
                     )}
                   </View>
-                  <Text style={s.featuredName} numberOfLines={1}>{mfg.name}</Text>
-                  <Text style={s.featuredMeta} numberOfLines={1}>{[mfg.city, mfg.country].filter(Boolean).join(', ')}</Text>
+                  <Text style={s.featuredName} numberOfLines={2}>{mfg.name}</Text>
+                  <Text style={s.featuredMeta} numberOfLines={2}>{[mfg.city, mfg.country].filter(Boolean).join(', ')}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>

@@ -108,6 +108,7 @@ export default function ChangePassword() {
           icon="smartphone"
           title="Sign out other devices"
           subtitle="Everywhere except this device"
+          subtitleNumberOfLines={2}
           toggle={{ value: signOutOthers, onChange: setSignOutOthers }}
         />
       </Card>
