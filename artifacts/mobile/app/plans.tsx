@@ -9,6 +9,10 @@
  * Platform commission on sales depends on the plan (GET /seller/subscription/perks).
  * Every new subscription starts with a 5-day free trial (card required upfront).
  *
+ * Monthly / Yearly (item 116): a year is 10 × monthly ("2 months free",
+ * lib/billingInterval.ts). The toggle copies Paramount+'s plan picker; on iOS /
+ * Android it only appears when the RevenueCat offering has the yearly packages.
+ *
  * The recommended tier is personalized based on the seller's brand-stage answer from onboarding.
  *
  * Redesign notes (single-page paywall, applying Superwall "4,000 paywalls" lessons):
@@ -55,6 +59,11 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
+import { isSubscriptionPaymentRecoveryRequired } from '@/lib/subscriptionRecovery';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import {
+  ANNUAL_SAVINGS_LABEL, annualPackageFor, canOfferYearly, yearlyDisplayFor, type BillingInterval,
+} from '@/lib/billingInterval';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
 import { displayPriceFor } from '@/lib/sellerPlansDisplay';
@@ -114,6 +123,8 @@ export default function PlansScreen() {
   const [pricesTimedOut,    setPricesTimedOut]    = useState(false);
   const [perks,             setPerks]             = useState<PerksResponse | null>(null);
   const [selectedId,        setSelectedId]        = useState<SellerPlanDefinition['id'] | null>(null);
+  const [billingInterval,   setBillingInterval]   = useState<BillingInterval>('month');
+  const [currentInterval,   setCurrentInterval]   = useState<BillingInterval>('month');
   const [exitDrawerVisible, setExitDrawerVisible] = useState(false);
   const [offerVisible,      setOfferVisible]      = useState(false);
   // Guards each open/close cycle of the drawer/offer sheets against the
@@ -134,6 +145,11 @@ export default function PlansScreen() {
   }, [packages.length]);
 
   const pricesFailed   = Platform.OS !== 'web' && packages.length === 0 && (!revenueCatAvailable || pricesTimedOut);
+  // Native shows Yearly only when the offering has every annual package.
+  const yearlyAvailable = canOfferYearly(Platform.OS, packages);
+  const interval: BillingInterval = yearlyAvailable ? billingInterval : 'month';
+  /** The seller's plan, on the interval they're billed — switching interval is a change. */
+  const isCurrentPlan = (planId: string) => planId === currentPlanId && currentPlanStatus !== 'none' && currentInterval === interval;
   // Whether the store actually returned a free-trial intro offer for this user
   // on ANY plan — used to avoid promising a trial that isn't really there.
   const hasRealTrialOffer = Platform.OS === 'web'
@@ -167,6 +183,7 @@ export default function PlansScreen() {
           const status = await api.seller.subscription.status();
           setCurrentPlanId(status.plan ?? null);
           setCurrentPlanStatus(status.status ?? null);
+          setCurrentInterval(status.interval ?? 'month');
         } catch { /* non-fatal */ }
       }
     })();
@@ -242,13 +259,20 @@ export default function PlansScreen() {
 
     // Only treat the plan as already active when there's a real paid subscription.
     // status:'none' means no paid plan yet — Starter must remain selectable.
-    if (!isOnboarding && plan.id === currentPlanId && currentPlanStatus !== 'none') return;
+    if (!isOnboarding && isCurrentPlan(plan.id)) return;
+    // Past due / paused: pay the open invoice (Update card), never a second plan.
+    if (!isOnboarding && isSubscriptionPaymentRecoveryRequired(currentPlanStatus)) {
+      await openPaymentUpdate();
+      return;
+    }
 
     setLoadingId(plan.id);
 
     try {
       if (Platform.OS !== 'web') {
-        const packageToPurchase = packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id]);
+        const packageToPurchase = interval === 'year'
+          ? annualPackageFor(packages, plan.id)
+          : packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id]);
         if (!revenueCatAvailable || !packageToPurchase) {
           throw new Error('Subscriptions are temporarily unavailable. Please try again shortly.');
         }
@@ -265,12 +289,16 @@ export default function PlansScreen() {
         }
         return;
       }
-      const { url } = await api.seller.subscription.checkout(plan.id);
+      const { url } = await api.seller.subscription.checkout(plan.id, interval);
       checkoutOpenedRef.current = true;
       await Linking.openURL(url);
       // setLoadingId stays set until AppState fires on return
     } catch (e: any) {
       setLoadingId(null);
+      if (e?.code === 'SUBSCRIPTION_NEEDS_PAYMENT_UPDATE') {
+        await openPaymentUpdate();
+        return;
+      }
       if (parseRoleError(e)) {
         Alert.alert('Only the store owner can do this');
         return;
@@ -280,6 +308,16 @@ export default function PlansScreen() {
         e?.message ?? 'Please check your connection and try again.',
         [{ text: 'OK' }],
       );
+    }
+  }
+
+  /** Same "Update card" flow as Settings → Subscription: the Stripe billing portal. */
+  async function openPaymentUpdate() {
+    try {
+      const { url } = await api.seller.subscription.portal();
+      await Linking.openURL(url);
+    } catch (e: any) {
+      Alert.alert('Could not open billing', e?.message ?? 'Please try again.');
     }
   }
 
@@ -375,6 +413,19 @@ export default function PlansScreen() {
   }
 
   function getPricing(plan: SellerPlanDefinition): PlanPricing {
+    if (interval === 'year') {
+      const annualPackage = annualPackageFor(packages, plan.id);
+      const web = yearlyDisplayFor(plan);
+      return Platform.OS === 'web'
+        ? { priceLabel: web.price, period: web.period, note: web.note, loading: false, failed: false }
+        : {
+            priceLabel: annualPackage?.product.priceString ?? null,
+            period: 'per year',
+            note: annualPackage?.product.pricePerMonthString ? `${annualPackage.product.pricePerMonthString}/mo billed yearly` : null,
+            loading: false,
+            failed: !annualPackage,
+          };
+    }
     const revenueCatPackage = packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id]);
     const webPrice = displayPriceFor(plan);
     const priceLabel = Platform.OS === 'web'
@@ -392,9 +443,9 @@ export default function PlansScreen() {
   const offerPlan = SELLER_PLANS.find((p) => p.id === recommendedId) ?? selectedPlan;
   const selectedPricing = getPricing(selectedPlan);
   const selectedCtaDisabled = loadingId !== null
-    || (!isOnboarding && selectedPlan.id === currentPlanId && currentPlanStatus !== 'none')
+    || (!isOnboarding && isCurrentPlan(selectedPlan.id))
     || selectedPricing.failed;
-  const isCurrentSelected = !isOnboarding && selectedPlan.id === currentPlanId && currentPlanStatus !== 'none';
+  const isCurrentSelected = !isOnboarding && isCurrentPlan(selectedPlan.id);
 
   // ── Layout ────────────────────────────────────────────────────────────────
   const bottomPad = insets.bottom;
@@ -431,12 +482,24 @@ export default function PlansScreen() {
         <SellerPaywallBullets theme={theme} bullets={BENEFIT_BULLETS} />
 
         <SellerPaywallSocialProof theme={theme} text="Trusted by independent brands building on Brandthread" />
+        {/* Monthly / Yearly (item 116) — sits right above the plan cards. */}
+        {yearlyAvailable && (
+          <SegmentedControl
+            testID="seller-plans-interval"
+            options={[
+              { id: 'month', label: 'Monthly' },
+              { id: 'year', label: `Yearly · ${ANNUAL_SAVINGS_LABEL}` },
+            ]}
+            selectedId={billingInterval}
+            onChange={(id) => setBillingInterval(id as BillingInterval)}
+          />
+        )}
 
         <SellerPlanSelector
           theme={theme}
           plans={SELLER_PLANS}
           recommendedId={recommendedId}
-          currentPlanId={currentPlanId}
+          currentPlanId={currentInterval === interval ? currentPlanId : null}
           isOnboarding={isOnboarding}
           selectedId={selectedId}
           onSelect={setSelectedId}
@@ -462,7 +525,7 @@ export default function PlansScreen() {
           subtext="No commitment. Cancel anytime."
           billingLine={
             hasRealTrialOffer && !selectedPricing.failed
-              ? `Free for 5 days, then ${selectedPricing.priceLabel ?? selectedPlan.priceLabel}/month`
+              ? `Free for 5 days, then ${selectedPricing.priceLabel ?? selectedPlan.priceLabel}/${interval === 'year' ? 'year' : 'month'}`
               : null
           }
         />
@@ -529,7 +592,7 @@ export default function PlansScreen() {
         theme={theme}
         plans={SELLER_PLANS}
         recommendedId={recommendedId}
-        currentPlanId={currentPlanId}
+        currentPlanId={currentInterval === interval ? currentPlanId : null}
         isOnboarding={isOnboarding}
         selectedId={selectedId}
         onSelect={setSelectedId}

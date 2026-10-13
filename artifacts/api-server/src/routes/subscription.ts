@@ -24,6 +24,9 @@ import { requireRole, teamContext } from "../middlewares/requireRole";
 import { requireStripe } from "../lib/stripe";
 import { logger } from "../lib/logger";
 import { getWebOrigin } from "../lib/webOrigin";
+import { intervalFromSubscription, parseBillingInterval, planAmountCents, priceSpecFor, type BillingInterval } from "../lib/billing/annual";
+import { dunningAwareStatus, needsPaymentUpdate } from "../lib/billing/dunning";
+import { loadDunningSummary } from "../lib/billing/dunningWebhooks";
 import { getEffectiveEntitlement, reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
 import { PLAN_CATALOGUE, isSellerPlanId, type SellerPlanId as PlanId } from "../lib/planCatalogue";
 import { buildPlanPerks, hasAdvancedAnalytics } from "../lib/planPerks";
@@ -38,7 +41,7 @@ router.use(teamContext());
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Find or create a Stripe Price for the given plan using lookup_key so the
+ * Find or create a Stripe Price for the given plan + billing interval using lookup_key so the
  * same price is reused across calls and deployments.
  *
  * IMPORTANT: if the catalogue price for a plan changes (e.g. Growth $29 → $79)
@@ -48,14 +51,15 @@ router.use(teamContext());
  *  - future calls find the right price
  *  - legacy subscribers keep their old price ID until their subscription is updated
  */
-async function ensurePrice(stripe: any, planId: PlanId): Promise<string> {
-  const cfg = PLAN_CATALOGUE[planId];
+async function ensurePlanPrice(stripe: any, planId: PlanId, interval: BillingInterval = "month"): Promise<string> {
+  // Monthly or annual (lib/billing/annual.ts: 10 × monthly, "2 months free").
+  const cfg = priceSpecFor(planId, interval);
   const existing = await stripe.prices.list({ lookup_keys: [cfg.lookupKey], limit: 1 });
 
   if (existing.data.length > 0) {
     const found = existing.data[0];
-    // Amount matches — safe to reuse
-    if (found.unit_amount === cfg.amountCents) return found.id;
+    // Amount and interval match — safe to reuse
+    if (found.unit_amount === cfg.amountCents && (found.recurring?.interval ?? "month") === interval) return found.id;
     // Amount mismatch: catalogue was updated but old Stripe Price still holds the key.
     // Create a corrected price and transfer the lookup_key to it.
     logger.warn(
@@ -67,7 +71,7 @@ async function ensurePrice(stripe: any, planId: PlanId): Promise<string> {
   const price = await stripe.prices.create({
     currency:             "usd",
     unit_amount:          cfg.amountCents,
-    recurring:            { interval: "month" },
+    recurring:            { interval },
     product_data:         { name: cfg.name },
     lookup_key:           cfg.lookupKey,
     transfer_lookup_key:  existing.data.length > 0, // move key from stale price to new one
@@ -221,7 +225,10 @@ router.get("/status", requireRole("owner"), async (req, res) => {
         }
       : null;
 
-    const amountCents = PLAN_CATALOGUE[planId as PlanId]?.amountCents ?? 0;
+    const interval = intervalFromSubscription(sub);
+    const amountCents = PLAN_CATALOGUE[planId as PlanId] ? planAmountCents(planId as PlanId, interval) : 0;
+    // Retry N of 3 / paused-after-failed-payments (lib/billing/dunning.ts).
+    const dunning = await loadDunningSummary(clerkUserId, sub.status).catch(() => null);
 
     // Payment method label — card brand + last4
     const pm  = sub.default_payment_method;
@@ -233,13 +240,15 @@ router.get("/status", requireRole("owner"), async (req, res) => {
 
     res.json({
       plan:               planId,
-      status:             sub.status,
+      status:             dunningAwareStatus(sub),
       renewsOn,
       trialEnd:           trialEndFmt,
       trialStartAt:       trialStartAt?.toISOString() ?? null,
       trialEndAt:         trialEndsAt?.toISOString() ?? null,
       trialBanner,
       amountCents,
+      interval,
+      dunning,
       paymentMethodLabel: pmLabel,
       // Reaching this branch means the persisted Stripe subscription was
       // retrieved successfully. Keep billing recovery pointed at Stripe even
@@ -359,7 +368,9 @@ router.get("/invoices", requireRole("owner"), async (req, res) => {
 
 /**
  * POST /api/seller/subscription/checkout
- * Body: { planId: 'starter' | 'growth' | 'pro' }
+ * Body: { planId: 'starter' | 'growth' | 'pro', interval?: 'month' | 'year' }
+ *   interval defaults to 'month'; 'year' bills 10 × monthly (2 months free).
+ *   Switching interval on an active plan updates in place with prorations.
  *
  * • If the seller already has an active or trialing subscription, updates it
  *   in-place (Stripe subscription items update + prorations) instead of creating
@@ -379,6 +390,13 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
       res.status(400).json({ error: "planId must be 'starter', 'growth', or 'pro'" });
       return;
     }
+    const interval = parseBillingInterval(req.body?.interval);
+    if (!interval) {
+      res.status(400).json({ error: "interval must be 'month' or 'year'" });
+      return;
+    }
+    // Every price lookup in this handler uses the requested billing interval.
+    const ensurePrice = (client: any, plan: PlanId) => ensurePlanPrice(client, plan, interval);
 
     const returnBase = `${getWebOrigin("https://localhost:3000")}/api-server`;
 
@@ -390,6 +408,16 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
     if (user?.subscriptionId) {
       try {
         const sub = await (stripe.subscriptions.retrieve as any)(user.subscriptionId);
+        // An unpaid plan is recovered by paying it (Update card → portal),
+        // never by a second subscription (item 115).
+        if (sub && needsPaymentUpdate(sub)) {
+          res.status(409).json({
+            error: "Payment update required",
+            code: "SUBSCRIPTION_NEEDS_PAYMENT_UPDATE",
+            message: "Update your card to restore your plan.",
+          });
+          return;
+        }
         if (sub && ["active", "trialing"].includes(sub.status)) {
           // Update the existing subscription to the new plan — no new Checkout needed.
           const priceId = await ensurePrice(stripe, planId);

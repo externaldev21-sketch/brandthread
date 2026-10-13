@@ -1,8 +1,8 @@
 import React, { createContext, useContext } from 'react';
 
 export type RevenueCatPackage = {
-  identifier: '$bt_starter' | '$bt_growth' | '$bt_pro';
-  product: { priceString: string; introPrice?: { priceString: string; periodNumberOfUnits: number; periodUnit: string } | null };
+  identifier: '$bt_starter' | '$bt_growth' | '$bt_pro' | '$bt_starter_annual' | '$bt_growth_annual' | '$bt_pro_annual';
+  product: { priceString: string; pricePerMonthString?: string | null; introPrice?: { priceString: string; periodNumberOfUnits: number; periodUnit: string } | null };
 };
 
 type RevenueCatContextValue = {

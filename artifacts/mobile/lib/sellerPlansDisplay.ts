@@ -4,11 +4,11 @@
  * IMPORTANT — money safety: every price shown here is derived from the real
  * `SELLER_PLANS` catalogue in `lib/sellerPlans.ts` (the actual billed
  * monthly price). Nothing in this file changes what a seller is charged.
- * There is no yearly billing option today, so only the real monthly price
- * is ever shown — an annual price/toggle was deliberately left out to avoid
- * displaying a number checkout can't actually charge. See the PR
- * description for the real annual Price IDs the owner would need to create
- * before annual billing could ever be offered for real.
+ * Yearly billing (item 116) lives in `lib/billingInterval.ts`: a year is
+ * exactly 10 × this monthly price, which is what Stripe checkout charges
+ * (api-server lib/billing/annual.ts, Price lookup keys
+ * brandthread_<plan>_annual). Native stores need the matching
+ * App Store / Play products before the yearly toggle shows on iOS / Android.
  */
 import { SELLER_PLANS, type SellerPlanDefinition } from './sellerPlans';
 
@@ -104,6 +104,6 @@ export const PLAN_FAQ: PlanFaqItem[] = [
   },
   {
     question: 'How do I pay — monthly or yearly?',
-    answer: 'Plans are billed monthly today. Annual billing isn\'t available yet — we\'ll announce it here once it is.',
+    answer: 'Either. Plans are billed monthly, or yearly for the price of 10 months — 2 months free. Switching between monthly and yearly is prorated automatically.',
   },
 ];
