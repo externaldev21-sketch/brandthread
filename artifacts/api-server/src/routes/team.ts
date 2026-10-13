@@ -53,7 +53,7 @@ const teamInviteBody = looseBody({
 const teamRoleBody = looseBody({ role: cappedUnknown(40) });
 
 // ─── Role definitions ─────────────────────────────────────────────────────────
-// `owner` plus the five roles offered on invite. Permissions here mirror
+// `owner` plus the six roles offered on invite. Permissions here mirror
 // ROLE_PERMISSIONS in middlewares/requireRole.ts — that file is the source of
 // truth enforced server-side; this list is for the UI (roles screen, invite
 // picker). `manager`/`staff` are legacy roles kept alive for members invited
@@ -88,6 +88,13 @@ const ROLE_DEFINITIONS = [
     permissions: ["orders", "inventory"],
   },
   {
+    key: "packer",
+    name: "Packer",
+    group: "Store",
+    description: "Sees orders to pack and ship. No sales, payouts, customers' contact details or store settings.",
+    permissions: ["fulfillment"],
+  },
+  {
     key: "marketing",
     name: "Marketing",
     group: "Store",
@@ -103,7 +110,7 @@ const ROLE_DEFINITIONS = [
   },
 ] as const;
 
-const INVITE_ROLES = ["admin", "finance", "orders", "marketing", "viewer"] as const;
+const INVITE_ROLES = ["admin", "finance", "orders", "packer", "marketing", "viewer"] as const;
 type InviteRole = (typeof INVITE_ROLES)[number];
 const isInviteRole = (role: unknown): role is InviteRole => INVITE_ROLES.includes(role as InviteRole);
 
@@ -837,7 +844,7 @@ router.get("/roles/:role/members", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const viewerIsOwner = (((req as any).actorRole as string) ?? "owner") === "owner";
   const role = String(req.params.role).toLowerCase();
-  if (!["owner", "admin", "manager", "finance", "orders", "marketing", "staff", "viewer"].includes(role)) {
+  if (!["owner", "admin", "manager", "finance", "orders", "packer", "marketing", "staff", "viewer"].includes(role)) {
     res.status(400).json({ error: "Unknown role" });
     return;
   }

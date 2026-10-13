@@ -73,23 +73,25 @@ function initials(name: string) {
 }
 
 
-type InviteRole = 'admin' | 'finance' | 'orders' | 'marketing' | 'viewer';
+type InviteRole = 'admin' | 'finance' | 'orders' | 'packer' | 'marketing' | 'viewer';
 const INVITE_ROLES: { key: InviteRole; title: string; sub: string }[] = [
   { key: 'admin', title: 'Admin', sub: 'Everything but billing' },
   { key: 'finance', title: 'Finance', sub: 'Balance & payouts' },
   { key: 'orders', title: 'Orders', sub: 'Orders & fulfillment' },
+  { key: 'packer', title: 'Packer', sub: 'Pack & ship orders only' },
   { key: 'marketing', title: 'Marketing', sub: 'Ads, boosts & discounts' },
   { key: 'viewer', title: 'Viewer', sub: 'Read-only analytics' },
 ];
 const ROLE_LABEL: Record<string, string> = {
   owner: 'Owner', admin: 'Admin', finance: 'Finance', orders: 'Orders', marketing: 'Marketing', viewer: 'Viewer',
-  manager: 'Manager', staff: 'Staff',
+  manager: 'Manager', staff: 'Staff', packer: 'Packer',
 };
 const ROLE_ACCESS: Record<string, string> = {
   owner: 'Full access',
   admin: 'Products, orders, payouts, marketing & team',
   finance: 'Balance, payouts & transactions',
   orders: 'Orders, fulfillment & inventory',
+  packer: 'Orders to pack & ship',
   marketing: 'Ads, boosts & discount codes',
   viewer: 'Read-only analytics',
   manager: 'Orders, Products, Inventory',

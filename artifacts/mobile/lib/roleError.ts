@@ -8,7 +8,7 @@
 
 import { ApiError } from '@/lib/networkNotice';
 
-export type TeamRole = 'owner' | 'admin' | 'manager' | 'finance' | 'orders' | 'marketing' | 'staff' | 'viewer';
+export type TeamRole = 'owner' | 'admin' | 'manager' | 'finance' | 'orders' | 'marketing' | 'staff' | 'viewer' | 'packer';
 
 export interface RoleError {
   code: 'ROLE_REQUIRED' | 'PERMISSION_REQUIRED';
@@ -17,10 +17,15 @@ export interface RoleError {
   message: string;
 }
 
-const TEAM_ROLES: readonly TeamRole[] = ['owner', 'admin', 'manager', 'finance', 'orders', 'marketing', 'staff', 'viewer'];
+const TEAM_ROLES: readonly TeamRole[] = ['owner', 'admin', 'manager', 'finance', 'orders', 'marketing', 'staff', 'viewer', 'packer'];
 
 export function isTeamRole(role: unknown): role is TeamRole {
   return typeof role === 'string' && (TEAM_ROLES as readonly string[]).includes(role);
+}
+
+/** Packers only see and ship orders (server: middlewares/packerAccess.ts). */
+export function isPackerRole(role?: string | null): boolean {
+  return role === 'packer';
 }
 
 /** Managers can inspect billing data but cannot change owner-only settings. */

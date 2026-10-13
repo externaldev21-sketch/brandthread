@@ -28,6 +28,7 @@ import { db, teamMembers, users } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { teamMembershipOrderBy } from "../lib/teamMembership";
 import { actsAsSelf, teamRouteRuleFor } from "./teamRouteRules";
+import { enforcePackerScope } from "./packerAccess";
 
 export type TeamRole =
   | "owner"
@@ -37,7 +38,8 @@ export type TeamRole =
   | "orders"
   | "marketing"
   | "staff"
-  | "viewer";
+  | "viewer"
+  | "packer";
 
 const ROLE_ORDER: Record<TeamRole, number> = {
   viewer: 0,
@@ -48,6 +50,9 @@ const ROLE_ORDER: Record<TeamRole, number> = {
   // on order status, tracking, labels and shipping zones.
   marketing: 0,
   finance: 0,
+  // Packer passes the existing requireRole("staff") fulfilment gates; every
+  // other route is closed to it by enforcePackerScope (packerAccess.ts).
+  packer: 1,
   manager: 2,
   admin: 2,
   owner: 3,
@@ -74,7 +79,8 @@ export type Permission =
   | "customers"
   | "marketing"
   | "payouts"
-  | "team";
+  | "team"
+  | "fulfillment";
 
 export const ROLE_PERMISSIONS: Record<TeamRole, Permission[] | "*"> = {
   owner: "*",
@@ -85,6 +91,8 @@ export const ROLE_PERMISSIONS: Record<TeamRole, Permission[] | "*"> = {
   marketing: ["marketing", "analytics"],
   staff: ["orders"],
   viewer: ["analytics"],
+  // Orders to pack and ship only — see middlewares/packerAccess.ts.
+  packer: ["fulfillment"],
 };
 
 export function hasPermission(role: TeamRole, permission: Permission): boolean {
@@ -141,7 +149,14 @@ async function callerRunsOwnStore(userId: string): Promise<boolean> {
 
 export async function resolveTeamContext(req: Request): Promise<TeamContext | null> {
   const existing = (req as any).teamContext as TeamContext | undefined;
-  if (existing) return existing;
+  if (existing) {
+    // A router's own `requireAuth` (e.g. orders.ts) runs after the index-level
+    // `tc` and resets `req.clerkUserId` to the caller. Re-assert the store
+    // owner so the router's own teamContext()/requireRole() keeps acting on
+    // the resolved store instead of silently falling back to the caller's.
+    (req as any).clerkUserId = existing.storeOwnerId;
+    return existing;
+  }
 
   const { userId } = getAuth(req);
   if (!userId) return null;
@@ -257,6 +272,7 @@ export function teamContext(): RequestHandler<any, any, any, any> {
       }
       throw err;
     }
+    if (!enforcePackerScope(req as Request, res as any, (req as any).actorRole)) return;
     if ((req as any).actAsSelf) {
       (req as any).clerkUserId = (req as any).actorClerkId ?? (req as any).clerkUserId;
     } else if (rule?.writes && !SAFE_METHODS.has(req.method)) {
@@ -297,6 +313,7 @@ export function requireRole(minRole: TeamRole): RequestHandler<any, any, any, an
       throw err;
     }
     const role = ctx?.actorRole ?? "owner";
+    if (!enforcePackerScope(req as Request, res as any, role)) return;
 
     if (TEAM_OWNER_BYPASS && role === "owner") {
       next();
@@ -348,6 +365,7 @@ export function requirePermission(permission: Permission): RequestHandler<any, a
       throw err;
     }
     const role = ctx?.actorRole ?? "owner";
+    if (!enforcePackerScope(req as Request, res as any, role)) return;
 
     if (TEAM_OWNER_BYPASS && role === "owner") {
       next();
@@ -400,6 +418,7 @@ export function requirePayoutsRead(): RequestHandler<any, any, any, any> {
       throw err;
     }
     const role = ctx?.actorRole ?? "owner";
+    if (!enforcePackerScope(req as Request, res as any, role)) return;
 
     if ((TEAM_OWNER_BYPASS && role === "owner") || role === "manager" || hasPermission(role, "payouts")) {
       next();

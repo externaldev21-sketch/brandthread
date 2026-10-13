@@ -41,7 +41,7 @@ type StoreMembership = {
   ownerName: string;
 };
 
-function isSellerRoute(segments: string[], isOwnerProfile: boolean): boolean {
+export function isSellerRoute(segments: string[], isOwnerProfile: boolean): boolean {
   const [root] = segments;
   if (!root || root === '(buyer)' || root.startsWith('buyer-')) return false;
   // The shared seller-profile screen also renders public profiles from buyer
