@@ -77,10 +77,10 @@ function CaseDetailView({ caseData }: { caseData: IpCase }) {
 
   return (
     <div className="flex flex-col h-full overflow-hidden text-slate-200">
-      <div className="p-6 border-b border-blue-900/30 bg-slate-900/30 flex items-start justify-between shrink-0">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h2 className="text-xl font-semibold tracking-tight text-white" data-testid={`text-case-ref-${caseData.id}`}>
+      <div className="p-6 border-b border-blue-900/30 bg-slate-900/30 flex flex-wrap items-start justify-between gap-4 shrink-0">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3 mb-2">
+            <h2 className="text-xl font-semibold tracking-tight text-white break-words" data-testid={`text-case-ref-${caseData.id}`}>
               Case {caseData.publicReference}
             </h2>
             <StatusBadge status={caseData.status} />
@@ -91,7 +91,7 @@ function CaseDetailView({ caseData }: { caseData: IpCase }) {
           </p>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {!isResolved && (caseData.status === 'submitted' || caseData.status === 'information_requested') && (
             <button 
               onClick={setUnderReview}
@@ -180,7 +180,7 @@ function CaseDetailView({ caseData }: { caseData: IpCase }) {
                   </div>
                   <div>
                     <div className="text-xs text-slate-500">Email Address</div>
-                    <div className="font-medium font-mono text-sm" data-testid="text-claimant-email">{caseData.claimantEmail}</div>
+                    <div className="font-medium font-mono text-sm break-all" data-testid="text-claimant-email">{caseData.claimantEmail}</div>
                   </div>
                   <div>
                     <div className="text-xs text-slate-500">Additional Contact</div>
@@ -264,9 +264,9 @@ function CaseDetailView({ caseData }: { caseData: IpCase }) {
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate" data-testid="text-listing-name">{caseData.listingContext.name}</div>
+                          <div className="font-medium text-sm truncate" title={caseData.listingContext.name} data-testid="text-listing-name">{caseData.listingContext.name}</div>
                           <div className="text-xs text-slate-400 mt-1 line-clamp-3" data-testid="text-listing-description">{caseData.listingContext.description || 'No description'}</div>
-                          <div className="text-xs text-slate-500 mt-2 font-mono">Owner ID: {caseData.listingContext.ownerId}</div>
+                          <div className="text-xs text-slate-500 mt-2 font-mono break-all">Owner ID: {caseData.listingContext.ownerId}</div>
                         </div>
                       </div>
                     </div>
@@ -384,7 +384,7 @@ function CaseDetailView({ caseData }: { caseData: IpCase }) {
                           {JSON.stringify(log.details, null, 2)}
                         </div>
                       )}
-                      <div className="text-[10px] text-slate-600 font-mono mt-2">
+                      <div className="text-[10px] text-slate-600 font-mono mt-2 break-all">
                         Actor: {log.actorId}
                       </div>
                     </div>
@@ -532,12 +532,12 @@ export default function IpCases() {
                   )}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-mono text-xs font-medium text-slate-300 truncate mr-2">
+                    <span className="font-mono text-xs font-medium text-slate-300 truncate mr-2" title={c.publicReference}>
                       {c.publicReference}
                     </span>
                     <StatusBadge status={c.status} />
                   </div>
-                  <div className="text-sm font-medium text-slate-200 truncate">
+                  <div className="text-sm font-medium text-slate-200 truncate" title={c.claimantName}>
                     {c.claimantName}
                   </div>
                   <div className="text-xs text-slate-500 mt-1 truncate">

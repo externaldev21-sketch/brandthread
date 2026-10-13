@@ -351,8 +351,8 @@ export default function Products() {
               {products.map((product) => (
                 <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
                   <TableCell className="max-w-[220px]">
-                    <p className="truncate font-medium">{product.name}</p>
-                    {product.description && <p className="truncate text-xs text-muted-foreground">{product.description}</p>}
+                    <p className="truncate font-medium" title={product.name}>{product.name}</p>
+                    {product.description && <p className="truncate text-xs text-muted-foreground" title={product.description}>{product.description}</p>}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{product.category || "—"}</TableCell>
                   <TableCell className="text-sm">{product.moq.toLocaleString()} units</TableCell>
@@ -371,7 +371,7 @@ export default function Products() {
                       onValueChange={(value) => void changeStatus(product, value as ProductStatus)}
                       disabled={statusUpdatingId === product.id}
                     >
-                      <SelectTrigger className="h-8 w-[120px]" data-testid={`select-status-${product.id}`}>
+                      <SelectTrigger className="h-8 w-auto min-w-[120px] gap-2" data-testid={`select-status-${product.id}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -592,7 +592,7 @@ export default function Products() {
       <AlertDialog open={deleteTarget != null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete "{deleteTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogTitle className="break-words">Delete "{deleteTarget?.name}"?</AlertDialogTitle>
             <AlertDialogDescription>
               This removes the product and its price tiers from your catalog. This cannot be undone.
             </AlertDialogDescription>

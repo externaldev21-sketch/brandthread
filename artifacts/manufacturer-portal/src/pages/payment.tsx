@@ -165,10 +165,10 @@ export default function Payment() {
         </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-lg border border-border bg-card p-5">
           <p className="text-sm text-muted-foreground">Received from sellers</p>
-          <p className="mt-2 font-mono text-3xl font-bold" data-testid="text-total-received">{formatMoney(totalReceived)}</p>
+          <p className="mt-2 font-mono text-3xl font-bold [overflow-wrap:anywhere]" data-testid="text-total-received">{formatMoney(totalReceived)}</p>
           <p className="mt-1 text-xs text-muted-foreground">Gross, before platform and Stripe fees</p>
         </div>
         <div className="rounded-lg border border-border bg-card p-5">
@@ -210,15 +210,15 @@ export default function Payment() {
               const reversal = item.type === "payment_reversed";
               const Icon = reversal ? RotateCcw : item.amountCents == null ? ArrowUpRight : ArrowDownLeft;
               return (
-                <div key={item.id} className="flex items-center justify-between gap-4 border-b border-border p-4 last:border-0">
-                  <div className="flex min-w-0 items-center gap-3">
+                <div key={item.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-border p-4 last:border-0">
+                  <div className="flex min-w-0 flex-1 basis-32 items-center gap-3">
                     <div className={cn("rounded-full p-2", reversal ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary")}><Icon className="h-4 w-4" /></div>
                     <div className="min-w-0">
-                      <p className="truncate font-medium">{item.orderTitle ?? ACTIVITY_LABEL[item.type] ?? item.type.replaceAll("_", " ")}</p>
+                      <p className="truncate font-medium" title={item.orderTitle ?? ACTIVITY_LABEL[item.type] ?? item.type.replaceAll("_", " ")}>{item.orderTitle ?? ACTIVITY_LABEL[item.type] ?? item.type.replaceAll("_", " ")}</p>
                       <p className="text-xs text-muted-foreground">{item.orderTitle ? `${ACTIVITY_LABEL[item.type] ?? item.type} · ` : ""}{item.orderType === "bulk" ? "Bulk order · " : item.orderType === "sample" ? "Sample · " : ""}{formatTimestamp(item.createdAt)}</p>
                     </div>
                   </div>
-                  <span className={cn("shrink-0 font-mono font-semibold", reversal && "text-destructive")}>{item.amountCents == null ? "—" : `${reversal ? "−" : ""}${formatMoney(item.amountCents)}`}</span>
+                  <span className={cn("ml-auto shrink-0 font-mono font-semibold", reversal && "text-destructive")}>{item.amountCents == null ? "—" : `${reversal ? "−" : ""}${formatMoney(item.amountCents)}`}</span>
                 </div>
               );
             })}

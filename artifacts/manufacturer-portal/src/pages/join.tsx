@@ -33,13 +33,13 @@ export default function Join() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <header className="flex h-16 items-center justify-between border-b border-border px-6 md:px-10">
+      <header className="flex min-h-16 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border px-6 py-3 md:px-10">
         <Link href="/" className="flex items-center gap-3">
           <img src={`${import.meta.env.BASE_URL}brandthread-logo.png`} alt="" className="h-8 w-8 rounded-sm object-cover" />
           <span className="text-sm font-semibold uppercase tracking-tight">Brandthread</span>
           <span className="rounded border border-border bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">MANUFACTURERS</span>
         </Link>
-        <Show when="signed-out"><Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground">Sign in</Link></Show>
+        <Show when="signed-out"><Link href="/sign-in" className="whitespace-nowrap text-sm text-muted-foreground hover:text-foreground">Sign in</Link></Show>
       </header>
 
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center gap-12 px-6 py-12 md:flex-row md:items-center md:px-10">
@@ -52,7 +52,7 @@ export default function Join() {
                 <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-sm text-primary" data-testid="status-invite-valid">
                   <Handshake className="h-4 w-4" /> Private invite
                 </div>
-                <h1 className="text-4xl font-bold leading-tight tracking-tight md:text-5xl">
+                <h1 className="break-words text-4xl font-bold leading-tight tracking-tight md:text-5xl">
                   <span className="text-primary">{resolved.data.sellerName}</span> wants to make their collection with {resolved.data.companyName ?? "you"}.
                 </h1>
                 <p className="max-w-xl text-lg text-muted-foreground">Create your free manufacturer account to start working together on Brandthread.</p>

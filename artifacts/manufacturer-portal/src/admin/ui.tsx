@@ -27,7 +27,7 @@ export function StatCards({ items }: { items: { label: string; value: string; ac
           <Tag key={s.label} onClick={s.onClick}
             className={cn("rounded-lg border bg-card px-3.5 py-3 text-left", s.onClick && "hover:border-foreground/30", s.active ? "border-foreground" : "border-border")}>
             <div className="text-xs text-muted-foreground">{s.label}</div>
-            <div className="mt-1 truncate text-lg font-semibold tabular-nums">{s.value}</div>
+            <div className="mt-1 text-lg font-semibold tabular-nums [overflow-wrap:anywhere]">{s.value}</div>
           </Tag>
         );
       })}
@@ -130,7 +130,7 @@ export function DataTable<R>({ columns, rows, rowKey, onRowClick, empty, loading
         {rows.map((r) => (
           <div key={rowKey(r)} onClick={onRowClick ? () => onRowClick(r) : undefined}
             className={cn("rounded-lg border border-border bg-card p-3.5", onRowClick && "active:bg-secondary")}>
-            <div className="mb-2 text-sm font-medium">{primary.cell(r)}</div>
+            <div className="mb-2 break-words text-sm font-medium">{primary.cell(r)}</div>
             <dl className="space-y-1.5">
               {columns.filter((c) => c !== primary).map((c) => (
                 <div key={c.header} className="flex items-baseline justify-between gap-4 text-[13px]">

@@ -45,14 +45,14 @@ export function OrderCard({ order, threadId }: { order: OrderCardSnapshot; threa
 
   return (
     <div className="w-full max-w-sm overflow-hidden rounded-xl border border-border bg-card text-foreground shadow-sm" data-testid={`order-card-${order.id}`}>
-      <div className="flex items-start gap-3 border-b border-border p-4">
+      <div className="flex flex-wrap items-start gap-3 border-b border-border p-4">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary"><Icon className="h-5 w-5 text-primary" /></div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-32">
           <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{orderTypeLabel(order.orderType)} card</p>
           <p className="line-clamp-2 break-words font-semibold leading-snug" title={order.title}>{order.title}</p>
           <p className="text-sm text-muted-foreground">{order.quantity.toLocaleString("en-US")} {order.quantity === 1 ? "piece" : "pieces"}</p>
         </div>
-        <p className="shrink-0 font-mono text-base font-semibold" data-testid={`order-card-price-${order.id}`}>{formatMoney(order.priceCents, order.currency)}</p>
+        <p className="ml-auto shrink-0 font-mono text-base font-semibold" data-testid={`order-card-price-${order.id}`}>{formatMoney(order.priceCents, order.currency)}</p>
       </div>
       <div className="space-y-3 p-4">
         <div className="flex items-center justify-between gap-2">
@@ -70,7 +70,7 @@ export function OrderCard({ order, threadId }: { order: OrderCardSnapshot; threa
         )}
         <p className="text-sm text-muted-foreground">{state.detail}</p>
         {order.status === "shipped" || order.status === "delivered" ? (
-          order.trackingNumber && <p className="font-mono text-xs text-muted-foreground">{order.carrier} · {order.trackingNumber}</p>
+          order.trackingNumber && <p className="break-all font-mono text-xs text-muted-foreground">{order.carrier} · {order.trackingNumber}</p>
         ) : null}
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <div className="flex flex-wrap gap-2 pt-1">

@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { ChipRow } from "@/components/chip-row";
 
 type QuoteStatus =
   | "submitted"
@@ -374,27 +375,29 @@ export default function QuoteRequests() {
             data-testid="input-search-quote-requests"
           />
         </div>
-        <div className="flex flex-wrap rounded-md border border-border bg-card p-1" role="tablist" aria-label="Quote request status">
-          {filterOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              role="tab"
-              aria-selected={filter === option.value}
-              onClick={() => setFilter(option.value)}
-              className={cn(
-                "rounded px-3 py-2 text-sm transition-colors",
-                filter === option.value ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",
-              )}
-              data-testid={`tab-quotes-${option.value}`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <ChipRow className="lg:mx-0" innerClassName="lg:px-0">
+          <div className="flex rounded-md border border-border bg-card p-1" role="tablist" aria-label="Quote request status">
+            {filterOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="tab"
+                aria-selected={filter === option.value}
+                onClick={() => setFilter(option.value)}
+                className={cn(
+                  "shrink-0 whitespace-nowrap rounded px-3 py-2 text-sm transition-colors",
+                  filter === option.value ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",
+                )}
+                data-testid={`tab-quotes-${option.value}`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </ChipRow>
       </div>
 
-      <div className="grid min-h-[560px] gap-4 lg:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.5fr)]">
+      <div className="grid min-h-[560px] grid-cols-1 gap-4 lg:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.5fr)]">
         <section className="overflow-hidden rounded-lg border border-border bg-card" aria-label="Quote request list">
           {filteredRequests.length === 0 ? (
             <EmptyState
@@ -421,10 +424,10 @@ export default function QuoteRequests() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="truncate font-semibold">{item.productName}</p>
+                      <p className="truncate font-semibold" title={item.productName}>{item.productName}</p>
                       <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                     </div>
-                    <p className="mt-1 truncate text-xs text-muted-foreground">{item.sellerId} · {item.quantity ?? "—"} units</p>
+                    <p className="mt-1 truncate text-xs text-muted-foreground" title={`${item.sellerId} · ${item.quantity ?? "—"} units`}>{item.sellerId} · {item.quantity ?? "—"} units</p>
                     {item.rfqId && <RfqBadge className="mt-2" />}
                     <div className="mt-3 flex items-center justify-between gap-2">
                       <Badge variant="outline" className="capitalize">{item.type}</Badge>
@@ -449,8 +452,8 @@ export default function QuoteRequests() {
               <div className="flex flex-col gap-4 border-b border-border p-5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">Request detail</p>
-                  <h2 className="mt-2 truncate text-2xl font-bold">{selected.productName}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">From seller {selected.sellerId} · Received {formatDateTime(selected.createdAt)}</p>
+                  <h2 className="mt-2 line-clamp-2 break-words text-2xl font-bold" title={selected.productName}>{selected.productName}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground [overflow-wrap:anywhere]">From seller {selected.sellerId} · Received {formatDateTime(selected.createdAt)}</p>
                   {selected.rfqId && <RfqBadge className="mt-3" />}
                 </div>
                 <StatusBadge status={selected.status} />
@@ -518,7 +521,7 @@ export default function QuoteRequests() {
                 {selected.notes && (
                   <div className="rounded-md border border-border bg-secondary/20 p-4">
                     <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Previous notes</p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm">{selected.notes}</p>
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm">{selected.notes}</p>
                   </div>
                 )}
 

@@ -68,14 +68,14 @@ export default function OrderTracker({ orderId }: { orderId: string }) {
 
       <section className="rounded-lg border border-border bg-card p-6">
         <div className="flex flex-col justify-between gap-6 sm:flex-row">
-          <div className="flex gap-4">
+          <div className="flex min-w-0 gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-secondary"><Icon className="h-6 w-6 text-primary" /></div>
-            <div>
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded bg-primary/10 px-2 py-0.5 font-mono text-[11px] uppercase text-primary">{orderTypeLabel(order.orderType)}</span>
                 <span className="rounded border border-border px-2 py-0.5 font-mono text-[11px] uppercase text-muted-foreground" data-testid="text-order-status">{orderStatusLabel(order.status)}</span>
               </div>
-              <h1 className="mt-2 text-2xl font-bold md:text-3xl" data-testid="text-order-title">{order.title}</h1>
+              <h1 className="mt-2 break-words text-2xl font-bold md:text-3xl" data-testid="text-order-title">{order.title}</h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 For <span className="text-foreground">{sellerName}</span> · {order.quantity.toLocaleString("en-US")} {order.quantity === 1 ? "piece" : "pieces"} · Sent {formatTimestamp(data.createdAt)}
               </p>
@@ -89,7 +89,7 @@ export default function OrderTracker({ orderId }: { orderId: string }) {
         {order.description && <p className="mt-5 whitespace-pre-wrap border-t border-border pt-5 text-sm text-muted-foreground">{order.description}</p>}
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section className="rounded-lg border border-border bg-card p-6">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="font-semibold">Production tracker</h2>
@@ -136,7 +136,7 @@ export default function OrderTracker({ orderId }: { orderId: string }) {
             <section className="rounded-lg border border-border bg-card p-5" data-testid="panel-shipment">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Shipment</h2>
               <p className="mt-3 font-medium">{data.tracking.carrierName ?? "Carrier"}</p>
-              <p className="font-mono text-sm text-muted-foreground">{data.tracking.trackingNumber}</p>
+              <p className="break-all font-mono text-sm text-muted-foreground">{data.tracking.trackingNumber}</p>
               {data.tracking.url && (
                 <Button asChild variant="outline" size="sm" className="mt-3 w-full">
                   <a href={data.tracking.url} target="_blank" rel="noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> Track with carrier</a>
@@ -146,7 +146,7 @@ export default function OrderTracker({ orderId }: { orderId: string }) {
           )}
 
           {detail.data?.threadId && (
-            <Button asChild variant="outline" className="w-full">
+            <Button asChild variant="outline" className="h-auto min-h-10 w-full whitespace-normal py-2 text-center">
               <Link href={`/messages/${detail.data.threadId}`}><MessageSquare className="mr-2 h-4 w-4" /> Message {sellerName}</Link>
             </Button>
           )}
@@ -158,7 +158,7 @@ export default function OrderTracker({ orderId }: { orderId: string }) {
                 {[...data.events].reverse().map((event) => (
                   <li key={event.id} className="text-sm">
                     <p><span className="font-medium">{ACTOR_LABEL[event.actorRole] ?? event.actorRole}</span> <span className="text-muted-foreground">{event.toStatus === "pending_payment" ? "sent the card" : event.toStatus === "cancelled" ? "closed the card" : `→ ${orderStatusLabel(event.toStatus)}`}</span></p>
-                    {event.note && <p className="text-xs text-muted-foreground">"{event.note}"</p>}
+                    {event.note && <p className="break-words text-xs text-muted-foreground">"{event.note}"</p>}
                     <p className="font-mono text-[11px] text-muted-foreground">{formatTimestamp(event.createdAt)}</p>
                   </li>
                 ))}
