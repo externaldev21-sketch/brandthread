@@ -40,6 +40,7 @@ import { useFeedWatchSignals } from '@/hooks/useFeedWatchSignals';
 import { useAppActive } from '@/hooks/useAppActive';
 import { Asset } from 'expo-asset';
 import { Image as ExpoImage } from 'expo-image';
+import { prefetchImage } from '@/lib/prefetch';
 import {
   enqueueEngagementRetry, isRetryableFailure, setEngagementRetryExecutor, startEngagementRetryQueuePump,
 } from '@/lib/engagementRetryQueue';
@@ -163,6 +164,8 @@ const FEED_LOOP_REPEAT = 6;
 const CAPTION_BOTTOM_GAP = 10;
 /** Double-tap heart glyph size (pt). */
 const HEART_BURST_SIZE = 110;
+/** How many posts ahead of the visible one get their images warmed (item 90). */
+const FEED_IMAGE_PRELOAD_AHEAD = 3;
 
 // ─── Buyer demand page — sentinel and type guard ──────────────────────────────
 // The sentinel is the first element in displayItems when buyerMode=true.
@@ -2959,17 +2962,17 @@ export default function FeedScreen({
     }
   }).current;
 
-  // Prefetch the next 2 posts' poster images so the placeholder is already
-  // decoded by the time a swipe reaches them — the video players themselves
-  // are already buffering ahead of time via the FlatList's windowSize, but
-  // the poster (what actually covers the screen until playback starts) was
-  // only ever requested once its own cell mounted.
+  // Prefetch the next FEED_IMAGE_PRELOAD_AHEAD posts' images (memory + disk)
+  // so the poster or photo is already decoded by the time a swipe reaches
+  // it — the video players buffer via the FlatList's windowSize, but the
+  // poster (what covers the screen until playback starts) was only ever
+  // requested once its own cell mounted. Photo posts warm every slide.
   useEffect(() => {
-    for (let i = activeIndex + 1; i <= activeIndex + 2; i++) {
+    for (let i = activeIndex + 1; i <= activeIndex + FEED_IMAGE_PRELOAD_AHEAD; i++) {
       const next = displayItems[i];
       if (!next || !('contentType' in next)) continue;
-      const uri = next.videoPosterUri ?? (next.contentType !== 'video' ? next.mediaUris[0] : undefined);
-      if (uri) ExpoImage.prefetch(uri).catch(() => {});
+      const uris = next.contentType === 'video' ? [next.videoPosterUri] : next.mediaUris;
+      for (const uri of uris) prefetchImage(uri);
     }
   }, [activeIndex, displayItems]);
 

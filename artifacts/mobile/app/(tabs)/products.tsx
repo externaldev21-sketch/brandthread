@@ -511,6 +511,11 @@ export default function ProductsScreen() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // The filter + search the list on screen was loaded for. Coming back to
+  // this tab re-fetches that same list silently: no skeleton, and a failed
+  // background refresh keeps what's already shown (less-AI pass, item 89).
+  const loadedKeyRef = React.useRef<string | null>(null);
+
   const loadProducts = useCallback(async () => {
     if (previewDemo) {
       const { getPreviewSellerProducts } = await import('@/lib/previewSellerProducts');
@@ -535,7 +540,9 @@ export default function ProductsScreen() {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const key = `${filter}|${debouncedQuery}|${sort}`;
+    const silent = loadedKeyRef.current === key;
+    if (!silent) setLoading(true);
     try {
       const result = await getProducts({ filter, text: debouncedQuery || undefined, ...productSortQuery(sort) });
       if (previewOnlyRef.current && Platform.OS !== 'web') {
@@ -545,9 +552,10 @@ export default function ProductsScreen() {
       }
       const list = Array.isArray(result) ? result : [];
       setProducts(previewOnlyRef.current ? localPreviewSaves(list) : list);
+      loadedKeyRef.current = key;
       await loadStats();
     } catch {
-      setProducts([]);
+      if (!silent) setProducts([]);
     } finally {
       setLoading(false);
     }

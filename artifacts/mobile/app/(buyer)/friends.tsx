@@ -204,7 +204,9 @@ function PostCard({
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function FriendsScreen() {
-  const scrollResetRef = useScrollReset<any>();
+  // Long browsable list: coming back keeps your place (less-AI pass, item 85).
+  // A fresh visit still starts at the top and re-tapping the tab still jumps up.
+  const scrollResetRef = useScrollReset<any>(true, false);
   const { theme } = useAppTheme();
   const palette = useColors();
   const barInset = useBuyerTabBarInset();
