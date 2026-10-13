@@ -43,6 +43,8 @@ import { groupDeliveryWindow } from './OrderSummarySection';
 import { useCheckoutT } from './CheckoutLanguage';
 import { crispPx } from '@/lib/crispPixel';
 import { AddToOrderOffer } from './AddToOrderOffer';
+import { CoppedShareSheet } from '@/components/CoppedShareSheet';
+import { coppedCardData } from '@/lib/coppedCard';
 
 export interface VerifiedOrderRef {
   id: string;
@@ -193,6 +195,8 @@ export function OrderConfirmation({
   const singleSeller = session.deliveryGroups.length === 1 ? firstGroup : null;
   const brandAvatarUri = firstGroup?.items[0]?.sellerAvatarUri;
 
+  const [coppedOpen, setCoppedOpen] = useState(false);
+  const copped = coppedCardData(items);
 
   useEffect(() => {
     // A completed purchase is a meaningful, server-backed moment — exactly
@@ -381,6 +385,17 @@ export function OrderConfirmation({
             />
           </>
         ) : null}
+        {firstVerified?.id && !finalizing && copped ? (
+          <>
+            <Hairline style={styles.linkHairline} />
+            <LinkRow
+              icon="share"
+              label="Share to your story"
+              onPress={() => setCoppedOpen(true)}
+              testID="checkout-share-copped"
+            />
+          </>
+        ) : null}
         <Hairline style={styles.linkHairline} />
         <LinkRow
           icon="compass"
@@ -408,6 +423,10 @@ export function OrderConfirmation({
           sellerId={singleSeller.sellerId}
           fallback={<SellerProductsCarousel sellerId={singleSeller.sellerId} sellerName={singleSeller.sellerName} />}
         />
+      ) : null}
+
+      {copped ? (
+        <CoppedShareSheet visible={coppedOpen} data={copped} onClose={() => setCoppedOpen(false)} />
       ) : null}
     </View>
   );
