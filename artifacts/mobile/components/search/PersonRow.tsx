@@ -9,6 +9,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII, radius } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 
 export type SearchPerson = {
   userId: string;
@@ -83,7 +84,7 @@ export function PersonRow({
             <View style={styles.nameRow}>
               <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{person.name}</Text>
               {person.verified && (
-                <Feather name="check-circle" size={13} color={theme.text} style={styles.verifiedBadge} />
+                <VerifiedBadge style={styles.verifiedBadge} />
               )}
             </View>
             <Text style={[styles.sub, { color: theme.muted }]} numberOfLines={1}>

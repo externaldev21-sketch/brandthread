@@ -8,7 +8,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import Svg, { Defs, LinearGradient, Line, Path, Stop, Text as SvgText, Circle } from 'react-native-svg';
+import Svg, { Path, Text as SvgText, Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -95,29 +95,20 @@ export function InsightLineChart({ points, range, formatValue, height = 160, emp
   const x = (i: number) => yLabelW + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2);
   const y = (v: number) => top + plotH - (v / topVal) * plotH;
   const linePath = n > 0 ? points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ') : '';
-  const areaPath = n > 0 ? `${linePath} L${x(n - 1).toFixed(1)},${(top + plotH).toFixed(1)} L${x(0).toFixed(1)},${(top + plotH).toFixed(1)} Z` : '';
   const labelIdx = selectEvenlySpacedIndices(n, AXIS_LABEL_COUNT[range]);
   return (
     <View onLayout={e => setWidth(e.nativeEvent.layout.width)}>
       <Svg width={chartWidth} height={height}>
-        <Defs>
-          <LinearGradient id="insightArea" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={colors.primary} stopOpacity={0.28} />
-            <Stop offset="1" stopColor={colors.primary} stopOpacity={0} />
-          </LinearGradient>
-        </Defs>
         {levels.map((v, i) => {
           const ly = y(allZero ? (i / 2) * topVal : v);
           return (
             <React.Fragment key={i}>
-              <Line x1={yLabelW} y1={ly} x2={chartWidth} y2={ly} stroke={colors.border} strokeWidth={1} />
               <SvgText x={yLabelW - 6} y={ly + 4} textAnchor="end" fontSize={FS.xs} fontFamily={FONT.regular} fill={colors.mutedForeground}>
                 {allZero ? '' : fmt(v)}
               </SvgText>
             </React.Fragment>
           );
         })}
-        {!allZero && n > 1 && <Path d={areaPath} fill="url(#insightArea)" />}
         {!allZero && n > 1 && <Path d={linePath} stroke={colors.primary} strokeWidth={2} fill="none" strokeLinejoin="round" strokeLinecap="round" />}
         {!allZero && <Circle cx={x(n - 1)} cy={y(points[n - 1].value)} r={3.5} fill={colors.primary} />}
         {labelIdx.map(i => (

@@ -25,8 +25,8 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { radius } from '@/constants/radii';
 
 const { width } = Dimensions.get('window');
-const GAP = SP.xs;
-const CELL = (width - SP.md * 2 - GAP * 2) / 3;
+const GAP = 1;
+const CELL = (width - GAP * 2) / 3;
 
 type ArchiveTab = 'posts' | 'stories';
 
@@ -206,7 +206,7 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
   tabPillActive: { backgroundColor: theme.accentDim, borderColor: theme.accent },
   tabText: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   tabTextActive: { color: theme.accent },
-  grid: { paddingHorizontal: SP.md, paddingTop: SP.sm, gap: GAP, paddingBottom: 80 },
+  grid: { paddingTop: SP.sm, gap: GAP, paddingBottom: 80 },
   cell: { width: CELL, height: CELL, borderRadius: RADIUS.sm, overflow: 'hidden' },
   cellInner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xs },
   cellCaption: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, position: 'absolute', bottom: SP.xs, left: SP.xs, right: SP.xs },

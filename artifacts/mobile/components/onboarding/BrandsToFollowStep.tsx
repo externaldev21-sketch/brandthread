@@ -15,6 +15,7 @@ import { setSellerFollowing } from '@/services/socialService';
 import { PressableScale, Reveal, StepHeadline, StepSub } from './OnboardingUI';
 import { SPACE, TYPE } from './onboardingTokens';
 import { radius } from '@/constants/radii';
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 
 export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerIds: string[]) => void } = {}) {
   const { theme } = useAppTheme();
@@ -147,7 +148,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
                 </View>
                 <View style={styles.nameRow}>
                   <Text numberOfLines={1} style={styles.cardName}>{brand.name}</Text>
-                  {brand.verified && <Feather name="check-circle" size={11} color={theme.text} />}
+                  {brand.verified && <VerifiedBadge />}
                 </View>
               </PressableScale>
             </Reveal>

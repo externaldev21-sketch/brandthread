@@ -25,6 +25,7 @@ import { FONT, FS, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 import { CaptionSpans } from '@/components/social/CaptionText';
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 
 export interface RepostFriend {
   userId: string;
@@ -153,7 +154,7 @@ export function CaptionBlock({
               against bright/light footage (e.g. the Maison Vela demo
               clip's silver dress). The same text shadow as the rest of
               this block keeps it legible on light and dark video alike. */}
-          {verified && <Feather name="check-circle" size={14} color={ON_DARK} style={[styles.iconTextShadow, { marginLeft: 4 }]} />}
+          {verified && <VerifiedBadge onMedia style={[styles.iconTextShadow, { marginLeft: 4 }]} />}
           {sponsored && <Text style={styles.sponsoredLabel} accessibilityLabel="Sponsored">Sponsored</Text>}
         </View>
       </TouchableOpacity>
