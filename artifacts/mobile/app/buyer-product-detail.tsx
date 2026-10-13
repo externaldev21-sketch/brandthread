@@ -7,8 +7,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl,
-  Animated, Dimensions, PanResponder, Easing, AccessibilityInfo,
+  Animated, Dimensions, PanResponder, Easing, AccessibilityInfo, Pressable, Share,
 } from 'react-native';
+import { buildProductUrl } from '@/lib/shareLinks';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -61,6 +62,7 @@ import {
   messageSellerAboutProductHref, profileHref, profileVideosHref, resolveStoreVisitSource,
 } from '@/lib/profileNavigation';
 import { getPreviewBuyerProduct, getPreviewRelatedProducts, isPreviewProductId } from '@/lib/previewProducts';
+import { splitRelatedByBrand } from '@/lib/relatedByBrand';
 import { isPreviewSellerId } from '@/lib/previewCheckout';
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
@@ -177,10 +179,11 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
 
 const fmtPrice = formatCents;
 const GALLERY_WIDTH = Dimensions.get('window').width;
-// 3:4 — matches how product photos are now saved (cropped by the seller to
-// 3:4 at upload time; see ShopProductSheet's ProductImageCarousel, fixed the
-// same way in an earlier photo-audit pass).
-const GALLERY_HEIGHT = GALLERY_WIDTH * 4 / 3;
+// Full-bleed photo at ~65% of the screen height on open (Nike PDP:
+// https://mobbin.com/screens/b90e99c1-b452-41d7-bd88-c8aebe6f1852). Photos
+// are saved 3:4, so on a phone this is within a few points of their natural
+// height; `cover` keeps the photo edge-to-edge with no letterbox bands.
+const GALLERY_HEIGHT = Math.round(Dimensions.get('window').height * 0.65);
 
 function renderStars(rating: number): string {
   const full = Math.round(Math.max(0, Math.min(5, rating)));
@@ -260,7 +263,7 @@ function ZoomableGalleryImage({ uri }: { uri: string }) {
       <Animated.Image
         source={{ uri }}
         style={[StyleSheet.absoluteFill, { transform: [{ scale }] }]}
-        resizeMode="contain"
+        resizeMode="cover"
         accessibilityLabel="Product photo. Pinch with two fingers to zoom."
       />
       {zoomed && (
@@ -345,7 +348,7 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
             {images.map((_, index) => {
               const width = scrollX.interpolate({
                 inputRange: [(index - 1) * GALLERY_WIDTH, index * GALLERY_WIDTH, (index + 1) * GALLERY_WIDTH],
-                outputRange: [6, 22, 6],
+                outputRange: [6, 16, 6],
                 extrapolate: 'clamp',
               });
               const opacity = scrollX.interpolate({
@@ -437,6 +440,25 @@ function OptionPicker({ product, option, selections, onSelect, recommendedLabel 
             );
           }
 
+          // Size: 44pt-tall outlined chips, solid white when selected (Nike
+          // size grid, https://mobbin.com/screens/5163c408-ea2f-46d1-b945-ab33395eacd1).
+          if (option.name.toLowerCase() === 'size') {
+            const sizeEl = (
+              <SizeChip
+                key={val.id}
+                label={val.label}
+                selected={isSelected}
+                available={available}
+                accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', sold out'}`}
+                onPress={() => onSelect(option.id, val.id)}
+                testID={`option-${option.id}-${val.id}`}
+              />
+            );
+            return recommendedLabel && recommendedLabel === val.label
+              ? <View key={val.id} style={{ alignItems: 'center' }}>{sizeEl}<RecommendedTag /></View>
+              : sizeEl;
+          }
+
           const chipEl = (
             <Chip
               key={val.id}
@@ -463,6 +485,95 @@ function OptionPicker({ product, option, selections, onSelect, recommendedLabel 
     </View>
   );
 }
+
+function SizeChip({ label, selected, available, onPress, accessibilityLabel, testID }: {
+  label: string;
+  selected: boolean;
+  available: boolean;
+  onPress: () => void;
+  accessibilityLabel: string;
+  testID?: string;
+}) {
+  const { theme } = useThemeAliases();
+  return (
+    <Pressable
+      onPress={() => { if (!available) return; hapticToggle(); onPress(); }}
+      disabled={!available}
+      accessibilityRole="radio"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ selected, disabled: !available }}
+      testID={testID}
+      style={[
+        sizeChipStyles.chip,
+        selected
+          ? { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' } // theme-exempt: spec — selected size is solid white
+          : { backgroundColor: 'transparent', borderColor: theme.border },
+      ]}
+    >
+      {/* Sold out keeps its distinct shape: slash glyph + struck label. */}
+      {!available && <Feather name="slash" size={12} color={theme.subtle} />}
+      <Text
+        style={[
+          sizeChipStyles.label,
+          { color: selected ? '#000000' : available ? theme.text : theme.subtle }, // theme-exempt: black on the white selected chip
+          !available && { textDecorationLine: 'line-through' },
+        ]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+const sizeChipStyles = StyleSheet.create({
+  chip: {
+    height: 44, minWidth: 56, paddingHorizontal: 14, borderWidth: 1, borderRadius: radius.sm,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+  },
+  label: { fontSize: 15, lineHeight: 20, fontWeight: '500' },
+});
+
+/** Full-width 56pt row with a chevron (Details / Fit / Returns). */
+function InfoRow({ label, expanded, onPress, opensSheet = false, children, testID }: {
+  label: string;
+  expanded?: boolean;
+  onPress: () => void;
+  /** Opens a sheet instead of expanding in place — chevron points right. */
+  opensSheet?: boolean;
+  children?: React.ReactNode;
+  testID?: string;
+}) {
+  const { theme } = useThemeAliases();
+  return (
+    <View style={[infoRowStyles.wrap, { borderTopColor: theme.border }]}>
+      <TouchableOpacity
+        style={infoRowStyles.row}
+        onPress={onPress}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={opensSheet ? undefined : { expanded: !!expanded }}
+        testID={testID}
+      >
+        <Text style={[infoRowStyles.label, { color: theme.text }]}>{label}</Text>
+        <Feather
+          name={opensSheet ? 'chevron-right' : expanded ? 'chevron-up' : 'chevron-down'}
+          size={18}
+          color={theme.muted}
+        />
+      </TouchableOpacity>
+      {!opensSheet && expanded ? <View style={infoRowStyles.body}>{children}</View> : null}
+    </View>
+  );
+}
+
+const infoRowStyles = StyleSheet.create({
+  wrap: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: SP.md },
+  row: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  label: { fontSize: 16, lineHeight: 21, fontWeight: '500' },
+  body: { paddingBottom: SP.md },
+});
 
 const makeOptionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight;
@@ -555,6 +666,13 @@ export default function BuyerProductDetailScreen() {
   const [reserveLoading,  setReserveLoading]  = useState(false);
   const [sizeChartOpen,   setSizeChartOpen]   = useState(false);
   const [sizeGuideOpen,   setSizeGuideOpen]   = useState(false);
+  const [detailsOpen,     setDetailsOpen]     = useState(false);
+  const [returnsOpen,     setReturnsOpen]     = useState(false);
+  // Top bar turns solid (with the product name) once the photo has scrolled
+  // under it. A ref guards the setState so scrolling only re-renders on the
+  // crossing itself.
+  const [pastPhoto, setPastPhoto] = useState(false);
+  const pastPhotoRef = useRef(false);
 
   // Add to cart → the product photo flies to the bag icon, which bumps and
   // shows the count (the feed / shop sheet pattern, #287 / #291).
@@ -915,6 +1033,14 @@ export default function BuyerProductDetailScreen() {
     }) as never);
   }
 
+  function handleShare() {
+    if (!product) return;
+    const link = buildProductUrl(product.id);
+    Share.share(link ? { message: `${product.name} — ${link}`, url: link } : { message: product.name }).catch(() => {});
+  }
+
+  const topBarHeight = headerTopInset + SP.sm * 2 + COMP.iconBtn;
+
   async function handleBuyNow() {
     if (sellerVacationMessage) {
       Alert.alert('Seller is away', sellerVacationMessage);
@@ -967,6 +1093,11 @@ export default function BuyerProductDetailScreen() {
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          const next = e.nativeEvent.contentOffset.y > GALLERY_HEIGHT - topBarHeight;
+          if (next !== pastPhotoRef.current) { pastPhotoRef.current = next; setPastPhoto(next); }
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -974,61 +1105,11 @@ export default function BuyerProductDetailScreen() {
             tintColor={PURPLE}
           />
         }
-        contentContainerStyle={{ paddingBottom: insets.bottom + 144 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 184 }}
       >
         {/* Immersive product gallery */}
         <View style={s.imageArea} ref={galleryRef} collapsable={false}>
           <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} />
-          {/* Back button — solid dark chrome over the full-bleed gallery. A
-              BlurView-based "glass" variant re-samples whatever sits behind
-              it every frame; on a swipeable gallery that reads as the same
-              shimmer/glitch PR #109 killed on the video feed, so this uses
-              the same solid rgba(0,0,0,0.6) scrim pattern that PR used over
-              other media chrome, not a frosted blur. */}
-          <View style={[s.backBtnWrap, { top: headerTopInset + SP.sm, left: SP.md + insets.left }]}>
-            <IconButton
-              name="arrow-left"
-              onPress={leaveProduct}
-              accessibilityLabel="Back to previous screen"
-              variant="plain"
-              color="#FFFFFF"
-              style={s.mediaChromeBtn}
-            />
-          </View>
-          {/* Save heart — sits left of the cart button on the same chrome row
-              (tap saves, long-press files into a collection). */}
-          <SaveHeart
-            productId={product.id}
-            title={product.name}
-            brand={product.sellerName}
-            priceCents={product.priceCents > 0 ? product.priceCents : undefined}
-            size={44}
-            iconColor="#FFFFFF" // theme-exempt: same fixed chrome as the back/cart buttons over the photo
-            style={[s.mediaChromeBtn, { position: 'absolute', top: headerTopInset + SP.sm, right: SP.md + insets.right + 44 + SP.sm, borderWidth: 0 }]}
-            testID="product-save-heart"
-          />
-          {/* Cart button */}
-          <Animated.View
-            ref={cartTargetRef}
-            collapsable={false}
-            style={[s.cartBtnWrap, { top: headerTopInset + SP.sm, right: SP.md + insets.right, transform: [{ scale: cartPulse }] }]}
-            testID="product-cart-button"
-          >
-            <IconButton
-              name="shopping-bag"
-              onPress={() => router.push('/(buyer)/cart' as never)}
-              accessibilityLabel={cartCount > 0 ? `Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}` : 'Open cart'}
-              accessibilityHint="View items in your cart"
-              variant="plain"
-              color="#FFFFFF"
-              style={s.mediaChromeBtn}
-            />
-            {cartCount > 0 ? (
-              <View style={s.cartBadge} pointerEvents="none" testID="product-cart-badge">
-                <Text style={s.cartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
-              </View>
-            ) : null}
-          </Animated.View>
         </View>
 
         <ResponsiveContainer style={s.body}>
@@ -1052,6 +1133,19 @@ export default function BuyerProductDetailScreen() {
               title → price → sizes → the purchase bar (sticky) → seller →
               About this piece → returns → purchase protection (once) →
               you might also like → report links, small, at the very end. */}
+          {/* Brand (the seller's store) — taps through to the same store
+              route as the seller card below. */}
+          <TouchableOpacity
+            onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)}
+            activeOpacity={0.7}
+            accessibilityRole="link"
+            accessibilityLabel={`${product.sellerName}, view store`}
+            hitSlop={{ top: 8, bottom: 8 }}
+            style={s.brandLink}
+            testID="product-brand-link"
+          >
+            <Text style={[s.brandText, { color: `${theme.text}99` }]} numberOfLines={1}>{product.sellerName}</Text>
+          </TouchableOpacity>
           <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
           {/* Price */}
           <View style={s.priceRow}>
@@ -1235,24 +1329,6 @@ export default function BuyerProductDetailScreen() {
             </View>
           )}
 
-          {/* Size Chart — expandable table */}
-          {!!(product as any).sizeChart && (
-            <>
-              <TouchableOpacity
-                style={[sz.toggle, { borderTopColor: theme.border }]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeChartOpen(o => !o); }}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Size chart"
-                accessibilityState={{ expanded: sizeChartOpen }}
-              >
-                <Text style={[sz.label, { color: theme.text }]}>Size Chart</Text>
-                <Feather name={sizeChartOpen ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
-              </TouchableOpacity>
-              {sizeChartOpen && <SizeChartViewer chart={(product as any).sizeChart} />}
-            </>
-          )}
-
 
           <View style={s.divider} />
           <TouchableOpacity style={s.sellerCard} onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`} testID="product-seller-link">
@@ -1277,21 +1353,33 @@ export default function BuyerProductDetailScreen() {
             testID="product-message-seller"
           />
 
-          {/* About this piece — the product's own description (hidden when empty). */}
-          {product.description?.trim() ? (
-            <>
-              <View style={s.divider} />
-              <Text style={s.descTitle}>About this piece</Text>
-              <Text style={s.desc}>{product.description.trim()}</Text>
-            </>
-          ) : null}
+          {/* Details / Fit / Returns — full-width rows over the page's
+              existing content (description, the seller's size chart, the
+              return + cancellation policy). No Shipping row: there is no
+              per-product shipping source yet. A row with no content is
+              omitted. */}
+          <View style={[s.infoRows, { borderBottomColor: theme.border }]} testID="product-info-rows">
+            {product.description?.trim() ? (
+              <InfoRow label="Details" expanded={detailsOpen} onPress={() => setDetailsOpen(o => !o)} testID="product-row-details">
+                <Text style={s.desc}>{product.description.trim()}</Text>
+              </InfoRow>
+            ) : null}
+            {product.sizeChart?.columns?.length ? (
+              <InfoRow label="Fit" expanded={sizeChartOpen} onPress={() => setSizeChartOpen(o => !o)} testID="product-row-fit">
+                <SizeChartViewer chart={(product as any).sizeChart} />
+              </InfoRow>
+            ) : product.sizeChartImageUrl ? (
+              <InfoRow label="Fit" opensSheet onPress={() => setSizeGuideOpen(true)} testID="product-row-fit" />
+            ) : null}
+            {product.refundPolicy || product.cancellationPolicy ? (
+              <InfoRow label="Returns" expanded={returnsOpen} onPress={() => setReturnsOpen(o => !o)} testID="product-row-returns">
+                {!!product.refundPolicy && <PolicyRow icon="refresh-ccw" label="Returns" value={product.refundPolicy} />}
+                {!!product.cancellationPolicy && <PolicyRow icon="x-circle" label="Cancellation" value={product.cancellationPolicy} />}
+              </InfoRow>
+            ) : null}
+          </View>
 
           <ProductVideo productId={product.id} />
-
-          {/* Returns & cancellation */}
-          <View style={s.divider} />
-          <PolicyRow icon="refresh-ccw" label="Returns" value={product.refundPolicy} />
-          <PolicyRow icon="x-circle" label="Cancellation" value={product.cancellationPolicy} />
 
           {/* Purchase protection — exactly once (it also rendered, compact,
               under the seller row). */}
@@ -1299,7 +1387,7 @@ export default function BuyerProductDetailScreen() {
 
           {/* Reviews — shared with the Shop sheet so review UI never drifts
               between the two surfaces. Renders nothing when there are none. */}
-          <ProductReviewsSection productId={product.id} productName={product.name} />
+          <ProductReviewsSection productId={product.id} productName={product.name} summaryLayout="inline" />
 
           {/* Questions — public Q&A, answered by the seller. */}
           <ProductQuestionsSection productId={product.id} productName={product.name} />
@@ -1310,7 +1398,7 @@ export default function BuyerProductDetailScreen() {
           <CompleteTheFit productId={product.id} />
 
           {/* You might also like — owns its header; renders nothing when empty. */}
-          <RelatedProducts productId={product.id} dividerStyle={s.divider} headerStyle={s.reviewsHeader} />
+          <RelatedProducts productId={product.id} sellerId={product.sellerId} dividerStyle={s.divider} headerStyle={s.reviewsHeader} />
 
           {/* Report links: de-emphasised via SUBTLE text color alone (below) —
               a resting `opacity < 1` on the row would make its already-dim
@@ -1345,6 +1433,69 @@ export default function BuyerProductDetailScreen() {
           </View>
         </ResponsiveContainer>
       </ScrollView>
+
+      {/* Top bar — circular back / share / bag buttons on dark translucent
+          circles over the photo; turns solid with the product name once the
+          photo has scrolled under it (Nike PDP,
+          https://mobbin.com/screens/f405046e-331e-488d-8919-0cb1943ee463).
+          Solid dark scrim, not a blur, over the swipeable gallery — the
+          same reason as PR #109. */}
+      <View
+        style={[
+          s.topBar,
+          { paddingTop: headerTopInset + SP.sm, paddingLeft: SP.md + insets.left, paddingRight: SP.md + insets.right },
+          pastPhoto && { backgroundColor: theme.background },
+        ]}
+        pointerEvents="box-none"
+        testID="product-top-bar"
+      >
+        <IconButton
+          name="arrow-left"
+          onPress={leaveProduct}
+          accessibilityLabel="Back to previous screen"
+          variant="plain"
+          color="#FFFFFF"
+          style={s.mediaChromeBtn}
+        />
+        <View style={s.topBarTitleWrap} pointerEvents="none">
+          {pastPhoto ? (
+            <Text style={[s.topBarTitle, { color: theme.text }]} numberOfLines={1} testID="product-top-bar-title">{product.name}</Text>
+          ) : null}
+        </View>
+        <View style={s.topBarRight} pointerEvents="box-none">
+          <IconButton
+            name="share"
+            onPress={handleShare}
+            accessibilityLabel="Share product"
+            variant="plain"
+            color="#FFFFFF"
+            style={s.mediaChromeBtn}
+            testID="product-share-top"
+          />
+          {/* Cart button */}
+          <Animated.View
+            ref={cartTargetRef}
+            collapsable={false}
+            style={{ transform: [{ scale: cartPulse }] }}
+            testID="product-cart-button"
+          >
+            <IconButton
+              name="shopping-bag"
+              onPress={() => router.push('/(buyer)/cart' as never)}
+              accessibilityLabel={cartCount > 0 ? `Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}` : 'Open cart'}
+              accessibilityHint="View items in your cart"
+              variant="plain"
+              color="#FFFFFF"
+              style={s.mediaChromeBtn}
+            />
+            {cartCount > 0 ? (
+              <View style={s.cartBadge} pointerEvents="none" testID="product-cart-badge">
+                <Text style={s.cartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
+              </View>
+            ) : null}
+          </Animated.View>
+        </View>
+      </View>
 
       {flying && flight ? (() => {
         const flySize = flight.source?.size ?? CART_FLIGHT_ITEM_SIZE;
@@ -1428,7 +1579,10 @@ export default function BuyerProductDetailScreen() {
         accessibilityRole="toolbar"
         accessibilityLabel="Product purchase actions"
       >
-        {/* Real "Add to cart" + "Buy now" pair (it was an unlabeled bag icon). */}
+        {/* Add to bag (live price inside) with Save and Share beside it
+            (Nike PDP CTA, https://mobbin.com/screens/5163c408-ea2f-46d1-b945-ab33395eacd1).
+            The bag-icon bump on success is unchanged. */}
+        <View style={s.buyNowBtn}>
         {addedToCart ? (
           <Button
             label="In your bag"
@@ -1436,31 +1590,57 @@ export default function BuyerProductDetailScreen() {
             variant="secondary"
             onPress={() => router.push('/(buyer)/cart' as never)}
             accessibilityLabel="In your bag. View cart"
-            style={s.buyNowBtn}
+            fullWidth
+            style={s.bagBtn}
             testID="product-view-cart"
           />
         ) : (
           <Button
-            label="Add to cart"
-            variant="secondary"
+            label={allSelected && !inStock ? 'Sold out' : `Add to bag · ${formatCents(variantPrice)}`}
+            variant="primary"
             onPress={handleAddToCart}
             loading={addingToCart}
             disabled={addingToCart || launching || (allSelected && !inStock)}
-            accessibilityLabel={!allSelected ? 'Add to cart. Select a size first' : !inStock ? 'Out of stock' : 'Add to cart'}
-            style={s.buyNowBtn}
+            accessibilityLabel={!allSelected ? 'Add to bag. Select a size first' : !inStock ? 'Out of stock' : 'Add to bag'}
+            fullWidth
+            style={s.bagBtn}
             testID="product-add-to-cart"
           />
         )}
-
+        </View>
+        <SaveHeart
+          productId={product.id}
+          title={product.name}
+          brand={product.sellerName}
+          priceCents={product.priceCents > 0 ? product.priceCents : undefined}
+          size={44}
+          iconColor={theme.text}
+          style={[s.barCircleBtn, { borderColor: theme.border }]}
+          testID="product-save-heart"
+        />
+        <IconButton
+          name="share"
+          onPress={handleShare}
+          accessibilityLabel="Share product"
+          variant="plain"
+          color={theme.text}
+          style={[s.barCircleBtn, { borderColor: theme.border }]}
+          testID="product-share-bar"
+        />
+      </View>
+      {/* Buy now / Reserve keep their place in the bar, as the secondary
+          action under Add to bag. */}
+      <View style={s.actionBarSecondRow}>
         {product.isPreOrder ? (
           <Button
             label={reserved ? 'Reserved ✓' : 'Reserve (No Charge)'}
             onPress={handleReserve}
-            variant={reserved ? 'secondary' : 'primary'}
+            variant="secondary"
+            size="small"
             loading={reserveLoading}
             disabled={reserveLoading || reserved || launching}
             accessibilityHint={reserved ? undefined : 'Reserves this pre-order at no charge'}
-            style={s.buyNowBtn}
+            fullWidth
           />
         ) : (
           <Button
@@ -1472,10 +1652,11 @@ export default function BuyerProductDetailScreen() {
             }
             icon={!inStock && allSelected && !paymentUnavailable ? 'clock' : undefined}
             onPress={handleBuyNow}
-            variant="primary"
+            variant="secondary"
+            size="small"
             loading={buyingNow}
             disabled={buyingNow || launching || !inStock || !allSelected || paymentUnavailable}
-            style={s.buyNowBtn}
+            fullWidth
           />
         )}
       </View>
@@ -1703,8 +1884,10 @@ const wv = StyleSheet.create({
  * nothing). Dev-web preview: seeded products get the same seller's other
  * pieces, then similar ones, from the preview catalog.
  */
-function RelatedProducts({ productId, dividerStyle, headerStyle }: {
+function RelatedProducts({ productId, sellerId, dividerStyle, headerStyle }: {
   productId: string;
+  /** This product's seller — related items from the same seller form "More from this brand". */
+  sellerId?: string;
   dividerStyle?: object;
   headerStyle?: object;
 }) {
@@ -1721,16 +1904,16 @@ function RelatedProducts({ productId, dividerStyle, headerStyle }: {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    const preview = isPreviewProductId(productId) ? getPreviewRelatedProducts(productId, 4) : [];
+    const preview = isPreviewProductId(productId) ? getPreviewRelatedProducts(productId, 8) : [];
     if (preview.length > 0) {
       setProducts(preview);
       setLoading(false);
       return () => { cancelled = true; };
     }
-    api.publicProducts.related(productId, 5)
+    api.publicProducts.related(productId, 9)
       .then((data) => {
         if (!cancelled) {
-          setProducts(data.filter((p: any) => p.id !== productId).slice(0, 4));
+          setProducts(data.filter((p: any) => p.id !== productId));
           setLoading(false);
         }
       })
@@ -1752,51 +1935,72 @@ function RelatedProducts({ productId, dividerStyle, headerStyle }: {
     return null;
   }
 
+  // Same data source as before (the related-products shelf, which already
+  // ranks this seller's own pieces first): those become "More from this
+  // brand" as 140pt-wide 3:4 cards; the rest stay "You might also like".
+  const { brand: brandProducts, others } = splitRelatedByBrand(products, sellerId, 6, 4);
+
+  const renderCard = (p: any, imageHeight: number, testID?: string) => {
+    let lowestPriceCents = 0;
+    if (p.variants && p.variants.length > 0) {
+      lowestPriceCents = p.variants.reduce((min: number, v: any) => Math.min(min, v.priceCents ?? 0), p.variants[0].priceCents ?? 0);
+    } else if (p.priceCents) {
+      lowestPriceCents = p.priceCents;
+    }
+
+    return (
+      <TouchableOpacity
+        key={p.id}
+        style={{ width: 140 }}
+        activeOpacity={0.8}
+        testID={testID}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          if (usesThreadPull) {
+            push({ pathname: '/thread-product-detail' as any, params: { productId: p.id } } as never);
+          } else {
+            router.push({ pathname: '/buyer-product-detail' as any, params: { productId: p.id } });
+          }
+        }}
+      >
+        <View style={{ width: 140, height: imageHeight, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SP.sm }}>
+          {(p.images && p.images[0]) ? (
+            <CachedImage source={{ uri: p.images[0] }} style={{ width: '100%', height: '100%' }} contentFit="cover" recyclingKey={p.images[0]} />
+          ) : (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <Feather name="image" size={24} color={MUTED} />
+            </View>
+          )}
+        </View>
+        <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG }} numberOfLines={1}>{p.name}</Text>
+        <Text style={{ fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 }} numberOfLines={1}>
+          {p.sellerDisplayName || 'Independent Seller'}
+        </Text>
+        <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginTop: 4 }}>{formatCents(lowestPriceCents)}</Text>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <>
-    <View style={dividerStyle} />
-    <Text style={headerStyle} accessibilityRole="header">You might also like</Text>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -SP.md }} contentContainerStyle={{ paddingHorizontal: SP.md, gap: SP.md }}>
-      {products.map((p) => {
-        let lowestPriceCents = 0;
-        if (p.variants && p.variants.length > 0) {
-          lowestPriceCents = p.variants.reduce((min: number, v: any) => Math.min(min, v.priceCents ?? 0), p.variants[0].priceCents ?? 0);
-        } else if (p.priceCents) {
-          lowestPriceCents = p.priceCents;
-        }
-
-        return (
-          <TouchableOpacity
-            key={p.id}
-            style={{ width: 140 }}
-            activeOpacity={0.8}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              if (usesThreadPull) {
-                push({ pathname: '/thread-product-detail' as any, params: { productId: p.id } } as never);
-              } else {
-                router.push({ pathname: '/buyer-product-detail' as any, params: { productId: p.id } });
-              }
-            }}
-          >
-            <View style={{ width: 140, height: 180, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SP.sm }}>
-              {(p.images && p.images[0]) ? (
-                <CachedImage source={{ uri: p.images[0] }} style={{ width: '100%', height: '100%' }} contentFit="cover" recyclingKey={p.images[0]} />
-              ) : (
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                  <Feather name="image" size={24} color={MUTED} />
-                </View>
-              )}
-            </View>
-            <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG }} numberOfLines={1}>{p.name}</Text>
-            <Text style={{ fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 }} numberOfLines={1}>
-              {p.sellerDisplayName || 'Independent Seller'}
-            </Text>
-            <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginTop: 4 }}>{formatCents(lowestPriceCents)}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
+    {brandProducts.length > 0 && (
+      <>
+        <View style={dividerStyle} />
+        <Text style={headerStyle} accessibilityRole="header">More from this brand</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -SP.md }} contentContainerStyle={{ paddingHorizontal: SP.md, gap: SP.md }} testID="product-more-from-brand">
+          {brandProducts.map((p) => renderCard(p, Math.round(140 * 4 / 3), `product-brand-card-${p.id}`))}
+        </ScrollView>
+      </>
+    )}
+    {others.length > 0 && (
+      <>
+        <View style={dividerStyle} />
+        <Text style={headerStyle} accessibilityRole="header">You might also like</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -SP.md }} contentContainerStyle={{ paddingHorizontal: SP.md, gap: SP.md }}>
+          {others.map((p) => renderCard(p, 180))}
+        </ScrollView>
+      </>
+    )}
     </>
   );
 }
@@ -1841,6 +2045,9 @@ const pr = StyleSheet.create({
   value: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, marginTop: 2, lineHeight: 17 },
 });
 
+/** Raised seller block (#1C1C1E — iOS secondarySystemBackground, dark). */
+const SELLER_CARD_RAISED = '#1C1C1E';
+
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const BG = theme.background;
   const CARD = theme.card;
@@ -1861,14 +2068,21 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     SHADOW_PURPLE: { shadowColor: theme.shadowColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   };
   return StyleSheet.create({
-  imageArea: { height: GALLERY_HEIGHT, backgroundColor: CARD, position: 'relative' },
+  // minHeight, not height: the thumbnail rail renders under the photo inside
+  // this block, and a fixed height let it overlap the brand/name below.
+  imageArea: { minHeight: GALLERY_HEIGHT, backgroundColor: CARD, position: 'relative' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   imagePlaceholderText: { fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', paddingHorizontal: SP.lg },
   // Positioning wrappers only — the solid dark chrome and hit area come
   // from `mediaChromeBtn` below on a `variant="plain"` IconButton (no blur
   // over the swipeable gallery — see the comment where these render).
-  backBtnWrap: { position: 'absolute', left: SP.md },
-  cartBtnWrap: { position: 'absolute', right: SP.md },
+  topBar: {
+    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingBottom: SP.sm,
+  },
+  topBarTitleWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  topBarTitle: { fontSize: 17, lineHeight: 22, fontWeight: '600', textAlign: 'center' },
+  topBarRight: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   // `right: 0` (was `-4`, pushing the badge outward past the button's
   // own bounds) — same class of fix as the buyer feed top bar's cart
   // badge (see feed.tsx): with a real device safe-area inset on top of
@@ -1880,14 +2094,16 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   cartBadgeText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: 11, lineHeight: 13 },
   cartFlyItem: { position: 'absolute', overflow: 'hidden', zIndex: 50, backgroundColor: CARD },
-  mediaChromeBtn: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill },
+  mediaChromeBtn: { width: COMP.iconBtn, height: COMP.iconBtn, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: COMP.iconBtn / 2 },
   body: { paddingVertical: SP.md },
   badgeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CYAN_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
   preOrderBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: CYAN, letterSpacing: 0.4 },
   saleBadge: { backgroundColor: RED_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
   saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: RED, letterSpacing: 0.4 },
-  productName: { ...TYPE.title, color: FG, marginBottom: SP.sm },
+  brandLink: { alignSelf: 'flex-start', marginBottom: 4 },
+  brandText: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
+  productName: { fontSize: 20, lineHeight: 26, fontWeight: '600', color: FG, marginBottom: SP.xs },
   addedSheetContent: { padding: SP.md, paddingTop: SP.xs, alignItems: 'center' },
   addedSheetTitle: { ...TYPE.title, color: FG, marginTop: SP.sm, marginBottom: SP.md },
   addedSheetProductRow: {
@@ -1897,9 +2113,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   addedSheetImage: { width: 52, height: 52, borderRadius: RADIUS.sm },
   addedSheetProductName: { ...TYPE.bodyMedium, color: FG },
   addedSheetProductMeta: { ...TYPE.caption, color: MUTED, marginTop: 2 },
+  // Raised #1C1C1E block, 12pt radius, no outline. (theme.surface is pure
+  // black in the default theme, so the spec's grey is set directly.)
   sellerCard: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm,
-    padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD,
+    padding: SP.md, borderRadius: RADII.card, backgroundColor: SELLER_CARD_RAISED,
   },
   sellerName: { ...TYPE.bodyMedium, color: FG, flexShrink: 1 },
   sellerHandle: { ...TYPE.caption, color: MUTED, flexShrink: 1 },
@@ -1928,7 +2146,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   vacationTitle: { color: ORANGE, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: 3 },
   vacationText: { color: FG, fontFamily: FONT.medium, fontSize: FS.meta, lineHeight: 18 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
-  price: { ...TYPE.heading, fontFamily: FONT.bold, color: FG },
+  price: { fontSize: 20, lineHeight: 26, fontWeight: '500', color: FG },
   priceSale: { color: SUCCESS },
   comparePrice: { fontSize: FS.base, fontFamily: FONT.regular, color: SUBTLE, textDecorationLine: 'line-through' },
   savings: { fontSize: FS.sm, fontFamily: FONT.semibold, color: SUCCESS },
@@ -1950,6 +2168,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // top border/shadow; only the original paddingTop is preserved here.
   actionBar: { paddingTop: SP.md },
   actionBarRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+  actionBarSecondRow: { flexDirection: 'row', alignItems: 'center', marginTop: SP.sm },
+  bagBtn: { height: COMP.buttonH },
+  barCircleBtn: { width: COMP.iconBtn, height: COMP.iconBtn, borderRadius: COMP.iconBtn / 2, borderWidth: 1, backgroundColor: 'transparent' },
+  infoRows: { borderBottomWidth: StyleSheet.hairlineWidth, marginHorizontal: -SP.md, marginTop: SP.sm, marginBottom: SP.md },
   // The add-to-cart / view-cart control uses IconButton's own 44×44pt
   // footprint; only the fill/border are overridden so it reads as a
   // secondary action next to the full-width primary Button.
