@@ -126,7 +126,7 @@ export default function VacationModeScreen() {
               style={s.input}
               value={message}
               onChangeText={setMessage}
-              placeholder="We're away until [date]. Thank you for your patience."
+              placeholder="We're away until [date]. Thank you for your patience!"
               placeholderTextColor={MUTED}
               multiline
               numberOfLines={3}
