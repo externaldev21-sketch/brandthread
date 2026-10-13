@@ -31,9 +31,10 @@ export type BestTimeResponse =
   | { status: 'not_enough_activity'; timeZone: string; days: number; activeFollowers: null; minActiveFollowers: number; grid: null; byWeekday: null; top: [] };
 
 /** Task title per check, verb first (Shopify setup guide style). Same text done or open. */
-export function launchCheckTitle(id: LaunchCheckId, followerCount = 0): string {
+export function launchCheckTitle(id: LaunchCheckId, counts: { followerCount?: number; imageCount?: number } = {}): string {
+  const followerCount = counts.followerCount ?? 0;
   switch (id) {
-    case 'photos': return 'Add 3 or more photos';
+    case 'photos': return counts.imageCount === 0 ? 'Add a photo' : 'Add 3 or more photos';
     case 'price': return 'Set a price';
     case 'stock': return 'Add stock or offer pre-order';
     case 'variants': return 'Add sizes or colors';

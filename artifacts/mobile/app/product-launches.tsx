@@ -303,7 +303,7 @@ function LaunchEditor({
     } catch (e: any) {
       if (e?.code === 'LAUNCH_NOT_READY') {
         loadChecklist();
-        Alert.alert('Finish the required steps', 'Add a photo, set a price and connect payouts, then schedule the launch.');
+        Alert.alert('Finish the required steps', 'Complete the checklist steps marked Required, then schedule the launch.');
         return;
       }
       Alert.alert("Couldn't save", e?.message ?? 'Try again.');

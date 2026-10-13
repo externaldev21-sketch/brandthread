@@ -16,8 +16,10 @@ describe('labels', () => {
   it('titles every check and pluralises followers', () => {
     const ids: LaunchCheckId[] = ['photos', 'price', 'stock', 'variants', 'description', 'shipping', 'payouts', 'launch_time', 'followers'];
     for (const id of ids) expect(launchCheckTitle(id).length).toBeGreaterThan(0);
-    expect(launchCheckTitle('followers', 1)).toBe('Notify your 1 follower');
-    expect(launchCheckTitle('followers', 1240)).toBe('Notify your 1,240 followers');
+    expect(launchCheckTitle('photos', { imageCount: 0 })).toBe('Add a photo');
+    expect(launchCheckTitle('photos', { imageCount: 2 })).toBe('Add 3 or more photos');
+    expect(launchCheckTitle('followers', { followerCount: 1 })).toBe('Notify your 1 follower');
+    expect(launchCheckTitle('followers', { followerCount: 1240 })).toBe('Notify your 1,240 followers');
   });
 
   it('routes each fixable check to the screen that fixes it', () => {

@@ -33,7 +33,7 @@ export function LaunchChecklistSection({
       </View>
       {checklist.items.map((item) => {
         const route = item.done ? null : launchCheckRoute(item.id, productId);
-        const title = launchCheckTitle(item.id, checklist.followerCount);
+        const title = launchCheckTitle(item.id, checklist);
         const body = (
           <>
             <View style={[s.check, item.done
