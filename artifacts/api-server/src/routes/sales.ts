@@ -8,6 +8,7 @@ import { and, eq, inArray, isNull, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requirePermission } from "../middlewares/requireRole";
 import { clearSalesCache } from "../lib/pricing/salesRuntime";
+import { parseTimeZone } from "../lib/scheduleWindow";
 
 const router = Router();
 router.use(requireAuth);
@@ -36,6 +37,8 @@ type Body = {
   name?: string; discountType?: string; value?: number; scope?: string;
   productIds?: string[]; collection?: string | null;
   startsAt?: string | null; endsAt?: string | null; active?: boolean;
+  /** IANA zone the seller picked the dates in (shown again in the edit form). */
+  scheduleTimeZone?: string | null;
 };
 
 /** Validates fields present in `b`; returns an error message or null. */
@@ -53,6 +56,7 @@ function validate(b: Body, full: boolean): string | null {
   const s = b.startsAt ? new Date(b.startsAt) : null;
   const e = b.endsAt ? new Date(b.endsAt) : null;
   if ((s && isNaN(s.getTime())) || (e && isNaN(e.getTime()))) return "startsAt / endsAt must be valid dates";
+  if (parseTimeZone(b.scheduleTimeZone) === "invalid") return "scheduleTimeZone must be an IANA time zone, e.g. America/New_York";
   if (s && e && e.getTime() <= s.getTime()) return "endsAt must be after startsAt";
   return null;
 }
@@ -112,6 +116,7 @@ router.post("/", requirePermission("marketing"), async (req, res) => {
         startsAt: b.startsAt ? new Date(b.startsAt) : new Date(),
         endsAt: b.endsAt ? new Date(b.endsAt) : null,
         active: b.active ?? true,
+        scheduleTimeZone: b.scheduleTimeZone || null,
       }).returning();
       if (productIds.length) await tx.insert(productSales).values(productIds.map((productId) => ({ saleId: row.id, productId })));
       return row;
@@ -155,6 +160,7 @@ router.patch("/:id", requirePermission("marketing"), async (req, res) => {
         ...(b.startsAt !== undefined && { startsAt: b.startsAt ? new Date(b.startsAt) : existing.startsAt }),
         ...(b.endsAt !== undefined && { endsAt: b.endsAt ? new Date(b.endsAt) : null }),
         ...(b.active !== undefined && { active: !!b.active }),
+        ...(b.scheduleTimeZone !== undefined && { scheduleTimeZone: b.scheduleTimeZone || null }),
         updatedAt: new Date(),
       }).where(eq(sales.id, existing.id)).returning();
       if (productIds || merged.scope !== "products") {
