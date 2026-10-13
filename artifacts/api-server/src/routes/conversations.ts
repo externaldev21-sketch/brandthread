@@ -872,7 +872,7 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
             userId:        recipientId,
             category:      "messages",
             type:          notifType,
-            title:         `New message from ${sender.name || "someone"}`,
+            title:         `${sender.name || "Someone"} sent a message`,
             body:          previewText.slice(0, 100),
             actorName:     sender.name,
             actorHandle:   sender.handle,

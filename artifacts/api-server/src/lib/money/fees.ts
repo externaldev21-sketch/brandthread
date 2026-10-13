@@ -219,3 +219,15 @@ export function formatUsd(cents: number): string {
   const abs = Math.abs(cents);
   return `${sign}$${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, "0")}`;
 }
+
+/**
+ * Money for notification and message copy (docs/VOICE.md): "$1,240" for whole
+ * dollars, "$12.50" when there are cents. Receipts keep `formatUsd`.
+ */
+export function formatMoney(cents: number): string {
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(Math.round(cents));
+  const dollars = Math.floor(abs / 100).toLocaleString("en-US");
+  const rest = abs % 100;
+  return rest === 0 ? `${sign}$${dollars}` : `${sign}$${dollars}.${String(rest).padStart(2, "0")}`;
+}

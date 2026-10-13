@@ -60,7 +60,8 @@ import { shouldNotifyRestricted } from "../lib/connectOnboarding";
 import { processDisputeEvent } from "../lib/disputes/webhook";
 import { buildDisputeDeps } from "../lib/disputes/store";
 import { productThumbnail } from "../lib/activityEvents";
-import { notifyBuyerOrderCancelled, notifyBuyerOrderConfirmed } from "../lib/orderNotifications";
+import { newOrderCopy, notifyBuyerOrderCancelled, notifyBuyerOrderConfirmed } from "../lib/orderNotifications";
+import { profilesById } from "../lib/safety";
 import { sendPushToUser, stableNotificationId } from "../lib/push";
 import { connectReadiness } from "./manufacturer-connect";
 import { recordPaidPhysicalOrder } from "../lib/sellerTaxLedger";
@@ -76,7 +77,7 @@ import {
 import { sellerPlanFromStripeLookupKey } from "../lib/stripePlanMapping";
 import { recordDiscountCodeUse } from "../lib/discounts";
 import { attributeOrder as attributeAffiliateOrder } from "../lib/affiliate/service";
-import { splitOrder } from "../lib/money/fees";
+import { formatMoney, splitOrder } from "../lib/money/fees";
 import { fetchChargeDetails, type ChargeDetails } from "../lib/money/stripeMoney";
 import {
   lockDrop, recordBulkPaidFromHeld, recordBulkReversalToHeld, recordOrderPaid,
@@ -1184,10 +1185,10 @@ export async function handleCheckoutPaid(
                 id: crypto.randomUUID(),
                 userId: variant.ownerId,
                 type: isZero ? 'out_of_stock' : 'low_stock',
-                title: isZero ? 'Out of stock' : 'Low stock alert',
+                title: isZero ? 'Sold out' : 'Low stock',
                 body: isZero
-                  ? `${variant.productName} is now out of stock.`
-                  : `${variant.productName} has only ${variant.stock} units left.`,
+                  ? `${variant.productName} sold out.`
+                  : `${variant.productName} has ${variant.stock} left.`,
                 targetId: item.variantId,
                 targetType: 'variant',
                 isRead: false,
@@ -1287,19 +1288,34 @@ export async function handleCheckoutPaid(
 
       if (createdOrder) {
         try {
-          const [firstItem] = await db
-            .select({ images: products.images })
+          const lineItems = await db
+            .select({ images: products.images, productName: orderItems.productName })
             .from(orderItems)
             .innerJoin(productVariants, eq(productVariants.id, orderItems.variantId))
             .innerJoin(products, eq(products.id, productVariants.productId))
-            .where(eq(orderItems.orderId, createdOrderId))
-            .limit(1);
+            .where(eq(orderItems.orderId, createdOrderId));
+          const firstItem = lineItems[0];
+          // "Maya bought Desires Tee": the buyer's profile name, or the
+          // shipping name a guest typed at checkout. Never a made-up name.
+          const buyerProfile = buyerId ? (await profilesById([buyerId])).get(buyerId) : undefined;
+          const buyerName = buyerProfile && !buyerProfile.deleted && !buyerProfile.suspended
+            ? buyerProfile.name
+            : shippingAddress?.name ?? null;
+          const copy = newOrderCopy({
+            buyerName,
+            productName: firstItem?.productName,
+            itemCount: lineItems.length,
+            orderNumber: createdOrder.orderNumber,
+            totalCents: createdOrder.totalCents,
+            // Order numbers count up per seller from BT-00001 (step 3 above).
+            firstSale: createdOrder.orderNumber === "BT-00001",
+          });
           await publishNotification({
             userId: createdOrder.ownerId,
             category: "orders",
             type: "new_order_received",
-            title: "New order!",
-            body: `Order #${createdOrder.orderNumber} for $${(createdOrder.totalCents / 100).toFixed(2)} is ready to review.`,
+            title: copy.title,
+            body: copy.body,
             targetId: createdOrderId,
             targetType: "order",
             targetImageUrl: productThumbnail(firstItem?.images),
@@ -1314,6 +1330,8 @@ export async function handleCheckoutPaid(
               orderNumber: createdOrder.orderNumber,
               totalCents: createdOrder.totalCents,
               targetImageUrl: productThumbnail(firstItem?.images),
+              productName: firstItem?.productName,
+              itemCount: lineItems.length,
             });
           }
         } catch (err) {
@@ -1615,7 +1633,7 @@ export async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
       category: "system",
       type: notificationType,
       title: "Payment failed",
-      body: "Payment failed — update your card to keep your features.",
+      body: "Update your card to keep your features.",
       targetId: invoice.id ?? null,
       targetType: "subscription_invoice",
       cta: "Update card",
@@ -1697,8 +1715,8 @@ async function handleIdentityVerified(session: any) {
       userId: clerkId,
       category: "system",
       type: "verification_verified",
-      title: "You're a verified seller! ✓",
-      body: "Your identity has been confirmed. Your verified badge is now live on your storefront.",
+      title: "You're verified",
+      body: "Your verified badge now shows on your store.",
     });
   } catch {
     // Non-critical
@@ -1731,8 +1749,8 @@ async function handleIdentityFailed(session: any) {
       userId: clerkId,
       category: "system",
       type: "verification_failed",
-      title: "Verification needs attention",
-      body: "We couldn't verify your identity. Open the app to try again.",
+      title: "Verification didn't go through",
+      body: "We couldn't verify your identity. Try again.",
     });
   } catch {
     // Non-critical
@@ -1842,7 +1860,7 @@ async function handleSellerPayoutPaid(payout: any, connectedAccountId?: string |
       category: "orders",
       type: "payout_sent",
       title: "Payout sent",
-      body: `${formatted} was sent to your bank account.`,
+      body: `${currency === "USD" ? formatMoney(amount) : formatted} sent to your bank.`,
       targetId: payout.id,
       targetType: "payout",
       pushCategory: "payout",

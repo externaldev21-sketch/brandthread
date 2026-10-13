@@ -109,7 +109,7 @@ async function notifyLaunch(productId: string, notifyFollowers: boolean, now: Da
         userId,
         category: "stock",
         type: "product_launched",
-        title: "Just launched",
+        title: "New drop",
         body: `${product.name} is live now.`,
         targetId: productId,
         targetType: "product",

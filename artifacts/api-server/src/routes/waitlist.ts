@@ -183,8 +183,8 @@ router.post("/seller/notify/:variantId", async (req, res) => {
     userId:   e.userId,
     category: "order",
     type:     "waitlist_restock",
-    title:    "Back in stock!",
-    body:     `${e.productName}${e.variantLabel ? ` (${e.variantLabel})` : ""} is available again. Grab it before it sells out.`,
+    title:    "Restock",
+    body:     `${e.productName}${e.variantLabel ? ` (${e.variantLabel})` : ""} is back.`,
     // Lets the Activity Center open the product and show its photo.
     targetId:       v.productId,
     targetType:     "product",

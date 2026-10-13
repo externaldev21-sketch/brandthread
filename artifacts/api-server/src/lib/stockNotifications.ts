@@ -9,6 +9,7 @@ import { db, productVariants, products, savedItems, waitlistEntries } from "@wor
 import { productThumbnail } from "./activityEvents";
 import { publishNotification } from "../routes/notifications-feed";
 import { logger } from "./logger";
+import { formatMoney } from "./money/fees";
 
 async function likersOf(productId: string): Promise<string[]> {
   const rows = await db
@@ -61,10 +62,10 @@ export async function notifyStockLevelChanged(input: {
     userId: input.ownerId,
     category: "stock",
     type: "low_stock",
-    title: isOut ? "Out of stock" : "Low stock alert",
+    title: isOut ? "Sold out" : "Low stock",
     body: isOut
-      ? `${input.productName} just sold out.`
-      : `${input.productName} is running low — ${input.newStock} left.`,
+      ? `${input.productName} sold out.`
+      : `${input.productName} has ${input.newStock} left.`,
     targetId: input.productId,
     targetType: "product",
     cta: "Manage inventory",
@@ -113,8 +114,8 @@ export async function notifyWaitlistRestock(input: {
       userId: entry.userId,
       category: "order",
       type: "waitlist_restock",
-      title: "Back in stock!",
-      body: `${input.productName}${entry.variantLabel ? ` (${entry.variantLabel})` : ""} is available again. Grab it before it sells out.`,
+      title: "Restock",
+      body: `${input.productName}${entry.variantLabel ? ` (${entry.variantLabel})` : ""} is back.`,
       targetId: input.productId,
       targetType: "product",
       targetImageUrl: image,
@@ -156,8 +157,8 @@ export async function notifyBackInStock(input: {
       userId,
       category: "stock",
       type: "back_in_stock",
-      title: "Back in stock",
-      body: `${input.productName} is back in stock — get it before it's gone again.`,
+      title: "Restock",
+      body: `${input.productName} is back.`,
       targetId: input.productId,
       targetType: "product",
       cta: "Shop now",
@@ -177,14 +178,14 @@ export async function notifyPriceDrop(input: {
 }): Promise<void> {
   if (input.newPriceCents >= input.previousPriceCents) return;
   const likers = await likersOf(input.productId);
-  const formatted = (input.newPriceCents / 100).toFixed(2);
+  const formatted = formatMoney(input.newPriceCents);
   await Promise.all(likers.map((userId) =>
     publishNotification({
       userId,
       category: "stock",
       type: "price_drop",
       title: "Price drop",
-      body: `${input.productName} just dropped to $${formatted}.`,
+      body: `${input.productName} dropped to ${formatted}.`,
       targetId: input.productId,
       targetType: "product",
       cta: "Shop now",

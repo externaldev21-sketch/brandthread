@@ -31,9 +31,9 @@ export function composeBatchedMessage(input: {
 
   switch (input.type) {
     case "post_liked":
-      return { title: "New likes", body: `${who} liked your post` };
+      return { title: `${who} liked your post`, body: "" };
     default:
-      return { title: "New activity", body: `${who} interacted with your post` };
+      return { title: `${who} interacted with your post`, body: "" };
   }
 }
 
