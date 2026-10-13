@@ -223,6 +223,9 @@ export function buildExpoPushMessages(
       message.richContent = { image };
       message.mutableContent = true;
     }
+    // The seller widget delta (lib/salePing.ts) is applied by the iOS service
+    // extension, which only runs for mutable-content pushes.
+    if (payload.data && "widgetDelta" in payload.data) message.mutableContent = true;
     if (categoryId !== undefined) message.categoryId = categoryId;
     return message;
   });

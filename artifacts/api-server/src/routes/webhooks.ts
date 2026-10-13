@@ -55,6 +55,7 @@ import {
   sendPayoutEmail,
 } from "../lib/brandthreadEmail";
 import { isChannelEnabledForUser } from "../lib/notificationChannels";
+import { salePingPushFields } from "../lib/salePing";
 import { publishNotification } from "./notifications-feed";
 import { shouldNotifyRestricted } from "../lib/connectOnboarding";
 import { processDisputeEvent } from "../lib/disputes/webhook";
@@ -1288,7 +1289,7 @@ export async function handleCheckoutPaid(
       if (createdOrder) {
         try {
           const [firstItem] = await db
-            .select({ images: products.images })
+            .select({ images: products.images, name: products.name })
             .from(orderItems)
             .innerJoin(productVariants, eq(productVariants.id, orderItems.variantId))
             .innerJoin(products, eq(products.id, productVariants.productId))
@@ -1308,6 +1309,14 @@ export async function handleCheckoutPaid(
             pushChannelId: "orders",
             // Registered on the device with a "Ship now" action (app/_layout.tsx).
             pushCategoryId: "new_order",
+            // "New order · $98" / product name: short enough for Apple Watch
+            // (nativeSurfaces flag only).
+            ...(await salePingPushFields({
+              totalCents: createdOrder.totalCents,
+              productName: firstItem?.name,
+              itemCount: rawItems.length,
+              orderNumber: createdOrder.orderNumber,
+            })),
           });
           // The buyer's side of the same event (guest checkouts have no feed).
           if (buyerId) {

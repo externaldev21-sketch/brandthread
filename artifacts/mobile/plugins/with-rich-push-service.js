@@ -12,7 +12,10 @@ const { withXcodeProject, withDangerousMod } = require('expo/config-plugins');
  * BT_IOS_RICH_PUSH=1 (e.g. an EAS build profile's `env`): the extension's
  * bundle id (`<main bundle id>.RichPushService`) needs its own App ID +
  * provisioning profile in EAS before a build that includes it can be signed.
- * No App Group or extra capability is needed. The gate lives here, not in
+ * The extension joins the App Group `group.com.brandthread.mobile.liveactivity`
+ * (RichPushService.entitlements) so a new-order push can update the seller
+ * widgets' snapshot; enable "App Groups" for that group on the extension's
+ * App ID. The gate lives here, not in
  * app.config.js, which must never read env (fingerprint stability, see
  * scripts/release-tooling.test.ts). The extension has no JS-facing native
  * API, so builds with and without it run the same OTA updates.
@@ -28,7 +31,7 @@ function withRichPushServiceFiles(config) {
     async (cfg) => {
       const destDir = path.join(cfg.modRequest.platformProjectRoot, EXTENSION_NAME);
       fs.mkdirSync(destDir, { recursive: true });
-      for (const fileName of [...SWIFT_SOURCES, 'Info.plist']) {
+      for (const fileName of [...SWIFT_SOURCES, 'Info.plist', `${EXTENSION_NAME}.entitlements`]) {
         fs.copyFileSync(path.join(SOURCE_DIR, fileName), path.join(destDir, fileName));
       }
       return cfg;
@@ -47,10 +50,15 @@ function withRichPushServiceTarget(config) {
     if (project.pbxTargetByName(EXTENSION_NAME)) return cfg;
 
     const target = project.addTarget(EXTENSION_NAME, 'app_extension', EXTENSION_NAME, extensionBundleId);
-    project.addPbxGroup([...SWIFT_SOURCES, 'Info.plist'], EXTENSION_NAME, EXTENSION_NAME);
+    project.addPbxGroup([...SWIFT_SOURCES, 'Info.plist', `${EXTENSION_NAME}.entitlements`], EXTENSION_NAME, EXTENSION_NAME);
     project.addBuildPhase(SWIFT_SOURCES, 'PBXSourcesBuildPhase', 'Sources', target.uuid);
     project.addBuildPhase([], 'PBXResourcesBuildPhase', 'Resources', target.uuid);
-    project.addBuildPhase(['UserNotifications.framework'], 'PBXFrameworksBuildPhase', 'Frameworks', target.uuid);
+    project.addBuildPhase(
+      ['UserNotifications.framework', 'WidgetKit.framework', 'ImageIO.framework'],
+      'PBXFrameworksBuildPhase',
+      'Frameworks',
+      target.uuid,
+    );
 
     const configurations = project.pbxXCBuildConfigurationSection();
     for (const key in configurations) {
@@ -65,6 +73,7 @@ function withRichPushServiceTarget(config) {
         entry.buildSettings.IPHONEOS_DEPLOYMENT_TARGET = '15.1';
         entry.buildSettings.TARGETED_DEVICE_FAMILY = '"1,2"';
         entry.buildSettings.PRODUCT_BUNDLE_IDENTIFIER = `"${extensionBundleId}"`;
+        entry.buildSettings.CODE_SIGN_ENTITLEMENTS = `"${EXTENSION_NAME}/${EXTENSION_NAME}.entitlements"`;
         entry.buildSettings.INFOPLIST_FILE = `"${EXTENSION_NAME}/Info.plist"`;
         entry.buildSettings.GENERATE_INFOPLIST_FILE = 'NO';
         entry.buildSettings.CURRENT_PROJECT_VERSION = `"${cfg.ios?.buildNumber || '1'}"`;
