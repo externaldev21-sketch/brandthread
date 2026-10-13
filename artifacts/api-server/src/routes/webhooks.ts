@@ -90,6 +90,7 @@ import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
 import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
 import { amountBucket, captureServerEvent } from "../lib/analytics";
+import { broadcastOrderCity } from "../lib/liveMap/broadcastOrderCity";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -1275,6 +1276,10 @@ export async function handleCheckoutPaid(
     }
 
     if (createdOrderId) {
+      // Seller dashboard Live map: ping the order's city on any open
+      // dashboard. City level only; never throws (see broadcastOrderCity).
+      broadcastOrderCity(ownerId, shippingAddress);
+
       const [createdOrder] = await db
         .select({
           ownerId: orders.ownerId,

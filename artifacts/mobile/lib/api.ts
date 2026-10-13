@@ -7,6 +7,7 @@ import type { SizeChartData, SizeChartPreset, SizeChartTemplateSummary, SizeChar
 import { prepareImageForUpload } from '@/lib/imageUploadPrep';
 import { useAuth } from '@clerk/expo';
 import type { LaunchChecklistResponse } from '@/lib/launchChecklist';
+import type { LiveMapToday } from '@/lib/liveMap/liveMap';
 import type {
   AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
   ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
@@ -2341,6 +2342,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        *  SearchResult shape (kind='brand'|'product') compatible with searchData.ts. */
       search: (q: string, limit = 20) =>
         get<{ results: any[] }>(`/api/public/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+      /** Dashboard Live map: today's paid orders by city (city level only), seller-local day. */
+      liveMapToday: () =>
+        get<LiveMapToday>(`/api/seller/live-map/today?tz=${-new Date().getTimezoneOffset()}`),
       launchChecklist: {
         get: () => get<LaunchChecklistResponse>('/api/seller/launch-checklist'),
         previewSeen: () => post<void>('/api/seller/launch-checklist/preview-seen', {}),
