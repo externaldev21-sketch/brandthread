@@ -7,7 +7,7 @@
 import React, { useCallback, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, useWindowDimensions,
+  View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, useWindowDimensions, Dimensions,
   Modal, TextInput, ActivityIndicator, Share, Platform,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
@@ -30,7 +30,8 @@ import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { CachedImage } from '@/components/CachedImage';
 import { GridSkeleton } from '@/components/layout/Skeleton';
 import { EmptyState, HapticSwitch } from '@/components/BrandthreadUI';
-import { Button } from '@/components/ui/Button';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { hapticSuccess } from '@/lib/haptics';
 import { formatCents } from '@/lib/money';
 import { BrandLink } from '@/components/products/BrandLink';
 import { buildCanonicalCollectionUrl } from '@/lib/shareCollection';
@@ -98,6 +99,7 @@ export default function BuyerCollection() {
     try {
       const updated = await updateCollection(collection.id, { name: renameValue.trim() });
       setCollection(updated);
+      hapticSuccess();
       setRenameOpen(false);
     } catch {
       Alert.alert('Couldn’t rename', 'Try again.');
@@ -277,40 +279,28 @@ export default function BuyerCollection() {
         />
       )}
 
-      <Modal transparent animationType="fade" visible={renameOpen} onRequestClose={() => setRenameOpen(false)}>
-        <ModalSafeArea>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View style={{ flex: 1 }}>
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={styles.backdrop} activeOpacity={1} onPress={() => setRenameOpen(false)} />
-          <View style={styles.centerModal}>
-            <View style={styles.renameCard}>
-              <Text style={styles.renameTitle}>Rename collection</Text>
-              <TextInput
-                style={styles.input}
-                value={renameValue}
-                onChangeText={setRenameValue}
-                autoFocus
-                onSubmitEditing={handleRename}
-                returnKeyType="done"
-              />
-              <View style={styles.modalActions}>
-                <Button label="Cancel" variant="tertiary" size="small" onPress={() => setRenameOpen(false)} />
-                <Button
-                  label="Save"
-                  variant="primary"
-                  size="small"
-                  loading={saving}
-                  disabled={!renameValue.trim() || saving}
-                  onPress={handleRename}
-                  style={styles.modalSave}
-                />
-              </View>
-            </View>
-          </View>
-            </View>
-          </KeyboardAvoidingView>
-        </ModalSafeArea>
-      </Modal>
+      {/* Pinterest "Edit board" name field; Save pinned above the keyboard. */}
+      <Sheet
+        visible={renameOpen}
+        onClose={() => setRenameOpen(false)}
+        title="Rename collection"
+        primaryAction={{
+          label: 'Save',
+          onPress: handleRename,
+          loading: saving,
+          disabled: !renameValue.trim() || saving,
+        }}
+      >
+        <TextInput
+          style={styles.input}
+          value={renameValue}
+          onChangeText={setRenameValue}
+          autoFocus
+          onSubmitEditing={handleRename}
+          returnKeyType="done"
+          accessibilityLabel="Collection name"
+        />
+      </Sheet>
     </View>
   );
 }
@@ -347,6 +337,4 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], TILE_SIZE: n
     height: COMP.inputH, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
     backgroundColor: CARD, paddingHorizontal: SP.md, color: FG, fontSize: FS.base,
   },
-  modalActions: { flexDirection: 'row', gap: SP.sm, justifyContent: 'flex-end' },
-  modalSave: { minWidth: 84 },
 });

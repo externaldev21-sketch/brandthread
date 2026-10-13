@@ -11,13 +11,13 @@
  * Bundle pricing is intentionally NOT shown here: checkout does not apply
  * bundle prices today, so a "save $X" row would be a promise the cart breaks.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { haptics } from '@/lib/haptics';
 import { CachedImage } from '@/components/CachedImage';
-import { BottomSheet } from '@/components/ui';
+import { Sheet } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
 import { useApi, type PublicPairedProduct } from '@/lib/api';
 import { isPreviewDemoMode } from '@/lib/devPreview';
@@ -96,6 +96,9 @@ export function CompleteTheFit({ productId }: { productId: string }) {
   const [loading, setLoading] = useState(true);
   const [addedId, setAddedId] = useState<string | null>(null);
   const [picking, setPicking] = useState<RailItem | null>(null);
+  // Keeps the sheet's title on screen through its close motion.
+  const pickingName = useRef('');
+  if (picking) pickingName.current = picking.name;
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -188,9 +191,9 @@ export function CompleteTheFit({ productId }: { productId: string }) {
       </ScrollView>
       {message ? <Text style={s.error}>{message}</Text> : null}
 
-      <BottomSheet visible={!!picking} onClose={() => setPicking(null)}>
-        <View style={{ padding: SP.md }}>
-          <Text style={s.sheetTitle}>{picking?.name}</Text>
+      {/* SSENSE size list: the item as the title, one row per variant. */}
+      <Sheet visible={!!picking} onClose={() => setPicking(null)} title={pickingName.current}>
+        <View>
           {pickVariants.map((v) => (
             <TouchableOpacity
               key={v.id}
@@ -203,9 +206,9 @@ export function CompleteTheFit({ productId }: { productId: string }) {
               <Text style={s.variantPrice}>{formatCents(v.priceCents)}</Text>
             </TouchableOpacity>
           ))}
-          {pickVariants.length === 0 ? <ActivityIndicator color={colors.primary} /> : null}
+          {pickVariants.length === 0 ? <ActivityIndicator color={colors.primary} style={s.sheetLoading} /> : null}
         </View>
-      </BottomSheet>
+      </Sheet>
     </View>
   );
 }
@@ -226,7 +229,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   name: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.foreground, lineHeight: 18, minHeight: 36 },
   price: { fontSize: FS.sm, fontFamily: FONT.bold, color: c.foreground, marginTop: 2 },
   error: { fontSize: FS.sm, fontFamily: FONT.medium, color: c.mutedForeground, marginTop: SP.sm },
-  sheetTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: c.foreground, marginBottom: SP.sm },
+  sheetLoading: { paddingVertical: SP.md },
   variantRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     minHeight: 48, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border,

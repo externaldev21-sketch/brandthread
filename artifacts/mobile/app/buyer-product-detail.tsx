@@ -1,5 +1,4 @@
 import { hapticToggle } from '@/lib/haptics';
-import * as Haptics from 'expo-haptics';
 /**
  * Brandthread Buyer Product Detail
  * Variant selection, add to cart, buy now.
@@ -50,7 +49,7 @@ import {
 import { ResponsiveContainer, StickyFooter } from '@/components/layout';
 import { SaveHeart } from '@/components/SaveHeart';
 import { CachedImage } from '@/components/CachedImage';
-import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar } from '@/components/ui';
+import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Sheet, Avatar } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII, radius } from '@/constants/radii';
@@ -1020,7 +1019,7 @@ export default function BuyerProductDetailScreen() {
     : !inStock ? 'Sold out'
     : variant.inventoryQuantity <= 5 ? `Only ${variant.inventoryQuantity} left`
     : 'In stock';
-  const openSizeSheet = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeSheetOpen(true); };
+  const openSizeSheet = () => { haptics.light(); setSizeSheetOpen(true); };
 
   function handleSelect(optionId: string, valueId: string) {
     setOptionsTouched(true);
@@ -1135,7 +1134,7 @@ export default function BuyerProductDetailScreen() {
     if (sizeOptionId && !selections[sizeOptionId]) { openSizeSheet(); return; }
     if (!allSelected) {
       setOptionsTouched(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      haptics.warning();
       return;
     }
     if (!variant) return;
@@ -1776,7 +1775,7 @@ function SizeChartViewer({ chart }: { chart: SizeChart }) {
 // 0c16f080-0cb8-487a-8928-6a7631cb205c) and Polarsteps' full-bleed,
 // pinch-zoomable photo viewer (mobbin.com/screens/
 // 7d855183-6163-4eb9-8776-7ac07592c47f) for the zoom behavior — adapted to
-// the app's own shared BottomSheet rather than a full-screen viewer, since
+// the app's own shared Sheet rather than a full-screen viewer, since
 // a translucent Glass blur over the chart photo itself would work against
 // the one thing this sheet exists to show clearly.
 
@@ -1825,11 +1824,7 @@ function SizeGuideSheet({ visible, chart, imageUri, onClose }: { visible: boolea
   if (!imageUri && !hasTable) return null;
 
   return (
-    <BottomSheet visible={visible} onClose={() => { resetZoom(); onClose(); }} testID="size-guide-sheet">
-      <View style={sgs.header}>
-        <Text style={[sgs.title, { color: FG }]}>Size guide</Text>
-        <IconButton name="x" size={20} variant="plain" onPress={() => { resetZoom(); onClose(); }} accessibilityLabel="Close size guide" />
-      </View>
+    <Sheet visible={visible} onClose={() => { resetZoom(); onClose(); }} title="Size guide" padded={false} maxHeightRatio={0.88} testID="size-guide-sheet">
       {hasTable && chart ? (
         <View style={{ paddingHorizontal: SP.md }} testID="size-guide-table">
           <SizeChartViewer chart={chart} />
@@ -1848,13 +1843,11 @@ function SizeGuideSheet({ visible, chart, imageUri, onClose }: { visible: boolea
           <Text style={[sgs.hint, { color: MUTED }]}>Pinch to zoom</Text>
         </>
       ) : null}
-    </BottomSheet>
+    </Sheet>
   );
 }
 
 const sgs = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, marginBottom: SP.sm },
-  title: { fontFamily: FONT.bold, fontSize: FS.lg },
   imageWrap: { width: '100%', aspectRatio: 4 / 3, overflow: 'hidden' },
   hint: { textAlign: 'center', fontFamily: FONT.regular, fontSize: FS.xs, marginTop: SP.sm, marginBottom: SP.xs },
 });

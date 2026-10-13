@@ -5,6 +5,10 @@
  * (that file is owned by another surface and is not edited here). Used by
  * both DiscoverPager's Add-to-Cart flow and BuyNowFlow's variant step.
  *
+ * Chrome is the shared `<Sheet>` (title row + circular close, the "Add to
+ * bag" CTA pinned above the home indicator) — Nike / SSENSE size picker:
+ * product summary, size grid, one pinned add-to-bag action.
+ *
  * Visual reference (Mobbin): UNIQLO "Select Size" sheet (grid of size chips,
  * sticky Apply CTA) and Vestiaire Collective's size sheet (44pt targets, one
  * clear disabled treatment) — https://mobbin.com/screens/76430e6c-342a-42be-8fce-148ab5d9651e
@@ -12,8 +16,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity,
-  TouchableWithoutFeedback, View,
+  ActivityIndicator, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
@@ -22,6 +25,7 @@ import { useSheetTransition } from '@/components/ui/BottomSheet';
 import { Icon } from '@/components/ui/Icon';
 import { haptics } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { CachedImage } from '@/components/CachedImage';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Chip } from '@/components/ui/Chip';
@@ -73,7 +77,6 @@ export function VariantPickerSheet({
 }) {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
   const [product, setProduct] = useState<BuyerProduct | null>(initialProduct ?? null);
   const [loading, setLoading] = useState(!initialProduct);
   const [error, setError] = useState('');
@@ -128,6 +131,7 @@ export function VariantPickerSheet({
       haptics.warning();
       return;
     }
+    // The pinned SheetButton already plays the primary-action haptic.
     setConfirming(true);
     try {
       await onConfirm(product, variant, quantity);
@@ -142,158 +146,125 @@ export function VariantPickerSheet({
     : !variant.isAvailable ? 'Out of stock'
     : `${confirmVerb} · ${formatCents(price * quantity)}`;
 
-  return (
-    <Modal transparent animationType="none" visible onRequestClose={onClose}>
-      <Animated.View style={[StyleSheet.absoluteFill, sheetMotion.backdropStyle]}>
-        <TouchableWithoutFeedback accessibilityRole="button" accessibilityLabel="Close" onPress={onClose}>
-          <View style={s.backdrop} />
-        </TouchableWithoutFeedback>
-      </Animated.View>
-      <Animated.View onLayout={sheetMotion.onSheetLayout}
-        style={[s.sheet, { paddingBottom: Math.max(insets.bottom, SP.md) }, sheetMotion.sheetStyle]}>
-        <GestureDetector gesture={sheetMotion.panGesture}>
-        <Animated.View>
-        <View style={s.handleWrap}><View style={s.handle} /></View>
-        <View style={s.header}>
-          <Text style={s.title}>Choose options</Text>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8} style={s.closeBtn}>
-            <Icon name="x" size={18} color={theme.text} />
-          </TouchableOpacity>
-        </View>
-        </Animated.View>
-        </GestureDetector>
+  const ctaDisabled = allSelected && (!variant || !variant.isAvailable);
 
-        {loading ? (
-          <View style={s.centerBox}><ActivityIndicator color={theme.accent} /></View>
-        ) : error ? (
-          <ErrorState message={error || undefined} onRetry={load} />
-        ) : product ? (
-          <>
-            <ScrollView showsVerticalScrollIndicator={false} bounces={false} contentContainerStyle={s.scrollContent}>
-              <View style={s.productRow}>
-                {product.imageUris[0] ? (
-                  <CachedImage source={{ uri: product.imageUris[0] }} style={s.thumb} contentFit="cover" />
-                ) : <View style={[s.thumb, s.thumbPlaceholder]}><Icon name="image" size={18} color={theme.subtle} /></View>}
-                <View style={{ flex: 1 }}>
-                  <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
-                  <Text style={s.productPrice}>{formatCents(price)}</Text>
-                  {lowStock && (
-                    <View style={s.lowStockRow}>
-                      <Icon name="alert-circle" size={11} color={theme.warning} />
-                      <Text style={s.lowStockText}>Only {variant!.inventoryQuantity} left</Text>
-                    </View>
-                  )}
+  return (
+    <Sheet
+      visible
+      onClose={onClose}
+      title="Choose options"
+      maxHeightRatio={0.86}
+      contentContainerStyle={s.scrollContent}
+      primaryAction={product && !loading && !error ? {
+        label: confirmLabel,
+        onPress: handleConfirm,
+        disabled: ctaDisabled,
+        loading: confirming,
+        testID: 'variant-picker-confirm',
+      } : undefined}
+    >
+      {loading ? (
+        <View style={s.centerBox}><ActivityIndicator color={theme.accent} /></View>
+      ) : error ? (
+        <ErrorState message={error || undefined} onRetry={load} />
+      ) : product ? (
+        <>
+          <View style={s.productRow}>
+            {product.imageUris[0] ? (
+              <CachedImage source={{ uri: product.imageUris[0] }} style={s.thumb} contentFit="cover" />
+            ) : <View style={[s.thumb, s.thumbPlaceholder]}><Icon name="image" size={18} color={theme.subtle} /></View>}
+            <View style={{ flex: 1 }}>
+              <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
+              <Text style={s.productPrice}>{formatCents(price)}</Text>
+              {lowStock && (
+                <View style={s.lowStockRow}>
+                  <Icon name="alert-circle" size={11} color={theme.warning} />
+                  <Text style={s.lowStockText}>Only {variant!.inventoryQuantity} left</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {product.options.map((option: BuyerProductOption) => {
+            const isColor = option.name.toLowerCase() === 'color';
+            const showRequired = touched && !selections[option.id];
+            return (
+              <View key={option.id} style={s.optionSection}>
+                <View style={s.optionHeader}>
+                  <Text style={s.optionLabel}>{option.name}</Text>
+                  {selections[option.id] ? (
+                    <Text style={s.optionSelected}>
+                      {option.values.find(v => v.id === selections[option.id])?.label}
+                    </Text>
+                  ) : showRequired ? (
+                    <Text style={s.optionRequired}>Required</Text>
+                  ) : null}
+                </View>
+                <View style={s.chipsRow}>
+                  {option.values.map(val => {
+                    const selected = selections[option.id] === val.id;
+                    const { [option.id]: _ignored, ...rest } = selections;
+                    const available = isVariantComboAvailable(product, option.id, val.id, rest);
+                    if (isColor && val.colorHex) {
+                      return (
+                        <TouchableOpacity
+                          key={val.id}
+                          onPress={() => { if (available) { haptics.selection(); setSelections(prev => ({ ...prev, [option.id]: val.id })); } }}
+                          style={[s.colorSwatch, selected && s.colorSwatchSelected, !available && s.chipUnavail]}
+                          accessibilityRole="radio"
+                          accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}
+                          accessibilityState={{ selected, disabled: !available }}
+                        >
+                          <View style={[s.colorDot, { backgroundColor: val.colorHex }]} />
+                          {!available && <Icon name="slash" size={13} color={theme.subtle} style={s.colorSlash} />}
+                        </TouchableOpacity>
+                      );
+                    }
+                    // The shared Chip — same size chip + sold-out treatment
+                    // (disabled, slash, struck label) as the product page.
+                    return (
+                      <Chip
+                        key={val.id}
+                        label={val.label}
+                        selected={selected}
+                        disabled={!available}
+                        icon={available ? undefined : 'slash'}
+                        iconColor={theme.subtle}
+                        strikethrough={!available}
+                        accessibilityRole="radio"
+                        accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', sold out'}`}
+                        testID={`variant-chip-${val.id}`}
+                        onPress={() => {
+                          if (!available) return;
+                          setSelections(prev => {
+                            const updated = { ...prev, [option.id]: val.id };
+                            const nextVariant = findVariant(product, updated);
+                            if (nextVariant && quantity > nextVariant.inventoryQuantity) setQuantity(1);
+                            return updated;
+                          });
+                        }}
+                      />
+                    );
+                  })}
                 </View>
               </View>
+            );
+          })}
 
-              {product.options.map((option: BuyerProductOption) => {
-                const isColor = option.name.toLowerCase() === 'color';
-                const showRequired = touched && !selections[option.id];
-                return (
-                  <View key={option.id} style={s.optionSection}>
-                    <View style={s.optionHeader}>
-                      <Text style={s.optionLabel}>{option.name}</Text>
-                      {selections[option.id] ? (
-                        <Text style={s.optionSelected}>
-                          {option.values.find(v => v.id === selections[option.id])?.label}
-                        </Text>
-                      ) : showRequired ? (
-                        <Text style={s.optionRequired}>Required</Text>
-                      ) : null}
-                    </View>
-                    <View style={s.chipsRow}>
-                      {option.values.map(val => {
-                        const selected = selections[option.id] === val.id;
-                        const { [option.id]: _ignored, ...rest } = selections;
-                        const available = isVariantComboAvailable(product, option.id, val.id, rest);
-                        if (isColor && val.colorHex) {
-                          return (
-                            <TouchableOpacity
-                              key={val.id}
-                              onPress={() => { if (available) { haptics.selection(); setSelections(prev => ({ ...prev, [option.id]: val.id })); } }}
-                              style={[s.colorSwatch, selected && s.colorSwatchSelected, !available && s.chipUnavail]}
-                              accessibilityRole="radio"
-                              accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}
-                              accessibilityState={{ selected, disabled: !available }}
-                            >
-                              <View style={[s.colorDot, { backgroundColor: val.colorHex }]} />
-                              {!available && <Icon name="slash" size={13} color={theme.subtle} style={s.colorSlash} />}
-                            </TouchableOpacity>
-                          );
-                        }
-                        // The shared Chip — same size chip + sold-out treatment
-                        // (disabled, slash, struck label) as the product page.
-                        return (
-                          <Chip
-                            key={val.id}
-                            label={val.label}
-                            selected={selected}
-                            disabled={!available}
-                            icon={available ? undefined : 'slash'}
-                            iconColor={theme.subtle}
-                            strikethrough={!available}
-                            accessibilityRole="radio"
-                            accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', sold out'}`}
-                            testID={`variant-chip-${val.id}`}
-                            onPress={() => {
-                              if (!available) return;
-                              setSelections(prev => {
-                                const updated = { ...prev, [option.id]: val.id };
-                                const nextVariant = findVariant(product, updated);
-                                if (nextVariant && quantity > nextVariant.inventoryQuantity) setQuantity(1);
-                                return updated;
-                              });
-                            }}
-                          />
-                        );
-                      })}
-                    </View>
-                  </View>
-                );
-              })}
-
-              <View style={s.qtyRow}>
-                <Text style={s.optionLabel}>Quantity</Text>
-                <View style={{ flex: 1 }} />
-                <QuantityStepper value={quantity} onChange={setQuantity} min={1} max={maxQty} disabled={!variant} />
-              </View>
-            </ScrollView>
-
-            <View style={s.footer}>
-              <TouchableOpacity
-                onPress={handleConfirm}
-                disabled={confirming || (allSelected && (!variant || !variant.isAvailable))}
-                style={[s.confirmBtn, (confirming || (allSelected && (!variant || !variant.isAvailable))) && s.confirmBtnDisabled]}
-                accessibilityRole="button"
-                accessibilityLabel={confirmLabel}
-              >
-                {confirming ? <ActivityIndicator color={theme.onAccent} size="small" /> : (
-                  <Text style={s.confirmBtnText}>{confirmLabel}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : null}
-      </Animated.View>
-    </Modal>
+          <View style={s.qtyRow}>
+            <Text style={s.optionLabel}>Quantity</Text>
+            <View style={{ flex: 1 }} />
+            <QuantityStepper value={quantity} onChange={setQuantity} min={1} max={maxQty} disabled={!variant} />
+          </View>
+        </>
+      ) : null}
+    </Sheet>
   );
 }
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
-    backgroundColor: theme.surface, borderColor: theme.border, borderWidth: 1,
-    borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-    maxHeight: '86%',
-  },
-  handleWrap: { alignItems: 'center', paddingTop: SP.sm, paddingBottom: 2 },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  closeBtn: { width: COMP.iconBtn, height: COMP.iconBtn, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
   centerBox: { alignItems: 'center', justifyContent: 'center', paddingVertical: SP.xl },
-  scrollContent: { paddingHorizontal: SP.md, paddingBottom: SP.md },
+  scrollContent: { paddingTop: SP.xs, paddingBottom: SP.sm },
   productRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.lg, alignItems: 'center' },
   thumb: { width: 68, height: 68, borderRadius: RADIUS.md, backgroundColor: theme.cardElevated },
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
@@ -316,14 +287,4 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   colorDot: { width: 26, height: 26, borderRadius: RADIUS.sm - 2 },
   colorSlash: { position: 'absolute' },
   qtyRow: { flexDirection: 'row', alignItems: 'center', marginBottom: SP.sm },
-  footer: {
-    paddingHorizontal: SP.md, paddingTop: SP.sm,
-    borderTopWidth: 1, borderTopColor: theme.border, backgroundColor: theme.surface,
-  },
-  confirmBtn: {
-    minHeight: COMP.buttonH, borderRadius: RADIUS.md, backgroundColor: theme.accent,
-    alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm,
-  },
-  confirmBtnDisabled: { opacity: 0.45 },
-  confirmBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.onAccent },
 });

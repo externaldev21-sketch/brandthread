@@ -18,9 +18,10 @@ import { Icon } from '@/components/ui/Icon';
 import { haptics } from '@/lib/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { useSheetTransition } from '@/components/ui/BottomSheet';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { hapticError, hapticSuccess } from '@/lib/haptics';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, OVERLAY,
+  CARD, BORDER, FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, ICON, COMP,
 } from '@/lib/theme';
 import { createCollection, getCollections, moveSavedItemToCollection, saveItem } from '@/services/socialService';
@@ -45,16 +46,12 @@ interface Props {
 
 export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props) {
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
   const styles = makeStyles(theme);
   const [collections, setCollections] = useState<SavedCollection[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
-  const {
-    modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout,
-  } = useSheetTransition(visible, onClose);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -106,122 +103,88 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
     }
   }
 
-  if (!modalVisible) return null;
-
+  // Pinterest "Save to board": the boards as a list (unfiled first), then
+  // "New collection" at the end, which turns into an inline name field.
   return (
-    <Modal transparent animationType="none" visible={modalVisible} onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ flex: 1 }}>
-      <ReanimatedAnimated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
-        <TouchableWithoutFeedback accessibilityRole="button" accessibilityLabel="Close" onPress={onClose}>
-          <View style={styles.backdrop} />
-        </TouchableWithoutFeedback>
-      </ReanimatedAnimated.View>
-      <GestureDetector gesture={panGesture}>
-      <ReanimatedAnimated.View testID="save-to-collection-sheet" onLayout={onSheetLayout} style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }, sheetStyle]}>
-        <View style={styles.handle} />
-        <View style={styles.header}>
-          <Text style={styles.title}>Save to…</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityLabel="Close">
-            <Icon name="x" size={18} color={FG} />
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Save to"
+      maxHeightRatio={0.75}
+      testID="save-to-collection-sheet"
+    >
+      {loading ? (
+        <View style={styles.loadingRow}><ActivityIndicator color={theme.accent} /></View>
+      ) : (
+        <>
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => fileInto(null)}
+            disabled={!!busyId}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.rowIcon, { backgroundColor: theme.accentDim }]}>
+              <Icon name="bookmark" size={ICON.sm} color={theme.accent} />
+            </View>
+            <Text style={styles.rowLabel}>All Saved (no board)</Text>
+            {busyId === 'none' ? <ActivityIndicator color={theme.accent} /> : null}
           </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <View style={styles.loadingRow}><ActivityIndicator color={theme.accent} /></View>
-        ) : (
-          <FlatList
-            data={collections}
-            keyExtractor={c => c.id}
-            style={styles.list}
-            ListHeaderComponent={
+          {collections.map(c => (
+            <TouchableOpacity
+              key={c.id}
+              style={styles.row}
+              onPress={() => fileInto(c.id)}
+              disabled={!!busyId}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.rowIcon, { backgroundColor: theme.accentDim }]}>
+                <Icon name="folder" size={ICON.sm} color={theme.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowLabel} numberOfLines={1}>{c.name}</Text>
+                <Text style={styles.rowSubtitle}>{c.itemCount} saved{c.isPublic ? ' · Public' : ''}</Text>
+              </View>
+              {busyId === c.id ? <ActivityIndicator color={theme.accent} /> : null}
+            </TouchableOpacity>
+          ))}
+          {creating ? (
+            <View style={styles.newRow}>
+              <TextInput
+                style={styles.newInput}
+                placeholder="Collection name"
+                placeholderTextColor={SUBTLE}
+                value={newName}
+                onChangeText={setNewName}
+                autoFocus
+                onSubmitEditing={handleCreate}
+                returnKeyType="done"
+              />
               <TouchableOpacity
-                style={styles.row}
-                onPress={() => fileInto(null)}
-                disabled={!!busyId}
-                activeOpacity={0.7}
+                style={[styles.createBtn, { backgroundColor: theme.accent }]}
+                onPress={handleCreate}
+                disabled={!newName.trim() || !!busyId}
               >
-                <View style={[styles.rowIcon, { backgroundColor: theme.accentDim }]}>
-                  <Icon name="bookmark" size={ICON.sm} color={theme.accent} />
-                </View>
-                <Text style={styles.rowLabel}>All Saved (no board)</Text>
-                {busyId === 'none' ? <ActivityIndicator color={theme.accent} /> : null}
+                {busyId === 'new' ? <ActivityIndicator color={theme.onAccent} size="small" /> : (
+                  <Text style={[styles.createBtnText, { color: theme.onAccent }]}>Create</Text>
+                )}
               </TouchableOpacity>
-            }
-            renderItem={({ item: c }) => (
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() => fileInto(c.id)}
-                disabled={!!busyId}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.rowIcon, { backgroundColor: theme.accentDim }]}>
-                  <Icon name="folder" size={ICON.sm} color={theme.accent} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowLabel} numberOfLines={1}>{c.name}</Text>
-                  <Text style={styles.rowSubtitle}>{c.itemCount} saved{c.isPublic ? ' · Public' : ''}</Text>
-                </View>
-                {busyId === c.id ? <ActivityIndicator color={theme.accent} /> : null}
-              </TouchableOpacity>
-            )}
-            ListFooterComponent={
-              creating ? (
-                <View style={styles.newRow}>
-                  <TextInput
-                    style={styles.newInput}
-                    placeholder="Collection name"
-                    placeholderTextColor={SUBTLE}
-                    value={newName}
-                    onChangeText={setNewName}
-                    autoFocus
-                    onSubmitEditing={handleCreate}
-                    returnKeyType="done"
-                  />
-                  <TouchableOpacity
-                    style={[styles.createBtn, { backgroundColor: theme.accent }]}
-                    onPress={handleCreate}
-                    disabled={!newName.trim() || !!busyId}
-                  >
-                    {busyId === 'new' ? <ActivityIndicator color={theme.onAccent} size="small" /> : (
-                      <Text style={[styles.createBtnText, { color: theme.onAccent }]}>Create</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity style={styles.row} onPress={() => setCreating(true)} activeOpacity={0.7}>
-                  <View style={[styles.rowIcon, { borderWidth: 1, borderColor: theme.accent, backgroundColor: 'transparent' }]}>
-                    <Icon name="plus" size={ICON.sm} color={theme.accent} />
-                  </View>
-                  <Text style={[styles.rowLabel, { color: theme.accent, fontFamily: FONT.semibold }]}>New collection</Text>
-                </TouchableOpacity>
-              )
-            }
-          />
-        )}
-      </ReanimatedAnimated.View>
-      </GestureDetector>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.row} onPress={() => setCreating(true)} activeOpacity={0.7}>
+              <View style={[styles.rowIcon, { borderWidth: 1, borderColor: theme.accent, backgroundColor: 'transparent' }]}>
+                <Icon name="plus" size={ICON.sm} color={theme.accent} />
+              </View>
+              <Text style={[styles.rowLabel, { color: theme.accent, fontFamily: FONT.semibold }]}>New collection</Text>
+            </TouchableOpacity>
+          )}
+        </>
+      )}
+    </Sheet>
   );
 }
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: OVERLAY },
-  sheet: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '75%',
-    backgroundColor: theme.surface, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-    borderWidth: 1, borderColor: theme.border, paddingTop: SP.sm,
-  },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.sm },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SP.md, paddingBottom: SP.sm,
-  },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg },
   loadingRow: { paddingVertical: SP.xl, alignItems: 'center' },
-  list: { paddingHorizontal: SP.md },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
     paddingVertical: SP.sm + 2, borderBottomWidth: 1, borderBottomColor: BORDER,

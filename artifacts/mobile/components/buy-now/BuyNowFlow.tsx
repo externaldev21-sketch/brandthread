@@ -32,6 +32,8 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { CachedImage } from '@/components/CachedImage';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { hapticSuccess } from '@/lib/haptics';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import {
@@ -56,7 +58,6 @@ export function BuyNowFlow({
   onOrderPlaced?: () => void;
 }) {
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
   const api = useApi();
   const router = useRouter();
 
@@ -184,6 +185,7 @@ export function BuyNowFlow({
         fullShippingAddress: fullAddress || undefined,
         paymentMethodLabel: 'Card on file',
       });
+      hapticSuccess();
       setPhase('success');
       onOrderPlaced?.();
     } catch {
@@ -230,44 +232,44 @@ export function BuyNowFlow({
     );
   }
 
+  const reviewing = (phase === 'review' || phase === 'paying') && !!product && !!variant;
+  const primaryAction = !reviewing || !variant ? undefined
+    : defaultAddress ? {
+      label: `Pay ${formatCents(variant.priceCents * quantity)}`,
+      accessibilityLabel: 'Pay now',
+      onPress: handlePay,
+      loading: phase === 'paying',
+    } : {
+      label: 'Continue to checkout',
+      onPress: handleContinueInCheckout,
+    };
+
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
-      <TouchableWithoutFeedback accessibilityRole="button" accessibilityLabel="Close" onPress={onClose}>
-        <View style={s.backdrop} />
-      </TouchableWithoutFeedback>
-      <View style={[s.sheet, { backgroundColor: theme.surface, paddingBottom: insets.bottom + SP.md }]}>
-        <View style={s.handle} />
-        <View style={s.header}>
-          <Text style={[s.title, { color: theme.text }]}>Buy Now</Text>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
-            <Icon name="x" size={18} color={theme.text} />
-          </TouchableOpacity>
-        </View>
+    <Sheet visible onClose={onClose} title="Buy now" primaryAction={primaryAction}>
+      {phase === 'loading' && (
+        <View style={s.centerBox}><ActivityIndicator color={theme.accent} /></View>
+      )}
 
-        {phase === 'loading' && (
-          <View style={s.centerBox}><ActivityIndicator color={theme.accent} /></View>
-        )}
+      {phase === 'error' && (
+        <ErrorState message={error || undefined} onRetry={hydrate} />
+      )}
 
-        {phase === 'error' && (
-          <ErrorState message={error || undefined} onRetry={hydrate} />
-        )}
-
-        {(phase === 'review' || phase === 'paying') && product && variant && (
-          <>
-            <View style={s.productRow}>
-              {(variant.imageUri ?? product.imageUris[0]) ? (
-                <CachedImage source={{ uri: variant.imageUri ?? product.imageUris[0] }} style={s.thumb} contentFit="cover" />
-              ) : <View style={[s.thumb, { backgroundColor: theme.cardElevated }]} />}
-              <View style={{ flex: 1 }}>
-                <Text style={[s.productName, { color: theme.text }]} numberOfLines={2}>{product.name}</Text>
-                <Text style={[s.variantTitle, { color: theme.muted }]}>{variant.title} · Qty {quantity}</Text>
-              </View>
-              <Text style={[s.price, { color: theme.accent }]}>{formatCents(variant.priceCents * quantity)}</Text>
+      {reviewing && product && variant && (
+        <>
+          <View style={s.productRow}>
+            {(variant.imageUri ?? product.imageUris[0]) ? (
+              <CachedImage source={{ uri: variant.imageUri ?? product.imageUris[0] }} style={s.thumb} contentFit="cover" />
+            ) : <View style={[s.thumb, { backgroundColor: theme.cardElevated }]} />}
+            <View style={{ flex: 1 }}>
+              <Text style={[s.productName, { color: theme.text }]} numberOfLines={2}>{product.name}</Text>
+              <Text style={[s.variantTitle, { color: theme.muted }]}>{variant.title} · Qty {quantity}</Text>
             </View>
+            <Text style={[s.price, { color: theme.accent }]}>{formatCents(variant.priceCents * quantity)}</Text>
+          </View>
 
-            <View style={[s.divider, { backgroundColor: theme.border }]} />
+          <View style={[s.divider, { backgroundColor: theme.border }]} />
 
-            {defaultAddress ? (
+          {defaultAddress ? (
               <View style={s.addressRow}>
                 <Icon name="map-pin" size={14} color={theme.muted} />
                 <Text style={[s.addressText, { color: theme.text }]} numberOfLines={2}>
@@ -279,45 +281,15 @@ export function BuyNowFlow({
               <Text style={[s.noAddressText, { color: theme.muted }]}>
                 No saved address yet — continue to checkout to add one.
               </Text>
-            )}
-
-            {!!error && <Text style={[s.errorText, { color: theme.error }]}>{error}</Text>}
-
-            {defaultAddress ? (
-              <TouchableOpacity
-                onPress={handlePay}
-                disabled={phase === 'paying'}
-                style={[s.payBtn, { backgroundColor: theme.accent }, phase === 'paying' && { opacity: 0.7 }]}
-                accessibilityRole="button"
-                accessibilityLabel="Pay now"
-              >
-                {phase === 'paying' ? <ActivityIndicator color={theme.onAccent} size="small" /> : (
-                  <Text style={[s.payBtnText, { color: theme.onAccent }]}>Pay {formatCents(variant.priceCents * quantity)}</Text>
-                )}
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                onPress={handleContinueInCheckout}
-                style={[s.payBtn, { backgroundColor: theme.accent }]}
-                accessibilityRole="button"
-                accessibilityLabel="Continue to checkout"
-              >
-                <Text style={[s.payBtnText, { color: theme.onAccent }]}>Continue to Checkout</Text>
-              </TouchableOpacity>
-            )}
-          </>
-        )}
-      </View>
-    </Modal>
+          )}
+          {!!error && <Text style={[s.errorText, { color: theme.error }]}>{error}</Text>}
+        </>
+      )}
+    </Sheet>
   );
 }
 
 const s = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: SP.md },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginTop: 10, marginBottom: 4 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.sm },
-  title: { fontSize: FS.md, fontFamily: FONT.bold },
   centerBox: { alignItems: 'center', justifyContent: 'center', paddingVertical: SP.xl },
   productRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: SP.md },
   thumb: { width: 56, height: 56, borderRadius: RADIUS.sm },
@@ -329,6 +301,4 @@ const s = StyleSheet.create({
   addressText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium },
   noAddressText: { fontSize: FS.sm, fontFamily: FONT.regular, marginBottom: SP.md },
   errorText: { fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm },
-  payBtn: { minHeight: 52, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
-  payBtnText: { fontSize: FS.base, fontFamily: FONT.bold },
 });
