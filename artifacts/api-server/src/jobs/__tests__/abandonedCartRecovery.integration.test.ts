@@ -58,7 +58,7 @@ describe("runCartReminders", () => {
     await runCartReminders();
 
     const mine = sent.pushes.filter((p) => ids.includes(p.userId));
-    expect(mine).toEqual([{ userId: recent, category: "cart", body: "Logo Tee and 1 more is waiting in your cart." }]);
+    expect(mine).toEqual([{ userId: recent, category: "cart", body: "Logo Tee and 1 more is waiting." }]);
     expect(sent.emails.filter((e) => e.includes(suffix)).sort()).toEqual([`${stale}@test.local`]);
 
     const feed = await db.select().from(notificationsFeed).where(inArray(notificationsFeed.userId, ids));
