@@ -274,3 +274,31 @@ describe("POST /api/posts/:id/watched and GET /api/posts/watched-videos", () => 
     expect(rows[0].createdAt.getTime()).toBeGreaterThan(oldWatch.getTime());
   });
 });
+describe("GET /api/posts/my-reposts (#146)", () => {
+  it("lists my reposts newest first, only mine, and drops posts I can no longer see", async () => {
+    const me = newId("reposter");
+    const other = newId("other-reposter");
+    const author = newId("repost-author");
+    await seedUsers([me, other, author]);
+    await db.update(users).set({ accountType: "seller" }).where(eq(users.clerkId, author));
+    const [a, b, hidden] = await seedVideoPosts([author, author, author], ["first", "second", "hidden later"]);
+    const now = Date.now();
+    await db.insert(interactions).values([
+      { userId: me, postId: a, type: "repost", createdAt: new Date(now - 3_000) },
+      { userId: me, postId: b, type: "repost", createdAt: new Date(now - 1_000) },
+      { userId: me, postId: hidden, type: "repost", createdAt: new Date(now - 2_000) },
+      { userId: other, postId: a, type: "repost", createdAt: new Date(now) },
+    ]);
+    createdInteractionUsers.push(me, other);
+    await db.update(posts).set({ postStatus: "deleted" }).where(eq(posts.id, hidden));
+
+    const res = await actingAs(me, "/api/posts/my-reposts");
+    expect(res.status).toBe(200);
+    const body = await res.json() as { items: Array<{ postId: string; caption: string; thumbnailUrl: string | null }>; nextCursor: string | null };
+    expect(body.items.map((i) => i.postId)).toEqual([b, a]);
+    expect(body.items[0].thumbnailUrl).toBeTruthy();
+    expect(body.nextCursor).toBeNull();
+
+    expect((await actingAs(me, "/api/posts/my-reposts?cursor=nope")).status).toBe(400);
+  });
+});
