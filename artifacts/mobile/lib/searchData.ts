@@ -35,6 +35,8 @@ export interface SearchVideo {
   authorName: string;
   authorHandle: string;
   authorAvatarUrl: string | null;
+  /** 'buyer' | 'seller' | 'both' — present on live results; splits buyer Fits from brand videos. */
+  authorAccountType?: string | null;
   color: string;
   initials: string;
   likesCount: number;
