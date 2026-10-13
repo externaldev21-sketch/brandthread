@@ -11,7 +11,7 @@ import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT } from '@/lib/theme';
-import { budgetFor, getRecentRoutePerf, overBudget, subscribeRoutePerf } from '@/lib/perf';
+import { budgetFor, getLatestRoutePerf, overBudget, subscribeRoutePerf } from '@/lib/perf';
 
 export function isPerfOverlayEnabled(): boolean {
   return typeof __DEV__ !== 'undefined' && __DEV__ && process.env.EXPO_PUBLIC_PERF_OVERLAY === '1';
@@ -67,15 +67,11 @@ function useHeapMb(): number | null {
   return mb;
 }
 
-const getPerfSnapshot = () => getRecentRoutePerf().length;
-
 function PerfOverlayInner() {
   const insets = useSafeAreaInsets();
   const fps = useJsFps();
   const heapMb = useHeapMb();
-  useSyncExternalStore(subscribeRoutePerf, getPerfSnapshot, getPerfSnapshot);
-  const recent = getRecentRoutePerf();
-  const last = recent[recent.length - 1];
+  const last = useSyncExternalStore(subscribeRoutePerf, getLatestRoutePerf, getLatestRoutePerf);
   const over = last ? overBudget(last) : [];
   const budget = last ? budgetFor(last.route) : null;
 

@@ -104,8 +104,20 @@ export function recordNavigationStart(route: string, queryClient?: QueryClient):
   }
 }
 
+/** Immutable copy of the newest entry, replaced on every update, so React
+ *  (and the React Compiler's memoization) sees a new value each time. */
+let latestSnapshot: RoutePerfEntry | null = null;
+
+/** Newest route timing as an immutable snapshot (for useSyncExternalStore). */
+export function getLatestRoutePerf(): RoutePerfEntry | null {
+  return latestSnapshot;
+}
+
 function logIfDone(entry: RoutePerfEntry) {
-  perfListeners.forEach((l) => l());
+  if (recent[recent.length - 1] === entry) {
+    latestSnapshot = { ...entry };
+    perfListeners.forEach((l) => l());
+  }
   if (entry.firstRenderMs === null) return;
   // eslint-disable-next-line no-console
   console.log(
