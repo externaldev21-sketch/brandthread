@@ -6,7 +6,7 @@
  *   - seller: GET /api/orders (Orders tab + dashboard "to ship" count)
  *   - buyer:  GET /api/buyer/orders
  *   - seller: notifications_feed "new_order_received" deep link
- * Same order id, same BT-00000 number, same status enum — no forked model.
+ * Same order id, same BT-4821-style number, same status enum — no forked model.
  * Also pins that the seller list carries `paidAt` (a paid checkout order is
  * stored as status "pending", so without it the app showed it as unpaid).
  */
@@ -179,7 +179,7 @@ describe("buyer checkout → seller orders cohesion", () => {
     const sellerView = sellerRows.find((row) => row.id === buyerRows[0].id);
     expect(sellerView).toBeTruthy();
     // Same number format and the same status enum on both sides.
-    expect(sellerView.orderNumber).toMatch(/^BT-\d{5}$/);
+    expect(sellerView.orderNumber).toMatch(/^BT-[1-9]\d{3,}$/);
     expect(sellerView.orderNumber).toBe(buyerRows[0].orderNumber);
     expect(sellerView.status).toBe("processing");
     expect(buyerRows[0].status).toBe(sellerView.status);
@@ -197,7 +197,7 @@ describe("buyer checkout → seller orders cohesion", () => {
     expect(guest).toBeTruthy();
     expect(guest.customerName).toBe("Guest Buyer");
     expect(guest.paidAt).toBeTruthy();
-    expect(guest.orderNumber).toMatch(/^BT-\d{5}$/);
+    expect(guest.orderNumber).toMatch(/^BT-[1-9]\d{3,}$/);
   });
 
   it("sends the seller one new-order notification per order, deep-linked to that order id", async () => {

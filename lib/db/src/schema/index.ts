@@ -551,6 +551,7 @@ export const orders = pgTable('orders', {
 }, (table) => ({
   customerIdx: index('orders_customer_id_idx').on(table.customerId),
   dropIdx: index('orders_drop_id_idx').on(table.dropId),
+  orderNumberIdx: index('orders_order_number_idx').on(table.orderNumber),
 }));
 
 // ─── Order Items ──────────────────────────────────────────────────────────────

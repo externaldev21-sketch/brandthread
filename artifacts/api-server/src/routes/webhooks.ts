@@ -4,6 +4,7 @@
  */
 import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
+import { generateOrderNumberIn } from "../lib/orderNumber";
 import type Stripe from "stripe";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed,
@@ -947,12 +948,8 @@ export async function handleCheckoutPaid(
       }
     }
 
-    // Step 3: Generate order number
-    const countRes = await tx.execute(
-      sql`SELECT count(*)::int AS c FROM orders WHERE owner_id = ${ownerId}`,
-    );
-    const count: number = (countRes as any).rows?.[0]?.c ?? 0;
-    const orderNumber   = `BT-${String(count + 1).padStart(5, "0")}`;
+    // Step 3: Short order number (BT-4821), unique across every store
+    const orderNumber = await generateOrderNumberIn(tx);
 
     // Step 4: Insert order — pending if stock OK, refund_pending if oversold
     const dropId: string | null = orderDropId;
