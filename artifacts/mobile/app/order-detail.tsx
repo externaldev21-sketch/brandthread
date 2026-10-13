@@ -34,6 +34,7 @@ import { OrderRiskBadge } from '@/components/orders/OrderRiskBadge';
 import { queryKeys } from '@/lib/queryClient';
 import { DELIVERY_CONFIRMED_BY_NOTE, formatLocalDate, sellerOrderConflictMessage, unshippedItems } from '@/lib/deliveryGuarantee';
 import { SellerDeliveryBanner, ShipItemsSheet } from '@/components/orders/SellerDelivery';
+import { PackingSlipSheet } from '@/components/orders/PackingSlipSheet';
 import { getPreviewSellerOrder } from '@/lib/previewOrders';
 import { ApiError } from '@/lib/networkNotice';
 
@@ -128,7 +129,7 @@ export function adaptApiOrder(raw: any): Order {
     productId:        typeof item.productId === 'string' ? item.productId : '',
     productName:      item.productName,
     variant:          item.variantLabel ?? '',
-    sku:              undefined,
+    sku:              typeof item.sku === 'string' && item.sku ? item.sku : undefined,
     quantity:         item.quantity,
     unitPriceCents:   item.priceCents ?? 0,
     discountAmountCents: 0,
@@ -643,6 +644,7 @@ export default function OrderDetailScreen() {
   }
 
   const [showShipItems, setShowShipItems] = useState(false);
+  const [showPackingSlip, setShowPackingSlip] = useState(false);
   const [shippingItems, setShippingItems] = useState(false);
 
   async function handleShipItems(itemIds: string[], trackingNumber: string, carrier: string) {
@@ -857,7 +859,10 @@ export default function OrderDetailScreen() {
         divider={false}
         variant="push"
         onBack={() => goBackOr(router, '/(tabs)/orders')}
-        actions={[{ icon: 'refresh-cw', onPress: retryUpdates, accessibilityLabel: 'Refresh order' }]}
+        actions={[
+          { icon: 'printer', onPress: () => setShowPackingSlip(true), accessibilityLabel: 'Print packing slip' },
+          { icon: 'refresh-cw', onPress: retryUpdates, accessibilityLabel: 'Refresh order' },
+        ]}
       />
 
       {/* Tab bar */}
@@ -987,6 +992,8 @@ export default function OrderDetailScreen() {
           router.push(`/fulfill-order?orderId=${id}&itemIds=${itemIds.join(',')}`);
         }}
       />
+
+      <PackingSlipSheet visible={showPackingSlip} orders={[order]} onClose={() => setShowPackingSlip(false)} />
 
       {/* Tracking Events Modal */}
       <Modal visible={!!trackingModalShipmentId} transparent animationType="slide" onRequestClose={() => setTrackingModalShipmentId(null)}>

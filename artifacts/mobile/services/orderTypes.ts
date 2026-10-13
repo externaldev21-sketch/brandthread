@@ -134,6 +134,12 @@ export interface ShippingRate {
   trackingIncluded: boolean;
   insuranceIncluded: boolean;
   isRecommended: boolean;
+  /** 'shippo' | 'easypost' — the label is bought where the rate came from. */
+  provider?: string;
+  /** The carrier's retail price, only when the provider published one. */
+  retailPriceCents?: number | null;
+  /** retailPriceCents − priceCents; null/absent when there is no real retail figure. */
+  savingsCents?: number | null;
 }
 
 export interface TrackingEvent {
