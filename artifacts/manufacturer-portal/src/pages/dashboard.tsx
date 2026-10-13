@@ -55,7 +55,7 @@ export default function Dashboard() {
   if (dashboard.isLoading || profile.isLoading) {
     return (
       <div className="space-y-6" data-testid="status-dashboard-loading">
-        <div className="h-9 w-72 animate-pulse rounded bg-secondary" />
+        <div className="h-9 w-72 max-w-full animate-pulse rounded bg-secondary" />
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <div key={item} className="h-28 animate-pulse rounded-lg border border-border bg-card" />)}</div>
         <div className="grid gap-4 lg:grid-cols-3">{[1, 2, 3].map((item) => <div key={item} className="h-72 animate-pulse rounded-lg border border-border bg-card" />)}</div>
       </div>
@@ -117,12 +117,12 @@ export default function Dashboard() {
           {verificationPending && verification.data?.message && (
             <p className="mt-1 text-sm" data-testid="text-verification-missing">{verification.data.message}</p>
           )}
-          <ul className="mt-4 grid gap-2 sm:grid-cols-3">
+          <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
             {checklist.map((item) => (
               <li key={item.label}>
                 <Link href={item.href} className={cn("flex items-center gap-2 rounded-md border px-3 py-2.5 text-sm transition-colors", item.done ? "border-border text-muted-foreground" : "border-primary/40 bg-card hover:bg-secondary")}>
                   {item.done ? <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" /> : item.label.startsWith("Add") ? <ImagePlus className="h-4 w-4 shrink-0 text-primary" /> : <CircleDashed className="h-4 w-4 shrink-0 text-primary" />}
-                  <span className="truncate">{item.label}</span>
+                  <span className="min-w-0">{item.label}</span>
                 </Link>
               </li>
             ))}
@@ -134,12 +134,12 @@ export default function Dashboard() {
         {stats.map((stat) => (
           <Link key={stat.label} href={stat.href} className="flex flex-col gap-3 rounded-lg border border-border bg-card p-5 transition-colors hover:border-muted-foreground/40" data-testid={`stat-${stat.label.toLowerCase().replaceAll(" ", "-")}`}>
             <div className="flex items-start justify-between"><p className="text-sm text-muted-foreground">{stat.label}</p><stat.icon className="h-4 w-4 text-muted-foreground" /></div>
-            <div className="flex items-baseline gap-2"><p className="text-3xl font-bold">{stat.value}</p>{stat.detail && <p className="font-mono text-xs text-muted-foreground">{stat.detail}</p>}</div>
+            <div className="flex flex-wrap items-baseline gap-x-2"><p className="text-3xl font-bold">{stat.value}</p>{stat.detail && <p className="font-mono text-xs text-muted-foreground">{stat.detail}</p>}</div>
           </Link>
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <section className="flex flex-col rounded-lg border border-border bg-card">
           <header className="flex items-center justify-between border-b border-border px-5 py-4">
             <h2 className="font-semibold">Inbox</h2>
@@ -155,10 +155,10 @@ export default function Dashboard() {
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-xs font-bold text-muted-foreground">{thread.buyerName.substring(0, 2).toUpperCase()}</div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
-                        <p className={cn("truncate text-sm", thread.unreadCount ? "font-semibold" : "font-medium text-muted-foreground")}>{thread.buyerName}</p>
+                        <p className={cn("truncate text-sm", thread.unreadCount ? "font-semibold" : "font-medium text-muted-foreground")} title={thread.buyerName}>{thread.buyerName}</p>
                         <span className="shrink-0 text-[11px] text-muted-foreground">{formatDistanceToNow(new Date(thread.lastMessageAt), { addSuffix: true })}</span>
                       </div>
-                      <p className="truncate text-xs text-muted-foreground">{thread.lastMessage || thread.subject}</p>
+                      <p className="truncate text-xs text-muted-foreground" title={thread.lastMessage || thread.subject}>{thread.lastMessage || thread.subject}</p>
                     </div>
                     {thread.unreadCount > 0 && <span className="mt-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">{thread.unreadCount}</span>}
                   </Link>
@@ -183,7 +183,7 @@ export default function Dashboard() {
                   <li key={order.id}>
                     <Link href={`/orders/${order.id}`} className="block px-5 py-3.5 hover:bg-secondary/30" data-testid={`link-dashboard-order-${order.id}`}>
                       <div className="flex items-baseline justify-between gap-2">
-                        <p className="truncate text-sm font-medium">{order.title}</p>
+                        <p className="truncate text-sm font-medium" title={order.title}>{order.title}</p>
                         <p className="shrink-0 font-mono text-xs">{formatMoney(order.priceCents)}</p>
                       </div>
                       <p className="mt-0.5 text-xs text-muted-foreground">{orderTypeLabel(order.orderType)} · {order.sellerName ?? "Seller"} · <span className={order.status === "pending_payment" ? "text-amber-300" : ""}>{orderStatusLabel(order.status)}</span></p>
@@ -225,7 +225,7 @@ export default function Dashboard() {
             )}
             <div className="mt-auto grid grid-cols-2 gap-3 border-t border-border pt-4">
               <div><p className="text-xs text-muted-foreground">Paid orders</p><p className="font-mono text-lg font-semibold">{allOrders.filter((order) => order.status !== "pending_payment" && order.status !== "cancelled").length}</p></div>
-              <div><p className="text-xs text-muted-foreground">Completed value</p><p className="font-mono text-lg font-semibold">{formatMoney(data.totalRevenueCents)}</p></div>
+              <div><p className="text-xs text-muted-foreground">Completed value</p><p className="font-mono text-lg font-semibold [overflow-wrap:anywhere]">{formatMoney(data.totalRevenueCents)}</p></div>
             </div>
             {!payoutReady && !paymentsOff && (
               <Link href="/payment" className="rounded-md bg-primary px-4 py-2 text-center text-sm font-semibold text-primary-foreground" data-testid="link-setup-payouts">

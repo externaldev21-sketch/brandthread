@@ -414,13 +414,13 @@ export default function Onboarding() {
       </div>
 
       {step < 5 && (
-        <footer className="fixed bottom-0 left-0 right-0 flex items-center justify-between border-t border-border bg-background/80 p-4 backdrop-blur-md md:left-64 md:p-6">
-          <Button variant="outline" onClick={() => setStep((current) => Math.max(0, current - 1))} disabled={step === 0 || step === 4 || pending} className="h-12 gap-2 px-6">
+        <footer className="fixed bottom-0 left-0 right-0 flex items-center justify-between gap-3 border-t border-border bg-background/80 p-4 backdrop-blur-md md:left-64 md:p-6">
+          <Button variant="outline" onClick={() => setStep((current) => Math.max(0, current - 1))} disabled={step === 0 || step === 4 || pending} className="h-12 gap-2 px-4 sm:px-6">
             <ArrowLeft className="h-4 w-4" /> Back
           </Button>
           {step < 3 && <Button onClick={next} className="h-12 gap-2 px-8 font-semibold" data-testid="button-onboarding-next">Continue <ArrowRight className="h-4 w-4" /></Button>}
           {step === 3 && (
-            <Button onClick={submit} disabled={pending || !agreedToTerms} className="h-12 gap-2 px-8 font-semibold shadow-lg shadow-primary/20" data-testid="button-onboarding-submit">
+            <Button onClick={submit} disabled={pending || !agreedToTerms} className="h-auto min-h-12 gap-2 whitespace-normal px-5 py-2 text-center font-semibold shadow-lg shadow-primary/20 sm:px-8" data-testid="button-onboarding-submit">
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
               {pending ? "Creating profile…" : isInvited ? "Create private profile" : "Create profile"}
             </Button>

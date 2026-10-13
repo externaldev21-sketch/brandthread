@@ -6,6 +6,7 @@ import { formatMoney, isTerminalStatus, orderStatusLabel, orderTypeLabel, stageI
 import { Input } from "@/components/ui/input";
 import { EmptyState, QueryError } from "@/components/query-state";
 import { cn } from "@/lib/utils";
+import { ChipRow } from "@/components/chip-row";
 
 type Filter = "all" | "awaiting_payment" | "in_production" | "shipped";
 
@@ -54,20 +55,20 @@ export default function Orders({ view }: { view: "active" | "history" }) {
         </div>
       </div>
       {view === "active" && !isLoading && !isError && (
-        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter orders">
+        <ChipRow role="tablist" aria-label="Filter orders">
           {FILTERS.map((item) => (
             <button
               key={item.id}
               role="tab"
               aria-selected={filter === item.id}
               onClick={() => setFilter(item.id)}
-              className={cn("rounded-full border px-3 py-1.5 text-sm transition-colors", filter === item.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground")}
+              className={cn("shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm transition-colors", filter === item.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground")}
               data-testid={`filter-orders-${item.id}`}
             >
               {item.label} <span className="ml-1 font-mono text-xs opacity-70">{counts[item.id]}</span>
             </button>
           ))}
-        </div>
+        </ChipRow>
       )}
       {isLoading ? (
         <div className="space-y-3">{[1, 2, 3].map((item) => <div key={item} className="h-24 animate-pulse rounded-lg border border-border bg-card" />)}</div>
@@ -89,7 +90,7 @@ export default function Orders({ view }: { view: "active" | "history" }) {
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary"><Icon className="h-5 w-5 text-primary" /></div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="truncate font-semibold">{order.title}</h2>
+                    <h2 className="line-clamp-2 break-words font-semibold" title={order.title}>{order.title}</h2>
                     <span className="rounded border border-border bg-secondary px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider">{orderTypeLabel(order.orderType)}</span>
                     <span className={cn("rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider", order.status === "pending_payment" ? "border-amber-500/40 text-amber-300" : "border-border text-muted-foreground")}>{orderStatusLabel(order.status)}</span>
                   </div>

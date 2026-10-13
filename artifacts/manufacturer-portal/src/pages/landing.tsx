@@ -10,7 +10,7 @@ export default function Landing() {
         style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}
       ></div>
 
-      <header className="h-20 border-b border-border px-8 flex items-center justify-between z-10 shrink-0 bg-background/80 backdrop-blur-md">
+      <header className="min-h-20 border-b border-border px-4 py-3 sm:px-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 z-10 shrink-0 bg-background/80 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary text-primary-foreground rounded flex items-center justify-center font-bold tracking-tighter text-xl">
             B
@@ -20,8 +20,8 @@ export default function Landing() {
         </div>
         <div>
           <div className="flex items-center gap-6">
-            <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground">Sign in</Link>
-            <Link href="/join" className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-2">
+            <Link href="/sign-in" className="whitespace-nowrap text-sm text-muted-foreground hover:text-foreground">Sign in</Link>
+            <Link href="/join" className="whitespace-nowrap text-sm font-medium hover:text-primary transition-colors flex items-center gap-2">
               List your factory <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

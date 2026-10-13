@@ -223,7 +223,7 @@ export default function Profile() {
           <h1 className="text-3xl font-bold tracking-tight">Business Profile</h1>
           <p className="text-muted-foreground mt-1">This is how your factory appears to verified buyers.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button asChild variant="outline">
             <Link href="/messages">
               <MessageSquare className="w-4 h-4 mr-2" />
@@ -412,7 +412,7 @@ export default function Profile() {
                   <div key={`${photo}-${index}`} className="group relative overflow-hidden rounded-md border border-border bg-card">
                     <img src={photo} alt={`Factory production ${index + 1}`} className="aspect-[4/3] w-full object-cover" />
                     <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-background/85 p-1.5">
-                      <span className="truncate px-1 text-xs font-medium text-foreground">
+                      <span className="truncate px-1 text-xs font-medium text-foreground" title={index === 0 ? "Lead image" : `Photo ${index + 1}`}>
                         {index === 0 ? "Lead image" : `Photo ${index + 1}`}
                       </span>
                       <div className="flex items-center gap-0.5">
@@ -546,7 +546,7 @@ export default function Profile() {
             />
           </div>
 
-          <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 md:p-6 bg-background/80 backdrop-blur-md border-t border-border flex justify-end z-20">
+          <div className="fixed bottom-[calc(2.25rem+16px)] md:bottom-0 left-0 md:left-64 right-0 p-4 md:p-6 bg-background/80 backdrop-blur-md border-t border-border flex justify-end z-20">
             <Button 
               type="submit" 
               className="h-12 px-8 font-semibold shadow-lg shadow-primary/20 gap-2"
