@@ -26,6 +26,7 @@ import { z } from "@workspace/api-zod";
 import { bodyObject, centsLike, idArray, idParams, intLike, str, validateInput } from "../lib/commerceValidation";
 import { formatRefundAmount, parseSellerRefundRequest, sellerRefundBlockedReason } from "../lib/sellerRefundRequest";
 import { notifyOrderLiveActivity } from "../lib/liveActivityPush";
+import { generateOrderNumberIn } from "../lib/orderNumber";
 
 const router = Router();
 router.use(requireAuth);
@@ -288,8 +289,8 @@ router.post("/", requireRole("manager"), validateInput({ body: createOrderBody }
 
       const totalCents = subtotalCents + shippingCents;
 
-      // Per-owner order number, serialised per seller (lib/orderNumber.ts)
-      const orderNumber = await nextOrderNumber(tx, ownerId);
+      // Short order number (BT-4821), unique across every store.
+      const orderNumber = await generateOrderNumberIn(tx);
 
       // Deduct stock for non-drop orders BEFORE inserting the order, so an
       // oversold cart never creates an order row at all (a drop's stock is

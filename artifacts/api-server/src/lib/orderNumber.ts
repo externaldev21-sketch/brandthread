@@ -1,24 +1,61 @@
+/**
+ * Short, human order numbers: `BT-4821`.
+ *
+ * Order numbers used to be a per-seller count (`BT-00001`), so every store
+ * had its own BT-00001 and two sellers' orders could share a number. A
+ * buyer reading their number to support, or a seller searching for it,
+ * needs it to point at exactly one order, so numbers are now random and
+ * checked against every order.
+ *
+ * Four digits first (#BT-4821). When a few draws in a row are taken, the
+ * number grows a digit, so the space never runs out. New numbers never
+ * start with 0, so they can't be confused with an old zero-padded one.
+ * The row id stays the real key; this is the label people read.
+ */
 import { sql } from "drizzle-orm";
 
-type SqlExecutor = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> };
+export const ORDER_NUMBER_PREFIX = "BT-";
+const TRIES_PER_LENGTH = 4;
+const MIN_DIGITS = 4;
+const MAX_DIGITS = 9;
+
+type Executor = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> };
+
+/** A random `BT-` number with `digits` digits and no leading zero. */
+export function randomOrderNumber(digits: number, random: () => number = Math.random): string {
+  const min = 10 ** (digits - 1);
+  const value = min + Math.floor(random() * (9 * min));
+  return `${ORDER_NUMBER_PREFIX}${Math.min(value, 10 ** digits - 1)}`;
+}
 
 /**
- * Next per-seller order number ("BT-00042"). Must run inside the transaction
- * that inserts the order.
- *
- * A transaction-scoped advisory lock per seller serialises numbering, so two
- * orders paid at the same moment (two webhooks, or a webhook and a manual
- * order) can't both read the same value and share a number. Numbering
- * continues from the highest existing BT number rather than a row count, so
- * a removed order never causes a later one to reuse a number.
+ * Picks an order number no other order has. `isTaken` is injectable for
+ * tests; the default asks the orders table (indexed by migration 285).
  */
-export async function nextOrderNumber(tx: SqlExecutor, ownerId: string): Promise<string> {
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`order_number:${ownerId}`}))`);
-  const result = await tx.execute(sql`
-    SELECT coalesce(max(substring(order_number FROM 4)::int), 0)::int AS n
-    FROM orders
-    WHERE owner_id = ${ownerId} AND order_number ~ '^BT-[0-9]{1,9}$'
-  `);
-  const current = Number((result as any).rows?.[0]?.n ?? 0);
-  return `BT-${String(current + 1).padStart(5, "0")}`;
+export async function generateOrderNumber(
+  isTaken: (candidate: string) => Promise<boolean>,
+  random: () => number = Math.random,
+): Promise<string> {
+  for (let digits = MIN_DIGITS; digits <= MAX_DIGITS; digits += 1) {
+    for (let attempt = 0; attempt < TRIES_PER_LENGTH; attempt += 1) {
+      const candidate = randomOrderNumber(digits, random);
+      if (!(await isTaken(candidate))) return candidate;
+    }
+  }
+  throw new Error("Could not find a free order number");
+}
+
+/** `generateOrderNumber` against the orders table, inside the caller's transaction. */
+export function generateOrderNumberIn(tx: Executor): Promise<string> {
+  // Serialize allocation until the caller inserts and commits the order.
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"order_number:global"}))`);
+  return generateOrderNumber(async (candidate) => {
+    const result = await tx.execute(sql`SELECT 1 FROM orders WHERE order_number = ${candidate} LIMIT 1`);
+    return ((result as { rows?: unknown[] }).rows?.length ?? 0) > 0;
+  });
+}
+
+/** Compatibility for existing checkout paths: every new label uses global allocation. */
+export async function nextOrderNumber(tx: Executor, _ownerId: string): Promise<string> {
+  return generateOrderNumberIn(tx);
 }

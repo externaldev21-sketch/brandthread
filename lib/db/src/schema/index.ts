@@ -661,6 +661,7 @@ export const orders = pgTable('orders', {
   buyerCreatedIdx: index('orders_buyer_created_idx')
     .on(table.buyerId, table.createdAt.desc().nullsFirst())
     .where(sql`${table.buyerId} IS NOT NULL`),
+  orderNumberIdx: index('orders_order_number_idx').on(table.orderNumber),
 }));
 
 // ─── Order Items ──────────────────────────────────────────────────────────────

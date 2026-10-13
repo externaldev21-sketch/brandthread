@@ -4,6 +4,7 @@
  */
 import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
+import { generateOrderNumberIn } from "../lib/orderNumber";
 import type Stripe from "stripe";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed,
@@ -1099,8 +1100,8 @@ export async function handleCheckoutPaid(
       }
     }
 
-    // Step 3: Generate order number (serialised per seller — see lib/orderNumber.ts)
-    const orderNumber = await nextOrderNumber(tx, ownerId);
+    // Step 3: Short order number (BT-4821), unique across every store
+    const orderNumber = await generateOrderNumberIn(tx);
 
     // Step 4: Insert order — pending if stock OK, refund_pending if oversold
     const dropId: string | null = orderDropId;
