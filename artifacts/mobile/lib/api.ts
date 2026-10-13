@@ -2433,6 +2433,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           trialEnd: string | null;    // formatted date when in trial, null otherwise
           trialStartAt: string | null;
           trialEndAt: string | null;
+          /** Billing interval of a Stripe plan (item 116); absent on older servers. */
+          interval?: 'month' | 'year';
+          /** Failed-payment retries / paused after the last retry (item 115). */
+          dunning?: import('./billingStatus').DunningSummary;
           trialBanner: {
             visible: boolean;
             day: number | null;
@@ -2463,8 +2467,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         }>('/api/seller/subscription/invoices'),
         /** Create a Stripe Checkout Session in subscription mode.
          *  Returns { url } for the mobile client to open in the system browser. */
-        checkout: (planId: 'starter' | 'growth' | 'pro') =>
-          post<{ url: string }>('/api/seller/subscription/checkout', { planId }),
+        checkout: (planId: 'starter' | 'growth' | 'pro', interval: 'month' | 'year' = 'month') =>
+          post<{ url: string }>('/api/seller/subscription/checkout', { planId, interval }),
         /** Create a Stripe Billing Portal session so the seller can manage their
          *  payment method, view invoices, or cancel. Returns { url }. */
         portal: () =>

@@ -8,6 +8,10 @@
  *
  * All plans carry a 5% platform commission on sales.
  * New subscriptions start with a 5-day free trial (card collected upfront).
+ *
+ * Failed payments (item 115): the payment alert shows "Retry N of 3 on
+ * <date>", then "Your plan is paused" after the last retry, with one
+ * "Update card" button (lib/billingStatus.ts; Warby Parker's update-card card).
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -35,9 +39,10 @@ import { getGrowthStudioTools, GROWTH_EXTRAS } from '@/lib/growthTools';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
 import { getSellerPlan, SELLER_PLANS } from '@/lib/sellerPlans';
+import { paymentAlertFor, type DunningSummary } from '@/lib/billingStatus';
+import { Button } from '@/components/ui/Button';
 import {
   getBillingRecoveryTarget,
-  isSubscriptionPaymentRecoveryRequired,
   type SubscriptionBillingProvider,
 } from '@/lib/subscriptionRecovery';
 
@@ -73,6 +78,7 @@ export default function SubscriptionScreen() {
     period:             'month',
     renewsOn:           '—',
     trialEnd:           null as string | null,
+    dunning:            null as DunningSummary,
     status:             'none',
     effectiveProvider:  'none' as SubscriptionBillingProvider,
     amountCents:        0,
@@ -94,9 +100,10 @@ export default function SubscriptionScreen() {
     setCurrentPlan({
       name:               plan.name,
       price:              data.amountCents > 0 ? formatCents(data.amountCents) : plan.priceLabel,
-      period:             'month',
+      period:             data.interval === 'year' ? 'year' : 'month',
       renewsOn:           data.renewsOn ?? '—',
       trialEnd:           data.trialEnd ?? null,
+      dunning:            data.dunning ?? null,
       status:             data.status,
       effectiveProvider:  data.effectiveProvider,
       amountCents:        data.amountCents,
@@ -248,6 +255,7 @@ export default function SubscriptionScreen() {
     currentPlan.status === 'active'    ? theme.success
     : currentPlan.status === 'trialing' ? theme.secondary
     : currentPlan.status === 'past_due' ? theme.warning
+    : currentPlan.status === 'paused'   ? theme.error
     : currentPlan.status === 'canceled' ? theme.error
     : theme.muted;
 
@@ -255,8 +263,39 @@ export default function SubscriptionScreen() {
     currentPlan.status === 'active'    ? 'Active'
     : currentPlan.status === 'trialing' ? 'Trial'
     : currentPlan.status === 'past_due' ? 'Past Due'
+    : currentPlan.status === 'paused'   ? 'Paused'
     : currentPlan.status === 'canceled' ? 'Cancelled'
     : 'Free';
+
+  const perPeriod = currentPlan.period === 'year' ? '/yr' : '/mo';
+  const paymentAlert = paymentAlertFor({
+    status: currentPlan.status,
+    provider: currentPlan.effectiveProvider,
+    dunning: currentPlan.dunning,
+    planName: currentPlan.name,
+    platformOS: Platform.OS,
+  });
+  const paymentAlertCard = paymentAlert && (
+    <View style={styles.pastDueAlert} testID="seller-subscription-past-due-alert">
+      <View style={styles.pastDueIcon}>
+        <Feather name="alert-circle" size={18} color={theme.error} />
+      </View>
+      <View style={styles.pastDueCopy}>
+        <Text style={styles.pastDueTitle}>{paymentAlert.title}</Text>
+        <Text style={styles.pastDueBody}>{paymentAlert.body}</Text>
+        {!isReadOnly && !isSellerPreview && (
+          <Button
+            label={paymentAlert.cta}
+            onPress={handleOpenPortal}
+            size="small"
+            fullWidth
+            style={styles.pastDueButton}
+            testID="seller-subscription-update-card"
+          />
+        )}
+      </View>
+    </View>
+  );
 
   if (isLoadingRole && !isSellerPreview) {
     return (
@@ -303,6 +342,7 @@ export default function SubscriptionScreen() {
         {/* ── Plan tab ── */}
         {activeTab === 'plan' && (
           <>
+            {!statusLoading && paymentAlertCard}
             {/* Current plan summary card */}
             <LinearGradient colors={theme.primaryGradient as any} style={styles.currentPlanCard}>
               {statusLoading ? (
@@ -326,11 +366,11 @@ export default function SubscriptionScreen() {
                     </Text>
                   ) : currentPlan.trialEnd ? (
                     <Text style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
-                      Free trial ends {currentPlan.trialEnd} · then {currentPlan.price}/mo
+                      Free trial ends {currentPlan.trialEnd} · then {currentPlan.price}{perPeriod}
                     </Text>
                   ) : currentPlan.status === 'active' ? (
                     <Text style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
-                      Renews {currentPlan.renewsOn} · {currentPlan.price}/mo
+                      Renews {currentPlan.renewsOn} · {currentPlan.price}{perPeriod}
                     </Text>
                   ) : (
                     <Text style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
@@ -511,19 +551,7 @@ export default function SubscriptionScreen() {
               <ActivityIndicator color={PURPLE} style={{ marginTop: SP.lg }} />
             ) : (
               <>
-                  {isSubscriptionPaymentRecoveryRequired(currentPlan.status) && (
-                    <View style={styles.pastDueAlert} testID="seller-subscription-past-due-alert">
-                      <View style={styles.pastDueIcon}>
-                        <Feather name="alert-circle" size={18} color={RED} />
-                      </View>
-                      <View style={styles.pastDueCopy}>
-                        <Text style={styles.pastDueTitle}>Payment failed</Text>
-                        <Text style={styles.pastDueBody}>
-                          Your last payment didn’t go through. Update your card to keep your features.
-                        </Text>
-                      </View>
-                    </View>
-                  )}
+                  {paymentAlertCard}
                 <View style={styles.billingCard}>
                   {currentPlan.trialEnd && (
                     <View style={[styles.billingRow, { backgroundColor: `${CYAN}11` }]}>
@@ -543,7 +571,7 @@ export default function SubscriptionScreen() {
                       {currentPlan.status === 'canceled'
                         ? '$0'
                         : currentPlan.amountCents > 0
-                          ? `${currentPlan.price}/mo`
+                          ? `${currentPlan.price}${perPeriod}`
                           : '—'}
                     </Text>
                   </View>
@@ -661,6 +689,7 @@ const createStyles = (theme: AppThemePreset) => {
   pastDueCopy:        { flex: 1, gap: 3 },
   pastDueTitle:       { color: RED, fontSize: FS.sm, fontFamily: FONT.semibold },
   pastDueBody:        { color: FG, fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 17 },
+  pastDueButton:      { marginTop: SP.sm },
   billingRow:         { flexDirection: 'row', justifyContent: 'space-between', padding: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   billingLabel:       { color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular },
   billingValue:       { color: FG, fontSize: FS.sm, fontFamily: FONT.medium },

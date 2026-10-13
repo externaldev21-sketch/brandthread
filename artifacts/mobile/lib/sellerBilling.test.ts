@@ -11,12 +11,14 @@ describe('seller native billing boundaries', () => {
     });
     expect(isSellerRevenueCatPackage('$bt_growth')).toBe(true);
     expect(isSellerRevenueCatPackage('$rc_monthly')).toBe(false);
+    // Yearly packages (item 116) are seller packages too.
+    expect(isSellerRevenueCatPackage('$bt_pro_annual')).toBe(true);
   });
 
   it('takes the native RevenueCat purchase path before Stripe seller checkout', () => {
     const source = readFileSync(new URL('../app/plans.tsx', import.meta.url).pathname, 'utf8');
     const nativePurchase = source.indexOf("if (Platform.OS !== 'web')");
-    const stripeCheckout = source.indexOf('api.seller.subscription.checkout(plan.id)');
+    const stripeCheckout = source.indexOf('api.seller.subscription.checkout(plan.id');
     expect(nativePurchase).toBeGreaterThan(-1);
     expect(stripeCheckout).toBeGreaterThan(nativePurchase);
     expect(source.slice(nativePurchase, stripeCheckout)).toContain('await purchase(packageToPurchase)');
