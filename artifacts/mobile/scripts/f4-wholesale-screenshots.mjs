@@ -75,7 +75,7 @@ function json(route, origin, body, status = 200) {
  * demo=false: boots the signed-in session, then drops the preview flag so the
  * screen runs its real code path against the fake API (+ `routes`).
  */
-async function open(browser, origin, images, { role, target, demo, routes }) {
+async function open(browser, origin, images, { role, target, demo, routes, cold = false }) {
   const { context, page, activity } = await openContext(browser, { device: { viewport: VIEWPORT, scale: 2, isMobile: true }, role, origin, images });
   if (routes) {
     await context.route(`${API}/**`, async (route) => {
@@ -92,9 +92,14 @@ async function open(browser, origin, images, { role, target, demo, routes }) {
   await waitForQuietNetwork(activity, 800, 15_000);
   await page.waitForTimeout(2500);
   if (!demo) await page.evaluate(() => { localStorage.removeItem('user_role'); });
-  const url = demo ? `${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}` : target;
+  const url = demo ? `${target}${target.includes("?") ? "&" : "?"}bt_preview=${role}&demo=1` : target;
   const wanted = target.split('?')[0];
-  for (let attempt = 0; attempt < 6; attempt++) {
+  if (cold) {
+    // Cold load of the deep link: the layout restores it after its own redirects, keeping the query.
+    await page.goto(`${origin}${url}`);
+    await page.waitForTimeout(6000);
+  }
+  for (let attempt = 0; attempt < (cold ? 0 : 6); attempt++) {
     await page.evaluate((u) => { history.pushState(history.state, '', u); dispatchEvent(new PopStateEvent('popstate', { state: history.state })); }, url);
     await page.waitForTimeout(2500);
     if (new URL(page.url()).pathname === wanted) break;
@@ -102,6 +107,7 @@ async function open(browser, origin, images, { role, target, demo, routes }) {
   await waitForQuietNetwork(activity, 900, 20_000);
   await waitForImages(page);
   await page.waitForTimeout(1200);
+  console.log(`  at ${page.url()}`);
   return { context, page };
 }
 
@@ -134,7 +140,7 @@ async function storeMenu(browser, origin, images, prefix) {
     if (p === `/api/wholesale/store/${SELLER}`) return reply({ enabled: true, minOrderCents: 25000 });
     return false;
   };
-  const { context, page } = await open(browser, origin, images, { role: 'buyer', target: `/seller-profile?id=${SELLER}`, demo: false, routes });
+  const { context, page } = await open(browser, origin, images, { role: 'buyer', target: `/seller-profile?id=${SELLER}`, demo: true, routes });
   await need(page, page.getByTestId('seller-profile-more'), 'profile');
   await page.waitForTimeout(1500);
   await page.getByTestId('seller-profile-more').click();
@@ -144,7 +150,7 @@ async function storeMenu(browser, origin, images, prefix) {
   if (prefix === 'after') {
     await page.getByText('Wholesale pricing', { exact: true }).click();
     await page.waitForTimeout(2500);
-    await need(page, page.getByText('Business name'), 'apply-from-menu');
+    await need(page, page.getByText('You’re approved'), 'apply-from-menu');
     await shot(page, `after-06-buyer-apply-from-menu-${TAG}`);
   }
   await context.close();
@@ -173,7 +179,7 @@ async function buyerApply(browser, origin, images) {
   }
   state = 'approved';
   {
-    const { context, page } = await open(browser, origin, images, { role: 'buyer', target, demo: false, routes });
+    const { context, page } = await open(browser, origin, images, { role: 'buyer', target, demo: true, routes, cold: true });
     await need(page, page.getByText('You’re approved'), 'approved');
     await shot(page, `after-09-buyer-approved-price-list-${TAG}`);
     await textFit(page, 'approved');
@@ -183,11 +189,11 @@ async function buyerApply(browser, origin, images) {
 
 async function sellerScreens(browser, origin, images) {
   {
-    const { context, page } = await open(browser, origin, images, { role: 'seller', target: '/wholesale', demo: true });
+    const { context, page } = await open(browser, origin, images, { role: 'seller', target: '/wholesale', demo: true, cold: true, routes: async (p) => { if (p.includes('wholesale')) console.log('  API', p); return false; } });
     await need(page, page.getByText('Wholesale pricing'), 'wholesale');
     await shot(page, `after-02-wholesale-top-${TAG}`);
     await textFit(page, 'wholesale-top');
-    await page.getByText('Approved buyers').scrollIntoViewIfNeeded();
+    await page.getByText('Approved buyers').evaluate(el => el.scrollIntoView({ block: 'center' }));
     await page.waitForTimeout(600);
     await shot(page, `after-03-wholesale-buyer-requests-${TAG}`);
     await textFit(page, 'wholesale-requests');
@@ -197,7 +203,7 @@ async function sellerScreens(browser, origin, images) {
     await context.close();
   }
   {
-    const { context, page } = await open(browser, origin, images, { role: 'seller', target: '/wholesale-products', demo: true });
+    const { context, page } = await open(browser, origin, images, { role: 'seller', target: '/wholesale-products', demo: true, cold: true });
     await need(page, page.getByText('Canvas tote'), 'products');
     await shot(page, `after-04-price-list-${TAG}`);
     await textFit(page, 'price-list');

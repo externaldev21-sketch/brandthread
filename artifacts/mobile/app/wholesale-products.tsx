@@ -181,11 +181,11 @@ export default function WholesaleProductsScreen() {
 
       <BottomSheet visible={!!editing} onClose={() => setEditing(null)}>
         <View style={s.sheetHeader}>
-          <PressableScale onPress={() => setEditing(null)} accessibilityRole="button" accessibilityLabel="Cancel" hitSlop={12}>
+          <PressableScale style={s.sheetButton} onPress={() => setEditing(null)} accessibilityRole="button" accessibilityLabel="Cancel" hitSlop={12}>
             <Text style={s.sheetAction}>Cancel</Text>
           </PressableScale>
           <Text style={s.sheetTitle} numberOfLines={1}>{editing?.name ?? ''}</Text>
-          <PressableScale onPress={() => void saveRule()} disabled={saving} accessibilityRole="button" accessibilityLabel="Save" hitSlop={12}>
+          <PressableScale style={s.sheetButton} onPress={() => void saveRule()} disabled={saving} accessibilityRole="button" accessibilityLabel="Save" hitSlop={12}>
             <Text style={[s.sheetAction, { fontFamily: FONT.bold }]}>Save</Text>
           </PressableScale>
         </View>
@@ -228,6 +228,7 @@ function makeStyles(ck: CheckoutColors) {
     error: { fontFamily: FONT.medium, fontSize: FS.sm, color: ck.text, marginBottom: SP.sm },
     sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.md, paddingHorizontal: GUTTER, minHeight: 48 },
     sheetTitle: { flex: 1, textAlign: 'center', fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text },
+    sheetButton: { minHeight: 44, justifyContent: 'center' },
     sheetAction: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
   });
 }

@@ -221,7 +221,7 @@ export default function WholesaleScreen() {
                         <Text style={s.title} numberOfLines={1}>{buyer.businessName}</Text>
                         <Text style={s.fine} numberOfLines={1}>{buyer.username ? `@${buyer.username}` : buyer.name ?? 'Buyer'}</Text>
                       </View>
-                      <PressableScale onPress={() => confirmRemove(buyer)} accessibilityRole="button" accessibilityLabel={`Remove ${buyer.businessName}`} hitSlop={12}>
+                      <PressableScale style={s.removeButton} onPress={() => confirmRemove(buyer)} accessibilityRole="button" accessibilityLabel={`Remove ${buyer.businessName}`} hitSlop={12}>
                         <Text style={s.textAction}>Remove</Text>
                       </PressableScale>
                     </View>
@@ -247,6 +247,7 @@ function makeStyles(ck: CheckoutColors) {
     title: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
     fine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.muted, marginTop: 2 },
     error: { fontFamily: FONT.medium, fontSize: FS.sm, color: ck.text, marginTop: SP.sm },
+    removeButton: { minHeight: 44, justifyContent: 'center' },
     textAction: { fontFamily: FONT.semibold, fontSize: FS.sm, textDecorationLine: 'underline', color: ck.text },
   });
 }
