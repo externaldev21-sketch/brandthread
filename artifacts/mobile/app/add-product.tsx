@@ -2135,19 +2135,20 @@ export default function AddProductScreen() {
           const reached = target <= step;
           const enabled = canJumpToStep(target, step, stepInput, editingExisting);
           return (
-            <PressableScale
-              key={label}
-              style={s.stepItem}
-              onPress={() => goToStep(target)}
-              disabled={!enabled || active}
-              accessibilityRole="tab"
-              accessibilityLabel={`Step ${i + 1} of ${LISTING_STEPS.length}: ${label}`}
-              accessibilityState={{ selected: active, disabled: !enabled }}
-              testID={`add-product-step-${i}`}
-            >
-              <View style={[s.stepBar, { backgroundColor: reached ? FG : BORDER }]} />
-              <Text style={[s.stepLabel, { color: active ? FG : MUTED }]} numberOfLines={1}>{label}</Text>
-            </PressableScale>
+            <View key={label} style={s.stepItem}>
+              <PressableScale
+                style={s.stepItemInner}
+                onPress={() => goToStep(target)}
+                disabled={!enabled || active}
+                accessibilityRole="tab"
+                accessibilityLabel={`Step ${i + 1} of ${LISTING_STEPS.length}: ${label}`}
+                accessibilityState={{ selected: active, disabled: !enabled }}
+                testID={`add-product-step-${i}`}
+              >
+                <View style={[s.stepBar, { backgroundColor: reached ? FG : BORDER }]} />
+                <Text style={[s.stepLabel, { color: active ? FG : MUTED }]} numberOfLines={1}>{label}</Text>
+              </PressableScale>
+            </View>
           );
         })}
       </View>
@@ -2159,31 +2160,37 @@ export default function AddProductScreen() {
     return (
       <View style={[s.stepFooter, { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
         {step > 0 && (
-          <Button
-            variant="secondary"
-            label="Back"
-            onPress={() => goToStep((step - 1) as ListingStep)}
-            style={{ flex: 1 }}
-            testID="add-product-step-back"
-          />
+          <View style={s.stepFooterSlot}>
+            <Button
+              variant="secondary"
+              label="Back"
+              onPress={() => goToStep((step - 1) as ListingStep)}
+              fullWidth
+              testID="add-product-step-back"
+            />
+          </View>
         )}
         {isLast ? (
-          <Button
-            label={publishing ? 'Saving…' : currentStatus === 'active' ? 'Publish' : 'Save draft'}
-            onPress={handlePublish}
-            disabled={!canSave || publishing || photosUploading}
-            loading={publishing}
-            style={{ flex: 1 }}
-            testID="add-product-step-publish"
-          />
+          <View style={s.stepFooterSlot}>
+            <Button
+              label={publishing ? 'Saving…' : currentStatus === 'active' ? 'Publish' : 'Save draft'}
+              onPress={handlePublish}
+              disabled={!canSave || publishing || photosUploading}
+              loading={publishing}
+              fullWidth
+              testID="add-product-step-publish"
+            />
+          </View>
         ) : (
-          <Button
-            label="Next"
-            onPress={() => goToStep((step + 1) as ListingStep)}
-            disabled={!stepValid}
-            style={{ flex: 1 }}
-            testID="add-product-step-next"
-          />
+          <View style={s.stepFooterSlot}>
+            <Button
+              label="Next"
+              onPress={() => goToStep((step + 1) as ListingStep)}
+              disabled={!stepValid}
+              fullWidth
+              testID="add-product-step-next"
+            />
+          </View>
         )}
       </View>
     );
@@ -2487,7 +2494,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Step indicator (under the header) + sticky Back / Next footer.
   stepIndicator: { flexDirection: 'row', gap: SP.xs, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.xs },
-  stepItem: { flex: 1, gap: 6 },
+  stepItem: { flex: 1 },
+  stepItemInner: { gap: 6 },
+  stepFooterSlot: { flex: 1 },
   stepBar: { height: 2, borderRadius: 1 },
   stepLabel: { fontSize: FS.xs, fontFamily: FONT.medium },
   stepFooter: {
