@@ -44,7 +44,7 @@ import { useApi } from '@/hooks/useApi';
 import { ReturnLabelCard } from '@/components/returns/ReturnLabelCard';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
-  adaptReturnRow, itemsTotalCents, returnHeadline, returnReasonLabel, returnSteps, statusLabel,
+  adaptReturnRow, itemsTotalCents, refundDestination, returnHeadline, returnReasonLabel, returnSteps, statusLabel,
   type ReturnView, type ReturnViewer,
 } from '@/lib/returns';
 
@@ -153,6 +153,7 @@ export default function ReturnDetailScreen() {
   const steps = returnSteps(view, viewer);
   const itemsTotal = itemsTotalCents(view.items);
   const refundBasis = view.orderTotalCents || itemsTotal;
+  const destination = refundDestination(view.refundMethod, viewer, view);
   const orderHref = viewer === 'seller' ? `/order-detail?id=${encodeURIComponent(view.orderId)}` : `/buyer-order-detail?id=${encodeURIComponent(view.orderId)}`;
 
   return (
@@ -207,7 +208,7 @@ export default function ReturnDetailScreen() {
             <Text style={s.cardTitle}>{view.status === 'pending' ? 'Your decision' : 'Refund'}</Text>
             <Text style={s.cardBody}>
               {view.status === 'pending'
-                ? `Approving refunds ${formatCents(refundBasis)} to ${view.buyerName}’s original payment. Declining keeps the order as it is. Tell the buyer why.`
+                ? `Approving refunds ${formatCents(refundBasis)} to ${destination}. Declining keeps the order as it is. Tell the buyer why.`
                 : `The refund of ${formatCents(refundBasis)} hasn’t been confirmed yet. Retrying is safe: the buyer is only ever refunded once.`}
             </Text>
             {actionError ? (
@@ -318,9 +319,17 @@ export default function ReturnDetailScreen() {
         <View style={s.footNote}>
           <Icon name="info" size={ICON.xs} color={theme.subtle} />
           <Text style={s.footNoteText}>
-            {viewer === 'seller'
-              ? 'Refunds go back to the buyer’s original payment. Your payout for this order is adjusted automatically.'
-              : 'Refunds go back to your original payment method.'}
+            {view.refundMethod === 'thread_cash'
+              ? (viewer === 'seller'
+                ? 'The buyer chose Thread Cash. Your payout for this order is adjusted the same as a card refund.'
+                : 'Your refund goes to your Thread Cash.')
+              : view.refundMethod === 'store_credit'
+                ? (viewer === 'seller'
+                  ? 'The buyer chose store credit. They get a gift card for your store and you keep this payment.'
+                  : `Your refund comes as a gift card for ${view.sellerName}.`)
+                : viewer === 'seller'
+                  ? 'Refunds go back to the buyer’s original payment. Your payout for this order is adjusted automatically.'
+                  : 'Refunds go back to your original payment method.'}
           </Text>
         </View>
       </ScrollView>

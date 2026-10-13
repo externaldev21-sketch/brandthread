@@ -55,6 +55,15 @@ describe("rules", () => {
 });
 
 describe("replayLots", () => {
+  it("never expires a refund the buyer took as Thread Cash, but still expires returned reward spend", () => {
+    const refundToThreadCash = entry(2_000, "refund_credit", 0, "refund-method:00000000-0000-0000-0000-000000000001");
+    const returnedSpend = entry(300, "refund_credit", 0, "refund:order-1");
+    const lots = replayLots([refundToThreadCash, returnedSpend], 30);
+    expect(lots.find((l) => l.entryId === refundToThreadCash.id)?.expiresAt).toBeNull();
+    expect(lots.find((l) => l.entryId === returnedSpend.id)?.expiresAt).toEqual(at(30));
+    expect(dueExpiries(lots, at(400)).map((l) => l.entryId)).toEqual([returnedSpend.id]);
+  });
+
   it("never expires anything when there is no expiry policy", () => {
     const lots = replayLots([entry(100, "daily_checkin", 0)], null);
     expect(lots).toHaveLength(1);

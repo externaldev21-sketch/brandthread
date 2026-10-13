@@ -119,6 +119,15 @@ export const LEDGER_ACCOUNTS = {
    * lib/firstOrderDiscount.ts.
    */
   first_order_discount: "first_order_discount",
+  /**
+   * Card money Brandthread keeps on its own balance because the buyer took a
+   * refund as Thread Cash instead of back to their card (party = buyer):
+   * the seller's share clawed back by transfer reversal plus Brandthread's
+   * own fee on the refunded part. It is the cash behind that Thread Cash and
+   * funds the seller top-up when the buyer spends it — see
+   * lib/money/refunds.ts, method 'thread_cash'.
+   */
+  thread_cash_refund_credit: "thread_cash_refund_credit",
 } as const;
 export type LedgerAccount = keyof typeof LEDGER_ACCOUNTS;
 

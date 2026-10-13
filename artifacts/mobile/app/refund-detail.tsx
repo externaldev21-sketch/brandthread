@@ -26,6 +26,28 @@ export default function RefundDetailScreen() {
     router.replace(refundSheetHref(orderId) as never);
   }, [orderId, router]);
 
+  if (done) {
+    return (
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ScreenHeader title="Issue Refund" onBack={() => goBackOr(router)} />
+        <View style={styles.successWrap}>
+          <BrandthreadCard elevated style={styles.successCard}>
+            <Feather name="check-circle" size={32} color={colors.foreground} style={styles.successIcon} />
+            <Text style={[styles.successTitle, { color: colors.foreground }]}>
+              {done.method === 'store_credit' ? `${formatCents(done.amountCents)} store credit issued` : `${formatCents(done.amountCents)} refunded`}
+            </Text>
+            <Text style={[styles.successSub, { color: colors.mutedForeground }]}>
+              {done.method === 'store_credit'
+                ? `${order.customer.name} got a gift card for your store by email.`
+                : `Back to ${order.customer.name}’s original payment in 5–10 business days.`}
+            </Text>
+          </BrandthreadCard>
+          <PrimaryButton label="Back to order" onPress={() => goBackOr(router)} />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1 }}>
       <ScreenHeader title="Refund" />

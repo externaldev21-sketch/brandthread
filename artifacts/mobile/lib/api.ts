@@ -1883,6 +1883,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       updateStatus:   (id: string, status: string, opts?: { reason?: string; notes?: string; notifyCustomer?: false }) =>
         patch(`/api/orders/${id}/status`, { status, ...opts }),
       addTracking:    (id: string, body: unknown)  => patch(`/api/orders/${id}/tracking`, body),
+      /** Seller's manual refund (Issue refund screen): to the original payment or as store credit. */
+      refund: (id: string, body: {
+        amountCents: number;
+        method: 'original' | 'store_credit';
+        clientRequestId: string;
+        note?: string;
+        items?: Array<{ lineItemId: string; quantity: number }>;
+        restock?: boolean;
+      }) => post<{ refundId: string; amountCents: number; method: 'original' | 'store_credit'; giftCardId: string | null; duplicate: boolean }>(
+        `/api/orders/${id}/refund`, body),
       /** Ship only the selected order items with their own tracking number. */
       addItemsTracking: (id: string, body: { itemIds: string[]; trackingNumber: string; carrier?: string; notifyCustomer?: false }) =>
         patch(`/api/orders/${id}/items-tracking`, body),
@@ -4149,6 +4159,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       uploadEvidence: (image: { uri: string; mimeType?: string | null }) =>
         uploadImage<{ objectPath: string }>('/api/returns/evidence', image, getToken, getCacheScope),
       listBuyer:    () => get<any[]>('/api/returns/buyer'),
+      /** How a buyer can take a refund: original payment, Thread Cash (only while it can be spent), store credit. */
+      refundOptions: () => get<{ methods: Array<'original' | 'thread_cash' | 'store_credit'> }>('/api/returns/refund-options'),
       listSeller:   () => get<any[]>('/api/returns'),
       get:          (id: string) => get<any>(`/api/returns/${id}`),
       updateStatus: (id: string, data: { status: string; sellerResponse?: string; refundAmountCents?: number }) =>

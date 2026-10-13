@@ -14,6 +14,32 @@ import { refundExpectedLabel } from '@/lib/refundEta';
 export type ReturnStatusKey = 'pending' | 'approved' | 'denied' | 'refunded';
 export type ReturnViewer = 'buyer' | 'seller';
 
+/** How a refund is paid back (items 113/114). */
+export type RefundMethodKey = 'original' | 'thread_cash' | 'store_credit';
+
+/** returns.resolutionRequested → the refund method approval pays out. */
+export function refundMethodForResolution(resolution: unknown): RefundMethodKey {
+  if (resolution === 'thread_cash') return 'thread_cash';
+  if (resolution === 'store_credit') return 'store_credit';
+  return 'original';
+}
+
+/** The refund method → the resolution a return request sends. */
+export function resolutionForRefundMethod(method: RefundMethodKey): 'refund' | 'thread_cash' | 'store_credit' {
+  return method === 'original' ? 'refund' : method;
+}
+
+/** Where the money goes, phrased for who is reading. */
+export function refundDestination(
+  method: RefundMethodKey,
+  viewer: ReturnViewer,
+  names: { buyerName: string; sellerName: string },
+): string {
+  if (method === 'thread_cash') return viewer === 'seller' ? `${names.buyerName}’s Thread Cash` : 'your Thread Cash';
+  if (method === 'store_credit') return viewer === 'seller' ? 'store credit at your store' : `store credit at ${names.sellerName}`;
+  return viewer === 'seller' ? `${names.buyerName}’s original payment` : 'your original payment';
+}
+
 export interface ReturnItem {
   lineItemId: string;
   productName: string;
@@ -36,6 +62,8 @@ export interface ReturnView {
   evidenceUrls: string[];
   items: ReturnItem[];
   refundAmountCents: number | null;
+  /** What the buyer asked for, or — once refunded — how it was actually paid. */
+  refundMethod: RefundMethodKey;
   orderTotalCents: number;
   sellerResponse: string | null;
   createdAt: string;
@@ -72,6 +100,7 @@ export function adaptReturnRow(row: any): ReturnView {
       unitPriceCents: Number(item?.unitPriceCents ?? 0) || 0,
     })),
     refundAmountCents: typeof row?.refundAmountCents === 'number' ? row.refundAmountCents : null,
+    refundMethod: refundMethodForResolution(row?.refundMethod === 'original' ? 'refund' : (row?.refundMethod ?? row?.resolutionRequested)),
     orderTotalCents: Number(row?.totalCents ?? 0) || 0,
     sellerResponse: row?.sellerResponse ?? null,
     createdAt: row?.createdAt ?? new Date(0).toISOString(),
@@ -124,7 +153,7 @@ export function statusLabel(status: ReturnStatusKey): string {
 }
 
 /** The status screen's headline for each side. */
-export function returnHeadline(view: Pick<ReturnView, 'status' | 'buyerName' | 'sellerName' | 'refundAmountCents' | 'sellerResponse' | 'orderNumber'> & { updatedAt?: string }, viewer: ReturnViewer, money: (cents: number) => string): { title: string; body: string } {
+export function returnHeadline(view: Pick<ReturnView, 'status' | 'buyerName' | 'sellerName' | 'refundAmountCents' | 'sellerResponse' | 'orderNumber'> & { updatedAt?: string; refundMethod?: RefundMethodKey }, viewer: ReturnViewer, money: (cents: number) => string): { title: string; body: string } {
   const amount = view.refundAmountCents != null ? money(view.refundAmountCents) : null;
   switch (view.status) {
     case 'pending':
@@ -135,10 +164,22 @@ export function returnHeadline(view: Pick<ReturnView, 'status' | 'buyerName' | '
       return viewer === 'buyer'
         ? { title: 'Return approved', body: 'Your refund is being processed. We’ll let you know as soon as it’s issued.' }
         : { title: 'Approved, refund not issued yet', body: 'The refund didn’t go through. Try it again. The buyer is never refunded twice.' };
-    case 'refunded':
+    case 'refunded': {
+      const title = amount ? `Refunded ${amount}` : 'Refunded';
+      if (view.refundMethod === 'thread_cash') {
+        return viewer === 'buyer'
+          ? { title, body: 'Added to your Thread Cash. Spend it on your next order.' }
+          : { title, body: `Refunded to ${view.buyerName}’s Thread Cash.` };
+      }
+      if (view.refundMethod === 'store_credit') {
+        return viewer === 'buyer'
+          ? { title, body: `Added to your gift cards as ${view.sellerName} store credit. We emailed you the code.` }
+          : { title, body: `Refunded as store credit at your store. ${view.buyerName} got a gift card by email.` };
+      }
       return viewer === 'buyer'
-        ? { title: amount ? `Refunded ${amount}` : 'Refunded', body: `Back to your original payment method. ${refundExpectedLabel(view.updatedAt) ?? 'It can take 5–10 business days to appear'}.` }
+        ? { title, body: `Back to your original payment method. ${refundExpectedLabel(view.updatedAt) ?? 'It can take 5–10 business days to appear'}.` }
         : { title: amount ? `Refunded ${amount}` : 'Refunded', body: `Refunded to ${view.buyerName}’s original payment method.` };
+    }
     case 'denied':
       return viewer === 'buyer'
         ? { title: 'Return declined', body: view.sellerResponse ? `${view.sellerName}: “${view.sellerResponse}”` : `${view.sellerName} declined this return. Message them if you have questions.` }
@@ -149,7 +190,7 @@ export function returnHeadline(view: Pick<ReturnView, 'status' | 'buyerName' | '
 export type ReturnStepState = 'done' | 'current' | 'upcoming';
 
 /** Klarna / Shopee-style vertical steps, from real status + timestamps only. */
-export function returnSteps(view: Pick<ReturnView, 'status' | 'createdAt' | 'updatedAt'>, viewer: ReturnViewer = 'buyer'): { key: string; label: string; state: ReturnStepState; at?: string }[] {
+export function returnSteps(view: Pick<ReturnView, 'status' | 'createdAt' | 'updatedAt'> & Partial<Pick<ReturnView, 'refundMethod' | 'buyerName' | 'sellerName'>>, viewer: ReturnViewer = 'buyer'): { key: string; label: string; state: ReturnStepState; at?: string }[] {
   const requested = { key: 'requested', label: 'Return requested', state: 'done' as ReturnStepState, at: view.createdAt };
   if (view.status === 'denied') {
     return [requested, { key: 'declined', label: 'Declined by the seller', state: 'current', at: view.updatedAt }];
@@ -174,7 +215,13 @@ export function returnSteps(view: Pick<ReturnView, 'status' | 'createdAt' | 'upd
   return [
     requested,
     { key: 'review', label: viewer === 'seller' ? 'You review the request' : 'Seller reviews your request', state: 'current' },
-    { key: 'refund', label: viewer === 'seller' ? 'Refund to the buyer’s original payment' : 'Refund to your original payment', state: 'upcoming' },
+    {
+      key: 'refund',
+      label: (view.refundMethod ?? 'original') === 'original'
+        ? (viewer === 'seller' ? 'Refund to the buyer’s original payment' : 'Refund to your original payment')
+        : `Refund to ${refundDestination(view.refundMethod!, viewer, { buyerName: view.buyerName ?? 'the buyer', sellerName: view.sellerName ?? 'the seller' })}`,
+      state: 'upcoming',
+    },
   ];
 }
 

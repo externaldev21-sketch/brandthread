@@ -21,7 +21,15 @@ export const CASH_OUT_SOURCES: ReadonlySet<string> = new Set(["cash_out"]);
 /** Days before an expiry that the buyer is warned. */
 export const EXPIRY_WARNING_DAYS = 7;
 
-export function isExpiringCreditSource(source: string): boolean {
+/**
+ * A refund the buyer chose to take as Thread Cash (lib/money/refunds.ts,
+ * method 'thread_cash') is their own money, not a reward: it never expires.
+ * Its ledger row is source 'refund_credit' with this reference prefix.
+ */
+export const REFUND_TO_THREAD_CASH_REFERENCE_PREFIX = "refund-method:";
+
+export function isExpiringCreditSource(source: string, referenceId?: string | null): boolean {
+  if (source === "refund_credit" && referenceId?.startsWith(REFUND_TO_THREAD_CASH_REFERENCE_PREFIX)) return false;
   return !NON_EXPIRING_CREDIT_SOURCES.has(source);
 }
 

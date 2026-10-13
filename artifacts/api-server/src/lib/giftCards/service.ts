@@ -100,6 +100,13 @@ export type NewCardInput = {
   expiresAt?: Date | null;
   stripePaymentIntentId?: string | null;
   actorId?: string | null;
+  /**
+   * Store credit for an order refund (order_refunds.id). Such a card carries
+   * the exact refund amount, so the $5–$1,000 range for cards a store sells
+   * or hands out does not apply; the unique index on gift_cards.refund_id
+   * makes it one card per refund.
+   */
+  refundId?: string | null;
 };
 
 export function assertValidAmount(amountCents: number): void {
@@ -110,7 +117,13 @@ export function assertValidAmount(amountCents: number): void {
 
 /** Creates a card awaiting payment (no code yet; the code is generated when payment succeeds). */
 export async function createPendingCard(exec: Exec, input: NewCardInput): Promise<GiftCardRow> {
-  assertValidAmount(input.amountCents);
+  if (input.refundId) {
+    if (!Number.isSafeInteger(input.amountCents) || input.amountCents <= 0) {
+      throw new GiftCardError(400, "INVALID_AMOUNT", "Store credit must be a positive amount.");
+    }
+  } else {
+    assertValidAmount(input.amountCents);
+  }
   const [card] = await exec.insert(giftCards).values({
     sellerId: input.sellerId,
     initialCents: input.amountCents,
@@ -125,6 +138,7 @@ export async function createPendingCard(exec: Exec, input: NewCardInput): Promis
     source: input.source,
     expiresAt: input.expiresAt ?? null,
     stripePaymentIntentId: input.stripePaymentIntentId ?? null,
+    refundId: input.refundId ?? null,
   }).returning();
   return card;
 }
@@ -155,7 +169,7 @@ export async function activateCard(
   await appendEntry(exec, {
     cardId, type: "issue", amountCents: card.initialCents, balanceAfterCents: card.initialCents,
     idempotencyKey: `issue/${cardId}`, actorId: options.actorId ?? card.purchaserId,
-    note: card.source === "purchase" ? "Purchased" : "Issued by the store",
+    note: card.source === "purchase" ? "Purchased" : card.refundId ? "Store credit for a refund" : "Issued by the store",
   });
   if (options.liabilityLedger !== false && card.source === "purchase") {
     // Brandthread holds the buyer's payment; it is owed to the seller only

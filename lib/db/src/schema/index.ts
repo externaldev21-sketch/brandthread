@@ -1951,7 +1951,11 @@ export const returns = pgTable('returns', {
   sellerId:            text('seller_id').notNull(),
   reason:              text('reason').notNull(),
   notes:               text('notes'),
-  /** 'refund' | 'exchange' | 'store_credit' | 'replacement' */
+  /**
+   * 'refund' | 'exchange' | 'store_credit' | 'replacement' | 'thread_cash'.
+   * Approval pays a refund the way the buyer picked: 'refund' → original
+   * payment, 'thread_cash' → Thread Cash, 'store_credit' → a store gift card.
+   */
   resolutionRequested: text('resolution_requested').notNull().default('refund'),
   /** 'pending' | 'approved' | 'denied' | 'refunded' */
   status:              text('status').notNull().default('pending'),

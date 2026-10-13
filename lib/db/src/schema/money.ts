@@ -98,6 +98,10 @@ export const orderRefunds = pgTable('order_refunds', {
   platformFeeRefundCents:   integer('platform_fee_refund_cents').notNull().default(0),
   transferReversalCents:    integer('transfer_reversal_cents').notNull().default(0),
   stripeTransferReversalId: text('stripe_transfer_reversal_id'),
+  // 'original' (Stripe card refund) | 'thread_cash' | 'store_credit' (migration 616)
+  method:                   text('method').notNull().default('original'),
+  threadCashEntryId:        uuid('thread_cash_entry_id'),
+  giftCardId:               uuid('gift_card_id'),
   failureCode:              text('failure_code'),
   failureMessage:           text('failure_message'),
   succeededAt:              timestamp('succeeded_at', { withTimezone: true }),

@@ -19,7 +19,7 @@ import { DEFAULT_THREAD_CASH_CONFIG, type ThreadCashConfig } from "./streaks";
 import { rewardsPolicy, type ThreadCashRewardsPolicy } from "./rewardsConfig";
 import { assertThreadCashEarnAllowed, claimDeviceReward, reserveRewardsBudget } from "./earnGate";
 import { postRewardIssued, postThreadCashSpendReturned, postThreadCashSpent } from "./liability";
-import { activeExpiryDays, redemptionCapViolation } from "./rules";
+import { activeExpiryDays, redemptionCapViolation, REFUND_TO_THREAD_CASH_REFERENCE_PREFIX } from "./rules";
 import { postDueExpiries } from "./expiry";
 import {
   FUNDING_SHIFT_SOURCE, entrySplit, getFundingBalances, insertCreditRows, insertDebitEntry, insertRestoreEntry,
@@ -930,6 +930,38 @@ export async function refundThreadCashSpend(
   }, { promoCents: amountCents - paidCents, paidCents });
   await postThreadCashSpendReturned(transaction, { orderId, amountCents });
   return { created: true };
+}
+
+/**
+ * A refund the buyer took as Thread Cash instead of back to their card
+ * (lib/money/refunds.ts, method 'thread_cash'). Exactly one entry per refund:
+ * keyed by the order_refunds id, guarded by the unique idempotency_key index.
+ * It never expires (rules.ts REFUND_TO_THREAD_CASH_REFERENCE_PREFIX).
+ */
+export async function creditRefundToThreadCash(
+  transaction: any,
+  input: { buyerId: string; orderId: string; refundId: string; orderNumber: string; amountCents: number },
+): Promise<{ entryId: string; created: boolean }> {
+  if (!Number.isSafeInteger(input.amountCents) || input.amountCents < 1) {
+    throw new ThreadCashError("Refund amount must be positive", 400, "INVALID_AMOUNT");
+  }
+  const idempotencyKey = `refund-method/${input.refundId}`;
+  const [existing] = await transaction
+    .select({ id: threadCashEntries.id })
+    .from(threadCashEntries)
+    .where(eq(threadCashEntries.idempotencyKey, idempotencyKey))
+    .limit(1);
+  if (existing) return { entryId: existing.id, created: false };
+  const [entry] = await transaction.insert(threadCashEntries).values({
+    buyerId: input.buyerId,
+    amountCents: input.amountCents,
+    source: "refund_credit",
+    referenceId: `${REFUND_TO_THREAD_CASH_REFERENCE_PREFIX}${input.refundId}`,
+    note: `Refund for order #${input.orderNumber}`,
+    usedOrderId: input.orderId,
+    idempotencyKey,
+  }).returning({ id: threadCashEntries.id });
+  return { entryId: entry.id, created: true };
 }
 
 // ─── Send in chat (Apple-Cash-style) ───────────────────────────────────────

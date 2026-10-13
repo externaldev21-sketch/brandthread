@@ -629,6 +629,22 @@ describe("at checkout", () => {
     expect(await balanceOf(cart.card.id)).toBe(0);
   }
 
+  it("a store's own (seller-issued) card is a discount the seller gives: no payout transfer, no liability", async () => {
+    const cart = await seedCart("own", 3_000);
+    const { card: own } = await issue(cart.sellerA, 2_000, cart.buyer);
+    const quote = await pay(cart.buyer, cart.groups({ cardId: own.id }));
+    expect(quote.status).toBe(200);
+    expect(quote.body.groups[0].giftCardCents).toBe(2_000);
+    const intent = paid(quote.body.paymentIntentId);
+    await handleCartPaymentSucceeded(intent, `evt_${uid("pi")}`, new Date());
+    const { made } = await ordersOf(intent.id);
+    const orderA = made.find((o) => o.ownerId === cart.sellerA)!;
+    expect(fake.state.transfers.filter((t) => t.metadata?.kind === "gift_card_seller_payout" && t.transfer_group === orderA.id)).toHaveLength(0);
+    expect(await payoutSellerForOrder(fake.stripe as any, orderA.id)).toBe("none");
+    expect((await orderLedger(orderA.id)).gift_card_liability ?? 0).toBe(0);
+    expect(await balanceOf(own.id)).toBe(0);
+  });
+
   it("refuses a card on another store's group and someone else's wallet card", async () => {
     const cart = await seedCart("wrong", 3_000);
     const wrongStore = await pay(cart.buyer, cart.groups({ cardId: cart.card.id }, true));
