@@ -106,6 +106,7 @@ import { MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
 import { consumeAnimationOverride } from '@/lib/navigationAnimationOverride';
 import { setRequestGuard } from '@workspace/api-client-react';
+import { WhatsNewHost } from '@/components/whats-new/WhatsNewHost';
 
 // Generated API hooks share this guard with the app-local API clients so
 // signed-out seller preview never reaches the backend through an alternate
@@ -1343,6 +1344,7 @@ function RootLayoutNav() {
       </Pressable>
       <StatusBarMask />
       <SellerBarGate />
+      <WhatsNewHost />
       <AuthGate />
       <ServiceConfigurer />
       <PushRegistrar />
