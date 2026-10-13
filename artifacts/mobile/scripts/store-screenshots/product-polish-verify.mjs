@@ -83,14 +83,14 @@ const SELLER_EDITOR = {
 };
 
 const PDP = `/buyer-product-detail?productId=${base.id}`;
-const scrollTo = (testId) => async (page) => {
+const scrollTo = (testId, lift = 220) => async (page) => {
   await page.getByTestId(testId).first().scrollIntoViewIfNeeded();
-  await page.evaluate(() => {
+  await page.evaluate((lift) => {
     const sc = [...document.querySelectorAll('div')]
       .filter((d) => d.scrollHeight > d.clientHeight + 4 && getComputedStyle(d).overflowY !== 'visible')
       .sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
-    if (sc) sc.scrollTop = Math.max(0, sc.scrollTop - 220);
-  });
+    if (sc) sc.scrollTop = Math.max(0, sc.scrollTop - lift);
+  }, lift);
   await page.waitForTimeout(500);
 };
 const clickText = (text) => (page) => page.getByText(text, { exact: true }).first().click();
@@ -111,20 +111,15 @@ const SHOTS = {
     act: async (page) => { await page.getByTestId('option-opt_color-color_Bone').click(); await scrollTo('option-opt_color-color_Bone')(page); },
   },
   'pdp-sold-out': {
-    target: PDP, rich: true,
-    act: async (page) => {
-      await page.getByTestId('option-opt_color-color_Bone').click();
-      await page.getByTestId('option-opt_size-size_S').click();
-      await page.waitForTimeout(1500);
-      await scrollTo('sold-out-alternatives')(page);
-    },
+    target: PDP, rich: true, soldOut: true,
+    act: async (page) => { await page.getByTestId('sold-out-alternatives').waitFor({ timeout: 15000 }); await scrollTo('sold-out-alternatives')(page); },
   },
   'pdp-size-chart-cm': {
     target: PDP, rich: true,
     act: async (page) => {
       await page.getByRole('button', { name: 'Size chart' }).click();
       await page.waitForTimeout(400);
-      await page.getByTestId('size-chart-unit-toggle').getByText('Centimeters', { exact: true }).click();
+      await page.getByTestId('size-chart-unit-toggle').getByText(/^(cm|Centimeters)$/).click();
       await scrollTo('size-chart-unit-toggle')(page);
     },
   },
@@ -133,7 +128,7 @@ const SHOTS = {
     act: async (page) => {
       await page.getByTestId('product-detail-row-fabric').click();
       await page.getByTestId('product-detail-row-care').click();
-      await scrollTo('product-detail-rows')(page);
+      await scrollTo('product-detail-rows', 40)(page);
     },
   },
   'pdp-loupe': {
@@ -155,12 +150,13 @@ const SHOTS = {
       await page.getByTestId('option-opt_size-size_M').click();
       await page.getByTestId('product-add-to-cart').click();
       await page.getByTestId('bag-plus-one').waitFor({ timeout: 8000 });
-      await page.waitForTimeout(160);
+      await page.waitForTimeout(220);
       await page.evaluate(() => { const sc = [...document.querySelectorAll('div')].filter((d) => d.scrollHeight > d.clientHeight + 4 && getComputedStyle(d).overflowY !== 'visible').sort((a, b) => b.scrollHeight - a.scrollHeight)[0]; if (sc) sc.scrollTop = 0; });
     },
   },
   'pdp-video-first': { target: PDP, rich: true, video: true },
-  'seller-details': { target: `/product-page-details?productId=${base.id}`, role: 'seller', seller: true, full: true },
+  'seller-details': { target: `/product-page-details?productId=${base.id}`, role: 'seller', seller: true, extra: '&demo=1' },
+  'seller-details-empty': { target: `/product-page-details?productId=${base.id}`, role: 'seller', seller: true },
   'bag': { target: '/(buyer)/cart', full: true },
 };
 
@@ -209,7 +205,10 @@ async function run() {
         contextOptions: shot.motion ? { reducedMotion: 'no-preference' } : {},
       });
       if (shot.rich) {
-        await override(context, server.origin, (p) => /^\/api\/public\/products\/[^/]+$/.test(p), RICH_PRODUCT);
+        const product = shot.soldOut
+          ? { ...RICH_PRODUCT, variants: RICH_PRODUCT.variants.map((v) => ({ ...v, stock: 0 })) }
+          : RICH_PRODUCT;
+        await override(context, server.origin, (p) => /^\/api\/public\/products\/[^/]+$/.test(p), product);
         await override(context, server.origin, (p) => /^\/api\/product-page-details\/public\/[^/]+\/in-bags$/.test(p), { count: 12 });
       }
       if (shot.video) {
@@ -222,7 +221,7 @@ async function run() {
       }
       page.setDefaultNavigationTimeout(120_000);
       for (let attempt = 0; attempt < 5; attempt += 1) {
-        await openScreen(page, activity, server.origin, role, shot.target);
+        await openScreen(page, activity, server.origin, role, shot.target, { extraQuery: shot.extra ?? '' });
         await page.waitForTimeout(800);
         const pathname = decodeURIComponent(await page.evaluate(() => window.location.pathname)).replace('/(buyer)', '');
         if (pathname.startsWith(shot.target.split('?')[0].replace('/(buyer)', ''))) break;

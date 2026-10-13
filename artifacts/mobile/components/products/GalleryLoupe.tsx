@@ -23,6 +23,34 @@ const MOVE_TOLERANCE = 8; // a drag before the hold completes is a swipe, not a 
 
 export interface LoupePoint { x: number; y: number }
 
+/**
+ * Finger position plus the frame's top-left corner, in one coordinate space.
+ * Native touch events carry locationX/Y (relative to the photo, which fills
+ * the frame); web touch events don't, so there the frame's bounding rect and
+ * the touch's viewport position are used instead.
+ */
+function readTouch(e: GestureResponderEvent): { x: number; y: number; originX: number; originY: number } | null {
+  const ne = e.nativeEvent as any;
+  const touch = ne.touches?.[0] ?? ne.changedTouches?.[0] ?? ne;
+  const rect = (e.currentTarget as any)?.getBoundingClientRect?.();
+  if (rect && typeof touch?.clientX === 'number') {
+    return { x: touch.clientX, y: touch.clientY, originX: rect.left, originY: rect.top };
+  }
+  const pageX = typeof ne.pageX === 'number' ? ne.pageX : touch?.pageX;
+  const pageY = typeof ne.pageY === 'number' ? ne.pageY : touch?.pageY;
+  if (typeof pageX !== 'number' || typeof pageY !== 'number' || typeof ne.locationX !== 'number') return null;
+  return { x: pageX, y: pageY, originX: pageX - ne.locationX, originY: pageY - ne.locationY };
+}
+
+function touchXY(e: GestureResponderEvent): { x: number; y: number } | null {
+  const ne = e.nativeEvent as any;
+  const touch = ne.touches?.[0] ?? ne.changedTouches?.[0] ?? ne;
+  if ((e.currentTarget as any)?.getBoundingClientRect && typeof touch?.clientX === 'number') return { x: touch.clientX, y: touch.clientY };
+  const x = typeof ne.pageX === 'number' ? ne.pageX : touch?.pageX;
+  const y = typeof ne.pageY === 'number' ? ne.pageY : touch?.pageY;
+  return typeof x === 'number' && typeof y === 'number' ? { x, y } : null;
+}
+
 /** Where the loupe circle goes for a finger at `p` in a `width`×`height` frame. */
 export function loupeFrame(p: LoupePoint, width: number, height: number) {
   const r = LOUPE_SIZE / 2;
@@ -44,7 +72,7 @@ export function useGalleryLoupe({ enabled, onActiveChange }: { enabled: boolean;
   const [point, setPoint] = useState<LoupePoint | null>(null);
   const activeRef = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const start = useRef<{ pageX: number; pageY: number; originX: number; originY: number } | null>(null);
+  const start = useRef<{ x: number; y: number; originX: number; originY: number } | null>(null);
 
   const clearTimer = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -62,14 +90,15 @@ export function useGalleryLoupe({ enabled, onActiveChange }: { enabled: boolean;
   }, [onActiveChange]);
 
   const onTouchStart = useCallback((e: GestureResponderEvent) => {
-    const { touches, pageX, pageY, locationX, locationY } = e.nativeEvent;
-    if (!enabled || touches.length !== 1) { end(); return; }
-    start.current = { pageX, pageY, originX: pageX - locationX, originY: pageY - locationY };
+    const touches = e.nativeEvent.touches;
+    const t = readTouch(e);
+    if (!enabled || !t || (touches && touches.length !== 1)) { end(); return; }
+    start.current = t;
     clearTimer();
     timer.current = setTimeout(() => {
       if (!start.current) return;
       activeRef.current = true;
-      setPoint({ x: start.current.pageX - start.current.originX, y: start.current.pageY - start.current.originY });
+      setPoint({ x: start.current.x - start.current.originX, y: start.current.y - start.current.originY });
       onActiveChange?.(true);
       hapticLight();
     }, LOUPE_HOLD_MS);
@@ -78,13 +107,15 @@ export function useGalleryLoupe({ enabled, onActiveChange }: { enabled: boolean;
   const onTouchMove = useCallback((e: GestureResponderEvent) => {
     const s = start.current;
     if (!s) return;
-    const { touches, pageX, pageY } = e.nativeEvent;
-    if (touches.length > 1) { end(); return; }
+    const touches = e.nativeEvent.touches;
+    if (touches && touches.length > 1) { end(); return; }
+    const p = touchXY(e);
+    if (!p) return;
     if (!activeRef.current) {
-      if (Math.abs(pageX - s.pageX) > MOVE_TOLERANCE || Math.abs(pageY - s.pageY) > MOVE_TOLERANCE) end();
+      if (Math.abs(p.x - s.x) > MOVE_TOLERANCE || Math.abs(p.y - s.y) > MOVE_TOLERANCE) end();
       return;
     }
-    setPoint({ x: pageX - s.originX, y: pageY - s.originY });
+    setPoint({ x: p.x - s.originX, y: p.y - s.originY });
   }, [end]);
 
   return {

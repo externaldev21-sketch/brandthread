@@ -23,7 +23,7 @@ import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useApi, type ProductPageDetailsEditor } from '@/lib/api';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { hapticSelection } from '@/lib/haptics';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
@@ -73,11 +73,26 @@ export default function ProductPageDetailsScreen() {
     setColorImages(e.details.colorImages ?? {});
   };
 
+  // Signed-out web preview: never call the API. The form shows in its empty
+  // state; `&demo=1` fills it from the preview catalogue. Save is hidden, so
+  // nothing pretends to be stored.
+  const preview = isSellerDevPreview();
   useEffect(() => {
-    if (isSellerDevPreview()) {
-      setLoadError('Product details can be edited once you are signed in.');
-      setLoading(false);
-      return;
+    if (preview) {
+      let live = true;
+      (async () => {
+        const empty = { modelHeightCm: null, modelSizeWorn: null, fabric: null, care: null, origin: null, colorImages: {} };
+        if (!isPreviewDemoMode()) {
+          if (live) hydrate({ productId: String(productId ?? ''), productName: '', images: [], colors: [], details: empty });
+          return;
+        }
+        const { getProducts } = await import('@/services/productService');
+        const first = (await getProducts())[0];
+        const images = (first?.media ?? []).map(m => m.uri).filter(Boolean).slice(0, 6);
+        const colors = (first?.options ?? []).find(o => o.name.toLowerCase() === 'color')?.values.map(v => v.value) ?? [];
+        if (live) hydrate({ productId: first?.id ?? '', productName: first?.name ?? '', images, colors, details: empty });
+      })().finally(() => { if (live) setLoading(false); });
+      return () => { live = false; };
     }
     if (!productId || !isLoaded || !isSignedIn) {
       if (isLoaded) setLoading(false);
@@ -90,7 +105,7 @@ export default function ProductPageDetailsScreen() {
       .catch(err => { if (live) setLoadError(errorText(err, 'Could not load this product.')); })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [api, productId, isLoaded, isSignedIn]);
+  }, [api, productId, isLoaded, isSignedIn, preview]);
 
   async function save() {
     if (!editor || saving) return;
@@ -127,7 +142,7 @@ export default function ProductPageDetailsScreen() {
         title="Details"
         dividerVariant="none"
         onBack={() => goBackOr(router)}
-        rightElement={editor ? (
+        rightElement={editor && !preview ? (
           <Pressable onPress={save} disabled={saving} hitSlop={8} accessibilityRole="button" accessibilityLabel="Save" style={s.saveBtn}>
             {saving ? <ActivityIndicator size="small" color={theme.text} /> : <Text style={s.saveText}>{saved ? 'Saved' : 'Save'}</Text>}
           </Pressable>

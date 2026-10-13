@@ -983,6 +983,8 @@ export default function BuyerProductDetailScreen() {
       await flyToCart();
       bumpCart();
       setBagPlusOne(prev => ({ trigger: prev.trigger + 1, quantity: qty }));
+      // Let the bag's bounce and "+1" read before the sheet dims the page.
+      if (shouldAnimateCartSuccess(reduceMotion)) await new Promise(resolve => setTimeout(resolve, 450));
       setShowAddedSheet(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Auto-clear the icon-button checkmark after 2.5s; the sheet itself
@@ -2026,7 +2028,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     SHADOW_PURPLE: { shadowColor: theme.shadowColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   };
   return StyleSheet.create({
-  imageArea: { height: GALLERY_HEIGHT, backgroundColor: CARD, position: 'relative' },
+  // minHeight (not height): the thumbnail rail under the photo stays in flow
+  // instead of spilling over the badges and title below it.
+  imageArea: { minHeight: GALLERY_HEIGHT, backgroundColor: CARD, position: 'relative' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   imagePlaceholderText: { fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', paddingHorizontal: SP.lg },
   // Positioning wrappers only — the solid dark chrome and hit area come
