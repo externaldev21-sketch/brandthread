@@ -17,6 +17,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { StarRating } from '@/components/StarRating';
 import { FONT, FS, SP, BORDER_SUBTLE, FG, MUTED, SUBTLE, CARD_ELEVATED, SCREEN_BG } from '@/lib/theme';
 import { SellerReplyBlock, type ReviewItem } from '@/components/ProductReviewsSection';
+import { orderPhotoFirst } from '@/lib/reviewOrder';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
@@ -71,11 +72,12 @@ export default function ProductReviewsScreen() {
     [reviews],
   );
 
-  const filtered = reviews.filter(r =>
+  // Photo-first (item 138): reviews with photos lead.
+  const filtered = orderPhotoFirst(reviews.filter(r =>
     (!photosOnly || !!r.photos?.length) &&
     (!starFilter || Math.round(r.rating) === starFilter) &&
     (!sizeFilter || r.sizeBought === sizeFilter),
-  );
+  ));
 
   // Opened without a product (stale link): there is nothing to fetch, so
   // never sit on the spinner.
@@ -166,7 +168,6 @@ export default function ProductReviewsScreen() {
                     <Text style={s.fitChipText}>{fitChipText(item)}</Text>
                   </View>
                 )}
-                {!!item.body && <Text style={s.body}>{item.body}</Text>}
                 {!!item.photos?.length && (
                   <View style={s.photoRow}>
                     {item.photos.map((uri, i) => (
@@ -174,6 +175,7 @@ export default function ProductReviewsScreen() {
                     ))}
                   </View>
                 )}
+                {!!item.body && <Text style={s.body}>{item.body}</Text>}
                 </Pressable>
                 <SellerReplyBlock reply={item.sellerReply} repliedAt={item.sellerRepliedAt} />
               </>
@@ -218,6 +220,6 @@ const s = StyleSheet.create({
   fitChip: { alignSelf: 'flex-start', backgroundColor: CARD_ELEVATED, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 6 },
   fitChipText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
   body: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, lineHeight: 20, marginBottom: 8 },
-  photoRow: { flexDirection: 'row', gap: 6 },
-  photoThumb: { width: 56, height: 56, borderRadius: 8, backgroundColor: CARD_ELEVATED },
+  photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  photoThumb: { width: 88, height: 110, borderRadius: 6, backgroundColor: CARD_ELEVATED },
 });

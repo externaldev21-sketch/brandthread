@@ -19,7 +19,8 @@
  * a review has them.
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
+import { orderPhotoFirst } from '@/lib/reviewOrder';
 import { useReviewActions } from '@/lib/useReviewActions';
 import { useAuth } from '@clerk/expo';
 import { Icon } from '@/components/ui/Icon';
@@ -173,7 +174,10 @@ export function ProductReviewsSection({
     return { star, count, pct: Math.round((count / sampleCount) * 100) };
   });
   const maxCount = Math.max(1, ...breakdown.map(b => b.count));
-  const topReviews = data.reviews.filter(r => r.body?.trim()).slice(0, 3);
+  // Photo-first (item 138, Tripadvisor's review page): reviews with photos
+  // lead, then the rest in server order.
+  const topReviews = orderPhotoFirst(data.reviews.filter(r => r.body?.trim() || r.photos?.length)).slice(0, 3);
+  const allPhotos = data.reviews.flatMap(r => r.photos ?? []);
   const fitScales = data.reviews.map(r => r.fitScale).filter((v): v is number => typeof v === 'number');
   const avgFitScale = fitScales.length > 0 ? fitScales.reduce((a, b) => a + b, 0) / fitScales.length : null;
 
@@ -189,6 +193,25 @@ export function ProductReviewsSection({
           <Text style={s.seeAll}>See all</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Every review photo in one strip, above the rating summary. */}
+      {allPhotos.length > 0 && (
+        <View style={s.photoStripWrap} testID="reviews-photo-strip">
+          <Text style={s.photoStripTitle}>{allPhotos.length} photo{allPhotos.length !== 1 ? 's' : ''}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.photoStripScroll} contentContainerStyle={s.photoStrip}>
+            {allPhotos.map((uri, i) => (
+              <TouchableOpacity
+                key={uri + i}
+                onPress={() => setOpenPhoto({ photos: allPhotos, index: i })}
+                accessibilityRole="button"
+                accessibilityLabel={`View review photo ${i + 1} of ${allPhotos.length}`}
+              >
+                <CachedImage source={{ uri }} style={s.photoStripTile} recyclingKey={'strip-' + uri + i} />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       <View style={s.summaryRow}>
         <View style={s.avgBlock}>
@@ -248,8 +271,6 @@ export function ProductReviewsSection({
               </View>
             )}
 
-            {!!review.body && <Text style={s.reviewBody}>{review.body}</Text>}
-
             {!!review.photos?.length && (
               <View style={s.photoRow}>
                 {review.photos.map((uri, i) => (
@@ -264,6 +285,8 @@ export function ProductReviewsSection({
                 ))}
               </View>
             )}
+
+            {!!review.body && <Text style={s.reviewBody}>{review.body}</Text>}
 
             <SellerReplyBlock reply={review.sellerReply} repliedAt={review.sellerRepliedAt} />
 
@@ -323,8 +346,14 @@ const s = StyleSheet.create({
   fitChip: { alignSelf: 'flex-start', backgroundColor: CARD_ELEVATED, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 6 },
   fitChipText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
   reviewBody: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, lineHeight: 19, marginBottom: 8 },
-  photoRow: { flexDirection: 'row', gap: 6, marginBottom: 8 },
-  photoThumb: { width: 56, height: 56, borderRadius: 8, backgroundColor: CARD_ELEVATED },
+  photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  photoThumb: { width: 88, height: 110, borderRadius: 6, backgroundColor: CARD_ELEVATED },
+  photoStripWrap: { marginBottom: 16 },
+  photoStripTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 8 },
+  // Bleeds to the screen edge under the section's 16pt gutter.
+  photoStripScroll: { marginHorizontal: -16 },
+  photoStrip: { gap: 6, paddingHorizontal: 16 },
+  photoStripTile: { width: 112, height: 140, borderRadius: 6, backgroundColor: CARD_ELEVATED },
   helpfulRow: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start' },
   helpfulText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
 });
