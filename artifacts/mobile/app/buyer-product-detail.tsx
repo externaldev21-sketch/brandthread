@@ -67,6 +67,7 @@ import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { StockCounter } from '@/components/products/StockCounter';
+import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { ApiError } from '@/lib/networkNotice';
 import {
   CART_FLIGHT_ITEM_SIZE, flightSourceFromRect, getCartFlightVector, measureCartTarget, measureWindowRect,
@@ -1311,6 +1312,10 @@ export default function BuyerProductDetailScreen() {
 
           {/* You might also like — owns its header; renders nothing when empty. */}
           <RelatedProducts productId={product.id} dividerStyle={s.divider} headerStyle={s.reviewsHeader} />
+
+          {/* Recently viewed — the shared row, minus this product. Hides
+              signed out, when empty, or when this is the only one viewed. */}
+          <RecentlyViewedRow excludeProductId={product.id} style={{ marginTop: SP.lg }} />
 
           {/* Report links: de-emphasised via SUBTLE text color alone (below) —
               a resting `opacity < 1` on the row would make its already-dim

@@ -637,6 +637,8 @@ export interface PublicPairedProduct {
   isPreOrder: boolean;
   available: boolean;
   variants: Array<{ id: string; size: string | null; color: string | null; priceCents: number; stock: number }>;
+  /** 'curated' = seller-paired; 'auto' = same-brand complementary fill. */
+  source?: 'curated' | 'auto';
 }
 export interface ProductVideoInfo { videoUrl: string; posterUrl: string | null; durationMs: number | null }
 

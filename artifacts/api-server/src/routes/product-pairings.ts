@@ -3,7 +3,10 @@
  *
  * Public (no auth):
  *   GET /api/product-pairings/public/:productId
- *       → active, non-deleted paired products only, in the seller's order.
+ *       → active, non-deleted paired products only, in the seller's order
+ *         (`source: 'curated'`), then, while the row has fewer than
+ *         COMPLETE_THE_FIT_TARGET items, in-stock products from the same
+ *         seller in complementary categories (`source: 'auto'`).
  *
  * Seller (auth; writes need the manager role, scoped to the team store owner):
  *   GET /api/product-pairings/:productId   → current pairings (incl. hidden ones, flagged)
@@ -16,12 +19,18 @@
  */
 import { Router } from "express";
 import { db, products, productVariants, productPairings, users } from "@workspace/db";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { setPublicCacheHeaders } from "../lib/httpCache";
 import { toPublicVariant } from "../lib/publicProfile";
-import { isAvailable, isUuid, lowestPriceCents, parsePairingInput } from "../lib/productPairings";
+import {
+  COMPLETE_THE_FIT_TARGET, isAvailable, isUuid, lowestPriceCents, parsePairingInput, selectAutoPairings,
+} from "../lib/productPairings";
+import { classifyProduct } from "../lib/categoryTaxonomy";
+
+/** Newest same-seller products considered for the automatic fill. */
+const AUTO_CANDIDATE_POOL = 200;
 
 const router = Router();
 
@@ -32,13 +41,16 @@ router.get("/public/:productId", async (req, res) => {
   if (!isUuid(productId)) { res.json([]); return; }
   try {
     setPublicCacheHeaders(res);
-    const [current] = await db.select({ id: products.id, ownerId: products.ownerId })
+    const [current] = await db.select({
+      id: products.id, ownerId: products.ownerId, category: products.category,
+      name: products.name, tags: products.tags, styleTags: products.styleTags,
+    })
       .from(products)
       .where(and(eq(products.id, productId), eq(products.status, "active"), isNull(products.deletedAt)))
       .limit(1);
     if (!current) { res.json([]); return; }
 
-    const rows = await db
+    const curated = await db
       .select({
         id: products.id,
         ownerId: products.ownerId,
@@ -56,12 +68,54 @@ router.get("/public/:productId", async (req, res) => {
         isNull(products.deletedAt),
       ))
       .orderBy(asc(productPairings.position), asc(productPairings.createdAt));
+
+    type Row = { id: string; ownerId: string; name: string; images: string[] | null; isPreOrder: boolean };
+    const rows: Array<Row & { source: "curated" | "auto" }> = curated.map((r) => ({ ...r, source: "curated" }));
+    const variants = curated.length
+      ? await db.select().from(productVariants).where(inArray(productVariants.productId, curated.map((r) => r.id)))
+      : [];
+
+    // Automatic same-brand fill, only while the row is short.
+    if (rows.length < COMPLETE_THE_FIT_TARGET) {
+      const pool = await db.select({
+        id: products.id, ownerId: products.ownerId, name: products.name, images: products.images,
+        isPreOrder: products.isPreOrder, category: products.category, tags: products.tags,
+        styleTags: products.styleTags, createdAt: products.createdAt,
+      })
+        .from(products)
+        .where(and(
+          eq(products.ownerId, current.ownerId),
+          ne(products.id, current.id),
+          eq(products.status, "active"),
+          isNull(products.deletedAt),
+        ))
+        .orderBy(desc(products.createdAt))
+        .limit(AUTO_CANDIDATE_POOL);
+      const curatedIds = new Set(curated.map((r) => r.id));
+      const classified = pool
+        .filter((p) => !curatedIds.has(p.id))
+        .map((p) => ({ ...p, slug: classifyProduct(p) }))
+        .filter((p) => p.slug !== null);
+      if (classified.length) {
+        const poolVariants = await db.select().from(productVariants)
+          .where(inArray(productVariants.productId, classified.map((p) => p.id)));
+        const stockById = new Map<string, typeof poolVariants>();
+        for (const v of poolVariants) stockById.set(v.productId, [...(stockById.get(v.productId) ?? []), v]);
+        const picked = selectAutoPairings(
+          { id: current.id, slug: classifyProduct(current) },
+          classified.map((p) => ({ ...p, available: isAvailable(stockById.get(p.id) ?? [], p.isPreOrder) })),
+          { excludeIds: curatedIds, limit: COMPLETE_THE_FIT_TARGET - rows.length },
+        );
+        for (const p of picked) {
+          rows.push({ id: p.id, ownerId: p.ownerId, name: p.name, images: p.images, isPreOrder: p.isPreOrder, source: "auto" });
+          variants.push(...(stockById.get(p.id) ?? []));
+        }
+      }
+    }
     if (rows.length === 0) { res.json([]); return; }
 
-    const [variants, [seller]] = await Promise.all([
-      db.select().from(productVariants).where(inArray(productVariants.productId, rows.map((r) => r.id))),
-      db.select({ displayName: users.displayName }).from(users).where(eq(users.clerkId, current.ownerId)).limit(1),
-    ]);
+    const [seller] = await db.select({ displayName: users.displayName }).from(users)
+      .where(eq(users.clerkId, current.ownerId)).limit(1);
     const byProduct = new Map<string, typeof variants>();
     for (const v of variants) byProduct.set(v.productId, [...(byProduct.get(v.productId) ?? []), v]);
 
@@ -78,6 +132,7 @@ router.get("/public/:productId", async (req, res) => {
         isPreOrder: row.isPreOrder,
         available: isAvailable(vs, row.isPreOrder),
         variants: vs.map(toPublicVariant),
+        source: row.source,
       };
     }));
   } catch (err) {
