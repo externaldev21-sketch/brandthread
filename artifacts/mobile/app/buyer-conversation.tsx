@@ -341,6 +341,11 @@ export default function BuyerConversationScreen() {
   // whatever the composer is showing by the time it resolves. uploadMedia()
   // has no real cancel/abort — this only makes the UI stop listening to it.
   const mediaUploadTokenRef = useRef(0);
+  // Polish #161: real upload progress (0–1) for the staged photo/video, shown
+  // on the composer thumb and, if Send is tapped before it finishes, inside
+  // the sent bubble. The ref holds the finished attachment for that send.
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const pendingUploadRef = useRef<Promise<MessageAttachment | null> | null>(null);
   // Real-time "X is typing…": true once we've told the server we're
   // composing (PATCH /api/conversations/:id/typing), so handleChangeText
   // doesn't re-send it on every keystroke, and a timer that clears it after
@@ -714,8 +719,12 @@ export default function BuyerConversationScreen() {
 
   // ── Media upload helper ───────────────────────────────────────────────────────
 
-  async function uploadMedia(base64: string, mimeType: string, extension: string): Promise<string> {
-    const result = await api.conversations.uploadMedia({ data: base64, mimeType, extension });
+  async function uploadMedia(
+    base64: string, mimeType: string, extension: string, onProgress?: (fraction: number) => void,
+  ): Promise<string> {
+    const result = onProgress
+      ? await api.conversations.uploadMediaWithProgress({ data: base64, mimeType, extension }, onProgress)
+      : await api.conversations.uploadMedia({ data: base64, mimeType, extension });
     return result.url;
   }
 
@@ -909,26 +918,34 @@ export default function BuyerConversationScreen() {
       meta: { photoUris: JSON.stringify(localUris), uploading: 'true' },
     });
     setIsUploading(true);
-    try {
+    setUploadProgress(0);
+    const assets = result.assets.filter((a) => !!a.base64);
+    const upload = (async (): Promise<MessageAttachment | null> => {
       const urls: string[] = [];
-      for (const asset of result.assets) {
-        if (!asset.base64) continue;
-        urls.push(await uploadMedia(asset.base64, 'image/jpeg', 'jpg'));
+      for (const [i, asset] of assets.entries()) {
+        urls.push(await uploadMedia(asset.base64!, 'image/jpeg', 'jpg', (p) => {
+          if (mediaUploadTokenRef.current === token || pendingUploadRef.current === upload) setUploadProgress((i + p) / assets.length);
+        }));
       }
-      if (mediaUploadTokenRef.current !== token) return; // superseded/cancelled
-      if (!urls.length) { setSelectedAttachment(null); return; }
-      setSelectedAttachment({
+      return urls.length ? {
         type: 'image', uri: urls[0],
         title: urls.length > 1 ? `${urls.length} photos` : 'Photo',
         meta: { photoUris: JSON.stringify(urls) },
-      });
+      } : null;
+    })();
+    pendingUploadRef.current = upload;
+    try {
+      const uploaded = await upload;
+      if (mediaUploadTokenRef.current !== token) return; // superseded, cancelled, or already sent
+      if (!uploaded) { setSelectedAttachment(null); return; }
+      setSelectedAttachment(uploaded);
     } catch {
       if (mediaUploadTokenRef.current === token) {
         setSelectedAttachment(null);
         Alert.alert('Upload failed', 'Could not upload. Please try again.');
       }
     }
-    finally { if (mediaUploadTokenRef.current === token) setIsUploading(false); }
+    finally { if (mediaUploadTokenRef.current === token) { setIsUploading(false); setUploadProgress(null); } }
   }
 
   async function handlePickVideo() {
@@ -952,22 +969,23 @@ export default function BuyerConversationScreen() {
       meta: { duration: durationLabel, uploading: 'true' },
     });
     setIsUploading(true);
+    setUploadProgress(0);
+    const ext = (asset.uri.split('.').pop() ?? 'mp4').replace(/\?.*/, '');
+    const upload = uploadMedia(asset.base64, 'video/mp4', ext, (p) => {
+      if (mediaUploadTokenRef.current === token || pendingUploadRef.current === upload) setUploadProgress(p);
+    }).then((url): MessageAttachment => ({ type: 'video', uri: url, title: 'Video clip', meta: { duration: durationLabel } }));
+    pendingUploadRef.current = upload;
     try {
-      const ext = (asset.uri.split('.').pop() ?? 'mp4').replace(/\?.*/, '');
-      const url = await uploadMedia(asset.base64, 'video/mp4', ext);
-      if (mediaUploadTokenRef.current !== token) return; // superseded/cancelled
-      setSelectedAttachment({
-        type: 'video', uri: url,
-        title: 'Video clip',
-        meta: { duration: durationLabel },
-      });
+      const uploaded = await upload;
+      if (mediaUploadTokenRef.current !== token) return; // superseded, cancelled, or already sent
+      setSelectedAttachment(uploaded);
     } catch {
       if (mediaUploadTokenRef.current === token) {
         setSelectedAttachment(null);
         Alert.alert('Upload failed', 'Could not upload video. Please try again.');
       }
     }
-    finally { if (mediaUploadTokenRef.current === token) setIsUploading(false); }
+    finally { if (mediaUploadTokenRef.current === token) { setIsUploading(false); setUploadProgress(null); } }
   }
 
   // ── Voice recording ────────────────────────────────────────────────────────────
@@ -1118,6 +1136,11 @@ export default function BuyerConversationScreen() {
               onPress={() => setViewerUri(uri)}
             >
               <CachedImage source={{ uri }} style={s.photoImg} recyclingKey={uri} />
+              {att.meta?.uploading === 'true' && idx === 0 ? (
+                <View style={s.bubbleUploadOverlay} testID="bubble-upload-progress">
+                  <UploadRing size={36} color="#fff" progress={uploadProgress} />
+                </View>
+              ) : null}
               {idx === 3 && uris.length > 4 && (
                 <View style={s.photoMore}><Text style={s.photoMoreText}>+{uris.length - 4}</Text></View>
               )}
@@ -1135,7 +1158,11 @@ export default function BuyerConversationScreen() {
           onPress={() => { if (att.uri && !att.meta?.uploading) setViewerVideoUri(att.uri); }}
         >
           {att.uri ? <CachedImage source={{ uri: att.uri }} style={s.videoThumbImg} recyclingKey={att.uri} /> : null}
-          <View style={s.videoPlayOverlay}><Feather name="play-circle" size={36} color="#fff" /></View>
+          <View style={s.videoPlayOverlay}>
+            {att.meta?.uploading === 'true'
+              ? <UploadRing size={36} color="#fff" progress={uploadProgress} />
+              : <Feather name="play-circle" size={36} color="#fff" />}
+          </View>
           {att.meta?.duration ? <View style={s.videoDurBadge}><Text style={s.videoDurText}>{att.meta.duration}s</Text></View> : null}
         </PressableScale>
       );
@@ -1457,6 +1484,35 @@ export default function BuyerConversationScreen() {
         setMessages((prev) => [...prev, reply]);
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
       }, previewAutoReplyDelayMs());
+      return;
+    }
+
+    // Sent before its photo/video finished uploading (#161): the bubble shows
+    // up now with the upload ring inside it, and posts once the upload lands.
+    if (att?.meta?.uploading === 'true' && pendingUploadRef.current) {
+      const upload = pendingUploadRef.current;
+      mediaUploadTokenRef.current += 1; // the composer no longer owns this upload
+      const localId = `local-upload-${Date.now()}`;
+      const convId = conv.id;
+      setMessages((prev) => [...prev, {
+        id: localId, conversationId: convId, fromId: myId, fromName: 'You', fromInitials: MY_INITIALS,
+        fromColor: theme.accent, text: t, attachment: att, replyToId: replyingTo?.id, replyPreview: replyingTo?.text,
+        replyToAuthorName: replyingTo?.fromName, reactions: [], status: 'sending', ts: Date.now(), deletedForMe: false,
+      }]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      try {
+        const uploaded = await upload;
+        if (!uploaded) throw new Error('Nothing uploaded');
+        await sendMessage(convId, t, uploaded, replyingTo?.id);
+        setMessages(await getMessages(convId));
+      } catch (e) {
+        setMessages((prev) => prev.map((m) => (m.id === localId ? { ...m, status: 'failed' } : m)));
+        Alert.alert('Message not sent', apiErrorMessage(e, 'The upload didn’t finish. Please try again.'));
+      } finally {
+        if (pendingUploadRef.current === upload) pendingUploadRef.current = null;
+        setIsUploading(false);
+        setUploadProgress(null);
+      }
       return;
     }
 
@@ -2114,6 +2170,7 @@ export default function BuyerConversationScreen() {
                   type={selectedAttachment.type as 'image' | 'video'}
                   uri={selectedAttachment.type === 'image' ? selectedAttachment.uri : undefined}
                   uploading={uploadingMedia}
+                  progress={uploadingMedia ? uploadProgress : null}
                   size={40}
                   ringColor={theme.accent}
                   iconColor={theme.muted}
@@ -3725,6 +3782,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   photoCellSingle:{ width: '100%', aspectRatio: 4 / 3 },
   photoImg:       { width: '100%', height: '100%' },
   photoMore:      { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  // theme-exempt: scrim over the photo while it uploads (#161)
+  bubbleUploadOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
   photoMoreText:  { color: '#fff', fontSize: FS.lg, fontFamily: FONT.bold },
 
   // Video thumb

@@ -36,6 +36,7 @@ export default function MediaUploadThumb({
   ringColor,
   iconColor,
   trackColor,
+  progress,
 }: {
   type: 'image' | 'video';
   uri?: string;
@@ -44,6 +45,8 @@ export default function MediaUploadThumb({
   ringColor: string;
   iconColor: string;
   trackColor: string;
+  /** Real upload progress 0–1 when known; otherwise the ring spins. */
+  progress?: number | null;
 }) {
   return (
     <View style={[styles.wrap, { width: size, height: size, backgroundColor: trackColor }]} testID="media-upload-thumb">
@@ -56,7 +59,7 @@ export default function MediaUploadThumb({
       )}
       {uploading && (
         <View style={[StyleSheet.absoluteFill, styles.overlay]} testID="media-upload-thumb-overlay">
-          <UploadRing size={size * 0.6} color="#fff" />
+          <UploadRing size={size * 0.6} color="#fff" progress={progress} />
         </View>
       )}
     </View>

@@ -21,16 +21,24 @@ import Svg, { Circle } from 'react-native-svg';
  * the DOM as a boolean attribute, which React warns about (item 74 found and
  * fixed this while adding a second, more prominent use of this ring).
  */
-export default function UploadRing({ size = 28, color, trackColor }: { size?: number; color: string; trackColor?: string }) {
+export default function UploadRing({ size = 28, color, trackColor, progress }: {
+  size?: number;
+  color: string;
+  trackColor?: string;
+  /** 0–1 when the upload reports real bytes (#161): a filling arc, no spin. */
+  progress?: number | null;
+}) {
   const spin = useRef(new Animated.Value(0)).current;
+  const determinate = typeof progress === 'number';
 
   useEffect(() => {
+    if (determinate) return undefined;
     const loop = Animated.loop(
       Animated.timing(spin, { toValue: 1, duration: 900, easing: Easing.linear, useNativeDriver: true }),
     );
     loop.start();
     return () => loop.stop();
-  }, [spin]);
+  }, [spin, determinate]);
 
   const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const radius = size / 2 - 2.5;
@@ -38,7 +46,7 @@ export default function UploadRing({ size = 28, color, trackColor }: { size?: nu
 
   return (
     <View style={{ width: size, height: size }}>
-      <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ rotate }] }]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ rotate: determinate ? '-90deg' : rotate }] }]}>
         <Svg width={size} height={size}>
           {trackColor ? (
             <Circle
@@ -58,7 +66,7 @@ export default function UploadRing({ size = 28, color, trackColor }: { size?: nu
             strokeWidth={2.5}
             strokeLinecap="round"
             fill="none"
-            strokeDasharray={`${circumference * 0.28} ${circumference}`}
+            strokeDasharray={`${circumference * (determinate ? Math.max(0.02, Math.min(1, progress!)) : 0.28)} ${circumference}`}
           />
         </Svg>
       </Animated.View>
