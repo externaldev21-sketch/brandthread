@@ -25,6 +25,7 @@ import { flatRateShipping } from "../lib/defaultShipping";
 import { refundOrder, RefundError } from "../lib/money/refunds";
 import { notifyBuyerOrderCancelled, notifySellerOrderCancelledByBuyer } from "../lib/orderNotifications";
 import { withItemProductIds } from "../lib/orderItemProducts";
+import { loadOrderListThumbs, withItemImages } from "../lib/orderItemImages";
 import { resolveReorder } from "../lib/reorderResolver";
 import {
   bindLoyaltyRedemptionToCheckout,
@@ -1550,9 +1551,17 @@ router.get("/orders", async (req, res) => {
       .limit(page.limit + 1)
       .offset(page.offset);
     const rows = finishListPage(res, page, fetched);
+    // Item 55: every line (so "+N more" stays right) with a product
+    // thumbnail on the first few, for the list card's thumbnail row.
+    const thumbs = await loadOrderListThumbs(rows.map((row) => row.id));
     // The list carries the timeline and guarantee but not the scan history
     // (events are loaded with the order detail).
-    res.json(rows.map((row) => ({ ...row, delivery: buildBuyerDelivery(row) })));
+    res.json(rows.map((row) => ({
+      ...row,
+      delivery: buildBuyerDelivery(row),
+      items: thumbs.get(row.id)?.items ?? [],
+      thumbnailUrl: thumbs.get(row.id)?.thumbnailUrl ?? null,
+    })));
   } catch (err) {
     req.log.error({ err }, "Failed to fetch buyer orders");
     res.status(500).json({ error: "Failed to fetch orders" });
@@ -1598,7 +1607,7 @@ router.get("/orders/:id", async (req, res) => {
       return;
     }
 
-    const items = await withItemProductIds(await db
+    const items = await withItemImages(await db
       .select()
       .from(orderItems)
       .where(eq(orderItems.orderId, row.id)));

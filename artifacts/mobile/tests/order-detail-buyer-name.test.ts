@@ -109,4 +109,16 @@ describe('seller order detail buyer identity adapter', () => {
     });
     expect(order.customer.initials).toBe('GC');
   });
+
+  it('maps each line\'s product thumbnail so fulfill-order can show it (item 55)', () => {
+    const order = adaptApiOrder({
+      id: 'order-1', ownerId: 'seller-1', buyerId: 'buyer-1', orderNumber: 'BT-1',
+      status: 'processing', totalCents: 3000, createdAt: '2026-08-31T12:00:00.000Z',
+      items: [
+        { id: 'l1', productId: 'p1', productName: 'Tee', quantity: 1, priceCents: 1500, imageUrl: 'https://signed.example/tee' },
+        { id: 'l2', productId: null, productName: 'Gone', quantity: 1, priceCents: 1500, imageUrl: null },
+      ],
+    });
+    expect(order.lineItems.map((li) => li.imageUri)).toEqual(['https://signed.example/tee', undefined]);
+  });
 });

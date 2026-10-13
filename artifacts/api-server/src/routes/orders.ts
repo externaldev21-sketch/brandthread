@@ -6,6 +6,8 @@ import { finishListPage, parseListPage } from "../lib/pagination";
 import { executeOrderRelease, requestOrderRelease } from "../lib/money/escrow";
 import { withItemImageUrls, withItemProductIds } from "../lib/orderItemProducts";
 import { orderGrossCents, refundOrder, RefundError } from "../lib/money/refunds";
+import { loadOrderListThumbs, ORDER_LIST_THUMB_LIMIT, withItemImages, withOrderImage } from "../lib/orderItemImages";
+
 import { orderStatusMachine, type OrderStatus } from "../lib/money/stateMachines";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
@@ -194,8 +196,15 @@ router.get("/", async (req, res) => {
     .limit(page.limit + 1)
     .offset(page.offset);
   const rows = finishListPage(res, page, fetched);
+  // Item 55: first few lines with their product thumbnail (additive; the
+  // full count stays in itemCount).
+  const thumbs = await loadOrderListThumbs(rows.map((row) => row.id), { itemLimit: ORDER_LIST_THUMB_LIMIT });
   // Seller-only Radar summary: one `risk` object instead of the raw columns.
-  res.json(rows.map(withRiskView));
+  res.json(rows.map((row) => ({
+    ...withRiskView(row),
+    items: thumbs.get(row.id)?.items ?? [],
+    thumbnailUrl: thumbs.get(row.id)?.thumbnailUrl ?? null,
+  })));
 });
 
 // POST /api/orders — transactional, server-side prices, stock validation (manager+)
@@ -677,7 +686,7 @@ router.patch("/:id/status", requireRole("staff"), validateInput({ params: orderI
   };
   const notif = quietShip ? undefined : notifMap[status];
   if (transitioned.buyerId && notif) {
-    publishNotification({
+    withOrderImage(transitioned.id, {
       userId:     transitioned.buyerId,
       category:   "orders",
       type:       notif.type,
@@ -685,7 +694,7 @@ router.patch("/:id/status", requireRole("staff"), validateInput({ params: orderI
       body:       notif.body,
       targetId:   transitioned.id,
       targetType: "order",
-    }).catch(() => { /* non-critical */ });
+    }).then(publishNotification).catch(() => { /* non-critical */ });
   }
   if (status === "shipped" && !quietShip) {
     void notifyOrderShipped(transitioned).catch((err) => {
@@ -1004,7 +1013,7 @@ router.patch("/:id/tracking", requireRole("staff"), validateInput({ params: orde
   // Notify buyer only when status genuinely transitioned to shipped
   if (statusTransition?.buyerId && notifyCustomer) {
     const carrierLabel = updated.carrier ?? carrier ?? "carrier";
-    publishNotification({
+    withOrderImage(statusTransition.id, {
       userId:     statusTransition.buyerId,
       category:   "orders",
       type:       "order_shipped",
@@ -1012,7 +1021,7 @@ router.patch("/:id/tracking", requireRole("staff"), validateInput({ params: orde
       body:       `Order #${statusTransition.orderNumber} is on its way via ${carrierLabel} — tracking: ${updated.trackingNumber ?? "not available yet"}`,
       targetId:   statusTransition.id,
       targetType: "order",
-    }).catch(() => { /* non-critical */ });
+    }).then(publishNotification).catch(() => { /* non-critical */ });
   }
   const trackingAlertMap: Partial<Record<typeof TRACKING_STATUSES[number], {
     type: string;
@@ -1038,7 +1047,7 @@ router.patch("/:id/tracking", requireRole("staff"), validateInput({ params: orde
   const trackingAlert = trackingStatusTransition
     && trackingAlertMap[trackingStatusTransition.trackingStatus as typeof TRACKING_STATUSES[number]];
   if (trackingAlert && updated.buyerId) {
-    publishNotification({
+    withOrderImage(updated.id, {
       userId:     updated.buyerId,
       category:   "orders",
       pushCategory: "order",
@@ -1047,7 +1056,7 @@ router.patch("/:id/tracking", requireRole("staff"), validateInput({ params: orde
       body:       trackingAlert.body,
       targetId:   updated.id,
       targetType: "buyer_order",
-    }).catch(() => { /* non-critical */ });
+    }).then(publishNotification).catch(() => { /* non-critical */ });
   }
   if (notifyCustomer && statusTransition) {
     void notifyOrderShipped(updated).catch((err) => {
@@ -1122,12 +1131,12 @@ router.patch("/:id/items-tracking", requireRole("staff"), validateInput({ params
     );
   }
   if (result.buyerId && notifyCustomer) {
-    publishNotification({
+    withOrderImage(req.params.id, {
       userId: result.buyerId, category: "orders", pushCategory: "order", type: "order_shipped",
       title: "Part of your order has shipped!",
       body: `Order #${result.orderNumber} is on its way via ${carrier ?? "carrier"} — tracking: ${trackingNumber}`,
       targetId: req.params.id, targetType: "buyer_order",
-    }).catch(() => { /* non-critical */ });
+    }).then(publishNotification).catch(() => { /* non-critical */ });
   }
   void notifyOrderLiveActivity(req.params.id);
   const [order] = await db.select().from(orders).where(eq(orders.id, req.params.id)).limit(1);
