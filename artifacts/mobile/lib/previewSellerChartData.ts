@@ -32,7 +32,10 @@
 import { EMPTY_TRAFFIC_SOURCES, type SellerHomeAnalytics } from './sellerHomeAnalytics';
 import { ordersForDay, type PreviewSellerOrder } from './previewSellerOrders';
 
-export type PreviewSellerChartRange = 'today' | 'week' | 'month' | 'year' | 'all';
+export type PreviewSellerChartRange = 'today' | 'week' | 'month' | 'year' | 'all' | '7d' | '30d' | '90d';
+
+/** Rolling "last N days" ranges (today included) — same windows as the API's 7d/30d/90d. */
+const ROLLING_DAYS: Partial<Record<PreviewSellerChartRange, number>> = { '7d': 7, '30d': 30, '90d': 90 };
 export type PreviewSellerChartMode = 'fresh' | 'demo';
 
 type Bucket = SellerHomeAnalytics['buckets'][number];
@@ -66,7 +69,7 @@ function daysInMonth(y: number, m: number): number {
 }
 
 const SEED_BY_RANGE: Record<PreviewSellerChartRange, number> = {
-  today: 1001, week: 2002, month: 3003, year: 4004, all: 5005,
+  today: 1001, week: 2002, month: 3003, year: 4004, all: 5005, '7d': 6006, '30d': 7007, '90d': 8008,
 };
 
 function makeBucket(iso: string, mode: PreviewSellerChartMode, baseCents: number, shape: number, rand: () => number): Bucket {
@@ -100,7 +103,18 @@ function ordersInDays(y: number, m: number, firstDay: number, lastDay: number, n
   return out;
 }
 
+/** One daily bucket per local day for the `days` days ending `endOffsetDays` before today (0 = ending today). */
+function rollingDemoBuckets(days: number, now: Date, endOffsetDays = 0): Bucket[] {
+  return Array.from({ length: days }, (_, i) => {
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - endOffsetDays - (days - 1 - i));
+    return bucketFromOrders(localBucketIso(day.getFullYear(), day.getMonth(), day.getDate()),
+      ordersForDay(day.getFullYear(), day.getMonth(), day.getDate(), now));
+  });
+}
+
 function buildDemoBuckets(range: PreviewSellerChartRange, now: Date): Bucket[] {
+  const rollingDays = ROLLING_DAYS[range];
+  if (rollingDays) return rollingDemoBuckets(rollingDays, now);
   switch (range) {
     case 'today': {
       const y = now.getFullYear(); const m = now.getMonth(); const d = now.getDate();
@@ -143,6 +157,13 @@ function buildDemoBuckets(range: PreviewSellerChartRange, now: Date): Bucket[] {
 function buildBuckets(range: PreviewSellerChartRange, mode: PreviewSellerChartMode, now: Date): Bucket[] {
   if (mode === 'demo') return buildDemoBuckets(range, now);
   const rand = mulberry32(SEED_BY_RANGE[range]);
+  const rollingDays = ROLLING_DAYS[range];
+  if (rollingDays) {
+    return Array.from({ length: rollingDays }, (_, i) => {
+      const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (rollingDays - 1 - i));
+      return makeBucket(localBucketIso(day.getFullYear(), day.getMonth(), day.getDate()), mode, 16500, 1, rand);
+    });
+  }
 
   switch (range) {
     case 'today': {
@@ -211,8 +232,21 @@ export function buildPreviewSellerAnalytics(
   const orderCount = buckets.reduce((sum, b) => sum + b.orderCount, 0);
   const visitorCount = buckets.reduce((sum, b) => sum + b.visitorCount, 0);
 
+  const rollingDays = ROLLING_DAYS[range];
   const previous = mode === 'fresh'
     ? { totalCents: 0, netCents: 0, orderCount: 0, visitorCount: 0 }
+    : rollingDays
+      // Rolling windows compare against the real demo orders of the N days
+      // right before the window (the same rule as the API's previousPeriod).
+      ? (() => {
+        const prior = rollingDemoBuckets(rollingDays, now, rollingDays);
+        return {
+          totalCents: prior.reduce((sum, b) => sum + b.totalCents, 0),
+          netCents: prior.reduce((sum, b) => sum + b.netCents, 0),
+          orderCount: prior.reduce((sum, b) => sum + b.orderCount, 0),
+          visitorCount: prior.reduce((sum, b) => sum + b.visitorCount, 0),
+        };
+      })()
     : (() => {
       const previousTotalCents = Math.round(totalCents * (0.72 + mulberry32(SEED_BY_RANGE[range] + 1)() * 0.35));
       return {

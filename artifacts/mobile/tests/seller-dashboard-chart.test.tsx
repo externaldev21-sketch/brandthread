@@ -98,6 +98,10 @@ vi.mock('react-native-svg', () => {
 });
 
 import { AXIS_LABEL_WIDTH, DASHBOARD_RANGES, SellerDashboardChart } from '@/components/SellerDashboardChart';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const chartSource = fs.readFileSync(path.resolve(__dirname, '../components/SellerDashboardChart.tsx'), 'utf8');
 
 const theme = {
   accent: '#F7F7FA',
@@ -494,5 +498,40 @@ describe('SellerDashboardChart', () => {
     });
     const indicator = renderer!.root.findByProps({ testID: 'seller-dashboard-range-indicator' });
     expect(indicator.findByType('Glass' as unknown as React.ElementType)).toBeTruthy();
+  });
+
+  it('draws one smooth line only — no area gradient fill under it', async () => {
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart values={[10, 40, 25, 60]} labels={['A', 'B', 'C', 'D']} theme={theme} range="7d" onScrub={vi.fn()} isEmpty={false} />,
+      );
+    });
+    await layoutChart();
+    const paths = renderer!.root.findAllByType('Path' as React.ElementType);
+    expect(paths).toHaveLength(1);
+    expect(paths[0].props.fill).toBe('none');
+    expect(renderer!.root.findAllByType('LinearGradient' as React.ElementType)).toHaveLength(0);
+  });
+
+  it("renders the caller's range control instead of the default pills when given one", async () => {
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={[10, 40]}
+          labels={['A', 'B']}
+          theme={theme}
+          range="30d"
+          onScrub={vi.fn()}
+          isEmpty={false}
+          rangeControl={React.createElement('View', { testID: 'custom-range' })}
+        />,
+      );
+    });
+    expect(renderer!.root.findAllByProps({ testID: 'custom-range' }).length).toBeGreaterThan(0);
+    expect(renderer!.root.findAllByProps({ testID: 'seller-dashboard-range-pills' })).toHaveLength(0);
+  });
+
+  it('never fires a haptic per scrub tick', () => {
+    expect(chartSource).not.toContain('expo-haptics');
   });
 });

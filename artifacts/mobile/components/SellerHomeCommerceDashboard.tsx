@@ -49,12 +49,10 @@ import { buildPreviewSellerAnalytics } from '@/lib/previewSellerChartData';
 import { formatCents } from '@/lib/money';
 import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
 import { computeMetricChange } from '@/lib/sellerMetricChange';
-import { useCountUp } from '@/lib/useCountUp';
 import {
   countOrderReturns,
   deriveHubStats,
   deriveInventoryStats,
-  describeDashboardDelta,
   isNewSeller,
   mergeTopProductImages,
   normalizeRecentOrder,
@@ -74,12 +72,26 @@ import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { DASHBOARD_RANGES, SellerDashboardChart, type SellerDashboardRange } from '@/components/SellerDashboardChart';
 import { SellerDashboardStatGrid, type SellerDashboardStatTileData } from '@/components/SellerDashboardStatGrid';
-import { SellerDashboardActionNeeded } from '@/components/SellerDashboardActionNeeded';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { SellerDashboardTopProducts } from '@/components/SellerDashboardTopProducts';
 import { SellerDashboardTrafficSources } from '@/components/SellerDashboardTrafficSources';
-import { SellerDashboardRecentOrders } from '@/components/SellerDashboardRecentOrders';
 import { SellerDashboardSetupCard } from '@/components/SellerDashboardSetupCard';
+import { SellerDashboardTodo, SHIP_NOW_ROUTE } from '@/components/SellerDashboardTodo';
+import { SellerDashboardHomeRange } from '@/components/SellerDashboardHomeRange';
+import { SellerDashboardQuickActions } from '@/components/SellerDashboardQuickActions';
+import { SellerDashboardPayoutCard } from '@/components/SellerDashboardPayoutCard';
+import { SellerDashboardActivityFeed } from '@/components/SellerDashboardActivityFeed';
+import { SellerDashboardSectionTitle } from '@/components/SellerDashboardSectionTitle';
+import {
+  HOME_RANGE_COMPARISON,
+  HOME_RANGE_EMPTY_MESSAGE,
+  describeHomeDelta,
+  mergeDashboardActivity,
+  type DashboardActivityItem,
+  type NextPayoutEstimate,
+  type PayoutScheduleSummary,
+  type SellerHomeDashboardRange,
+} from '@/lib/sellerDashboardHome';
 import {
   BG,
   FG,
@@ -112,6 +124,9 @@ interface FinanceBalance {
     currency: string;
     formatted: string;
   } | null;
+  /** Real next payout (Stripe's pending payout, or the schedule's next run). */
+  nextPayoutEstimate?: NextPayoutEstimate | null;
+  payoutSchedule?: PayoutScheduleSummary | null;
 }
 
 interface PersistedCashoutAttempt {
@@ -126,25 +141,20 @@ function cashoutAttemptStorageKey(userId: string): string {
   return `bt:seller-cashout-attempt:${userId}`;
 }
 
-const PERIOD_LABEL: Record<SellerDashboardRange, string> = {
-  today: 'yesterday',
-  week: 'last week',
-  month: 'last month',
-  year: 'last year',
-  all: '',
+// "yesterday", "previous 7 days", … — the Traffic sources panel's own
+// "vs …" line reads the same comparison as the hero's delta.
+const PERIOD_LABEL: Record<SellerHomeDashboardRange, string> = {
+  today: HOME_RANGE_COMPARISON.today.replace(/^vs /, ''),
+  '7d': HOME_RANGE_COMPARISON['7d'].replace(/^vs /, ''),
+  '30d': HOME_RANGE_COMPARISON['30d'].replace(/^vs /, ''),
+  '90d': HOME_RANGE_COMPARISON['90d'].replace(/^vs /, ''),
 };
 
 // Range-aware empty-chart copy — "No sales yet" alone reads the same for
 // every range; naming the range itself (Shopify's own zero-state pattern)
 // makes it clear which window is empty rather than implying the WHOLE store
 // has never sold anything.
-const EMPTY_CHART_MESSAGE: Record<SellerDashboardRange, string> = {
-  today: 'No sales yet today',
-  week: 'No sales yet this week',
-  month: 'No sales yet this month',
-  year: 'No sales yet this year',
-  all: 'No sales yet',
-};
+const EMPTY_CHART_MESSAGE: Record<SellerHomeDashboardRange, string> = HOME_RANGE_EMPTY_MESSAGE;
 
 // Live updates while the Dashboard is visible: there's no push/socket
 // channel for new orders or Thread Cash events (see lib/live/* — that's Live
@@ -208,7 +218,7 @@ export default function SellerHomeCommerceDashboard({
   const scrollResetRef = useScrollReset<ScrollView>();
 
   // Opens on Today every launch (Dev) — nothing persisted across launches.
-  const [range, setRange] = useState<SellerDashboardRange>('today');
+  const [range, setRange] = useState<SellerHomeDashboardRange>('today');
   const [metric, setMetric] = useState<MetricKey>('sales');
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [snapshot, setSnapshot] = useState<SellerHomeAnalyticsSnapshot | null>(null);
@@ -233,6 +243,7 @@ export default function SellerHomeCommerceDashboard({
   const [everSoldCount, setEverSoldCount] = useState<number | null>(null);
   const [actionInputs, setActionInputs] = useState<{ unreadMessages: number; lowStockCount: number; returns: number; toShip: number } | null>(null);
   const [secondaryError, setSecondaryError] = useState(false);
+  const [activityItems, setActivityItems] = useState<DashboardActivityItem[]>([]);
 
   // The seller's own public store URL, shown next to the "Dashboard" title
   // and copied to the clipboard on tap — real even before the store is
@@ -373,9 +384,11 @@ export default function SellerHomeCommerceDashboard({
       setRecentOrders(previewOrders.slice(0, 5).map(normalizeRecentOrder));
       setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0, toShip: filterOrders(previewOrders.map(apiRowToOrder), 'unfulfilled').length });
       setTopProducts(mergeTopProductImages([...byProduct.values()].sort((a, b) => b.revenueCents - a.revenueCents).slice(0, 5), []));
+      setActivityItems(mergeDashboardActivity({ orders: previewOrders.slice(0, 10) }));
       return;
     }
     if (!userId) {
+      setActivityItems([]);
       setTopProducts([]);
       setRecentOrders([]);
       setEverSoldCount(0);
@@ -428,6 +441,18 @@ export default function SellerHomeCommerceDashboard({
           }))
         : [];
       setTopProducts(mergeTopProductImages(top, Array.isArray(catalog) ? catalog : []));
+
+      // Recent activity: real orders (already fetched) plus real followers
+      // and reviews. Either of those failing only drops its rows.
+      const [followersResult, reviewsResult] = await Promise.allSettled([
+        api.social.followers(),
+        api.reviews.mine(),
+      ]);
+      setActivityItems(mergeDashboardActivity({
+        orders: orders.slice(0, 10),
+        followers: followersResult.status === 'fulfilled' && Array.isArray(followersResult.value) ? followersResult.value.slice(0, 10) : [],
+        reviews: reviewsResult.status === 'fulfilled' && Array.isArray(reviewsResult.value) ? reviewsResult.value.slice(0, 10) : [],
+      }));
     } catch (error) {
       if (__DEV__) console.warn('[seller-dashboard] secondary data unavailable', error);
       setSecondaryError(true);
@@ -446,6 +471,16 @@ export default function SellerHomeCommerceDashboard({
         payoutsEnabled: true,
         bankConnected: true,
         processingCashout: null,
+        // Demo only: a weekly schedule paying out next Friday.
+        ...(isPreviewDemoMode() ? {
+          nextPayoutEstimate: (() => {
+            const date = new Date();
+            date.setDate(date.getDate() + (((5 - date.getDay()) + 7) % 7 || 7));
+            date.setHours(12, 0, 0, 0);
+            return { kind: 'scheduled', date: date.toISOString(), amount: 428122, formatted: '$4,281.22' };
+          })(),
+          payoutSchedule: { interval: 'weekly' },
+        } : {}),
       });
       setFinanceLoading(false);
       return;
@@ -685,21 +720,14 @@ export default function SellerHomeCommerceDashboard({
 
   const isEmptyChart = newSeller || buckets.every((b) => b.totalCents === 0 && b.orderCount === 0 && b.visitorCount === 0);
   const activeValue = scrubIndex !== null && series[scrubIndex] != null ? series[scrubIndex] : metricAggregate.current;
-  const heroDisplay = useCountUp(Math.round(activeValue), scrubIndex === null);
-  // The delta line is computed instantly from metricAggregate (no animation),
-  // but the hero number above it counts up over ~650ms — showing the delta
-  // before the count-up settles would briefly (or, if requestAnimationFrame
-  // stalls, not-so-briefly) show a total and a delta that don't agree. Only
-  // reveal the delta once the displayed hero number has actually caught up.
-  const heroSettled = heroDisplay === Math.round(activeValue);
+  // Static hero value (no count-up flourish), so it and the delta line
+  // under it always agree.
+  const heroDisplay = Math.round(activeValue);
   const scrubLabel = scrubIndex !== null ? labels[scrubIndex] : null;
 
-  const periodLabel = PERIOD_LABEL[range];
-  const deltaFormatter = metric === 'sales' || metric === 'aov' ? formatCents
-    : metric === 'conversion' ? (n: number) => `${n.toFixed(1)}%`
-    : (n: number) => formatCompactCount(Math.round(n));
-  const deltaLine = data && range !== 'all' && periodLabel
-    ? describeDashboardDelta(metricAggregate.current, metricAggregate.previous, deltaFormatter, periodLabel)
+  // "+12% vs yesterday" — percent only, plain text + a small arrow icon.
+  const deltaLine = data
+    ? describeHomeDelta(metricAggregate.current, metricAggregate.previous, range, { isEmpty: isEmptyChart })
     : null;
 
   const metricLabelText: Record<MetricKey, string> = {
@@ -771,6 +799,18 @@ export default function SellerHomeCommerceDashboard({
             />}
           </View>
 
+          {/* ── To do: only when something needs action ─────────────── */}
+          {actionCounts && (
+            <View style={styles.todoSection}>
+              <SellerDashboardTodo
+                counts={actionCounts}
+                theme={theme}
+                onNavigate={nav}
+                onShipNow={() => router.push(SHIP_NOW_ROUTE as never)}
+              />
+            </View>
+          )}
+
           {!data && analyticsError ? (
             <View style={styles.errorBanner} testID="seller-dashboard-error">
               <Feather name="alert-circle" size={16} color={theme.error} />
@@ -807,20 +847,15 @@ export default function SellerHomeCommerceDashboard({
                   // message is shown once, in the chart itself; this blank
                   // line only holds the hero's height so nothing jumps.
                   <Text style={[styles.heroDelta, { color: theme.muted }]}>{' '}</Text>
-                ) : deltaLine && scrubIndex === null && heroSettled ? (
-                  <Text
-                    style={[
-                      styles.heroDelta,
-                      { color: deltaLine.direction === 'flat' ? theme.muted : theme.text },
-                    ]}
-                  >
-                    {deltaLine.direction === 'up' ? '↑ ' : deltaLine.direction === 'down' ? '↓ ' : ''}
-                    {deltaLine.label}
-                  </Text>
+                ) : deltaLine && scrubIndex === null ? (
+                  <View style={styles.heroDeltaRow} testID="seller-dashboard-hero-delta">
+                    {deltaLine.direction !== 'flat' && (
+                      <Feather name={deltaLine.direction === 'up' ? 'arrow-up-right' : 'arrow-down-right'} size={14} color={theme.text} />
+                    )}
+                    <Text style={[styles.heroDelta, styles.heroDeltaText, { color: theme.text }]}>{deltaLine.label}</Text>
+                  </View>
                 ) : (
-                  <Text style={[styles.heroDelta, { color: theme.muted }]}>
-                    {range === 'all' ? 'All-time' : ' '}
-                  </Text>
+                  <Text style={[styles.heroDelta, { color: theme.muted }]}>{' '}</Text>
                 )}
               </PressableScale>
 
@@ -829,13 +864,18 @@ export default function SellerHomeCommerceDashboard({
                 labels={labels}
                 theme={theme}
                 range={range}
-                onRangeChange={(next) => { setRange(next); setScrubIndex(null); }}
+                rangeControl={<SellerDashboardHomeRange range={range} onRangeChange={(next) => { setRange(next); setScrubIndex(null); }} />}
                 onScrub={setScrubIndex}
                 isEmpty={isEmptyChart}
                 formatValue={(v) => formatMetricValue(metric, v)}
                 emptyMessage={EMPTY_CHART_MESSAGE[range]}
                 showNowMarker={range === 'today'}
               />
+
+              {/* ── Quick actions ────────────────────────────────────────── */}
+              <View style={styles.section}>
+                <SellerDashboardQuickActions theme={theme} onNavigate={nav} />
+              </View>
 
               {/* ── Stat tile grid ───────────────────────────────────────── */}
               {!newSeller && (
@@ -844,9 +884,20 @@ export default function SellerHomeCommerceDashboard({
                 </View>
               )}
 
-              {/* ── Balance / withdraw ───────────────────────────────────── */}
+              {/* ── Payouts: next payout, then balance / withdraw ───────── */}
               {currentRole === 'owner' && (
-                <View style={[styles.section, styles.balanceRow, { borderColor: theme.borderSubtle }]}>
+                <View style={styles.section} testID="seller-dashboard-payouts">
+                  <SellerDashboardSectionTitle title="Payouts" theme={theme} />
+                  <SellerDashboardPayoutCard
+                    estimate={financeBalance?.nextPayoutEstimate}
+                    schedule={financeBalance?.payoutSchedule}
+                    theme={theme}
+                    onOpen={() => nav('/payouts')}
+                  />
+                </View>
+              )}
+              {currentRole === 'owner' && (
+                <View style={[styles.balanceRow, { borderColor: theme.borderSubtle }]}>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[styles.balanceLabel, { color: theme.muted }]}>Available balance</Text>
                     <Text style={[styles.balanceValue, { color: theme.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
@@ -872,7 +923,7 @@ export default function SellerHomeCommerceDashboard({
               {/* ── Thread Cash — small row, links to the Payouts card/cash-out ── */}
               {currentRole === 'owner' && (
                 <TouchableOpacity
-                  style={[styles.section, styles.threadCashRow, { borderColor: theme.borderSubtle }]}
+                  style={[styles.threadCashRow, { borderColor: theme.borderSubtle }]}
                   activeOpacity={0.8}
                   onPress={() => nav('/payouts')}
                   accessibilityRole="button"
@@ -899,10 +950,6 @@ export default function SellerHomeCommerceDashboard({
                       onAddProduct={() => nav(withOrigin('/add-product', 'dashboard'))}
                       onOpenSetup={() => (addProductTask ? openTask(addProductTask) : nav(withOrigin('/add-product', 'dashboard')))}
                     />
-                  </View>
-                ) : actionCounts ? (
-                  <View style={[isTablet && styles.tabletRowItem, styles.section]}>
-                    <SellerDashboardActionNeeded counts={actionCounts} theme={theme} onNavigate={nav} />
                   </View>
                 ) : null}
 
@@ -937,7 +984,7 @@ export default function SellerHomeCommerceDashboard({
                   <SellerDashboardTrafficSources
                     totalVisits={data.visitorCount}
                     previousVisits={data.previous?.visitorCount ?? 0}
-                    periodLabel={range !== 'all' ? PERIOD_LABEL[range] : null}
+                    periodLabel={PERIOD_LABEL[range]}
                     trafficSources={data.trafficSources}
                     theme={theme}
                     onSeeAll={() => nav('/analytics-store')}
@@ -947,13 +994,10 @@ export default function SellerHomeCommerceDashboard({
                 </View>
               )}
 
-              {!newSeller && recentOrders && recentOrders.length > 0 && (
+              {/* ── Recent activity: orders, followers, reviews ─────────── */}
+              {activityItems.length > 0 && (
                 <View style={styles.section}>
-                  <SellerDashboardRecentOrders
-                    orders={recentOrders}
-                    onOpenOrder={(id) => nav(`/order-detail?id=${id}`)}
-                    onSeeAll={() => nav('/(tabs)/orders')}
-                  />
+                  <SellerDashboardActivityFeed items={activityItems} theme={theme} onNavigate={nav} />
                 </View>
               )}
             </>
@@ -1050,6 +1094,10 @@ const styles = StyleSheet.create({
     fontSize: FS.sm,
     marginTop: 4,
   },
+  heroDeltaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  heroDeltaText: { marginTop: 0 },
+  // "To do" sits right under the header, above the hero.
+  todoSection: { marginTop: SP.md, marginBottom: SP.md },
 
   section: { marginTop: SP.xl },
 
@@ -1068,6 +1116,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SP.md,
     paddingTop: SP.md,
+    paddingBottom: SP.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   balanceLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', letterSpacing: 0.6 },

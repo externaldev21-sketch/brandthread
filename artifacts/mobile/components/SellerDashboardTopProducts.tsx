@@ -1,8 +1,9 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { SellerDashboardSectionTitle } from '@/components/SellerDashboardSectionTitle';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import type { TopProductSummary } from '@/lib/sellerDashboardStats';
@@ -22,12 +23,7 @@ export function SellerDashboardTopProducts({
 
   return (
     <View testID="seller-dashboard-top-products">
-      <View style={styles.headerRow}>
-        <Text style={[styles.sectionHeader, { color: theme.muted }]}>Top products</Text>
-        <TouchableOpacity onPress={onSeeAll} accessibilityRole="button" accessibilityLabel="See all products">
-          <Text style={[styles.seeAll, { color: theme.subtle }]}>See all</Text>
-        </TouchableOpacity>
-      </View>
+      <SellerDashboardSectionTitle title="Top products" theme={theme} action="See all" onAction={onSeeAll} />
       <View>
         {products.slice(0, 5).map((product, index) => (
           <PressableScale

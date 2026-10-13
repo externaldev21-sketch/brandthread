@@ -1392,7 +1392,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     analytics: {
       dashboard:  () => get('/api/analytics/dashboard'),
-      home: (range: 'live' | 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'all') =>
+      home: (range: 'live' | 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'all' | '7d' | '30d' | '90d') =>
         get<{
           range: string;
           totalCents: number;
