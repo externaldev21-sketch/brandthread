@@ -138,7 +138,7 @@ export default function BuyerQRCode() {
               <View style={s.infoRow}>
                 <Icon name="link" size={17} color={PURPLE} />
                 <Text style={s.infoLabel}>Link</Text>
-                <Text style={s.infoValue} numberOfLines={1}>{qrValue}</Text>
+                <Text style={s.infoValue} numberOfLines={2}>{qrValue}</Text>
               </View>
             ) : null}
           </View>
