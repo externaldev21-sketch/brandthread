@@ -31,6 +31,7 @@ import { payoutMayRelease, payoutReleasableSql } from "../delivery/payoutGate";
 import { applyThreadCashSellerTopup } from "../threadCash/checkoutTopup";
 import { notifySellerPayoutTransferred } from "../sellerMoneyNotifications";
 import { announceRecovered, netRecoveriesFromRelease } from "./sellerRecovery";
+import { checkFirstPayout } from "./firstPayoutGate";
 import { isDefinitiveStripeRejection, stripeErrorCode } from "./stripeMoney";
 import {
   expiredReservationCheckouts, releaseStockReservation,
@@ -74,6 +75,8 @@ export async function settleTransferOrder(
   // Hold-until-delivered (lib/delivery/payoutGate.ts): the seller is paid
   // only after delivery + the buffer, with no dispute or return open.
   if (!(await payoutMayRelease(db, { ...order, id: orderId }, options.now ?? new Date()))) return "not_ready";
+  // First payout waits for Stripe Identity (lib/money/firstPayoutGate.ts); the sweep retries.
+  if (!(await checkFirstPayout(db, order.ownerId)).ok) return "not_ready";
 
   const [seller] = await db.select({ stripeAccountId: users.stripeAccountId })
     .from(users).where(eq(users.clerkId, order.ownerId)).limit(1);

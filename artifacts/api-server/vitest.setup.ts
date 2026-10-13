@@ -9,6 +9,10 @@ process.env.PAYOUT_MODE ??= "immediate";
 // just because the workspace has credentials. Moderation suites explicitly
 // enable screening through their provider seams or environment fixtures.
 process.env.MEDIA_MODERATION_ENABLED = "false";
+// Same for the first-payout identity gate (lib/money/firstPayoutGate.ts):
+// the money suites seed sellers who never ran Stripe Identity. The gate's own
+// suite (firstPayoutGate.integration.test.ts) turns it back on.
+process.env.PAYOUT_REQUIRE_IDENTITY ??= "off";
 import pg from "pg";
 import { purgeTestData } from "@workspace/db/testing";
 

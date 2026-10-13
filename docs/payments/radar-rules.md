@@ -160,9 +160,11 @@ Radar lowers disputes; it does not remove them. `charge.dispute.*` events are al
   before they ship.
 - Flags (for example `country_mismatch`, `cvc_failed`) are stored on the order, so when a fraud dispute arrives
   the evidence screen can show the seller what Stripe saw at payment time.
-- Stripe's Early Fraud Warnings (`radar.early_fraud_warning.created`) are a separate Stripe feature; the app does
-  not use them yet. **[Dev]** decide whether to refund proactively on an EFW (it usually avoids the dispute fee);
-  that would be a separate change.
+- Stripe's Early Fraud Warnings (`radar.early_fraud_warning.created` / `.updated`) now flag the order
+  (`lib/risk/orderRisk.ts` `applyEarlyFraudWarning`): risk goes to **highest**, the order goes back to unreviewed
+  and the seller sees "Review before shipping" with "The card's bank reported this payment as …". Add both event
+  types to the platform webhook endpoint in the Stripe Dashboard. **[Dev]** decide whether to refund proactively on
+  an EFW (it usually avoids the dispute fee); that stays a separate change owned by the auto-refunds work.
 
 ## 10. Decisions that are Dev's to make
 
@@ -175,6 +177,6 @@ Radar lowers disputes; it does not remove them. `charge.dispute.*` events are al
 4. Whether billing/shipping country mismatch (R4/S4) reviews or only challenges. Affects gift buyers.
 5. Who works the review queue, and the response deadline relative to drop release.
 6. Whether any allow rules exist at all (section 6).
-7. Whether to act on Early Fraud Warnings.
+7. Whether to auto-refund unshipped orders on an Early Fraud Warning (orders are flagged today).
 8. Whether sellers should be told more than "Review before shipping" (currently they see flags only, no
    Stripe rule names).

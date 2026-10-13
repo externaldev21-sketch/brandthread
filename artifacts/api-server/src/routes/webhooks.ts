@@ -102,7 +102,7 @@ import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
 import { reserveStockForOrder } from "../lib/stockReservation";
 import { recordPurchaseSignals } from "../lib/ranking/signals";
 import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
-import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
+import { applyEarlyFraudWarningToOrders, applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
 import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
 import { amountBucket, captureServerEvent } from "../lib/analytics";
 import { sendPurchaseConversions } from "../lib/conversionTracking";
@@ -520,6 +520,18 @@ router.post("/stripe", async (req: Request, res: Response) => {
           );
         } catch (err) {
           req.log.warn({ err, eventId: event.id }, "Radar review event could not update order risk");
+        }
+        break;
+
+      // ── Stripe Radar early fraud warnings: the issuer reported the payment
+      // as fraud (usually days before a chargeback). Flag the order so the
+      // seller sees "Review before shipping"; best effort.
+      case "radar.early_fraud_warning.created":
+      case "radar.early_fraud_warning.updated":
+        try {
+          await applyEarlyFraudWarningToOrders(dbReviewDeps, event.data.object as any);
+        } catch (err) {
+          req.log.warn({ err, eventId: event.id }, "Early fraud warning could not update order risk");
         }
         break;
 

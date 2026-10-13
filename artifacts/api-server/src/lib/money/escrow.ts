@@ -31,6 +31,7 @@ import {
 import { isDefinitiveStripeRejection, safeErrorMessage, stripeErrorCode, type ChargeDetails } from "./stripeMoney";
 import { payoutHoldApplies, payoutReleasableSql, payoutTimeReached, hasOpenReturn } from "../delivery/payoutGate";
 import { announceRecovered, netRecoveriesFromRelease, type SellerRecovery } from "./sellerRecovery";
+import { checkFirstPayout } from "./firstPayoutGate";
 import type Stripe from "stripe";
 import { applyThreadCashSellerTopup } from "../threadCash/checkoutTopup";
 
@@ -488,6 +489,16 @@ export async function executeOrderRelease(
         lastErrorMessage: stripeClient
           ? "The seller has no connected Stripe account yet; the release will retry."
           : "Stripe is not configured on this server.",
+        updatedAt: new Date(),
+      }).where(eq(orderReleases.id, releaseId));
+      return { release: { ...release, state: release.state }, go: false as const, blocked: true };
+    }
+    // Verify before a new transfer attempt, without altering recovery netting
+    // or the durable provider reference used to reconcile ambiguous retries.
+    if (release.amount_cents > 0 && !staleTransfer && !(await checkFirstPayout(tx, release.seller_id)).ok) {
+      await tx.update(orderReleases).set({
+        lastErrorCode: "IDENTITY_REQUIRED",
+        lastErrorMessage: "The seller hasn't verified their identity yet; the release will retry.",
         updatedAt: new Date(),
       }).where(eq(orderReleases.id, releaseId));
       return { release: { ...release, state: release.state }, go: false as const, blocked: true };

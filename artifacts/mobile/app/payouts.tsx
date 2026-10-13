@@ -141,6 +141,8 @@ function PayoutsScreenContent() {
   const onboardingOpenRef = useRef(false);
   const threadCash = useSellerThreadCashBalance();
   const [cashOutVisible, setCashOutVisible] = useState(false);
+  // A new seller's first payout waits for identity verification (server: lib/money/firstPayoutGate.ts).
+  const [identityRequired, setIdentityRequired] = useState(false);
 
   function leaveSetupDestination() {
     if (params.from === STUDIO_MENU_ORIGIN) {
@@ -231,6 +233,15 @@ function PayoutsScreenContent() {
   useFocusEffect(useCallback(() => {
     void load();
   }, [load]));
+
+  useFocusEffect(useCallback(() => {
+    if (isPreview) return;
+    let active = true;
+    api.finance.firstPayout()
+      .then((r) => { if (active) setIdentityRequired(r.identityRequired); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [api, isPreview]));
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -487,6 +498,22 @@ function PayoutsScreenContent() {
              >
                <Text style={styles.settingsValue}>Payout setup checklist</Text>
                <Icon name="chevron-right" size={16} color={theme.muted} />
+             </TouchableOpacity>
+           )}
+
+           {!isPreview && !isReadOnly && identityRequired && (
+             <TouchableOpacity
+               testID="seller-payouts-verify-identity"
+               style={[styles.settingsRow, { borderTopWidth: 0, marginBottom: SP.sm }]}
+               onPress={() => { haptic(); router.push('/seller-verification' as never); }}
+               accessibilityRole="button"
+               accessibilityLabel="Verify your identity to get your first payout"
+             >
+               <View style={{ flex: 1 }}>
+                 <Text style={styles.settingsValue}>Verify your identity</Text>
+                 <Text style={styles.bankSub}>Your first payout is sent once you verify with a photo ID.</Text>
+               </View>
+               <Feather name="chevron-right" size={16} color={theme.muted} />
              </TouchableOpacity>
            )}
 

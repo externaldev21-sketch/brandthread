@@ -4214,6 +4214,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Lost chargebacks being recovered from upcoming payouts, with their history. */
       recoveries: () => freshGet<RecoveriesResponse>('/api/finance/recoveries'),
       /** Current schedule, Instant eligibility and fee quote (optionally for an amount in cents), next payout estimate. */
+      /** True while a new seller's first payout waits for identity verification. */
+      firstPayout: () => get<{ identityRequired: boolean; message: string | null }>('/api/finance/first-payout'),
       payoutSchedule: (amountCents?: number) =>
         freshGet<PayoutScheduleInfo>(`/api/finance/payout-schedule${amountCents ? `?amount=${amountCents}` : ''}`),
       setPayoutSchedule: (data: { interval: 'daily' | 'weekly' | 'manual'; weeklyAnchor?: WeeklyAnchor }) =>
