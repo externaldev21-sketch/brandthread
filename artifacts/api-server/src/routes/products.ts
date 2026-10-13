@@ -575,6 +575,7 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
     void notifyBackInStock({
       productId: req.params.id, ownerId, productName: product.name,
       previousStock: before.stock, newStock: updated.stock,
+      variantId: updated.id,
     });
     void notifyPriceDrop({
       productId: req.params.id, ownerId, productName: product.name,

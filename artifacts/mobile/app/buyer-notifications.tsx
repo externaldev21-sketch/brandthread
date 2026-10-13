@@ -98,6 +98,8 @@ function notifIcon(type: Notification['type']): string {
     case 'live_reminder':
     case 'live_started': return 'video';
     case 'product_restocked': return 'refresh-cw';
+    case 'bag_restock':
+    case 'size_back': return 'refresh-cw';
     case 'price_drop': return 'trending-down';
     case 'saved_product_update': return 'bookmark';
     case 'new_friend_message': return 'message-circle';
@@ -189,6 +191,14 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
       break;
     case 'live_reminder':
       router.push('/live' as any);
+      break;
+    case 'bag_restock':
+    case 'size_back':
+      if (notif.targetId) {
+        router.push(`/buyer-product-detail?productId=${encodeURIComponent(notif.targetId)}` as any);
+        break;
+      }
+      router.navigate('/(buyer)/discover' as any);
       break;
     case 'drop_live':
     case 'product_restocked':

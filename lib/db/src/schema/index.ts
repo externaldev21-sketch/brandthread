@@ -5,6 +5,7 @@ export * from './sizeCharts';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
 export * from './productVariantsStock';
+export * from './restockAlerts';
 export * from './security';
 export * from './money';
 export * from './productLaunches';

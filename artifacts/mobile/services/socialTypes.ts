@@ -541,6 +541,7 @@ export type NotificationType =
   | 'return_update' | 'refund_update' | 'dispute_update'
   | 'product_restocked' | 'drop_live' | 'live_reminder' | 'live_started' | 'preorder_closing'
   | 'price_drop' | 'saved_product_update'
+  | 'bag_restock' | 'size_back'
   | 'new_friend_message' | 'new_seller_reply' | 'new_order_message' | 'message_request'
   | 'system' | 'marketing';
 
