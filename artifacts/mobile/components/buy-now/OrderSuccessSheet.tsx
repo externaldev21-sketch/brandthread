@@ -186,7 +186,7 @@ export function OrderSuccessSheet({
               accessibilityRole="button"
               accessibilityLabel="Open in Maps"
             >
-              <View style={[s.mapIconCircle, { backgroundColor: theme.accentDim }]}>
+              <View style={s.mapIconCircle}>
                 <Icon name="map" size={18} color={theme.accent} />
               </View>
               <Text style={[s.mapText, { color: theme.text }]} numberOfLines={2}>{order.fullShippingAddress}</Text>

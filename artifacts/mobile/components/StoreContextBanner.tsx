@@ -158,7 +158,7 @@ export default function StoreContextBanner() {
     <View style={[styles.safeArea, { paddingTop: headerTopInset }]}>
       <View style={styles.root} accessibilityRole="summary">
         <View style={styles.message}>
-          <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
+          <View style={styles.iconWrap}>
             <Icon name="users" size={13} color={theme.accentLight} />
           </View>
           <Text style={styles.label} numberOfLines={1}>
@@ -218,7 +218,7 @@ export default function StoreContextBanner() {
                      selected && { borderColor: theme.accentLight, backgroundColor: theme.accentDim },
                    ]}
                  >
-                   <View style={[styles.storeIcon, { backgroundColor: theme.accentDim }]}>
+                   <View style={styles.storeIcon}>
                      <Icon
                        name={membership.id === 'own' ? 'home' : 'users'}
                        size={15}

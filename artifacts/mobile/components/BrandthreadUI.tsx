@@ -394,16 +394,15 @@ interface BrandthreadCardProps {
   elevated?: boolean;
 }
 
-export function BrandthreadCard({ children, style, onPress, glow = false, elevated = false }: BrandthreadCardProps) {
-  const { theme } = useAppTheme();
+// `glow` is still accepted from existing callers but draws nothing: the
+// seller tab-bar swipe glow is the app's only glow.
+export function BrandthreadCard({ children, style, onPress, elevated = false }: BrandthreadCardProps) {
   const colors = useColors();
   const s: ViewStyle = {
     backgroundColor: elevated ? colors.elevated : colors.card,
     borderRadius: RADIUS.lg,
     // No border: cards sit on black (BRANDTHREAD_DESIGN.md, "Surfaces").
     padding: SP.md,
-    // `glow` is a crisp hairline, never a soft halo.
-    ...(glow ? { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.accent } : {}),
   };
   if (onPress) {
     return (
@@ -425,7 +424,7 @@ interface GradientCardProps {
   glow?: boolean;
 }
 
-export function GradientCard({ children, style, onPress, colors, glow = false }: GradientCardProps) {
+export function GradientCard({ children, style, onPress, colors }: GradientCardProps) {
   const { theme } = useAppTheme();
   const palette = useColors();
   const cardColors = colors ?? [theme.accentDim, theme.secondaryDim] as const;
@@ -434,7 +433,7 @@ export function GradientCard({ children, style, onPress, colors, glow = false }:
       colors={cardColors}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[gcS.card, glow && { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.accent }, style]}
+      style={[gcS.card, style]}
     >
       {children}
     </LinearGradient>
@@ -948,7 +947,7 @@ export function StatCard({ label, value, icon, change, positive, accent, style }
   const resolvedAccent = accent ?? theme.accent;
   return (
     <BrandthreadCard style={[scS.root, style]}>
-      <View style={[scS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
+      <View style={scS.iconWrap}>
         <Icon name={icon} size={ICON.sm} color={resolvedAccent} />
       </View>
       <Text style={[scS.value, { color: theme.text }]}>{value}</Text>
@@ -992,7 +991,7 @@ export function QuickActionCard({ icon, label, onPress, accent, badge, style }: 
       style={[qaS.root, { backgroundColor: theme.card }, style]}
       testID={`quick-action-card-${label.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      <View style={[qaS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
+      <View style={qaS.iconWrap}>
         <Icon name={icon} size={ICON.md} color={resolvedAccent} />
         {badge && <View style={[qaS.dot, { backgroundColor: theme.accent }]} />}
       </View>
@@ -1221,7 +1220,7 @@ export function NavigationCard({ icon, label, description, onPress, accent, badg
       accessibilityHint="Opens this section"
       style={[ncS.root, { backgroundColor: theme.card }, style]}
     >
-      <View style={[ncS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
+      <View style={ncS.iconWrap}>
         <Icon name={icon} size={ICON.md} color={resolvedAccent} />
       </View>
       <View style={ncS.body}>

@@ -115,7 +115,7 @@ export default function NotificationBanner() {
         ]}
       >
         <TouchableOpacity activeOpacity={0.85} onPress={handlePress} style={styles.content}>
-          <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
+          <View style={styles.iconWrap}>
             <Icon name={icon} size={18} color={theme.accent} />
           </View>
           <View style={styles.textWrap}>

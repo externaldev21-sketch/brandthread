@@ -123,7 +123,7 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
             disabled={!!busyId}
             activeOpacity={0.7}
           >
-            <View style={[styles.rowIcon, { backgroundColor: theme.accentDim }]}>
+            <View style={styles.rowIcon}>
               <Icon name="bookmark" size={ICON.sm} color={theme.accent} />
             </View>
             <Text style={styles.rowLabel}>All Saved (no board)</Text>
@@ -137,7 +137,7 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
               disabled={!!busyId}
               activeOpacity={0.7}
             >
-              <View style={[styles.rowIcon, { backgroundColor: theme.accentDim }]}>
+              <View style={styles.rowIcon}>
                 <Icon name="folder" size={ICON.sm} color={theme.accent} />
               </View>
               <View style={{ flex: 1 }}>

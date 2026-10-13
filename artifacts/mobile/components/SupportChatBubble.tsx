@@ -357,7 +357,7 @@ export default function SupportChatBubble({ bottomOffset = 0, side = 'left' }: S
         ]}
         pointerEvents="box-none"
       >
-        <Pressable accessibilityLabel="Contact support" accessibilityRole="button" onPress={handlePress} style={[s.fabInner, { backgroundColor: theme.secondary, shadowColor: theme.secondary }]}>
+        <Pressable accessibilityLabel="Contact support" accessibilityRole="button" onPress={handlePress} style={[s.fabInner, { backgroundColor: theme.secondary }]}>
           <Icon name="headphones" size={22} color="#000" />
         </Pressable>
       </Animated.View>

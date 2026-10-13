@@ -165,7 +165,6 @@ export default function AIBrainFAB({
       >
         {expanded ? (
           <>
-            <View style={[styles.glow, { backgroundColor: theme.accentDim }]} />
 
             {/* Main gradient circle */}
             <LinearGradient

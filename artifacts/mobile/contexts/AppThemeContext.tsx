@@ -46,7 +46,8 @@ const palette = (
   text: '#FFFFFF', muted: '#C0C0C0', subtle: '#B0B0B0',
   accent, accentLight: accent, accentDim: `${accent}2E`, onAccent,
   secondary: accent, secondaryDim: `${accent}24`,
-  primaryGradient, heroGradient, glowGradient, tabBarBackground: `${background}F5`,
+  // No glow washes: the seller tab-bar swipe glow is the app's only glow.
+  primaryGradient, heroGradient, glowGradient: ['transparent', 'transparent'], tabBarBackground: `${background}F5`,
   ...status, shadowColor: '#000000',
 });
 const STATUS = { success: '#7FF0B0', warning: '#FFD580', error: '#FFB4B4' } as const;

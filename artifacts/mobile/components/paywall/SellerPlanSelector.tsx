@@ -155,8 +155,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   cardSelected: { borderColor: theme.text, borderWidth: 2 },
   cardInverted: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
   cardSelectedInverted: {
-    borderColor: '#FFFFFF', borderWidth: 2, shadowColor: '#FFFFFF', shadowOpacity: 0.25,
-    shadowRadius: 16, shadowOffset: { width: 0, height: 0 }, elevation: 6,
+    borderColor: '#FFFFFF', borderWidth: 2,
   },
   textOnInverted: { color: '#0A0A0B' },
   mutedOnInverted: { color: ON_LIGHT_MUTED },

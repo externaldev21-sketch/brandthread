@@ -26,7 +26,7 @@ export function RoleLockedView({ screenTitle, currentRole }: Props) {
   return (
     <View style={styles.root}>
       <View style={styles.card}>
-        <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
+        <View style={styles.iconWrap}>
           <Icon name="lock" size={28} color={theme.accent} />
         </View>
         <Text style={styles.title}>Owner access required</Text>

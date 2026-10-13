@@ -148,7 +148,8 @@ export const GOLD           = '#F59E0B';   // premium, pro
 // ─── Gradients ────────────────────────────────────────────────────────────────
 export const GRAD_PRIMARY   = [ACCENT, ACCENT] as const;
 export const GRAD_HERO      = ['#000000', '#000000'] as const;
-export const GRAD_CARD_GLOW = ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.01)'] as const;
+// No glow washes: the seller tab-bar swipe glow is the app's only glow.
+export const GRAD_CARD_GLOW = ['transparent', 'transparent'] as const;
 export const GRAD_SUCCESS_G = ['#10B981', '#34D399'] as const;
 export const GRAD_DARK_FADE = ['rgba(0,0,0,0)', 'rgba(0,0,0,1)'] as const;
 export const GRAD_TAB_BAR   = ['rgba(0,0,0,0.96)', 'rgba(0,0,0,1)'] as const;

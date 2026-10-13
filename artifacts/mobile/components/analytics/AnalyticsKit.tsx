@@ -248,7 +248,7 @@ export function StatRow({
   return (
     <View style={s.row}>
       {icon && (
-        <View style={[s.icon, { backgroundColor: (iconColor ?? colors.primary) + '22' }]}>
+        <View style={s.icon}>
           <Icon name={icon} size={14} color={iconColor ?? colors.primary} />
         </View>
       )}

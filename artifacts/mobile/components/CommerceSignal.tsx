@@ -403,7 +403,7 @@ export function HighDemandSectionHead({
 
   return (
     <View style={[hd.root, style]}>
-      <View style={[hd.iconWrap, { backgroundColor: iconDim }]}>
+      <View style={hd.iconWrap}>
         <Icon name="trending-up" size={14} color={iconColor} />
       </View>
       <View style={{ flex: 1 }}>

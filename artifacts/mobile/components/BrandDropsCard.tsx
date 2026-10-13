@@ -79,7 +79,7 @@ export function BrandDropsCard({ sellerId, sellerName }: BrandDropsCardProps) {
       accessibilityLabel={`${drop.isLive ? 'Live drop' : 'Upcoming drop'}: ${drop.name}${sellerName ? ` by ${sellerName}` : ''}`}
       testID="brand-drops-card"
     >
-      <View style={[styles.iconWrap, { backgroundColor: drop.isLive ? `${theme.accent}22` : theme.card }]}>
+      <View style={styles.iconWrap}>
         <Icon name="zap" size={17} color={drop.isLive ? theme.accent : theme.muted} />
       </View>
       <View style={{ flex: 1 }}>

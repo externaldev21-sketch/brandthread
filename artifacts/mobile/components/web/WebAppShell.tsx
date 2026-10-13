@@ -52,7 +52,6 @@ export function WebAppShell({ children }: { children: React.ReactNode }) {
   const palette = theme as typeof theme & Record<string, any>;
   const background = palette.background ?? '#0A0A0B';
   const surface = palette.surface ?? background;
-  const accent = palette.accent ?? '#FFFFFF';
 
   return (
     <View style={styles.backdrop}>
@@ -63,10 +62,6 @@ export function WebAppShell({ children }: { children: React.ReactNode }) {
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
-      {/* A soft, very low-opacity glow behind the column for depth — never a
-          saturated color, just a lift of the theme's own accent so all 12
-          themes stay monochrome. */}
-      <View pointerEvents="none" style={[styles.glow, { backgroundColor: accent }]} />
       <View
         testID="web-app-shell-column"
         style={[
