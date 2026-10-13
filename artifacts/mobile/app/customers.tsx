@@ -15,6 +15,8 @@ import { EmptyState } from '@/components/layout';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { radius } from '@/constants/radii';
+import { AlphabetScrubber } from '@/components/AlphabetScrubber';
+import { firstRowByLetter, INDEX_MIN_ROWS, rowForLetter, type IndexLetter } from '@/lib/alphabetIndex';
 
 type ApiCustomer = {
   id: string;
@@ -117,6 +119,21 @@ export default function CustomersScreen() {
     }
   }, [customers, sortBy]);
 
+  // A–Z index (S5 #100): only for a long list sorted by name.
+  const showIndex = sortBy === 'name' && !loading && !error && sortedCustomers.length >= INDEX_MIN_ROWS;
+  const scrollRef = useRef<ScrollView>(null);
+  const listTopRef = useRef(0);
+  const rowTopsRef = useRef<number[]>([]);
+  const firstRows = useMemo(
+    () => firstRowByLetter(sortedCustomers.map((c) => c.name)),
+    [sortedCustomers],
+  );
+  const jumpToLetter = useCallback((letter: IndexLetter) => {
+    const row = rowForLetter(letter, firstRows, sortedCustomers.length);
+    if (row === null) return;
+    scrollRef.current?.scrollTo({ y: listTopRef.current + (rowTopsRef.current[row] ?? 0), animated: false });
+  }, [firstRows, sortedCustomers.length]);
+
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
@@ -134,9 +151,11 @@ export default function CustomersScreen() {
           </TouchableOpacity>
         }
       />
+      <View style={{ flex: 1 }}>
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20, paddingRight: showIndex ? 32 : 20 }}
         showsVerticalScrollIndicator={false}
       >
 
@@ -211,7 +230,10 @@ export default function CustomersScreen() {
           compact
         />
       ) : (
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View
+        onLayout={(e) => { listTopRef.current = e.nativeEvent.layout.y; }}
+        style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}
+      >
         {loading ? (
           <View style={styles.custRow}>
             <ActivityIndicator size="small" color={colors.primary} />
@@ -232,6 +254,7 @@ export default function CustomersScreen() {
               <TouchableOpacity
                 key={c.id}
                 activeOpacity={0.8}
+                onLayout={(e) => { rowTopsRef.current[i] = e.nativeEvent.layout.y; }}
                 style={[styles.custRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
                 onPress={() => router.push(`/customer-orders?customerId=${c.id}` as never)}
               >
@@ -264,6 +287,12 @@ export default function CustomersScreen() {
       </View>
       )}
     </ScrollView>
+      {showIndex ? (
+        <View pointerEvents="box-none" style={styles.indexWrap}>
+          <AlphabetScrubber onLetter={jumpToLetter} />
+        </View>
+      ) : null}
+      </View>
       <AIBrainFAB context={{ screen: 'customers' as const }} bottomOffset={0} />
     </View>
   );
@@ -271,6 +300,7 @@ export default function CustomersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  indexWrap: { position: 'absolute', top: 0, bottom: 0, right: 0, justifyContent: 'center' },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
   backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
