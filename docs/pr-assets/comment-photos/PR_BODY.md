@@ -91,7 +91,7 @@ API (`cd artifacts/api-server && TEST_DATABASE_URL=postgres://postgres:postgres@
   - Deleting the comment cascades to the photo row.
 - `src/lib/__tests__/commentMedia.test.ts`: URL prefix and input parsing.
 - Re-run unchanged: `post-comments-pin-mentions`, `ugc-safety`, `activity-events`, `connectivity-commerce-social`, `social-audit-foryou`, `drops-role-gate`.
-- Result: **8 files, 73 tests passed** (17 of them new: 12 integration + 5 unit).
+- Result: **8 files, 73 tests passed** (16 of them new: 11 integration + 5 unit).
 
 Mobile:
 - `pnpm exec vitest run lib/__tests__/commentPhoto.test.ts` covers sizing, MIME and the guest guard. **6 passed**.
