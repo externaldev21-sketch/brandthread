@@ -223,3 +223,15 @@ export const signInEvents = pgTable("sign_in_events", {
   userIdx: index("sign_in_events_user_idx").on(table.userId, table.createdAt),
   userDeviceIdx: index("sign_in_events_user_device_idx").on(table.userId, table.deviceKey),
 }));
+
+/**
+ * Hidden Words (feature 71, migration 524): a creator's own list of words and
+ * phrases. A comment on their posts that contains one is hidden from everyone
+ * but its author (post_comments.hidden_by_owner).
+ */
+export const commentFilters = pgTable("comment_filters", {
+  userId: text("user_id").primaryKey(),
+  hideCustom: integer("hide_custom").notNull().default(1),
+  words: jsonb("words").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

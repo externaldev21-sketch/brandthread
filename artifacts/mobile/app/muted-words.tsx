@@ -11,9 +11,7 @@ import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Icon } from '@/components/ui/Icon';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { useFocusEffect } from 'expo-router';
-
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 
 import { haptics, haptic } from '@/lib/haptics';
@@ -32,6 +30,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
+import { ListRow } from '@/components/ui';
 import { apiErrorMessage } from '@/lib/safety';
 
 import { addGuestMutedWord, GUEST_MUTED_WORD_LIMIT, readGuestMutedWords, removeGuestMutedWord } from '@/lib/guestMutedWords';
@@ -58,6 +57,7 @@ export default function MutedWordsScreen() {
   }, [clerkLoaded]);
   const authLoaded = clerkLoaded || authTimedOut;
   const api = useApi();
+  const router = useRouter();
   const inputRef = useRef<TextInput>(null);
   const loadGeneration = useRef(0);
   const loadedFor = useRef<string | null>(null);
@@ -176,6 +176,18 @@ export default function MutedWordsScreen() {
             ? 'Posts in your feed and comments with these words are hidden on this device. Nobody is notified.'
             : 'Comments and posts that contain these words are hidden from you everywhere on Brandthread. Nobody is notified.'}
         </Text>
+
+        {!guestMode && authLoaded ? (
+          <ListRow
+            icon="eye-off"
+            title="Hidden Words"
+            subtitle="Hide comments on your own posts"
+            chevron
+            onPress={() => router.push('/hidden-words' as never)}
+            testID="muted-words-hidden-words"
+            style={{ marginBottom: SP.sm }}
+          />
+        ) : null}
 
         <View style={s.inputShell}>
           <Icon name="plus" size={18} color={(!canEdit || atLimit) ? TEXT_DISABLED : theme.muted} />

@@ -49,6 +49,7 @@ export async function visibleCommentCounts(postIds: string[]): Promise<Map<strin
     .where(and(
       inArray(postComments.postId, postIds),
       eq(postComments.moderationStatus, "visible"),
+      eq(postComments.hiddenByOwner, false),
       authorInGoodStanding(postComments.authorId),
     ))
     .groupBy(postComments.postId);

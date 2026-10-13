@@ -2048,6 +2048,9 @@ export const postComments = pgTable('post_comments', {
   moderatedBy:      text('moderated_by'),
   // Set while the post owner has this top-level comment pinned (migration 116).
   pinnedAt:         timestamp('pinned_at', { withTimezone: true }),
+  // Hidden by the post owner's Hidden Words (migration 524): shown only to
+  // the person who wrote it, like Instagram's hidden comments.
+  hiddenByOwner:    boolean('hidden_by_owner').notNull().default(false),
   createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt:        timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({

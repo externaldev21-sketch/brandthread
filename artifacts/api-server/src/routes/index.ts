@@ -88,6 +88,7 @@ import interactionSettingsRouter from "./interaction-settings";
 import remixRouter from "./remix";
 import displayPreferencesRouter from "./display-preferences";
 import translateRouter from "./translate";
+import hiddenWordsRouter from "./hidden-words";
 import socialRouter from "./social";
 import storyMentionsRouter from "./story-mentions";
 import closeFriendsRouter from "./close-friends";
@@ -412,6 +413,7 @@ router.use("/reports",                   reportsRouter);
 router.use("/account-status",            accountStatusRouter); // strikes + your reports (signed-in)
 router.use("/moderation",                auditModerationActions, moderationRouter);
 router.use("/admin",                     adminRouter); // platform admin dashboard API (users.role = admin)
+router.use("/safety/hidden-words",       hiddenWordsRouter); // creator's own comment filter
 router.use("/safety",                    safetyRouter);
 router.use("/social/contacts",           socialContactsRouter);
 router.use("/interaction-settings",      interactionSettingsRouter); // comment/repost/download + hidden-story settings; download check is public
