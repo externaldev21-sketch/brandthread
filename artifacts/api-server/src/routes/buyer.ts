@@ -53,6 +53,7 @@ import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
 import {
   BUYER_CANCELLABLE_ORDER_STATUSES,
+  buyerCancelDeadline,
   buyerCancellationEligibility,
 } from "../lib/buyerCancellationPolicy";
 import { consumeBuyerAddressListFailure } from "./release-test-control";
@@ -1595,6 +1596,7 @@ router.get("/orders/:id", async (req, res) => {
         cancellationReason:      orders.cancellationReason,
         cancellationNotes:       orders.cancellationNotes,
         createdAt:               orders.createdAt,
+        sellerCancelWindowHours: users.buyerCancelWindowHours,
         ...deliveryColumns,
       })
       .from(orders)
@@ -1622,6 +1624,9 @@ router.get("/orders/:id", async (req, res) => {
       cancellationReason: isCustomerVisible ? row.cancellationReason : null,
       cancellationNotes: isCustomerVisible ? row.cancellationNotes : null,
       isCustomerVisible,
+      // When the buyer's self-cancel closes (seller-set window, else the
+      // 21-day default); null once the order can't be cancelled by status.
+      buyerCancelDeadline: buyerCancelDeadline(row.status, row.createdAt, row.sellerCancelWindowHours),
       items,
       delivery: await loadBuyerDelivery(row.id, row),
     });
@@ -1775,18 +1780,22 @@ router.post("/orders/:id/cancel", validateRequest({ params: uuidParamsSchema }),
       idempotencyKey: `buyer-cancel/${id}`,
       cancelOrder: {
         reason: "buyer_requested",
-        notes: "Cancelled by buyer within the 21-day cancellation window.",
+        notes: "Cancelled by buyer within the cancellation window.",
         restock: true,
       },
       precondition: async (locked, tx) => {
         if (locked.buyer_id !== buyerId) throw new RefundError("Order not found", 404, "ORDER_NOT_FOUND");
-        const eligibility = buyerCancellationEligibility(locked.status, locked.created_at);
+        const [seller] = await tx.select({ windowHours: users.buyerCancelWindowHours })
+          .from(users).where(eq(users.clerkId, locked.owner_id)).limit(1);
+        const eligibility = buyerCancellationEligibility(locked.status, locked.created_at, Date.now(), seller?.windowHours);
         if (eligibility.reason === "shipped_or_ineligible") {
           throw new RefundError(`Only pre-shipment orders can be cancelled. Current status: ${locked.status}.`, 409, "NOT_CANCELLABLE");
         }
         if (eligibility.reason === "window_expired") {
           throw new RefundError(
-            "Orders can only be cancelled through day 21 after placement. Contact the seller to request a cancellation.",
+            seller?.windowHours
+              ? "The seller's cancellation window for this order has closed. Contact the seller to request a cancellation."
+              : "Orders can only be cancelled through day 21 after placement. Contact the seller to request a cancellation.",
             409, "WINDOW_EXPIRED",
           );
         }

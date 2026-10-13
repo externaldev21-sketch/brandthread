@@ -41,6 +41,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { useApi } from '@/hooks/useApi';
+import { ReturnLabelCard } from '@/components/returns/ReturnLabelCard';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
   adaptReturnRow, itemsTotalCents, returnHeadline, returnReasonLabel, returnSteps, statusLabel,
@@ -197,6 +198,8 @@ export default function ReturnDetailScreen() {
             ))}
           </View>
         </BrandthreadCard>
+
+        {viewer === 'buyer' ? <ReturnLabelCard labelUrl={view.returnLabelUrl} carrier={view.returnCarrier} trackingNumber={view.returnTrackingNumber} /> : null}
 
         {/* Seller actions */}
         {viewer === 'seller' && (view.status === 'pending' || view.status === 'approved') ? (

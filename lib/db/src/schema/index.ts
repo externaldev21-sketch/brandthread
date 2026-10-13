@@ -217,6 +217,9 @@ export const users = pgTable('users', {
   // on the consent sheet; null = not given. Brandthread Agent messages are
   // only forwarded to the AI provider when this is set (middlewares/requireAiConsent.ts).
   aiDataConsentAt: timestamp('ai_data_consent_at', { withTimezone: true }),
+  // Seller-set buyer cancellation window in hours (migration 272). NULL =
+  // the platform default in api-server lib/buyerCancellationPolicy.ts.
+  buyerCancelWindowHours: integer('buyer_cancel_window_hours'),
   // Quiet hours: local wall-clock "HH:MM" strings evaluated in quietHoursTimezone.
   // A push falling inside the window is suppressed (feed row still written);
   // null start/end means quiet hours are off.

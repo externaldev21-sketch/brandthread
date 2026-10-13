@@ -374,6 +374,42 @@ export async function sendTeamInviteEmail(options: {
   return sendBrandthreadEmail({ to: options.to, subject, html, idempotencyKey: options.idempotencyKey });
 }
 
+/** Universal link to one order; brandthread.app/buyer-order-detail* is claimed in routes/wellKnown.ts. */
+export function orderDeepLink(orderId: string): string {
+  return `https://brandthread.app/buyer-order-detail?id=${encodeURIComponent(orderId)}`;
+}
+
+export type OrderDeliveryFacts = {
+  isPreorder?: boolean | null;
+  promisedShipDate?: Date | null;
+  deliverBy?: Date | null;
+  estimatedDelivery?: string | null;
+};
+
+function shortDate(value: Date): string {
+  return value.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+/**
+ * The "Estimated delivery" line, worded like the app's order screen
+ * (mobile lib/deliveryGuarantee.ts deliveryHeadline, before shipping):
+ * "Seller ships by Oct 30" for a pre-order, else "Arrives by Oct 20" from the
+ * delivery guarantee, else the carrier estimate. null when nothing is known,
+ * so the email never invents a date.
+ */
+export function orderConfirmationDeliveryEstimate(facts: OrderDeliveryFacts | null | undefined): string | null {
+  if (!facts) return null;
+  const valid = (d: Date | null | undefined): d is Date => d instanceof Date && Number.isFinite(d.getTime());
+  if (facts.isPreorder && valid(facts.promisedShipDate)) return `Seller ships by ${shortDate(facts.promisedShipDate)}`;
+  if (valid(facts.deliverBy)) return `Arrives by ${shortDate(facts.deliverBy)}`;
+  const eta = facts.estimatedDelivery?.trim();
+  if (eta) {
+    const parsed = new Date(eta);
+    return valid(parsed) ? `Arriving ${shortDate(parsed)}` : null;
+  }
+  return null;
+}
+
 export const ORDERS_URL = "https://brandthread.app/orders";
 
 /**
@@ -392,6 +428,8 @@ export type OrderReceiptInput = {
   shippingCents: number;
   taxCents?: number;
   totalCents: number;
+  delivery?: OrderDeliveryFacts | null;
+  orderId?: string | null;
   store?: EmailStoreBranding | null;
   shippingAddress?: EmailShippingAddress | null;
   orderUrl?: string;
@@ -443,7 +481,7 @@ export function renderOrderReceiptHtml(input: OrderReceiptInput): string {
   const storeName = receiptStoreName(input);
   const storeLogoUrl = safeImageUrl(input.store?.logoUrl);
   const contactEmail = safeEmailAddress(input.store?.contactEmail);
-  const orderUrl = input.orderUrl ?? ORDERS_URL;
+  const orderUrl = input.orderUrl ?? (input.orderId ? orderDeepLink(input.orderId) : ORDERS_URL);
   const font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
   const brandMark = storeLogoUrl
@@ -505,6 +543,8 @@ export function renderOrderReceiptHtml(input: OrderReceiptInput): string {
     ? `Sold by ${escapeHtml(storeName)} on Brandthread`
     : "Sold on Brandthread";
   const preheader = `Order ${input.orderNumber} is confirmed.`;
+  const deliveryEstimate = orderConfirmationDeliveryEstimate(input.delivery);
+  const deliveryHtml = deliveryEstimate ? `<p class="bt-text">Estimated delivery: ${escapeHtml(deliveryEstimate)}</p>` : "";
 
   return `<!doctype html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
@@ -559,7 +599,7 @@ export function renderOrderReceiptHtml(input: OrderReceiptInput): string {
               <table role="presentation" border="0" cellspacing="0" cellpadding="0" style="margin-top:24px;">
                 <tr>
                   <td class="bt-btn" align="center" bgcolor="#111111" style="border-radius:4px;background:#111111;">
-                    <a href="${escapeHtml(orderUrl)}" style="display:inline-block;padding:16px 28px;color:#ffffff;font-size:16px;line-height:20px;font-weight:600;text-decoration:none;">View your order</a>
+                    <a href="${escapeHtml(orderUrl)}" style="display:inline-block;padding:16px 28px;color:#ffffff;font-size:16px;line-height:20px;font-weight:600;text-decoration:none;">${input.orderId ? "Track order" : "View your order"}</a>
                   </td>
                 </tr>
               </table>
@@ -567,7 +607,7 @@ export function renderOrderReceiptHtml(input: OrderReceiptInput): string {
           </tr>
           <tr>
             <td class="bt-rule" style="padding:40px 0;border-top:1px solid #e5e5e5;">
-              <h3 class="bt-text" style="margin:0 0 8px;color:#111111;font-size:20px;line-height:26px;font-weight:600;">Order summary</h3>
+              ${deliveryHtml}<h3 class="bt-text" style="margin:0 0 8px;color:#111111;font-size:20px;line-height:26px;font-weight:600;">Order summary</h3>
               <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">${itemsHtml}
               </table>
               <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" class="bt-rule" style="margin-top:15px;border-top:1px solid #e5e5e5;">
@@ -626,6 +666,10 @@ export function renderOrderReceiptText(input: OrderReceiptInput): string {
   if (contactEmail) lines.push(`If you have any questions, reply to this email or contact us at ${contactEmail}`);
   lines.push(storeName ? `Sold by ${storeName} on Brandthread` : "Sold on Brandthread");
   return lines.join("\n");
+}
+
+export function buildOrderConfirmationEmail(options: OrderReceiptInput): {subject: string; html: string} {
+  return {subject: renderOrderReceiptSubject(options), html: renderOrderReceiptHtml(options)};
 }
 
 export async function sendOrderConfirmationEmail(options: OrderReceiptInput & {

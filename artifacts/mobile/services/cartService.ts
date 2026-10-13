@@ -1292,7 +1292,7 @@ export async function createReturnRequest(params: {
   const result = await api.returns.create({
     orderId: params.orderId,
     reason: params.reason,
-    notes: params.description,
+    notes: params.description.trim() || undefined,
     resolutionRequested: params.preferredResolution,
     evidenceUrls,
     requestedItems: params.items,

@@ -27,6 +27,7 @@ import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 // or AI endpoints there (a hung request left the list spinning forever) —
 // use the local storeService copy and the local template instead.
 const inDevPreview = () => isSellerDevPreview() || isBuyerDevPreview();
+import { CancelWindowSetting } from '@/components/seller/CancelWindowSetting';
 
 export type PolicyType = 'shipping' | 'return' | 'refund' | 'privacy' | 'terms' | 'pre_order';
 
@@ -255,6 +256,7 @@ export default function StorePoliciesScreen() {
             })}
           </View>
 
+          <CancelWindowSetting />
         </ScrollView>
       )}
     </View>

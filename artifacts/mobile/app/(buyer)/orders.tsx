@@ -50,9 +50,11 @@ import { getPreviewBuyerOrders as getPreviewCommerceBuyerOrders, isPreviewCommer
 import { deliveryHeadline } from '@/lib/deliveryGuarantee';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-
-import { BrandthreadScreen, FilterChip, StatusBadge, EmptyState } from '@/components/BrandthreadUI';
-
+import {
+  BrandthreadScreen, FilterChip,
+  StatusBadge, EmptyState, SearchBar,
+} from '@/components/BrandthreadUI';
+import { searchOrders } from '@/lib/orderSearch';
 import { Header, SkeletonBlock, useCenteredContentPadding } from '@/components/layout';
 
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
@@ -371,6 +373,7 @@ export default function BuyerOrdersScreen() {
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = usePersistedChoice<BuyerFilterKey>('buyer-orders.filter', 'all', FILTER_CHIPS.map((c) => c.key));
+  const [query, setQuery] = useState('');
   // Track whether the very first load has completed so re-focuses and
   // polling intervals don't flash the full-screen spinner.
   const hasLoadedRef = useRef(false);
@@ -482,7 +485,8 @@ export default function BuyerOrdersScreen() {
   // reset effect or the new account's request has completed.
   const ownsRenderedOrders = ordersOwnerId === userId;
   const visibleOrders = visibleOrdersForBuyer(orders, ordersOwnerId, userId);
-  const filtered = applyFilter(visibleOrders, filter);
+  const filtered = searchOrders(applyFilter(visibleOrders, filter), query);
+  const searching = query.trim().length > 0;
   const visibleLoading = loading || !ownsRenderedOrders;
 
   return (
@@ -498,6 +502,11 @@ export default function BuyerOrdersScreen() {
           own edge, painting a solid black block over the last chip instead
           of fading it — same antipattern the tab-bar glass zone replaced
           for Activity, see app/activity-center.tsx's history). */}
+      {visibleOrders.length > 0 || searching ? (
+        <View style={{ paddingHorizontal: centeredPadding, paddingBottom: SP.sm }}>
+          <SearchBar value={query} onChange={setQuery} placeholder="Search all orders" />
+        </View>
+      ) : null}
       <ChipRow
         selectedIndex={FILTER_CHIPS.findIndex(i => i.key === filter)}
         hapticOnSelect={false}
@@ -527,7 +536,14 @@ export default function BuyerOrdersScreen() {
             </View>
           )}
           {filtered.length === 0 ? (
-            loadError ? (
+            searching && visibleOrders.length > 0 ? (
+              <EmptyState
+                icon="search"
+                title="No matching orders"
+                description="Try a product, brand or order number."
+                style={{ flex: 1 }}
+              />
+            ) : loadError ? (
               <EmptyState
                 icon="alert-triangle"
                 title="Couldn't load your orders."

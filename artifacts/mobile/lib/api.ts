@@ -3237,6 +3237,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       // ─ Policies ───────────────────────────────────────────────────────────
       getPolicies:          () => get<{ policies: any[] }>('/api/seller/settings/policies'),
       savePolicies:         (policies: any[]) => put<any>('/api/seller/settings/policies', { policies }),
+      // ─ Buyer cancellation window (item 129; null = until shipped) ────────
+      getCancelWindow:      () => get<{ hours: number | null }>('/api/seller/cancel-window'),
+      setCancelWindow:      (hours: number | null) => put<{ hours: number | null }>('/api/seller/cancel-window', { hours }),
       // ─ Integration status ─────────────────────────────────────────────────
       integrationStatus:    () => get<{ integrations: Array<{ key: string }> }>('/api/seller/settings/integrations'),
       connectIntegration:   (key: string, settings: Record<string, any>) =>

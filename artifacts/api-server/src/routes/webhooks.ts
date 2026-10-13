@@ -159,6 +159,10 @@ async function sendOrderConfirmationForOrder(orderId: string): Promise<boolean> 
       shippingAddress: orders.shippingAddress,
       stripeCheckoutSessionId: orders.stripeCheckoutSessionId,
       status: orders.status,
+      isPreorder: orders.isPreorder,
+      promisedShipDate: orders.promisedShipDate,
+      deliverBy: orders.deliverBy,
+      estimatedDelivery: orders.estimatedDelivery,
     })
     .from(orders)
     .leftJoin(users, eq(users.clerkId, orders.buyerId))
@@ -205,6 +209,15 @@ async function sendOrderConfirmationForOrder(orderId: string): Promise<boolean> 
   const threadCashCents = Math.max(0, order.threadCashAppliedCents ?? 0);
   return sendOrderConfirmationEmail({
     to: recipient,
+    // Guest orders have no account to open the order in, so they keep the
+    // generic orders link.
+    orderId: order.buyerEmail ? order.id : null,
+    delivery: {
+      isPreorder: order.isPreorder,
+      promisedShipDate: order.promisedShipDate,
+      deliverBy: order.deliverBy,
+      estimatedDelivery: order.estimatedDelivery,
+    },
     orderNumber: order.orderNumber,
     items: items.map(({ variantId, ...item }) => ({
       ...item,
