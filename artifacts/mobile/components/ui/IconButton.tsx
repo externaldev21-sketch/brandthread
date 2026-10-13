@@ -15,6 +15,7 @@ import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { Glass } from '@/components/ui/Glass';
 import { iconAccessibilityLabel } from '@/lib/a11y/iconLabels';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+import { DISABLED_OPACITY } from '@/constants/states';
 
 export interface IconButtonProps {
   name: keyof typeof Feather.glyphMap;
@@ -71,7 +72,7 @@ export function IconButton({
           styles.root,
           variant === 'filled' && { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border, borderRadius: RADII.chip },
           variant === 'glass' && { borderRadius: RADII.pill, overflow: 'hidden' },
-          disabled && { opacity: 0.4 },
+          disabled && { opacity: DISABLED_OPACITY },
           { transform: [{ scale }] },
           style,
         ]}

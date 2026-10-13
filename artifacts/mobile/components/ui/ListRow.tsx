@@ -19,6 +19,7 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_DURATION_MS } from '@/constants/motion';
 import { BODY_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+import { DISABLED_OPACITY } from '@/constants/states';
 
 export interface ListRowProps {
   icon?: keyof typeof Feather.glyphMap;
@@ -74,7 +75,7 @@ export function ListRow({
   );
 
   if (!interactive) {
-    return <View style={[styles.row, { opacity: disabled ? 0.5 : 1 }, style]} testID={testID}>{content}</View>;
+    return <View style={[styles.row, { opacity: disabled ? DISABLED_OPACITY : 1 }, style]} testID={testID}>{content}</View>;
   }
 
   return (
@@ -88,7 +89,7 @@ export function ListRow({
       onPressOut={() => Animated.timing(highlight, { toValue: 0, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
       testID={testID}
     >
-      <View style={[styles.row, { opacity: disabled ? 0.5 : 1 }, style]}>
+      <View style={[styles.row, { opacity: disabled ? DISABLED_OPACITY : 1 }, style]}>
         <Animated.View
           pointerEvents="none"
           style={[

@@ -19,6 +19,7 @@ import { SPACING } from '@/constants/spacing';
 import { RADII, radius } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+import { DISABLED_OPACITY } from '@/constants/states';
 
 export interface ChipProps {
   label: string;
@@ -57,7 +58,8 @@ export function Chip({
   const { theme } = useAppTheme();
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
-  const contentColor = selected ? theme.onAccent : palette.mutedForeground;
+  // Solid when selected, outline when not (one chip rule app-wide).
+  const contentColor = selected ? theme.onAccent : palette.foreground;
   const isQuickReply = variant === 'quickReply';
 
   return (
@@ -76,11 +78,11 @@ export function Chip({
           styles.chip,
           {
             borderRadius: radius.sm,
-            backgroundColor: selected ? theme.accent : palette.card,
+            backgroundColor: selected ? theme.accent : 'transparent',
             borderColor: selected ? theme.accent : palette.border,
             borderWidth: isQuickReply ? StyleSheet.hairlineWidth : 1,
             height: isQuickReply ? 32 : undefined,
-            opacity: disabled ? 0.5 : 1,
+            opacity: disabled ? DISABLED_OPACITY : 1,
             transform: [{ scale }],
           },
         ]}
