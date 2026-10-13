@@ -61,6 +61,10 @@ export const users = pgTable('users', {
   dmPrivacy:      text('dm_privacy').notNull().default('requests'),
   // Private account (buyers only): new followers need approval (follow_requests).
   isPrivate:      boolean('is_private').notNull().default(false),
+  // Profile song (migration 272): { provider, id, title, artist, artworkUrl,
+  // previewUrl, url } from the licensed provider, or null. Only served while
+  // profile music is configured and flagged on (api-server lib/profileMusic.ts).
+  profileSong:    jsonb('profile_song'),
   // Buyer onboarding style picks (cold start for the For You ranking pipeline).
   buyerStyleInterests: jsonb('buyer_style_interests').$type<string[]>().notNull().default([]),
   // Brand onboarding fields (seller side)

@@ -16,6 +16,7 @@
  * a non-friend sees a clear locked state instead of an empty grid.
  */
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import { ProfileSongLine } from '@/components/profile/ProfileSongLine';
 import { View, Text, Alert, StyleSheet, Modal, Pressable, Platform, Share } from 'react-native';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
@@ -385,6 +386,7 @@ export default function BuyerOtherProfileScreen() {
 
   const meta = (
     <ProfileMeta bio={profile?.bio ?? null}>
+      {canonicalReady && !iBlockedThem ? <ProfileSongLine userId={canonicalUserId} /> : null}
       {isFollowedBy && !isMutual ? <ProfileChip label="Follows you" icon="user-check" /> : null}
       {isMutual ? <ProfileChip label="Friends" icon="users" tone="accent" /> : null}
       {isMutual && threadCashSendEnabled ? (
