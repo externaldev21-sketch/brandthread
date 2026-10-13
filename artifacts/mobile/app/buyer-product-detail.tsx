@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl,
-  Animated, Dimensions, PanResponder, Easing, AccessibilityInfo, Pressable, Share,
+  Animated, Dimensions, PanResponder, AccessibilityInfo, Pressable, Share,
 } from 'react-native';
 import { buildProductUrl } from '@/lib/shareLinks';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
@@ -70,10 +70,6 @@ import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { StockCounter } from '@/components/products/StockCounter';
 import { ApiError } from '@/lib/networkNotice';
-import {
-  CART_FLIGHT_ITEM_SIZE, flightSourceFromRect, getCartFlightVector, measureCartTarget, measureWindowRect,
-  shouldAnimateCartSuccess, type CartFlightPoint, type CartFlightSource,
-} from '@/lib/cartFlight';
 
 type ThemeAliases = {
   theme: AppThemePreset;
@@ -680,10 +676,6 @@ export default function BuyerProductDetailScreen() {
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
   const { scale: cartPulse, bump: bumpCart } = useCartBadgeBump(reduceMotion);
   const cartTargetRef = useRef<View>(null);
-  const galleryRef = useRef<View>(null);
-  const cartFlyProgress = useRef(new Animated.Value(0)).current;
-  const [flying, setFlying] = useState(false);
-  const [flight, setFlight] = useState<{ source: CartFlightSource | null; target: CartFlightPoint } | null>(null);
   useEffect(() => {
     let active = true;
     void AccessibilityInfo.isReduceMotionEnabled?.()
@@ -976,7 +968,6 @@ export default function BuyerProductDetailScreen() {
     if (result.success) {
       setAddedToCart(true);
       setCartCount(result.cart.items.reduce((sum, item) => sum + item.quantity, 0));
-      await flyToCart();
       bumpCart();
       setShowAddedSheet(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -987,27 +978,6 @@ export default function BuyerProductDetailScreen() {
     } else {
       Alert.alert('Cannot Add to Cart', result.message ?? 'Please try again.');
     }
-  }
-
-  /** The product photo lifts off the gallery and lands in the bag icon (skipped under Reduce Motion). */
-  async function flyToCart(): Promise<void> {
-    if (!shouldAnimateCartSuccess(reduceMotion)) return;
-    const fallback = { x: GALLERY_WIDTH - 40, y: headerTopInset + SP.sm + 22 };
-    const [target, photoRect] = await Promise.all([
-      measureCartTarget(cartTargetRef.current?.measureInWindow?.bind(cartTargetRef.current), fallback),
-      measureWindowRect(galleryRef.current?.measureInWindow?.bind(galleryRef.current)),
-    ]);
-    const source = flightSourceFromRect(photoRect, { top: 0, bottom: Dimensions.get('window').height });
-    setFlight({ source, target });
-    setFlying(true);
-    cartFlyProgress.setValue(0);
-    await new Promise<void>(resolve => {
-      requestAnimationFrame(() => {
-        Animated.timing(cartFlyProgress, {
-          toValue: 1, duration: 720, easing: Easing.inOut(Easing.cubic), useNativeDriver: true,
-        }).start(() => { setFlying(false); resolve(); });
-      });
-    });
   }
 
   // DM the seller about this product: opens (or reuses) the buyer↔seller
@@ -1108,7 +1078,7 @@ export default function BuyerProductDetailScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 184 }}
       >
         {/* Immersive product gallery */}
-        <View style={s.imageArea} ref={galleryRef} collapsable={false}>
+        <View style={s.imageArea}>
           <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} />
         </View>
 
@@ -1496,31 +1466,6 @@ export default function BuyerProductDetailScreen() {
           </Animated.View>
         </View>
       </View>
-
-      {flying && flight ? (() => {
-        const flySize = flight.source?.size ?? CART_FLIGHT_ITEM_SIZE;
-        const startLeft = flight.source ? flight.source.x - flySize / 2 : GALLERY_WIDTH / 2 - flySize / 2;
-        const startTop = flight.source ? flight.source.y - flySize / 2 : GALLERY_HEIGHT / 2 - flySize / 2;
-        const vector = getCartFlightVector(startLeft, startTop, flight.target, flySize);
-        const ratio = CART_FLIGHT_ITEM_SIZE / flySize;
-        return (
-          <Animated.View
-            testID="cart-fly-item"
-            pointerEvents="none"
-            style={[s.cartFlyItem, {
-              left: startLeft, top: startTop, width: flySize, height: flySize, borderRadius: 14 / ratio,
-              opacity: cartFlyProgress.interpolate({ inputRange: [0, 0.82, 1], outputRange: [1, 1, 0] }),
-              transform: [
-                { translateX: cartFlyProgress.interpolate({ inputRange: [0, 1], outputRange: [0, vector.x] }) },
-                { translateY: cartFlyProgress.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, -48, vector.y] }) },
-                { scale: cartFlyProgress.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 0.72 * ratio, 0.28 * ratio] }) },
-              ],
-            }]}
-          >
-            {product.imageUris[0] ? <CachedImage source={{ uri: product.imageUris[0] }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
-          </Animated.View>
-        );
-      })() : null}
 
       {/* Added-to-bag confirmation — a deliberate choice (UNIQLO-style), not
           an auto-dismissing toast: the buyer picks View bag or Keep shopping. */}
@@ -2093,7 +2038,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center',
   },
   cartBadgeText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: 11, lineHeight: 13 },
-  cartFlyItem: { position: 'absolute', overflow: 'hidden', zIndex: 50, backgroundColor: CARD },
   mediaChromeBtn: { width: COMP.iconBtn, height: COMP.iconBtn, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: COMP.iconBtn / 2 },
   body: { paddingVertical: SP.md },
   badgeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
