@@ -67,6 +67,7 @@ import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { StockCounter } from '@/components/products/StockCounter';
+import { PayLaterLine } from '@/components/products/PayLaterLine';
 import { ApiError } from '@/lib/networkNotice';
 import {
   CART_FLIGHT_ITEM_SIZE, flightSourceFromRect, getCartFlightVector, measureCartTarget, measureWindowRect,
@@ -1059,6 +1060,7 @@ export default function BuyerProductDetailScreen() {
             {hasDiscount && <Text style={s.comparePrice}>{fmtPrice(variantCompare!)}</Text>}
             {hasDiscount && <Text style={s.savings}>Save {fmtPrice(savingsAmt)}</Text>}
           </View>
+          <PayLaterLine sellerId={product.sellerId} priceCents={variantPrice} />
 
           <LaunchCountdown productId={product.id} onLaunchingChange={setLaunching} />
 

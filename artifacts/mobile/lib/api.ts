@@ -3105,6 +3105,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           source: opts.source,
           productId: opts.productId ?? undefined,
         }),
+      /** Whether the product page may show the "4 interest-free payments" line (no auth). */
+      payLater: (sellerId: string) =>
+        get<{ eligible: boolean; minCents: number }>(`/api/public/sellers/${encodeURIComponent(sellerId)}/pay-later`),
     },
     /** Buyer-facing drops listing (active, with countdown releaseAt) */
     publicDrops: {

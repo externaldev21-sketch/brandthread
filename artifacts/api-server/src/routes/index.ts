@@ -86,7 +86,7 @@ import financeRouter from "./finance";
 import financeStatementsRouter from "./finance-statements";
 import { financeFeesRouter, publicFeeScheduleRouter } from "./fees";
 import taxesRouter from "./taxes";
-import sellerPaymentSettingsRouter from "./seller-payment-settings";
+import sellerPaymentSettingsRouter, { publicPayLaterRouter } from "./seller-payment-settings";
 import teamRouter from "./team";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import notificationEventsRouter from "./notification-events";
@@ -170,6 +170,7 @@ const router = Router();
 router.use("/config/features", featureFlagsRouter);
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
+router.use("/public",          publicPayLaterRouter); // GET /sellers/:sellerId/pay-later (no auth, BNPL line on product page)
 router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
 router.use("/public",          emailMarketingPublicRouter); // /stores/:slug/subscribe, /email/unsubscribe/:token
 router.use("/access",          accessRouter); // invite-only launch: validate/waitlist public, status/redeem authed

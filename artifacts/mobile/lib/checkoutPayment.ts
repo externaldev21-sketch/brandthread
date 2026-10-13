@@ -184,7 +184,7 @@ export type QuoteGroup = {
   processingDays: number | null;
 };
 
-/** paymentMethodTypes: what the server will offer for this cart (card, plus klarna / afterpay_clearpay when every seller opted in). */
+/** paymentMethodTypes: what the server will offer for this cart (card, plus klarna / afterpay_clearpay when every seller opted in and the total is at least BNPL_MIN_ORDER_CENTS, $75 by default). */
 export type CartQuote = { amountCents: number; groups: QuoteGroup[]; paymentMethodTypes?: string[] };
 
 /** Whether the quote offers Buy now, pay later (web Payment Element only; native keeps card / wallets). */
