@@ -15,12 +15,38 @@ export type EmailLineItem = {
   variantLabel?: string | null;
   quantity: number;
   priceCents: number;
+  /** Product photo; only an absolute https URL is ever rendered. */
+  imageUrl?: string | null;
+};
+
+/** The seller whose order this is (users row of orders.ownerId). */
+export type EmailStoreBranding = {
+  name: string;
+  /** Storefront logo; only an absolute https URL is ever rendered. */
+  logoUrl?: string | null;
+  /** Seller's public store contact email (users.contact_email). */
+  contactEmail?: string | null;
+};
+
+/** Same shape as orders.shipping_address. */
+export type EmailShippingAddress = {
+  name?: string | null;
+  street: string;
+  line2?: string | null;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
 };
 
 export type BrandthreadEmailOptions = {
   to: string;
   subject: string;
   html: string;
+  /** Plain-text alternative part. */
+  text?: string;
+  /** Reply-To address, e.g. the seller's store contact email on a receipt. */
+  replyTo?: string;
   idempotencyKey?: string;
 };
 
@@ -39,6 +65,22 @@ function escapeHtml(value: unknown): string {
 
 function formatCents(cents: number): string {
   return `$${(Math.max(0, cents) / 100).toFixed(2)}`;
+}
+
+function formatSignedCents(cents: number): string {
+  return `-${formatCents(cents)}`;
+}
+
+/** Email images must be absolute https URLs; storage paths and signed URLs are dropped. */
+function safeImageUrl(value: string | null | undefined): string | null {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return /^https:\/\/[^\s"'<>]+$/i.test(trimmed) ? trimmed : null;
+}
+
+/** A plausible single address, or null; an invalid reply_to would make Resend reject the whole send. */
+function safeEmailAddress(value: string | null | undefined): string | null {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/.test(trimmed) && trimmed.length <= 254 ? trimmed : null;
 }
 
 function formatDate(value: Date = new Date()): string {
@@ -83,8 +125,14 @@ export function renderBrandthreadEmail(options: {
   subtitle?: string;
   bodyHtml: string;
   cta?: { label: string; url: string };
+  /** Seller branding for order emails: store logo + name replace the Brandthread mark in the header. */
+  store?: EmailStoreBranding | null;
 }): string {
-  const logo = LOGO_CONTENT
+  const storeLogoUrl = safeImageUrl(options.store?.logoUrl);
+  const storeName = options.store?.name?.trim() || null;
+  const logo = storeLogoUrl
+    ? `<img src="${escapeHtml(storeLogoUrl)}" width="58" height="58" alt="${escapeHtml(storeName ?? "Store logo")}" style="display:block;width:58px;height:58px;object-fit:contain;border:0;border-radius:12px;background:#ffffff;" />`
+    : LOGO_CONTENT
     ? `<img src="cid:brandthread-logo" width="58" height="58" alt="Brandthread" style="display:block;width:58px;height:58px;object-fit:contain;border:0;" />`
     : `<span style="display:block;width:58px;height:58px;color:#ffffff;font-size:38px;line-height:58px;font-weight:700;text-align:center;">B</span>`;
   const cta = options.cta
@@ -113,7 +161,7 @@ export function renderBrandthreadEmail(options: {
             <tr>
               <td style="padding:28px 30px;background:linear-gradient(135deg,#050505 0%,#1d1d1d 45%,#dedede 100%);border-radius:20px 20px 0 0;">
                 ${logo}
-                <div style="margin-top:18px;color:#d8d8d8;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">BRANDTHREAD</div>
+                <div style="margin-top:18px;color:#d8d8d8;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">${storeName ? escapeHtml(storeName) : "BRANDTHREAD"}</div>
               </td>
             </tr>
             <tr>
@@ -174,6 +222,8 @@ export async function sendBrandthreadEmail({
   to,
   subject,
   html,
+  text,
+  replyTo,
   idempotencyKey,
 }: BrandthreadEmailOptions): Promise<boolean> {
   const recipient = await deliveryAddressFor(to.trim());
@@ -199,6 +249,8 @@ export async function sendBrandthreadEmail({
     to: [recipient],
     subject,
     html,
+    ...(text ? { text } : {}),
+    ...(replyTo?.trim() ? { reply_to: replyTo.trim() } : {}),
     ...(LOGO_CONTENT && html.includes("cid:brandthread-logo")
       ? {
           attachments: [{
@@ -322,33 +374,272 @@ export async function sendTeamInviteEmail(options: {
   return sendBrandthreadEmail({ to: options.to, subject, html, idempotencyKey: options.idempotencyKey });
 }
 
-export async function sendOrderConfirmationEmail(options: {
-  to: string;
+export const ORDERS_URL = "https://brandthread.app/orders";
+
+/**
+ * Everything the buyer receipt shows. Every field comes from the order rows
+ * (orders, order_items, the seller's users row, gift-card ledger); optional
+ * amounts render only when non-zero.
+ */
+export type OrderReceiptInput = {
   orderNumber: string;
   items: EmailLineItem[];
   subtotalCents: number;
+  /** Discount code + loyalty, excluding Thread Cash (orders.discount_amount_cents - thread_cash_applied_cents). */
+  discountCents?: number;
+  threadCashCents?: number;
+  giftCardCents?: number;
   shippingCents: number;
+  taxCents?: number;
   totalCents: number;
+  store?: EmailStoreBranding | null;
+  shippingAddress?: EmailShippingAddress | null;
+  orderUrl?: string;
+};
+
+type ReceiptRow = { label: string; value: string };
+
+function receiptTotalsRows(input: OrderReceiptInput): ReceiptRow[] {
+  const rows: ReceiptRow[] = [{ label: "Subtotal", value: formatCents(input.subtotalCents) }];
+  const push = (label: string, cents: number | undefined, negative = false) => {
+    if (cents && cents > 0) rows.push({ label, value: negative ? formatSignedCents(cents) : formatCents(cents) });
+  };
+  push("Discount", input.discountCents, true);
+  push("Thread Cash", input.threadCashCents, true);
+  push("Gift card", input.giftCardCents, true);
+  push("Shipping", input.shippingCents);
+  push("Taxes", input.taxCents);
+  return rows;
+}
+
+function addressLines(address: EmailShippingAddress | null | undefined): string[] {
+  if (!address) return [];
+  const cityLine = [address.city, [address.state, address.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  return [address.name, address.street, address.line2, cityLine, address.country]
+    .map((line) => (typeof line === "string" ? line.trim() : ""))
+    .filter(Boolean);
+}
+
+function receiptStoreName(input: OrderReceiptInput): string | null {
+  return input.store?.name?.trim() || null;
+}
+
+export function renderOrderReceiptSubject(input: Pick<OrderReceiptInput, "orderNumber" | "store">): string {
+  const storeName = input.store?.name?.trim();
+  return storeName
+    ? `Order ${input.orderNumber} confirmed - ${storeName}`
+    : `Brandthread order ${input.orderNumber} confirmed`;
+}
+
+/**
+ * Seller-branded buyer receipt, laid out 1:1 on Shopify's default
+ * "Order confirmation" notification: store mark + order number, thank-you
+ * title, "View your order" button, order summary with thumbnails, totals,
+ * customer information, store-contact footer. Monochrome; table layout with
+ * inline styles; max-width 600; dark-mode overrides for clients that honour
+ * prefers-color-scheme.
+ */
+export function renderOrderReceiptHtml(input: OrderReceiptInput): string {
+  const storeName = receiptStoreName(input);
+  const storeLogoUrl = safeImageUrl(input.store?.logoUrl);
+  const contactEmail = safeEmailAddress(input.store?.contactEmail);
+  const orderUrl = input.orderUrl ?? ORDERS_URL;
+  const font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+  const brandMark = storeLogoUrl
+    ? `<img src="${escapeHtml(storeLogoUrl)}" height="40" alt="${escapeHtml(storeName ?? "Store logo")}" style="display:block;height:40px;width:auto;max-width:180px;border:0;outline:none;text-decoration:none;" />`
+    : storeName
+      ? `<span class="bt-text" style="font-size:24px;line-height:32px;font-weight:600;color:#111111;">${escapeHtml(storeName)}</span>`
+      : LOGO_CONTENT
+        ? `<img src="cid:brandthread-logo" width="40" height="40" alt="Brandthread" style="display:block;width:40px;height:40px;border:0;" />`
+        : `<span class="bt-text" style="font-size:24px;line-height:32px;font-weight:600;color:#111111;">Brandthread</span>`;
+
+  const itemsHtml = input.items.map((item) => {
+    const imageUrl = safeImageUrl(item.imageUrl);
+    const thumb = imageUrl
+      ? `<img src="${escapeHtml(imageUrl)}" width="60" height="60" alt="" style="display:block;width:60px;height:60px;object-fit:cover;border:1px solid #e5e5e5;border-radius:8px;" />`
+      : `<div class="bt-thumb" style="width:60px;height:60px;border:1px solid #e5e5e5;border-radius:8px;background:#f2f2f2;"></div>`;
+    const each = item.quantity > 1
+      ? `<br /><span class="bt-muted" style="color:#737373;font-size:14px;line-height:20px;">${formatCents(item.priceCents)} each</span>`
+      : "";
+    return `
+                <tr>
+                  <td width="60" valign="top" style="width:60px;padding:15px 0;">${thumb}</td>
+                  <td valign="top" style="padding:15px 0 15px 15px;">
+                    <span class="bt-text" style="color:#111111;font-size:16px;line-height:22px;font-weight:600;">${escapeHtml(item.productName)} &times;&nbsp;${escapeHtml(item.quantity)}</span>${item.variantLabel ? `<br /><span class="bt-muted" style="color:#737373;font-size:14px;line-height:20px;">${escapeHtml(item.variantLabel)}</span>` : ""}${each}
+                  </td>
+                  <td valign="top" align="right" style="padding:15px 0 15px 15px;white-space:nowrap;">
+                    <span class="bt-text" style="color:#111111;font-size:16px;line-height:22px;font-weight:600;">${formatCents(item.priceCents * item.quantity)}</span>
+                  </td>
+                </tr>`;
+  }).join("");
+
+  const totalsHtml = receiptTotalsRows(input).map((row) => `
+                <tr>
+                  <td class="bt-muted" style="padding:2px 0;color:#737373;font-size:16px;line-height:24px;">${escapeHtml(row.label)}</td>
+                  <td align="right" class="bt-text" style="padding:2px 0;color:#111111;font-size:16px;line-height:24px;font-weight:600;white-space:nowrap;">${row.value}</td>
+                </tr>`).join("");
+
+  const address = addressLines(input.shippingAddress);
+  const customerInfo = address.length
+    ? `
+          <tr>
+            <td class="bt-rule" style="padding:40px 0 0;border-top:1px solid #e5e5e5;">
+              <h3 class="bt-text" style="margin:0 0 20px;color:#111111;font-size:20px;line-height:26px;font-weight:600;">Customer information</h3>
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td valign="top" style="padding:0 0 24px;">
+                    <h4 class="bt-text" style="margin:0 0 6px;color:#111111;font-size:16px;line-height:22px;font-weight:600;">Shipping address</h4>
+                    <p class="bt-muted" style="margin:0;color:#737373;font-size:14px;line-height:21px;">${address.map(escapeHtml).join("<br />")}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`
+    : "";
+
+  const contactLine = contactEmail
+    ? `<p class="bt-muted" style="margin:0 0 8px;color:#737373;font-size:14px;line-height:21px;">If you have any questions, reply to this email or contact us at <a href="mailto:${escapeHtml(contactEmail)}" class="bt-text" style="color:#111111;text-decoration:underline;">${escapeHtml(contactEmail)}</a></p>`
+    : "";
+  const soldBy = storeName
+    ? `Sold by ${escapeHtml(storeName)} on Brandthread`
+    : "Sold on Brandthread";
+  const preheader = `Order ${input.orderNumber} is confirmed.`;
+
+  return `<!doctype html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="supported-color-schemes" content="light dark" />
+    <title>Order ${escapeHtml(input.orderNumber)} confirmed</title>
+    <style>
+      body { margin:0; padding:0; -webkit-text-size-adjust:100%; }
+      a { color:inherit; }
+      @media (max-width:600px) {
+        .bt-pad { padding-left:16px !important; padding-right:16px !important; }
+        .bt-title { font-size:24px !important; line-height:30px !important; }
+      }
+      @media (prefers-color-scheme: dark) {
+        .bt-bg { background:#000000 !important; }
+        .bt-text { color:#f5f5f5 !important; }
+        .bt-muted { color:#a3a3a3 !important; }
+        .bt-rule { border-color:#2e2e2e !important; }
+        .bt-thumb { background:#1c1c1c !important; border-color:#2e2e2e !important; }
+        .bt-btn { background:#ffffff !important; }
+        .bt-btn a { color:#000000 !important; }
+      }
+      [data-ogsc] .bt-text { color:#f5f5f5 !important; }
+      [data-ogsc] .bt-muted { color:#a3a3a3 !important; }
+      [data-ogsb] .bt-btn { background:#ffffff !important; }
+      [data-ogsc] .bt-btn a { color:#000000 !important; }
+    </style>
+  </head>
+  <body class="bt-bg" style="margin:0;padding:0;background:#ffffff;color:#111111;font-family:${font};">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">${escapeHtml(preheader)}</div>
+    <table role="presentation" class="bt-bg" border="0" cellspacing="0" cellpadding="0" width="100%" bgcolor="#ffffff" style="width:100%;background:#ffffff;">
+      <tr>
+        <td align="center" class="bt-pad" style="padding:32px 24px;font-family:${font};">
+          <table role="presentation" border="0" cellspacing="0" cellpadding="0" width="560" style="width:100%;max-width:560px;">
+          <tr>
+            <td style="padding:0 0 40px;">
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td valign="middle">${brandMark}</td>
+                  <td valign="middle" align="right" class="bt-muted" style="padding-left:16px;color:#737373;font-size:14px;line-height:20px;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;">Order #${escapeHtml(input.orderNumber)}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 0 40px;">
+              <h2 class="bt-text bt-title" style="margin:0 0 8px;color:#111111;font-size:28px;line-height:34px;font-weight:600;">Thank you for your purchase!</h2>
+              <p class="bt-muted" style="margin:0;color:#737373;font-size:16px;line-height:24px;">We&#39;re getting your order ready to be shipped. We will notify you when it has been sent.</p>
+              <table role="presentation" border="0" cellspacing="0" cellpadding="0" style="margin-top:24px;">
+                <tr>
+                  <td class="bt-btn" align="center" bgcolor="#111111" style="border-radius:4px;background:#111111;">
+                    <a href="${escapeHtml(orderUrl)}" style="display:inline-block;padding:16px 28px;color:#ffffff;font-size:16px;line-height:20px;font-weight:600;text-decoration:none;">View your order</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td class="bt-rule" style="padding:40px 0;border-top:1px solid #e5e5e5;">
+              <h3 class="bt-text" style="margin:0 0 8px;color:#111111;font-size:20px;line-height:26px;font-weight:600;">Order summary</h3>
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">${itemsHtml}
+              </table>
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" class="bt-rule" style="margin-top:15px;border-top:1px solid #e5e5e5;">
+                <tr><td colspan="2" style="height:15px;line-height:15px;font-size:0;">&nbsp;</td></tr>${totalsHtml}
+              </table>
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" class="bt-rule" style="margin-top:15px;border-top:2px solid #e5e5e5;">
+                <tr>
+                  <td class="bt-muted" style="padding:20px 0 0;color:#737373;font-size:16px;line-height:24px;">Total</td>
+                  <td align="right" class="bt-text" style="padding:20px 0 0;color:#111111;font-size:24px;line-height:30px;font-weight:600;white-space:nowrap;">${formatCents(input.totalCents)}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>${customerInfo}
+          <tr>
+            <td class="bt-rule" style="padding:32px 0 0;border-top:1px solid #e5e5e5;">
+              ${contactLine}
+              <p class="bt-muted" style="margin:0;color:#737373;font-size:14px;line-height:21px;">${soldBy}</p>
+            </td>
+          </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+/** Plain-text alternative of the receipt; same sections and amounts as the HTML. */
+export function renderOrderReceiptText(input: OrderReceiptInput): string {
+  const storeName = receiptStoreName(input);
+  const contactEmail = safeEmailAddress(input.store?.contactEmail);
+  const lines: string[] = [
+    storeName ?? "Brandthread",
+    `Order #${input.orderNumber}`,
+    "",
+    "Thank you for your purchase!",
+    "We're getting your order ready to be shipped. We will notify you when it has been sent.",
+    "",
+    `View your order: ${input.orderUrl ?? ORDERS_URL}`,
+    "",
+    "Order summary",
+  ];
+  for (const item of input.items) {
+    lines.push(`${item.productName} x ${item.quantity}  ${formatCents(item.priceCents * item.quantity)}`);
+    if (item.variantLabel) lines.push(`  ${item.variantLabel}`);
+    if (item.quantity > 1) lines.push(`  ${formatCents(item.priceCents)} each`);
+  }
+  lines.push("");
+  for (const row of receiptTotalsRows(input)) lines.push(`${row.label}: ${row.value}`);
+  lines.push(`Total: ${formatCents(input.totalCents)}`);
+  const address = addressLines(input.shippingAddress);
+  if (address.length) {
+    lines.push("", "Customer information", "Shipping address", ...address);
+  }
+  lines.push("");
+  if (contactEmail) lines.push(`If you have any questions, reply to this email or contact us at ${contactEmail}`);
+  lines.push(storeName ? `Sold by ${storeName} on Brandthread` : "Sold on Brandthread");
+  return lines.join("\n");
+}
+
+export async function sendOrderConfirmationEmail(options: OrderReceiptInput & {
+  to: string;
   idempotencyKey: string;
 }): Promise<boolean> {
-  const itemsHtml = options.items.map((item) => `
-    <tr>
-      <td style="padding:10px 0;border-bottom:1px solid #eeeeee;"><strong>${escapeHtml(item.productName)}</strong>${item.variantLabel ? `<br /><span style="color:#777777;font-size:13px;">${escapeHtml(item.variantLabel)}</span>` : ""}<br /><span style="color:#777777;font-size:13px;">Qty ${escapeHtml(item.quantity)}</span></td>
-      <td align="right" style="padding:10px 0;border-bottom:1px solid #eeeeee;vertical-align:top;">${formatCents(item.priceCents * item.quantity)}</td>
-    </tr>`).join("");
-  const html = renderBrandthreadEmail({
-    preheader: `Order ${options.orderNumber} is confirmed.`,
-    eyebrow: "Order confirmed",
-    title: "Thanks for your order",
-    subtitle: `Order ${options.orderNumber} is confirmed and being prepared.`,
-    bodyHtml: `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">${itemsHtml}<tr><td style="padding:16px 0 4px;color:#666666;">Subtotal</td><td align="right" style="padding:16px 0 4px;">${formatCents(options.subtotalCents)}</td></tr><tr><td style="padding:4px 0;color:#666666;">Shipping</td><td align="right" style="padding:4px 0;">${options.shippingCents ? formatCents(options.shippingCents) : "Free"}</td></tr><tr><td style="padding:12px 0 0;font-size:17px;font-weight:700;">Total</td><td align="right" style="padding:12px 0 0;font-size:17px;font-weight:700;">${formatCents(options.totalCents)}</td></tr></table><p style="margin-bottom:0;color:#666666;">We’ll send another note when your order is on the way.</p>`,
-    cta: { label: "View your order", url: "https://brandthread.app/orders" },
-  });
+  const { to, idempotencyKey, ...receipt } = options;
   return sendBrandthreadEmail({
-    to: options.to,
-    subject: `Brandthread order ${options.orderNumber} confirmed`,
-    html,
-    idempotencyKey: options.idempotencyKey,
+    to,
+    subject: renderOrderReceiptSubject(receipt),
+    html: renderOrderReceiptHtml(receipt),
+    text: renderOrderReceiptText(receipt),
+    replyTo: safeEmailAddress(receipt.store?.contactEmail) ?? undefined,
+    idempotencyKey,
   });
 }
 
@@ -358,6 +649,7 @@ export async function sendOrderShippingEmail(options: {
   carrier?: string | null;
   trackingNumber?: string | null;
   trackingUpdate?: boolean;
+  store?: EmailStoreBranding | null;
   idempotencyKey: string;
 }): Promise<boolean> {
   const tracking = options.trackingNumber
@@ -373,6 +665,7 @@ export async function sendOrderShippingEmail(options: {
       : `Order ${options.orderNumber} has shipped${carrier}.`,
     bodyHtml: `<p>${options.trackingUpdate ? "Use the details below to follow your package." : "Your package is moving toward you. Keep this email for your shipping details."}</p>${tracking}`,
     cta: { label: "Track your order", url: "https://brandthread.app/orders" },
+    store: options.store,
   });
   return sendBrandthreadEmail({
     to: options.to,
@@ -390,6 +683,7 @@ export async function sendReturnStatusEmail(options: {
   status: "pending" | "approved" | "denied" | "refunded";
   refundAmountCents?: number | null;
   sellerResponse?: string | null;
+  store?: EmailStoreBranding | null;
   idempotencyKey: string;
 }): Promise<boolean> {
   const statusCopy: Record<typeof options.status, { title: string; subtitle: string; body: string }> = {
@@ -427,6 +721,7 @@ export async function sendReturnStatusEmail(options: {
     subtitle: copy.subtitle,
     bodyHtml: `<p>${copy.body}</p>${response}<p style="margin-bottom:0;color:#666666;">You can review the full request and its status in your Brandthread account.</p>`,
     cta: { label: "View return status", url: "https://brandthread.app/returns" },
+    store: options.store,
   });
   return sendBrandthreadEmail({
     to: options.to,
@@ -624,4 +919,4 @@ export async function sendIpCounterNoticeOutcomeEmail(options: {
   });
 }
 
-export { escapeHtml, formatCents, formatDate };
+export { escapeHtml, formatCents, formatDate, safeEmailAddress, safeImageUrl };

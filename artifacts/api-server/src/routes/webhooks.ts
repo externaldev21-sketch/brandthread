@@ -71,6 +71,7 @@ import { markB2bAsyncPaymentFailed, markB2bPaymentProcessing, settleB2bCardPayme
 import { processB2bDisputeEvent } from "../lib/b2b/disputes";
 import { buildDisputeDeps } from "../lib/disputes/store";
 import { productThumbnail } from "../lib/activityEvents";
+import { loadReceiptExtras } from "../lib/orderReceipt";
 import { notifyBuyerOrderCancelled, notifyBuyerOrderConfirmed, notifySellerOrderOversold, newOrderCopy } from "../lib/orderNotifications";
 import { ORDER_SOUND_FILE, sendPushToUser, stableNotificationId } from "../lib/push";
 import { nextOrderNumber } from "../lib/orderNumber";
@@ -144,12 +145,18 @@ async function sendOrderConfirmationForOrder(orderId: string): Promise<boolean> 
   const [order] = await db
     .select({
       id: orders.id,
+      ownerId: orders.ownerId,
       orderNumber: orders.orderNumber,
       guestEmail: orders.guestEmail,
       buyerEmail: users.email,
       subtotalCents: orders.subtotalCents,
       shippingCents: orders.shippingCents,
+      taxCents: orders.taxCents,
+      discountAmountCents: orders.discountAmountCents,
+      threadCashAppliedCents: orders.threadCashAppliedCents,
       totalCents: orders.totalCents,
+      shippingAddress: orders.shippingAddress,
+      stripeCheckoutSessionId: orders.stripeCheckoutSessionId,
       status: orders.status,
     })
     .from(orders)
@@ -172,6 +179,7 @@ async function sendOrderConfirmationForOrder(orderId: string): Promise<boolean> 
 
   const items = await db
     .select({
+      variantId: orderItems.variantId,
       productName: orderItems.productName,
       variantLabel: orderItems.variantLabel,
       quantity: orderItems.quantity,
@@ -180,13 +188,38 @@ async function sendOrderConfirmationForOrder(orderId: string): Promise<boolean> 
     .from(orderItems)
     .where(eq(orderItems.orderId, orderId));
 
+  // Seller branding, thumbnails and gift card are cosmetic: a lookup failure
+  // still sends the receipt (Brandthread mark, no thumbnails).
+  let extras: Awaited<ReturnType<typeof loadReceiptExtras>> | null = null;
+  try {
+    extras = await loadReceiptExtras({
+      ownerId: order.ownerId,
+      variantIds: items.map((item) => item.variantId),
+      stripeCheckoutSessionId: order.stripeCheckoutSessionId,
+    });
+  } catch (err) {
+    logger.warn({ err, orderId }, "Order receipt branding lookup failed; sending unbranded receipt");
+  }
+
+  const threadCashCents = Math.max(0, order.threadCashAppliedCents ?? 0);
   return sendOrderConfirmationEmail({
     to: recipient,
     orderNumber: order.orderNumber,
-    items,
+    items: items.map(({ variantId, ...item }) => ({
+      ...item,
+      imageUrl: variantId ? extras?.imageByVariant.get(variantId) ?? null : null,
+    })),
     subtotalCents: order.subtotalCents,
+    // orders.discount_amount_cents is Stripe's combined coupon, which folds
+    // Thread Cash in; the receipt shows the two as separate rows.
+    discountCents: Math.max(0, (order.discountAmountCents ?? 0) - threadCashCents),
+    threadCashCents,
+    giftCardCents: extras?.giftCardCents ?? 0,
     shippingCents: order.shippingCents,
+    taxCents: order.taxCents,
     totalCents: order.totalCents,
+    store: extras?.store ?? null,
+    shippingAddress: order.shippingAddress ?? null,
     idempotencyKey: `order-confirmation/${order.id}`,
   });
 }

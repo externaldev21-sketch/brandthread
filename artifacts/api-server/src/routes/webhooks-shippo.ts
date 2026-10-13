@@ -24,6 +24,7 @@ import { db, orderItems, orders, shippingLabels, shippoWebhookEvents, users } fr
 import { applyShippoTrack, mapShippoStatus } from "../lib/delivery/trackingSync";
 import { getTrack, shippoCarrierToken, type ShippoTrack } from "../lib/shippo";
 import { sendOrderShippingEmail } from "../lib/brandthreadEmail";
+import { loadStoreBrandingForOrderSafe } from "../lib/orderReceipt";
 import { logger } from "../lib/logger";
 import { handleReturnLabelTracking, returnLabelIdFromMetadata } from "../lib/returnLabels";
 
@@ -218,6 +219,7 @@ async function notifyOrderShipped(order: {
     carrier: order.carrier,
     trackingNumber: order.trackingNumber,
     trackingUpdate: true,
+    store: await loadStoreBrandingForOrderSafe(order.id),
     idempotencyKey: `order-tracking-webhook/${order.id}`,
   }).catch(() => false);
 }

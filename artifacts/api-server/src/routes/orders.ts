@@ -17,6 +17,7 @@ import { reversePurchasePointsOnce } from "./loyalty";
 import { buildOrderStatusUpdate, orderStatusTransitionConflict } from "../lib/orderStatusPolicy";
 import { logger } from "../lib/logger";
 import { sendOrderShippingEmail } from "../lib/brandthreadEmail";
+import { loadStoreBrandingForOrderSafe } from "../lib/orderReceipt";
 import { withRiskView } from "../lib/risk/orderRisk";
 import { reserveStockForOrder, restoreStockForOrder } from "../lib/stockReservation";
 import { nextOrderNumber } from "../lib/orderNumber";
@@ -80,6 +81,7 @@ async function notifyOrderShipped(
     carrier: order.carrier,
     trackingNumber: order.trackingNumber,
     trackingUpdate,
+    store: await loadStoreBrandingForOrderSafe(order.id),
     idempotencyKey,
   });
   if (!sent) {
