@@ -146,7 +146,6 @@ export default function ProductImportScreen() {
         : await api.productImport.etsyCommit();
       setResult(res);
       setPublished(null);
-      hapticSuccess();
       void loadProviders();
     } catch (error) {
       setReviewError(messageOf(error));

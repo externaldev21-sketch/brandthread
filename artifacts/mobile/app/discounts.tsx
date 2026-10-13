@@ -492,7 +492,7 @@ export default function DiscountsScreen() {
                 <View key={group.label}>
                   <Text style={s.groupLabel}>{group.label}</Text>
                   {group.items.map((d, i) => (
-                    <DiscountRow key={d.id} d={d} first={i === 0} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActionFor(d); }} />
+            <DiscountRow key={d.id} d={d} first={i === 0} onPress={() => { haptic('sheet'); setActionFor(d); }} />
                   ))}
                 </View>
               ))}

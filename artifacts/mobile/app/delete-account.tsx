@@ -169,7 +169,6 @@ export default function DeleteAccountScreen() {
       const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });
       if (!credential.identityToken) throw new Error('Apple did not return a sign-in token.');
       setAppleProof({ identityToken: credential.identityToken, authorizationCode: credential.authorizationCode ?? null });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
       if (!isOAuthCancellationError(err) && (err as { code?: string })?.code !== 'ERR_REQUEST_CANCELED') {
         setDeleteError('We couldn’t confirm it’s you with Apple. Try again.');

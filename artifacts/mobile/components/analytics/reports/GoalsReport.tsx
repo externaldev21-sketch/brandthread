@@ -100,7 +100,6 @@ export default function GoalsReport() {
     try {
       const next = editing === 'new' || !editing ? await createGoal({ metric, period, target }) : await updateGoal(editing.id, { metric, period, target });
       setData(next);
-      hapticSuccess();
       setEditing(null);
     } catch { Alert.alert('Could not save', 'Check your connection and try again.'); }
     finally { setSaving(false); }

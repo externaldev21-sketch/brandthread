@@ -505,7 +505,7 @@ function PayoutsScreenContent() {
              <TouchableOpacity
                testID="seller-payouts-verify-identity"
                style={[styles.settingsRow, { borderTopWidth: 0, marginBottom: SP.sm }]}
-               onPress={() => { haptic(); router.push('/seller-verification' as never); }}
+               onPress={() => { router.push('/seller-verification' as never); }}
                accessibilityRole="button"
                accessibilityLabel="Verify your identity to get your first payout"
              >
@@ -513,7 +513,7 @@ function PayoutsScreenContent() {
                  <Text style={styles.settingsValue}>Verify your identity</Text>
                  <Text style={styles.bankSub}>Your first payout is sent once you verify with a photo ID.</Text>
                </View>
-               <Feather name="chevron-right" size={16} color={theme.muted} />
+               <Icon name="chevron-right" size={16} color={theme.muted} />
              </TouchableOpacity>
            )}
 

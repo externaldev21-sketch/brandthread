@@ -1686,7 +1686,7 @@ export default function BuyerProductDetailScreen() {
           checkoutDisabled={product.isPreOrder ? reserved || launching : paymentUnavailable || launching || !allSelected}
           checkoutBusy={product.isPreOrder ? reserveLoading : buyingNow}
           addBusy={addingToCart}
-          onSelect={(valueId) => { hapticToggle(); handleSelect(sizeOption.id, valueId); }}
+          onSelect={(valueId) => { haptic('select'); handleSelect(sizeOption.id, valueId); }}
           onCheckout={() => { setSizeSheetOpen(false); void (product.isPreOrder ? handleReserve() : handleBuyNow()); }}
           onAddToBag={() => { setSizeSheetOpen(false); void handleAddToCart(); }}
           onClose={() => setSizeSheetOpen(false)}
@@ -2044,7 +2044,7 @@ function MoreFromBrand({ productId, sellerId, sellerName, dividerStyle, headerSt
       <View style={dividerStyle} />
       <TouchableOpacity
         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-        onPress={() => { hapticToggle(); router.push(brandLinkHref(sellerId) as never); }}
+                onPress={() => { router.push(brandLinkHref(sellerId) as never); }}
         accessibilityRole="button"
         accessibilityLabel={`More from ${sellerName}. Open store`}
         activeOpacity={0.7}
@@ -2062,7 +2062,6 @@ function MoreFromBrand({ productId, sellerId, sellerName, dividerStyle, headerSt
             accessibilityRole="button"
             accessibilityLabel={`${p.name}, ${formatCents(p.priceCents)}`}
             onPress={() => {
-              hapticToggle();
               if (usesThreadPull) push({ pathname: '/thread-product-detail' as any, params: { productId: p.id } } as never);
               else router.push({ pathname: '/buyer-product-detail' as any, params: { productId: p.id } });
             }}

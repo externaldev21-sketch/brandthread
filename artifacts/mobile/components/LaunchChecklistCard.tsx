@@ -56,7 +56,7 @@ export default function LaunchChecklistCard() {
           <Pressable
             key={row.id}
             testID={`get-ready-${row.id}`}
-            onPress={() => { hapticLight(); router.push(row.route as never); }}
+        onPress={() => { router.push(row.route as never); }}
             accessibilityRole="button"
             accessibilityLabel={`${row.title}${row.done ? ', done' : ''}`}
             style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]}

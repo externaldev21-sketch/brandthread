@@ -114,7 +114,6 @@ export default function LocationsScreen() {
       } else {
         await api.seller.createLocation(form) as any;
       }
-      hapticSuccess();
       setModalVisible(false);
       await load();
     } catch {

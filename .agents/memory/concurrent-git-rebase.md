@@ -52,3 +52,9 @@ Explicitly excluded work must also be excluded from the ancestry of every approv
 **Why:** An approved head can include an unapproved visual change through its parent history. Resolving file conflicts does not remove that ancestry or make the exclusion true.
 
 **How to apply:** Fetch the excluded ref read-only when needed, check each requested head with `git merge-base --is-ancestor`, and request a clean replacement head for any dependent PR.
+
+Review unexpected deletions and markerless unmerged paths against the pre-batch tree, not only the visible conflict markers.
+
+**Why:** Older integration snapshots can leave a required native provider absent while its unchanged callers still reference it. A feedback-only merge must not treat that absence as an intentional feature retirement.
+
+**How to apply:** Check baseline existence and indexed merge stages before accepting a deletion. Preserve the current functional dependency, layer the actual incoming change, and confirm native imports and TypeScript after the complete batch.

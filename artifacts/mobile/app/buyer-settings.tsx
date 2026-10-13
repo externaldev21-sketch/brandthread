@@ -83,7 +83,6 @@ export default function BuyerSettingsScreen() {
   }
 
   function handleItem(item: SettingsCatalogItem) {
-    hapticLight();
     if (item.action === 'sign-out') { setSignOutVisible(true); return; }
     if (item.action === 'share-profile') { setShareSheetOpen(true); return; }
     if (item.action === 'delete-account') { router.push('/delete-account' as never); return; }

@@ -118,7 +118,7 @@ export function SellerThreadCashCard({
       )}
 
       <Pressable
-        onPress={() => { hapticLight(); onCashOutPress(); }}
+            onPress={() => { onCashOutPress(); }}
         disabled={loading || error || !balanceCents || !quotedCents || paused}
         style={[
           styles.cashOutBtn,

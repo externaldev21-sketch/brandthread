@@ -144,7 +144,7 @@ export default function MarketingScreen() {
       actions={[{
         icon: 'bar-chart-2',
         accessibilityLabel: 'View analytics',
-        onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(tabs)/analytics' as never); },
+        onPress: () => { router.push('/(tabs)/analytics' as never); },
       }]}
     />
     <ScrollView
@@ -187,7 +187,7 @@ export default function MarketingScreen() {
       <SectionHeader
         title="Campaigns"
         action={campaigns.length > 0 ? 'New' : undefined}
-        onAction={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/design-campaign' as never); }}
+              onAction={() => { router.push('/design-campaign' as never); }}
       />
       {campaignsError ? (
         <View style={styles.emptyFlat}>
@@ -243,7 +243,7 @@ export default function MarketingScreen() {
       <SectionHeader
         title="Discount codes"
         action={discounts.length > 0 ? 'New' : undefined}
-        onAction={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/discounts' as never); }}
+              onAction={() => { router.push('/discounts' as never); }}
       />
       {discountsError ? (
         <View style={styles.emptyFlat}>

@@ -263,7 +263,7 @@ export default function MoreScreen() {
             <View style={[styles.progressFill, { width: `${percent}%` }]} />
           </View>
           <TouchableOpacity
-            onPress={() => { hapticPrimaryAction(); router.push('/settings' as any); }}
+            onPress={() => { router.push('/settings' as any); }}
             hitSlop={CONTINUE_SETUP_HIT_SLOP}
             accessibilityRole="button"
           >

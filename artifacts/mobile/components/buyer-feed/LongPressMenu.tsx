@@ -28,7 +28,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { SheetRise } from '@/components/motion/SheetRise';
 
-import { hapticLight } from '@/lib/haptics';
+import { haptic } from '@/lib/haptics';
 
 export type NotInterestedReason = 'video' | 'creator';
 
@@ -72,11 +72,11 @@ export function LongPressMenu({
 
   // One haptic per action, then the sheet closes (TikTok closes on every
   // action except opening the "Not interested" details).
-  const act = (fn: () => void) => () => { hapticLight(); onClose(); fn(); };
+  const act = (fn: () => void) => () => { onClose(); fn(); };
 
   const topActions: { key: string; icon: FeatherName; label: string; onPress: () => void; active?: boolean }[] = [
     { key: 'report', icon: 'flag', label: 'Report', onPress: act(onReport) },
-    { key: 'not-interested', icon: 'slash', label: 'Not interested', onPress: () => { hapticLight(); setPage('not-interested'); } },
+    { key: 'not-interested', icon: 'slash', label: 'Not interested', onPress: () => { haptic('sheet'); setPage('not-interested'); } },
   ];
   if (isVideo && canDownload && onDownload) {
     topActions.push({ key: 'download', icon: 'download', label: 'Save video', onPress: act(onDownload) });

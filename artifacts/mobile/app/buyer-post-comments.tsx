@@ -517,7 +517,7 @@ function CommentActionsSheet({
         variant: 'destructive',
         loading: busy,
         disabled: busy,
-        onPress: () => { hapticDestructiveConfirm(); void run(step === 'confirm-block' ? onBlock : onDelete); },
+          onPress: () => { void run(step === 'confirm-block' ? onBlock : onDelete); },
       } : undefined}
       secondaryAction={confirming ? { label: 'Cancel', onPress: () => setStep('menu'), disabled: busy } : undefined}
     >
@@ -1290,7 +1290,7 @@ export default function BuyerPostCommentsScreen() {
                     style={[s.sortChip, selected && s.sortChipOn]}
                     onPress={() => {
                       if (selected) return;
-                      hapticSelection();
+                      haptic('select');
                       setSort(option.id);
                       listRef.current?.scrollToOffset({ offset: 0, animated: false });
                     }}

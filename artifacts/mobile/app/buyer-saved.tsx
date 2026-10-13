@@ -251,7 +251,6 @@ export default function BuyerSaved() {
     setCreatingCollection(true);
     try {
       await createCollection(name);
-      hapticSuccess();
       setNewCollectionModal(false);
       setNewCollectionName('');
       await load({ silent: true });

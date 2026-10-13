@@ -21,7 +21,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 
 import { useColors } from '@/hooks/useColors';
 
-import { haptics, hapticSelection } from '@/lib/haptics';
+import { haptic } from '@/lib/haptics';
 
 
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
@@ -720,7 +720,7 @@ export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
   const palette = useColors();
   return (
     <PressableScale
-      onPress={() => {  onPress(); }}
+      onPress={() => { if (!active) haptic('select'); onPress(); }}
       accessibilityLabel={count !== undefined ? `${label}, ${count}` : label}
       accessibilityState={{ selected: active }}
       style={[fcS.chip, { backgroundColor: 'transparent', borderColor: palette.border }, active && [fcS.active, { backgroundColor: theme.accent, borderColor: theme.accent }]]}
@@ -1452,7 +1452,7 @@ export function HapticSwitch({
 
   function handlePress() {
     if (disabled) return;
-    haptics.selection();
+    haptic('select');
     onValueChange?.(!on);
   }
 

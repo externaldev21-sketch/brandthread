@@ -120,7 +120,6 @@ export default function BuyerCollection() {
     try {
       const updated = await updateCollection(collection.id, { name: renameValue.trim() });
       setCollection(updated);
-      hapticSuccess();
       setRenameOpen(false);
     } catch {
       Alert.alert('Couldn’t rename', 'Try again.');

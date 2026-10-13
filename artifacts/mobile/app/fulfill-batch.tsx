@@ -179,7 +179,6 @@ export default function FulfillBatchScreen() {
 
   // Step 2: buy exactly the quoted labels after the seller saw the total.
   async function handleBuyQuoted() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setRunning('labels');
     const rows: RowResult[] = [...results];
     for (const { order, rate } of quotes) {

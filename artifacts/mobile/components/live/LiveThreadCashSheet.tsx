@@ -133,7 +133,6 @@ export function LiveThreadCashSheet({
     }
     haptics.success();
     setBalanceCents(prev => (prev == null ? prev : Math.max(0, prev - selected)));
-    hapticSuccess();
     setJustSentCents(selected);
     onSent(selected);
     setSending(false);

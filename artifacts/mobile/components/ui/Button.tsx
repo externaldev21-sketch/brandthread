@@ -22,7 +22,6 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { useColors } from '@/hooks/useColors';
 
-import { haptics } from '@/lib/haptics';
 
 import { COMP, FILL_ELEVATED, FONT, RED } from '@/lib/theme';
 

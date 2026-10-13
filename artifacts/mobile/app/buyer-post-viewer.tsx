@@ -323,7 +323,6 @@ export default function BuyerPostViewer() {
   };
 
   const handleRepost = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const wasReposted = reposted;
     setReposted(!wasReposted);
     if (!realPostId) {
@@ -340,7 +339,7 @@ export default function BuyerPostViewer() {
   };
 
   const handleSaveToggle = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!saved) haptic('save');
     if (!params.postId) return;
     const wasSaved = saved;
     setSaved(!wasSaved);

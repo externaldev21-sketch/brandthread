@@ -341,7 +341,6 @@ export default function OnboardingScreen() {
 
   const goNext = useCallback((from: StepId) => {
     if (!flow) return;
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const next = nextStepId(flow, from, ctx);
     if (next) goTo(next, 1);
   }, [ctx, flow, goTo]);
@@ -539,7 +538,6 @@ export default function OnboardingScreen() {
   // ── Account type ──────────────────────────────────────────────────────────
   function continueFromAccountType() {
     if (!selectedFlow) return;
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     void AsyncStorage.setItem(ONBOARDING_KEY, 'false').catch(() => {});
     setFlow(selectedFlow);
     goTo(nextStepId(selectedFlow, 'ACCOUNT_TYPE', ctx) ?? 'NAME', 1);

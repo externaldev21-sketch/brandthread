@@ -532,7 +532,6 @@ export default function CartScreen() {
     if (!item) return;
     // Signed out there are no Saves yet; keep the line on this device instead.
     if (!savedProducts.isSignedIn()) { await handleSaveForLater(itemId); return; }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const snapshot = cart;
     setPending(itemId, 'save');
     try {

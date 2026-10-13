@@ -24,7 +24,7 @@ import { Sheet } from '@/components/ui/BottomSheet';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 
-import { haptics, hapticLight, hapticSelection, hapticSuccess } from '@/lib/haptics';
+import { haptics, haptic } from '@/lib/haptics';
 
 import { Product } from '@/services/productTypes';
 
@@ -116,7 +116,6 @@ export function StockEditorSheet({ product, visible, onClose, onChanged }: Stock
         : await adjustInventory(product!.id, undefined, nextQty - previousQty, 'Set exact quantity');
       if (!adj) throw new Error('not found');
       const latest = await getProduct(product!.id);
-      hapticSuccess();
       if (latest) onChanged(latest);
       showUndo({
         message: `${row.title} set to ${nextQty}`,
@@ -157,7 +156,7 @@ export function StockEditorSheet({ product, visible, onClose, onChanged }: Stock
             <TextInput
               value={row.draft}
               onChangeText={(text) => setRows(prev => prev.map(r => (r.key === row.key ? { ...r, draft: text.replace(/[^0-9]/g, '') } : r)))}
-              onSubmitEditing={() => { hapticSelection(); void applyDirectEntry(row); }}
+            onSubmitEditing={() => { haptic('select'); void applyDirectEntry(row); }}
               onBlur={() => { void applyDirectEntry(row); }}
               keyboardType="number-pad"
               returnKeyType="done"

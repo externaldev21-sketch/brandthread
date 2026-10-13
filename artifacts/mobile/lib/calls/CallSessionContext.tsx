@@ -169,7 +169,6 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
     const offIncoming = agora.onIncoming((incoming) => {
       const current = sessionRef.current;
       if (current && current.status !== 'ended') return; // one call at a time (server also refuses a busy callee)
-      hapticPrimaryAction();
       setSession({ ...incoming, me: me() });
       unsubRef.current?.();
       unsubRef.current = agora.subscribe(incoming.callId, patch => applyPatch(incoming.callId, patch));
@@ -203,7 +202,6 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
 
   const startCall = useCallback(async (input: StartCallInput) => {
     if (sessionRef.current && sessionRef.current.status !== 'ended') return; // one call at a time
-    hapticPrimaryAction();
     const base: CallSession = {
       callId: `pending_${Date.now()}`,
       conversationId: input.conversationId,

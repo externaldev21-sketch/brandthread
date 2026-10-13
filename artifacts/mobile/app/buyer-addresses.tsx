@@ -187,7 +187,6 @@ export default function BuyerAddressesScreen() {
         const next = isCreating ? [...prev, { id, ...body }] : prev.map(a => (a.id === id ? { ...a, ...body } : a));
         return isDefault ? next.map(a => ({ ...a, isDefault: a.id === id })) : next;
       });
-      hapticSuccess();
       handleCancel();
       setSaving(false);
       return;

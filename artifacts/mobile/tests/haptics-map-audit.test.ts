@@ -36,12 +36,14 @@ const AUDITED = [
   'app/admin-invites.tsx',
   'app/admin-promotions.tsx',
   'app/admin-reports.tsx',
-  'app/analytics-export.tsx',
-  'app/analytics-goals.tsx',
-  'app/analytics-marketing.tsx',
-  'app/analytics-production.tsx',
-  'app/analytics-products.tsx',
-  'app/analytics-store.tsx',
+  // These legacy routes were replaced by the current shared reports and hubs.
+  // Audit the live implementation instead of resurrecting the old screens.
+  'components/analytics/reports/ExportReport.tsx',
+  'components/analytics/reports/GoalsReport.tsx',
+  'app/(tabs)/marketing.tsx',
+  'components/analytics/reports/AdvancedReport.tsx',
+  'components/analytics/reports/ProductStatsReport.tsx',
+  'app/(tabs)/analytics.tsx',
   'app/appearance.tsx',
   'app/automation.tsx',
   'app/away-message.tsx',
@@ -272,6 +274,6 @@ describe('haptics map audit', () => {
     }
     const ui = readFileSync(resolve(ROOT, 'components/BrandthreadUI.tsx'), 'utf8');
     // Only FilterChip (selection) and HapticSwitch (selection) tick.
-    expect(ui.match(/\bhaptic\w*\(/g)).toEqual(['hapticSelection(', 'hapticSelection(']);
+    expect(ui.match(/\bhaptic\('select'\)/g)).toEqual(["haptic('select')", "haptic('select')"]);
   });
 });

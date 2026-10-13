@@ -287,7 +287,6 @@ export default function ConnectionsScreen() {
       await removeFollower(row.id);
       setFollowers((prev) => prev.filter((u) => u.id !== row.id));
       setRemoveTarget(null);
-      hapticSuccess();
       showToast('Removed');
     } catch {
       // Sheet stays open; the person can retry or cancel.

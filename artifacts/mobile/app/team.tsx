@@ -174,7 +174,6 @@ export default function TeamScreen() {
       const payload = { ...target.payload, role: inviteRole };
       const res = await api.team.invite(payload);
       setInviteResult({ inviteUrl: res.inviteUrl, emailSent: !!res.emailSent, email: res.member?.email ?? value });
-      hapticSuccess();
       await load();
     } catch (err: any) {
       const rejection = getEntitlementRejection(err);

@@ -1,4 +1,4 @@
-import { hapticToggle } from '@/lib/haptics';
+import { haptic } from '@/lib/haptics';
 
 /**
  * Settings → Notifications, for buyers and sellers (the server resolves the
@@ -95,7 +95,7 @@ export default function NotificationsSettingsScreen() {
 
   async function pauseFor(minutes: number) {
     setPauseSheet(false);
-    hapticToggle();
+    haptic('select');
     try {
       const saved = await api.notificationPrefs.update({ pause: { minutes }, pushEnabled: true });
       setPushEnabled(true);
@@ -106,7 +106,7 @@ export default function NotificationsSettingsScreen() {
   }
 
   function onPauseToggle(next: boolean) {
-    hapticToggle();
+    haptic('select');
     if (next) setPauseSheet(true);
     else void resume();
   }

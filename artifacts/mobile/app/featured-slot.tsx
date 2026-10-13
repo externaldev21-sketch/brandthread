@@ -159,7 +159,6 @@ export default function FeaturedSlotScreen() {
           const credit = await applyStoreCredit(() => api.featuredSlots.iapApplyCredit(slot.id));
           const { transactionId } = credit ? { transactionId: credit } : await purchaseConsumable(featuredProductId(slot.durationDays));
           const confirmed = await confirmNativePromotion(() => api.featuredSlots.iapVerify(slot.id, transactionId));
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           Alert.alert(
             confirmed ? 'In review' : 'Payment pending',
             confirmed

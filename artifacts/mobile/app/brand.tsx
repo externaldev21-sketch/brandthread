@@ -118,7 +118,6 @@ export default function BrandScreen() {
     setSavingLogo(true);
     try {
       await api.seller.uploadLogo({ uri: `data:image/png;base64,${b64}`, mimeType: 'image/png' });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Logo saved', 'It’s now your store logo.');
     } catch (error) {
       Alert.alert('Couldn’t save logo', apiErrorMessage(error, 'Check your connection and try again.'));

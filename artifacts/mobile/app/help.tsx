@@ -141,7 +141,6 @@ export default function HelpScreen() {
   // Live Chat is the in-app support assistant (it can hand off to a person).
   // It reads the account, so it needs one; signed out, offer email instead.
   function openLiveChat() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (isSignedIn) {
       setChatOpen(true);
       return;

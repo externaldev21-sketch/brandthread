@@ -51,7 +51,6 @@ export default function BuyerQRCode() {
 
   async function handleShare() {
     if (!canonicalUrl) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await Share.share({
         message: `Find me on Brandthread! ${qrValue}`,

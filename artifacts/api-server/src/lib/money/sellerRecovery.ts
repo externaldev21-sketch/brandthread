@@ -262,7 +262,9 @@ export async function recordDisputeClosedRecovery(input: { dispute: any; orderId
     const [booked] = ((await tx.execute(sql`
       SELECT COALESCE(SUM(p.amount_cents), 0) AS total FROM ledger_postings p
       JOIN ledger_transactions t ON t.id = p.transaction_id
-      WHERE t.kind = 'dispute_fee' AND t.stripe_object_id = ${input.dispute.id} AND p.account = 'stripe_dispute_fees'
+      -- Include loss/reinstatement postings too: the retained fee may already
+      -- be booked by chargeback_lost, not a standalone dispute_fee entry.
+      WHERE t.stripe_object_id = ${input.dispute.id} AND p.account = 'stripe_dispute_fees'
     `)) as unknown as { rows: Array<{ total: string }> }).rows;
     const delta = disputeFeeFromDispute(input.dispute, 0) - Number(booked?.total ?? 0);
     if (!delta) return { feeDeltaCents: 0, lostMovedCents: 0 };

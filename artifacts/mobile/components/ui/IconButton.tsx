@@ -11,7 +11,6 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 
 import { useColors } from '@/hooks/useColors';
 
-import { hapticLight } from '@/lib/haptics';
 
 import { COMP, FONT, TEXT_DISABLED } from '@/lib/theme';
 
