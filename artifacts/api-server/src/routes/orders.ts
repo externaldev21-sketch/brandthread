@@ -19,6 +19,7 @@ import { withRiskView } from "../lib/risk/orderRisk";
 import { shipItems } from "../lib/delivery/deliveryState";
 import { notifyBuyerPreparing } from "../lib/delivery/notifications";
 import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
+import { generateOrderNumberIn } from "../lib/orderNumber";
 
 const router = Router();
 router.use(requireAuth);
@@ -213,12 +214,8 @@ router.post("/", requireRole("manager"), async (req, res) => {
 
       const totalCents = subtotalCents + shippingCents;
 
-      // Concurrency-safe, per-owner order number
-      const countRes = await tx.execute(sql`
-        SELECT count(*)::int AS c FROM orders WHERE owner_id = ${ownerId}
-      `);
-      const count: number = (countRes as any).rows?.[0]?.c ?? 0;
-      const orderNumber = `BT-${String(count + 1).padStart(5, "0")}`;
+      // Short order number (BT-4821), unique across every store.
+      const orderNumber = await generateOrderNumberIn(tx);
 
       // Deduct stock for non-drop orders BEFORE inserting the order, so an
       // oversold cart never creates an order row at all (a drop's stock is
