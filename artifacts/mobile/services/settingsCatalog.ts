@@ -223,6 +223,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     title: 'Privacy & safety',
     items: [
       { label: 'Customer privacy', description: 'How customer data is collected and used', aliases: ['gdpr', 'ccpa', 'customer data'], icon: 'lock', route: '/customer-privacy', audience: 'seller' },
+      { label: 'Close Friends', description: 'Your top buyers and the people who see your Close Friends stories', aliases: ['close friends', 'top buyers', 'vip'], icon: 'star', route: '/seller-close-friends', audience: 'seller' },
       { label: 'Blocked accounts', description: 'See and unblock people you have blocked', aliases: ['block', 'unblock', 'blocked'], icon: 'slash', route: '/buyer-blocked', audience: 'shared' },
       { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
       { label: 'Review reports', description: 'Moderate reported content and filter holds', aliases: ['moderation', 'reports', 'admin', 'queue'], icon: 'flag', route: '/admin-reports', audience: 'seller', requiresModerator: true },
