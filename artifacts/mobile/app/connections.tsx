@@ -288,6 +288,10 @@ export default function ConnectionsScreen() {
 
     return (
       <View style={styles.row}>
+        {/* PressableScale puts object styles on its inner view, so this flex
+            cell lets a long name shrink instead of pushing the trailing pill
+            off-screen. */}
+        <View style={styles.rowTapCell}>
         <PressableScale
           style={styles.rowTap}
           activeOpacity={0.8}
@@ -319,6 +323,7 @@ export default function ConnectionsScreen() {
             </>
           )}
         </PressableScale>
+        </View>
 
         {isMe ? (
           <Icon name="chevron-right" size={16} color={theme.muted} />
@@ -541,6 +546,7 @@ function makeStyles(theme: AppThemePreset) {
     sortValueRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     sortValue: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
     row:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, minHeight: 64, paddingVertical: SP.sm },
+    rowTapCell: { flex: 1, minWidth: 0 },
     rowTap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: SP.sm },
     rowCopy: { flex: 1, minWidth: 0 },
     rowTags: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: 4 },

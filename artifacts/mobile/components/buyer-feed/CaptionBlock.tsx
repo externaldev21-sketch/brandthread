@@ -244,7 +244,10 @@ const styles = StyleSheet.create({
   repostAvatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#35353A' },
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   repostIdentityText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
-  creatorRow: { minHeight: 30, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  // alignSelf: 'stretch' — useHitAreaBoost centres its child when it pads a
+  // short tap target, which centred the name and let a long one spill past
+  // both screen edges; stretching keeps it left-aligned and ellipsized.
+  creatorRow: { alignSelf: 'stretch', minHeight: 30, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
   // Shared legibility shadow for every text overlay in this block (name,
   // caption, sound) plus the verified badge glyph — strong enough to hold
   // up against a bright/high-key clip (e.g. Maison Vela's silver dress),

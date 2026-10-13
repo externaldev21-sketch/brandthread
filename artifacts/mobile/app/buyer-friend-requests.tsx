@@ -212,7 +212,7 @@ export default function BuyerFriendRequestsScreen() {
             <PressableScaleRow onPress={() => goToProfile({ userId: row.userId, name: row.name, handle: row.handle, initials: '', color: '' })}>
               <Avatar uri={row.avatarUrl} name={row.name} size={48} />
               <View style={s.rowCenter}>
-                <Text style={[TYPE_SCALE.body, s.rowName]} numberOfLines={1}>{row.name}</Text>
+                <Text style={[TYPE_SCALE.body, s.rowName]} numberOfLines={2}>{row.name}</Text>
                 <Text style={[TYPE_SCALE.footnote, s.rowHandle]} numberOfLines={1}>{row.handle}</Text>
               </View>
             </PressableScaleRow>
@@ -253,20 +253,14 @@ export default function BuyerFriendRequestsScreen() {
                 <Text style={[TYPE_SCALE.headline, s.avatar48Text]}>{row.initials}</Text>
               </View>
               <View style={s.rowCenter}>
-                <Text style={[TYPE_SCALE.body, s.rowName]} numberOfLines={1}>{row.name}</Text>
+                <Text style={[TYPE_SCALE.body, s.rowName]} numberOfLines={2}>{row.name}</Text>
                 <Text style={[TYPE_SCALE.footnote, s.rowHandle]} numberOfLines={1}>{row.handle}</Text>
                 <Text style={[TYPE_SCALE.caption, s.rowMutual]}>Follows you</Text>
               </View>
             </PressableScaleRow>
             <View style={s.rowActions}>
-              <Button label="Dismiss" variant="secondary" size="small" onPress={() => handleDismiss(row)} />
-              <Button
-                label="Follow"
-                variant="primary"
-                size="small"
-                loading={actionId === row.userId}
-                onPress={() => handleFollowBack(row)}
-              />
+              <View style={s.requestBtn}><Button label="Dismiss" variant="secondary" size="small" fullWidth style={{ paddingHorizontal: 12 }} onPress={() => handleDismiss(row)} /></View>
+              <View style={s.requestBtn}><Button label="Follow" variant="primary" size="small" fullWidth style={{ paddingHorizontal: 12 }} loading={actionId === row.userId} onPress={() => handleFollowBack(row)} /></View>
             </View>
           </View>
         )}
@@ -415,13 +409,18 @@ export default function BuyerFriendRequestsScreen() {
 // A row's tap area (open profile) built on the shared press-scale feel, kept
 // separate from the row's trailing action buttons so they don't nest presses.
 function PressableScaleRow({ children, onPress, onLongPress }: { children: React.ReactNode; onPress: () => void; onLongPress?: () => void }) {
+  // PressableScale puts object styles on its inner view; the cell gives the
+  // outer pressable the flex so long names shrink and the actions stay on screen.
   return (
-    <PressableScale onPress={onPress} onLongPress={onLongPress} style={rowStyles.wrap}>
-      {children}
-    </PressableScale>
+    <View style={rowStyles.cell}>
+      <PressableScale onPress={onPress} onLongPress={onLongPress} style={rowStyles.wrap}>
+        {children}
+      </PressableScale>
+    </View>
   );
 }
 const rowStyles = StyleSheet.create({
+  cell: { flex: 1, minWidth: 0 },
   wrap: { flex: 1, flexDirection: 'row', alignItems: 'center' },
 });
 
@@ -433,13 +432,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   row:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.border, gap: SPACING.sm },
   avatar48:        { width: 48, height: 48, borderRadius: RADII.avatar, alignItems: 'center', justifyContent: 'center' },
   avatar48Text:    { color: '#FFFFFF' }, // theme-exempt: initials on a per-user identity color
-  rowCenter:       { flex: 1, marginLeft: SPACING.sm, gap: 2 },
+  rowCenter:       { flex: 1, minWidth: 0, marginLeft: SPACING.sm, gap: 2 },
   rowName:         { color: palette.foreground },
   rowHandle:       { color: palette.mutedForeground },
   rowMutual:       { color: palette.mutedForeground },
   requestBtn:      { width: 96, flexShrink: 0 }, // Delete / Confirm: equal width
   sectionLabel:    { color: palette.mutedForeground, paddingHorizontal: SPACING.md, paddingTop: SPACING.md, paddingBottom: SPACING.xs },
-  rowActions:      { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
+  rowActions:      { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, flexShrink: 0 },
   requestedPill:   { paddingHorizontal: SPACING.sm, paddingVertical: 4, backgroundColor: palette.card, borderWidth: 1, borderRadius: RADII.pill },
   requestedPillText: {},
 });
