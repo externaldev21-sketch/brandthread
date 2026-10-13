@@ -15,6 +15,14 @@ import { useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadChunked, type ChunkedTransport, type ResumeStore } from '@/lib/createPost/chunkedUpload';
 import {
+  fetchWithTimeout,
+  REQUEST_TIMEOUT_MS,
+  timeoutError,
+  IMAGE_UPLOAD_TIMEOUT_MS,
+  VIDEO_UPLOAD_TIMEOUT_MS,
+  UPLOAD_CHUNK_TIMEOUT_MS,
+} from './fetchWithTimeout';
+import {
   ApiError,
   dismissNetworkNotice,
   reportNetworkError,
@@ -76,12 +84,6 @@ const BASE =
  * ws(s):// URL from the same host this client already talks to over HTTP. */
 export const API_BASE_URL = BASE;
 
-/**
- * Every request gets a hard ceiling so a hung connection (dead server, black
- * hole route, a device that fell asleep mid-request) always resolves into an
- * error a screen can show instead of leaving loading state stuck forever.
- */
-const REQUEST_TIMEOUT_MS = 15_000;
 
 function rejectSellerPreviewApiRequest(): void {
   if (!isSellerDevPreview()) return;
@@ -100,31 +102,6 @@ function rejectSellerPreviewApiRequest(): void {
  * instead of the real result.
  */
 const EXPENSIVE_REQUEST_TIMEOUT_MS = 90_000;
-
-/**
- * fetch() with a hard timeout. Expo/RN's fetch never rejects or resolves on
- * its own if the connection just hangs — AbortController is the only way to
- * bound it. A timeout surfaces as ApiError(408) so it flows through the same
- * classification/retry path as a real server timeout.
- */
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutMs: number = REQUEST_TIMEOUT_MS,
-): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new ApiError(408, JSON.stringify({ error: { message: 'Request timed out. Please try again.', code: 'timeout' } }));
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 /**
  * Global 429 backoff gate. When the server rate-limits us, every request
@@ -564,7 +541,7 @@ async function uploadImage<T = any>(
   const token = await getCachedToken(getToken);
   let res: Response;
   try {
-    res = await fetch(`${BASE}${versionApiPath(path)}`, {
+    res = await fetchWithTimeout(`${BASE}${versionApiPath(path)}`, {
       method: "POST",
       headers: {
         "Content-Type": contentType,
@@ -572,7 +549,7 @@ async function uploadImage<T = any>(
         ...storeContextHeaders(),
       },
       body: imageBlob,
-    });
+    }, IMAGE_UPLOAD_TIMEOUT_MS);
   } catch (error) {
     reportNetworkError(error);
     throw error;
@@ -602,7 +579,7 @@ async function uploadVideo<T = any>(
   const token = await getCachedToken(getToken);
   let res: Response;
   try {
-    res = await fetch(`${BASE}${versionApiPath(path)}`, {
+    res = await fetchWithTimeout(`${BASE}${versionApiPath(path)}`, {
       method: "POST",
       headers: {
         "Content-Type": contentType,
@@ -610,7 +587,7 @@ async function uploadVideo<T = any>(
         ...storeContextHeaders(),
       },
       body: videoBlob,
-    });
+    }, VIDEO_UPLOAD_TIMEOUT_MS);
   } catch (error) {
     reportNetworkError(error);
     throw error;
@@ -665,6 +642,8 @@ async function uploadVideoWithProgress<T = any>(
     };
     xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText });
     xhr.onerror = () => reject(new Error("Network error while uploading the video."));
+    xhr.timeout = VIDEO_UPLOAD_TIMEOUT_MS;
+    xhr.ontimeout = () => reject(timeoutError());
     xhr.send(videoBlob);
   }).catch((error) => { reportNetworkError(error); throw error; });
   if (result.status < 200 || result.status >= 300) {
@@ -704,7 +683,7 @@ async function uploadVideoChunked(
     return { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...storeContextHeaders() };
   };
   const json = async <T,>(path: string, init: RequestInit): Promise<T> => {
-    const res = await fetch(`${BASE}${versionApiPath(path)}`, {
+    const res = await fetchWithTimeout(`${BASE}${versionApiPath(path)}`, {
       ...init,
       headers: { "Content-Type": "application/json", ...(await authHeaders()), ...(init.headers ?? {}) },
     });
@@ -725,6 +704,8 @@ async function uploadVideoChunked(
         xhr.upload.onprogress = (e) => { if (e.lengthComputable) onBytes(e.loaded); };
         xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new ApiError(xhr.status, xhr.responseText)));
         xhr.onerror = () => reject(new Error("Network error while uploading"));
+        xhr.timeout = UPLOAD_CHUNK_TIMEOUT_MS;
+        xhr.ontimeout = () => reject(timeoutError());
         xhr.send(chunk);
       });
     },
@@ -3846,6 +3827,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           getToken,
           false,
           getCacheScope,
+          true,
+          // A file upload, not an ordinary request: the 15s default cut off
+          // ad videos mid-upload on a normal phone connection.
+          opts?.mediaKind === 'video' ? VIDEO_UPLOAD_TIMEOUT_MS : IMAGE_UPLOAD_TIMEOUT_MS,
         );
       },
       removeMedia: (id: string, index: number) =>

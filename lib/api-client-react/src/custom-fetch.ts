@@ -1,6 +1,55 @@
 export type CustomFetchOptions = RequestInit & {
   responseType?: "json" | "text" | "blob" | "auto";
+  /**
+   * Hard ceiling for the whole request (default 30s, 120s when sending a
+   * file). A hung connection rejects with a `TimeoutError` instead of leaving
+   * a spinner up forever. Pass 0 to disable.
+   */
+  timeoutMs?: number;
 };
+
+const DEFAULT_TIMEOUT_MS = 30_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
+
+function isFileBody(body: unknown): boolean {
+  return (
+    (typeof Blob !== "undefined" && body instanceof Blob) ||
+    (typeof FormData !== "undefined" && body instanceof FormData)
+  );
+}
+
+/** Combines the caller's AbortSignal (if any) with a timeout. */
+export function withTimeoutSignal(
+  signal: AbortSignal | null | undefined,
+  timeoutMs: number,
+): { signal: AbortSignal | undefined; timedOut: () => boolean; clear: () => void } {
+  if (!timeoutMs || timeoutMs <= 0 || typeof AbortController === "undefined") {
+    return { signal: signal ?? undefined, timedOut: () => false, clear: () => {} };
+  }
+  const controller = new AbortController();
+  let fired = false;
+  const timer = setTimeout(() => { fired = true; controller.abort(); }, timeoutMs);
+  const onAbort = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener("abort", onAbort, { once: true });
+  }
+  return {
+    signal: controller.signal,
+    timedOut: () => fired,
+    clear: () => {
+      clearTimeout(timer);
+      signal?.removeEventListener?.("abort", onAbort);
+    },
+  };
+}
+
+export class TimeoutError extends Error {
+  constructor(message = "Request timed out. Please try again.") {
+    super(message);
+    this.name = "TimeoutError";
+  }
+}
 
 export type ErrorType<T = unknown> = ApiError<T>;
 
@@ -336,7 +385,7 @@ export async function customFetch<T = unknown>(
     throw new Error('This action is unavailable in the signed-out seller preview.');
   }
   input = applyBaseUrl(input);
-  const { responseType = "auto", headers: headersInit, ...init } = options;
+  const { responseType = "auto", headers: headersInit, timeoutMs, ...init } = options;
 
   const method = resolveMethod(input, init.method);
 
@@ -383,7 +432,19 @@ export async function customFetch<T = unknown>(
 
   const requestInfo = { method, url: resolveUrl(input) };
 
-  const response = await fetch(input, { ...init, method, headers });
+  const deadline = withTimeoutSignal(
+    init.signal,
+    timeoutMs ?? (isFileBody(init.body) ? UPLOAD_TIMEOUT_MS : DEFAULT_TIMEOUT_MS),
+  );
+  let response: Response;
+  try {
+    response = await fetch(input, { ...init, method, headers, signal: deadline.signal });
+  } catch (error) {
+    if (deadline.timedOut()) throw new TimeoutError();
+    throw error;
+  } finally {
+    deadline.clear();
+  }
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);

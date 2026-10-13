@@ -88,6 +88,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { InlineSlider } from '@/components/InlineSlider';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { radius } from '@/constants/radii';
+import { prepareImageForUpload } from '@/lib/imageUploadPrep';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -457,14 +458,20 @@ export default function CreateAdScreen() {
 
       setLoading(true);
       try {
-        const fetchRes = await fetch(asset.uri);
+        // Photos go up resized on device (long edge ≤ 2048px, ~0.8 quality),
+        // same step every other image upload uses.
+        const prepared = kind === 'video'
+          ? { uri: asset.uri, mimeType }
+          : await prepareImageForUpload({ uri: asset.uri, mimeType });
+        const uploadMime = prepared.mimeType ?? mimeType;
+        const fetchRes = await fetch(prepared.uri);
         const blob = await fetchRes.blob();
-        const uploadRes = await api.adCampaigns.uploadMedia(campaign.id, blob, mimeType, {
+        const uploadRes = await api.adCampaigns.uploadMedia(campaign.id, blob, uploadMime, {
           mediaKind: kind,
           ...(kind === 'video' && duration != null ? { durationSeconds: duration / 1000 } : {}),
         });
         setLocalPaths((prev) => [...prev, uploadRes.objectPath]);
-        setLocalMimes((prev) => [...prev, mimeType]);
+        setLocalMimes((prev) => [...prev, uploadMime]);
         setLocalUris((prev)  => [...prev, asset.uri]);
         setMediaKind(kind);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
