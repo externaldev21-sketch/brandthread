@@ -20,6 +20,7 @@ import { getMyProfile } from '@/services/socialService';
 import type { BuyerSocialProfile } from '@/services/socialTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
+import { BRANDTHREAD_ORIGIN, buildCanonicalProfileUrl } from '@/lib/shareProfile';
 import { radius } from '@/constants/radii';
 
 import { Button } from '@/components/ui/Button';
@@ -44,10 +45,10 @@ export default function BuyerQRCode() {
   const demo = previewBuyerIdentity();
   const username = profile?.username || demo?.username || '';
   const displayName = profile?.name || demo?.name || '';
-  const canonicalUrl = profileShareUrl(username);
+  const canonicalUrl = buildCanonicalProfileUrl(username);
   const handle = canonicalUrl ? `@${username.replace(/^@/, '')}` : null;
   // Legacy alias — used by existing Share call below; keep for compatibility.
-  const qrValue = canonicalUrl ?? 'https://brandthread.app';
+  const qrValue = canonicalUrl ?? BRANDTHREAD_ORIGIN;
 
   async function handleShare() {
     if (!canonicalUrl) return;

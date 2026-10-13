@@ -57,6 +57,8 @@ import { isVisitorPreviewParam, resolveProfileMode } from '@/lib/profileAccess';
 import { taggedItemHref } from '@/services/profileService';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { buildCanonicalProfileUrl, shareLinkWithFallback } from '@/lib/shareProfile';
+import * as Clipboard from 'expo-clipboard';
+import { copyProfileLink } from '@/lib/copyProfileLink';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -337,6 +339,10 @@ export default function BuyerOtherProfileScreen() {
     })
       .then((result) => { if (result === 'copied') setSnackbar('Profile link copied'); })
       .catch(() => {});
+  };
+  const handleCopyLink = async () => {
+    setMoreSheetOpen(false);
+    if (await copyProfileLink(profile?.username, Clipboard.setStringAsync)) { hapticSuccess(); setSnackbar('Link copied'); }
   };
   const handleMute     = async () => { setMoreSheetOpen(false); await muteUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); };
   // No "Restrict" here: it was only saved on this device, so the other person
@@ -661,7 +667,7 @@ export default function BuyerOtherProfileScreen() {
         accessibilityLabel={`${displayName} options`}
         testID="buyer-other-profile-more-sheet"
         sections={[
-          [{ key: 'share', icon: 'share-2', label: 'Share profile', onPress: handleShare }],
+          [{ key: 'share', icon: 'share-2', label: 'Share profile', onPress: handleShare }, ...(profile?.username ? [{ key: 'copy', icon: 'link' as const, label: 'Copy profile link', onPress: () => { void handleCopyLink(); } }] : [])],
           [
             { key: 'mute', icon: 'volume-x', label: 'Mute', onPress: () => { void handleMute(); } },
           ],
