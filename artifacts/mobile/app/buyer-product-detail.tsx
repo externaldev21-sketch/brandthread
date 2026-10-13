@@ -2352,9 +2352,6 @@ function WornInVideos({ productId, productName }: { productId: string; productNa
                 <AppIcon name="video" size={20} color={theme.muted} />
               </View>
             )}
-            <View style={wv.playBadge}>
-              <AppIcon name="play" size={12} color="#FFFFFF" />
-            </View>
             <Text style={[wv.authorName, { color: theme.muted }]} numberOfLines={1}>{video.authorName}</Text>
           </TouchableOpacity>
         ))}

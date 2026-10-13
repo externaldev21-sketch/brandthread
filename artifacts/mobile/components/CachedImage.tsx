@@ -4,6 +4,9 @@ import { Image, ImageProps } from 'expo-image';
 import { rewriteImageSource } from '@/lib/cdnUrl';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT } from '@/lib/theme';
+import { lowResPlaceholder } from '@/lib/imageVariants';
+
+const DEFAULT_BLURHASH = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj';
 
 /**
  * Shared remote-image behavior: memory+disk caching prevents scroll flicker,
@@ -26,7 +29,9 @@ import { FONT } from '@/lib/theme';
  */
 export function CachedImage({
   source,
-  placeholder,
+  // Low-res → sharp: where the host can resize, a tiny copy paints first
+  // and the transition fades to the full photo (lib/imageVariants.ts).
+  placeholder = lowResPlaceholder(source),
   transition = 180,
   cachePolicy = 'memory-disk',
   contentFit = 'cover',
@@ -48,6 +53,7 @@ export function CachedImage({
   return (
     <Image
       accessible={described}
+      placeholderContentFit={contentFit}
       {...props}
       source={rewriteImageSource(source)}
       contentFit={contentFit}

@@ -1,15 +1,17 @@
 /**
- * Product video — a poster tile with a play control, shown on the product
- * page when the seller has added a video (GET /api/product-videos/public/:id,
- * works signed out). Renders nothing otherwise.
+ * Product video — shown on the product page when the seller has added a
+ * video (GET /api/product-videos/public/:id, works signed out). Renders
+ * nothing otherwise.
  *
- * Playback reuses the app's expo-video pattern (profile cover / hero media):
- * muted, looping. The server renders these videos without an audio track.
+ * Plays on its own, muted and looping, with no play button (Dev's less-AI
+ * pass, item 49) — same expo-video pattern as the profile cover / hero media,
+ * paused while the screen is not focused. The poster shows until the first
+ * frame. The server renders these videos without an audio track.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Icon } from '@/components/ui/Icon';
+import { StyleSheet, Text, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useIsFocused } from 'expo-router';
 import { CachedImage } from '@/components/CachedImage';
 import { useColors } from '@/hooks/useColors';
 import { useApi, type ProductVideoInfo } from '@/lib/api';
@@ -55,50 +57,35 @@ export function ProductVideo({ productId }: { productId: string }) {
   );
 }
 
-function Tile({ posterUri, length, onPress }: { posterUri: string | null; length: string | null; onPress?: () => void }) {
+function Tile({ posterUri, length, children }: { posterUri: string | null; length: string | null; children?: React.ReactNode }) {
   const colors = useColors();
   const s = useMemo(() => makeStyles(colors), [colors]);
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      disabled={!onPress}
-      onPress={onPress}
-      style={s.tile}
-      accessibilityRole="button"
-      accessibilityLabel="Play product video"
-    >
+    <View style={s.tile} accessibilityLabel="Product video" testID="product-video-tile">
       {posterUri ? <CachedImage source={{ uri: posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
-      <View style={s.playWrap}>
-        <View style={s.play}><Icon name="play" size={22} color={colors.foreground} style={{ marginLeft: 2 }} /></View>
-      </View>
+      {children}
       {length ? <View style={s.length}><Text style={s.lengthText}>{length}</Text></View> : null}
-    </TouchableOpacity>
-  );
-}
-
-function PlayableTile({ video }: { video: ProductVideoInfo }) {
-  const colors = useColors();
-  const s = useMemo(() => makeStyles(colors), [colors]);
-  const [playing, setPlaying] = useState(false);
-  if (!playing) {
-    return <Tile posterUri={video.posterUrl} length={formatVideoLength(video.durationMs)} onPress={() => setPlaying(true)} />;
-  }
-  return (
-    <View style={s.tile}>
-      <InlinePlayer uri={video.videoUrl} />
-      <TouchableOpacity style={s.close} onPress={() => setPlaying(false)} accessibilityRole="button" accessibilityLabel="Close product video">
-        <Icon name="x" size={16} color={colors.foreground} />
-      </TouchableOpacity>
     </View>
   );
 }
 
+function PlayableTile({ video }: { video: ProductVideoInfo }) {
+  return (
+    <Tile posterUri={video.posterUrl} length={formatVideoLength(video.durationMs)}>
+      <InlinePlayer uri={video.videoUrl} />
+    </Tile>
+  );
+}
+
 function InlinePlayer({ uri }: { uri: string }) {
+  const focused = useIsFocused();
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
     p.muted = true;
-    p.play();
   });
+  useEffect(() => {
+    if (focused) player.play(); else player.pause();
+  }, [focused, player]);
   return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />;
 }
 
@@ -106,9 +93,6 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   divider: { height: 1, backgroundColor: c.border, marginVertical: SP.md },
   header: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.mutedForeground, marginBottom: SP.sm },
   tile: { width: '100%', aspectRatio: 4 / 5, maxHeight: 420, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: c.card },
-  playWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  play: { width: 56, height: 56, borderRadius: 28, backgroundColor: c.background, alignItems: 'center', justifyContent: 'center' },
   length: { position: 'absolute', left: SP.sm, bottom: SP.sm, backgroundColor: c.foreground, borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 3 },
   lengthText: { color: c.background, fontSize: FS.xs, fontFamily: FONT.semibold },
-  close: { position: 'absolute', top: SP.sm, right: SP.sm, width: 32, height: 32, borderRadius: 16, backgroundColor: c.background, alignItems: 'center', justifyContent: 'center' },
 });

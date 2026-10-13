@@ -140,7 +140,6 @@ export default function BuyerRecentlyWatched() {
                 {item.thumbnailUrl
                   ? <CachedImage source={{ uri: item.thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
                   : null}
-                <Icon name="play" size={20} color={theme.text} style={styles.play} />
               </View>
               <View style={styles.details}>
                 <Text numberOfLines={2} style={styles.caption}>{item.caption || 'Video'}</Text>

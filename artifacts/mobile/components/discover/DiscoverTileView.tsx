@@ -57,14 +57,6 @@ export function DiscoverTileView({
           )}
         </View>
       )}
-      {post.media === 'video' && (
-        <View style={[styles.glyphWrap, styles.videoGlyph]}>
-          <Icon name="play" size={13} color="#FFFFFF" />
-          {!!formatVideoDuration(post.durationSec) && (
-            <Text style={[styles.duration, TABULAR_NUMS]}>{formatVideoDuration(post.durationSec)}</Text>
-          )}
-        </View>
-      )}
       {post.media === 'slideshow' && (
         <View style={styles.glyphWrap}>
           <Icon name="copy" size={13} color="#FFFFFF" />
