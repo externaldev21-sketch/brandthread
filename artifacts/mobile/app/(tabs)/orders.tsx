@@ -90,6 +90,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 
 import { SELLER_ORDERS_GESTURE } from '@/lib/firstRunTips/content';
+import { readSellerOrdersCache, saveSellerOrdersCache } from '@/lib/sellerOrdersCache';
 
 import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
 
@@ -865,10 +866,27 @@ export default function OrdersScreen() {
     if (requestGenerationRef.current === generation) return;
     const requestOwnerId = userId;
     requestGenerationRef.current = generation;
+    // Offline: paint the last list this account loaded while the request
+    // runs, so a cold start with no connection still shows real orders.
+    if (!hasLoadedRef.current) {
+      const cachedRows = await readSellerOrdersCache<any>();
+      if (cachedRows && generationRef.current === generation && !hasLoadedRef.current) {
+        const cached = cachedRows.map(apiRowToOrder);
+        detailSeedRef.current = {
+          ownerId: requestOwnerId,
+          rows: new Map(cachedRows.filter(raw => !!raw?.id).map(raw => [raw.id, raw])),
+        };
+        setOrders(cached);
+        setOrdersOwnerId(requestOwnerId);
+        setStats(computeStats(cached));
+        setLoading(false);
+      }
+    }
     try {
       const rows = await api.orders.list();
       if (generationRef.current !== generation) return;
       const all = Array.isArray(rows) ? (rows as SellerOrderListRow[]).map(apiRowToOrder) : [];
+      saveSellerOrdersCache(rows);
       setOrders(all);
       // Keep the raw snapshot outside the shared cache. Seed only the tapped
       // order; hundreds of cache updates synchronously dehydrate the cache
