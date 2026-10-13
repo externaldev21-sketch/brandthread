@@ -20,6 +20,7 @@ import { PREVIEW_SELLER_CARDS, PREVIEW_SETTINGS } from '@/lib/giftCardsPreview';
 import {
   EMAIL_PATTERN, amountTextToCents, giftCardMask, giftCardStatusLabel, type GiftCard, type GiftCardSettings,
 } from '@/lib/giftCards';
+import { formatCents } from '@/lib/money';
 import { formatMoney } from '@/lib/format';
 
 export default function GiftCardsManageScreen() {
@@ -108,7 +109,7 @@ export default function GiftCardsManageScreen() {
   }
 
   function confirmVoid(card: GiftCard) {
-    Alert.alert('Void this gift card?', `${giftCardMask(card)} has ${formatMoney(card.balanceCents)} left. Voiding removes it and can’t be undone.`, [
+    Alert.alert('Void this gift card?', `${giftCardMask(card)} has ${formatCents(card.balanceCents)} left. Voiding removes it and can’t be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Void', style: 'destructive',

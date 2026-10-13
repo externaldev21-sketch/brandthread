@@ -26,6 +26,7 @@ import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-c
 import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
 import { hapticLight } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
+import { formatCents } from '@/lib/money';
 import { formatMoney } from '@/lib/format';
 
 const TIP_AMOUNTS_CENTS = [100, 500, 1000, 2000, 5000, 10000];
@@ -137,7 +138,7 @@ export function LiveThreadCashSheet({
 
         {justSentCents != null && (
           <Animated.View style={[styles.sentBanner, { borderColor: THREAD_CASH_GREEN_MID }, popStyle]}>
-            <Text style={[styles.sentBannerText, { color: theme.text }]}>Sent {formatMoney(justSentCents)} 🎉</Text>
+            <Text style={[styles.sentBannerText, { color: theme.text }]}>Sent {formatCents(justSentCents)} 🎉</Text>
           </Animated.View>
         )}
 
