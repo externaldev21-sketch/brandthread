@@ -15,7 +15,6 @@ import { Toast } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
 import { useBuyerPreferences } from '@/hooks/useBuyerPreferences';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { hapticSuccess } from '@/lib/haptics';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -80,7 +79,6 @@ export default function BuyerMySizes() {
   async function save(patch: BuyerPreferencesPatch, okMessage: string) {
     try {
       await update(patch);
-      hapticSuccess();
       flash(okMessage);
     } catch {
       flash("Couldn't save. Try again.", 'error');

@@ -8,7 +8,7 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SURVEY_SIZE_CATEGORIES, toggleSize, type OnboardingSurvey } from '@/lib/onboardingSurvey';
 import type { SizeCategory } from '@/lib/sizeRecommendation';
@@ -25,7 +25,7 @@ export function SizesStep({ sizes, onChange }: Props) {
   const styles = createStyles(theme);
 
   function pick(key: SizeCategory, value: string) {
-    Haptics.selectionAsync();
+    haptic('select');
     onChange(toggleSize(sizes, key, value));
   }
 

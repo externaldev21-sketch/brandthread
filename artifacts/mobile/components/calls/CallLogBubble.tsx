@@ -1,8 +1,7 @@
 /**
  * CallLogBubble — an Instagram-style DM call-log entry: a light rounded pill,
  * left-aligned like an incoming message bubble, with a small phone icon and
- * two lines of text. Tapping it calls back (per the product requirement),
- * with a light haptic on press.
+ * two lines of text. Tapping it calls back (per the product requirement).
  *
  * PR1 note: the log this reads (`useCallLog`, lib/calls/CallSessionContext.tsx)
  * is in-memory only — it shows calls placed/received in the current app
@@ -20,7 +19,6 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { hapticPrimaryAction } from '@/lib/haptics';
 import type { CallLogEntry } from '@/lib/calls/types';
 
 /** Matches the "h:mm AM/PM" format the conversation screens already use for
@@ -53,7 +51,7 @@ export function CallLogBubble({ entry, onCallBack }: CallLogBubbleProps) {
 
   return (
     <PressableScale
-      onPress={() => { hapticPrimaryAction(); onCallBack(); }}
+      onPress={() => { onCallBack(); }}
       style={[styles.bubble, { backgroundColor: theme.card, borderColor: theme.border }]}
       accessibilityRole="button"
       accessibilityLabel={`${title}, ${isEnded ? subtitle : `at ${subtitle}`}. Double tap to call back.`}

@@ -15,7 +15,7 @@ import {
 import ReanimatedAnimated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '@/lib/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useSheetTransition } from '@/components/ui/BottomSheet';
@@ -83,11 +83,10 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
         collectionId,
       });
       await moveSavedItemToCollection(item.targetId, collectionId);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onSaved?.(collectionId);
       onClose();
     } catch {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptic('error');
     } finally {
       setBusyId(null);
     }
@@ -101,7 +100,7 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
       const collection = await createCollection(name);
       await fileInto(collection.id);
     } catch {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptic('error');
       setBusyId(null);
     }
   }

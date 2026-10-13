@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
@@ -109,14 +109,13 @@ export default function DeleteAccountScreen() {
     setDeleteError(null);
     try {
       const result = await api.auth.deleteAccount(usesCode ? { code: code.trim() } : { password });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await clearAccountLifecycleState().catch(() => {});
       setScheduledFor(result.scheduledFor);
       setStep('done');
       // Every session was revoked server-side; clear the local one too.
       signOut().catch(() => {});
     } catch (err) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptic('error');
       if (apiErrorCode(err) === 'DELETION_BLOCKED') {
         const details = apiErrorDetails<{ blockers?: DeletionBlocker[] }>(err);
         setCheck((prev) => prev ? { ...prev, canDelete: false, blockers: details?.blockers ?? prev.blockers } : prev);
@@ -331,7 +330,7 @@ export default function DeleteAccountScreen() {
             )}
 
             <PressableScale
-              onPress={() => { Haptics.selectionAsync(); setAcknowledged((v) => !v); }}
+              onPress={() => { setAcknowledged((v) => !v); }}
               style={s.ackRow}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: acknowledged }}
