@@ -19,7 +19,7 @@
  * a review has them.
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
 import { useReviewActions } from '@/lib/useReviewActions';
 import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
@@ -28,6 +28,7 @@ import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { StarRating } from '@/components/StarRating';
 import { CachedImage } from '@/components/CachedImage';
+import { PhotoViewer } from '@/components/media/PhotoViewer';
 import { FONT, FS, BORDER_SUBTLE, FG, MUTED, SUBTLE, CARD_ELEVATED } from '@/lib/theme';
 import * as Haptics from 'expo-haptics';
 import { applyHelpfulToggle, fitChipText, isVerifiedReview } from '@/lib/reviewDisplay';
@@ -113,13 +114,7 @@ export function SellerReplyBlock({ reply, repliedAt }: { reply?: string | null; 
 }
 
 function ReviewPhotoViewer({ photos, startIndex, onClose }: { photos: string[]; startIndex: number; onClose: () => void }) {
-  return (
-    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
-      <TouchableOpacity style={photoS.backdrop} activeOpacity={1} onPress={onClose} accessibilityLabel="Close photo">
-        <CachedImage source={{ uri: photos[startIndex] }} style={photoS.image} contentFit="contain" />
-      </TouchableOpacity>
-    </Modal>
-  );
+  return <PhotoViewer visible images={photos} initialIndex={startIndex} onClose={onClose} />;
 }
 
 export function ProductReviewsSection({
@@ -348,7 +343,3 @@ const fitS = StyleSheet.create({
   endLabel: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE },
 });
 
-const photoS = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
-  image: { width: '100%', height: '80%' },
-});

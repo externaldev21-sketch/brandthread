@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl,
-  Animated, Dimensions, PanResponder, Easing, AccessibilityInfo,
+  Animated, Dimensions, PanResponder, Easing, AccessibilityInfo, Pressable,
 } from 'react-native';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,6 +44,7 @@ import {
 import { ResponsiveContainer, StickyFooter } from '@/components/layout';
 import { SaveHeart } from '@/components/SaveHeart';
 import { CachedImage } from '@/components/CachedImage';
+import { PhotoViewer } from '@/components/media/PhotoViewer';
 import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar, SuccessCheck } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -212,7 +213,7 @@ function isVariantComboAvailable(
   );
 }
 
-function ZoomableGalleryImage({ uri }: { uri: string }) {
+function ZoomableGalleryImage({ uri, onOpen }: { uri: string; onOpen?: () => void }) {
   const scale = useRef(new Animated.Value(1)).current;
   const currentScale = useRef(1);
   const pinchStartDistance = useRef(0);
@@ -257,12 +258,20 @@ function ZoomableGalleryImage({ uri }: { uri: string }) {
 
   return (
     <View style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT, overflow: 'hidden' }} {...responder.panHandlers}>
-      <Animated.Image
-        source={{ uri }}
-        style={[StyleSheet.absoluteFill, { transform: [{ scale }] }]}
-        resizeMode="contain"
-        accessibilityLabel="Product photo. Pinch with two fingers to zoom."
-      />
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={onOpen}
+        disabled={!onOpen}
+        accessibilityRole="imagebutton"
+        accessibilityLabel="Product photo. Pinch with two fingers to zoom, tap to open full screen."
+        testID="product-gallery-photo"
+      >
+        <Animated.Image
+          source={{ uri }}
+          style={[StyleSheet.absoluteFill, { transform: [{ scale }] }]}
+          resizeMode="contain"
+        />
+      </Pressable>
       {zoomed && (
         <TouchableOpacity style={galleryStyles.resetZoom} onPress={resetZoom} accessibilityRole="button" accessibilityLabel="Reset product photo zoom">
           <Feather name="minimize-2" size={14} color={ON_DARK} />
@@ -306,6 +315,7 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
   const scrollX = useRef(new Animated.Value(0)).current;
   const listRef = useRef<Animated.FlatList<string>>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   if (!images.length) {
     return (
@@ -326,7 +336,7 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => <ZoomableGalleryImage uri={item} />}
+          renderItem={({ item, index }) => <ZoomableGalleryImage uri={item} onOpen={() => setViewerIndex(index)} />}
           getItemLayout={(_, index) => ({ length: GALLERY_WIDTH, offset: GALLERY_WIDTH * index, index })}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
           onMomentumScrollEnd={(e) => {
@@ -383,6 +393,13 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
           ))}
         </ScrollView>
       )}
+
+      <PhotoViewer
+        visible={viewerIndex != null}
+        images={images}
+        initialIndex={viewerIndex ?? 0}
+        onClose={() => setViewerIndex(null)}
+      />
     </View>
   );
 }

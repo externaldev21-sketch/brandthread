@@ -34,6 +34,7 @@ import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useSheetTransition } from '@/components/ui/BottomSheet';
 import { CachedImage } from '@/components/CachedImage';
+import { PhotoViewer } from '@/components/media/PhotoViewer';
 import { Avatar } from '@/components/ui/Avatar';
 import { profileHref } from '@/lib/profileNavigation';
 import { ProductReviewsSection, type ReviewsSeed } from '@/components/ProductReviewsSection';
@@ -1646,62 +1647,15 @@ function ProductListRow({
   );
 }
 
-// ─── Full-screen image viewer — swipeable, tap/swipe-down to dismiss ────────
+// ─── Full-screen image viewer — the shared PhotoViewer (pinch-zoom, swipe
+// down to close, thumbnail strip; components/media/PhotoViewer.tsx) ─────────
 
 function FullScreenImageViewer({
   imageUris, startIndex, onClose,
 }: {
   imageUris: string[]; startIndex: number; onClose: () => void;
 }) {
-  const { theme } = useAppTheme();
-  const ss = useMemo(() => makeSheetStyles(theme), [theme]);
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const [index, setIndex] = useState(startIndex);
-  const scrollRef = useRef<ScrollView>(null);
-
-  return (
-    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
-      <View style={[ss.fullScreenWrap, { backgroundColor: '#000' }]}>
-        <ScrollView
-          ref={scrollRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          contentOffset={{ x: startIndex * windowWidth, y: 0 }}
-          onMomentumScrollEnd={e => {
-            const next = Math.round(e.nativeEvent.contentOffset.x / windowWidth);
-            setIndex(Math.max(0, Math.min(imageUris.length - 1, next)));
-          }}
-        >
-          {imageUris.map((uri, i) => (
-            <TouchableOpacity
-              key={`${uri}-${i}`}
-              activeOpacity={1}
-              onPress={onClose}
-              style={{ width: windowWidth, height: windowHeight }}
-              accessibilityRole="button"
-              accessibilityLabel="Close full-screen photo"
-            >
-              <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        <TouchableOpacity
-          onPress={onClose}
-          style={ss.fullScreenClose}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Close"
-        >
-          <Feather name="x" size={20} color={ON_DARK} />
-        </TouchableOpacity>
-        {imageUris.length > 1 && (
-          <View style={ss.fullScreenCounter} pointerEvents="none">
-            <Text style={ss.carouselCounterText}>{index + 1}/{imageUris.length}</Text>
-          </View>
-        )}
-      </View>
-    </Modal>
-  );
+  return <PhotoViewer visible images={imageUris} initialIndex={startIndex} onClose={onClose} />;
 }
 
 // ─── Product image carousel — full sheet-width 3:4, swipeable, dot indicator ──
