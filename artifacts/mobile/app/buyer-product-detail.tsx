@@ -44,7 +44,7 @@ import {
 import { ResponsiveContainer, StickyFooter } from '@/components/layout';
 import { SaveHeart } from '@/components/SaveHeart';
 import { CachedImage } from '@/components/CachedImage';
-import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar, SuccessCheck } from '@/components/ui';
+import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII, radius } from '@/constants/radii';
@@ -54,13 +54,14 @@ import { LaunchCountdown } from '@/components/products/LaunchCountdown';
 import { PreOrderShipBy } from '@/components/products/PreOrderShipBy';
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
 import { CompleteTheFit } from '@/components/products/CompleteTheFit';
+import { BrandLink, brandLinkHref } from '@/components/products/BrandLink';
 import { ProductVideo } from '@/components/products/ProductVideo';
 import { ProductQuestionsSection } from '@/components/ProductQuestionsSection';
 import { SizeRecommendationBadge, RecommendedTag, useSizeBadgeModel } from '@/components/SizeRecommendationBadge';
 import {
   messageSellerAboutProductHref, profileHref, profileVideosHref, resolveStoreVisitSource,
 } from '@/lib/profileNavigation';
-import { getPreviewBuyerProduct, getPreviewRelatedProducts, isPreviewProductId } from '@/lib/previewProducts';
+import { getPreviewBuyerProduct, getPreviewRelatedProducts, getPreviewSellerProducts, isPreviewProductId } from '@/lib/previewProducts';
 import { isPreviewSellerId } from '@/lib/previewCheckout';
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
@@ -68,10 +69,6 @@ import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { StockCounter } from '@/components/products/StockCounter';
 import { ApiError } from '@/lib/networkNotice';
-import {
-  CART_FLIGHT_ITEM_SIZE, flightSourceFromRect, getCartFlightVector, measureCartTarget, measureWindowRect,
-  shouldAnimateCartSuccess, type CartFlightPoint, type CartFlightSource,
-} from '@/lib/cartFlight';
 
 type ThemeAliases = {
   theme: AppThemePreset;
@@ -150,7 +147,7 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
 
   return {
     id:                 row.id,
-    sellerId:           row.ownerId,
+    sellerId:           row.ownerId ?? row.sellerId,
     sellerName:         row.sellerDisplayName ?? 'Independent Seller',
     sellerHandle:       '',
     name:               row.name,
@@ -176,11 +173,16 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmtPrice = formatCents;
+/** How long Add to cart reads "In bag ✓" after a successful add (item 131). */
+export const IN_BAG_CONFIRM_MS = 2000;
 const GALLERY_WIDTH = Dimensions.get('window').width;
 // 3:4 — matches how product photos are now saved (cropped by the seller to
 // 3:4 at upload time; see ShopProductSheet's ProductImageCarousel, fixed the
 // same way in an earlier photo-audit pass).
-const GALLERY_HEIGHT = GALLERY_WIDTH * 4 / 3;
+// Capped at 60% of the window so photo, brand, name, price, the size row and
+// the purchase bar all fit on one screen (item 129). Only bites on short
+// phones (390×844: 520 → 506pt); the photo stays cover-fit.
+const GALLERY_HEIGHT = Math.min(GALLERY_WIDTH * 4 / 3, Dimensions.get('window').height * 0.6);
 
 function renderStars(rating: number): string {
   const full = Math.round(Math.max(0, Math.min(5, rating)));
@@ -410,7 +412,10 @@ function OptionPicker({ product, option, selections, onSelect, recommendedLabel 
           </Text>
         )}
       </View>
-      <View style={op.chips}>
+      {/* Sizes sit on one row (item 130): a single horizontal line of chips,
+          sold-out sizes crossed out, so the size row never pushes Add below
+          the fold. Colour swatches keep their wrapping grid. */}
+      <ChipRow oneRow={!isColor}>
         {option.values.map(val => {
           const isSelected = selections[option.id] === val.id;
           const { [option.id]: _ignored, ...rest } = selections;
@@ -459,8 +464,25 @@ function OptionPicker({ product, option, selections, onSelect, recommendedLabel 
             ? <View key={val.id} style={{ alignItems: 'center' }}>{chipEl}<RecommendedTag /></View>
             : chipEl;
         })}
-      </View>
+      </ChipRow>
     </View>
+  );
+}
+
+function ChipRow({ oneRow, children }: { oneRow: boolean; children: React.ReactNode }) {
+  const { theme } = useThemeAliases();
+  const op = makeOptionStyles(theme);
+  if (!oneRow) return <View style={op.chips}>{children}</View>;
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={op.chipRowScroll}
+      contentContainerStyle={op.chipRow}
+      testID="product-size-row"
+    >
+      {children}
+    </ScrollView>
   );
 }
 
@@ -474,6 +496,9 @@ const makeOptionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   optionName: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, color: theme.text },
   selectedLabel: { ...TYPE_SCALE.footnote, color: PURPLE_LIGHT, flexShrink: 1, marginLeft: SPACING.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+  // Bleeds to the screen edges so the row scrolls under the gutter.
+  chipRowScroll: { marginHorizontal: -SP.md },
+  chipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.sm, paddingHorizontal: SP.md },
   colorSwatch: {
     width: 44, height: 44, borderRadius: RADII.chip,
     borderWidth: 2, borderColor: BORDER,
@@ -534,10 +559,6 @@ export default function BuyerProductDetailScreen() {
   const [buyingNow, setBuyingNow] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
   const { ref: actionBarRef, rect: actionBarRect, onLayout: actionBarOnLayout } = useMeasuredTarget();
-  // Deliberate-choice confirmation sheet (View bag / Keep shopping) —
-  // separate from `addedToCart` above, which only drives the transient
-  // checkmark on the sticky action bar's icon button.
-  const [showAddedSheet, setShowAddedSheet] = useState(false);
   const [sellerPaymentReady, setSellerPaymentReady] = useState<boolean | null>(null);
   const [sellerPaymentReason, setSellerPaymentReason] = useState<string | null>(null);
   const [sellerVacationMessage, setSellerVacationMessage] = useState<string | null>(null);
@@ -563,9 +584,6 @@ export default function BuyerProductDetailScreen() {
   const { scale: cartPulse, bump: bumpCart } = useCartBadgeBump(reduceMotion);
   const cartTargetRef = useRef<View>(null);
   const galleryRef = useRef<View>(null);
-  const cartFlyProgress = useRef(new Animated.Value(0)).current;
-  const [flying, setFlying] = useState(false);
-  const [flight, setFlight] = useState<{ source: CartFlightSource | null; target: CartFlightPoint } | null>(null);
   useEffect(() => {
     let active = true;
     void AccessibilityInfo.isReduceMotionEnabled?.()
@@ -856,41 +874,21 @@ export default function BuyerProductDetailScreen() {
       : await addToCart({ product: product!, variant, quantity: qty, attribution });
     setAddingToCart(false);
     if (result.success) {
+      // Item 131: the button itself says "In bag ✓" for 2s, then goes back
+      // to "Add to cart". No sheet and no flying photo (item 148: the seller
+      // swipe glow is the app's only "wow" motion); the bag badge count
+      // changing is the one other signal that something happened.
       setAddedToCart(true);
       setCartCount(result.cart.items.reduce((sum, item) => sum + item.quantity, 0));
-      await flyToCart();
       bumpCart();
-      setShowAddedSheet(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Auto-clear the icon-button checkmark after 2.5s; the sheet itself
-      // stays open until the buyer taps View bag or Keep shopping.
       if (addedBannerTimerRef.current) clearTimeout(addedBannerTimerRef.current);
-      addedBannerTimerRef.current = setTimeout(() => setAddedToCart(false), 2500);
+      addedBannerTimerRef.current = setTimeout(() => setAddedToCart(false), IN_BAG_CONFIRM_MS);
     } else {
       Alert.alert('Cannot Add to Cart', result.message ?? 'Please try again.');
     }
   }
 
-  /** The product photo lifts off the gallery and lands in the bag icon (skipped under Reduce Motion). */
-  async function flyToCart(): Promise<void> {
-    if (!shouldAnimateCartSuccess(reduceMotion)) return;
-    const fallback = { x: GALLERY_WIDTH - 40, y: headerTopInset + SP.sm + 22 };
-    const [target, photoRect] = await Promise.all([
-      measureCartTarget(cartTargetRef.current?.measureInWindow?.bind(cartTargetRef.current), fallback),
-      measureWindowRect(galleryRef.current?.measureInWindow?.bind(galleryRef.current)),
-    ]);
-    const source = flightSourceFromRect(photoRect, { top: 0, bottom: Dimensions.get('window').height });
-    setFlight({ source, target });
-    setFlying(true);
-    cartFlyProgress.setValue(0);
-    await new Promise<void>(resolve => {
-      requestAnimationFrame(() => {
-        Animated.timing(cartFlyProgress, {
-          toValue: 1, duration: 720, easing: Easing.inOut(Easing.cubic), useNativeDriver: true,
-        }).start(() => { setFlying(false); resolve(); });
-      });
-    });
-  }
 
   // DM the seller about this product: opens (or reuses) the buyer↔seller
   // product thread with this product's card staged in the composer.
@@ -1052,6 +1050,14 @@ export default function BuyerProductDetailScreen() {
               title → price → sizes → the purchase bar (sticky) → seller →
               About this piece → returns → purchase protection (once) →
               you might also like → report links, small, at the very end. */}
+          {/* Brand above the name, tappable to the store (item 136; SSENSE
+              product page: designer name, then product name, then price). */}
+          <BrandLink
+            sellerId={product.sellerId}
+            name={product.sellerName}
+            style={s.brandLink}
+            testID="product-brand-link"
+          />
           <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
           {/* Price */}
           <View style={s.priceRow}>
@@ -1063,30 +1069,6 @@ export default function BuyerProductDetailScreen() {
           <LaunchCountdown productId={product.id} onLaunchingChange={setLaunching} />
 
           <StockCounter productId={product.id} />
-          {/* ── Buyer demand signals (server-supplied values only) ── */}
-          {(demandClaimedUnits > 0 || demandRemainingUnits > 0 || !!demandEndsAt ||
-            (demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD)) && (
-            <View style={{ marginBottom: SP.md, gap: 6 }}>
-              {demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD && (
-                <DemandBadge demandCount={demandCount} accent={theme.accent} />
-              )}
-              <ClaimedRemainingLabel
-                claimedUnits={demandClaimedUnits}
-                remainingUnits={demandRemainingUnits}
-                urgent={demandRemainingUnits > 0 && demandRemainingUnits <= URGENCY_UNITS_THRESHOLD}
-                accent={theme.accent}
-              />
-              {!!demandEndsAt && (
-                <TimeRemainingLabel endsAt={demandEndsAt} accent={theme.accent} />
-              )}
-              <UrgencyBar
-                claimedUnits={demandClaimedUnits}
-                remainingUnits={demandRemainingUnits}
-                accentColor={theme.accent}
-              />
-            </View>
-          )}
-
            {paymentUnavailable && (
              <View style={s.paymentWarningBanner} accessibilityRole="alert">
                <Feather name="alert-triangle" size={ICON.xs} color={ORANGE} />
@@ -1133,7 +1115,9 @@ export default function BuyerProductDetailScreen() {
 
           <PreOrderShipBy productId={product.id} isPreOrder={product.isPreOrder} />
 
-          <View style={s.divider} />
+          {/* No rule between price and sizes (SSENSE runs price straight into
+              the size picker): keeps the size row above the fold (item 129). */}
+          <View style={{ height: SP.sm }} />
 
           {/* Options — unselected options highlight after the buyer attempts to add */}
           {product.options.map(option => {
@@ -1159,6 +1143,32 @@ export default function BuyerProductDetailScreen() {
               </View>
             );
           })}
+
+          {/* Demand signals sit under the sizes so photo, name, price, size
+              and Add all fit above the fold (item 129). */}
+          {/* ── Buyer demand signals (server-supplied values only) ── */}
+          {(demandClaimedUnits > 0 || demandRemainingUnits > 0 || !!demandEndsAt ||
+            (demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD)) && (
+            <View style={{ marginBottom: SP.md, gap: 6 }}>
+              {demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD && (
+                <DemandBadge demandCount={demandCount} accent={theme.accent} />
+              )}
+              <ClaimedRemainingLabel
+                claimedUnits={demandClaimedUnits}
+                remainingUnits={demandRemainingUnits}
+                urgent={demandRemainingUnits > 0 && demandRemainingUnits <= URGENCY_UNITS_THRESHOLD}
+                accent={theme.accent}
+              />
+              {!!demandEndsAt && (
+                <TimeRemainingLabel endsAt={demandEndsAt} accent={theme.accent} />
+              )}
+              <UrgencyBar
+                claimedUnits={demandClaimedUnits}
+                remainingUnits={demandRemainingUnits}
+                accentColor={theme.accent}
+              />
+            </View>
+          )}
 
           {/* "Size guide" text link — only when the seller uploaded a size
               chart photo, right under the size chips (mobbin.com/screens/
@@ -1309,8 +1319,20 @@ export default function BuyerProductDetailScreen() {
 
           <CompleteTheFit productId={product.id} />
 
-          {/* You might also like — owns its header; renders nothing when empty. */}
-          <RelatedProducts productId={product.id} dividerStyle={s.divider} headerStyle={s.reviewsHeader} />
+          {/* More from this brand (item 135) — SSENSE's "{DESIGNER} >" shelf
+              under "Styled with"; renders nothing when the brand has no other
+              live pieces. */}
+          <MoreFromBrand
+            productId={product.id}
+            sellerId={product.sellerId}
+            sellerName={product.sellerName}
+            dividerStyle={s.divider}
+            headerStyle={s.reviewsHeader}
+          />
+
+          {/* You might also like — owns its header; renders nothing when empty.
+              The brand's own pieces are left out: they're in the row above. */}
+          <RelatedProducts productId={product.id} excludeSellerId={product.sellerId} dividerStyle={s.divider} headerStyle={s.reviewsHeader} />
 
           {/* Report links: de-emphasised via SUBTLE text color alone (below) —
               a resting `opacity < 1` on the row would make its already-dim
@@ -1346,68 +1368,7 @@ export default function BuyerProductDetailScreen() {
         </ResponsiveContainer>
       </ScrollView>
 
-      {flying && flight ? (() => {
-        const flySize = flight.source?.size ?? CART_FLIGHT_ITEM_SIZE;
-        const startLeft = flight.source ? flight.source.x - flySize / 2 : GALLERY_WIDTH / 2 - flySize / 2;
-        const startTop = flight.source ? flight.source.y - flySize / 2 : GALLERY_HEIGHT / 2 - flySize / 2;
-        const vector = getCartFlightVector(startLeft, startTop, flight.target, flySize);
-        const ratio = CART_FLIGHT_ITEM_SIZE / flySize;
-        return (
-          <Animated.View
-            testID="cart-fly-item"
-            pointerEvents="none"
-            style={[s.cartFlyItem, {
-              left: startLeft, top: startTop, width: flySize, height: flySize, borderRadius: 14 / ratio,
-              opacity: cartFlyProgress.interpolate({ inputRange: [0, 0.82, 1], outputRange: [1, 1, 0] }),
-              transform: [
-                { translateX: cartFlyProgress.interpolate({ inputRange: [0, 1], outputRange: [0, vector.x] }) },
-                { translateY: cartFlyProgress.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, -48, vector.y] }) },
-                { scale: cartFlyProgress.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 0.72 * ratio, 0.28 * ratio] }) },
-              ],
-            }]}
-          >
-            {product.imageUris[0] ? <CachedImage source={{ uri: product.imageUris[0] }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
-          </Animated.View>
-        );
-      })() : null}
 
-      {/* Added-to-bag confirmation — a deliberate choice (UNIQLO-style), not
-          an auto-dismissing toast: the buyer picks View bag or Keep shopping. */}
-      <BottomSheet visible={showAddedSheet} onClose={() => setShowAddedSheet(false)}>
-        <View style={s.addedSheetContent}>
-          {/* Monochrome brand accent, not a green checkmark — the shared
-              success-moment primitive (components/ui/SuccessCheck.tsx). */}
-          <SuccessCheck size={56} iconSize={26} />
-          <Text style={s.addedSheetTitle}>Added to your bag</Text>
-          <View style={s.addedSheetProductRow}>
-            {product.imageUris[0] ? (
-              <CachedImage source={{ uri: product.imageUris[0] }} style={s.addedSheetImage} contentFit="cover" />
-            ) : (
-              <View style={[s.addedSheetImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED }]}>
-                <Feather name="image" size={18} color={SUBTLE} />
-              </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={s.addedSheetProductName} numberOfLines={1}>{product.name}</Text>
-              <Text style={s.addedSheetProductMeta}>
-                {formatCents(variantPrice)}{qty > 1 ? ` · Qty ${qty}` : ''}
-              </Text>
-            </View>
-          </View>
-          <Button
-            label="View bag"
-            onPress={() => { setShowAddedSheet(false); router.push('/(buyer)/cart' as never); }}
-            fullWidth
-          />
-          <Button
-            label="Keep shopping"
-            variant="secondary"
-            onPress={() => setShowAddedSheet(false)}
-            fullWidth
-            style={{ marginTop: SP.sm }}
-          />
-        </View>
-      </BottomSheet>
 
       <SizeGuideSheet
         visible={sizeGuideOpen}
@@ -1431,11 +1392,10 @@ export default function BuyerProductDetailScreen() {
         {/* Real "Add to cart" + "Buy now" pair (it was an unlabeled bag icon). */}
         {addedToCart ? (
           <Button
-            label="In your bag"
-            icon="check"
+            label="In bag ✓"
             variant="secondary"
             onPress={() => router.push('/(buyer)/cart' as never)}
-            accessibilityLabel="In your bag. View cart"
+            accessibilityLabel="In bag. View cart"
             style={s.buyNowBtn}
             testID="product-view-cart"
           />
@@ -1698,13 +1658,117 @@ const wv = StyleSheet.create({
 });
 
 /**
+ * "More from {brand}" (item 135). Reference: SSENSE product page, the
+ * designer shelf under "Styled with": the brand name as the row title with a
+ * chevron that opens the brand, then a horizontal row of that brand's other
+ * pieces (https://mobbin.com/flows/0f29b0fc-f9f8-4d14-b152-cce071029b9e).
+ * Uses the public storefront endpoint only, so signed-out visitors never hit a
+ * protected API. Dev-web preview: the seeded seller's other preview pieces.
+ */
+function MoreFromBrand({ productId, sellerId, sellerName, dividerStyle, headerStyle }: {
+  productId: string;
+  sellerId: string;
+  sellerName: string;
+  dividerStyle?: object;
+  headerStyle?: object;
+}) {
+  const { push } = useThreadPull();
+  const { theme, CARD_ELEVATED, FG, MUTED } = useThemeAliases();
+  const api = useApi();
+  const router = useRouter();
+  const pathname = usePathname();
+  const usesThreadPull = pathname === '/thread-product-detail';
+  const [products, setProducts] = useState<Array<{ id: string; name: string; images: string[]; priceCents: number }>>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setProducts([]);
+    if (isPreviewProductId(productId)) {
+      setProducts(getPreviewSellerProducts(productId, 8));
+      return () => { cancelled = true; };
+    }
+    if (!sellerId) return () => { cancelled = true; };
+    api.publicSellers.get(sellerId)
+      .then((data) => {
+        if (cancelled) return;
+        setProducts((data?.products ?? [])
+          .filter((p: any) => p?.id && p.id !== productId)
+          .slice(0, 8)
+          .map((p: any) => ({
+            id: p.id,
+            name: p.name ?? '',
+            images: Array.isArray(p.images) ? p.images : [],
+            priceCents: lowestPriceCents(p),
+          })));
+      })
+      .catch(() => { /* The row simply doesn't render. */ });
+    return () => { cancelled = true; };
+  }, [productId, sellerId, api]);
+
+  if (products.length === 0 || !sellerName) return null;
+
+  return (
+    <View testID="product-more-from-brand">
+      <View style={dividerStyle} />
+      <TouchableOpacity
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+        onPress={() => { hapticToggle(); router.push(brandLinkHref(sellerId) as never); }}
+        accessibilityRole="button"
+        accessibilityLabel={`More from ${sellerName}. Open store`}
+        activeOpacity={0.7}
+        hitSlop={{ top: 6, bottom: 6 }}
+      >
+        <Text style={[headerStyle, { flexShrink: 1 }]} accessibilityRole="header" numberOfLines={1}>More from {sellerName}</Text>
+        <Feather name="chevron-right" size={16} color={MUTED} style={{ marginBottom: SP.sm }} />
+      </TouchableOpacity>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -SP.md }} contentContainerStyle={{ paddingHorizontal: SP.md, gap: SP.md }}>
+        {products.map((p) => (
+          <TouchableOpacity
+            key={p.id}
+            style={{ width: 140 }}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`${p.name}, ${formatCents(p.priceCents)}`}
+            onPress={() => {
+              hapticToggle();
+              if (usesThreadPull) push({ pathname: '/thread-product-detail' as any, params: { productId: p.id } } as never);
+              else router.push({ pathname: '/buyer-product-detail' as any, params: { productId: p.id } });
+            }}
+          >
+            <View style={{ width: 140, height: 180, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SP.sm }}>
+              {p.images[0] ? (
+                <CachedImage source={{ uri: p.images[0] }} style={{ width: '100%', height: '100%' }} contentFit="cover" recyclingKey={p.images[0]} />
+              ) : (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                  <Feather name="image" size={24} color={theme.muted} />
+                </View>
+              )}
+            </View>
+            <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG }} numberOfLines={1}>{p.name}</Text>
+            <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginTop: 4 }}>{formatCents(p.priceCents)}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function lowestPriceCents(p: any): number {
+  const variants: any[] = Array.isArray(p?.variants) ? p.variants : [];
+  const prices = variants.map((v) => v?.priceCents).filter((n): n is number => typeof n === 'number' && n > 0);
+  if (prices.length > 0) return Math.min(...prices);
+  return typeof p?.priceCents === 'number' ? p.priceCents : 0;
+}
+
+/**
  * "You might also like". Owns its header so an empty or failed row never
  * leaves a bare section title behind (it did: "You Might Also Like" over
  * nothing). Dev-web preview: seeded products get the same seller's other
  * pieces, then similar ones, from the preview catalog.
  */
-function RelatedProducts({ productId, dividerStyle, headerStyle }: {
+function RelatedProducts({ productId, excludeSellerId, dividerStyle, headerStyle }: {
   productId: string;
+  excludeSellerId?: string;
   dividerStyle?: object;
   headerStyle?: object;
 }) {
@@ -1721,16 +1785,22 @@ function RelatedProducts({ productId, dividerStyle, headerStyle }: {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    const preview = isPreviewProductId(productId) ? getPreviewRelatedProducts(productId, 4) : [];
+    const preview = isPreviewProductId(productId)
+      ? getPreviewRelatedProducts(productId, 12)
+        .filter((p) => !getPreviewSellerProducts(productId, 12).some((own) => own.id === p.id))
+        .slice(0, 4)
+      : [];
     if (preview.length > 0) {
       setProducts(preview);
       setLoading(false);
       return () => { cancelled = true; };
     }
-    api.publicProducts.related(productId, 5)
+    api.publicProducts.related(productId, 9)
       .then((data) => {
         if (!cancelled) {
-          setProducts(data.filter((p: any) => p.id !== productId).slice(0, 4));
+          setProducts(data
+            .filter((p: any) => p.id !== productId && (!excludeSellerId || (p.ownerId ?? p.sellerId) !== excludeSellerId))
+            .slice(0, 4));
           setLoading(false);
         }
       })
@@ -1738,7 +1808,7 @@ function RelatedProducts({ productId, dividerStyle, headerStyle }: {
         if (!cancelled) { setError(true); setLoading(false); }
       });
     return () => { cancelled = true; };
-  }, [productId, api, router]);
+  }, [productId, excludeSellerId, api, router]);
 
   if (loading) {
     return (
@@ -1789,9 +1859,11 @@ function RelatedProducts({ productId, dividerStyle, headerStyle }: {
               )}
             </View>
             <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG }} numberOfLines={1}>{p.name}</Text>
-            <Text style={{ fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 }} numberOfLines={1}>
-              {p.sellerDisplayName || 'Independent Seller'}
-            </Text>
+            <BrandLink
+              sellerId={p.ownerId ?? p.sellerId}
+              name={p.sellerDisplayName || 'Independent Seller'}
+              style={{ fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 }}
+            />
             <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginTop: 4 }}>{formatCents(lowestPriceCents)}</Text>
           </TouchableOpacity>
         );
@@ -1879,7 +1951,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center',
   },
   cartBadgeText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: 11, lineHeight: 13 },
-  cartFlyItem: { position: 'absolute', overflow: 'hidden', zIndex: 50, backgroundColor: CARD },
   mediaChromeBtn: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill },
   body: { paddingVertical: SP.md },
   badgeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
@@ -1888,15 +1959,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   saleBadge: { backgroundColor: RED_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
   saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: RED, letterSpacing: 0.4 },
   productName: { ...TYPE.title, color: FG, marginBottom: SP.sm },
-  addedSheetContent: { padding: SP.md, paddingTop: SP.xs, alignItems: 'center' },
-  addedSheetTitle: { ...TYPE.title, color: FG, marginTop: SP.sm, marginBottom: SP.md },
-  addedSheetProductRow: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm, width: '100%',
-    marginBottom: SP.lg, padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
-  },
-  addedSheetImage: { width: 52, height: 52, borderRadius: RADIUS.sm },
-  addedSheetProductName: { ...TYPE.bodyMedium, color: FG },
-  addedSheetProductMeta: { ...TYPE.caption, color: MUTED, marginTop: 2 },
+  brandLink: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, textDecorationLine: 'underline', alignSelf: 'flex-start', marginBottom: 2 },
   sellerCard: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm,
     padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD,

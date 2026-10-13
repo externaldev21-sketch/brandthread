@@ -209,3 +209,22 @@ export function rankPreviewRelated(all: PreviewCatalogProduct[], id: string, lim
     id: p.productId, name: p.name, images: p.images, priceCents: p.currentPriceCents, sellerDisplayName: p.sellerDisplayName,
   }));
 }
+
+/**
+ * "More from {brand}" for a preview product: the same seller's other pieces
+ * only, in the related-products row shape. Empty when the seller has none.
+ */
+export function getPreviewSellerProducts(id: string, limit = 8): Array<{ id: string; name: string; images: string[]; priceCents: number; sellerDisplayName: string }> {
+  if (!isPreviewProductId(id) || !previewEnabled()) return [];
+  return rankPreviewSameSeller(catalog().getPreviewCatalog(), id, limit);
+}
+
+/** Pure filter behind getPreviewSellerProducts (exported for tests). */
+export function rankPreviewSameSeller(all: PreviewCatalogProduct[], id: string, limit = 8): Array<{ id: string; name: string; images: string[]; priceCents: number; sellerDisplayName: string }> {
+  const self = all.find(p => p.productId === id);
+  if (!self) return [];
+  return all
+    .filter(p => p.productId !== id && p.sellerId === self.sellerId)
+    .slice(0, limit)
+    .map(p => ({ id: p.productId, name: p.name, images: p.images, priceCents: p.currentPriceCents, sellerDisplayName: p.sellerDisplayName }));
+}
