@@ -38,6 +38,9 @@ vi.mock('@/components/ui/ErrorState', () => ({ ErrorState: nativeComponent('Erro
 vi.mock('@/components/ui/QuantityStepper', () => ({ QuantityStepper: nativeComponent('QuantityStepper') }));
 vi.mock('@/components/ui/Chip', () => ({ Chip: nativeComponent('Chip') }));
 vi.mock('@/services/cartService', () => ({ getBuyerProduct: vi.fn() }));
+// The shared sheet chrome (Reanimated + Gesture Handler) is out of scope
+// here: render its body and expose its props (title, pinned primaryAction).
+vi.mock('@/components/ui/BottomSheet', () => ({ Sheet: nativeComponent('Sheet') }));
 
 import { VariantPickerSheet } from '@/components/buy-now/VariantPickerSheet';
 import type { BuyerProduct } from '@/services/cartTypes';
@@ -81,5 +84,16 @@ describe('VariantPickerSheet size chips', () => {
     expect(tree.root.findAllByType('Chip' as never).some(c => c.props.selected)).toBe(false);
     act(() => tree.root.findAllByType('Chip' as never)[2].props.onPress());
     expect(tree.root.findAllByType('Chip' as never)[2].props.selected).toBe(true);
+  });
+
+  it('renders in the shared Sheet with the add-to-bag CTA pinned as its primary action', () => {
+    let tree!: ReactTestRenderer;
+    act(() => { tree = create(<VariantPickerSheet productId="p1" initialProduct={product} onClose={vi.fn()} onConfirm={vi.fn()} />); });
+    const sheet = tree.root.findByType('Sheet' as never);
+    expect(sheet.props.title).toBe('Choose options');
+    expect(sheet.props.primaryAction.label).toBe('Select options');
+    act(() => tree.root.findAllByType('Chip' as never)[0].props.onPress());
+    expect(tree.root.findByType('Sheet' as never).props.primaryAction.label).toBe('Add to bag · $220.00');
+    expect(tree.root.findByType('Sheet' as never).props.primaryAction.disabled).toBe(false);
   });
 });
