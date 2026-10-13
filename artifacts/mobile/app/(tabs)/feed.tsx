@@ -95,7 +95,6 @@ import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadExactCreatorVideoReplay, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
-import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
@@ -1495,11 +1494,6 @@ function SpotlightPageImpl({
   // scale pop needs its own 0.8 -> 1.1 -> 1 sequence, not a value
   // interpolated off the fade's own progress.
   const heartBurstScale = useRef(new Animated.Value(0.8)).current;
-  // Counter, not boolean: bumping it on every double-tap (even in rapid
-  // succession) gives HeartBurstParticles a fresh value to key its
-  // Reanimated replay off, the same way a changing `key` would remount it
-  // but without paying for an unmount/remount each time.
-  const [heartBurstTrigger, setHeartBurstTrigger] = useState(0);
   const heartScale = useRef(new Animated.Value(1)).current;
   /** Ring that flashes out from behind the rail heart on like — a second,
    * smaller echo of the double-tap burst so a single tap on the rail icon
@@ -1548,7 +1542,8 @@ function SpotlightPageImpl({
       Animated.spring(heartBurstScale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 0 }),
     ]).start();
     Animated.timing(heartBurst, { toValue: 0, duration: 550, delay: 350, useNativeDriver: true }).start();
-    setHeartBurstTrigger(t => t + 1);
+    // Item 148: the big heart is the "liked" signal; the particle spray that
+    // used to play around it was decoration and is gone.
   }
 
   // 1 -> 1.15 -> 1 over 180ms total (was a 1.35 spring — stronger overshoot
@@ -1559,27 +1554,23 @@ function SpotlightPageImpl({
       Animated.timing(heartScale, { toValue: 1.15, duration: 90, useNativeDriver: true }),
       Animated.timing(heartScale, { toValue: 1, duration: 90, useNativeDriver: true }),
     ]).start();
-    likeRing.setValue(0);
-    Animated.timing(likeRing, { toValue: 1, duration: 480, useNativeDriver: true }).start();
+    // Item 148: no ring echo — the heart filling in says it's liked.
   }
 
-  /** Arrows spin a full turn with a pop of scale — repost toggled either way. */
+  /** Item 148: the same small 1 → 1.15 → 1 tap bump as the heart — the icon
+   *  filling in is the signal; no full-turn spin. */
   function spinRepost() {
-    repostSpin.setValue(0);
-    Animated.timing(repostSpin, { toValue: 1, duration: 420, useNativeDriver: true }).start();
     Animated.sequence([
-      Animated.spring(repostScale, { toValue: 1.3, useNativeDriver: true, speed: 40 }),
-      Animated.spring(repostScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
+      Animated.timing(repostScale, { toValue: 1.15, duration: 90, useNativeDriver: true }),
+      Animated.timing(repostScale, { toValue: 1, duration: 90, useNativeDriver: true }),
     ]).start();
   }
 
-  /** Bookmark lifts, pops gold, then drops/settles — save toggled either way. */
+  /** Item 148: same small tap bump; no lift-and-drop. */
   function dropSave() {
-    saveDrop.setValue(0);
-    Animated.timing(saveDrop, { toValue: 1, duration: 360, useNativeDriver: true }).start();
     Animated.sequence([
-      Animated.spring(saveScale, { toValue: 1.4, useNativeDriver: true, speed: 40 }),
-      Animated.spring(saveScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
+      Animated.timing(saveScale, { toValue: 1.15, duration: 90, useNativeDriver: true }),
+      Animated.timing(saveScale, { toValue: 1, duration: 90, useNativeDriver: true }),
     ]).start();
   }
 
@@ -1706,7 +1697,6 @@ function SpotlightPageImpl({
           >
             <Feather name="heart" size={110} color={ON_DARK} />
           </Animated.View>
-          <HeartBurstParticles trigger={heartBurstTrigger} />
           {item.contentType === 'video' && (
             <Animated.View
               pointerEvents="none"
