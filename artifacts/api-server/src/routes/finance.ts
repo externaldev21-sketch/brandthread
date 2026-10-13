@@ -1001,6 +1001,18 @@ function scheduleView(account: any) {
     : null;
 }
 
+// ─── GET /api/finance/first-payout — is the first payout waiting on identity? ──
+router.get("/first-payout", requirePayoutsRead(), async (req, res) => {
+  const sellerId = getSellerId(req);
+  try {
+    const check = await checkFirstPayout(db, sellerId);
+    res.json({ identityRequired: !check.ok, message: check.ok ? null : IDENTITY_REQUIRED_MESSAGE });
+  } catch (err) {
+    req.log?.error({ err, sellerId }, "First payout check failed");
+    res.status(500).json({ error: "Could not check payout readiness" });
+  }
+});
+
 router.get("/payout-schedule", requirePayoutsRead(), async (req, res) => {
   const sellerId = getSellerId(req);
   try {

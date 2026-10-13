@@ -50,7 +50,7 @@ export async function checkFirstPayout(
            ) AS paid_before
     FROM users u WHERE u.clerk_id = ${sellerId} LIMIT 1
   `);
-  const row = ((result as { rows?: Row[] }).rows ?? [])[0];
+  const row = ((result as unknown as { rows?: Row[] }).rows ?? [])[0];
   if (row?.verified === true && row.verification_status === "verified") return { ok: true, reason: "verified" };
   if (row?.paid_before) return { ok: true, reason: "already_paid" };
   return { ok: false, reason: "identity_required" };

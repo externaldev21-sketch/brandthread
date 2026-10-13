@@ -26,7 +26,7 @@ beforeAll(async () => {
     INSERT INTO ledger_transactions (idempotency_key, kind, seller_id)
     VALUES (${`fpg-test/${suffix}`}, 'order_transferred', ${PAID_BEFORE}) RETURNING id
   `);
-  txId = ((tx as { rows: Array<{ id: string }> }).rows)[0].id;
+  txId = ((tx as unknown as { rows: Array<{ id: string }> }).rows)[0].id;
   await db.execute(sql`
     INSERT INTO ledger_postings (transaction_id, account, party_id, amount_cents)
     VALUES (${txId}::uuid, 'seller_held', ${PAID_BEFORE}, -500), (${txId}::uuid, 'seller_paid_out', ${PAID_BEFORE}, 500)

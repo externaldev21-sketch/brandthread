@@ -140,6 +140,34 @@ export function applyReviewEvent(current: StoredRisk, event: "opened" | "closed"
   return { level: current.level, flags, reviewed: true };
 }
 
+/** Stripe radar.early_fraud_warning payload subset. */
+export type EarlyFraudWarningInput = { fraud_type?: string | null; actionable?: boolean | null };
+
+const EFW = "early_fraud_warning";
+
+const FRAUD_TYPE_LABELS: Record<string, string> = {
+  card_never_received: "card never received",
+  fraudulent_card_application: "fraudulent card application",
+  made_with_counterfeit_card: "counterfeit card",
+  made_with_lost_card: "lost card",
+  made_with_stolen_card: "stolen card",
+  misc: "other fraud",
+  unauthorized_use_of_card: "unauthorized use",
+};
+
+/**
+ * Applies a Stripe early fraud warning (the card issuer reporting the payment
+ * as fraud, usually days before a chargeback) to an order's stored risk:
+ * highest risk, back to unreviewed, so the seller sees "Review before
+ * shipping" on the order. Pure and idempotent.
+ */
+export function applyEarlyFraudWarning(current: StoredRisk, warning: EarlyFraudWarningInput): StoredRisk {
+  const flags = current.flags.filter((f) => f.code !== EFW);
+  const kind = warning.fraud_type ? FRAUD_TYPE_LABELS[warning.fraud_type] ?? "fraud" : "fraud";
+  flags.push({ code: EFW, label: `The card's bank reported this payment as ${kind}`, severity: "high" });
+  return { level: "highest", flags, reviewed: false };
+}
+
 /** Seller-facing API shape. */
 export type OrderRiskView = { level: RiskLevel; score: number | null; flags: RiskFlag[]; reviewed: boolean };
 
