@@ -338,6 +338,14 @@ export async function getParcelSuggestion(orderId: string): Promise<ParcelSugges
   return await serviceRequest(`/api/shipping-labels/${encodeURIComponent(orderId)}/parcel-suggestion`) as ParcelSuggestion;
 }
 
+/** Newest active outbound label file for an order, or null when there is none. */
+export async function getPrintableLabelUrl(orderId: string): Promise<string | null> {
+  const result = await serviceRequest(`/api/shipping-labels/${encodeURIComponent(orderId)}/printable`) as {
+    label: { labelUrl: string | null } | null;
+  };
+  return result?.label?.labelUrl ?? null;
+}
+
 export async function getShippingRates(orderId: string, parcel: {
   itemIds?: string[];
   fromAddress: OrderAddress;

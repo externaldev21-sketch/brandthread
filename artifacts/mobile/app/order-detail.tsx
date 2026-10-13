@@ -35,6 +35,7 @@ import { queryKeys } from '@/lib/queryClient';
 import { DELIVERY_CONFIRMED_BY_NOTE, formatLocalDate, sellerOrderConflictMessage, unshippedItems } from '@/lib/deliveryGuarantee';
 import { SellerDeliveryBanner, ShipItemsSheet } from '@/components/orders/SellerDelivery';
 import { getPreviewSellerOrder } from '@/lib/previewOrders';
+import { PrintLabelButton } from '@/components/orders/PrintLabelButton';
 import { ApiError } from '@/lib/networkNotice';
 
 function useThemeAliases() {
@@ -1150,6 +1151,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
               icon="credit-card"
             />
           )}
+          <PrintLabelButton orderId={order.id} />
         </View>
         {order.autoRefundedAt ? (
           <Text style={s.readOnlyNote}>Auto-refunded orders are read-only. Mark shipped and Add tracking are turned off.</Text>

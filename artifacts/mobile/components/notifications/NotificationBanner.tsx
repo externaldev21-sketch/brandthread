@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { playBannerFeedback } from '@/lib/newOrderAlert';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -54,7 +54,7 @@ export default function NotificationBanner() {
       if (dismissTimer.current) clearTimeout(dismissTimer.current);
       visibleRef.current = true;
       setPayload(next);
-      if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      playBannerFeedback(next.data);
       translateY.setValue(-200);
       Animated.spring(translateY, {
         toValue: 0,

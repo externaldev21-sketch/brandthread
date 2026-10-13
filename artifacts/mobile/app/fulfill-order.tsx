@@ -32,6 +32,7 @@ import {
   updateFulfillmentChecklist, PackagePreset, getParcelSuggestion,
 } from '@/services/orderService';
 import { sharePackingSlip } from '@/lib/packingSlip';
+import { printLabel, printPackingSlip } from '@/lib/airPrint';
 import { radius } from '@/constants/radii';
 
 const LAST_PACKAGE_KEY = '@brandthread/fulfill-last-package:v1';
@@ -348,6 +349,23 @@ export default function FulfillOrderScreen() {
     }
   }
 
+  async function handlePrintPackingSlip() {
+    if (!order) return;
+    try {
+      await printPackingSlip(order);
+    } catch (err: any) {
+      Alert.alert('Could not create packing slip', err?.message ?? 'Please try again.');
+    }
+  }
+
+  async function handlePrintLabel() {
+    if (!label?.labelUrl) {
+      Alert.alert('Label unavailable', 'The carrier did not return a printable label.');
+      return;
+    }
+    await printLabel(label.labelUrl);
+  }
+
   async function handleOpenLabel() {
     if (!label?.labelUrl) {
       Alert.alert('Label unavailable', 'The carrier did not return a downloadable label.');
@@ -639,6 +657,7 @@ export default function FulfillOrderScreen() {
                   <Text style={s.mutedText}>{label.carrier} {label.service} · {formatCents(label.priceCents)}</Text>
                   <Text style={s.mutedText}>Tracking: {label.trackingNumber}</Text>
                 </View>
+                <SecondaryButton label="Print label" icon="printer" small onPress={handlePrintLabel} />
                 <View style={s.dimRow}>
                   <SecondaryButton label="Open label" icon="external-link" small onPress={handleOpenLabel} style={{ flex: 1 }} />
                   <SecondaryButton label="Share" icon="share-2" small onPress={handleShareLabel} style={{ flex: 1 }} />
@@ -719,7 +738,7 @@ export default function FulfillOrderScreen() {
                 </>
               )}
             </BrandthreadCard>
-            <SecondaryButton label="Print packing slip" icon="file-text" onPress={handlePackingSlip} />
+            <SecondaryButton label="Print packing slip" icon="file-text" onPress={handlePrintPackingSlip} />
             <PrimaryButton label="Mark as Shipped" onPress={handleMarkShipped} loading={marking} icon="send" />
           </>
         )}
