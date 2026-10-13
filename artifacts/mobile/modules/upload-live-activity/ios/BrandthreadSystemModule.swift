@@ -87,14 +87,16 @@ public class BrandthreadSystemModule: Module {
 
         // MARK: Widgets
 
+        // widgetKind "*" reloads every widget (one snapshot feeds the seller's
+        // "Sales today" and "To ship" widgets).
         Function("setWidgetSnapshot") { (key: String, json: String, widgetKind: String) in
             UserDefaults(suiteName: Self.appGroup)?.set(json, forKey: key)
-            WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)
+            Self.reload(widgetKind)
         }
 
         Function("clearWidgetSnapshot") { (key: String, widgetKind: String) in
             UserDefaults(suiteName: Self.appGroup)?.removeObject(forKey: key)
-            WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)
+            Self.reload(widgetKind)
         }
 
         // MARK: Quick actions
@@ -116,6 +118,14 @@ public class BrandthreadSystemModule: Module {
 
         Function("takeInitialQuickAction") { () -> String? in
             QuickActionCenter.shared.takePending()
+        }
+    }
+
+    static func reload(_ widgetKind: String) {
+        if widgetKind == "*" {
+            WidgetCenter.shared.reloadAllTimelines()
+        } else {
+            WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)
         }
     }
 

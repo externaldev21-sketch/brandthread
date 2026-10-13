@@ -8,6 +8,7 @@ import SwiftUI
 struct UploadLiveActivityBundle: WidgetBundle {
     var body: some Widget {
         SellerTodayWidget()
+        SellerToShipWidget()
         BuyerCashWidget()
         if #available(iOS 16.1, *) {
             UploadLiveActivityWidget()
