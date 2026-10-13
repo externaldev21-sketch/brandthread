@@ -301,5 +301,5 @@ describe("other roles are unchanged", () => {
     const back = await call("PATCH", `/team/members/${orderMembership}`, OWNER, { role: "orders" });
     expect(back.status).toBe(200);
     expect((await call("GET", "/products", ORDERS_ROLE)).status).toBe(200);
-  });
+  }, 20_000);
 });

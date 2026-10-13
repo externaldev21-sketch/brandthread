@@ -3434,7 +3434,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       roles:     () => get<any[]>('/api/team/roles'),
       roleMembers: (role: string) => get<any[]>(`/api/team/roles/${encodeURIComponent(role)}/members`),
       /** Resolves the caller's permission tier for the active store context. */
-      context: () => get<{ role: 'owner' | 'admin' | 'manager' | 'finance' | 'orders' | 'marketing' | 'staff' | 'viewer' }>('/api/team/context'),
+      context: () => get<{ role: 'owner' | 'admin' | 'manager' | 'finance' | 'orders' | 'marketing' | 'staff' | 'viewer' | 'packer' }>('/api/team/context'),
       /** Returns all of the caller's active memberships in other seller stores. */
       myMemberships: () =>
         get<{
