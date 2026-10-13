@@ -85,6 +85,7 @@ Mobile (`cd artifacts/mobile`):
 
 - `pnpm exec vitest run tests/live-flash-deal.test.ts tests/live-commerce.test.ts tests/live-pager-logic.test.ts tests/live-provider.test.ts tests/live-tips-flag.test.ts tests/live-moderation-cohost.test.ts tests/live-row-enter.test.tsx` — **all pass** (`live-commerce.test.ts` updated: the stream id now rides along without a code).
 - `tests/live-feed-wiring.structure.test.ts` — 2 failures that pre-exist on `dev` (stale `<LiveViewerStack` / Messages `LiveHostRing` string assertions).
+- Full suite diffed against `origin/dev` (per coordinator): `origin/dev` 88 failed / 4811 passed; this branch 87 failed / 4817 passed; **no new FAIL entries** (`comm -13` of the sorted FAIL lists is empty).
 - `pnpm exec tsc -p tsconfig.json --noEmit`: **0 errors**.
 
 Screenshots: `node scripts/f6-live-commerce-screenshots.mjs [--skip-build]` → `docs/pr-assets/live-commerce/ours/` (390×844).

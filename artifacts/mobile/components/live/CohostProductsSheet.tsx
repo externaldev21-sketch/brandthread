@@ -71,6 +71,7 @@ export function CohostProductsSheet({ streamId, myId, visible, onClose }: {
 
   return (
     <BottomSheet visible={visible} onClose={onClose} testID="cohost-products-sheet">
+      <View style={{ paddingHorizontal: SP.md, paddingTop: SP.xs }}>
       <Text style={styles.title}>Your products in this live</Text>
       {loading ? <ActivityIndicator color={theme.muted} style={{ marginVertical: SP.lg }} /> : (
         <ScrollView style={{ maxHeight: 360 }}>
@@ -93,6 +94,7 @@ export function CohostProductsSheet({ streamId, myId, visible, onClose }: {
       )}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Button label="Save" onPress={() => void save()} loading={saving} fullWidth />
+      </View>
     </BottomSheet>
   );
 }
