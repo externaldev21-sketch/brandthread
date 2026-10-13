@@ -556,7 +556,8 @@ router.get("/:id/messages", async (req, res) => {
   const notExpired = sql`(${messages.disappearAt} IS NULL OR ${messages.disappearAt} >= now()) AND ${messages.deletedAt} IS NULL`;
 
   const whereClause = q
-    ? and(eq(messages.conversationId, id), notExpired, ilike(messages.body, `%${q}%`))
+    // Search is literal: % and _ typed by the user are not wildcards.
+    ? and(eq(messages.conversationId, id), notExpired, ilike(messages.body, `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`))
     : before
       ? and(eq(messages.conversationId, id), notExpired, sql`${messages.createdAt} < ${new Date(before)}`)
       : and(eq(messages.conversationId, id), notExpired);

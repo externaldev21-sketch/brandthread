@@ -163,4 +163,16 @@ describe("messages polish", () => {
       expect((await call(`/${convId}/messages/${crypto.randomUUID()}`, { method: "DELETE" })).status).toBe(404);
     });
   });
+  describe("search in chat", () => {
+    it("treats % and _ literally", async () => {
+      await addMessage(BUYER, "50% off today", 2);
+      await addMessage(BUYER, "5000 off", 1);
+      await addMessage(BUYER, "snake_case", 1);
+      await addMessage(BUYER, "snakeXcase", 1);
+      const pct = await call(`/${convId}/messages?q=${encodeURIComponent("50%")}`);
+      expect(pct.body.map((m: any) => m.text)).toEqual(["50% off today"]);
+      const under = await call(`/${convId}/messages?q=${encodeURIComponent("e_c")}`);
+      expect(under.body.map((m: any) => m.text)).toEqual(["snake_case"]);
+    });
+  });
 });
