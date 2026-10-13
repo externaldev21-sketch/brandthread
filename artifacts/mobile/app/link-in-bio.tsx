@@ -11,6 +11,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP, TEXT_DISABLED } from '@/lib/theme';
+import { initialsOf } from '@/lib/initials';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PrimaryButton, SecondaryButton, PressableScale, HapticSwitch } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -141,7 +142,7 @@ export default function LinkInBioScreen() {
             <View style={s.profileRow}>
               {page.avatarUrl
                 ? <Image source={{ uri: page.avatarUrl }} style={[s.avatar, { borderColor: colors.border }]} accessibilityLabel="Profile photo" />
-                : <View style={[s.avatar, s.avatarPh, { backgroundColor: colors.secondary, borderColor: colors.border }]}><Icon name="user" size={28} color={colors.mutedForeground} /></View>}
+                : <View style={[s.avatar, s.avatarPh, { backgroundColor: colors.secondary, borderColor: colors.border }]}><Text style={[s.avatarInitials, { color: colors.mutedForeground }]}>{initialsOf(page.displayName)}</Text></View>}
               <View style={{ flex: 1 }}>
                 <Field label="Name" value={page.displayName} onChangeText={(v) => edit({ displayName: v })} maxLength={60} />
               </View>
@@ -321,6 +322,7 @@ const s = StyleSheet.create({
   profileRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md, marginBottom: SP.xs },
   avatar: { width: 64, height: 64, borderRadius: 32, borderWidth: 1, marginTop: 26 },
   avatarPh: { alignItems: 'center', justifyContent: 'center' },
+  avatarInitials: { fontFamily: FONT.semibold, fontSize: 22 },
   linksHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.sm },
   addPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, minHeight: 40, borderRadius: ControlRadius.md, marginBottom: SP.sm },
   linkRow: { flexDirection: 'row', alignItems: 'center', padding: SP.sm, gap: SP.sm },

@@ -40,45 +40,28 @@ function posterUri(index: number): string {
   return Asset.fromModule(POSTER_SOURCES[index]).uri;
 }
 // Same names/ids as previewCatalog.ts's SEED, so a buyer sees one consistent
-// cast of brands across Feed, Discover, Search, Shop and now Activity. Each
-// gets the matching preview poster as a stand-in profile photo (no real
-// headshots in this seed set), same convention as previewInbox.ts.
-const PEOPLE = [
-  { userId: 'preview-seller-01', name: 'Atelier Noire', initials: 'AN', color: pickAvatarColor('preview-seller-01'), avatarUrl: posterUri(0) },
-  { userId: 'preview-seller-02', name: 'Maison Vela', initials: 'MV', color: pickAvatarColor('preview-seller-02'), avatarUrl: posterUri(1) },
-  { userId: 'preview-seller-03', name: 'Saint Rue', initials: 'SR', color: pickAvatarColor('preview-seller-03'), avatarUrl: posterUri(2) },
-  { userId: 'preview-seller-04', name: 'Orison', initials: 'OR', color: pickAvatarColor('preview-seller-04'), avatarUrl: posterUri(3) },
-  { userId: 'preview-seller-05', name: 'Kuro Line', initials: 'KL', color: pickAvatarColor('preview-seller-05'), avatarUrl: posterUri(4) },
-  { userId: 'preview-seller-06', name: 'Forme 22', initials: 'F2', color: pickAvatarColor('preview-seller-06'), avatarUrl: posterUri(5) },
-  { userId: 'preview-seller-07', name: 'Astrae', initials: 'AS', color: pickAvatarColor('preview-seller-07'), avatarUrl: posterUri(6) },
-  { userId: 'preview-seller-08', name: 'Noma Archive', initials: 'NA', color: pickAvatarColor('preview-seller-08'), avatarUrl: posterUri(7) },
-  { userId: 'preview-seller-09', name: 'Echelon', initials: 'EC', color: pickAvatarColor('preview-seller-09'), avatarUrl: posterUri(8) },
+// cast of brands across Feed, Discover, Search, Shop and now Activity. No
+// profile photos: the bundled posters are AI-generated models, so every
+// preview avatar is initials (less-AI pass, item 47).
+const PEOPLE: { userId: string; name: string; initials: string; color: string; avatarUrl?: string }[] = [
+  { userId: 'preview-seller-01', name: 'Atelier Noire', initials: 'AN', color: pickAvatarColor('preview-seller-01') },
+  { userId: 'preview-seller-02', name: 'Maison Vela', initials: 'MV', color: pickAvatarColor('preview-seller-02') },
+  { userId: 'preview-seller-03', name: 'Saint Rue', initials: 'SR', color: pickAvatarColor('preview-seller-03') },
+  { userId: 'preview-seller-04', name: 'Orison', initials: 'OR', color: pickAvatarColor('preview-seller-04') },
+  { userId: 'preview-seller-05', name: 'Kuro Line', initials: 'KL', color: pickAvatarColor('preview-seller-05') },
+  { userId: 'preview-seller-06', name: 'Forme 22', initials: 'F2', color: pickAvatarColor('preview-seller-06') },
+  { userId: 'preview-seller-07', name: 'Astrae', initials: 'AS', color: pickAvatarColor('preview-seller-07') },
+  { userId: 'preview-seller-08', name: 'Noma Archive', initials: 'NA', color: pickAvatarColor('preview-seller-08') },
+  { userId: 'preview-seller-09', name: 'Echelon', initials: 'EC', color: pickAvatarColor('preview-seller-09') },
   { userId: 'preview-seller-10', name: 'Vale Studio', initials: 'VS', color: pickAvatarColor('preview-seller-10') },
 ];
 
-// Real photos (the same asset pool the rest of the buyer preview already
-// uses for post/story thumbnails), keyed by the seeded seller id, so
-// Activity rows show an actual image instead of a flat color-and-initials
-// circle. Looked up by `previewActorAvatarUri` below — never used outside
-// the dev-web preview.
-const PEOPLE_AVATAR_INDEX: Record<string, number> = Object.fromEntries(
-  PEOPLE.map((person, index) => [person.userId, index % POSTER_SOURCES.length]),
-);
-
-/**
- * A preview actor's avatar photo, or `undefined` outside the preview (a real
- * account's actor never has a `preview-*` id, so this is a guaranteed no-op
- * there). Looked up by id first, falling back to name for rows that only
- * carry `actorName` (some seed rows predate `actorId`).
- */
-export function previewActorAvatarUri(actorId?: string, actorName?: string): string | undefined {
-  if (!isPreviewActivityEnabled()) return undefined;
-  const id = actorId && PEOPLE_AVATAR_INDEX[actorId] !== undefined
-    ? actorId
-    : PEOPLE.find((person) => person.name === actorName)?.userId;
-  if (!id) return undefined;
-  const index = PEOPLE_AVATAR_INDEX[id];
-  return index === undefined ? undefined : posterUri(index);
+/** A preview actor's avatar photo: always none, so the row shows initials. */
+export function previewActorAvatarUri(_actorId?: string, _actorName?: string): string | undefined {
+  // Preview actors show initials: the bundled posters are AI-generated
+  // runway models, and no avatar shows a person who isn't real (less-AI
+  // pass, item 47).
+  return undefined;
 }
 
 function minutesAgo(mins: number): string {

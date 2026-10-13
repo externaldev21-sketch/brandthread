@@ -103,10 +103,6 @@ const SAMPLE_ROOMS_SOURCE = [
     viewerCount: 1204,
     video: demoRunwayVideoUri(2),
     poster: require('../assets/videos/fashion_runway_02.jpg'),
-    // Stand-in profile photo, same convention as lib/previewActivity.ts (no
-    // real headshots in this seed set) — a different frame than the room's
-    // own video/poster so the avatar doesn't just repeat it.
-    avatar: require('../assets/videos/fashion_runway_05.jpg'),
     productId: 'sample-product-liquid-silver-dress',
     productName: 'Liquid Silver Dress',
     priceCents: 32500,
@@ -120,7 +116,6 @@ const SAMPLE_ROOMS_SOURCE = [
     viewerCount: 862,
     video: demoRunwayVideoUri(1),
     poster: require('../assets/videos/fashion_runway_01.jpg'),
-    avatar: require('../assets/videos/fashion_runway_06.jpg'),
     productId: 'sample-product-sculpted-blazer',
     productName: 'Sculpted Blazer',
     priceCents: 28500,
@@ -233,7 +228,6 @@ export default function LiveFeedScreen() {
         viewerCount: sample.viewerCount,
         videoSource: sample.video,
         posterSource: sample.poster,
-        avatarSource: sample.avatar,
         productId: sample.productId,
         productName: sample.productName,
         priceCents: sample.priceCents,

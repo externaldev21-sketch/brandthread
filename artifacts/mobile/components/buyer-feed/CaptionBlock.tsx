@@ -162,7 +162,7 @@ export function CaptionBlock({
               ))}
               {friendReposts.length === 0 && (
                 <View style={[styles.repostAvatar, styles.repostAvatarFallback]}>
-                  <Icon name="user" size={13} color={ON_DARK} />
+                  <Icon name="repeat" size={12} color={ON_DARK} />
                 </View>
               )}
             </View>

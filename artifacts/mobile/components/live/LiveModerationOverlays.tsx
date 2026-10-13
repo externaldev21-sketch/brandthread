@@ -7,6 +7,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { initialsOf } from '@/lib/initials';
 import type { PinnedComment } from '@/lib/live/useLiveModeration';
 import type { LiveCohostPerson } from '@/lib/live/moderationTypes';
 
@@ -45,7 +46,7 @@ export function CohostTiles({
           {RtcSurfaceView && c.agoraUid != null ? (
             <RtcSurfaceView canvas={{ uid: c.agoraUid, renderMode: 1 }} style={StyleSheet.absoluteFill} zOrderMediaOverlay />
           ) : (
-            <View style={styles.tileFallback}><Icon name="user" size={22} color={theme.muted} /></View>
+            <View style={styles.tileFallback}><Text style={[styles.tileInitials, { color: theme.muted }]}>{initialsOf(c.displayName)}</Text></View>
           )}
           <View style={[styles.tileName, { backgroundColor: theme.card }]}>
             <Text style={[styles.tileNameText, { color: theme.text }]} numberOfLines={1}>{c.displayName}</Text>
@@ -67,6 +68,7 @@ const styles = StyleSheet.create({
   tiles: { position: 'absolute', left: 12, zIndex: 9, gap: SP.sm },
   tile: { width: 92, height: 136, borderRadius: RADIUS.md, overflow: 'hidden' },
   tileFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  tileInitials: { fontFamily: FONT.semibold, fontSize: 20 },
   tileName: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 6, paddingVertical: 3 },
   tileNameText: { fontFamily: FONT.semibold, fontSize: 11 },
 });

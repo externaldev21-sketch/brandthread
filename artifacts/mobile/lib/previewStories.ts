@@ -32,7 +32,8 @@ export interface PreviewStoryTrayRow {
   authorHandle: string;
   authorInitials: string;
   authorColor: string;
-  avatarUrl: string;
+  /** None in the preview: avatars are initials, never AI-generated faces (item 47). */
+  avatarUrl?: string;
   isLive: boolean;
   /** Base "seen" state before any runtime viewing this session. */
   seen: boolean;
@@ -87,12 +88,12 @@ export const PREVIEW_MY_STORY: Story = {
 export const PREVIEW_LIVE_TRAY_ROWS: PreviewStoryTrayRow[] = [
   {
     authorId: 'preview-seller-01', authorName: 'Atelier Noire', authorHandle: '@atelier_noire',
-    authorInitials: 'AN', authorColor: '#232323', avatarUrl: posterUri(0),
+    authorInitials: 'AN', authorColor: '#232323',
     isLive: true, seen: false, closeFriendsOnly: false, latestCreatedAt: now,
   },
   {
     authorId: 'preview-seller-02', authorName: 'Maison Vela', authorHandle: '@maison_vela',
-    authorInitials: 'MV', authorColor: '#474747', avatarUrl: posterUri(1),
+    authorInitials: 'MV', authorColor: '#474747',
     isLive: true, seen: false, closeFriendsOnly: false, latestCreatedAt: now,
   },
 ];
@@ -142,7 +143,6 @@ function rowFor(person: PreviewPerson, seen: boolean): PreviewStoryTrayRow {
     authorHandle: person.handle,
     authorInitials: person.initials,
     authorColor: person.color,
-    avatarUrl: posterUri(person.poster),
     isLive: false,
     seen,
     closeFriendsOnly: person.closeFriendsOnly,

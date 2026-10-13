@@ -43,7 +43,7 @@ export function BrandRow({ brand, onPress }: { brand: SearchBrandRow; onPress: (
     >
       <Animated.View style={[styles.rowInner, { transform: [{ scale }] }]}>
         <View style={[styles.avatar, { backgroundColor: brand.color }]}>
-          <Icon name="shopping-bag" size={18} color="#FFFFFF" />
+          <Text style={styles.initials}>{brand.initials}</Text>
         </View>
         <View style={{ flex: 1 }}>
           <View style={styles.nameRow}>
@@ -63,6 +63,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   row: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs + 2 },
   rowInner: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   avatar: { width: 44, height: 44, borderRadius: RADII.avatar, alignItems: 'center', justifyContent: 'center' },
+  initials: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 15 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   name: { ...TYPE_SCALE.body, fontFamily: FONT.semibold },
   sub: { ...TYPE_SCALE.caption, marginTop: 2 },

@@ -84,7 +84,8 @@ function logoUri(): string {
 
 function avatarUriFor(seed: PreviewConversationSeed): string | undefined {
   if (seed.isBrandMark) return logoUri();
-  if (typeof seed.posterIndex === 'number') return posterUri(seed.posterIndex);
+  // No poster as a person's photo: the bundled posters are AI-generated
+  // models, so preview people show initials (less-AI pass, item 47).
   return undefined;
 }
 

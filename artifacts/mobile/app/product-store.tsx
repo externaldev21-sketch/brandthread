@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
+import { initialsOf } from '@/lib/initials';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
 import { minHitSlop } from '@/lib/hitSlop';
@@ -622,7 +623,7 @@ export default function ProductStoreScreen() {
               onPress={() => router.push(('/seller-profile?id=' + product.sellerId) as never)}
             >
               <View style={s.sellerProfileIcon}>
-                <Icon name="user" size={ICON.md} color={ACCENT_LIGHT} />
+                <Text style={s.sellerProfileInitial}>{initialsOf(product.vendor, 1)}</Text>
               </View>
               <View style={s.sellerProfileInfo}>
                 <Text style={s.sellerProfileLabel}>Shop {product.vendor}</Text>
@@ -1085,6 +1086,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderColor: BORDER,
     padding: SP.md,
   },
+  sellerProfileInitial: { color: ACCENT_LIGHT, fontFamily: FONT.semibold, fontSize: FS.md },
   sellerProfileIcon: {
     width: 40, height: 40, borderRadius: RADIUS.sm,
     backgroundColor: ACCENT + '18',

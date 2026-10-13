@@ -37,7 +37,8 @@ interface PreviewOrderSeed {
   sellerHandle: string;
   productName: string;
   productId: string;
-  imageUri: string;
+  /** No photo: preview orders show the brand-initial tile, never stock photography. */
+  imageUri: string | null;
   totalCents: number;
   trackingNumber: string;
   trackingStatus: TrackingStatus;
@@ -52,7 +53,7 @@ const ORDER_SEEDS: PreviewOrderSeed[] = [
     sellerHandle: '@atelier_noire',
     productName: 'Sculpted Wool Coat',
     productId: 'preview-product-01',
-    imageUri: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=480&q=80',
+    imageUri: null,
     totalCents: 48000,
     trackingNumber: 'PREVIEW-TRACKING-01',
     trackingStatus: 'label_created',
@@ -65,7 +66,7 @@ const ORDER_SEEDS: PreviewOrderSeed[] = [
     sellerHandle: '@maison_vela',
     productName: 'Liquid Silver Dress',
     productId: 'preview-product-02',
-    imageUri: 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=480&q=80',
+    imageUri: null,
     totalCents: 32500,
     trackingNumber: 'PREVIEW-TRACKING-02',
     trackingStatus: 'accepted',
@@ -115,7 +116,7 @@ export function getPreviewBuyerOrders(): BuyerOrderView[] {
       variant: index === 0 ? 'M' : 'S',
       quantity: 1,
       unitPriceCents: seed.totalCents,
-      imageUri: seed.imageUri,
+      imageUri: seed.imageUri ?? undefined,
     }],
     shippingAddress: {
       name: index === 0 ? 'Maya Chen' : 'Jordan Reyes',
@@ -154,7 +155,7 @@ export interface PreviewLiveSession {
   seller_name: string;
   brand_name: string;
   title: string;
-  thumbnail_url: string;
+  thumbnail_url: string | null;
   viewer_count: number;
   product_tags: { productId: string; productName: string; priceCents: number }[];
   is_preview: true;
@@ -168,7 +169,7 @@ const PREVIEW_LIVE_SESSIONS: PreviewLiveSession[] = [
     seller_name: 'Atelier Noire',
     brand_name: 'Atelier Noire',
     title: 'Preview · The Atelier Noire fitting room',
-    thumbnail_url: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=900&q=82',
+    thumbnail_url: null,
     viewer_count: 128,
     product_tags: [{ productId: 'preview-product-01', productName: 'Sculpted Wool Coat', priceCents: 48000 }],
     is_preview: true,
@@ -180,7 +181,7 @@ const PREVIEW_LIVE_SESSIONS: PreviewLiveSession[] = [
     seller_name: 'Maison Vela',
     brand_name: 'Maison Vela',
     title: 'Preview · Evening silhouettes with Maison Vela',
-    thumbnail_url: 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=900&q=82',
+    thumbnail_url: null,
     viewer_count: 86,
     product_tags: [{ productId: 'preview-product-02', productName: 'Liquid Silver Dress', priceCents: 32500 }],
     is_preview: true,
