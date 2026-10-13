@@ -214,6 +214,7 @@ export default function StitchPostScreen() {
       {step === 'clip' ? (
         <View style={[styles.flex, { paddingBottom: Math.max(insets.bottom, SP.md) }]} testID="stitch-step-clip">
           <View style={styles.stage}>
+            {sourceStill ? <CachedImage source={{ uri: sourceStill }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
             <ClipPreview uri={source.mediaUrl} startMs={clip.startMs} endMs={clip.endMs} onDuration={onDuration} />
           </View>
           <View style={styles.trim}>

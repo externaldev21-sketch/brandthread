@@ -57,18 +57,24 @@ const fitChecks = [
   { postId: uuid(22), userId: 'user_mo', caption: '', mediaType: 'photo', thumbnailUrl: `${IMAGE_HOST}/look-mono.jpg`, createdAt: '2026-09-29T10:00:00Z', author: { displayName: 'Mo', username: 'mo' } },
 ];
 
+/** Matches the API path with or without the /api/v1 prefix the app sends; `**` = any suffix. */
+function rx(rest) {
+  const esc = rest.replace(/\*\*$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^${API.replace(/[.]/g, '\\.')}/api(/v1)?${esc}${rest.endsWith('**') ? '' : '(\\?.*)?$'}`);
+}
+
 async function installRoutes(page, origin) {
-  await page.route(`${API}/api/fits/stitch-source/**`, (r) => fulfill(r, origin, { source: sourceSummary }));
-  await page.route(`${API}/api/fits/purchased-products**`, (r) => fulfill(r, origin, { products: purchased }));
-  await page.route(`${API}/api/products/${PRODUCT}/fit-checks**`, (r) => fulfill(r, origin, { fitChecks }));
-  await page.route(`${API}/api/fits/fit-checks/${FIT_POST}**`, (r) => fulfill(r, origin, { fitCheck: { postId: FIT_POST, product: purchased[0] } }));
-  await page.route(`${API}/api/fits/fit-checks/${STITCH_POST}**`, (r) => fulfill(r, origin, { error: 'Not a fit check' }, 404));
-  await page.route(`${API}/api/fits/stitches/${FIT_POST}**`, (r) => fulfill(r, origin, { error: 'Not a stitch' }, 404));
-  await page.route(`${API}/api/fits/stitches/${STITCH_POST}**`, (r) => fulfill(r, origin, {
+  await page.route(rx(`/fits/stitch-source/**`), (r) => fulfill(r, origin, { source: sourceSummary }));
+  await page.route(rx(`/fits/purchased-products**`), (r) => fulfill(r, origin, { products: purchased }));
+  await page.route(rx(`/products/${PRODUCT}/fit-checks**`), (r) => fulfill(r, origin, { fitChecks }));
+  await page.route(rx(`/fits/fit-checks/${FIT_POST}**`), (r) => fulfill(r, origin, { fitCheck: { postId: FIT_POST, product: purchased[0] } }));
+  await page.route(rx(`/fits/fit-checks/${STITCH_POST}**`), (r) => fulfill(r, origin, { error: 'Not a fit check' }, 404));
+  await page.route(rx(`/fits/stitches/${FIT_POST}**`), (r) => fulfill(r, origin, { error: 'Not a stitch' }, 404));
+  await page.route(rx(`/fits/stitches/${STITCH_POST}**`), (r) => fulfill(r, origin, {
     stitch: { postId: STITCH_POST, clipStartMs: 0, clipEndMs: 5000, sourceAuthor: nova, source: sourceSummary },
   }));
-  await page.route(`${API}/api/fits/repost-requests/status**`, (r) => fulfill(r, origin, { request: null }));
-  await page.route(`${API}/api/fits/repost-requests/${REQUEST}**`, (r) => fulfill(r, origin, {
+  await page.route(rx(`/fits/repost-requests/status**`), (r) => fulfill(r, origin, { request: null }));
+  await page.route(rx(`/fits/repost-requests/${REQUEST}**`), (r) => fulfill(r, origin, {
     request: {
       id: REQUEST, postId: FIT_POST, status: 'pending', createdAt: '2026-10-12T10:00:00Z', respondedAt: null,
       brand: { userId: 'user_northline', name: 'Northline', handle: '@northline', avatarUrl: `${IMAGE_HOST}/portrait-mono.jpg` },
@@ -80,16 +86,16 @@ async function installRoutes(page, origin) {
     mediaUrls: [`${IMAGE_HOST}/look-rust.jpg`], thumbnailUrl: `${IMAGE_HOST}/look-rust.jpg`, slides: [], aspectRatio: '3:4',
     seller: { displayName: 'Ava', brandName: null }, likeCount: 12, repostCount: 1, createdAt: '2026-10-01T10:00:00Z',
   });
-  await page.route(`${API}/api/posts/${FIT_POST}`, (r) => fulfill(r, origin, viewerPost(FIT_POST, 'Ember hoodie, one size up.')));
-  await page.route(`${API}/api/posts/${STITCH_POST}`, (r) => fulfill(r, origin, viewerPost(STITCH_POST, '#stitch with @novastudio how I wear it to work')));
+  await page.route(rx(`/posts/${FIT_POST}`), (r) => fulfill(r, origin, viewerPost(FIT_POST, 'Ember hoodie, one size up.')));
+  await page.route(rx(`/posts/${STITCH_POST}`), (r) => fulfill(r, origin, viewerPost(STITCH_POST, '#stitch with @novastudio how I wear it to work')));
   // Product detail for a UUID product: the demo catalogue's hoodie, re-keyed.
-  await page.route(`${API}/api/public/products/${PRODUCT}`, (r) => {
+  await page.route(rx(`/public/products/${PRODUCT}`), (r) => {
     const body = respond({ method: 'GET', path: '/api/public/products/prod_nl_hoodie_ember', query: new URLSearchParams(), role: 'buyer' });
     return fulfill(r, origin, body ? { ...body, id: PRODUCT } : { error: 'nope' }, body ? 200 : 404);
   });
   // Feed posts with real (UUID) ids so the share sheet offers Quote/Stitch.
   for (const p of ['/api/posts/feed', '/api/public/posts']) {
-    await page.route(`${API}${p}**`, (r) => {
+    await page.route(rx(p.replace(/^\/api/, '') + '**'), (r) => {
       const url = new URL(r.request().url());
       const body = respond({ method: 'GET', path: url.pathname, query: url.searchParams, role: 'buyer' });
       const remap = (list) => list.map((post, i) => ({ ...post, id: uuid(100 + i) }));
@@ -132,7 +138,9 @@ async function main() {
   const { origin, close } = await serveBuild(DEFAULT_BUILD_DIR);
   const browser = await launchBrowser();
   const images = await ensureDemoImages(browser, path.join(MOBILE_ROOT, '.store-screenshots', 'images'));
-  const videos = { 'fits-walk': path.join(MOBILE_ROOT, 'assets/videos/fashion_walk.mp4') };
+  // Headless Chromium has no H.264: serve a VP9 copy (ffmpeg -c:v libvpx-vp9) when present.
+  const vp9 = path.join(MOBILE_ROOT, '.store-screenshots', 'fits-walk-vp9.mp4');
+  const videos = { 'fits-walk': existsSync(vp9) ? vp9 : path.join(MOBILE_ROOT, 'assets/videos/fashion_walk.mp4') };
   const device = { viewport: { width: 390, height: 844 }, scale: 2, isMobile: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15' };
   let i = 0;
   try {

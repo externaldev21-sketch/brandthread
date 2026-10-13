@@ -34,7 +34,8 @@ export function usePostFits({ postId, isOwner, authorAccountType }: {
   const [product, setProduct] = useState<FitProduct | null>(null);
   const [request, setRequest] = useState<{ id: string; status: RepostRequestStatus } | null>(null);
   const valid = !!postId && isUUID(postId);
-  const brandViewingBuyer = role === 'seller' && !isOwner && authorAccountType === 'buyer';
+  // Unknown author type still offers it; the server answers NOT_A_BUYER_POST for brand posts.
+  const brandViewingBuyer = role === 'seller' && !isOwner && authorAccountType !== 'seller';
 
   useFocusEffect(useCallback(() => {
     let cancelled = false;
