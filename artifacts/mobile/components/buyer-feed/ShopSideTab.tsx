@@ -50,11 +50,11 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { Glass } from '@/components/ui/Glass';
-import { formatCents } from '@/lib/money';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { FONT, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { a11yHidden } from '@/lib/a11yHidden';
+import { formatMoney } from '@/lib/format';
 
 export interface ShopSideTabTag {
   productId: string;
@@ -193,7 +193,7 @@ export function ShopTagPill({
       accessibilityRole="button"
       accessibilityLabel={
         expanded
-          ? `Shop ${tag.productName}, ${formatCents(tag.priceCents)}`
+          ? `Shop ${tag.productName}, ${formatMoney(tag.priceCents)}`
           : totalCount > 1 ? `Shop this video, ${totalCount} products` : 'Shop this video'
       }
     >
@@ -234,7 +234,7 @@ export function ShopTagPill({
           </View>
           <Text style={styles.name} numberOfLines={1}>{tag.productName}</Text>
           <Text style={styles.price} numberOfLines={1}>
-            {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
+            {formatMoney(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
           </Text>
           {/* Purely decorative — the whole expanded strip is one tap
               target (the TouchableOpacity above), see the module comment. */}

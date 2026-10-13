@@ -26,7 +26,6 @@ import {
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
-import { formatCents } from '@/lib/money';
 import * as WebBrowser from 'expo-web-browser';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { apiErrorMessage, confirmBlock, reportHref } from '@/lib/safety';
@@ -39,6 +38,7 @@ import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import { useLiveModeration } from '@/lib/live/useLiveModeration';
 import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
 import { radius } from '@/constants/radii';
+import { formatMoney } from '@/lib/format';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -543,12 +543,12 @@ function BuyerLiveNativeScreen() {
                 onPress={() => { hapticLight(); openPurchase(tag); }}
                 activeOpacity={0.8}
                 accessibilityRole="button"
-                accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
+                accessibilityLabel={`Shop ${tag.productName}, ${formatMoney(tag.priceCents)}`}
                 style={[s.productChip, { backgroundColor: 'rgba(0,0,0,0.7)' }]}
               >
                 <Feather name="shopping-bag" size={12} color={LIVE_RED} />
                 <Text style={s.productChipName} numberOfLines={1}>{tag.productName}</Text>
-                <Text style={s.productChipPrice}>{formatCents(tag.priceCents)}</Text>
+                <Text style={s.productChipPrice}>{formatMoney(tag.priceCents)}</Text>
               </PressableScale>
             ))}
           </ScrollView>
@@ -624,7 +624,7 @@ function BuyerLiveNativeScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <Text style={s.purchasePrice}>
-                {formatCents(
+                {formatMoney(
                   (purchaseProduct?.variants ?? []).find((variant: any) => variant.id === selectedVariantId)?.priceCents
                     ?? purchaseTag.priceCents,
                 )}

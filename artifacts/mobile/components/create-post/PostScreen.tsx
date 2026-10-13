@@ -26,7 +26,7 @@ import { MODE_LABEL, type PostMode } from '@/constants/postLimits';
 import { activeToken, CAPTION_MAX, replaceToken, tokenizeCaption } from '@/lib/createPost/caption';
 import type { MediaDraft, PostDetails, PublishInput } from '@/lib/createPost/types';
 import { CP, CreateHeader, PillButton, SubPage, tap } from '@/components/create-post/ui';
-import { formatCents } from '@/lib/money';
+import { formatMoney } from '@/lib/format';
 
 const MAX_PRODUCT_TAGS = 5;
 const isPreview = () => isSellerDevPreview() || isBuyerDevPreview();
@@ -154,7 +154,7 @@ function ProductsPage({ tags, onChange, onBack }: { tags: PostProductTag[]; onCh
               >
                 <View style={{ flex: 1 }}>
                   <Text style={s.rowLabel} numberOfLines={1}>{p.name}</Text>
-                  <Text style={s.rowValue}>{formatCents(p.pricing.priceCents)}</Text>
+                  <Text style={s.rowValue}>{formatMoney(p.pricing.priceCents)}</Text>
                 </View>
                 <View style={[s.check, on && s.checkOn]}>{on ? <Feather name="check" size={14} color={CP.black} /> : null}</View>
               </Pressable>

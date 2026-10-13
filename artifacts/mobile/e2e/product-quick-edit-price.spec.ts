@@ -120,7 +120,7 @@ test('seller product list — quick edit price @ 390x844', async ({ browser }) =
   await page.getByText('Save price').click();
 
   // Sheet closes and the card + undo toast both reflect the new price.
-  await page.getByText('$52.00').first().waitFor({ timeout: 5_000 });
+  await page.getByText('$52').first().waitFor({ timeout: 5_000 });
   await page.waitForTimeout(400); // let the quick-edit sheet's fade-out finish before capturing
   await page.screenshot({ path: 'docs/polish/screenshots/product-quick-edit-price/after-390x844.png' });
 

@@ -14,7 +14,6 @@ import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { formatCents } from '@/lib/money';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -27,6 +26,7 @@ import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationO
 import { LiveCommentActionsSheet, type CommentAction, type CommentActionTarget } from '@/components/live/LiveCommentActionsSheet';
 import { radius } from '@/constants/radii';
 import { loadAgoraModule } from '@/lib/agoraAvailability';
+import { formatMoney } from '@/lib/format';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -370,7 +370,7 @@ function SellerLiveNativeScreen() {
         <View style={[s.tipsRow, { paddingTop: headerTopInset + 78 }]} pointerEvents="none">
           <View style={[s.viewerBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]} testID="seller-live-tips-total">
             <Feather name="gift" size={13} color="#fff" />
-            <Text style={s.viewerText}>{formatCents(tipsTotalCents)} in tips</Text>
+            <Text style={s.viewerText}>{formatMoney(tipsTotalCents)} in tips</Text>
           </View>
         </View>
       )}
@@ -439,7 +439,7 @@ function SellerLiveNativeScreen() {
               >
                 <Feather name="shopping-bag" size={12} color={LIVE_RED} />
                 <Text style={s.productChipText} numberOfLines={1}>{tag.productName}</Text>
-                <Text style={s.productChipPrice}>{formatCents(tag.priceCents ?? 0)}</Text>
+                <Text style={s.productChipPrice}>{formatMoney(tag.priceCents ?? 0)}</Text>
                 {tag.highlighted && <Text style={s.featuredLabel}>FEATURED</Text>}
               </TouchableOpacity>
             ))}
@@ -521,7 +521,7 @@ function SellerLiveNativeScreen() {
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={[s.pickerRowName, { color: FG }]} numberOfLines={1}>{p.name}</Text>
-                       <Text style={[s.pickerRowPrice, { color: MUTED }]}>{formatCents(p.priceCents ?? 0)}</Text>
+                       <Text style={[s.pickerRowPrice, { color: MUTED }]}>{formatMoney(p.priceCents ?? 0)}</Text>
                     </View>
                     <View style={[s.checkbox, tagged && { backgroundColor: PURPLE, borderColor: PURPLE }]}>
                       {tagged && <Feather name="check" size={13} color={theme.onAccent} />}

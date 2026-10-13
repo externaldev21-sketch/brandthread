@@ -23,7 +23,6 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import { useScrollReset } from '@/hooks/useScrollReset';
-import { formatCents } from '@/lib/money';
 import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
 import {
   getSalesAnalytics, getFilterState, saveFilterState,
@@ -44,6 +43,7 @@ import { DEFAULT_INSIGHT_RANGE, INSIGHT_RANGES, type InsightRange } from '@/serv
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_ANALYTICS_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
+import { formatMoney } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -154,7 +154,7 @@ export default function AnalyticsScreen() {
   }
 
   // ── Display values ─────────────────────────────────────────────────────────
-  const displayRevenue = formatCents(summary.revenueCents);
+  const displayRevenue = formatMoney(summary.revenueCents);
   const chartPoints = bars.map(b => ({ label: b.label, value: b.cents }));
   const hasDelta = summary.visitsChangePct !== undefined || summary.revenueChangePct !== undefined;
   const comparedTo = hasDelta ? previousPeriodLabel(range) : null;

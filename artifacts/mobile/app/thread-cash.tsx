@@ -14,7 +14,6 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { formatCents } from '@/lib/money';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { BrandthreadScreen, BrandthreadCard, EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -27,6 +26,7 @@ import type { ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import { ThreadCashBill, ThreadCashBillStack, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { formatMoney, fmtRelativeDay } from '@/lib/format';
 
 function historyLabel(entry: ThreadCashEntry): string {
   switch (entry.source) {
@@ -220,7 +220,7 @@ export default function ThreadCashScreen() {
                 </View>
               ) : (
                 <Text style={[styles.balanceValue, tabularType('display'), { color: theme.text }]}>
-                  {formatCents(status?.balanceCents ?? 0)}
+                  {formatMoney(status?.balanceCents ?? 0)}
                 </Text>
               )}
               <Text style={styles.balanceHint}>
@@ -279,7 +279,7 @@ export default function ThreadCashScreen() {
             </View>
             <Text style={[styles.streakSub, TABULAR_NUMS, { color: theme.muted }]}>
               Longest streak: {status?.streak.longestStreak ?? 0} days{'\n'}
-              Earn ${(((status?.config.dailyAmountCents ?? 10)) / 100).toFixed(2)} a day, ${(((status?.config.streakBonusCents ?? 100)) / 100).toFixed(2)} bonus every {streakBonusDays} days
+              Earn {formatMoney(status?.config.dailyAmountCents ?? 10)} a day, {formatMoney(status?.config.streakBonusCents ?? 100)} bonus every {streakBonusDays} days
             </Text>
           </BrandthreadCard>
 
@@ -313,7 +313,7 @@ export default function ThreadCashScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.historyLabel, { color: theme.text }]} numberOfLines={1}>{historyLabel(entry)}</Text>
                       <Text style={[styles.historyDate, { color: theme.subtle }]} numberOfLines={1}>
-                        {new Date(entry.createdAt).toLocaleDateString()}
+                        {fmtRelativeDay(entry.createdAt)}
                         {entry.note ? ` · “${entry.note}”` : ''}
                       </Text>
                     </View>
@@ -321,7 +321,7 @@ export default function ThreadCashScreen() {
                       style={[styles.historyAmount, TABULAR_NUMS, { color: entry.amountCents >= 0 ? theme.success : theme.text }]}
                       numberOfLines={1}
                     >
-                      {entry.amountCents >= 0 ? '+' : '−'}{formatCents(Math.abs(entry.amountCents))}
+                      {entry.amountCents >= 0 ? '+' : '−'}{formatMoney(Math.abs(entry.amountCents))}
                     </Text>
                   </View>
                 );

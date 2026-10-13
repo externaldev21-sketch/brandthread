@@ -25,7 +25,7 @@ import {
 import { BrandthreadHeader, EmptyState, IconButton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
-import { formatCents } from '@/lib/money';
+import { formatMoney } from '@/lib/format';
 
 function BundleRow({ bundle, onPress }: { bundle: any; onPress: () => void }) {
   const savings = bundle.compareAtCents > bundle.bundlePriceCents
@@ -49,8 +49,8 @@ function BundleRow({ bundle, onPress }: { bundle: any; onPress: () => void }) {
         </View>
         <Text style={r.meta}>
           {bundle.itemCount ?? 0} item{(bundle.itemCount ?? 0) !== 1 ? 's' : ''} ·{' '}
-          {formatCents(bundle.bundlePriceCents)}
-          {savings > 0 ? ` · saves ${formatCents(savings)}` : ''}
+          {formatMoney(bundle.bundlePriceCents)}
+          {savings > 0 ? ` · saves ${formatMoney(savings)}` : ''}
         </Text>
       </View>
       <Feather name="chevron-right" size={16} color={MUTED} />

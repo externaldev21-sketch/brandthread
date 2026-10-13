@@ -12,9 +12,8 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
-import { formatCents } from '@/lib/money';
-import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
-import { fmtDate } from '@/lib/format';
+import { formatCompactCount } from '@/lib/compactFormat';
+import { fmtDate, formatMoney } from '@/lib/format';
 import { EmptyState, PrimaryButton } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { AnalyticsSkeleton, Card, CardDivider, SectionTitle, StatRow } from '@/components/analytics/AnalyticsKit';
@@ -84,7 +83,7 @@ function AdvancedReport() {
       ) : (
         <>
           <KpiGrid range={range} items={[
-            { key: 'aov', label: 'Average order', value: formatCents(t!.averageOrderCents), changePct: data.deltas.averageOrderPct, featured: true },
+            { key: 'aov', label: 'Average order', value: formatMoney(t!.averageOrderCents), changePct: data.deltas.averageOrderPct, featured: true },
             { key: 'conv', label: 'Conversion', value: `${t!.conversionPct}%`, changePct: data.deltas.conversionPct },
             { key: 'repeat', label: 'Repeat buyers', value: `${t!.repeatBuyerPct}%`, changePct: null },
             { key: 'refund', label: 'Refund rate', value: `${t!.refundRatePct}%`, changePct: data.deltas.refundRatePct, invert: true },
@@ -99,13 +98,13 @@ function AdvancedReport() {
           <Card>
             <StatRow label="Orders" value={formatCompactCount(t!.orders)} />
             <CardDivider />
-            <StatRow label="Revenue" value={formatCentsCompact(t!.revenueCents)} changePct={data.deltas.revenuePct ?? undefined} />
+            <StatRow label="Revenue" value={formatMoney(t!.revenueCents)} changePct={data.deltas.revenuePct ?? undefined} />
             <CardDivider />
             <StatRow label="Units per order" value={t!.unitsPerOrder.toFixed(2)} />
             <CardDivider />
-            <StatRow label="Orders with a discount" value={`${t!.discountedOrders} · ${formatCentsCompact(t!.discountCents)}`} />
+            <StatRow label="Orders with a discount" value={`${t!.discountedOrders} · ${formatMoney(t!.discountCents)}`} />
             <CardDivider />
-            <StatRow label="Refunded" value={`${t!.refundedOrders} · ${formatCentsCompact(t!.refundedCents)}`} />
+            <StatRow label="Refunded" value={`${t!.refundedOrders} · ${formatMoney(t!.refundedCents)}`} />
             <CardDivider />
             <StatRow label="Buyers" value={`${formatCompactCount(t!.buyers)} · ${t!.repeatBuyers} returning`} />
           </Card>
@@ -116,7 +115,7 @@ function AdvancedReport() {
               <ShareBarRow
                 key={c.channel}
                 label={c.channel === 'threads' ? `Threads and videos · ${c.orders} orders` : `Store · ${c.orders} orders`}
-                value={formatCents(c.revenueCents)}
+                value={formatMoney(c.revenueCents)}
                 pct={(c.revenueCents / channelTotal) * 100}
                 last={i === data.channels.length - 1}
               />
@@ -131,7 +130,7 @@ function AdvancedReport() {
               {data.topCustomers.map((c, i) => (
                 <View key={`${c.name}-${i}`}>
                   {i > 0 && <CardDivider />}
-                  <RankedRow rank={i + 1} icon="user" title={c.name} subtitle={`${c.orders} order${c.orders === 1 ? '' : 's'} · last ${fmtDate(c.lastOrderAt)}`} value={formatCents(c.totalCents)} />
+                  <RankedRow rank={i + 1} icon="user" title={c.name} subtitle={`${c.orders} order${c.orders === 1 ? '' : 's'} · last ${fmtDate(c.lastOrderAt)}`} value={formatMoney(c.totalCents)} />
                 </View>
               ))}
             </Card>

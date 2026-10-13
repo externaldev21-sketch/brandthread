@@ -21,12 +21,13 @@ import { randomUUID } from 'expo-crypto';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
 import { hapticLight } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
+import { formatCents } from '@/lib/money';
+import { formatMoney } from '@/lib/format';
 
 const TIP_AMOUNTS_CENTS = [100, 500, 1000, 2000, 5000, 10000];
 
@@ -131,7 +132,7 @@ export function LiveThreadCashSheet({
         <View style={[styles.balancePill, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
           <ThreadCashBillIcon size={16} />
           <Text style={[styles.balanceText, { color: theme.text }]} testID="live-thread-cash-balance">
-            {balanceCents == null ? '···' : `${formatCents(balanceCents)} available`}
+            {balanceCents == null ? '···' : `${formatMoney(balanceCents)} available`}
           </Text>
         </View>
 
@@ -158,10 +159,10 @@ export function LiveThreadCashSheet({
                 ]}
                 accessibilityRole="button"
                 accessibilityState={{ selected: isSelected, disabled: !affordable }}
-                accessibilityLabel={`Select ${formatCents(cents)}`}
+                accessibilityLabel={`Select ${formatMoney(cents)}`}
               >
                 <ThreadCashBillIcon size={18} style={isSelected ? { opacity: 0.85 } : undefined} />
-                <Text style={[styles.tipText, { color: isSelected ? theme.onAccent : theme.text }]}>{formatCents(cents)}</Text>
+                <Text style={[styles.tipText, { color: isSelected ? theme.onAccent : theme.text }]}>{formatMoney(cents)}</Text>
               </Pressable>
             );
           })}
@@ -176,9 +177,9 @@ export function LiveThreadCashSheet({
             (!selected || sending || balanceCents == null || selected > balanceCents) && styles.sendBtnDisabled,
           ]}
           accessibilityRole="button"
-          accessibilityLabel={selected ? `Send ${formatCents(selected)}` : 'Send'}
+          accessibilityLabel={selected ? `Send ${formatMoney(selected)}` : 'Send'}
         >
-          <Text style={[styles.sendBtnText, { color: theme.onAccent }]}>{selected ? `Send ${formatCents(selected)}` : 'Select an amount'}</Text>
+          <Text style={[styles.sendBtnText, { color: theme.onAccent }]}>{selected ? `Send ${formatMoney(selected)}` : 'Select an amount'}</Text>
         </Pressable>
       </SheetRise>
     </Modal>

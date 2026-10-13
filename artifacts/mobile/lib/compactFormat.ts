@@ -1,4 +1,4 @@
-import { formatCents } from '@/lib/money';
+import { formatMoney } from '@/lib/format';
 
 /** Scales a positive magnitude to a K/M/B suffix, e.g. 12_400 -> "12.4K". */
 function scaleWithSuffix(magnitude: number): string {
@@ -15,14 +15,14 @@ function scaleWithSuffix(magnitude: number): string {
 
 /**
  * Compact currency for a big, bold dashboard number that must never truncate:
- * under $1,000 shows the exact amount ($842.00); at or above it, a compact
- * form ($12.4K, $1.2M). Pair with the exact value (formatCents) for a
+ * under $1,000 shows the exact amount ($842, $842.50); at or above it, a
+ * compact form ($12.4K, $1.2M). Pair with the exact value (formatMoney) for a
  * long-press/tap reveal.
  */
 export function formatCentsCompact(cents: number): string {
   const sign = cents < 0 ? '-' : '';
   const dollars = Math.abs(cents) / 100;
-  if (dollars < 1000) return formatCents(cents);
+  if (dollars < 1000) return formatMoney(cents);
   return `${sign}$${scaleWithSuffix(dollars)}`;
 }
 

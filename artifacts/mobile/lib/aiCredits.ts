@@ -1,5 +1,7 @@
 /** AI credits: API shapes and the small pure helpers the credits screen uses. */
 
+import { formatMoney } from './format';
+
 export type AiCreditPack = { id: string; credits: number; amountCents: number; label: string };
 export type AiCreditTool = { tool: string; label: string; cost?: number };
 
@@ -63,7 +65,7 @@ export function formatResetDate(iso: string, locale = 'en-US'): string {
 }
 
 export function formatPackPrice(amountCents: number): string {
-  return `$${(amountCents / 100).toFixed(2)}`;
+  return formatMoney(amountCents);
 }
 
 /** Stripe return URL; must match the server allowlist (ai_credits_checkout). */

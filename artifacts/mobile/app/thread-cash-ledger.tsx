@@ -14,6 +14,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
+import { formatMoney, fmtRelativeDay } from '@/lib/format';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -93,7 +94,7 @@ export default function ThreadCashLedgerScreen() {
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={[styles.label, { color: theme.text }]} numberOfLines={1}>{ledgerLabel(row.source)}</Text>
           <Text style={[styles.sub, { color: theme.subtle }]} numberOfLines={1}>
-            {new Date(row.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+            {fmtRelativeDay(row.createdAt)}
             {row.expiresAt && (row.remainingCents ?? 0) > 0 ? ` · expires ${formatExpiryDate(row.expiresAt)}` : ''}
           </Text>
         </View>
@@ -113,10 +114,10 @@ export default function ThreadCashLedgerScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, SP.lg) + SP.md }} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <Text style={[styles.heroValue, tabularType('display'), { color: theme.text }]} testID="thread-cash-ledger-balance">
-            {data ? formatCents(data.balanceCents) : '···'}
+            {data ? formatMoney(data.balanceCents) : '···'}
           </Text>
           <Text style={[styles.heroSub, { color: theme.muted }]}>
-            {soon && soon.totalCents > 0 ? `${formatCents(soon.totalCents)} expires soon` : 'Thread Cash balance'}
+            {soon && soon.totalCents > 0 ? `${formatMoney(soon.totalCents)} expires soon` : 'Thread Cash balance'}
           </Text>
         </View>
 

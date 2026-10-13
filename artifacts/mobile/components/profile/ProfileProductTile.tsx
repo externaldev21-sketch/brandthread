@@ -13,10 +13,10 @@ import { CachedImage } from '@/components/CachedImage';
 import { SaveHeart } from '@/components/SaveHeart';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
-import { formatCents } from '@/lib/money';
 import type { ShopProduct } from '@/services/profileService';
 import { InteractionLayer } from './ProfileControls';
 import { PROFILE_GRID_GAP } from './profileLayout';
+import { formatMoney } from '@/lib/format';
 
 export const ProfileProductTile = React.memo(function ProfileProductTile({
   product, width, height, owner, onPress,
@@ -31,7 +31,7 @@ export const ProfileProductTile = React.memo(function ProfileProductTile({
   const { theme } = useAppTheme();
   const handlePress = useCallback(() => onPress(product), [onPress, product]);
   const soldOut = !product.inStock;
-  const price = product.priceCents > 0 ? formatCents(product.priceCents) : null;
+  const price = product.priceCents > 0 ? formatMoney(product.priceCents) : null;
   return (
     <View style={{ width, height, marginBottom: PROFILE_GRID_GAP }}>
       <PressableScale

@@ -18,8 +18,9 @@ import type { SellerProductQuestion } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { ANSWER_MAX, checkAnswerDraft } from '@/lib/reviewDisplay';
+import { fmtRelativeDay } from '@/lib/format';
 
-const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const fmtDate = (iso: string) => fmtRelativeDay(iso);
 
 function QuestionCard({ item, onAnswered }: { item: SellerProductQuestion; onAnswered: (id: string, body: string) => void }) {
   const api = useApi();

@@ -16,7 +16,6 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getMarketingAnalytics, getFilterState } from '@/services/analyticsService';
 import { MarketingAnalytics, CampaignAnalytics, InfluencerAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
-import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -24,6 +23,7 @@ import {
   AnalyticsSkeleton, Card, CardDivider, HeaderPillButton,
   ProgressBar, SectionTitle,
 } from '@/components/analytics/AnalyticsKit';
+import { formatMoney } from '@/lib/format';
 
 function RevenueBar({ label, valueCents, totalCents, color }: { label: string; valueCents: number; totalCents: number; color: string }) {
   const colors = useColors();
@@ -33,7 +33,7 @@ function RevenueBar({ label, valueCents, totalCents, color }: { label: string; v
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
         <Text style={{ fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground }}>{label}</Text>
         <Text style={{ fontSize: FS.xs, fontFamily: FONT.bold, color: colors.foreground }}>
-          {formatCents(valueCents)} <Text style={{ color: colors.subtle }}>({pct}%)</Text>
+          {formatMoney(valueCents)} <Text style={{ color: colors.subtle }}>({pct}%)</Text>
         </Text>
       </View>
       <ProgressBar pct={pct} color={color} />
@@ -61,8 +61,8 @@ function CampaignRow({ c }: { c: CampaignAnalytics }) {
         <Text style={s.rowMeta}>{c.recipients.toLocaleString()} sent · {c.orders} orders</Text>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
-        <Text style={s.rowValue}>{formatCents(c.revenueCents)}</Text>
-        <Text style={[s.rowSub, { color: colors.success }]}>{formatCents(c.revenuePerRecipientCents)}/rec.</Text>
+        <Text style={s.rowValue}>{formatMoney(c.revenueCents)}</Text>
+        <Text style={[s.rowSub, { color: colors.success }]}>{formatMoney(c.revenuePerRecipientCents)}/rec.</Text>
       </View>
     </TouchableOpacity>
   );
@@ -81,7 +81,7 @@ function InfluencerRow({ inf }: { inf: InfluencerAnalytics }) {
         <Text style={s.rowMeta}>{inf.orders} orders · {inf.clicks.toLocaleString()} clicks</Text>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
-        <Text style={s.rowValue}>{formatCents(inf.revenueCents)}</Text>
+        <Text style={s.rowValue}>{formatMoney(inf.revenueCents)}</Text>
         <Text style={[s.rowSub, { color: inf.returnOnCost >= 5 ? colors.success : colors.warning }]}>{inf.returnOnCost}× ROC</Text>
       </View>
     </View>
@@ -221,8 +221,8 @@ export default function AnalyticsMarketingScreen() {
               { label: 'Shares',             value: data.referral.shares.toLocaleString() },
               { label: 'Clicks',             value: data.referral.clicks.toLocaleString() },
               { label: 'Referred Customers', value: data.referral.referredCustomers.toLocaleString() },
-              { label: 'Revenue',            value: formatCents(data.referral.revenueCents) },
-              { label: 'Rewards Issued',     value: formatCents(data.referral.rewardsIssuedCents) },
+              { label: 'Revenue',            value: formatMoney(data.referral.revenueCents) },
+              { label: 'Rewards Issued',     value: formatMoney(data.referral.rewardsIssuedCents) },
             ].map((item, i) => (
               <View key={item.label}>
                 {i > 0 && <CardDivider />}

@@ -25,6 +25,7 @@ import { RADII } from '@/constants/radii';
 import { apiErrorMessage } from '@/lib/safety';
 import type { AccountSession } from '@/lib/safetyTypes';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
+import { fmtRelativeDay } from '@/lib/format';
 
 /**
  * Dev-preview has no real Clerk session list to show (and this app's audit/
@@ -47,9 +48,9 @@ function lastActiveLabel(iso: string): string {
   if (mins < 60) return `Active ${mins}m ago`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `Active ${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `Active ${days}d ago`;
-  return `Active ${new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  // A day or more: "Active yesterday", "Active Mar 4".
+  const day = fmtRelativeDay(iso);
+  return `Active ${day === 'Yesterday' ? 'yesterday' : day}`;
 }
 
 function deviceIcon(session: AccountSession): keyof typeof Feather.glyphMap {

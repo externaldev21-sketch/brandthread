@@ -14,12 +14,12 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { hapticLight } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
+import { formatMoney } from '@/lib/format';
 
 export function SellerThreadCashCard({
   balanceCents, loading, error, onReload, onCashOutPress,
@@ -70,10 +70,10 @@ export function SellerThreadCashCard({
       ) : (
         <>
           <Text style={[styles.balance, { color: THREAD_CASH_GREEN_MID }]} testID="seller-thread-cash-balance">
-            {formatCents(balanceCents ?? 0)}
+            {formatMoney(balanceCents ?? 0)}
           </Text>
           <Text style={[styles.subtitle, { color: theme.muted }]}>
-            {cashOutValueCents != null ? `Cash out for ${formatCents(cashOutValueCents)}` : ' '}
+            {cashOutValueCents != null ? `Cash out for ${formatMoney(cashOutValueCents)}` : ' '}
           </Text>
         </>
       )}

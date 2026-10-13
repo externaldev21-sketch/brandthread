@@ -24,13 +24,14 @@ import {
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { formatCents, parseDecimalToCents } from '@/lib/money';
+import { parseDecimalToCents } from '@/lib/money';
 import {
   BrandthreadCard, PrimaryButton, SecondaryButton, TertiaryButton,
   StatusBadge, SectionHeader, HapticSwitch,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/layout';
+import { formatMoney } from '@/lib/format';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
 type AppliesTo = 'entire_store' | 'specific_products' | 'collections';
@@ -82,7 +83,7 @@ function normalizeDiscount(raw: any): DiscountCode {
 
 function fmtValue(d: Pick<DiscountCode, 'type' | 'value'>) {
   if (d.type === 'percentage') return `${d.value}% off`;
-  if (d.type === 'fixed') return `${formatCents(Math.round(d.value * 100))} off`;
+  if (d.type === 'fixed') return `${formatMoney(Math.round(d.value * 100))} off`;
   if (d.type === 'free_shipping') return 'Free shipping';
   return 'Free item';
 }
@@ -233,7 +234,7 @@ export default function DiscountsScreen() {
   const summaryValueLabel = discType === 'percentage'
     ? `${percent}% off`
     : discType === 'fixed'
-      ? `${formatCents(Math.round((parseFloat(fixedValue) || 0) * 100))} off`
+      ? `${formatMoney(Math.round((parseFloat(fixedValue) || 0) * 100))} off`
       : discType === 'free_shipping'
         ? 'Free shipping'
         : 'Free item (cheapest eligible)';
@@ -458,7 +459,7 @@ export default function DiscountsScreen() {
               <Text style={s.summaryValue}>{summaryValueLabel}</Text>
               <View style={s.summaryRow}><Feather name="shopping-bag" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryScopeLabel}</Text></View>
               {minQuantity.trim() ? <View style={s.summaryRow}><Feather name="layers" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. {minQuantity.trim()} item{minQuantity.trim() === '1' ? '' : 's'}</Text></View> : null}
-              {minOrderCents ? <View style={s.summaryRow}><Feather name="dollar-sign" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. order {formatCents(minOrderCents)}</Text></View> : null}
+              {minOrderCents ? <View style={s.summaryRow}><Feather name="dollar-sign" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. order {formatMoney(minOrderCents)}</Text></View> : null}
               <View style={s.summaryRow}><Feather name="hash" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryUsageLabel}{oneUsePerCustomer ? ' · 1 per customer' : ''}{firstOrderOnly ? ' · First order only' : ''}</Text></View>
               <View style={s.summaryRow}><Feather name="calendar" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryDatesLabel}</Text></View>
             </View>
@@ -736,7 +737,7 @@ function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
           </View>
           <Text style={[s.valueText, { color: theme.accentLight }]}>{fmtValue(d)}</Text>
           <Text style={s.metaText}>{d.appliesTo === 'entire_store' ? 'Entire store' : d.appliesTo === 'collections' ? `${d.collectionIds.length} collection${d.collectionIds.length === 1 ? '' : 's'}` : `${d.productIds.length} product${d.productIds.length === 1 ? '' : 's'}`}</Text>
-          {d.minOrderCents > 0 && <Text style={s.metaText}>Min. order {formatCents(d.minOrderCents)}</Text>}
+          {d.minOrderCents > 0 && <Text style={s.metaText}>Min. order {formatMoney(d.minOrderCents)}</Text>}
           <Text style={s.metaText}>
             {d.startsAt && new Date(d.startsAt).getTime() > Date.now() ? `Starts ${fmtDate(d.startsAt)}` : d.expiresAt ? `Ends ${fmtDate(d.expiresAt)}` : 'No end date'}
           </Text>

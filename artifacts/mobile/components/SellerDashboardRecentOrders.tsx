@@ -7,8 +7,8 @@ import {
   SellerDashboardListItem,
   SellerDashboardSectionHeader,
 } from '@/components/SellerDashboardSections';
-import { formatCents } from '@/lib/money';
 import type { RecentOrderSummary } from '@/lib/sellerDashboardStats';
+import { formatMoney } from '@/lib/format';
 
 export function orderStatusVariant(status: string): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
   switch (status) {
@@ -61,7 +61,7 @@ export function SellerDashboardRecentOrders({
             icon="shopping-bag"
             title={order.buyerName}
             subtitle={`${order.orderNumber} · ${order.itemCount} ${order.itemCount === 1 ? 'item' : 'items'}`}
-            value={formatCents(order.totalCents)}
+            value={formatMoney(order.totalCents)}
             rightElement={<StatusBadge label={orderStatusLabel(order.status)} variant={orderStatusVariant(order.status)} small />}
             onPress={() => onOpenOrder(order.id)}
             isLast={index === arr.length - 1}

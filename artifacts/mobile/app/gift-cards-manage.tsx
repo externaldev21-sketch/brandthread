@@ -13,7 +13,6 @@ import { RetryRow } from '@/components/ui/RetryRow';
 import { CheckoutField, CheckoutSection, GUTTER, useCheckoutColors, type CheckoutColors } from '@/components/checkout/CheckoutPrimitives';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
-import { formatCents } from '@/lib/money';
 import { FONT, FS, SP } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
@@ -21,6 +20,8 @@ import { PREVIEW_SELLER_CARDS, PREVIEW_SETTINGS } from '@/lib/giftCardsPreview';
 import {
   EMAIL_PATTERN, amountTextToCents, giftCardMask, giftCardStatusLabel, type GiftCard, type GiftCardSettings,
 } from '@/lib/giftCards';
+import { formatCents } from '@/lib/money';
+import { formatMoney } from '@/lib/format';
 
 export default function GiftCardsManageScreen() {
   const router = useRouter();
@@ -145,10 +146,10 @@ export default function GiftCardsManageScreen() {
                     key={cents}
                     style={s.chip}
                     accessibilityRole="button"
-                    accessibilityLabel={`Remove ${formatCents(cents)}`}
+                    accessibilityLabel={`Remove ${formatMoney(cents)}`}
                     onPress={() => settings.denominations.length > 1 && void save({ denominations: settings.denominations.filter(d => d !== cents) })}
                   >
-                    <Text style={s.chipText}>{formatCents(cents)}  ×</Text>
+                    <Text style={s.chipText}>{formatMoney(cents)}  ×</Text>
                   </PressableScale>
                 ))}
               </View>
@@ -182,14 +183,14 @@ export default function GiftCardsManageScreen() {
             </CheckoutSection>
 
             <CheckoutSection title="Issued cards" style={s.section}>
-              <Text style={s.total}>{formatCents(outstanding)}</Text>
+              <Text style={s.total}>{formatMoney(outstanding)}</Text>
               <Text style={[s.fine, { marginBottom: SP.sm }]}>Outstanding balance on active cards</Text>
               {cards.length === 0 ? (
                 <Text style={s.fine}>Cards bought or issued for your store appear here.</Text>
               ) : cards.map(card => (
                 <View key={card.id} style={s.cardRow}>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={s.title}>{giftCardMask(card)} · {formatCents(card.balanceCents)} of {formatCents(card.initialCents)}</Text>
+                    <Text style={s.title}>{giftCardMask(card)} · {formatMoney(card.balanceCents)} of {formatMoney(card.initialCents)}</Text>
                     <Text style={s.fine} numberOfLines={1}>{card.recipientName || card.recipientEmail || 'Unassigned'} · {giftCardStatusLabel(card)}</Text>
                   </View>
                   {card.status === 'active' ? (

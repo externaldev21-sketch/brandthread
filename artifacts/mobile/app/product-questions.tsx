@@ -21,8 +21,9 @@ import type { ProductQuestion } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { QUESTION_MAX, checkQuestionDraft, questionCountLabel } from '@/lib/reviewDisplay';
+import { fmtRelativeDay } from '@/lib/format';
 
-const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const fmtDate = (iso: string) => fmtRelativeDay(iso);
 
 export default function ProductQuestionsScreen() {
   const { productId, productName } = useLocalSearchParams<{ productId: string; productName?: string }>();

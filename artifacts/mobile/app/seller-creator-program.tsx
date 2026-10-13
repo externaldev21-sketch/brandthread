@@ -13,13 +13,13 @@ import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { formatCents } from '@/lib/money';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { EMPTY_SELLER_OVERVIEW, getPreviewSellerOverview } from '@/lib/previewAffiliate';
 import type { SellerAffiliateOverview } from '@/lib/affiliateTypes';
 import { ActionButton, Card, KeyStatRow, Pill, SectionTitle, pct } from '@/components/affiliate/AffiliateUI';
+import { formatMoney } from '@/lib/format';
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Active', pending: 'Needs approval', paused: 'Paused', invited: 'Invited', removed: 'Removed',
@@ -138,11 +138,11 @@ export default function SellerCreatorProgramScreen() {
             </Card>
 
             <SectionTitle>Key stats</SectionTitle>
-            <KeyStatRow label="Revenue from creators" value={formatCents(t.revenueCents)} />
+            <KeyStatRow label="Revenue from creators" value={formatMoney(t.revenueCents)} />
             <KeyStatRow label="Orders" value={String(t.orders)} />
             <KeyStatRow label="Clicks" value={String(t.clicks)} />
-            <KeyStatRow label="Commission owed" value={formatCents(t.pendingCents + t.payableCents)} note="Pending plus payable" />
-            <KeyStatRow label="Commission paid" value={formatCents(t.paidCents)} note={data.payoutsAvailable ? undefined : 'Payouts are not switched on yet'} last />
+            <KeyStatRow label="Commission owed" value={formatMoney(t.pendingCents + t.payableCents)} note="Pending plus payable" />
+            <KeyStatRow label="Commission paid" value={formatMoney(t.paidCents)} note={data.payoutsAvailable ? undefined : 'Payouts are not switched on yet'} last />
 
             <SectionTitle>Invite a creator</SectionTitle>
             <View style={s.input}>
@@ -172,8 +172,8 @@ export default function SellerCreatorProgramScreen() {
               >
                 <View style={{ flex: 1 }}>
                   <Text style={s.name}>{c.displayName ?? c.username ?? 'Creator'}</Text>
-                  <Text style={s.meta}>{c.code} · {c.stats.orders} orders · {formatCents(c.stats.revenueCents)}</Text>
-                  <Text style={s.meta}>Owed {formatCents(c.stats.pendingCents + c.stats.payableCents)} · Paid {formatCents(c.stats.paidCents)}</Text>
+                  <Text style={s.meta}>{c.code} · {c.stats.orders} orders · {formatMoney(c.stats.revenueCents)}</Text>
+                  <Text style={s.meta}>Owed {formatMoney(c.stats.pendingCents + c.stats.payableCents)} · Paid {formatMoney(c.stats.paidCents)}</Text>
                 </View>
                 {c.status === 'pending' ? (
                   <ActionButton label="Approve" onPress={() => approve(c.id)} />

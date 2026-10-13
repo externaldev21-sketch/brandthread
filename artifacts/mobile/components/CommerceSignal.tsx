@@ -31,7 +31,7 @@ import {
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { formatCents } from '@/lib/money';
+import { formatMoney } from '@/lib/format';
 
 // ─── Thresholds ───────────────────────────────────────────────────────────────
 
@@ -301,7 +301,7 @@ interface PriceBadgeProps {
 export function PriceBadge({ currentPriceCents, style }: PriceBadgeProps) {
   if (currentPriceCents === null || currentPriceCents === undefined) return null;
   return (
-    <Text style={[sig.price, style]}>{formatCents(currentPriceCents)}</Text>
+    <Text style={[sig.price, style]}>{formatMoney(currentPriceCents)}</Text>
   );
 }
 

@@ -36,9 +36,9 @@ import {
 import { getManufacturerProducts, lowestTierPriceCents, type ManufacturerProduct } from '@/services/manufacturerCatalog';
 
 import { Manufacturer } from '@/services/manufacturerTypes';
-import { formatCents } from '@/lib/money';
 import { localTimeLabel } from '@workspace/manufacturer-flow';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { formatMoney, fmtRelativeDay } from '@/lib/format';
 
 // ─── Star Rating ──────────────────────────────────────────────────────────────
 
@@ -379,11 +379,11 @@ export default function ManufacturerProfileScreen() {
               </View>
               <View style={s.pricingItem}>
                 <Text style={s.pricingLabel}>Unit Price</Text>
-                <Text style={s.pricingValue}>{formatCents(m.unitPriceMinCents)}–{formatCents(m.unitPriceMaxCents)}</Text>
+                <Text style={s.pricingValue}>{formatMoney(m.unitPriceMinCents)}–{formatMoney(m.unitPriceMaxCents)}</Text>
               </View>
               <View style={s.pricingItem}>
                 <Text style={s.pricingLabel}>Sample Price</Text>
-                <Text style={s.pricingValue}>{formatCents(m.samplePriceMinCents)}–{formatCents(m.samplePriceMaxCents)}</Text>
+                <Text style={s.pricingValue}>{formatMoney(m.samplePriceMinCents)}–{formatMoney(m.samplePriceMaxCents)}</Text>
               </View>
               <View style={s.pricingItem}>
                 <Text style={s.pricingLabel}>Lead Time</Text>
@@ -431,7 +431,7 @@ export default function ManufacturerProfileScreen() {
                       )}
                       <Text style={s.catalogName} numberOfLines={2}>{product.name}</Text>
                       {from !== undefined && (
-                        <Text style={s.catalogPrice}>from {formatCents(from)}/unit</Text>
+                        <Text style={s.catalogPrice}>from {formatMoney(from)}/unit</Text>
                       )}
                       <Text style={s.catalogMeta}>MOQ {product.moq.toLocaleString('en-US')} · {product.leadTimeDays}d lead</Text>
                       {product.priceTiers.length > 0 && (
@@ -441,7 +441,7 @@ export default function ManufacturerProfileScreen() {
                               <Text style={s.tierMiniQty}>
                                 {tier.minQuantity}{tier.maxQuantity ? `–${tier.maxQuantity}` : '+'}
                               </Text>
-                              <Text style={s.tierMiniPrice}>{formatCents(tier.unitPriceCents)}</Text>
+                              <Text style={s.tierMiniPrice}>{formatMoney(tier.unitPriceCents)}</Text>
                             </View>
                           ))}
                         </View>
@@ -477,7 +477,7 @@ export default function ManufacturerProfileScreen() {
                     <Text style={s.reviewerName}>{review.sellerName}</Text>
                     <StarRating rating={review.rating} />
                   </View>
-                  <Text style={s.reviewDate}>{new Date(review.createdAt).toLocaleDateString()}</Text>
+                  <Text style={s.reviewDate}>{fmtRelativeDay(review.createdAt)}</Text>
                 </View>
                 {!!review.comment && <Text style={s.reviewComment}>{review.comment}</Text>}
                 <Text style={s.reviewBreakdown}>

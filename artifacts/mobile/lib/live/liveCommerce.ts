@@ -7,6 +7,7 @@
  * tests/live-commerce.test.ts.
  */
 import { serviceRequest } from '@/lib/serviceConfig';
+import { formatMoney } from '@/lib/format';
 
 type Row = Record<string, any>;
 
@@ -42,7 +43,7 @@ export interface LiveCode {
 export function describeLiveCode(c: Pick<LiveCode, 'type' | 'value'>): string {
   switch (c.type) {
     case 'percentage': return `${c.value}% off`;
-    case 'fixed': return `$${c.value.toFixed(2)} off`;
+    case 'fixed': return `${formatMoney(Math.round(c.value * 100))} off`;
     case 'free_shipping': return 'Free shipping';
     default: return 'Free item';
   }

@@ -11,7 +11,6 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
-import { formatCents } from '@/lib/money';
 import { EmptyState, PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Card, ProgressBar, SectionTitle } from '@/components/analytics/AnalyticsKit';
@@ -22,12 +21,13 @@ import {
   GOAL_METRICS, GOAL_PERIODS, createGoal, deleteGoal, getGoals, goalLabel, previewMode, updateGoal,
   type Goal, type GoalMetric, type GoalPeriod,
 } from '@/services/sellerInsightsService';
+import { formatMoney } from '@/lib/format';
 
 const STATUS_TEXT: Record<Goal['status'], string> = {
   achieved: 'Reached', on_track: 'On track', behind: 'Behind pace', not_started: 'Just started',
 };
 const PERIOD_TEXT: Record<GoalPeriod, string> = { week: 'this week', month: 'this month', quarter: 'this quarter', year: 'this year' };
-const fmt = (n: number, m: GoalMetric) => (m === 'revenue' ? formatCents(n) : n.toLocaleString());
+const fmt = (n: number, m: GoalMetric) => (m === 'revenue' ? formatMoney(n) : n.toLocaleString());
 
 function GoalCard({ goal, onEdit }: { goal: Goal; onEdit: () => void }) {
   const colors = useColors();

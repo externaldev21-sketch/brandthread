@@ -14,7 +14,6 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProductAnalytics, getFilterState } from '@/services/analyticsService';
-import { formatCents } from '@/lib/money';
 import { ProductAnalytics, ProductAnalyticsRow, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -22,6 +21,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
+import { formatMoney } from '@/lib/format';
 
 type SortKey = 'topByRevenue' | 'topByUnits';
 
@@ -65,7 +65,7 @@ function ProductRow({ p, rank }: { p: ProductAnalyticsRow; rank: number }) {
       <View style={{ flex: 1 }}>
         <Text style={s.prodName} numberOfLines={1}>{p.name}</Text>
         <View style={s.prodMeta}>
-          <Text style={s.prodStat}>{formatCents(p.revenueCents)}</Text>
+          <Text style={s.prodStat}>{formatMoney(p.revenueCents)}</Text>
           <Text style={s.dotSep}>·</Text>
           <Text style={s.prodStat}>{p.unitsSold} units</Text>
           {typeof p.conversionRate === 'number' && (
@@ -152,7 +152,7 @@ export default function AnalyticsProductsScreen() {
       <StatTileRow
         items={[
           { key: 'count', label: 'Products', value: String(rows.length) },
-          { key: 'rev', label: 'Total Revenue', value: formatCents(rows.reduce((a, b) => a + b.revenueCents, 0)) },
+          { key: 'rev', label: 'Total Revenue', value: formatMoney(rows.reduce((a, b) => a + b.revenueCents, 0)) },
           { key: 'units', label: 'Total Units', value: rows.reduce((a, b) => a + b.unitsSold, 0).toLocaleString() },
         ]}
       />

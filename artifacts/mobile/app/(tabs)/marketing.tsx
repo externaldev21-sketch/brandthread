@@ -11,13 +11,13 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { FS, FONT, SP, COMP, ICON } from '@/lib/theme';
 import { useApi } from '@/hooks/useApi';
-import { formatCents } from '@/lib/money';
 import type { AdCampaign } from '@/lib/api';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { ListRow } from '@/components/ui/ListRow';
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { formatMoney } from '@/lib/format';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -60,7 +60,7 @@ function campaignStatusLabel(s: AdCampaign['status']) {
 }
 
 function discountValueLabel(d: DiscountCode) {
-  return d.type === 'percentage' ? `${d.value}% off` : `${formatCents(d.value)} off`;
+  return d.type === 'percentage' ? `${d.value}% off` : `${formatMoney(d.value)} off`;
 }
 
 function discountExpiryLabel(d: DiscountCode) {
@@ -210,7 +210,7 @@ export default function MarketingScreen() {
                   <Badge label={campaignStatusLabel(c.status)} variant={campaignStatusVariant(c.status) as any} />
                 </View>
               </View>
-              <Text style={[styles.campaignRevenue, { color: colors.primary }]}>{formatCents(c.budgetCents)}</Text>
+              <Text style={[styles.campaignRevenue, { color: colors.primary }]}>{formatMoney(c.budgetCents)}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -278,7 +278,7 @@ export default function MarketingScreen() {
             {referrals == null
               ? 'Give $10, get $10 Thread Cash'
               : referrals.total > 0
-                ? `${referrals.total} ${referrals.total === 1 ? 'referral' : 'referrals'} · ${referrals.pointsEarned} pts${referrals.earnedCents > 0 ? ` · $${(referrals.earnedCents / 100).toFixed(0)} Thread Cash` : ''} earned`
+                ? `${referrals.total} ${referrals.total === 1 ? 'referral' : 'referrals'} · ${referrals.pointsEarned} pts${referrals.earnedCents > 0 ? ` · ${formatMoney(referrals.earnedCents)} Thread Cash` : ''} earned`
                 : 'No referrals yet'}
           </Text>
         </View>

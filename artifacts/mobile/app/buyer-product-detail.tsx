@@ -14,7 +14,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { formatCents } from '@/lib/money';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
@@ -99,6 +98,7 @@ import {
   URGENCY_UNITS_THRESHOLD,
   HIGH_DEMAND_THRESHOLD,
 } from '@/components/CommerceSignal';
+import { formatMoney } from '@/lib/format';
 
 function useChrome() {
   const colors = useColors();
@@ -175,7 +175,7 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const fmtPrice = formatCents;
+const fmtPrice = formatMoney;
 const GALLERY_WIDTH = Dimensions.get('window').width;
 // 3:4 — matches how product photos are now saved (cropped by the seller to
 // 3:4 at upload time; see ShopProductSheet's ProductImageCarousel, fixed the
@@ -1055,7 +1055,7 @@ export default function BuyerProductDetailScreen() {
           <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
           {/* Price */}
           <View style={s.priceRow}>
-            <Text style={[s.price, hasDiscount ? s.priceSale : undefined]}>{formatCents(variantPrice)}</Text>
+            <Text style={[s.price, hasDiscount ? s.priceSale : undefined]}>{formatMoney(variantPrice)}</Text>
             {hasDiscount && <Text style={s.comparePrice}>{fmtPrice(variantCompare!)}</Text>}
             {hasDiscount && <Text style={s.savings}>Save {fmtPrice(savingsAmt)}</Text>}
           </View>
@@ -1390,7 +1390,7 @@ export default function BuyerProductDetailScreen() {
             <View style={{ flex: 1 }}>
               <Text style={s.addedSheetProductName} numberOfLines={1}>{product.name}</Text>
               <Text style={s.addedSheetProductMeta}>
-                {formatCents(variantPrice)}{qty > 1 ? ` · Qty ${qty}` : ''}
+                {formatMoney(variantPrice)}{qty > 1 ? ` · Qty ${qty}` : ''}
               </Text>
             </View>
           </View>
@@ -1792,7 +1792,7 @@ function RelatedProducts({ productId, dividerStyle, headerStyle }: {
             <Text style={{ fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 }} numberOfLines={1}>
               {p.sellerDisplayName || 'Independent Seller'}
             </Text>
-            <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginTop: 4 }}>{formatCents(lowestPriceCents)}</Text>
+            <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginTop: 4 }}>{formatMoney(lowestPriceCents)}</Text>
           </TouchableOpacity>
         );
       })}

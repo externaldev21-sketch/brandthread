@@ -10,6 +10,7 @@
  */
 
 import { storyMentionViewerHref } from './storyMentionsRail';
+import { fmtRelativeDay } from './format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -83,9 +84,9 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
 /**
- * Shared relative-time formatter. The default style matches the notifications
- * screen ("5m ago", "3h ago", then a date after a week); `compact` matches the
- * inbox lists ("5m", "3h", "2d", "3w").
+ * Shared relative-time formatter. The default style is the app's voice
+ * (fmtRelativeDay): "now", "5m", "3h", "Yesterday", "Mar 4"; `compact`
+ * matches the inbox lists ("now", "5m", "3h", "2d", "3w").
  */
 export function relativeTime(
   date: string | number | Date,
@@ -95,17 +96,16 @@ export function relativeTime(
   const then = new Date(date).getTime();
   const current = typeof now === 'number' ? now : now.getTime();
   if (!Number.isFinite(then)) return '';
+  if (!options.compact) return fmtRelativeDay(Math.min(then, current), current);
   const diff = Math.max(0, current - then);
   const mins = Math.floor(diff / MINUTE);
-  const suffix = options.compact ? '' : ' ago';
-  if (mins < 1) return options.compact ? 'now' : 'just now';
-  if (mins < 60) return `${mins}m${suffix}`;
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h${suffix}`;
+  if (hrs < 24) return `${hrs}h`;
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d${suffix}`;
-  if (options.compact) return `${Math.floor(days / 7)}w`;
-  return new Date(then).toLocaleDateString();
+  if (days < 7) return `${days}d`;
+  return `${Math.floor(days / 7)}w`;
 }
 
 // ─── Recency sections ─────────────────────────────────────────────────────────
