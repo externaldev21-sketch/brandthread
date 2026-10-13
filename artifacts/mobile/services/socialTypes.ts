@@ -553,6 +553,7 @@ export type NotificationType =
   | 'price_drop' | 'saved_product_update'
   | 'bag_restock' | 'size_back'
   | 'new_friend_message' | 'new_seller_reply' | 'new_order_message' | 'message_request'
+  | 'digest' | 'order_anniversary'
   | 'system' | 'marketing';
 
 export interface Notification {

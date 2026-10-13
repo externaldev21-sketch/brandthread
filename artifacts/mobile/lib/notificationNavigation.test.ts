@@ -275,3 +275,14 @@ describe('notification response navigation', () => {
     expect(router.push).toHaveBeenCalledWith('/order-detail?id=ord-9');
   });
 });
+
+describe('retention push navigation', () => {
+  it('opens Home on Following for the weekly digest and the brand profile for an anniversary', () => {
+    const router = { push: vi.fn() };
+    const handle = createNotificationResponseHandler(router);
+    handle(targetResponse('wd-1', { type: 'digest', targetType: 'following_feed' }));
+    handle(targetResponse('oa-1', { type: 'order_anniversary', targetType: 'user', targetId: 'seller 1' }));
+    expect(router.push).toHaveBeenNthCalledWith(1, '/(buyer)?tab=following');
+    expect(router.push).toHaveBeenNthCalledWith(2, '/buyer-other-profile?userId=seller%201');
+  });
+});

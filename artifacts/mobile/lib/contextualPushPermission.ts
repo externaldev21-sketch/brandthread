@@ -45,10 +45,8 @@ async function isOnboardedUser(userId: string): Promise<boolean> {
 
 async function registerToken(api: PushApi): Promise<void> {
   const token = await Notifications.getExpoPushTokenAsync();
-  await api.push.register({ token: token.data, platform: Platform.OS, accountIds: signedInAccountIds });
-  // The device zone keeps quiet hours on local time (and follows travel).
   const timezone = deviceTimeZone();
-  await api.push.register({ token: token.data, platform: 'expo', ...(timezone ? { timezone } : {}) });
+  await api.push.register({token: token.data, platform: 'expo', ...(signedInAccountIds.length ? {accountIds: signedInAccountIds} : {}), ...(timezone ? {timezone} : {})});
 }
 
 /**

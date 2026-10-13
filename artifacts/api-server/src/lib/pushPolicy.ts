@@ -23,6 +23,7 @@ export const PROMOTIONAL_PUSH_TYPES: ReadonlySet<string> = new Set([
   "promotion",
   "marketing",
   "digest",
+  "order_anniversary", // "One year ago today" brand nudge (jobs/orderAnniversary.ts)
   "offer",
 ]);
 

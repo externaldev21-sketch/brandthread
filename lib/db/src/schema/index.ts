@@ -11,6 +11,7 @@ export * from './restockAlerts';
 export * from './security';
 export * from './realtime';
 export * from './sellerWinback';
+export * from './retentionPushes';
 export * from './money';
 export * from './sellerPayouts';
 export * from './productLaunches';
@@ -237,6 +238,9 @@ export const users = pgTable('users', {
   smsOrderUpdates: boolean('sms_order_updates').notNull().default(false),
   smsOptedInAt:    timestamp('sms_opted_in_at', { withTimezone: true }),
   smsOptedOutAt:   timestamp('sms_opted_out_at', { withTimezone: true }),
+  // Device IANA timezone (e.g. 'Europe/London'), reported with the push token
+  // (POST /api/push/register, migration 532). Null until a device reports it.
+  timezone: text('timezone'),
   // A tombstone is retained after an account erasure request.  Keeping the
   // Clerk subject prevents a delayed client sync from creating a fresh profile.
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

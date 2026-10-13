@@ -18,12 +18,13 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
-import { requestContextualPushPermission } from './contextualPushPermission';
+import { requestContextualPushPermission, registerGrantedPushToken } from './contextualPushPermission';
 import { registerPushPrePrompt } from './pushPrePrompt';
 
 const api = { push: { register: vi.fn(async () => ({})) } };
 
 describe('requestContextualPushPermission', () => {
+import {deviceTimeZone} from './deviceTimeZone';
   beforeEach(() => {
     store.clear();
     store.set('onboarding_complete', 'true');
@@ -78,5 +79,20 @@ describe('requestContextualPushPermission', () => {
     await requestContextualPushPermission('user_1', api, 'follow');
     off();
     expect(sheet).not.toHaveBeenCalled();
+  });
+
+  it("sends the device's IANA timezone with the token", async () => {
+    const register = vi.fn(async () => ({}));
+    await registerGrantedPushToken('user_1', { push: { register } });
+    expect(register).toHaveBeenCalledWith({
+      token: 'ExponentPushToken[x]',
+      platform: 'expo',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+  });
+
+  it('reads a non-empty timezone name', () => {
+    expect(typeof deviceTimeZone()).toBe('string');
+    expect(deviceTimeZone()).not.toBe('');
   });
 });

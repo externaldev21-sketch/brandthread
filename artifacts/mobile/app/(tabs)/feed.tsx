@@ -21,7 +21,7 @@ import { FontAwesome } from '@expo/vector-icons';
 
 import { Icon } from '@/components/ui/Icon';
 
-import { useRouter, useIsFocused, useScrollToTop } from 'expo-router';
+import { useRouter, useIsFocused, useScrollToTop, useLocalSearchParams } from 'expo-router';
 
 import { useReportSheet } from '@/components/safety/ReportSheet';
 
@@ -2381,6 +2381,15 @@ export default function FeedScreen({
   const [showNotifs, setShowNotifs] = useState(false);
   const [showRepostEducation, setShowRepostEducation] = useState(false);
   const [feedTab, setFeedTab] = useState<'following' | 'for-you'>('for-you');
+  // `?tab=following` (the weekly followed-brands digest push) opens Home on
+  // Following. Cleared once applied so the next push can select it again.
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
+  useEffect(() => {
+    if (creatorFeed || tabParam !== 'following') return;
+    setFeedTab('following');
+    router.setParams({ tab: undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabParam]);
   // Following|Threads content cross-fade: a soft 150ms dissolve on the
   // list's own opacity when the tab (and therefore its underlying data)
   // changes, instead of the new content just popping in. Gated by

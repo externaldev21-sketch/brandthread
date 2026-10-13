@@ -68,7 +68,7 @@ router.post("/register", requireAuth, validateBody(registerPushBody), async (req
 
   if (timezone !== undefined) {
     try {
-      await db.update(users).set({ quietHoursTimezone: timezone }).where(eq(users.clerkId, userId));
+      await db.update(users).set({ quietHoursTimezone: timezone, timezone: timezone as string }).where(eq(users.clerkId, userId));
     } catch (err) {
       // The token is registered; a missed timezone refresh retries next launch.
       logger.warn({ err }, "Could not store device timezone");

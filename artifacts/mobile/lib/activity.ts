@@ -554,6 +554,8 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'size_back':
     case 'product_restocked': return 'refresh-cw';
     case 'new_product': return 'star';
+    case 'digest': return 'layers';
+    case 'order_anniversary': return 'calendar';
     case 'new_order_received': return 'shopping-bag';
     case 'payout_sent': return 'dollar-sign';
     case 'low_stock': return 'alert-triangle';
@@ -668,6 +670,8 @@ const SELLER_SETUP_ROUTES = new Set(['/add-product', '/payouts', '/launch-publis
 export function sellerSetupHref(route: string | null | undefined): string | null {
   return route && SELLER_SETUP_ROUTES.has(route) ? route : null;
 }
+/** Home with its Following tab selected (app/(tabs)/feed.tsx reads `tab`). */
+export const FOLLOWING_FEED_HREF = '/(buyer)?tab=following';
 
 /**
  * Where tapping a row goes, or null when there is nowhere useful to go.
@@ -773,6 +777,9 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return sellerSetupHref(id);
     case 'subscription_invoice':
       return '/subscription';
+    case 'following_feed':
+      // Weekly "This week from brands you follow" digest.
+      return FOLLOWING_FEED_HREF;
     default:
       break;
   }
