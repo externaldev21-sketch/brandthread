@@ -440,7 +440,7 @@ export default function QuoteRequestScreen() {
         })}
 
         <FormInput
-          label="Product name *"
+          label="Product name"
           value={productName}
           onChange={setProductName}
           placeholder="e.g. Classic Heavyweight Hoodie"
@@ -454,11 +454,11 @@ export default function QuoteRequestScreen() {
       <View style={sc.stepContent}>
         <Text style={sc.stepHeadline}>Production details</Text>
 
-        <FormInput label="Quantity *" value={quantity} onChange={setQuantity}
+        <FormInput label="Quantity" value={quantity} onChange={setQuantity}
           placeholder="e.g. 500" keyboardType="numeric" />
 
-        <FormInput label="Target unit price ($)" value={targetUnitPrice} onChange={setTargetUnitPrice}
-          placeholder="e.g. 18.00" keyboardType="decimal-pad" />
+        <FormInput label="Target unit price" optional price value={targetUnitPrice} onChange={setTargetUnitPrice}
+          placeholder="e.g. 18.00" />
 
         <FormInput label="Needed by date (YYYY-MM-DD)" value={neededByDate} onChange={setNeededByDate}
           placeholder="e.g. 2025-06-01" />

@@ -35,6 +35,8 @@ import {
   BrandedLoadingState, HapticSwitch,} from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { formatCents, integerPercent, parseDecimalToCents } from '@/lib/money';
+import { displayPriceInput, sanitizePriceInput } from '@/lib/priceInput';
+import { KeyboardStickyFooter } from '@/components/KeyboardStickyFooter';
 import { radius } from '@/constants/radii';
 
 function centsToDecimalInput(cents: number | undefined): string {
@@ -196,8 +198,10 @@ export default function ProductBundleEditScreen() {
       />
 
       <ScrollView
-        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[s.content, { paddingBottom: SP.xl }]}
         showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
       >
         {/* Details */}
         <Text style={s.sectionTitle}>Bundle details</Text>
@@ -227,8 +231,8 @@ export default function ProductBundleEditScreen() {
           <Text style={s.dollarSign}>$</Text>
           <TextInput returnKeyType="done"
             style={s.priceInput}
-            value={priceStr}
-            onChangeText={setPriceStr}
+            value={displayPriceInput(priceStr)}
+            onChangeText={t => setPriceStr(sanitizePriceInput(t))}
             placeholder="0.00"
             placeholderTextColor={SUBTLE}
             keyboardType="decimal-pad"
@@ -337,14 +341,6 @@ export default function ProductBundleEditScreen() {
           </View>
         )}
 
-        {/* Actions */}
-        <PrimaryButton
-          label={saving ? 'Saving…' : isNew ? 'Create bundle' : 'Save changes'}
-          onPress={save}
-          loading={saving}
-          disabled={saving}
-          style={{ marginTop: SP.xl }}
-        />
         {!isNew && (
           <TouchableOpacity style={s.deleteBtn} onPress={deleteBundle} disabled={deleting} activeOpacity={0.7}>
             {deleting
@@ -354,6 +350,14 @@ export default function ProductBundleEditScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
+      <KeyboardStickyFooter testID="bundle-save-footer">
+        <PrimaryButton
+          label={saving ? 'Saving…' : isNew ? 'Create Bundle' : 'Save Changes'}
+          onPress={save}
+          loading={saving}
+          disabled={saving}
+        />
+      </KeyboardStickyFooter>
     </View>
   );
 }

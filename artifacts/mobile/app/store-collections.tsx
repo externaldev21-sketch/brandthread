@@ -350,7 +350,7 @@ export default function StoreCollectionsScreen() {
 
         {/* 2. Name */}
         <View style={styles.formSection}>
-          <Text style={styles.fieldLabel}>Name *</Text>
+          <Text style={styles.fieldLabel}>Name</Text>
           <TextInput returnKeyType="done"
             style={styles.textInput}
             value={form.name}
@@ -362,7 +362,7 @@ export default function StoreCollectionsScreen() {
 
         {/* 3. Description */}
         <View style={styles.formSection}>
-          <Text style={styles.fieldLabel}>Description</Text>
+          <Text style={styles.fieldLabel}>Description (optional)</Text>
           <TextInput
             style={[styles.textInput, styles.multilineInput]}
             value={form.description}

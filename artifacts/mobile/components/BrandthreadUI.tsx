@@ -31,6 +31,7 @@ import { useColors } from '@/hooks/useColors';
 import { haptics } from '@/lib/haptics';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { undoExpiresAt } from '@/lib/undoRecovery';
+import { displayPriceInput, finishPriceInput, sanitizePriceInput } from '@/lib/priceInput';
 import { PRESS_SCALE, PRESS_DURATION_MS } from '@/constants/motion';
 import { useSettled } from '@/lib/animationUtils';
 import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
@@ -1094,29 +1095,52 @@ interface FormInputProps {
   error?: string | null;
   /** Quiet helper text under the field (replaced by `error` when both are set). */
   helper?: string;
+  /** Marks the field "(optional)" after its label. Required fields carry no
+   *  marker (no asterisks) — Depop's "Sell an item" pattern. */
+  optional?: boolean;
+  /** Field-level check. Its message appears only once the field is left
+   *  (blur), never while typing the first time; after that it re-checks on
+   *  every change so it clears the moment the value is fixed. `error`
+   *  (screen-level, e.g. on submit) still wins when set. */
+  validate?: (value: string) => string | null | undefined;
+  /** Money field: "$" prefix, decimal keypad, thousands grouped as you
+   *  type, padded to cents on blur. `value` / `onChange` stay the raw
+   *  string without commas ("1250.5"), so existing parsing is unchanged. */
+  price?: boolean;
 }
 
 export function FormInput({
   label, value, onChange, placeholder, multiline, secureTextEntry, keyboardType,
   returnKeyType, onSubmitEditing, style, rightElement, error, helper,
-  autoComplete, textContentType, autoCapitalize,
+  autoComplete, textContentType, autoCapitalize, optional, validate, price,
 }: FormInputProps) {
   const [focused, setFocused] = useState(false);
+  const [touched, setTouched] = useState(false);
+  // Pad to cents on blur only after typing in this field, so just tapping
+  // through an untouched price never marks a form as edited.
+  const typedRef = useRef(false);
   const isEmail = keyboardType === 'email-address';
   const { theme } = useAppTheme();
+  const shownError = error || (touched && validate ? validate(value) : null) || null;
   return (
     <View style={[fiS.wrap, style]}>
-      {label && <Text style={[fiS.label, { color: theme.muted }]}>{label}</Text>}
-      <View style={[fiS.inputRow, focused && [fiS.focusedRow, { borderColor: theme.accent }], !!error && { borderColor: theme.error }, multiline && fiS.multilineRow]}>
+      {label && (
+        <Text style={[fiS.label, { color: theme.muted }]}>
+          {label}
+          {optional ? <Text style={fiS.optional}> (optional)</Text> : null}
+        </Text>
+      )}
+      <View style={[fiS.inputRow, focused && [fiS.focusedRow, { borderColor: theme.accent }], !!shownError && { borderColor: theme.error }, multiline && fiS.multilineRow]}>
+        {price ? <Text style={[fiS.input, fiS.pricePrefix, { color: value ? theme.text : SUBTLE }]}>$</Text> : null}
         <TextInput
           style={[fiS.input, { color: theme.text }, multiline && fiS.multilineInput, WEB_INPUT_RESET]}
-          value={value}
-          onChangeText={onChange}
-          placeholder={placeholder}
+          value={price ? displayPriceInput(value) : value}
+          onChangeText={price ? (text) => { typedRef.current = true; onChange(sanitizePriceInput(text)); } : onChange}
+          placeholder={placeholder ?? (price ? '0.00' : undefined)}
           placeholderTextColor={SUBTLE}
           multiline={multiline}
           secureTextEntry={secureTextEntry}
-          keyboardType={keyboardType}
+          keyboardType={keyboardType ?? (price ? 'decimal-pad' : undefined)}
           returnKeyType={returnKeyType ?? (multiline ? undefined : 'done')}
           onSubmitEditing={onSubmitEditing}
           autoComplete={autoComplete ?? (isEmail ? 'email' : undefined)}
@@ -1124,12 +1148,20 @@ export function FormInput({
           autoCapitalize={autoCapitalize ?? (isEmail || keyboardType === 'url' ? 'none' : undefined)}
           accessibilityLabel={label ?? placeholder}
           onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          onBlur={() => {
+            setFocused(false);
+            setTouched(true);
+            if (price && typedRef.current) {
+              typedRef.current = false;
+              const finished = finishPriceInput(value);
+              if (finished !== value) onChange(finished);
+            }
+          }}
         />
         {rightElement}
       </View>
-      {error ? (
-        <Text style={[fiS.note, { color: theme.error }]} accessibilityLiveRegion="polite">{error}</Text>
+      {shownError ? (
+        <Text style={[fiS.note, { color: theme.error }]} accessibilityLiveRegion="polite">{shownError}</Text>
       ) : helper ? (
         <Text style={[fiS.note, { color: theme.muted }]}>{helper}</Text>
       ) : null}
@@ -1141,6 +1173,8 @@ const fiS = StyleSheet.create({
   wrap:         { gap: SP.sm },
   label:        { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
   note:         { fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 18 },
+  optional:     { fontFamily: FONT.regular },
+  pricePrefix:  { flex: 0 },
   // Solid near-black fill, no resting border (Dev's addendum); the border
   // only appears for focus/error.
   inputRow:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: FILL_ELEVATED,

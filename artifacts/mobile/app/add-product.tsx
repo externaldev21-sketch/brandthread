@@ -53,6 +53,7 @@ import { Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES, SIZE_PRESET
 
 import { calcPricing, generateVariantCombinations, buildVariantTitle, validateForPublish, applyBulkEditToVariants } from '@/lib/productUtils';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
+import { displayPriceInput, sanitizePriceInput } from '@/lib/priceInput';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter, completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { confirmChoice } from '@/lib/confirmChoice';
@@ -1144,14 +1145,23 @@ export default function AddProductScreen() {
       Alert.alert('Permission required', 'Please allow access to your photo library in Settings.');
       return;
     }
+    const existingMedia = draftData.media ?? [];
+    const room = Math.max(0, 10 - existingMedia.length);
+    if (room === 0) {
+      Alert.alert('10 photos max', 'Remove a photo to add another.');
+      return;
+    }
+    // The system picker itself stops at the photos left (no silent
+    // drop after picking) and numbers each pick, so the order you tap
+    // is the order they're added in (Depop / Instagram multi-select).
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
+      selectionLimit: room,
+      orderedSelection: true,
       quality: 0.9,
     });
     if (result.canceled || result.assets.length === 0) return;
-    const existingMedia = draftData.media ?? [];
-    const room = Math.max(0, 10 - existingMedia.length);
     const assets = result.assets.slice(0, room);
     const newItems: ProductMedia[] = assets.map((a, i) => ({
       id: `${Date.now()}-${i}`,
@@ -1445,18 +1455,20 @@ export default function AddProductScreen() {
       <>
       <View style={s.priceRow}>
         <FormInput
-          label="Price *"
+          label="Price"
+          price
           value={priceStr}
-          onChange={v => updateUnsavedState(setPriceStr, sanitizeMoneyInput(v))}
-          placeholder="0.00"
+          onChange={v => updateUnsavedState(setPriceStr, sanitizePriceInput(v))}
           keyboardType="decimal-pad"
+          validate={v => (parseFloat(v) > 0 ? null : 'Add a price')}
           style={{ flex: 1 }}
         />
         <FormInput
           label="Compare-at price"
+          optional
+          price
           value={compareAtStr}
-          onChange={v => updateUnsavedState(setCompareAtStr, sanitizeMoneyInput(v))}
-          placeholder="0.00"
+          onChange={v => updateUnsavedState(setCompareAtStr, sanitizePriceInput(v))}
           keyboardType="decimal-pad"
           style={{ flex: 1 }}
         />
@@ -1478,21 +1490,21 @@ export default function AddProductScreen() {
           value={costStr}
           onChange={v => updateUnsavedState(setCostStr, sanitizeMoneyInput(v))}
           placeholder="What it costs to make"
-          keyboardType="decimal-pad"
+          price
         />
         <FormInput
           label="Est. shipping cost"
           value={shippingStr}
           onChange={v => updateUnsavedState(setShippingStr, sanitizeMoneyInput(v))}
           placeholder="per unit"
-          keyboardType="decimal-pad"
+          price
         />
         <FormInput
           label="Est. fees"
           value={feesStr}
           onChange={v => updateUnsavedState(setFeesStr, sanitizeMoneyInput(v))}
           placeholder="Platform + payment fees"
-          keyboardType="decimal-pad"
+          price
         />
         <GradientCard glow style={s.pricingCard}>
           <Text style={s.pricingTitle}>Pricing Summary</Text>
@@ -1766,8 +1778,8 @@ export default function AddProductScreen() {
                 <View style={s.variantFields}>
                   <TextInput
                     style={s.variantInput}
-                    value={bulkPrice}
-                    onChangeText={txt => setBulkPrice(sanitizeMoneyInput(txt))}
+                    value={displayPriceInput(bulkPrice)}
+                    onChangeText={txt => setBulkPrice(sanitizePriceInput(txt))}
                     placeholder="Set price for selected"
                     placeholderTextColor={SUBTLE}
                     keyboardType="decimal-pad"
@@ -1833,8 +1845,8 @@ export default function AddProductScreen() {
                   />
                   <TextInput
                     style={[s.variantInput, { flex: 0.9 }]}
-                    value={v.price}
-                    onChangeText={txt => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === v.id ? { ...x, price: sanitizeMoneyInput(txt) } : x))}
+                    value={displayPriceInput(v.price)}
+                    onChangeText={txt => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === v.id ? { ...x, price: sanitizePriceInput(txt) } : x))}
                     placeholder="Price"
                     placeholderTextColor={SUBTLE}
                     keyboardType="decimal-pad"
@@ -2005,7 +2017,7 @@ export default function AddProductScreen() {
         )}
         {mfgMode === 'quote' && (
           <>
-            <FormInput label="Target cost per unit" value={targetCost} onChange={v => updateUnsavedState(setTargetCost, sanitizeMoneyInput(v))} placeholder="0.00" keyboardType="decimal-pad" />
+            <FormInput label="Target cost per unit" value={targetCost} onChange={v => updateUnsavedState(setTargetCost, v)} price />
             <FormInput label="Required quantity" value={reqQty} onChange={v => updateUnsavedState(setReqQty, v)} placeholder="50" keyboardType="numeric" />
             <NativeDateTimeField mode="date" label="Production deadline" value={ymdToDate(prodDeadline)} onChange={d => updateUnsavedState(setProdDeadline, dateToYmd(d))} onClear={() => updateUnsavedState<string>(setProdDeadline, '')} minimumDate={startOfToday()} />
             <SecondaryButton label="Upload tech pack" onPress={() => Alert.alert('Tech Pack', 'Tech pack upload will be available in the next release.')} icon="upload" disabled />

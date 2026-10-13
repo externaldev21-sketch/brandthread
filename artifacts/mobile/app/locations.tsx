@@ -257,13 +257,13 @@ export default function LocationsScreen() {
         primaryAction={{ label: 'Save location', onPress: () => { void handleSave(); }, loading: saving, disabled: saving }}
       >
             {[
-              { label: 'Location name *', key: 'name', placeholder: 'e.g. Main Warehouse' },
-              { label: 'Address', key: 'address', placeholder: '123 Example St' },
-              { label: 'City', key: 'city', placeholder: 'Los Angeles' },
-              { label: 'State / Province', key: 'state', placeholder: 'CA' },
-              { label: 'ZIP / Postal code', key: 'zip', placeholder: '90001' },
-              { label: 'Country', key: 'country', placeholder: 'US' },
-              { label: 'Phone', key: 'phone', placeholder: '+1 555 000 0000' },
+              { label: 'Location name', key: 'name', placeholder: 'e.g. Main Warehouse' },
+              { label: 'Address (optional)', key: 'address', placeholder: '123 Example St' },
+              { label: 'City (optional)', key: 'city', placeholder: 'Los Angeles' },
+              { label: 'State / Province (optional)', key: 'state', placeholder: 'CA' },
+              { label: 'ZIP / Postal code (optional)', key: 'zip', placeholder: '90001' },
+              { label: 'Country (optional)', key: 'country', placeholder: 'US' },
+              { label: 'Phone (optional)', key: 'phone', placeholder: '+1 555 000 0000' },
             ].map(({ label, key, placeholder }) => (
               <View key={key} style={s.formField}>
                 <Text style={[s.formLabel, { color: colors.mutedForeground }]}>{label}</Text>

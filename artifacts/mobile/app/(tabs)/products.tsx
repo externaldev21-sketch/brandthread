@@ -294,10 +294,9 @@ function QuickEditPriceSheet({ product, visible, onClose, onSaved }: QuickEditPr
         </Text>
         <FormInput
           label="New price"
+          price
           value={priceInput}
           onChange={setPriceInput}
-          placeholder="0.00"
-          keyboardType="decimal-pad"
           returnKeyType="done"
           onSubmitEditing={handleSave}
         />

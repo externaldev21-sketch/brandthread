@@ -392,7 +392,7 @@ export default function StoreNavScreen() {
 
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {/* Label */}
-              <Text style={styles.fieldLabel}>Label *</Text>
+              <Text style={styles.fieldLabel}>Label</Text>
               <TextInput returnKeyType="done"
                 style={styles.textInput}
                 value={itemForm.label}
