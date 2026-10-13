@@ -142,7 +142,8 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByLabel('Password', { exact: true }).fill(id.password);
       await page.getByLabel('Confirm password', { exact: true }).fill(id.password);
       await page.getByTestId('onboarding-username-input').fill(id.username);
-      await page.getByTestId('legal-consent-line').waitFor({ timeout: 5_000 });
+      await page.getByTestId('onboarding-dob-input').fill('01/15/1995');
+      await page.getByTestId('legal-consent-checkbox').click();
       await shot('sign-up-form');
       await page.getByRole('button', { name: 'Create account', exact: true }).click();
     });
@@ -169,6 +170,14 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByRole('button', { name: 'Continue', exact: true }).click();
     });
 
+    await report.step('sizes (optional)', async () => {
+      await page.waitForTimeout(1500);
+      await shot('sizes');
+      const skip = page.getByRole('button', { name: /skip/i });
+      if (await skip.count()) await skip.first().click();
+      else await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    });
+
     await report.step('brands to follow', async () => {
       await page.getByText('Follow a few', { exact: false }).waitFor({ timeout: 10_000 });
       await shot('brands-to-follow');
@@ -186,10 +195,11 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByTestId('onboarding-notifications-skip').click();
     });
 
-    await report.step('success screen', async () => {
-      await page.getByText('Welcome to', { exact: false }).waitFor({ timeout: 10_000 });
-      await shot('success');
-      await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
+    await report.step('feed preview finale', async () => {
+      await page.getByText('Your feed is ready', { exact: true }).waitFor({ timeout: 10_000 });
+      await page.waitForTimeout(1500);
+      await shot('feed-preview');
+      await page.getByRole('button', { name: 'See my feed', exact: true }).click();
     });
 
     await report.step('lands on thread explainer', async () => {
@@ -259,7 +269,8 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByLabel('Password', { exact: true }).fill(id.password);
       await page.getByLabel('Confirm password', { exact: true }).fill(id.password);
       await page.getByTestId('onboarding-username-input').fill(id.username);
-      await page.getByTestId('legal-consent-line').waitFor({ timeout: 5_000 });
+      await page.getByTestId('onboarding-dob-input').fill('01/15/1995');
+      await page.getByTestId('legal-consent-checkbox').click();
       await shot('sign-up-form');
       await page.getByRole('button', { name: 'Create account', exact: true }).click();
     });

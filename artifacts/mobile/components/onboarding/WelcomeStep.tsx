@@ -10,12 +10,13 @@
  * frame instead of playing.
  */
 import React, { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PillButton } from './OnboardingUI';
 import { SPACE, TYPE, useOnboardingMotion } from './onboardingTokens';
@@ -24,7 +25,7 @@ const WELCOME_VIDEO = require('../../assets/videos/fashion_runway_02.mp4');
 const WELCOME_POSTER = require('../../assets/videos/fashion_runway_02.jpg');
 
 /** Share of the screen the footage takes; the rest is the black CTA panel. */
-const VIDEO_SHARE = 0.6;
+const VIDEO_SHARE = 0.55;
 
 export function WelcomeStep({
   onGetStarted,
@@ -95,14 +96,9 @@ function WelcomeFootage({ play }: { play: boolean }) {
     p.loop = true;
     p.muted = true;
   });
+  // Poster stays until a real frame is on screen — "playing" can fire
+  // before a clip actually decodes.
   const [started, setStarted] = useState(false);
-
-  useEffect(() => {
-    const sub = player.addListener('playingChange', ({ isPlaying }) => {
-      if (isPlaying) setStarted(true);
-    });
-    return () => sub.remove();
-  }, [player]);
 
   useEffect(() => {
     if (play) player.play();
@@ -117,9 +113,10 @@ function WelcomeFootage({ play }: { play: boolean }) {
         contentFit="cover"
         nativeControls={false}
         accessible={false}
+        onFirstFrameRender={() => setStarted(true)}
       />
       {/* Poster until the first frame plays (and for Reduce Motion). */}
-      {!started ? <Image source={WELCOME_POSTER} style={StyleSheet.absoluteFill} resizeMode="cover" accessible={false} /> : null}
+      {!started ? <CachedImage source={WELCOME_POSTER} style={StyleSheet.absoluteFill} contentFit="cover" accessible={false} /> : null}
     </>
   );
 }
