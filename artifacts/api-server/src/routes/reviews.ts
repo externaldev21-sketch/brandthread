@@ -152,7 +152,9 @@ router.get("/seller/:sellerId", async (req, res) => {
   const rows = await db
     .select()
     .from(reviews)
-    .where(eq(reviews.sellerId, canonicalClerkId))
+    // Reviews by someone the viewer blocked (or who blocked them) stay hidden,
+    // same as the product reviews list above.
+    .where(and(eq(reviews.sellerId, canonicalClerkId), notBlockedWith(optionalViewerId(req), reviews.buyerId)))
     .orderBy(desc(reviews.createdAt))
     .limit(50);
 

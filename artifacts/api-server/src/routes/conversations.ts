@@ -28,7 +28,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { cappedUnknown, jsonList, jsonValue, looseBody, optBoolish, optNumberish, optText, validateBody } from "../middlewares/bodySchemas";
 import { rateLimit } from "../middlewares/rateLimit";
 import { moderateMessage } from "../lib/contentModerator";
-import { blockRelation, publishingRestriction } from "../lib/safety";
+import { blockRelation, oneToOneNotBlockedWith, publishingRestriction } from "../lib/safety";
 import { publishNotification } from "./notifications-feed";
 import { emitToUsers } from "../ws/messagesHub";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
@@ -325,18 +325,9 @@ router.get("/", async (req, res) => {
     .innerJoin(conversations, eq(conversations.id, conversationParticipants.conversationId))
     .where(and(
       eq(conversationParticipants.userId, userId),
-      // Delete-for-me: hidden until a new message arrives (migration 131).
       sql`${conversationParticipants.hiddenAt} IS NULL`,
-      // A 1:1 thread with someone blocked (either way) leaves the inbox; it
-      // comes back on unblock. Group threads stay (the send gate handles them).
-      sql`NOT EXISTS (
-        SELECT 1 FROM conversation_participants other
-        JOIN blocks b ON (b.blocker_id = ${userId} AND b.blocked_id = other.user_id)
-                      OR (b.blocker_id = other.user_id AND b.blocked_id = ${userId})
-        WHERE other.conversation_id = ${conversationParticipants.conversationId}
-          AND other.user_id <> ${userId}
-          AND (SELECT count(*) FROM conversation_participants c2 WHERE c2.conversation_id = ${conversationParticipants.conversationId}) = 2
-      )`,
+      // Blocked either way: the 1:1 thread leaves both inboxes (Instagram).
+      oneToOneNotBlockedWith(userId, conversations.id, conversations.type),
     ))
     .orderBy(desc(conversations.updatedAt))
     .limit(limit)
