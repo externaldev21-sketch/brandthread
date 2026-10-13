@@ -59,6 +59,7 @@ import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
 import { BundlePricingError, linesAfterBundles } from "../lib/money/bundlePricing";
 import { priceGroupBundles } from "../lib/money/bundleLoader";
 import { CHECKOUT_PAUSED_ERROR, isThreadCashPaused } from "../lib/threadCash/killSwitch";
+import { emptyMysteryBoxVariants } from "../lib/mysteryBox";
 
 import { liveStreamIdFromItems, resolveLiveAttribution } from "../lib/liveAttribution";
 const router = Router();
@@ -411,7 +412,7 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
   const issues: Array<{
     itemId: string; productName: string;
     type: "unavailable" | "price_changed" | "inventory_changed";
-    message: string; oldValue?: number; newValue?: number; canContinue: boolean;
+    message: string; oldValue?: number; newValue?: number; canContinue: boolean; code?: "MYSTERY_BOX_EMPTY";
   }> = [];
   const sellerIds = new Set<string>();
   let subtotalCents = 0;
@@ -454,6 +455,11 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
           ? `Only ${row.stock} of ${row.productName} remain.`
           : `${row.productName} is now out of stock.`,
         oldValue: quantity, newValue: row.stock, canContinue: false,
+      });
+    } else if ((await emptyMysteryBoxVariants(db, [row.variantId])).length > 0) {
+      issues.push({
+        itemId, productName: row.productName, type: "unavailable", code: "MYSTERY_BOX_EMPTY",
+        message: `${row.productName} is sold out.`, canContinue: false,
       });
     }
     const currentPrice = row.priceCents / 100;
@@ -694,6 +700,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       }
       if (row.stock < qty) {
         res.status(400).json({ error: `Insufficient stock for ${row.productName}` });
+        return;
+      }
+      if ((await emptyMysteryBoxVariants(db, [row.variantId])).length > 0) {
+        res.status(409).json({ error: `${row.productName} is sold out.`, code: "MYSTERY_BOX_EMPTY", variantId: row.variantId });
         return;
       }
 

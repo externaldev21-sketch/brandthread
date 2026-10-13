@@ -209,6 +209,7 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
     ...(canManageFit ? [
       { label: 'Complete the fit', icon: 'layers' as const, onPress: () => { closeSheet(); router.push(('/product-pairings?productId=' + p.id) as never); } },
       { label: 'Product video', icon: 'film' as const, onPress: () => { closeSheet(); router.push(('/product-video?productId=' + p.id) as never); } },
+      { label: 'Make this a mystery box', icon: 'gift' as const, onPress: () => { closeSheet(); router.push(('/mystery-box-edit?productId=' + p.id) as never); } },
     ] : []),
     { label: 'Schedule launch', icon: 'clock', onPress: () => { closeSheet(); router.push(('/product-launches?productId=' + p.id) as never); } },
     { label: 'Share', icon: 'share', onPress: handleShare },

@@ -135,6 +135,7 @@ import productLaunchesRouter from "./product-launches";
 import preorderTermsRouter from "./preorder-terms";
 import waitlistRouter from "./waitlist";
 import bundlesRouter from "./bundles";
+import mysteryBoxesRouter, { buyerMysteryBoxesRouter } from "./mystery-boxes";
 import productPairingsRouter from "./product-pairings";
 import productDraftsRouter from "./product-drafts";
 import productVideosRouter from "./product-videos";
@@ -352,6 +353,8 @@ router.use("/product-launches",          tc, productLaunchesRouter);
 router.use("/preorder-terms",            tc, preorderTermsRouter);
 router.use("/waitlist",                  tc, waitlistRouter);
 router.use("/bundles",                   tc, bundlesRouter);
+router.use("/mystery-boxes",             tc, mysteryBoxesRouter);
+router.use("/buyer/mystery-boxes",       buyerMysteryBoxesRouter);
 router.use("/product-pairings",          productPairingsRouter);
 router.use("/product-drafts",            tc, productDraftsRouter); // Add Product wizard drafts synced across devices
 router.use("/product-videos",            productVideosRouter);

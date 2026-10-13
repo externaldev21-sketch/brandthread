@@ -87,6 +87,7 @@ import { CompleteTheFit } from '@/components/products/CompleteTheFit';
 import { BrandLink, brandLinkHref } from '@/components/products/BrandLink';
 
 import { BundleOffer } from '@/components/products/BundleOffer';
+import { MysteryBoxLabel } from '@/components/products/MysteryBoxLabel';
 import { ProductVideo } from '@/components/products/ProductVideo';
 
 import { ProductShareButton } from '@/components/products/ProductShareButton';
@@ -1351,6 +1352,7 @@ export default function BuyerProductDetailScreen() {
             testID="product-brand-link"
           />
           <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
+          <MysteryBoxLabel productId={product.id} />
           {/* Price */}
           <View style={s.priceRow}>
             <Text style={s.price}>{formatCents(variantPrice)}</Text>

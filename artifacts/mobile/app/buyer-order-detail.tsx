@@ -37,6 +37,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { FIT_OPTIONS, MAX_REVIEW_PHOTOS, addReviewPhotos, type FitOption } from '@/lib/reviewDisplay';
 import { getPreviewBuyerOrder } from '@/lib/previewOrders';
 import { useReorderFlow } from '@/components/orders/ReorderFlow';
+import { MysteryReveal } from '@/components/orders/MysteryReveal';
 import { mapDelivery, safeTrackingUrl } from '@/lib/deliveryGuarantee';
 import { DeliveryTrackerCard, AutoRefundCard } from '@/components/orders/DeliveryTracker';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -1237,6 +1238,7 @@ export default function BuyerOrderDetailScreen() {
               {item.productId ? <Icon name="chevron-right" size={ICON.sm} color={theme.muted} /> : null}
             </TouchableOpacity>
           ))}
+          <MysteryReveal orderId={id} />
           <TouchableOpacity
             onPress={handleViewSeller}
             activeOpacity={0.75}
