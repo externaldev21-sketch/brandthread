@@ -40,6 +40,7 @@ import { locationsByPlaceId, resolvePostLocation, withLocation } from "../lib/pl
 import { decodeCursor, encodeCursor } from "../lib/cursor";
 import { mergeHashtags, syncPostHashtags } from "../lib/hashtags";
 import { attachQuoteData, postCardImage } from "../lib/quotedPosts";
+import { attachPostExtras } from "../lib/postExtras";
 import {
   authorInGoodStanding,
   enqueueAutoFilterReport,
@@ -371,7 +372,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[], viewerId: stri
       commentsCount: commentsByPost[post.id] ?? 0,
     };
   });
-  return attachQuoteData(detailed, viewerId);
+  return attachPostExtras(await attachQuoteData(detailed, viewerId));
 }
 
 // ─── GET /api/posts/feed ──────────────────────────────────────────────────────
@@ -577,7 +578,7 @@ router.get("/feed", requireAuth, async (req, res) => {
       commentsCount: commentsByPost[p.id] ?? 0,
     }));
 
-    const result = await attachQuoteData(baseResult, clerkId);
+    const result = await attachPostExtras(await attachQuoteData(baseResult, clerkId));
 
     // Stable-sort: boosted posts surface first, rest preserve createdAt DESC order
     result.sort((a, b) => {
@@ -1764,13 +1765,13 @@ router.get("/:id", async (req, res) => {
 
   const minPriceByProduct = await productMinPrices(tags.map((t) => t.productId));
   const singleLocation = await locationsByPlaceId([post.placeId]);
-  const [detail] = await attachQuoteData([{
+  const [detail] = await attachPostExtras(await attachQuoteData([{
     ...withLocation(post, singleLocation),
     seller:       sellerRows[0] ?? null,
     taggedProducts: tags.map((t) => ({ ...t, priceCents: minPriceByProduct[t.productId] ?? 0 })),
     likeCount:    post.visibility?.showLikeCount === false ? null : likeRows[0]?.count ?? 0,
     repostCount:  repostRows[0]?.count ?? 0,
-  }], viewerId);
+  }], viewerId));
   return res.json(detail);
 });
 

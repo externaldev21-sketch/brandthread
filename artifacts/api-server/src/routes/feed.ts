@@ -13,6 +13,7 @@
  * watch_time, rewatch, shop taps, add-to-bag, skip, and not-interested.
  */
 import { attachQuoteData } from "../lib/quotedPosts";
+import { attachPostExtras } from "../lib/postExtras";
 import { Router } from "express";
 import { db, posts, interactions, users, liveStreams, postTaggedProducts, products, productVariants } from "@workspace/db";
 import { eq, inArray, sql } from "drizzle-orm";
@@ -235,7 +236,11 @@ router.get("/for-you", requireAuth, async (req, res) => {
       (await attachQuoteData(rawItems.filter((i) => i.type === "post").map((i) => ({ id: (i as { id: string }).id })), userId))
         .map((q) => [q.id, { quotedPost: q.quotedPost, quotesCount: q.quotesCount }]),
     );
-    const items = rawItems.map((i) => (i.type === "post" ? { ...i, ...quoteById.get((i as { id: string }).id) } : i));
+    const extrasById = new Map(
+      (await attachPostExtras(rawItems.filter((i) => i.type === "post").map((i) => ({ id: (i as { id: string }).id }))))
+        .map((x) => [x.id, { productMentions: x.productMentions, labels: x.labels }]),
+    );
+    const items = rawItems.map((i) => (i.type === "post" ? { ...i, ...quoteById.get((i as { id: string }).id), ...extrasById.get((i as { id: string }).id) } : i));
 
     // Sponsored placement (opt-in via ?sessionId=): approved, paid boosts are
     // spliced in as clearly labelled items under the frequency cap. Failure
