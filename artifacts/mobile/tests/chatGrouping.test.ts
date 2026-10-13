@@ -6,6 +6,7 @@ import {
   formatDate,
   formatTime,
   groupCornerRadii,
+  activeStatusLine,
   groupFlags,
   isSeenReceipt,
   lastOwnMessageId,
@@ -257,6 +258,23 @@ describe('chatGrouping: tail corner', () => {
       borderTopLeftRadius: FULL, borderTopRightRadius: FULL,
       borderBottomRightRadius: FULL, borderBottomLeftRadius: FULL,
     });
+  });
+});
+
+describe('chatGrouping: activeStatusLine', () => {
+  const NOW = Date.parse('2026-10-13T12:00:00Z');
+  const ago = (mins: number) => new Date(NOW - mins * 60_000).toISOString();
+
+  it('reads Active now / Active Nm ago / Active Nh ago, nothing after a day', () => {
+    expect(activeStatusLine({ isOnline: true, lastSeenAt: ago(1) }, NOW)).toBe('Active now');
+    expect(activeStatusLine({ isOnline: false, lastSeenAt: ago(12) }, NOW)).toBe('Active 12m ago');
+    expect(activeStatusLine({ isOnline: false, lastSeenAt: ago(185) }, NOW)).toBe('Active 3h ago');
+    expect(activeStatusLine({ isOnline: false, lastSeenAt: ago(60 * 25) }, NOW)).toBeNull();
+  });
+
+  it('is null without presence data (hidden or unknown)', () => {
+    expect(activeStatusLine({ isOnline: false }, NOW)).toBeNull();
+    expect(activeStatusLine(null, NOW)).toBeNull();
   });
 });
 

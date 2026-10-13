@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useUser } from '@clerk/expo';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, ONLINE_GREEN } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi, type SellerQuickReply } from '@/lib/api';
 import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
@@ -68,6 +68,7 @@ import {
   formatDate as sharedFormatDate, formatTime, groupFlags,
   groupCornerRadii, lastOwnMessageId, messagePreviewText,
   BUBBLE_RADIUS, BUBBLE_TAIL_RADIUS, SENT_BUBBLE, SENT_BUBBLE_TEXT, RECEIVED_BUBBLE, RECEIVED_BUBBLE_TEXT,
+  activeStatusLine,
 } from '@/lib/chatGrouping';
 import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
 import { ReplyBanner } from '@/components/chat/ReplyBanner';
@@ -642,6 +643,22 @@ export default function SellerConversationScreen() {
       },
       me: { id: myId, name: myName, initials: myInitials, color: PURPLE },
     });
+  }
+
+  // "Active now" / "Active 3h ago" — the server only sends this when both
+  // people share their activity status.
+  const activeLine = activeStatusLine(other);
+
+  function openOtherProfile() {
+    if (!other) return;
+    const qs = new URLSearchParams({
+      userId: other.userId,
+      name: other.name,
+      handle: other.handle ?? '',
+      initials: other.initials ?? '',
+      color: other.color ?? '',
+    });
+    router.push(('/buyer-other-profile?' + qs.toString()) as never);
   }
 
   // ── Chat details ───────────────────────────────────────────────────────────────
@@ -1611,16 +1628,24 @@ export default function SellerConversationScreen() {
             <PressableScale
               style={s.headerCenterRow}
               disabled={!other || !id}
-              onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+              // Instagram: avatar + name open their profile.
+              onPress={() => { hapticPrimaryAction(); openOtherProfile(); }}
               testID="seller-conversation-header-name"
               accessibilityRole="button"
-              accessibilityLabel={`${displayName} — chat details`}
+              accessibilityLabel={`${displayName} — view profile`}
             >
               {other && (
-                <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE }]}>
-                  <Text style={s.headerAvatarInitials}>
-                    {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
-                  </Text>
+                <View>
+                  <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE }]}>
+                    {other.avatarUri ? (
+                      <CachedImage source={{ uri: other.avatarUri }} style={s.headerAvatarImage} />
+                    ) : (
+                      <Text style={s.headerAvatarInitials}>
+                        {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+                  {other.isOnline ? <View style={s.headerOnlineDot} testID="seller-conversation-online-dot" /> : null}
                 </View>
               )}
               <View style={s.headerCenter}>
@@ -1631,7 +1656,9 @@ export default function SellerConversationScreen() {
                     existing subtitle slot there to reuse before now. */}
                 {conv?.otherTyping
                   ? <Text style={s.headerHandle} numberOfLines={1}>typing…</Text>
-                  : (other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null)}
+                  : activeLine
+                    ? <Text style={s.headerHandle} numberOfLines={1}>{activeLine}</Text>
+                    : (other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null)}
               </View>
             </PressableScale>
           </View>
@@ -1685,6 +1712,9 @@ export default function SellerConversationScreen() {
                 counterpart: { userId: other.userId, name: other.name },
                 messaging,
                 onChange: setMessaging,
+                // The header now opens the buyer's profile, so chat details
+                // lead this menu.
+                extraOptions: [{ text: 'Chat details', onPress: openChatDetails }],
               }); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
@@ -2500,6 +2530,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerAvatar: {
     width: 34, height: 34, borderRadius: 17,
     alignItems: 'center', justifyContent: 'center', marginRight: SP.sm,
+    overflow: 'hidden',
+  },
+  headerAvatarImage: { width: 34, height: 34 },
+  headerOnlineDot: {
+    position: 'absolute', right: SP.sm - 1, bottom: -1,
+    width: 11, height: 11, borderRadius: 6, borderWidth: 2,
+    backgroundColor: ONLINE_GREEN, borderColor: theme.background,
   },
   headerAvatarInitials: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
   // The actual flex/minWidth constraint has to live here, on a plain View —

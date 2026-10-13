@@ -20,7 +20,7 @@ import { Chip } from '@/components/ui/Chip';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticSuccessAction, hapticSelection, hapticDestructiveConfirm, hapticToggle } from '@/lib/haptics';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, ONLINE_GREEN } from '@/lib/theme';
 import {
   getConversation, createOrGetConversation, getMessages,
   sendMessage, retryMessage, addReaction, deleteMessageForMe,
@@ -92,6 +92,7 @@ import {
   formatDate as sharedFormatDate, formatTime as sharedFormatTime,
   sameSenderClose, groupCornerRadii, lastOwnMessageId, messagePreviewText,
   BUBBLE_RADIUS, BUBBLE_TAIL_RADIUS, SENT_BUBBLE, SENT_BUBBLE_TEXT, RECEIVED_BUBBLE, RECEIVED_BUBBLE_TEXT,
+  activeStatusLine,
 } from '@/lib/chatGrouping';
 import { radius } from '@/constants/radii';
 
@@ -619,17 +620,16 @@ export default function BuyerConversationScreen() {
   const isRequestMode = conv?.isRequest === true;
   const canSend = (text.trim().length > 0 || selectedAttachment != null) && !isDisabled && !isSending && !isRequestMode;
 
-  // Presence line under the header name. `isOnline`/`lastSeenAt` are the only
-  // presence signals ConversationParticipant carries; the backend does not
-  // currently populate them (see socialTypes.ts), so that part is simply
-  // omitted. "typing…" IS real for an ordinary conversation now — see
+  // Presence line under the header name: "Active now" / "Active 3h ago"
+  // from the server's activity status (isOnline/lastSeenAt — only sent when
+  // both people share it). "typing…" IS real for an ordinary conversation now — see
   // conv.otherTyping (PATCH/GET /api/conversations/:id/typing) — populated
   // the same way agentTyping is for the agent thread, just from the OTHER
   // human participant's own typing signal instead of a client-local flag.
   const isAgentConv = !!conv?.isOfficial || participant?.userId === BRANDTHREAD_AGENT_USER_ID;
   const statusLine = isAgentConv
     ? (agentTyping ? 'typing…' : 'AI assistant')
-    : (conv?.otherTyping ? 'typing…' : (participant?.isOnline ? 'Active now' : statusLineFor(participant)));
+    : (conv?.otherTyping ? 'typing…' : statusLineFor(participant));
   const headerTopPad = useHeaderTopInset();
   // Same reasoning at the bottom: react-native-web never fills in a real
   // bottom safe-area inset (no home-indicator polyfill), so insets.bottom
@@ -750,6 +750,10 @@ export default function BuyerConversationScreen() {
   // direct router.push to /seller-profile — see the pill's onPress below.
   function openParticipantProfile() {
     if (!participant) return;
+    if (participant.accountType === 'seller') {
+      router.push(('/seller-profile?id=' + encodeURIComponent(participant.userId)) as never);
+      return;
+    }
     const qs = new URLSearchParams({
       userId: participant.userId,
       name: participant.name,
@@ -1488,6 +1492,9 @@ export default function BuyerConversationScreen() {
     // takes the identical { text, onPress, style }[] shape and renders a
     // real themed bottom sheet on every platform.
     showActionSheet('Options', undefined, [
+      // The header now opens their profile (Instagram), so chat details
+      // (theme, nicknames, mute…) lead this menu.
+      { text: 'Chat details', onPress: openChatDetails },
       {
         text: 'Archive conversation',
         onPress: async () => {
@@ -2189,10 +2196,12 @@ export default function BuyerConversationScreen() {
               style={s.headerCenter}
               activeOpacity={participant ? 0.7 : 1}
               disabled={!participant}
-              onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+              // Instagram: the avatar + name open their profile; chat
+              // details stay on the header's info button.
+              onPress={() => { hapticPrimaryAction(); if (isAgentConv) openChatDetails(); else openParticipantProfile(); }}
               testID="conversation-header-name"
               accessibilityRole="button"
-              accessibilityLabel={`${displayName} — chat details`}
+              accessibilityLabel={isAgentConv ? `${displayName} — chat details` : `${displayName} — view profile`}
             >
               {participant && (
                 <View style={s.headerAvatarWrap} testID="conversation-avatar">
@@ -2201,11 +2210,15 @@ export default function BuyerConversationScreen() {
                       <BrandthreadLogo size={18} />
                     </View>
                   ) : (
-                    <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
-                      <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+                    <View style={[s.headerAvatarCircle, { backgroundColor: participant.color, overflow: 'hidden' }]}>
+                      {participant.avatarUri ? (
+                        <CachedImage source={{ uri: participant.avatarUri }} style={s.headerAvatarCircle} />
+                      ) : (
+                        <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+                      )}
                     </View>
                   )}
-                  {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
+                  {participant.isOnline && !isAgentConv && <View style={s.headerAvatarOnlineDot} testID="conversation-online-dot" />}
                 </View>
               )}
               <View style={s.headerTextCol}>
@@ -2221,7 +2234,7 @@ export default function BuyerConversationScreen() {
                   )}
                 </View>
                 {statusLine ? (
-                  <Text style={[s.headerStatusLine, { color: participant?.isOnline ? theme.success : theme.muted }]} numberOfLines={1}>
+                  <Text style={[s.headerStatusLine, { color: theme.muted }]} numberOfLines={1}>
                     {statusLine}
                   </Text>
                 ) : null}
@@ -2887,13 +2900,7 @@ export default function BuyerConversationScreen() {
 // ─── Presence line ────────────────────────────────────────────────────────────
 
 function statusLineFor(participant: ConversationParticipant | null): string | null {
-  if (!participant) return null;
-  if (participant.isOnline) return 'online';
-  if (participant.lastSeenAt) {
-    const ts = new Date(participant.lastSeenAt).getTime();
-    if (!Number.isNaN(ts)) return `last seen ${timeAgo(ts)} ago`;
-  }
-  return null;
+  return activeStatusLine(participant);
 }
 
 // ─── Double-tap heart burst ───────────────────────────────────────────────────
@@ -3167,7 +3174,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     width: 11,
     height: 11,
     borderRadius: 6,
-    backgroundColor: theme.success,
+    backgroundColor: ONLINE_GREEN,
     borderWidth: 2,
     borderColor: theme.background,
   },

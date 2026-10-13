@@ -176,3 +176,20 @@ export function lastOwnMessageId(messages: SeenableMessage[], myId: string): str
 export function isSeenReceipt(msg: SeenableMessage, myId: string, lastOwnId: string | null): boolean {
   return msg.fromId === myId && msg.id === lastOwnId && !!msg.readAt;
 }
+
+/** Header line from the server's activity status: "Active now" while
+ *  they're online, "Active 3h ago" within the last day, else null. */
+export function activeStatusLine(
+  participant: { isOnline?: boolean; lastSeenAt?: string } | null | undefined,
+  now: number = Date.now(),
+): string | null {
+  if (!participant) return null;
+  if (participant.isOnline) return 'Active now';
+  if (!participant.lastSeenAt) return null;
+  const ts = new Date(participant.lastSeenAt).getTime();
+  if (Number.isNaN(ts)) return null;
+  const mins = Math.floor((now - ts) / 60_000);
+  if (mins < 0 || mins >= 24 * 60) return null;
+  if (mins < 60) return `Active ${Math.max(mins, 1)}m ago`;
+  return `Active ${Math.floor(mins / 60)}h ago`;
+}
