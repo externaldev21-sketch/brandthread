@@ -587,3 +587,26 @@ describe('bottom fade into the page', () => {
     renderer.unmount();
   });
 });
+
+describe('mirrored header (avatar on the left)', () => {
+  it('avatarSide="left" puts the avatar column (note bubble + "+" badge) first; default stays TikTok\'s right side', () => {
+    const avatar = <React.Fragment />;
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        <ProfileBannerHeader banner={VIDEO} height={380} active posterOnly={false} topPad={47} avatar={avatar} avatarSide="left"
+          note={{ text: 'On your mind…', placeholder: true }} name="Alexandria Montgomery-Whitfield" handle="@alexandria" stats={[]} />,
+      );
+    });
+    const row = byTestId(renderer, 'profile-banner-identity-left')[0];
+    expect(row.props.style).toContainEqual({ flexDirection: 'row-reverse' });
+    // The note bubble lives in the avatar column, so it moves with the avatar.
+    expect(row.findAll((node) => node.props.testID === 'profile-banner-note')).not.toHaveLength(0);
+    renderer.unmount();
+    act(() => {
+      renderer = create(<ProfileBannerHeader banner={VIDEO} height={380} active posterOnly={false} topPad={47} avatar={avatar} name="N" stats={[]} />);
+    });
+    expect(byTestId(renderer, 'profile-banner-identity-right')).toHaveLength(1);
+    renderer.unmount();
+  });
+});
