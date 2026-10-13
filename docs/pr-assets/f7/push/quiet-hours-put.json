@@ -1,0 +1,12 @@
+[
+  {
+    "role": "buyer",
+    "body": {
+      "quietHours": {
+        "start": "23:00",
+        "end": "08:00",
+        "timezone": "America/Los_Angeles"
+      }
+    }
+  }
+]
