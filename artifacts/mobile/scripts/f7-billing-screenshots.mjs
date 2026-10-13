@@ -80,22 +80,23 @@ async function shotOnce(name, target, { status, steps } = {}) {
     const getItem = Storage.prototype.getItem;
     Storage.prototype.getItem = function (key) { return window.__btLive && key === 'user_role' ? null : getItem.call(this, key); };
   });
-  if (target === '/subscription') {
-    // A direct load of /subscription bounces to the dashboard in the preview
-    // build; open it the way a seller does: Settings → Subscription.
-    for (let attempt = 0; attempt < 4; attempt++) {
-      await openScreen(page, activity, origin, 'seller', '/seller-settings');
-      await page.waitForTimeout(2500);
-      const row = page.getByText('Subscription', { exact: true }).first();
-      if (!(await row.isVisible().catch(() => false)) && !(await row.count())) continue;
-      await page.evaluate(() => { window.__btLive = true; });
-      await row.scrollIntoViewIfNeeded();
-      await row.click();
-      await page.waitForTimeout(1500);
-      if (new URL(page.url()).pathname === '/subscription') break;
-    }
-  } else {
-    await openScreen(page, activity, origin, 'seller', target);
+  // Cold deep links bounce to the dashboard in the preview build; open each
+  // screen the way a seller does, from Settings.
+  const rowLabel = target === '/subscription' ? 'Subscription' : 'Compare plans';
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await openScreen(page, activity, origin, 'seller', '/seller-settings');
+    await page.waitForTimeout(2500);
+    const row = page.getByText(rowLabel, { exact: true }).first();
+    if (!(await row.count())) continue;
+    await page.evaluate(() => { window.__btLive = true; });
+    await row.scrollIntoViewIfNeeded();
+    await row.click();
+    await page.waitForTimeout(1500);
+    if (new URL(page.url()).pathname === target) break;
+  }
+  if (new URL(page.url()).pathname !== target) {
+    await context.close();
+    throw new Error(`${target} did not open`);
   }
   await page.waitForTimeout(2500);
   await waitForQuietNetwork(activity).catch(() => {});

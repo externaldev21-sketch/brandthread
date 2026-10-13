@@ -479,7 +479,7 @@ export default function PlansScreen() {
           theme={theme}
           plans={SELLER_PLANS}
           recommendedId={recommendedId}
-          currentPlanId={currentPlanId}
+          currentPlanId={currentInterval === interval ? currentPlanId : null}
           isOnboarding={isOnboarding}
           selectedId={selectedId}
           onSelect={setSelectedId}
@@ -572,7 +572,7 @@ export default function PlansScreen() {
         theme={theme}
         plans={SELLER_PLANS}
         recommendedId={recommendedId}
-        currentPlanId={currentPlanId}
+        currentPlanId={currentInterval === interval ? currentPlanId : null}
         isOnboarding={isOnboarding}
         selectedId={selectedId}
         onSelect={setSelectedId}
