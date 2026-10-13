@@ -39,29 +39,40 @@ async function overflowCheck(page, label) {
       if (r.width === 0 || r.height === 0) continue;
       const cs = getComputedStyle(el);
       const ellipsis = cs.textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1;
-      const offScreen = (r.right > vw + 1 || r.left < -1) && r.top >= 0 && r.top < innerHeight;
+      let scroller = false;
+      for (let a = el.parentElement; a; a = a.parentElement) { const o = getComputedStyle(a).overflowX; if (o === 'auto' || o === 'scroll') { scroller = true; break; } }
+      const offScreen = !scroller && (r.right > vw + 1 || r.left < -1) && r.top >= 0 && r.top < innerHeight;
       if (ellipsis || offScreen) out.push({ text: text.slice(0, 40), ellipsis, offScreen });
     }
     return out;
   });
   console.log(`overflow[${label}]:`, issues.length ? JSON.stringify(issues) : 'none');
 }
-async function waitText(page, text, pathForRetry) {
-  for (let attempt = 0; attempt < 6; attempt++) {
-    try { await page.getByText(text, { exact: true }).first().waitFor({ timeout: 12_000 }); return; }
-    catch (error) {
-      if (attempt === 5) { await shot(page, 'debug-wait'); throw error; }
-      await page.evaluate((url) => { history.pushState(history.state, '', url); dispatchEvent(new PopStateEvent('popstate')); }, pathForRetry);
+async function openWith(page, activity, origin, target, marker) {
+  for (let attempt = 1; ; attempt += 1) {
+    await openScreen(page, activity, origin, 'seller', target, {
+      extraQuery: DEMO,
+      beforeNavigate: () => page.evaluate(() => localStorage.setItem('bt_preview_demo', '1')),
+    });
+    try {
+      await page.waitForURL((u) => u.pathname === target.split('?')[0], { timeout: 10_000 });
+      await page.getByText(marker, { exact: true }).first().waitFor({ timeout: 10_000 });
+      return;
     }
+    catch (e) { if (attempt >= 5) { console.log('  url at failure:', page.url()); await shot(page, 'debug-wait'); throw e; } }
   }
+}
+async function waitText(page, text) {
+  try { await page.getByText(text, { exact: true }).first().waitFor({ timeout: 12_000 }); }
+  catch (e) { console.log('  url at failure:', page.url()); await shot(page, 'debug-wait'); throw e; }
 }
 const go = (page, url) => page.evaluate((u) => { history.pushState(history.state, '', u); dispatchEvent(new PopStateEvent('popstate')); }, url);
 
 async function launchesFlow(browser, images, origin) {
   const device = { viewport: VIEWPORT, scale: 2, isMobile: true, userAgent: UA };
-  const { context, page, activity } = await openContext(browser, { device, role: 'seller', origin, images });
-  await openScreen(page, activity, origin, 'seller', '/product-launches', { extraQuery: DEMO });
-  await waitText(page, BEFORE ? 'No scheduled launches' : 'Heavyweight Hoodie — Ember', `/product-launches?bt_preview=seller${DEMO}`);
+  const { context, page, activity } = await openContext(browser, { device, role: 'seller', origin, images, onUnseeded: (r) => console.log('  unseeded', r) });
+  page.on('pageerror', (e) => console.log('  pageerror', e.message));
+  await openWith(page, activity, origin, '/product-launches', BEFORE ? 'No scheduled launches' : 'Heavyweight Hoodie — Ember');
   await waitForImages(page);
   await page.waitForTimeout(800);
   await shot(page, `${MODE}-01-launches-list`);
@@ -72,7 +83,7 @@ async function launchesFlow(browser, images, origin) {
   } else {
     await page.getByText('Heavyweight Hoodie — Ember', { exact: true }).first().click();
   }
-  await waitText(page, BEFORE ? 'Schedule launch' : 'Edit launch', `/product-launches?productId=demo-launch-1&bt_preview=seller${DEMO}`);
+  await waitText(page, BEFORE ? 'Schedule launch' : 'Edit launch');
   await page.waitForTimeout(900);
   await shot(page, `${MODE}-02-editor-top`);
   await overflowCheck(page, 'editor-top');
@@ -94,7 +105,7 @@ async function launchesFlow(browser, images, origin) {
   await page.getByLabel('Go back').last().click();
   await page.waitForTimeout(900);
   await page.getByText('Field Shell Jacket — Rust', { exact: true }).first().click();
-  await waitText(page, 'Edit launch', `/product-launches?bt_preview=seller${DEMO}`);
+  await waitText(page, 'Edit launch');
   await page.waitForTimeout(700);
   await page.getByText('Finish the required steps to schedule this launch.', { exact: true }).scrollIntoViewIfNeeded();
   await page.mouse.wheel(0, 600);
@@ -113,8 +124,9 @@ async function launchesFlow(browser, images, origin) {
 async function audienceFlow(browser, images, origin) {
   const device = { viewport: VIEWPORT, scale: 2, isMobile: true, userAgent: UA };
   const { context, page, activity } = await openContext(browser, { device, role: 'seller', origin, images });
-  await openScreen(page, activity, origin, 'seller', '/analytics-audience', { extraQuery: DEMO });
-  await waitText(page, 'Devices', `/analytics-audience?bt_preview=seller${DEMO}`);
+  await openWith(page, activity, origin, '/analytics-audience', 'Audience');
+  await page.getByText('Month', { exact: true }).first().click();
+  await waitText(page, 'Devices');
   await waitForQuietNetwork(activity, 900, 15_000);
   await page.waitForTimeout(1200);
   await page.getByText(/Groups with fewer than/).last().scrollIntoViewIfNeeded();
@@ -138,7 +150,7 @@ async function run() {
   const browser = await launchBrowser();
   const images = await ensureDemoImages(browser, path.join(WORK_DIR, 'demo-images'));
   try {
-    await launchesFlow(browser, images, server.origin);
+    if (process.env.ONLY !== "audience") await launchesFlow(browser, images, server.origin);
     await audienceFlow(browser, images, server.origin);
   } finally {
     await browser.close();

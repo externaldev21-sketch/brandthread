@@ -72,11 +72,14 @@ export default function ProductLaunchesScreen() {
   const [picking, setPicking] = useState(false);
   const [autoOpened, setAutoOpened] = useState(false);
 
+  // The web seller preview never calls the API (lib/api rejects it); demo rows only with &demo=1.
+  // Read at render so a settled preview URL re-runs the load.
+  const preview = isSellerDevPreview();
+  const previewDemo = preview && isPreviewDemoMode();
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      // The web seller preview never calls the API (lib/api rejects it); demo rows only with &demo=1.
-      const demo = isSellerDevPreview() ? (isPreviewDemoMode() ? buildDemoLaunches() : { launches: [], products: [] }) : null;
+      const demo = preview ? (previewDemo ? buildDemoLaunches() : { launches: [], products: [] }) : null;
       const [l, p] = demo ? [demo.launches, demo.products] : await Promise.all([
         api.productLaunches.list(),
         (api.products.list() as Promise<any>).catch(() => []),
@@ -95,7 +98,7 @@ export default function ProductLaunchesScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [api]);
+  }, [api, preview, previewDemo]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -250,25 +253,26 @@ function LaunchEditor({
   const [notifyFollowers, setNotifyFollowers] = useState(draft?.notifyFollowers ?? existing?.notifyFollowers ?? false);
   const [saving, setSaving] = useState(false);
   const preview = isSellerDevPreview();
+  const previewDemo = preview && isPreviewDemoMode();
   const [checklist, setChecklist] = useState<ProductLaunchChecklist | null>(null);
   const [bestSlot, setBestSlot] = useState<ActiveSlot | null>(null);
 
   const loadChecklist = useCallback(async () => {
-    if (preview) { setChecklist(isPreviewDemoMode() ? buildDemoChecklistFor(target.productId) : null); return; }
+    if (preview) { setChecklist(previewDemo ? buildDemoChecklistFor(target.productId) : null); return; }
     try { setChecklist(await api.productLaunches.checklist(target.productId)); }
     catch { setChecklist(null); }
-  }, [api, preview, target.productId]);
+  }, [api, preview, previewDemo, target.productId]);
   React.useEffect(() => { loadChecklist(); }, [loadChecklist]);
 
   // Best time follows the zone being edited in, so the suggestion reads in that zone's wall clock.
   React.useEffect(() => {
     let live = true;
-    if (preview) { setBestSlot(isPreviewDemoMode() ? buildDemoBestTime(zone).top[0] ?? null : null); return; }
+    if (preview) { setBestSlot(previewDemo ? buildDemoBestTime(zone).top[0] ?? null : null); return; }
     api.productLaunches.bestTime(zone)
       .then((r) => { if (live) setBestSlot(r.status === 'ok' ? r.top[0] ?? null : null); })
       .catch(() => { if (live) setBestSlot(null); });
     return () => { live = false; };
-  }, [api, preview, zone]);
+  }, [api, preview, previewDemo, zone]);
 
   const liveLaunchAt = useMemo(() => {
     const parts = parseWallClock(date, time);

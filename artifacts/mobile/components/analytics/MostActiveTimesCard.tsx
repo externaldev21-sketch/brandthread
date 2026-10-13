@@ -77,7 +77,7 @@ export function MostActiveTimesCard() {
                   <PressableScale
                     onPress={() => { hapticSelection(); setDay((shownDay + 6) % 7); }}
                     accessibilityLabel="Previous day"
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    style={s.pagerBtn}
                   >
                     <Feather name="chevron-left" size={ICON.sm} color={colors.mutedForeground} />
                   </PressableScale>
@@ -85,7 +85,7 @@ export function MostActiveTimesCard() {
                   <PressableScale
                     onPress={() => { hapticSelection(); setDay((shownDay + 1) % 7); }}
                     accessibilityLabel="Next day"
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    style={s.pagerBtn}
                   >
                     <Feather name="chevron-right" size={ICON.sm} color={colors.mutedForeground} />
                   </PressableScale>
@@ -108,6 +108,7 @@ export function MostActiveTimesCard() {
 const s = StyleSheet.create({
   body: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 },
   sentence: { fontFamily: FONT.semibold, fontSize: FS.sm, lineHeight: 19, marginBottom: SP.md },
-  pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.lg, marginBottom: SP.sm },
+  pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.md, marginBottom: SP.xs },
+  pagerBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   pagerText: { fontFamily: FONT.semibold, fontSize: FS.sm, minWidth: 40, textAlign: 'center' },
 });
