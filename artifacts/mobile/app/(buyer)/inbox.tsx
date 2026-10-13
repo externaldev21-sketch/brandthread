@@ -2,14 +2,14 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   View, Text, FlatList, SectionList, Image,
   Alert, StyleSheet, ScrollView, RefreshControl,
-  Modal, TextInput, ActivityIndicator, Platform, Animated,
+  TextInput, ActivityIndicator, Platform, Animated, useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
-import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
+import { EmptyState, SearchBar, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -27,7 +27,7 @@ import {
   getNotesForTray, postNote,
 } from '@/services/socialService';
 import type { Conversation, ProfileSearchResult, AccountType, Story, Note } from '@/services/socialTypes';
-import { NOTE_MAX_CHARS } from '@/services/socialTypes';
+import type { NoteAudience } from '@/services/socialTypes';
 import { getSuggestedPeople, dismissSuggestedPerson, type SuggestedPerson } from '@/services/activityService';
 import { getCachedTabData, setCachedTabData } from '@/lib/tabDataCache';
 import { useApi } from '@/lib/api';
@@ -61,7 +61,8 @@ import {
 } from '@/lib/previewNotes';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { TabPageHeader } from '@/components/layout/TabPageHeader';
-import { Glass } from '@/components/ui/Glass';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { NoteComposerSheet } from '@/components/social/NoteComposerSheet';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
 import { radius } from '@/constants/radii';
@@ -270,6 +271,7 @@ export default function InboxScreen() {
   // ScrollViews, one FlashList) mounts at a time, so sharing this ref is safe.
   const scrollResetRef = useScrollReset<any>(true, false);
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   // Matches TabPageHeader's own topPad exactly (shared useHeaderTopInset),
   // so the search-mode header row sits at the identical vertical position
   // as the title/icon row it swaps with.
@@ -367,8 +369,6 @@ export default function InboxScreen() {
   const [myNote, setMyNote] = useState<Note | null>(null);
   const [notesByAuthor, setNotesByAuthor] = useState<Record<string, Note>>({});
   const [noteComposeVisible, setNoteComposeVisible] = useState(false);
-  const [noteComposeText, setNoteComposeText] = useState('');
-  const [noteComposeSaving, setNoteComposeSaving] = useState(false);
 
   // Re-renders whenever the shared LIVE directory changes (same singleton
   // LiveHostRing reads from), so sorting the tray by "is this author live
@@ -672,33 +672,21 @@ export default function InboxScreen() {
   // edit it" behavior.
   function openNoteCompose() {
     hapticPrimaryAction();
-    setNoteComposeText(myNote?.text ?? '');
     setNoteComposeVisible(true);
   }
 
   function closeNoteCompose() {
     setNoteComposeVisible(false);
-    setNoteComposeText('');
   }
 
-  async function submitNote() {
-    const text = noteComposeText.trim();
-    if (!text || noteComposeSaving) return;
-    hapticPrimaryAction();
-    setNoteComposeSaving(true);
-    try {
-      if (!userId && isPreviewNotesEnabled()) {
-        setMyNote(postPreviewNote(text));
-      } else {
-        const posted = await postNote(text);
-        setMyNote(posted);
-      }
-      closeNoteCompose();
-    } catch {
-      Alert.alert('Couldn’t post your note', 'Please try again.');
-    } finally {
-      setNoteComposeSaving(false);
+  // Throws on failure so the composer stays open with an inline error.
+  async function submitNote(text: string, audience: Exclude<NoteAudience, 'followers'>) {
+    if (!userId && isPreviewNotesEnabled()) {
+      setMyNote(postPreviewNote(text, audience));
+    } else {
+      setMyNote(await postNote(text, audience));
     }
+    closeNoteCompose();
   }
 
   // Requests-tab row tap: opens the conversation in request mode (see
@@ -1758,26 +1746,18 @@ export default function InboxScreen() {
           floating "New message" FAB was a duplicate of that same action and
           has been removed (see item 17: no duplicate compose actions). */}
 
-      <Modal
+      {/* New message — Instagram's "New message" sheet: title + close, a
+          people search, then suggested people. Fixed height so the list
+          has room to scroll; it shrinks above the keyboard. */}
+      <Sheet
         visible={composeVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={closeCompose}
+        onClose={closeCompose}
+        title="New message"
+        scrollable={false}
+        contentContainerStyle={{ height: Math.round(windowHeight * 0.72) }}
+        testID="inbox-compose-sheet"
       >
-        <View style={s.composeBackdrop}>
-          <View style={[s.composeSheet, { paddingBottom: insets.bottom + SP.md, backgroundColor: theme.card }]}>
-            <SheetHandle />
-            <View style={s.composeHeader}>
-              <Text style={[s.composeTitle, { color: theme.text }]}>New message</Text>
-              <PressableScale
-                onPress={closeCompose}
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Feather name="x" size={22} color={theme.text} />
-              </PressableScale>
-            </View>
+        <View style={s.composeBody}>
             <SearchBar
               value={composeQuery}
               onChange={setComposeQuery}
@@ -1809,7 +1789,7 @@ export default function InboxScreen() {
                     : null
                 }
                 renderSectionHeader={({ section }) => (
-                  <Text style={[s.composeSectionTitle, { color: theme.muted, backgroundColor: theme.card }]}>{section.title}</Text>
+                  <Text style={[s.composeSectionTitle, { color: theme.muted }]}>{section.title}</Text>
                 )}
                 renderItem={({ item }) => (
                   <PressableScale
@@ -1831,70 +1811,21 @@ export default function InboxScreen() {
                 )}
               />
             )}
-          </View>
         </View>
-      </Modal>
+      </Sheet>
 
-      {/* Note-compose sheet — a lightweight bottom sheet (not a whole new
-          screen), reusing the shared Glass chrome per the app's sheet/
-          overlay convention. Opened from the "Your note" bubble above. */}
-      <Modal
+      {/* Note composer — Instagram's "Leave a note" flow on the shared
+          sheet (components/social/NoteComposerSheet.tsx). Opened from the
+          "Your note" bubble above. */}
+      <NoteComposerSheet
         visible={noteComposeVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={closeNoteCompose}
-      >
-        <View style={s.composeBackdrop}>
-          <Glass
-            variant="regular"
-            tint="dark"
-            radius={RADIUS.xl}
-            style={[s.noteComposeSheet, { paddingBottom: insets.bottom + SP.md }]}
-          >
-            <SheetHandle />
-            <View style={s.composeHeader}>
-              <Text style={[s.composeTitle, { color: theme.text }]}>
-                {myNote ? 'Edit your note' : 'Share a note'}
-              </Text>
-              <PressableScale
-                onPress={closeNoteCompose}
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Feather name="x" size={22} color={theme.text} />
-              </PressableScale>
-            </View>
-            <Text style={[s.noteComposeHint, { color: theme.muted }]}>
-              Visible to your followers for 24 hours.
-            </Text>
-            <TextInput
-              value={noteComposeText}
-              onChangeText={text => setNoteComposeText(text.slice(0, NOTE_MAX_CHARS))}
-              placeholder="Your thoughts go here..."
-              placeholderTextColor={theme.subtle}
-              style={[s.noteComposeInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.cardElevated }, Platform.OS === 'web' && s.searchInputWebNoOutline]}
-              maxLength={NOTE_MAX_CHARS}
-              multiline
-              autoFocus
-              returnKeyType="done"
-              blurOnSubmit
-              onSubmitEditing={submitNote}
-              testID="inbox-note-compose-input"
-              accessibilityLabel="Note text"
-            />
-            <Text style={[s.noteComposeCount, { color: theme.subtle }]}>
-              {noteComposeText.length}/{NOTE_MAX_CHARS}
-            </Text>
-            <PrimaryButton
-              label={myNote ? 'Update note' : 'Share note'}
-              onPress={submitNote}
-              disabled={!noteComposeText.trim() || noteComposeSaving}
-              loading={noteComposeSaving}
-            />
-          </Glass>
-        </View>
-      </Modal>
+        onClose={closeNoteCompose}
+        initialText={myNote?.text ?? ''}
+        initialAudience={myNote?.audience}
+        avatarUri={myAvatarUri}
+        initials={myInitials}
+        onShare={submitNote}
+      />
 
       <Snackbar
         visible={!!snackbarMessage}
@@ -1917,23 +1848,8 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   return StyleSheet.create({
   root: { flex: 1 },
 
-  // Compose modal
-  composeBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  composeSheet: {
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    paddingTop: SP.sm,
-    paddingHorizontal: SP.md,
-    height: '70%',
-    maxWidth: Platform.OS === 'web' ? CONTENT_MAX_WIDTH + SP.xl * 2 : undefined,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  composeHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: SP.sm,
-  },
-  composeTitle: { fontSize: FS.lg, fontFamily: FONT.bold },
+  // New-message sheet body (inside the shared <Sheet>)
+  composeBody: { flex: 1 },
   composeSearchBar: { marginBottom: SP.sm },
   composeSectionTitle: {
     fontSize: FS.xs,
@@ -2011,24 +1927,6 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   noteBubbleTail: {
     width: 7, height: 7, marginTop: -4, borderRadius: 1.5,
     borderWidth: StyleSheet.hairlineWidth, transform: [{ rotate: '45deg' }],
-  },
-
-  // Note-compose bottom sheet
-  noteComposeSheet: {
-    paddingTop: SP.sm,
-    paddingHorizontal: SP.md,
-    maxWidth: Platform.OS === 'web' ? CONTENT_MAX_WIDTH + SP.xl * 2 : undefined,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  noteComposeHint: { fontSize: FS.meta, fontFamily: FONT.medium, marginBottom: SP.sm },
-  noteComposeInput: {
-    minHeight: 72, maxHeight: 120, borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth,
-    padding: SP.md, fontSize: FS.md, fontFamily: FONT.regular, textAlignVertical: 'top',
-  },
-  noteComposeCount: {
-    fontSize: FS.meta, fontFamily: FONT.medium, textAlign: 'right',
-    marginTop: SP.xs, marginBottom: SP.md,
   },
 
   // Threads-style empty inbox (centered badge + headline + full-width button)
