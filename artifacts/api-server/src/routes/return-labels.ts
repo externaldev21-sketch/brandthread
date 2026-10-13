@@ -4,11 +4,14 @@
  * POST /api/return-labels/:returnId  — seller buys the cheapest prepaid label for a return
  *      body: { returnAddress: { name, street1, street2?, city, state, zip, country, phone? },
  *              parcel: { length, width, height, weight } }   (inches / pounds)
+ *              refundAmountCents?   (partial refund; default = the full refundable amount)
  *      Approves the return and holds the refund until the carrier first scans the label.
  *
  * The buyer reads the label from GET /api/returns/:id (returnLabelUrl, returnTrackingNumber, ...).
  */
 import { Router } from "express";
+import { and, eq, inArray } from "drizzle-orm";
+import { db, returns } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { parcelInputError } from "../lib/parcelSuggestion";
@@ -32,7 +35,20 @@ router.post("/:returnId", requireRole("staff"), async (req, res) => {
   if (addrProblem) return void res.status(400).json({ error: addrProblem });
   const parcelProblem = parcelInputError(req.body?.parcel ?? {});
   if (parcelProblem) return void res.status(400).json({ error: parcelProblem });
+  const refundAmountCents = req.body?.refundAmountCents;
+  if (refundAmountCents !== undefined && (!Number.isSafeInteger(refundAmountCents) || refundAmountCents <= 0)) {
+    return void res.status(400).json({ error: "refundAmountCents must be a positive whole number of cents" });
+  }
   try {
+    if (refundAmountCents !== undefined) {
+      // Recorded before the label is bought, so the refund the first carrier
+      // scan issues is this amount (lib/returnLabels refundReturn; the refund
+      // service still caps it at what is refundable). Only an open return of
+      // this seller's is changed; buyReturnLabel re-checks both.
+      await db.update(returns).set({ refundAmountCents, updatedAt: new Date() }).where(and(
+        eq(returns.id, req.params.returnId), eq(returns.sellerId, sellerId), inArray(returns.status, ["pending", "approved"]),
+      ));
+    }
     const { label, duplicate } = await buyReturnLabel({
       returnId: req.params.returnId,
       sellerId,
