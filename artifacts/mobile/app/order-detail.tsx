@@ -26,8 +26,6 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
-import { useFeeSchedule } from '@/hooks/useFeeSchedule';
-import { quoteFromSchedule } from '@/lib/feeSchedule';
 import { adaptReturnRow, itemsTotalCents, returnReasonLabel as returnRequestReasonLabel, statusLabel as returnRequestStatusLabel, type ReturnView } from '@/lib/returns';
 import { Order, CANCELLATION_REASONS, CancellationReason, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent } from '@/services/orderTypes';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
@@ -37,6 +35,10 @@ import { getInitials } from '@/lib/format';
 import { sellerThreadCashPayout } from '@/lib/threadCashCheckout';
 import { useQueryClient } from '@tanstack/react-query';
 import { OrderRiskBadge } from '@/components/orders/OrderRiskBadge';
+import { OrderStatusDot } from '@/components/orders/OrderStatusDot';
+import { OrderReceipt } from '@/components/orders/OrderReceipt';
+import { isOrderLate } from '@/lib/orderLate';
+import { buildOrderReceipt } from '@/lib/orderReceipt';
 import { queryKeys } from '@/lib/queryClient';
 import { formatLocalDate, sellerOrderConflictMessage } from '@/lib/deliveryGuarantee';
 import { SellerDeliveryBanner } from '@/components/orders/SellerDelivery';
@@ -301,6 +303,8 @@ export function adaptApiOrder(raw: any): Order {
       payoutStatus:            isRefundPending ? 'held' : uiStatus === 'refunded' ? 'paid' : 'pending',
     },
     threadCashPayout: sellerThreadCashPayout(raw),
+    receipt: buildOrderReceipt(raw),
+    paidAt: typeof raw.paidAt === 'string' ? raw.paidAt : raw.paidAt ? new Date(raw.paidAt).toISOString() : null,
     shipments,
     trackingStatus: raw.trackingStatus ?? undefined,
     estimatedDelivery: raw.estimatedDelivery ?? undefined,
@@ -359,6 +363,25 @@ function usd(cents: number) {
 }
 function plural(n: number, word: string) {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+
+function timelineColor(type: string, theme: ReturnType<typeof useAppTheme>['theme']): string {
+  switch (type) {
+    case 'order_created': return theme.secondary;
+    case 'payment_confirmed': return theme.success;
+    case 'shipped': case 'label_purchased': case 'tracking_added': return theme.accentLight;
+    case 'delivered': return theme.success;
+    case 'return_requested': case 'refund_issued': return theme.warning;
+    case 'dispute_opened': case 'cancelled': return theme.error;
+    case 'risk_review': return theme.error;
+    case 'note_added': return theme.accent;
+    default: return theme.muted;
+  }
+}
+
+function returnReasonLabel(key: string): string {
+  return RETURN_REASONS.find(r => r.key === key)?.label ?? key;
 }
 
 function cancellationReasonLabel(key: string): string {
