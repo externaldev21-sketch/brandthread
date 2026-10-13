@@ -53,6 +53,9 @@ const OPTIONAL_VARS = [
   "SHIPPO_WEBHOOK_SECRET",
   "SENTRY_DSN",
   "POSTHOG_API_KEY",
+  // Pop-up mode (in-person Tap to Pay via Stripe Terminal). "1" turns the
+  // /api/seller/terminal routes on; also needs STRIPE_SECRET_KEY.
+  "STRIPE_TERMINAL_ENABLED",
 ];
 
 /**
