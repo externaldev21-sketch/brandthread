@@ -82,6 +82,7 @@ import postsRouter from "./posts";
 import postCaptionsRouter from "./post-captions";
 import postPollsRouter from "./post-polls";
 import feedRouter from "./feed";
+import feedFollowedFreshRouter from "./feed-followed-fresh";
 import reportsRouter from "./reports";
 import accountStatusRouter from "./account-status";
 import postCommentsRouter from "./post-comments";
@@ -438,6 +439,7 @@ router.use("/posts",                     postPollsRouter); // Thread polls: /pos
 router.use("/posts",                     tc, postsRouter);
 router.use("/upload-sessions",           uploadSessionsRouter); // resumable chunked uploads; owned by the signed-in person, no tc
 router.use("/feed",                      feedRouter); // buyer-scoped (For You ranking + event ingestion); no tc
+router.use("/feed",                      feedFollowedFreshRouter); // GET /followed-fresh (requireAuth); no tc
 router.use("/reports",                   reportsRouter);
 router.use("/account-status",            accountStatusRouter); // strikes + your reports (signed-in)
 router.use("/moderation",                auditModerationActions, moderationRouter);
