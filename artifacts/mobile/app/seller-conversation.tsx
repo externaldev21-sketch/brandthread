@@ -39,6 +39,7 @@ import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import Composer from '@/components/ui/Composer';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { LinkPreviewCard } from '@/components/chat/LinkPreviewCard';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
 import * as Clipboard from 'expo-clipboard';
@@ -1452,6 +1453,8 @@ export default function SellerConversationScreen() {
             ) : (msg.text?.trim().length ?? 0) > 0 ? (
               <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
             ) : null}
+            {/* Link card for the first URL (#163); seeded preview threads skip it. */}
+            {!removed && msg.text ? <LinkPreviewCard text={msg.text} enabled={!isSellerPreviewConversationId(id ?? '')} /> : null}
 
             {/* Inline bottom-right timestamp + read receipt (last bubble of
                 a run) — same automatic, group-boundary timestamp behavior as

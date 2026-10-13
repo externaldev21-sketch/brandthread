@@ -1922,6 +1922,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       }) => post<any>('/api/conversations', { type: 'group', ...body }),
       messages:   (id: string, limit = 50) =>
         get<any[]>(`/api/conversations/${encodeURIComponent(id)}/messages?limit=${limit}`),
+      /** DM link card for the first URL in a message (server fetches, SSRF-guarded). */
+      linkPreview: (url: string) =>
+        get<{ preview: import('@/lib/linkPreview').LinkPreview | null }>(`/api/link-preview?url=${encodeURIComponent(url)}`),
       /** Search-in-chat (chat details > Search): this conversation's own
        *  message history only, never global search. */
       searchMessages: (id: string, q: string) =>

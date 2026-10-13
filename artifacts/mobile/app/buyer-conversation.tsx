@@ -28,6 +28,7 @@ import {
   setConversationTheme, setConversationDisappearing,
   MY_USER_ID, MY_NAME, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
+import { LinkPreviewCard } from '@/components/chat/LinkPreviewCard';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
@@ -1970,6 +1971,8 @@ export default function BuyerConversationScreen() {
             {msg.text ? (
               <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
             ) : null}
+            {/* Link card for the first URL (#163); seeded preview threads skip it. */}
+            {msg.text ? <LinkPreviewCard text={msg.text} enabled={!isPreviewConversationId(conv?.id ?? '')} /> : null}
 
             {/* Inline bottom-right timestamp + read receipt (last bubble of a run) */}
             {isLastInGroup && (
