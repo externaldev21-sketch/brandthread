@@ -44,10 +44,7 @@ export function usePostFits({ postId, isOwner }: {
     if (!valid || !postId) return;
     fitsService.stitch(postId).then((r) => { if (!cancelled) setStitch(r.stitch); }).catch(() => { if (!cancelled) setStitch(null); });
     fitsService.fitCheck(postId).then((r) => { if (!cancelled) setProduct(r.fitCheck.product); }).catch(() => { if (!cancelled) setProduct(null); });
-    if (brandViewer && isSellerDevPreview()) {
-      // The signed-out seller preview makes no API calls; only its demo dataset shows the item.
-      setRepostEligible(isPreviewDemoMode());
-    } else if (brandViewer) {
+    if (brandViewer && !isSellerDevPreview()) {
       fitsService.repostEligibility(postId)
         .then((r) => { if (!cancelled) { setRepostEligible(r.eligible); setRequest(r.request); } })
         .catch(() => { if (!cancelled) setRepostEligible(false); });
@@ -74,7 +71,10 @@ export function usePostFits({ postId, isOwner }: {
         buttons.push({ text: 'Tag product', onPress: tag });
       }
     }
-    if (brandViewer && repostEligible && request?.status !== 'approved' && request?.status !== 'declined') {
+    // The signed-out seller preview makes no API calls; there only its demo dataset
+    // (read at tap time — the web URL settles after mount) shows the item.
+    const eligible = isSellerDevPreview() ? isPreviewDemoMode() : repostEligible;
+    if (brandViewer && eligible && request?.status !== 'approved' && request?.status !== 'declined') {
       if (request?.status === 'pending') {
         buttons.push({
           text: 'Withdraw repost request',

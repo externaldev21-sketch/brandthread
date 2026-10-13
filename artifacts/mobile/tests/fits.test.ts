@@ -46,7 +46,8 @@ describe('fits helpers', () => {
   it('shows "Request to repost" only when the server says the post is eligible', () => {
     const hook = read('components/social/PostFits.tsx');
     expect(hook).toContain('fitsService.repostEligibility(postId)');
-    expect(hook).toContain('brandViewer && repostEligible');
+    expect(hook).toContain("const eligible = isSellerDevPreview() ? isPreviewDemoMode() : repostEligible;");
+    expect(hook).toContain('brandViewer && eligible');
     expect(hook).not.toContain('authorAccountType');
     expect(read('services/fitsService.ts')).toContain('/repost-eligibility');
   });

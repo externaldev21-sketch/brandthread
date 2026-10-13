@@ -74,6 +74,7 @@ async function installRoutes(page, origin) {
     stitch: { postId: STITCH_POST, clipStartMs: 0, clipEndMs: 5000, sourceAuthor: nova, source: sourceSummary },
   }));
   await page.route(rx(`/fits/repost-requests/status**`), (r) => fulfill(r, origin, { request: null }));
+  await page.route(rx(`/fits/posts/${FIT_POST}/repost-eligibility**`), (r) => fulfill(r, origin, { eligible: true, request: null }));
   await page.route(rx(`/fits/repost-requests/${REQUEST}**`), (r) => fulfill(r, origin, {
     request: {
       id: REQUEST, postId: FIT_POST, status: 'pending', createdAt: '2026-10-12T10:00:00Z', respondedAt: null,
@@ -145,7 +146,7 @@ async function main() {
   let i = 0;
   try {
     const { context, page, activity } = await openContext(browser, { device, role: 'buyer', origin, images, videos });
-    page.on('pageerror', (err) => console.log(`  (page error: ${err.message.split('\n')[0]})`));
+  page.on('pageerror', (err) => console.log(`  (page error: ${err.message.split('\n')[0]})`));
     await installRoutes(page, origin);
 
     await step(page, 'share-sheet', async () => {
@@ -236,7 +237,8 @@ async function main() {
     const seller = await openContext(browser, { device, role: 'seller', origin, images, videos });
     await installRoutes(seller.page, origin);
     await step(seller.page, 'seller-menu', async () => {
-      await go(seller.page, seller.activity, origin, 'seller', `/buyer-post-viewer?postId=${FIT_POST}`, '&demo=1'); // seller preview makes no API calls; demo dataset only
+      // The signed-out seller preview blocks API calls, so it shows the item only in its demo dataset.
+      await go(seller.page, seller.activity, origin, 'seller', `/buyer-post-viewer?postId=${FIT_POST}`, '&demo=1');
       await seller.page.getByRole('button', { name: 'More options' }).click({ timeout: 10000 });
       await seller.page.waitForTimeout(600);
       await shot(seller.page, ++i, 'seller-request-to-repost-menu');
