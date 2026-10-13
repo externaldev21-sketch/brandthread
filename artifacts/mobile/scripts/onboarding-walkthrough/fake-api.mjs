@@ -14,7 +14,6 @@
  * the capture script makes one per browser context (one per buyer/seller run)
  * so the two walkthroughs never share state.
  */
-import { readFileSync } from 'node:fs';
 
 const TINY_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
@@ -24,26 +23,6 @@ function clerkIdFromAuthHeader(authorization) {
   const match = /^Bearer stub-token\.(.+)$/.exec(authorization || '');
   return match ? match[1] : null;
 }
-
-// WALKTHROUGH_FEATURED_BRANDS=1 seeds Brands-to-follow with brands that have
-// real products (demo photography from store-screenshots/demo-images.mjs,
-// served by installFakeBackend's `images`), including three featured brands
-// as ONBOARDING_FEATURED_SELLER_HANDLES would return them. Unset: both lists
-// are empty, as before.
-const IMAGE_HOST = 'https://images.brandthread.test';
-const demoImage = (name) => `${IMAGE_HOST}/demo/${name}.jpg`;
-const SEED_BRANDS = process.env.WALKTHROUGH_FEATURED_BRANDS === '1';
-const FEATURED_BRANDS = [
-  { id: 'seller_northline', sellerId: 'seller_northline', handle: 'northlinestudio', name: 'Northline Studio', logoUrl: null, verified: true, productCount: 24, productImages: [demoImage('hoodie-ember'), demoImage('jacket-rust'), demoImage('cargo-rust')] },
-  { id: 'seller_ember', sellerId: 'seller_ember', handle: 'emberandash', name: 'Ember & Ash', logoUrl: null, verified: false, productCount: 11, productImages: [demoImage('hoodie-graphite'), demoImage('jacket-onyx'), demoImage('hoodie-bone')] },
-  { id: 'seller_quiet', sellerId: 'seller_quiet', handle: 'quiethours', name: 'Quiet Hours', logoUrl: null, verified: false, productCount: 7, productImages: [demoImage('hoodie-moss'), demoImage('hoodie-midnight'), demoImage('runner-stone')] },
-];
-const DISCOVER_BRANDS = [
-  ...FEATURED_BRANDS.map(({ id, sellerId, name, logoUrl, verified }) => ({ id, sellerId, name, logoUrl, verified, brandType: null })),
-  { id: 'seller_field', sellerId: 'seller_field', name: 'Field Office', logoUrl: null, verified: false, brandType: null },
-  { id: 'seller_saint', sellerId: 'seller_saint', name: 'Saint Rue', logoUrl: null, verified: false, brandType: null },
-  { id: 'seller_kuro', sellerId: 'seller_kuro', name: 'Kuro Line', logoUrl: null, verified: false, brandType: null },
-];
 
 export function createFakeOnboardingApi() {
   /** @type {any} */
@@ -135,10 +114,6 @@ export function createFakeOnboardingApi() {
     if (p === '/auth/username/check' && get) {
       return { status: 200, body: { available: true } };
     }
-    // The sign-up step checks the handle and email before a session exists.
-    if ((p === '/public/username-check' || p === '/public/email-check') && get) {
-      return { status: 200, body: { available: true } };
-    }
     if (p === '/onboarding-sample/logo' && method === 'POST') {
       return { status: 200, body: { b64_json: TINY_PNG_BASE64 } };
     }
@@ -150,10 +125,7 @@ export function createFakeOnboardingApi() {
     }
     if (p === '/public/brands/discover' && get) {
       // Empty is a valid, gracefully-handled state for BrandsToFollowStep.
-      return { status: 200, body: SEED_BRANDS ? { brands: DISCOVER_BRANDS } : [] };
-    }
-    if (p === '/public/brands/featured' && get) {
-      return { status: 200, body: { brands: SEED_BRANDS ? FEATURED_BRANDS : [] } };
+      return { status: 200, body: [] };
     }
     if (p === '/config/features' && get) {
       return { status: 200, body: { flags: { aiPhotoShoot: true, outfitSwap: true, boosts: true, manufacturerHub: true }, updatedAt: null } };
@@ -210,7 +182,7 @@ export function createFakeOnboardingApi() {
  * BrowserContext, mirroring scripts/store-screenshots/harness.mjs's
  * `openContext` routing but for a signed-OUT onboarding run.
  */
-export async function installFakeBackend(context, { origin, apiOrigin, api, images = {} }) {
+export async function installFakeBackend(context, { origin, apiOrigin, api }) {
   await context.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -237,11 +209,6 @@ export async function installFakeBackend(context, { origin, apiOrigin, api, imag
         return route.fulfill({ status: 404, headers: cors, contentType: 'application/json', body: '{"error":{"code":"NOT_SEEDED","message":"Not part of the onboarding walkthrough fake API"}}' });
       }
       return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: '{"ok":true}' });
-    }
-    if (url.origin === IMAGE_HOST) {
-      const file = images[url.pathname.split('/').pop().replace(/\.jpg$/, '')];
-      if (file) return route.fulfill({ status: 200, contentType: 'image/jpeg', body: readFileSync(file) });
-      return route.fulfill({ status: 404, body: '' });
     }
     // Everything else (analytics, fonts CDNs, Clerk, images, …) stays offline
     // so the walkthrough is fast and repeatable — the onboarding screens this
