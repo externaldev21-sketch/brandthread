@@ -24,7 +24,10 @@ import {
   getCartForScreen, updateCartItemQuantity, removeCartItem, removeCartItems, restoreCartSnapshot,
   saveForLater, moveToCart, removeSavedItem,
   groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart,
+  refreshCartStock,
 } from '@/services/cartService';
+import { FreeShippingStrip } from '@/components/cart/FreeShippingStrip';
+import { refreshFreeShippingThresholds } from '@/lib/freeShipping';
 import {
   Cart, CartItem, SavedCartItem, CartSellerGroup, CheckoutLoyaltyRedemption, CheckoutThreadCashRedemption,
 } from '@/services/cartTypes';
@@ -422,6 +425,8 @@ function SellerGroup({
         <Feather name="chevron-right" size={18} color={theme.muted} />
       </PressableScale>
 
+      <FreeShippingStrip sellerId={group.sellerId} sellerName={group.sellerName} subtotalCents={group.subtotalCents} hasPreOrder={group.hasPreOrder} />
+
       {/* Items */}
       {group.items.map((item, idx) => (
         <View key={item.id}>
@@ -690,6 +695,8 @@ export default function CartScreen() {
       const { cart: nextCart, loadError: nextLoadError } = await getCartForScreen();
       setCart(nextCart);
       setLoadError(nextLoadError);
+      void refreshFreeShippingThresholds(nextCart.items.map(i => i.sellerId));
+      void refreshCartStock(nextCart.items).then(fresh => { if (fresh) setCart(fresh); }).catch(() => {});
       setSelectedIds(prev => {
         const next = new Set<string>();
         for (const item of nextCart.items) {
