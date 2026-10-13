@@ -1677,6 +1677,9 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="customer-privacy"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="customer-events"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="taxes-duties" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
+        <Stack.Screen name="tax-regions" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
+        <Stack.Screen name="tax-region-add" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
+        <Stack.Screen name="tax-head-office" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="shipping-delivery"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="locations"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="languages"          options={{ headerShown: false, animation: 'ios_from_right' }} />

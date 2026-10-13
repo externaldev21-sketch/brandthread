@@ -26,6 +26,7 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import type { FinanceSummary } from '@/lib/financeSummary';
 import type { StatementDetail, StatementFormat, StatementList } from '@/lib/statements';
 import type { PayoutDetail, PayoutScheduleInfo, WeeklyAnchor } from '@/lib/payoutScheduleView';
+import type { TaxHeadOffice, TaxRegistration, TaxRegistrationsInfo } from '@/lib/taxRegistrationsView';
 import type { DisputeEvidenceFile, DisputeFileType, DisputeTimeline } from '@/lib/disputeTypes';
 import type { ReorderResolution } from '@/lib/reorderSummary';
 import type {
@@ -3609,7 +3610,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         chargeShippingTax: boolean;
         chargeVat: boolean;
       }>('/api/taxes/status'),
-      enable:    () => post<any>('/api/taxes/enable', {}),
+      enable:    (headOffice?: TaxHeadOffice) => post<any>('/api/taxes/enable', headOffice ? { headOffice } : {}),
+      registrations: () => get<TaxRegistrationsInfo>('/api/taxes/registrations'),
+      addRegistration: (region: string) =>
+        post<{ registration: TaxRegistration }>('/api/taxes/registrations', { region }),
+      setHeadOffice: (headOffice: TaxHeadOffice) =>
+        put<{ headOffice: TaxHeadOffice }>('/api/taxes/head-office', { headOffice }),
       config:    (data: { stripeTaxEnabled?: boolean; collectDuties?: boolean; chargeShippingTax?: boolean; chargeVat?: boolean; taxCalculationMode?: string }) =>
         patch<any>('/api/taxes/config', data),
       forms1099: (year?: number) => get<any>(`/api/taxes/1099${year ? `?year=${year}` : ''}`),
