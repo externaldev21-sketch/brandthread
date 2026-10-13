@@ -5,10 +5,15 @@
  */
 import type { savedItems } from "@workspace/db";
 import { fetchProductBadgeInfo, isBackInStockRecent } from "./savedProductBadges";
+import { fetchSavedPostThumbnails } from "./savedPostThumbnails";
 
 export async function adaptSavedRows(rows: (typeof savedItems.$inferSelect)[]) {
   const productIds = rows.filter((r) => r.itemType === "product").map((r) => r.targetId);
-  const badgeInfo = await fetchProductBadgeInfo(productIds);
+  const postIds = rows.filter((r) => r.itemType === "post").map((r) => r.targetId);
+  const [badgeInfo, postImages] = await Promise.all([
+    fetchProductBadgeInfo(productIds),
+    fetchSavedPostThumbnails(postIds),
+  ]);
 
   return rows.map((r) => {
     const badges = badgeInfo.get(r.targetId);
@@ -26,7 +31,7 @@ export async function adaptSavedRows(rows: (typeof savedItems.$inferSelect)[]) {
       collectionId:  r.collectionId ?? undefined,
       savedAt:       r.createdAt?.toISOString() ?? new Date().toISOString(),
       notifyOnPriceDrop: r.notifyOnPriceDrop,
-      image:         badges?.image ?? undefined,
+      image:         (r.itemType === "post" ? postImages.get(r.targetId) : badges?.image) ?? undefined,
       brand:         badges?.brand ?? undefined,
       priceCents:    currentPriceCents ?? undefined,
       oldPriceCents: priceDropped ? r.savedPriceCents ?? undefined : undefined,

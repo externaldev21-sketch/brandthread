@@ -12,6 +12,7 @@ import { eq, and, asc, desc, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { fetchProductBadgeInfo } from "../lib/savedProductBadges";
 import { adaptSavedRows } from "../lib/savedItemAdapter";
+import { fetchSavedPostThumbnails } from "../lib/savedPostThumbnails";
 
 const router = Router();
 router.use(requireAuth);
@@ -31,7 +32,11 @@ async function withCovers(userId: string, rows: (typeof savedCollections.$inferS
     .where(and(eq(savedItems.userId, userId), inArray(savedItems.collectionId, collectionIds)));
 
   const productIds = items.filter((i) => i.itemType === "product").map((i) => i.targetId);
-  const badgeInfo = await fetchProductBadgeInfo(productIds);
+  const postIds = items.filter((i) => i.itemType === "post").map((i) => i.targetId);
+  const [badgeInfo, postImages] = await Promise.all([
+    fetchProductBadgeInfo(productIds),
+    fetchSavedPostThumbnails(postIds),
+  ]);
 
   const countByCollection = new Map<string, number>();
   const autoCoverByCollection = new Map<string, string | null>();
@@ -39,7 +44,8 @@ async function withCovers(userId: string, rows: (typeof savedCollections.$inferS
     if (!item.collectionId) continue;
     countByCollection.set(item.collectionId, (countByCollection.get(item.collectionId) ?? 0) + 1);
     if (!autoCoverByCollection.has(item.collectionId)) {
-      const image = badgeInfo.get(item.targetId)?.image ?? item.accentColor ?? null;
+      const image = (item.itemType === "post" ? postImages.get(item.targetId) : badgeInfo.get(item.targetId)?.image)
+        ?? item.accentColor ?? null;
       autoCoverByCollection.set(item.collectionId, image);
     }
   }

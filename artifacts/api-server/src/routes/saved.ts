@@ -6,7 +6,7 @@
  * DELETE /api/buyer/saved/:targetId           — unsave
  */
 import { Router } from "express";
-import { db, savedItems, posts } from "@workspace/db";
+import { db, savedCollections, savedItems, posts } from "@workspace/db";
 import { notifyPostSave } from "../lib/activityEvents";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -19,6 +19,19 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const router = Router();
 router.use(requireAuth);
+
+/**
+ * A collection id from the client must be one of the caller's own boards.
+ * `undefined`/`null` mean "no board" (All saved). Returns false for anything else.
+ */
+async function ownsCollection(userId: string, collectionId: unknown): Promise<boolean> {
+  if (collectionId === undefined || collectionId === null) return true;
+  if (typeof collectionId !== "string" || !UUID_RE.test(collectionId)) return false;
+  const [row] = await db.select({ id: savedCollections.id }).from(savedCollections)
+    .where(and(eq(savedCollections.id, collectionId), eq(savedCollections.userId, userId)))
+    .limit(1);
+  return !!row;
+}
 
 router.get("/", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
@@ -42,6 +55,7 @@ router.post("/", async (req, res) => {
   };
 
   if (!targetId || !title) return res.status(400).json({ error: "targetId and title required" });
+  if (!(await ownsCollection(userId, collectionId))) return res.status(404).json({ error: "Collection not found" });
 
   let savedPost: { userId: string; styleTags: unknown } | null = null;
   if (type === "post") {
@@ -96,6 +110,7 @@ router.post("/", async (req, res) => {
 router.patch("/:targetId", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { collectionId } = req.body as { collectionId?: string | null };
+  if (!(await ownsCollection(userId, collectionId))) return res.status(404).json({ error: "Collection not found" });
 
   const [row] = await db.update(savedItems)
     .set({ collectionId: collectionId ?? null })
