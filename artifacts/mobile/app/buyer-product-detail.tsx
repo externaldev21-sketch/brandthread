@@ -213,7 +213,8 @@ function isVariantComboAvailable(
   );
 }
 
-function ZoomableGalleryImage({ uri }: { uri: string }) {
+function ZoomableGalleryImage({ uri, brand, name }: { uri: string; brand?: string; name?: string }) {
+  const [failed, setFailed] = useState(false);
   const scale = useRef(new Animated.Value(1)).current;
   const currentScale = useRef(1);
   const pinchStartDistance = useRef(0);
@@ -256,10 +257,15 @@ function ZoomableGalleryImage({ uri }: { uri: string }) {
     },
   })).current;
 
+  if (failed) {
+    return <ProductPhotoPlaceholder brand={brand} name={name} style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT }} />;
+  }
+
   return (
     <View style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT, overflow: 'hidden' }} {...responder.panHandlers}>
       <Animated.Image
         source={{ uri }}
+        onError={() => setFailed(true)}
         style={[StyleSheet.absoluteFill, { transform: [{ scale }] }]}
         resizeMode="contain"
         accessibilityLabel="Product photo. Pinch with two fingers to zoom."
@@ -324,7 +330,7 @@ function ProductGallery({ imageUris, accentColor, brand, name }: { imageUris: st
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => <ZoomableGalleryImage uri={item} />}
+          renderItem={({ item }) => <ZoomableGalleryImage uri={item} brand={brand} name={name} />}
           getItemLayout={(_, index) => ({ length: GALLERY_WIDTH, offset: GALLERY_WIDTH * index, index })}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
           onMomentumScrollEnd={(e) => {

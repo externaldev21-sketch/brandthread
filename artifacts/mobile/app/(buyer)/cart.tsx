@@ -198,7 +198,7 @@ function CartItemRow({
           purchase control on the line: checkout is per seller group (under
           the group subtotal) and the main Checkout bar. */}
       <View style={ir.img}>
-        <ProductPhoto uri={item.imageUri} brand={item.sellerName} name={item.productName} style={ir.productImage} contentFit="contain" recyclingKey={item.imageUri} />
+        <ProductPhoto uri={item.imageUri} brand={item.sellerName} name={item.productName} style={ir.productImage} recyclingKey={item.imageUri} />
       </View>
 
       <View style={ir.col}>
@@ -317,7 +317,7 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 10, alignItems: 'center', justifyContent: 'center',
   },
-  // 4:5 and `contain`: the whole product shows, never cropped.
+  // 4:5, cropped to fill (Dev's less-AI pass: every product photo is 4:5).
   img: {
     width: 84, height: productPhotoHeight(84), borderRadius: RADII.card,
     backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border,

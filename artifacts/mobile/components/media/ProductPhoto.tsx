@@ -87,7 +87,7 @@ export function ProductPhoto({
     <CachedImage
       testID={testID}
       source={{ uri }}
-      style={[{ backgroundColor: PRODUCT_PLACEHOLDER_BG }, style] as StyleProp<ImageStyle>}
+      style={style as StyleProp<ImageStyle>}
       contentFit={contentFit}
       recyclingKey={recyclingKey}
       accessibilityLabel={accessibilityLabel}
