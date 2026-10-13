@@ -109,9 +109,9 @@ async function run() {
 
   // 1. Add to cart → bag.
   await page.getByTestId('product-add-to-cart').click();
-  await page.getByText('Added to your bag').waitFor({ timeout: 10_000 });
-  await page.waitForTimeout(900);
-  await page.getByRole('button', { name: 'View bag' }).click();
+  // Item 131: Add to cart reads "In bag ✓" for 2s; tapping it opens the bag.
+  await page.getByTestId('product-view-cart').waitFor({ timeout: 10_000 });
+  await page.getByTestId('product-view-cart').click();
   await page.getByRole('button', { name: 'Checkout', exact: true }).waitFor({ timeout: 30_000 });
   await page.waitForTimeout(1200);
   // 3. Remove is grey.
