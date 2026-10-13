@@ -4,6 +4,7 @@
  * POST   /api/buyer/saved                     — save (optionally into a collection)
  * PATCH  /api/buyer/saved/:targetId           — move to a collection (or null to un-file)
  * DELETE /api/buyer/saved/:targetId           — unsave
+ * GET    /api/buyer/saved/friends/:productId  — people you follow who saved this product
  */
 import { Router } from "express";
 import { db, savedItems, posts } from "@workspace/db";
@@ -14,6 +15,7 @@ import { adaptSavedRows } from "../lib/savedItemAdapter";
 import { blockRelation } from "../lib/safety";
 import { publicPostCondition as visiblePostCondition } from "../lib/postVisibility";
 import { applyEventToProfile } from "../lib/ranking/forYou";
+import { friendsWhoSaved } from "../lib/friendsSaved";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -26,6 +28,11 @@ router.get("/", async (req, res) => {
     .where(eq(savedItems.userId, userId))
     .orderBy(desc(savedItems.createdAt));
   return res.json(await adaptSavedRows(rows));
+});
+
+router.get("/friends/:productId", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  return res.json(await friendsWhoSaved(userId, req.params.productId));
 });
 
 router.post("/", async (req, res) => {

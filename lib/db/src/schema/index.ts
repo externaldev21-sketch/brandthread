@@ -61,6 +61,9 @@ export const users = pgTable('users', {
   dmPrivacy:      text('dm_privacy').notNull().default('requests'),
   // Private account (buyers only): new followers need approval (follow_requests).
   isPrivate:      boolean('is_private').notNull().default(false),
+  // "Saved by people you follow" on product pages (migration 270): off hides
+  // this person's saves from that line. Saves in a private collection never show.
+  showSavesToFollowers: boolean('show_saves_to_followers').notNull().default(true),
   // Buyer onboarding style picks (cold start for the For You ranking pipeline).
   buyerStyleInterests: jsonb('buyer_style_interests').$type<string[]>().notNull().default([]),
   // Brand onboarding fields (seller side)

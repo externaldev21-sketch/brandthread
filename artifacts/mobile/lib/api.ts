@@ -7,6 +7,7 @@ import type { SizeChartData, SizeChartPreset, SizeChartTemplateSummary, SizeChar
 import { prepareImageForUpload } from '@/lib/imageUploadPrep';
 import { useAuth } from '@clerk/expo';
 import type { LaunchChecklistResponse } from '@/lib/launchChecklist';
+import type { FriendsSaved } from '@/lib/friendsSaved';
 import type {
   AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
   ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
@@ -1848,6 +1849,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         save:   (body: { type: string; targetId: string; title: string; subtitle?: string; accentColor?: string }) =>
           post<any>('/api/buyer/saved', body),
         remove: (targetId: string) => del<any>(`/api/buyer/saved/${encodeURIComponent(targetId)}`),
+        /** People you follow who saved this product (only saves they let followers see). */
+        friends: (productId: string) =>
+          get<FriendsSaved>(`/api/buyer/saved/friends/${encodeURIComponent(productId)}`),
       },
       /** Server-side cart — full-replace sync model. */
       cart: {
@@ -3040,10 +3044,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     privacy: {
       /** Get current server-side privacy preferences */
       get: () =>
-        get<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; canBePrivate?: boolean }>('/api/auth/privacy'),
+        get<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; canBePrivate?: boolean; showSavesToFollowers?: boolean }>('/api/auth/privacy'),
       /** Update server-side privacy preferences */
-      update: (settings: { dmPrivacy?: 'requests' | 'followers_only'; isPrivate?: boolean }) =>
-        patch<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean }>('/api/auth/privacy', settings),
+      update: (settings: { dmPrivacy?: 'requests' | 'followers_only'; isPrivate?: boolean; showSavesToFollowers?: boolean }) =>
+        patch<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; showSavesToFollowers?: boolean }>('/api/auth/privacy', settings),
     },
     /** Private-account follow requests (incoming) and the Close Friends list. */
     followRequests: {
