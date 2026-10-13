@@ -55,7 +55,7 @@ const statusConfig = (theme: ReturnType<typeof useAppTheme>['theme']): Record<Ve
     icon: 'check-circle',
     color: theme.success,
     bg: theme.success + '26',
-    title: "You're verified!",
+    title: "You're verified",
     body: 'Your identity has been confirmed. Your verified badge is now live on your storefront and profile.',
   },
   failed: {

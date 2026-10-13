@@ -137,7 +137,7 @@ export function LiveThreadCashSheet({
 
         {justSentCents != null && (
           <Animated.View style={[styles.sentBanner, { borderColor: THREAD_CASH_GREEN_MID }, popStyle]}>
-            <Text style={[styles.sentBannerText, { color: theme.text }]}>Sent {formatCents(justSentCents)} 🎉</Text>
+            <Text style={[styles.sentBannerText, { color: theme.text }]}>Sent {formatCents(justSentCents)}</Text>
           </Animated.View>
         )}
 

@@ -820,7 +820,7 @@ export default function BuyerProductDetailScreen() {
     try {
       await (api as any).waitlist.join(product.id, variant.id);
       setWaitlistJoined(true);
-      Alert.alert("You're on the waitlist", "We'll notify you the moment this drops back in stock.");
+      Alert.alert("You're on the waitlist", "We'll notify you the moment this restocks.");
     } catch { Alert.alert('Error', 'Could not join waitlist. Please try again.'); }
     finally { setWaitlistLoading(false); }
   }
@@ -836,7 +836,7 @@ export default function BuyerProductDetailScreen() {
     try {
       await (api as any).buyer.reserve(product.id);
       setReserved(true);
-      Alert.alert('Reserved!', "Spot secured. We'll notify you once production is confirmed.");
+      Alert.alert('Reserved', "Spot secured. We'll notify you once production is confirmed.");
     } catch { Alert.alert('Error', 'Could not reserve. Please try again.'); }
     finally { setReserveLoading(false); }
   }
@@ -1196,7 +1196,7 @@ export default function BuyerProductDetailScreen() {
                   ? variant.inventoryQuantity <= 5
                     ? `Only ${variant.inventoryQuantity} left in stock`
                     : 'In stock'
-                  : 'Out of stock — select another option'
+                  : 'Sold out — select another option'
                 }
               </Text>
             </View>
@@ -1210,7 +1210,7 @@ export default function BuyerProductDetailScreen() {
               disabled={waitlistLoading || waitlistJoined}
               activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel={waitlistJoined ? "You're on the waitlist" : 'Notify me when back in stock'}
+              accessibilityLabel={waitlistJoined ? "You're on the waitlist" : 'Notify me when restocked'}
               accessibilityState={{ disabled: waitlistLoading || waitlistJoined, busy: waitlistLoading }}
             >
               {waitlistLoading ? (
@@ -1219,7 +1219,7 @@ export default function BuyerProductDetailScreen() {
                 <>
                   <Feather name={waitlistJoined ? 'check' : 'bell'} size={14} color={waitlistJoined ? SUCCESS : PURPLE_LIGHT} />
                   <Text style={[wl.text, waitlistJoined && { color: SUCCESS }]}>
-                    {waitlistJoined ? "You're on the waitlist" : 'Notify me when back in stock'}
+                    {waitlistJoined ? "You're on the waitlist" : 'Notify me when restocked'}
                   </Text>
                 </>
               )}
@@ -1446,7 +1446,7 @@ export default function BuyerProductDetailScreen() {
             onPress={handleAddToCart}
             loading={addingToCart}
             disabled={addingToCart || launching || (allSelected && !inStock)}
-            accessibilityLabel={!allSelected ? 'Add to cart. Select a size first' : !inStock ? 'Out of stock' : 'Add to cart'}
+            accessibilityLabel={!allSelected ? 'Add to cart. Select a size first' : !inStock ? 'Sold out' : 'Add to cart'}
             style={s.buyNowBtn}
             testID="product-add-to-cart"
           />

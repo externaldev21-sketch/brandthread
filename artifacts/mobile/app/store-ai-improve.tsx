@@ -130,7 +130,7 @@ export default function StoreAiImproveScreen() {
       <ScreenHeader title="Improve Store" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ai.scroll}>
-        <Text style={ai.subtitle}>AI-powered suggestions to improve your storefront.</Text>
+        <Text style={ai.subtitle}>Suggestions to improve your storefront.</Text>
 
         <SecondaryButton
           label={loading ? 'Refreshing...' : 'Refresh Suggestions'}
@@ -156,7 +156,7 @@ export default function StoreAiImproveScreen() {
           <EmptyState
             icon="check-circle"
             title="No suggestions right now"
-            description="Your store looks good! Check back after making changes."
+            description="Your store looks good. Check back after making changes."
             action={{ label: 'Refresh', onPress: handleRefresh, icon: 'refresh-cw' }}
             style={ai.emptyState}
           />

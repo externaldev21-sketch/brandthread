@@ -25,6 +25,6 @@ export const SELLER_NOTIFICATION_TYPES: NotificationTypeRow[] = [
   { key: 'payout_confirmations',  label: 'Payouts',               description: 'Payout sent or delayed' },
   { key: 'customer_messages',     label: 'Customer messages',     description: 'Messages from customers' },
   { key: 'disputes',              label: 'Disputes',              description: 'Disputes and case updates' },
-  { key: 'inventory_alerts',      label: 'Inventory alerts',      description: 'Low and out of stock' },
+  { key: 'inventory_alerts',      label: 'Inventory alerts',      description: 'Low stock and sold out' },
   { key: 'subscription_trial',    label: 'Trial reminders',       description: 'Before your trial converts' },
 ];

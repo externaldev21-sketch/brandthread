@@ -278,7 +278,7 @@ export default function ShareProfileScreen() {
                 color={theme.onAccent}
               />
               <Text style={[styles.copyBtnText, { color: theme.onAccent }]}>
-                {(copied || autoCopied) ? 'Link Copied!' : 'Copy Link'}
+                {(copied || autoCopied) ? 'Link copied' : 'Copy Link'}
               </Text>
             </TouchableOpacity>
 

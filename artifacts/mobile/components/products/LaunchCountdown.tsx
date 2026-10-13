@@ -30,7 +30,7 @@ function launchLabel(iso: string): string {
   const d = new Date(iso);
   const date = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  return `Launching ${date} at ${time}`;
+  return `Drops ${date} at ${time}`;
 }
 
 export function LaunchCountdown({
@@ -131,7 +131,7 @@ export function LaunchCountdown({
         ]}
         accessibilityRole="button"
         accessibilityState={{ selected: subscribed }}
-        accessibilityLabel={subscribed ? "You'll be notified at launch. Tap to turn off" : 'Notify me at launch'}
+        accessibilityLabel={subscribed ? "You'll be notified when it drops. Tap to turn off" : 'Notify me when it drops'}
         testID="launch-notify-me"
       >
         {busy ? (

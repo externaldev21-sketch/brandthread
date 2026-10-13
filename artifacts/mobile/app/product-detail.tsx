@@ -1285,7 +1285,7 @@ function StoreTab({
             <Text style={[st.stockText, {
               color: stockStatus === 'out' ? RED : stockStatus === 'low' ? ORANGE : SUCCESS
             }]}>
-              {stockStatus === 'out' ? 'Out of stock' : stockStatus === 'low' ? `Only ${product.inventory.availableStock} left` : 'In stock'}
+              {stockStatus === 'out' ? 'Sold out' : stockStatus === 'low' ? `Only ${product.inventory.availableStock} left` : 'In stock'}
             </Text>
           </View>
 

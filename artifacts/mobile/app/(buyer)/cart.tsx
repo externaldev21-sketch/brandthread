@@ -245,7 +245,7 @@ function CartItemRow({
           <View style={[ir.stockWarnRow, isCriticalStock && ir.stockWarnCritical]}>
              <Feather name="alert-triangle" size={10} color={theme.warning} />
             <Text style={[ir.stockWarn, isCriticalStock && ir.stockWarnCriticalText]}>
-              {isCriticalStock ? 'Last one left!' : `Only ${item.maxQuantity} left`}
+              {isCriticalStock ? 'Last one left' : `Only ${item.maxQuantity} left`}
             </Text>
           </View>
         )}

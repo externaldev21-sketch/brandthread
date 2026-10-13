@@ -42,7 +42,7 @@ function statusLabel(status: ProductAnalyticsRow['inventoryStatus']): string {
   switch (status) {
     case 'in_stock':    return 'In Stock';
     case 'low':         return 'Low Stock';
-    case 'out_of_stock':return 'Out of Stock';
+    case 'out_of_stock':return 'Sold Out';
     default:            return '—';
   }
 }
