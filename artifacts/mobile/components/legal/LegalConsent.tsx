@@ -8,7 +8,6 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 export function LegalConsent({
@@ -39,7 +38,7 @@ export function LegalConsent({
   return (
     <View style={style}>
       <Pressable
-        onPress={() => { Haptics.selectionAsync(); onChange(!checked); }}
+        onPress={() => { onChange(!checked); }}
         style={styles.row}
         accessibilityRole="checkbox"
         accessibilityState={{ checked }}

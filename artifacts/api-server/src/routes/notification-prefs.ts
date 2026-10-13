@@ -41,6 +41,8 @@ const SELLER_DEFAULTS = {
   subscription_trial: true,
   inventory_alerts: true,
   seller_announcements: true,
+  /** Settings › Sounds & haptics › New order sound (see lib/push.ts resolvePushSound). */
+  new_order_sound: true,
 };
 
 function defaultsFor(accountType: string | null | undefined) {

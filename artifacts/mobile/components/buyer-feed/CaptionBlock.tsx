@@ -19,7 +19,6 @@
 import React from 'react';
 import { Animated, LayoutChangeEvent, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
@@ -143,7 +142,7 @@ export function CaptionBlock({
         style={creatorHit.boostStyle}
         onLayout={creatorHit.onLayout}
         activeOpacity={0.8}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onOpenCreator(); }}
+        onPress={() => { onOpenCreator(); }}
         accessibilityRole="button"
         accessibilityLabel={`View ${creator}'s profile`}
       >

@@ -18,7 +18,6 @@ import { useAuth } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button, Card, IconButton } from '@/components/ui';
 import { EmptyState } from '@/components/BrandthreadUI';
-import { hapticDestructiveConfirm, hapticLight, hapticWarning } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -81,7 +80,6 @@ export default function BuyerPaymentMethodsScreen() {
 
   async function setDefault(pm: PaymentMethod) {
     if (pm.isDefault || settingDefault) return;
-    hapticLight();
     setSettingDefault(pm.id);
     try {
       await api.reviews.setDefaultPaymentMethod(pm.id);
@@ -94,7 +92,6 @@ export default function BuyerPaymentMethodsScreen() {
   }
 
   function confirmRemove(pm: PaymentMethod) {
-    hapticWarning();
     Alert.alert(
       'Remove card',
       `Remove your ${pm.brand.charAt(0).toUpperCase() + pm.brand.slice(1)} ending in ${pm.last4}?`,
@@ -103,7 +100,6 @@ export default function BuyerPaymentMethodsScreen() {
         {
           text: 'Remove', style: 'destructive',
           onPress: async () => {
-            hapticDestructiveConfirm();
             setRemoving(pm.id);
             try {
               await api.reviews.removePaymentMethod(pm.id) as any;

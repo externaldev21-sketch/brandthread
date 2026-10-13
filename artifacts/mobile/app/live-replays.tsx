@@ -22,7 +22,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi, type LiveReplay } from '@/lib/api';
 import { formatReplayDuration } from '@/lib/liveReplayFormat';
 import { FONT, FS, SP } from '@/lib/theme';
-import { hapticLight } from '@/lib/haptics';
+import { haptic } from '@/lib/haptics';
 
 const COLUMNS = 3;
 const GAP = 2;
@@ -80,7 +80,7 @@ export default function LiveReplaysScreen() {
   }, [api]);
 
   const openManage = useCallback((replay: LiveReplay) => {
-    hapticLight();
+    haptic('sheet');
     const hidden = replay.visibility === 'hidden';
     showActionSheet(replay.title, undefined, [
       {

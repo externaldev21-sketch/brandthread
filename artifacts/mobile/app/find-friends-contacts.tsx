@@ -33,7 +33,7 @@ import {
 } from '@/lib/contactsAccess';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { useAuth } from '@clerk/expo';
-import { hapticSuccess } from '@/lib/haptics';
+import { hapticFollow } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -117,11 +117,11 @@ export default function FindFriendsContacts() {
   }
 
   async function follow(m: ContactMatch) {
+    hapticFollow(true);
     setFollowed((prev) => new Set(prev).add(m.userId));
     if (demo) return;
     try {
       await api.social.follow(m.userId);
-      hapticSuccess();
       void requestContextualPushPermission(userId, api);
     } catch {
       setFollowed((prev) => { const n = new Set(prev); n.delete(m.userId); return n; });

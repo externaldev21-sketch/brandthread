@@ -4,7 +4,6 @@ import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { FONT, COMP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
@@ -13,7 +12,6 @@ import { useAuth } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button, Card, IconButton } from '@/components/ui';
 import { EmptyState } from '@/components/BrandthreadUI';
-import { hapticDestructiveConfirm, hapticSuccess, hapticToggle } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -69,7 +67,6 @@ export default function BuyerAddressesScreen() {
   useEffect(() => { load(); }, [userId]);
 
   const handleAddNew = () => {
-    Haptics.selectionAsync();
     setEditingId(null);
     setIsCreating(true);
     setLabel('Home');
@@ -85,7 +82,6 @@ export default function BuyerAddressesScreen() {
   };
 
   const handleEdit = (addr: any) => {
-    Haptics.selectionAsync();
     setEditingId(addr.id);
     setIsCreating(false);
     setLabel(addr.label || '');
@@ -124,7 +120,6 @@ export default function BuyerAddressesScreen() {
       } else if (editingId) {
         await api.buyer.addresses.update(editingId, body);
       }
-      hapticSuccess();
       await load();
       handleCancel();
     } catch (e: any) {
@@ -139,7 +134,6 @@ export default function BuyerAddressesScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         try {
-          hapticDestructiveConfirm();
           await api.buyer.addresses.delete(id);
           await load();
         } catch {
@@ -151,7 +145,6 @@ export default function BuyerAddressesScreen() {
 
   const handleSetDefault = async (id: string) => {
     try {
-      hapticToggle();
       await api.buyer.addresses.setDefault(id);
       await load();
     } catch {

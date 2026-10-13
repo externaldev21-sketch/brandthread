@@ -13,7 +13,6 @@ import { ListRow } from '@/components/ui/ListRow';
 import { QuietHoursRow, type QuietHoursPreset } from '@/components/notifications/QuietHoursRow';
 import { Card } from '@/components/ui/Card';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { hapticToggle } from '@/lib/haptics';
 import { BUYER_NOTIFICATION_TYPES, SELLER_NOTIFICATION_TYPES } from '@/lib/notificationTypes';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -46,7 +45,6 @@ export default function NotificationChannelsScreen() {
   }, []);
 
   const change = useCallback(async (channel: Channel, key: string, value: boolean) => {
-    hapticToggle();
     const prior = channels;
     setChannels({ ...channels, [channel]: { ...channels[channel], [key]: value } });
     try {

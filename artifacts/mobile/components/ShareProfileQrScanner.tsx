@@ -20,7 +20,6 @@ import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'ex
 
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { parseProfileDeepLink } from '@/lib/shareProfile';
-import { hapticSuccess } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
 
 interface ShareProfileQrScannerProps {
@@ -50,7 +49,6 @@ export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
     const username = parseProfileDeepLink(result.data);
     if (!username) return; // Not a Brandthread profile QR — ignore, keep scanning.
     setHandled(true);
-    hapticSuccess();
     onClose();
     router.push(`/u/${username}` as never);
   }, [handled, onClose, router]);

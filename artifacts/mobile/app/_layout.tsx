@@ -106,6 +106,7 @@ import { MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
 import { consumeAnimationOverride } from '@/lib/navigationAnimationOverride';
 import { setRequestGuard } from '@workspace/api-client-react';
+import { hydrateHapticsPreference } from '@/lib/hapticsPreference';
 
 // Generated API hooks share this guard with the app-local API clients so
 // signed-out seller preview never reaches the backend through an alternate
@@ -554,6 +555,9 @@ if (Platform.OS !== 'web') {
 }
 
 SplashScreen.preventAutoHideAsync();
+
+// Settings › Sounds & haptics switch — read before the first tap.
+void hydrateHapticsPreference();
 
 // Paint the native root window the same dark default as app.json's splash
 // background (#0A0A0B) immediately at module load — before RuntimeThemeShell

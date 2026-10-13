@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { hapticFollow } from '@/lib/haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useApi } from '@/lib/api';
@@ -41,9 +41,9 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
       ? { isFollowing: false, isFollowedBy: state.isFollowedBy, isMutual: false }
       : { isFollowing: true, isFollowedBy: state.isFollowedBy, isMutual: state.isFollowedBy };
 
+    hapticFollow(!wasFollowing);
     setState(optimistic);
     setBusy(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     onChange?.(optimistic, wasFollowing ? -1 : 1);
 
     try {

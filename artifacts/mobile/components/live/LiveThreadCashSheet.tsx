@@ -25,7 +25,7 @@ import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
-import { hapticLight } from '@/lib/haptics';
+import { haptic } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
 
 const TIP_AMOUNTS_CENTS = [100, 500, 1000, 2000, 5000, 10000];
@@ -92,7 +92,6 @@ export function LiveThreadCashSheet({
   async function handleSend() {
     if (!selected || sending || balanceCents == null || selected > balanceCents) return;
     setSending(true);
-    hapticLight();
     if (recipientId && streamId && !isPreviewThreadCashEnabled()) {
       try {
         await api.threadCash.liveGift({
@@ -149,7 +148,7 @@ export function LiveThreadCashSheet({
               <Pressable
                 key={cents}
                 disabled={!affordable}
-                onPress={() => { hapticLight(); setSelected(cents); }}
+                onPress={() => { haptic('select'); setSelected(cents); }}
                 style={[
                   styles.tip,
                   { borderColor: isSelected ? theme.accent : theme.border },

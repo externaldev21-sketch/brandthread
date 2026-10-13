@@ -10,7 +10,6 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
@@ -92,7 +91,6 @@ export function LaunchCountdown({
   async function toggle() {
     if (!productId || busy) return;
     if (!isSignedIn) { router.push('/sign-in' as never); return; }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setBusy(true);
     const next = !subscribed;
     setSubscribed(next);

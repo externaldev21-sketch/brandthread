@@ -13,7 +13,6 @@ import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
 import { formatCents } from '@/lib/money';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -48,7 +47,7 @@ import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar, Success
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII, radius } from '@/constants/radii';
-import { hapticToggle, hapticPrimaryAction, hapticWarning } from '@/lib/haptics';
+import { haptic } from '@/lib/haptics';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { LaunchCountdown } from '@/components/products/LaunchCountdown';
 import { PreOrderShipBy } from '@/components/products/PreOrderShipBy';
@@ -425,7 +424,7 @@ function OptionPicker({ product, option, selections, onSelect, recommendedLabel 
                   isSelected && op.colorSwatchSelected,
                   !available && op.unavail,
                 ]}
-                onPress={() => { if (available) { hapticToggle(); onSelect(option.id, val.id); } }}
+                onPress={() => { if (available) { if (!isSelected) haptic('select'); onSelect(option.id, val.id); } }}
                 activeOpacity={0.8}
                 accessibilityRole="radio"
                 accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}
@@ -815,7 +814,6 @@ export default function BuyerProductDetailScreen() {
       goToSignIn();
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setWaitlistLoading(true);
     try {
       await (api as any).waitlist.join(product.id, variant.id);
@@ -831,7 +829,6 @@ export default function BuyerProductDetailScreen() {
       goToSignIn();
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setReserveLoading(true);
     try {
       await (api as any).buyer.reserve(product.id);
@@ -845,11 +842,10 @@ export default function BuyerProductDetailScreen() {
     if (!allSelected) {
       // Mark options as touched so unselected options show a required indicator
       setOptionsTouched(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
     if (!variant) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptic('addToBag');
     setAddingToCart(true);
     const result = editCartItemId
       ? await replaceCartItemVariant(editCartItemId, product!, variant, qty)
@@ -861,7 +857,6 @@ export default function BuyerProductDetailScreen() {
       await flyToCart();
       bumpCart();
       setShowAddedSheet(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Auto-clear the icon-button checkmark after 2.5s; the sheet itself
       // stays open until the buyer taps View bag or Keep shopping.
       if (addedBannerTimerRef.current) clearTimeout(addedBannerTimerRef.current);
@@ -904,7 +899,6 @@ export default function BuyerProductDetailScreen() {
       goToSignIn();
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(messageSellerAboutProductHref({
       sellerId: product.sellerId,
       sellerName: product.sellerName,
@@ -925,7 +919,6 @@ export default function BuyerProductDetailScreen() {
       return;
     }
     if (!variant) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setBuyingNow(true);
     try {
       // Check seller payment readiness before entering checkout
@@ -1167,7 +1160,7 @@ export default function BuyerProductDetailScreen() {
           {!!product.sizeChartImageUrl && (
             <TouchableOpacity
               style={s.sizeGuideLink}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeGuideOpen(true); }}
+              onPress={() => { haptic('sheet'); setSizeGuideOpen(true); }}
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel="Size guide"
@@ -1240,7 +1233,7 @@ export default function BuyerProductDetailScreen() {
             <>
               <TouchableOpacity
                 style={[sz.toggle, { borderTopColor: theme.border }]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeChartOpen(o => !o); }}
+                onPress={() => { setSizeChartOpen(o => !o); }}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel="Size chart"
@@ -1771,7 +1764,6 @@ function RelatedProducts({ productId, dividerStyle, headerStyle }: {
             style={{ width: 140 }}
             activeOpacity={0.8}
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               if (usesThreadPull) {
                 push({ pathname: '/thread-product-detail' as any, params: { productId: p.id } } as never);
               } else {

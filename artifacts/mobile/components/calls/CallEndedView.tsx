@@ -1,7 +1,7 @@
 /**
  * CallEndedView — Instagram's "call ended + rating" screen. Terminal, not
  * minimizable, so the top-right icon is a close "X" (not the chevron the
- * other three surfaces use). Tapping a rating icon gives visual + haptic
+ * other three surfaces use). Tapping a rating icon gives visual + selection-tick
  * confirmation and auto-dismisses after a beat; there's no backend yet to
  * persist the rating (follow-up for a later PR — see the report).
  *
@@ -11,7 +11,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCallSession } from '@/lib/calls/CallSessionContext';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
@@ -43,7 +43,7 @@ export function CallEndedView() {
   function rate(value: 'good' | 'not-good') {
     if (rating) return;
     setRating(value);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    haptic('select');
   }
 
   return (
