@@ -1009,9 +1009,9 @@ export default function ProfileScreen() {
       {bannerFlow.sheet}
 
       {/* ••• (Instagram's profile action sheet): Edit profile · Notifications ·
-          Share profile, then the existing extras below a separator. These
-          replaced the Edit / Share / add-friend button row under the bio
-          (Friends stays in the ☰ menu). */}
+          Share profile, then Find friends + the existing extras below a
+          separator. These replaced the Edit / Share / add-friend button row
+          under the bio. */}
       <ProfileMenuSheet
         visible={menuOpen}
         title={displayHandle || displayName}
@@ -1021,6 +1021,7 @@ export default function ProfileScreen() {
           onEditProfile: () => router.push('/(buyer)/edit-profile'),
           onNotifications: () => router.push('/buyer-notifications' as any),
           onShareProfile: caps.showShare ? handleShareProfile : null,
+          onFindFriends: () => router.push('/(buyer)/friends' as any),
           onViewAsVisitor: caps.showViewAsVisitor && user?.id
             ? () => router.push(viewAsVisitorHref('buyer', user.id) as never)
             : null,

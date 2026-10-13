@@ -759,13 +759,13 @@ describe('buyer profile — Instagram layout', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/edit-profile');
   });
 
-  it('••• menu: Edit profile · Notifications · Share profile, then View as visitor below a separator', async () => {
+  it('••• menu: Edit profile · Notifications · Share profile, then Find friends + View as visitor below a separator', async () => {
     renderer = await renderScreen();
     const rows = renderer.root.findAll((node) => typeof node.props.testID === 'string'
       && node.props.testID.startsWith('profile-menu-sheet-') && typeof node.props.onPress === 'function' && typeof node.type !== 'string');
     const keys = [...new Set(rows.map((node) => node.props.testID.replace('profile-menu-sheet-', '')))];
-    expect(keys).toEqual(['edit-profile', 'notifications', 'share', 'view-as-visitor']);
-    expect(renderer.root.findAll((node) => node.props.testID === 'profile-menu-sheet-separator-view-as-visitor')).not.toHaveLength(0);
+    expect(keys).toEqual(['edit-profile', 'notifications', 'share', 'find-friends', 'view-as-visitor']);
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-menu-sheet-separator-find-friends')).not.toHaveLength(0);
     const notifications = rows.find((node) => node.props.testID === 'profile-menu-sheet-notifications')!;
     await act(async () => { notifications.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith('/buyer-notifications');
