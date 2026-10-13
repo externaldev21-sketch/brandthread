@@ -93,6 +93,7 @@ export type NewCardInput = {
   purchaserId?: string | null;
   ownerId?: string | null;
   recipientEmail?: string | null;
+  recipientPhone?: string | null;
   recipientName?: string | null;
   message?: string | null;
   source: "purchase" | "seller_issued";
@@ -117,6 +118,7 @@ export async function createPendingCard(exec: Exec, input: NewCardInput): Promis
     purchaserId: input.purchaserId ?? null,
     ownerId: input.ownerId ?? null,
     recipientEmail: input.recipientEmail ?? null,
+    recipientPhone: input.recipientPhone ?? null,
     recipientName: input.recipientName ?? null,
     message: input.message ?? null,
     status: "pending_payment",
@@ -433,7 +435,9 @@ export function presentCard(card: GiftCardRow, role: "owner" | "purchaser" | "se
     createdAt: card.createdAt,
     role,
     recipientName: card.recipientName,
-    ...(role === "seller" || role === "purchaser" ? { recipientEmail: card.recipientEmail } : {}),
+    ...(role === "seller" || role === "purchaser"
+      ? { recipientEmail: card.recipientEmail, recipientPhoneLast4: card.recipientPhone ? card.recipientPhone.slice(-4) : null }
+      : {}),
     message: card.message,
   };
 }

@@ -4702,11 +4702,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     giftCards: {
       store: (sellerId: string) => get<GiftCardStoreInfo>(`/api/gift-cards/store/${encodeURIComponent(sellerId)}`),
       purchase: (body: {
-        sellerId: string; amountCents: number; recipientEmail: string; recipientName?: string; message?: string;
+        sellerId: string; amountCents: number; recipientEmail?: string; recipientPhone?: string; recipientName?: string; message?: string;
         forSelf?: boolean; clientIdempotencyKey: string;
       }) => post<{ giftCardId: string; paymentIntentId: string; clientSecret: string | null; amountCents: number }>('/api/gift-cards/purchase', body),
       confirmPurchase: (giftCardId: string) =>
-        post<{ status: 'paid' | 'processing' | 'unpaid'; card: GiftCard; code: string | null }>(
+        post<{ status: 'paid' | 'processing' | 'unpaid'; card: GiftCard; code: string | null; textedTo?: string | null }>(
           `/api/gift-cards/purchase/${encodeURIComponent(giftCardId)}/confirm`, {}),
       claim: (code: string) => post<{ card: GiftCard; storeName: string }>('/api/gift-cards/claim', { code }),
       mine: () => freshGet<{ cards: GiftCard[]; totalCents: number }>('/api/gift-cards/mine'),

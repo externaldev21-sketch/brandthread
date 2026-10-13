@@ -21,6 +21,7 @@ export type GiftCard = {
   role: 'owner' | 'purchaser' | 'seller';
   recipientName: string | null;
   recipientEmail?: string | null;
+  recipientPhoneLast4?: string | null;
   message: string | null;
 };
 
@@ -32,6 +33,8 @@ export type GiftCardStoreInfo = {
   allowCustom: boolean;
   minCents: number;
   maxCents: number;
+  /** The server texts cards sent to a phone itself (Twilio configured). */
+  smsDelivery?: boolean;
 };
 
 export type GiftCardSettings = {
@@ -89,10 +92,38 @@ export function amountTextToCents(text: string): number | null {
 
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+/**
+ * US-first E.164, the same rule as the server (api-server lib/sms/phone.ts):
+ * 10 digits or 1 + 10 digits become +1…, otherwise it must start with +.
+ */
+export function toE164(raw: string): string | null {
+  const value = raw.trim();
+  if (!value || /[a-z]/i.test(value)) return null;
+  const digits = value.replace(/\D/g, '');
+  let e164: string;
+  if (value.startsWith('+')) e164 = `+${digits}`;
+  else if (digits.length === 10) e164 = `+1${digits}`;
+  else if (digits.length === 11 && digits.startsWith('1')) e164 = `+${digits}`;
+  else return null;
+  if (!/^\+[1-9]\d{7,14}$/.test(e164)) return null;
+  if (e164.startsWith('+1') && !/^\+1[2-9]\d{2}[2-9]\d{6}$/.test(e164)) return null;
+  return e164;
+}
+
+export const GIFT_CARD_CLAIM_URL = 'https://brandthread.app/gift-cards';
+
+/** The note the buyer sends from Messages when the server doesn't text it. */
+export function giftCardTextBody(input: { storeName: string; amountCents: number; code: string }): string {
+  const amount = input.amountCents % 100 === 0 ? `$${(input.amountCents / 100).toLocaleString('en-US')}` : formatCents(input.amountCents);
+  return `Here’s a ${amount} ${input.storeName} gift card.\nCode: ${input.code}\nClaim it: ${GIFT_CARD_CLAIM_URL}`;
+}
+
 /** What the buy screen still needs before Pay can start. Null when ready. */
 export function giftCardPurchaseIssue(input: {
   amountCents: number | null; info: Pick<GiftCardStoreInfo, 'denominations' | 'allowCustom' | 'minCents' | 'maxCents'>;
   email: string;
+  /** Sending by text: the phone is checked instead of the email. */
+  phone?: string | null;
 }): string | null {
   const { amountCents, info } = input;
   if (!amountCents) return 'Choose an amount';
@@ -100,6 +131,7 @@ export function giftCardPurchaseIssue(input: {
   if (amountCents < info.minCents || amountCents > info.maxCents) {
     return `Amounts run from ${formatCents(info.minCents)} to ${formatCents(info.maxCents)}`;
   }
+  if (input.phone != null) return toE164(input.phone) ? null : 'Enter the recipient’s phone number';
   if (!EMAIL_PATTERN.test(input.email.trim())) return 'Enter the recipient’s email';
   return null;
 }
