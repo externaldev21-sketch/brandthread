@@ -273,10 +273,6 @@ export default function LoginMethods() {
           contentContainerStyle={[s.body, { paddingBottom: insets.bottom + 32 }]}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={s.desc}>
-            The sign-in methods connected to your Brandthread account.
-          </Text>
-
           {/* Methods card */}
           <View style={s.card}>
             {methods.map((method, idx) => {

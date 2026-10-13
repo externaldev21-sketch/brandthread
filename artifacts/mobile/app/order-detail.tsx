@@ -1206,7 +1206,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
       {/* Risk Flags */}
       {order.riskFlags.length > 0 && (
         <View style={s.section}>
-          <SectionHeader title="Risk Flags" />
+          <SectionHeader title="Risk" />
           {order.riskFlags.map(f => (
             <View key={f.id} style={s.riskRow}>
               <Feather name="alert-circle" size={ICON.sm} color={f.severity === 'high' ? RED : ORANGE} />
@@ -1295,7 +1295,7 @@ function CustomerTab({ order }: { order: Order }) {
 
       {c.tags.length > 0 && (
         <View style={s.section}>
-          <SectionHeader title="Customer Tags" />
+          <SectionHeader title="Tags" />
           <View style={s.chipRow}>
             {c.tags.map(t => (
               <View key={t} style={s.chip}><Text style={s.chipText}>{t}</Text></View>
@@ -1358,7 +1358,7 @@ function PaymentTab({ order }: { order: Order }) {
     <View style={s.tabContent}>
       {order.threadCashPayout ? <ThreadCashPayoutCard payout={order.threadCashPayout} /> : null}
 
-      <SectionHeader title="Payment Breakdown" />
+      <SectionHeader title="Payment" />
       <BrandthreadCard>
         <InfoRow label="Subtotal" value={usd(p.subtotalCents)} />
         {p.discountTotalCents > 0 && <InfoRow label="Discounts" value={`-${usd(p.discountTotalCents)}`} />}
@@ -1446,7 +1446,7 @@ function ThreadCashPayoutCard({ payout }: { payout: NonNullable<Order['threadCas
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   return (
     <View style={s.section} testID="order-thread-cash-payout">
-      <SectionHeader title="Your Payout" />
+      <SectionHeader title="Payout" />
       <BrandthreadCard>
         {payout.lines.map(line => (
           <View key={line.key}>
