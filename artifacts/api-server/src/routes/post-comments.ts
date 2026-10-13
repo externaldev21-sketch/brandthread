@@ -31,6 +31,7 @@ import { publicPostCondition } from "../lib/postVisibility";
 import { notifyCommentActivity, notifyCommentLike, notifyCommentPinned } from "../lib/activityEvents";
 import { mentionsForComments, recordCommentMentions, resolveCommentMentions, type CommentMention } from "../lib/commentMentions";
 import { recordPostSignal } from "../lib/ranking/signals";
+import { hiddenByFilter, loadHiddenWords } from "../lib/hiddenWords";
 import {
   authorInGoodStanding,
   blockRelation,
@@ -119,10 +120,10 @@ router.get("/:postId/comments", async (req, res) => {
     // what is waiting for review.
     const visibility = viewerId
       ? or(
-          eq(postComments.moderationStatus, "visible"),
+          and(eq(postComments.moderationStatus, "visible"), or(eq(postComments.hiddenByOwner, false), eq(postComments.authorId, viewerId))),
           and(eq(postComments.moderationStatus, "held"), eq(postComments.authorId, viewerId)),
         )
-      : eq(postComments.moderationStatus, "visible");
+      : and(eq(postComments.moderationStatus, "visible"), eq(postComments.hiddenByOwner, false));
     const standing = authorInGoodStanding(postComments.authorId);
 
     const topLevel = await db
@@ -212,6 +213,7 @@ router.get("/:postId/comments", async (req, res) => {
         .where(and(
           eq(postComments.postId, postId),
           eq(postComments.moderationStatus, "visible"),
+          eq(postComments.hiddenByOwner, false),
           standing,
           blocked.size > 0 ? notInArray(postComments.authorId, [...blocked]) : undefined,
         )),
@@ -300,10 +302,10 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
     const [blocked, muted] = await Promise.all([blockedUserIds(viewerId), mutedPhrasesFor(viewerId)]);
     const visibility = viewerId
       ? or(
-          eq(postComments.moderationStatus, "visible"),
+          and(eq(postComments.moderationStatus, "visible"), or(eq(postComments.hiddenByOwner, false), eq(postComments.authorId, viewerId))),
           and(eq(postComments.moderationStatus, "held"), eq(postComments.authorId, viewerId)),
         )
-      : eq(postComments.moderationStatus, "visible");
+      : and(eq(postComments.moderationStatus, "visible"), eq(postComments.hiddenByOwner, false));
     const standing = authorInGoodStanding(postComments.authorId);
 
     const rows = await db
@@ -430,6 +432,9 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
     }
 
     const held = decision.action === "hold";
+    // The post owner's Hidden Words (lib/hiddenWords.ts): hidden from everyone
+    // but the commenter. Owners never filter themselves.
+    const hiddenByOwner = post.userId !== authorId && hiddenByFilter(await loadHiddenWords(post.userId), body);
     const [created] = await db.insert(postComments).values({
       postId,
       authorId,
@@ -437,6 +442,7 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
       body,
       moderationStatus: held ? "held" : "visible",
       moderationReason: held ? decision.category : null,
+      hiddenByOwner,
     }).returning();
 
     const mentions = await resolveCommentMentions(body, authorId);
@@ -455,7 +461,7 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
 
     // Held comments are invisible to everyone but their author, so nobody
     // else is told about them until a moderator approves.
-    if (!held) {
+    if (!held && !hiddenByOwner) {
       void notifyCommentActivity({
         postId, commentId: created.id, authorId, body, parentAuthorId,
         mentionedUserIds: mentions.map((m) => m.userId),

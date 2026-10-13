@@ -2719,6 +2719,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     /** Personal safety settings. */
     safety: {
       mutedWords: () => freshGet<{ words: MutedWord[]; limit: number }>('/api/safety/muted-words'),
+      /** Hidden Words: your own words; matching comments on your posts are hidden from everyone but their author. */
+      hiddenWords: () => freshGet<{ hideCustom: boolean; words: string[] }>('/api/safety/hidden-words'),
+      setHiddenWords: (body: { hideCustom?: boolean; words?: string[] }) =>
+        put<{ hideCustom: boolean; words: string[] }>('/api/safety/hidden-words', body),
       muteWord: (phrase: string) =>
         post<MutedWord & { alreadyMuted?: boolean }>('/api/safety/muted-words', { phrase }),
       unmuteWord: (phrase: string) =>
