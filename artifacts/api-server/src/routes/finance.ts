@@ -1011,12 +1011,12 @@ function instantInfo() {
 }
 
 /**
- * The instant fee as the seller sees it on the quote and the receipt: Stripe's
- * part (what Stripe debited, else its published rate) + Brandthread's part
+ * The instant fee as the seller sees it on the cash-out receipt: Stripe's
+ * part at its published rate + Brandthread's part
  * (fixed on the cash-out attempt).
  */
-function instantFeeReceipt(amountCents: number, platformFeeCents: number, stripeFeeCents?: number) {
-  const stripePart = stripeFeeCents ?? instantPayoutFee(amountCents).stripeFeeCents;
+function instantFeeReceipt(amountCents: number, platformFeeCents: number) {
+  const stripePart = instantPayoutFee(amountCents).stripeFeeCents;
   const total = stripePart + platformFeeCents;
   return {
     amount: total,
