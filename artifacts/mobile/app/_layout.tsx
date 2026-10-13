@@ -77,6 +77,7 @@ import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts
 import { UndoToastProvider } from '@/components/BrandthreadUI';
 import { CallSessionProvider } from '@/lib/calls/CallSessionContext';
 import { FirstRunTipsProvider } from '@/contexts/FirstRunTipsContext';
+import { WhatsNewHost } from '@/components/whats-new/WhatsNewHost';
 import { ReportSheetProvider } from '@/components/safety/ReportSheet';
 import { GlobalCallOverlay } from '@/components/calls/GlobalCallOverlay';
 import { SaveHeartHost } from '@/components/SaveHeartHost';
@@ -1343,6 +1344,7 @@ function RootLayoutNav() {
       </Pressable>
       <StatusBarMask />
       <SellerBarGate />
+      <WhatsNewHost />
       <AuthGate />
       <ServiceConfigurer />
       <PushRegistrar />
