@@ -34,6 +34,14 @@ File: `artifacts/api-server/src/routes/live.ts`, mounted at `/api/live`
 
 All screens: try-catch the `require('react-native-agora')` at top; show placeholder on web/Expo Go.
 
+## Durable purchase-activity reconciliation
+
+Keep one room purchase broadcaster when integrating activity polling with the existing live-attribution path. A durable activity claim must be shared with the broadcaster, not a second independent announcement.
+
+**Why:** Two independently correct payment handlers can notify the room twice. Internal checkout-row UUIDs and Stripe checkout/payment references are different identities; confusing them can also fail the post-payment claim.
+
+**How to apply:** Resolve the internal checkout identity before claiming activity; preserve authoritative order attribution and privacy checks, and retain old and new event formats at the client boundary.
+
 ## Feed Integration
 `artifacts/mobile/app/(tabs)/feed.tsx`:
 - `LiveStreamFeedItem` type with `_isLive: true` discriminant

@@ -53,6 +53,7 @@ export {
 import { emptyMysteryBoxVariants } from "../mysteryBox";
 import { resolveWithLiveRates } from "../intl/liveShippingRates";
 import { DutiesUnavailableError, dutiesForGroup } from "../intl/duties";
+import { resolveAuctionLinePrice } from "../liveAuctions";
 
 export const CART_CHECKOUT_KIND = "cart_checkout";
 /** Sellers in one cart payment (bounded by what the order pipeline handles per webhook). */
@@ -174,7 +175,7 @@ export async function priceCartGroup(input: {
   buyerId: string | null;
   /** Who the discount code's per-customer limits count against (the buyer id, or "guest:<email>"). */
   customerKey?: string;
-  items: Array<{ variantId: string; productId: string; quantity: number; bundleId?: string | null }>;
+  items: Array<{ variantId: string; productId: string; quantity: number; bundleId?: string | null; auctionId?: string }>;
   discountCode?: string | null;
   /** Live stream the buyer is shopping from (live-only discount codes). */
   liveStreamId?: string | null;
@@ -220,7 +221,12 @@ export async function priceCartGroup(input: {
     const variantLabel = [row.size, row.color].filter(Boolean).join(" / ");
     // Automatic sale (lib/pricing/sales.ts): the sale price is the authoritative
     // charge, and discount codes apply on top of it.
-    const unitCents = (await effectiveUnitPrice({
+    // A live-auction win is charged the winning price; a piece held by an
+    // auction can't be bought any other way (throws AuctionError).
+    const auctionPrice = await resolveAuctionLinePrice({
+      buyerId: input.buyerId, productId: item.productId, variantId: item.variantId, quantity: item.quantity, auctionId: item.auctionId ?? null,
+    });
+    const unitCents = auctionPrice ? auctionPrice.priceCents : (await effectiveUnitPrice({
       productId: item.productId, sellerId: row.sellerId, priceCents: row.priceCents, compareAtPriceCents: row.compareAtPriceCents,
     })).priceCents;
     items.push({

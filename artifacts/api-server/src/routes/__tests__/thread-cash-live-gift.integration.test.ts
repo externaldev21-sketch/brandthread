@@ -230,7 +230,7 @@ describe("sendLiveGift", () => {
     const seller = await makeUser();
     const stream = await makeStream(seller);
     const [config] = await db.select().from(threadCashConfig).limit(1);
-    const cap = config?.dailyReceiveCapCents ?? 5000;
+    const cap = (await getThreadCashConfig()).dailyReceiveCapCents;
     await reachReceiveCap(seller, stream, cap, config?.dailySendCapCents ?? 2000, 0);
     const late = await makeUser();
     await grant(late, 100);
@@ -269,7 +269,7 @@ describe("sendLiveGift", () => {
     const seller = await makeUser();
     const stream = await makeStream(seller);
     const [config] = await db.select().from(threadCashConfig).limit(1);
-    const cap = config?.dailyReceiveCapCents ?? 5000;
+    const cap = (await getThreadCashConfig()).dailyReceiveCapCents;
     await reachReceiveCap(seller, stream, cap, config?.dailySendCapCents ?? 2000, 3000);
     // The seller was only credited 70% of `cap`, but the cap is on gifts received.
     expect(await getBalanceCents(db, seller)).toBeLessThan(cap);

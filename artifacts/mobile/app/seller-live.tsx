@@ -52,6 +52,10 @@ import { LiveCommentActionsSheet, type CommentAction, type CommentActionTarget }
 import { radius } from '@/constants/radii';
 
 import { loadAgoraModule } from '@/lib/agoraAvailability';
+import { useLiveAuction } from '@/lib/live/useLiveAuction';
+import { LiveAuctionCard } from '@/components/live/LiveAuctionCard';
+import { LiveAuctionHostSheet } from '@/components/live/LiveAuctionHostSheet';
+import { cancelLiveAuction } from '@/services/liveAuctionsService';
 
 import { LiveCohostSplit } from '@/components/live/LiveCohostSplit';
 
@@ -121,6 +125,12 @@ function SellerLiveNativeScreen() {
   // Host-only tips total; stays null (and renders nothing) while the
   // `live_tips` flag is OFF or the call fails.
   const liveTipsEnabled = useFeatureFlag('live_tips');
+  // Live auctions (live_auctions flag): the host's card + "Start an auction" sheet.
+  const liveAuctionsEnabled = useFeatureFlag('live_auctions');
+  const auctionState = useLiveAuction(params.streamId, { enabled: liveAuctionsEnabled, viewerId: user?.id });
+  const auctionEventRef = useRef(auctionState.handleEvent);
+  auctionEventRef.current = auctionState.handleEvent;
+  const [showAuctionSheet, setShowAuctionSheet] = useState(false);
   const [tipsTotalCents, setTipsTotalCents] = useState<number | null>(null);
   useEffect(() => {
     if (!liveTipsEnabled || !params.streamId) return undefined;
@@ -228,6 +238,7 @@ function SellerLiveNativeScreen() {
 
   // ─── Realtime: WebSocket room for this stream, replacing the old 3s poll ──────
   const handleLiveEvent = React.useCallback((event: LiveSocketEvent) => {
+    auctionEventRef.current(event as any);
     if (event.type === 'comment') {
       lastCommentTs.current = event.comment.created_at;
       setComments(prev => [...prev, event.comment].slice(-80));
@@ -543,10 +554,44 @@ function SellerLiveNativeScreen() {
             </View>
           )}
         </TouchableOpacity>
+        {/* Auction (live_auctions flag) */}
+        {liveAuctionsEnabled && (
+          <TouchableOpacity
+            style={s.railBtn}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Start an auction"
+            onPress={() => setShowAuctionSheet(true)}
+            testID="seller-live-auction"
+          >
+            <Feather name="clock" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Purchases paid from this live */}
       <LivePurchaseToast purchase={purchaseToasts.current} top={headerTopInset + 84} />
+      {liveAuctionsEnabled && auctionState.auction && (
+        <View style={{ position: 'absolute', left: 12, right: 64, bottom: 205, zIndex: 9 }}>
+          <LiveAuctionCard
+            auction={auctionState.auction}
+            receivedAt={auctionState.receivedAt}
+            onCancel={() => { void cancelLiveAuction(params.streamId, auctionState.auction!.id).then(auctionState.refresh).catch(() => {}); }}
+          />
+        </View>
+      )}
+      {liveAuctionsEnabled && (
+        <LiveAuctionHostSheet
+          streamId={params.streamId}
+          products={productTags.map(t => ({ productId: t.productId, productName: t.productName, priceCents: t.priceCents }))}
+          visible={showAuctionSheet}
+          onClose={() => setShowAuctionSheet(false)}
+          onStarted={auctionState.refresh}
+        />
+      )}
+
+      {/* Co-host tiles */}
+      <CohostTiles cohosts={mod.cohosts} RtcSurfaceView={AgoraModule?.RtcSurfaceView ?? null} top={headerTopInset + 86} />
 
       {/* Tagged products strip */}
       {productTags.length > 0 && (

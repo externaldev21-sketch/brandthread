@@ -15,7 +15,8 @@ export type FeatureFlagKey =
   | 'oauthAppleEnabled'
   | 'hostedCheckoutFallback'
   | 'live_tips'
-  | 'autoCaptions';
+  | 'autoCaptions'
+  | 'live_auctions';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   aiPhotoShoot: true,
@@ -47,6 +48,9 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   // Auto captions (Whisper) on video posts. OFF until the server has the AI keys
   // and an operator flips it (PUT /api/feature-flags/autoCaptions).
   autoCaptions: false,
+  // Live auctions for 1-of-1s (Whatnot-style). OFF until launch; the server
+  // enforces it too (routes/live-auctions.ts, seeded OFF in migration 300).
+  live_auctions: false,
 };
 
 const STORAGE_KEY = 'bt:feature-flags:v1';

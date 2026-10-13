@@ -112,6 +112,7 @@ import { reserveStockForOrder } from "../lib/stockReservation";
 import { recordPurchaseSignals } from "../lib/ranking/signals";
 import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 import { applyEarlyFraudWarningToOrders, applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
+import { markAuctionPaid } from "../lib/liveAuctions";
 import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
 import { amountBucket, captureServerEvent } from "../lib/analytics";
 import { sendPurchaseConversions } from "../lib/conversionTracking";
@@ -1465,6 +1466,8 @@ export async function handleCheckoutPaid(
     }
   } else {
     logger.info({ orderId: createdOrderId, buyerId: buyerId ?? undefined, isGuest: !buyerId, stripeSessionId: sessionId }, "Order created from paid checkout");
+    // A live-auction win was paid: record the order on the auction (never throws).
+    if (createdOrderId) await markAuctionPaid(csRecord.id, createdOrderId);
 
     // Seller-only Radar risk flags. Best effort: enrichOrderRisk never throws.
     if (createdOrderId) {

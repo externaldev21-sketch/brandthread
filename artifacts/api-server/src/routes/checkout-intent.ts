@@ -54,6 +54,7 @@ import { destinationApplicationFeeCents } from "../lib/money/fees";
 import { paymentIntentMethodParams, paymentMethodTypesFor } from "../lib/payments/bnpl";
 import { bnplMethodsForCart } from "../lib/payments/sellerPaymentSettings";
 import { StockReservationError, releaseStockReservation, reserveStock } from "../lib/money/stockReservation";
+import { AuctionError, recordAuctionCheckout } from "../lib/liveAuctions";
 import { applyGiftCardToGroup, trimGiftCardsForMinimumCharge } from "../lib/giftCards/checkout";
 import { GiftCardError, claimCard, giftCentsForCheckouts, reserveForCheckout } from "../lib/giftCards/service";
 import {
@@ -95,6 +96,8 @@ const itemSchema = z.object({
   productId: requestPrimitives.uuid,
   quantity: z.coerce.number().int().min(1).max(100),
   bundleId: requestPrimitives.uuid.nullable().optional(),
+  /** Paying for a live auction you won: the winning price comes from the server (lib/liveAuctions.ts). */
+  auctionId: z.string().uuid().optional(),
 });
 const addressSchema = z.object({
   recipientName: requestPrimitives.shortText,
@@ -328,6 +331,10 @@ function stripeFor(res: Response): ReturnType<typeof requireStripe> | null {
 }
 
 function sendError(res: Response, error: unknown): boolean {
+  if (error instanceof AuctionError) {
+    res.status(error.status).json({ error: error.message, code: error.code });
+    return true;
+  }
   if (error instanceof GiftCardError) {
     res.status(error.status).json({ error: error.message, code: error.code });
     return true;
@@ -670,6 +677,9 @@ export function createCheckoutIntentRouter(mode: CheckoutIntentMode): Router {
     // is linked only after every seller group has a durable checkout row.
     for (const [index, row] of rows.entries()) {
       const source = body.groups[index];
+      for (const item of source?.items ?? []) {
+        if (item.auctionId && payer.buyerId) await recordAuctionCheckout(row.id, item.auctionId, payer.buyerId);
+      }
       await recordLiveCheckout({
         checkoutSessionId: row.id, streamId: source?.liveStreamId,
         buyerId: payer.buyerId, sellerId: row.sellerId,
