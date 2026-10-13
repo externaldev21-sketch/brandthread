@@ -14,7 +14,7 @@ const read = (relativePath: string) => readFileSync(resolve(__dirname, '..', rel
 describe('no translucent selected-chip highlight', () => {
   it('Chip fills the selected state solid instead of a translucent accentDim wash', () => {
     const chip = read('components/ui/Chip.tsx');
-    expect(chip).toContain("backgroundColor: selected ? theme.accent : palette.card");
+    expect(chip).toContain("backgroundColor: selected ? theme.accent : 'transparent'");
     expect(chip).not.toMatch(/backgroundColor:\s*selected\s*\?\s*theme\.accentDim/);
   });
 

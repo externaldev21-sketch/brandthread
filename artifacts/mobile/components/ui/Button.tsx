@@ -27,6 +27,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { radius } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+import { DISABLED_OPACITY } from '@/constants/states';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive';
@@ -110,14 +111,16 @@ export function Button({
 
   const variantStyle = ((): { bg: string; fg: string; border?: string } => {
     switch (variant) {
-      case 'primary': return { bg: isDisabled ? palette.elevated : theme.accent, fg: isDisabled ? palette.mutedForeground : theme.onAccent };
-      case 'secondary': return { bg: 'transparent', fg: isDisabled ? palette.mutedForeground : palette.foreground, border: isDisabled ? palette.border : palette.foreground };
-      case 'tertiary': return { bg: 'transparent', fg: isDisabled ? palette.mutedForeground : theme.accentLight };
-      case 'destructive': return { bg: isDisabled ? palette.elevated : RED, fg: isDisabled ? palette.mutedForeground : palette.background };
+      // Disabled keeps these colours; the whole control drops to
+      // DISABLED_OPACITY below. Destructive is red text only, no red fill.
+      case 'primary': return { bg: theme.accent, fg: theme.onAccent };
+      case 'secondary': return { bg: 'transparent', fg: palette.foreground, border: palette.foreground };
+      case 'tertiary': return { bg: 'transparent', fg: theme.accentLight };
+      case 'destructive': return { bg: 'transparent', fg: RED };
     }
   })();
 
-  const isFilled = variant === 'primary' || variant === 'destructive';
+  const isFilled = variant === 'primary';
   // Filled buttons darken on press; outline/ghost buttons pick up a faint
   // theme-tinted fill. Never a separate translucent circle/pill layer, and
   // no android_ripple — the ripple's spreading-circle wash is exactly the
@@ -147,7 +150,7 @@ export function Button({
           variant === 'secondary' && { borderWidth: 1, borderColor: variantStyle.border },
           isFilled && !isDisabled && styles.raisedShadow,
           fullWidth && styles.fullWidth,
-          isDisabled && !isFilled && { opacity: 0.5 },
+          disabled && { opacity: DISABLED_OPACITY },
           style,
         ]}
       >
@@ -166,9 +169,9 @@ export function Button({
           <ActivityIndicator color={variantStyle.fg} size="small" />
         ) : (
           <>
-            {icon && <Feather name={icon} size={size === 'compact' ? 16 : 18} color={variantStyle.fg} />}
-            {/* An icon-only button passes label="" (with an accessibilityLabel)
-                — no empty Text, so the icon sits dead centre. */}
+            {/* Icons only on icon-only buttons (label="" with an
+                accessibilityLabel) — a text button is just its words. */}
+            {icon && !label && <Feather name={icon} size={size === 'compact' ? 16 : 18} color={variantStyle.fg} />}
             {label ? (
               <Text style={[styles.label, labelType, { color: variantStyle.fg }]} numberOfLines={1} maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}>
                 {label}

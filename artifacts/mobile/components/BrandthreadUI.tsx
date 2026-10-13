@@ -43,6 +43,7 @@ import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusedAnimationLoop } from '@/lib/useFocusedAnimationLoop';
 import { radius } from '@/constants/radii';
+import { DISABLED_OPACITY } from '@/constants/states';
 
 // ─── Shared undo action/toast ─────────────────────────────────────────────────
 // Mutations remain responsible for their own server/local rollback. This provider
@@ -487,23 +488,20 @@ export function PrimaryButton({
       // the caller's `style` sets a slimmer one — so PressableScale's forced
       // 44pt minimum is skipped here (its auto hit-slop still pads the TAP
       // area back up to 44pt; only the drawn box gets slimmer).
-      style={[{ borderRadius: RADIUS.md, overflow: 'hidden', height: h }, style]}
+      style={[{ borderRadius: RADIUS.md, overflow: 'hidden', height: h }, disabled && { opacity: DISABLED_OPACITY }, style]}
       noMinHeight
       testID={testID}
     >
       <LinearGradient
-        colors={disabled ? [palette.elevated, palette.elevated] : buttonColors}
+        colors={buttonColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[pbS.inner, { height: '100%' }]}
       >
         {loading ? (
-          <ActivityIndicator color={disabled ? palette.mutedForeground : foreground} size="small" />
+          <ActivityIndicator color={foreground} size="small" />
         ) : (
-          <>
-            {icon && <Feather name={icon} size={ICON.sm} color={disabled ? palette.mutedForeground : foreground} />}
-            <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, disabled ? { color: palette.mutedForeground, fontSize: small ? FS.sm : FS.base, opacity: 0.5 } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]} numberOfLines={1}>{label}</Text>
-          </>
+          <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]} numberOfLines={1}>{label}</Text>
         )}
       </LinearGradient>
     </PressableScale>
@@ -549,9 +547,8 @@ export function SecondaryButton({ label, onPress, icon, disabled, small, style, 
       }}
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
-      style={[sbS.root, { height: h, borderColor: resolvedAccent + '55', backgroundColor: resolvedAccent + '14', opacity: disabled ? 0.5 : 1 }, style]}
+      style={[sbS.root, { height: h, borderColor: resolvedAccent + '55', backgroundColor: resolvedAccent + '14', opacity: disabled ? DISABLED_OPACITY : 1 }, style]}
     >
-      {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
       <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[sbS.label, { fontSize: small ? FS.sm : FS.base, color: resolvedAccent }]} numberOfLines={1}>{label}</Text>
     </PressableScale>
   );
@@ -579,6 +576,7 @@ export function TertiaryButton({ label, onPress, icon, disabled, small, style, a
   const { theme } = useAppTheme();
   const resolvedAccent = accent ?? theme.accentLight;
   const h = small ? COMP.buttonHSm : COMP.buttonH;
+  const [pressed, setPressed] = useState(false);
   return (
     <PressableScale
       onPress={() => {
@@ -588,10 +586,12 @@ export function TertiaryButton({ label, onPress, icon, disabled, small, style, a
       }}
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
-      style={[{ height: h, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: BUTTON_INNER_PADDING_X, opacity: disabled ? 0.4 : 1 }, style]}
+      style={[{ height: h, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: BUTTON_INNER_PADDING_X, opacity: disabled ? DISABLED_OPACITY : 1 }, style]}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
     >
-      {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
-      <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={{ fontFamily: FONT.semibold, fontSize: small ? FS.sm : FS.base, color: resolvedAccent }} numberOfLines={1}>{label}</Text>
+      {/* A text link: the label alone, underlined while pressed. */}
+      <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={{ fontFamily: FONT.semibold, fontSize: small ? FS.sm : FS.base, color: resolvedAccent, textDecorationLine: pressed ? 'underline' : 'none' }} numberOfLines={1}>{label}</Text>
     </PressableScale>
   );
 }
@@ -713,9 +713,9 @@ export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       accessibilityLabel={count !== undefined ? `${label}, ${count}` : label}
       accessibilityState={{ selected: active }}
-      style={[fcS.chip, { backgroundColor: palette.card, borderColor: palette.border }, active && [fcS.active, { backgroundColor: theme.accent, borderColor: theme.accent }]]}
+      style={[fcS.chip, { backgroundColor: 'transparent', borderColor: palette.border }, active && [fcS.active, { backgroundColor: theme.accent, borderColor: theme.accent }]]}
     >
-      <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[fcS.label, { color: palette.mutedForeground }, active && [fcS.activeLabel, { color: theme.onAccent }]]}>{label}</Text>
+      <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[fcS.label, { color: palette.foreground }, active && [fcS.activeLabel, { color: theme.onAccent }]]}>{label}</Text>
       {count !== undefined && (
         <View style={[fcS.count, active && [fcS.activeCount, { backgroundColor: `${theme.onAccent}26` }]]}>
           <Text style={[fcS.countText, { color: palette.mutedForeground }, active && [fcS.activeCountText, { color: theme.onAccent }]]}>{count}</Text>
@@ -1401,7 +1401,7 @@ export function HapticSwitch({
       disabled={disabled}
       // The drawn switch stays at its slim 42×24 size; hitSlop pads out to a
       // full 44×44 tap target on every side without widening the visual.
-      style={[{ width: SWITCH_WIDTH, height: SWITCH_HEIGHT, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1 }, style]}
+      style={[{ width: SWITCH_WIDTH, height: SWITCH_HEIGHT, alignItems: 'center', justifyContent: 'center', opacity: disabled ? DISABLED_OPACITY : 1 }, style]}
       hitSlop={hitSlop ?? {
         top: (SWITCH_HIT_AREA - SWITCH_HEIGHT) / 2,
         bottom: (SWITCH_HIT_AREA - SWITCH_HEIGHT) / 2,

@@ -11,6 +11,7 @@ import { hapticToggle } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 import { radius } from '@/constants/radii';
+import { DISABLED_OPACITY } from '@/constants/states';
 
 export interface QuantityStepperProps {
   value: number;
@@ -97,5 +98,5 @@ const styles = StyleSheet.create({
   rootSm: { paddingHorizontal: 2, height: 32 },
   btn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   btnSm: { width: 26, height: 26 },
-  disabled: { opacity: 0.4 },
+  disabled: { opacity: DISABLED_OPACITY },
 });
