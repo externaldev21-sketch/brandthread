@@ -30,6 +30,7 @@
     "@workspace/integrations-openai-ai-server": "workspace:*",
     "@workspace/manufacturer-flow": "workspace:*",
     "agora-access-token": "^2.0.4",
+    "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",
@@ -44,10 +45,11 @@
     "resend": "^6.30.0",
     "sharp": "^0.35.4",
     "stripe": "^22.5.0",
-    "zod": "catalog:",
-    "ws": "^8.21.0"
+    "ws": "^8.21.0",
+    "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/compression": "^1.8.1",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
