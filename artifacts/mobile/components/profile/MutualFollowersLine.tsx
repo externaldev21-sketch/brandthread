@@ -7,7 +7,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { CachedImage } from '@/components/CachedImage';
+import { Avatar } from '@/components/ui/Avatar';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { mutualFollowerLabel, mutualFollowersSegments } from '@/lib/mutualFollowersText';
@@ -17,7 +17,7 @@ export type MutualFollowers = {
   count: number;
 };
 
-const AVATAR = 20;
+const AVATAR = 24;
 
 export function MutualFollowersLine({ mutual, onPress }: { mutual?: MutualFollowers | null; onPress?: () => void }) {
   const { theme } = useAppTheme();
@@ -37,22 +37,16 @@ export function MutualFollowersLine({ mutual, onPress }: { mutual?: MutualFollow
     >
       {() => (
         <>
-          <View style={[styles.avatars, { width: AVATAR + 4 + (Math.min(users.length, 3) - 1) * (AVATAR - 6) }]}>
+          <View style={[styles.avatars, { width: AVATAR + 4 + (Math.min(users.length, 3) - 1) * (AVATAR - 8) }]}>
             {users.slice(0, 3).map((user, index) => (
               <View
                 key={user.userId}
                 style={[
                   styles.avatarWrap,
-                  { left: index * (AVATAR - 6), zIndex: 3 - index, borderColor: theme.background, backgroundColor: theme.cardElevated },
+                  { left: index * (AVATAR - 8), zIndex: 3 - index, borderColor: theme.background, backgroundColor: theme.background },
                 ]}
               >
-                {user.avatarUrl ? (
-                  <CachedImage source={{ uri: user.avatarUrl }} style={styles.avatar} contentFit="cover" />
-                ) : (
-                  <Text style={[styles.initial, { color: theme.text }]}>
-                    {mutualFollowerLabel(user).slice(0, 1).toUpperCase()}
-                  </Text>
-                )}
+                <Avatar uri={user.avatarUrl} name={mutualFollowerLabel(user)} size={AVATAR} />
               </View>
             ))}
           </View>
@@ -74,8 +68,6 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 0, width: AVATAR + 4, height: AVATAR + 4, borderRadius: (AVATAR + 4) / 2,
     borderWidth: 2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center',
   },
-  avatar: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2 },
-  initial: { fontSize: FS.xs, fontFamily: FONT.semibold },
   text: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   bold: { fontFamily: FONT.semibold },
 });
