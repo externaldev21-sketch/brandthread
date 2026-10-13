@@ -21,7 +21,10 @@ import {
   saveForLater, moveToCart, removeSavedItem,
   groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart,
   estimateGroupShipping, totalShippingEstimate, replaceCartItemVariant, type ShippingEstimate,
+  refreshCartStock,
 } from '@/services/cartService';
+import { FreeShippingStrip } from '@/components/cart/FreeShippingStrip';
+import { refreshFreeShippingThresholds } from '@/lib/freeShipping';
 import { VariantPickerSheet } from '@/components/buy-now/VariantPickerSheet';
 import {
   BAG_BAR_HEIGHT, BagCheckoutBar, BagColumns, BagEmpty, BagHeader, BagItemRow, BagTotals, toNewArrivals,
@@ -185,6 +188,10 @@ export default function CartScreen() {
       const { cart: nextCart, loadError: nextLoadError } = await getCartForScreen();
       setCart(nextCart);
       setLoadError(nextLoadError);
+      void refreshFreeShippingThresholds(nextCart.items.map(i => i.sellerId));
+      void refreshCartStock(nextCart.items).then(fresh => {
+        if (fresh) setCart(current => current.id === fresh.id ? fresh : current);
+      }).catch(() => {});
       const pendingCheckout = await getCheckoutSession();
       if (
         pendingCheckout?.loyaltyRedemption &&
@@ -572,6 +579,9 @@ export default function CartScreen() {
             {hasItems ? (
               <>
                 <BagColumns count={itemCount} />
+                {groups.map(group => (
+                  <FreeShippingStrip key={group.sellerId} sellerId={group.sellerId} sellerName={group.sellerName} subtotalCents={group.subtotalCents} hasPreOrder={group.hasPreOrder} />
+                ))}
                 {editMode && <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: SP.sm }}>
                   <Button label="Select all" variant="secondary" size="small" onPress={() => setSelectedIds(new Set(cart.items.map(i => i.id)))} />
                   <Button label={`Remove (${selectedIds.size})`} variant="secondary" size="small" disabled={!selectedIds.size} loading={removingSelected} onPress={handleRemoveSelected} />

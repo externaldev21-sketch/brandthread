@@ -7,7 +7,8 @@ import { track } from '@/lib/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { safeGetItem, safeSetItem, safeRemoveItem } from '@/lib/safeAsyncStorage';
 import { previewShippingRate } from '@/lib/previewCheckout';
-import { getPreviewBuyerProduct } from '@/lib/previewProducts';
+import { getPreviewBuyerProduct, isPreviewProductId } from '@/lib/previewProducts';
+import { applyLiveStock, cartMaxQuantity, lineQuantityCap } from '@/lib/cartStock';
 import { serviceRequest } from '@/lib/serviceConfig';
 import {
   Cart, CartItem, SavedCartItem, CartSellerGroup,
@@ -412,6 +413,48 @@ export async function getCartForScreen(): Promise<{ cart: Cart; loadError: boole
   return { cart, loadError };
 }
 
+/**
+ * Re-reads live stock for the bag's lines (on bag focus) so "Only N left" is
+ * today's count, not the one captured when the item was added. Uses the
+ * public product endpoint (no auth, so a signed-out bag works too), at most
+ * 20 products. Seeded preview products have static stock and are skipped.
+ * Returns the updated cart, or null when nothing changed or nothing was read.
+ */
+const STOCK_REFRESH_MAX_PRODUCTS = 20;
+export async function refreshCartStock(items: CartItem[]): Promise<Cart | null> {
+  const k = keys();
+  const productIds = [...new Set(items.filter(i => !i.isPreOrder).map(i => i.productId))]
+    .filter(id => id && !isPreviewProductId(id))
+    .slice(0, STOCK_REFRESH_MAX_PRODUCTS);
+  if (productIds.length === 0) return null;
+  const results = await Promise.allSettled(productIds.map(id =>
+    serviceRequest<any>(`/api/public/products/${encodeURIComponent(id)}`, {}, false),
+  ));
+  const stockByVariantId = new Map<string, number>();
+  for (const result of results) {
+    if (result.status !== 'fulfilled' || !Array.isArray(result.value?.variants)) continue;
+    for (const variant of result.value.variants) {
+      if (typeof variant?.id === 'string' && typeof variant.stock === 'number') stockByVariantId.set(variant.id, variant.stock);
+    }
+  }
+  if (stockByVariantId.size === 0 || _cartUserId !== k.userId) return null;
+  // Re-read the stored bag right before writing so an edit made while the
+  // requests were in flight is kept.
+  let cart: Cart;
+  try {
+    const raw = await safeGetItem(k.cart);
+    if (!raw) return null;
+    cart = normalizeCart(JSON.parse(raw) as Cart);
+  } catch {
+    return null;
+  }
+  const { items: next, changed } = applyLiveStock(cart.items, stockByVariantId);
+  if (!changed || _cartUserId !== k.userId) return null;
+  cart.items = next;
+  await saveCart(cart, k);
+  return cart;
+}
+
 async function saveCart(cart: Cart, k: CartKeys = keys()): Promise<void> {
   cart.updatedAt = now();
   // safeSetItem (not a bare AsyncStorage.setItem): on web, AsyncStorage is a
@@ -463,7 +506,7 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
   if (existingIdx >= 0) {
     const existing = cart.items[existingIdx];
     const newQty = existing.quantity + quantity;
-    const cap = variant.inventoryQuantity > 0 ? variant.inventoryQuantity : 99;
+    const cap = cartMaxQuantity(variant.inventoryQuantity, product.isPreOrder);
     if (newQty > cap) {
       return { success: false, message: `You already have ${existing.quantity} in your cart. Can't add more.`, cart };
     }
@@ -487,7 +530,7 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
       priceCents: variant.priceCents ?? product.priceCents,
       compareAtPriceCents: variant.compareAtPriceCents ?? product.compareAtPriceCents,
       quantity,
-      maxQuantity: variant.inventoryQuantity > 0 ? variant.inventoryQuantity : 99,
+      maxQuantity: cartMaxQuantity(variant.inventoryQuantity, product.isPreOrder),
       isPreOrder: product.isPreOrder,
       preOrderEstShipDate: product.preOrderEstShipDate,
       inventoryPolicy: 'deny',
@@ -604,7 +647,9 @@ export async function updateCartItemQuantity(itemId: string, quantity: number): 
       cart.items.splice(idx, 1);
     } else {
       const item = cart.items[idx];
-      const capped = Math.min(quantity, item.maxQuantity || 99);
+      // A sold-out line (cap 0) can still step down, never up.
+      const cap = lineQuantityCap(item.maxQuantity);
+      const capped = cap === 0 ? Math.min(quantity, item.quantity) : Math.min(quantity, cap);
       cart.items[idx] = { ...item, quantity: capped };
     }
     await saveCart(cart, k);
@@ -638,7 +683,7 @@ export async function replaceCartItemVariant(
     if (!product.isPreOrder && mergedQuantity > variant.inventoryQuantity) {
       return { success: false, message: `You already have ${duplicate.quantity} of this variant in your cart.`, cart };
     }
-    cart.items[duplicateIndex] = { ...duplicate, quantity: mergedQuantity, maxQuantity: variant.inventoryQuantity || 99 };
+    cart.items[duplicateIndex] = { ...duplicate, quantity: mergedQuantity, maxQuantity: cartMaxQuantity(variant.inventoryQuantity, product.isPreOrder) };
     cart.items.splice(index, 1);
   } else {
     cart.items[index] = {
@@ -651,7 +696,7 @@ export async function replaceCartItemVariant(
       priceCents: variant.priceCents ?? product.priceCents,
       compareAtPriceCents: variant.compareAtPriceCents ?? product.compareAtPriceCents,
       quantity,
-      maxQuantity: variant.inventoryQuantity || 99,
+      maxQuantity: cartMaxQuantity(variant.inventoryQuantity, product.isPreOrder),
       isAvailable: true,
       unavailableReason: undefined,
     };
@@ -726,7 +771,7 @@ export async function moveToCart(savedItemId: string): Promise<Cart> {
       const current = cart.items[existing];
       cart.items[existing] = {
         ...current,
-        quantity: Math.min(current.quantity + saved.quantity, current.maxQuantity || 99),
+        quantity: Math.max(current.quantity, Math.min(current.quantity + saved.quantity, lineQuantityCap(current.maxQuantity))),
       };
     } else {
       cart.items.push({ ...saved, addedAt: now() });
@@ -1163,7 +1208,7 @@ export async function createBuyNowSession(
     priceCents: variant.priceCents,
     compareAtPriceCents: variant.compareAtPriceCents,
     quantity,
-    maxQuantity: variant.inventoryQuantity || 99,
+    maxQuantity: cartMaxQuantity(variant.inventoryQuantity, product.isPreOrder),
     isPreOrder: product.isPreOrder,
     preOrderEstShipDate: product.preOrderEstShipDate,
     inventoryPolicy: 'deny',

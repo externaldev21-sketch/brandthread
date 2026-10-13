@@ -87,6 +87,7 @@ import { primaryOption, sizeCells } from '@/lib/sizeSheet';
 import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
 import { productTransitionKey } from '@/lib/tileTransition';
 import { deliveryPromiseLine } from '@/lib/deliveryGuarantee';
+import { useStockInfo, variantStockLine } from '@/lib/stockInfo';
 import { ApiError } from '@/lib/networkNotice';
 
 type ThemeAliases = {
@@ -619,6 +620,7 @@ export default function BuyerProductDetailScreen() {
     src?: string;
   }>();
   const router = useRouter();
+  const stockInfo = useStockInfo(productId);
   const pathname = usePathname();
   const { push, back } = useThreadPull();
   const usesThreadPull = pathname === '/thread-product-detail';
@@ -1009,6 +1011,7 @@ export default function BuyerProductDetailScreen() {
   const allSelected = allOptionsSelected(product, selections);
   const inStock = variant ? variant.isAvailable && variant.inventoryQuantity > 0 : true;
   const maxQty = variant ? Math.max(1, variant.inventoryQuantity) : 10;
+  const stockLine = variant ? variantStockLine(variant, stockInfo) : null;
   const paymentUnavailable = sellerPaymentReady === false;
   // GOAT: the size is picked in a sheet (price under each size), not chips.
   const sizeOption = primaryOption(product);
@@ -1448,25 +1451,21 @@ export default function BuyerProductDetailScreen() {
           )}
 
           {/* Stock status */}
-          {allSelected && variant && (
+          {allSelected && variant && stockLine && stockLine.kind !== 'hidden' && (
             <View style={s.stockRow} testID="product-stock-line">
               {/* Monochrome (no green/red): low stock is white and bold,
-                  plain in-stock and sold-out are grey. */}
+                  plain in-stock and sold-out are grey. Threshold and
+                  de-duplication with <StockCounter>: lib/stockLine.ts. */}
               <View style={[s.stockDot, {
-                backgroundColor: variant.isAvailable && variant.inventoryQuantity <= 5 ? FG : variant.isAvailable ? MUTED : SUBTLE,
+                backgroundColor: stockLine.kind === 'low' ? FG : stockLine.kind === 'in' ? MUTED : SUBTLE,
               }]} />
               <Text style={[
                 s.stockText,
-                variant.isAvailable && variant.inventoryQuantity <= 5
+                stockLine.kind === 'low'
                   ? { color: FG, fontFamily: FONT.bold }
                   : { color: MUTED },
               ]}>
-                {variant.isAvailable
-                  ? variant.inventoryQuantity <= 5
-                    ? `Only ${variant.inventoryQuantity} left in stock`
-                    : 'In stock'
-                  : 'Sold out — select another option'
-                }
+                {stockLine.text}
               </Text>
             </View>
           )}

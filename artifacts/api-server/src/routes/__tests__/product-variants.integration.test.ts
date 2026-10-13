@@ -219,20 +219,20 @@ describe("auto sold-out", () => {
 });
 
 describe("public stock-info privacy", () => {
-  it("exposes only soldOut/limited/editionSize/remaining, and remaining only when meant to be public", async () => {
+  it("exposes only soldOut/limited/editionSize/remaining/counterThreshold, and remaining only when meant to be public", async () => {
     const p = await newProduct(seller);
     await call(`/api/product-variants/${p.id}/axes`, seller, "PUT", { axes: [{ name: "Size", values: ["S"] }] });
     await call(`/api/product-variants/${p.id}/generate`, seller, "POST", { priceCents: 1000, stock: 12 });
 
     const plain = await call(`/api/catalog-public/products/${p.id}/stock-info`, null);
-    expect(Object.keys(plain.body).sort()).toEqual(["editionSize", "limited", "remaining", "soldOut"]);
-    expect(plain.body).toEqual({ soldOut: false, limited: false, editionSize: null, remaining: null });
+    expect(Object.keys(plain.body).sort()).toEqual(["counterThreshold", "editionSize", "limited", "remaining", "soldOut"]);
+    expect(plain.body).toEqual({ soldOut: false, limited: false, editionSize: null, remaining: null, counterThreshold: null });
 
     await call(`/api/product-variants/${p.id}/stock-rules`, seller, "PUT", { showRemainingCounter: true, counterThreshold: 5 });
-    expect((await call(`/api/catalog-public/products/${p.id}/stock-info`, null)).body.remaining).toBeNull(); // 12 > 5
+    expect((await call(`/api/catalog-public/products/${p.id}/stock-info`, null)).body).toMatchObject({ remaining: null, counterThreshold: 5 }); // 12 > 5
 
     await call(`/api/product-variants/${p.id}/stock-rules`, seller, "PUT", { limitedQuantityEnabled: true, limitedQuantityTotal: 50 });
-    expect((await call(`/api/catalog-public/products/${p.id}/stock-info`, null)).body).toEqual({ soldOut: false, limited: true, editionSize: 50, remaining: 12 });
+    expect((await call(`/api/catalog-public/products/${p.id}/stock-info`, null)).body).toEqual({ soldOut: false, limited: true, editionSize: 50, remaining: 12, counterThreshold: null });
 
     const draft = await newProduct(seller, { status: "draft" });
     expect((await call(`/api/catalog-public/products/${draft.id}/stock-info`, null)).status).toBe(404);
