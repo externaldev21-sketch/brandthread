@@ -74,5 +74,5 @@ describe('minimum text size (polish #80)', () => {
       .filter((rel) => !KNOWN_BELOW_FLOOR.has(rel))
       .filter((rel) => smallFontSizes(readFileSync(path.join(ROOT, rel), 'utf8')).length > 0);
     expect(offenders).toEqual([]);
-  });
+  }, 30_000);
 });

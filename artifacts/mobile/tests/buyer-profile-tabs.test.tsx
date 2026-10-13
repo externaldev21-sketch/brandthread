@@ -572,10 +572,13 @@ describe('buyer profile tabs', () => {
     expect(renderer.root.findAllByProps({ testID: 'account-switcher-sheet' }).length).toBe(1);
 
     routerMock.push.mockReset();
+    const menuButton = renderer.root.findAll(
+      node => node.props.accessibilityLabel === 'Profile options' && typeof node.props.onPress === 'function',
+    )[0];
+    await act(async () => { menuButton.props.onPress(); });
     const editProfileBtns = renderer.root.findAll(
-      node => (node.type as unknown) === 'Pressable'
-        && typeof node.props.onPress === 'function'
-        && textContent(node.props.children).includes('Edit profile'),
+      node => node.props.testID === 'profile-menu-sheet-edit-profile'
+        && typeof node.props.onPress === 'function',
     );
     expect(editProfileBtns.length).toBeGreaterThan(0);
     await act(async () => { editProfileBtns[0].props.onPress(); });
@@ -585,10 +588,13 @@ describe('buyer profile tabs', () => {
   it('opens the real share sheet (QR, copy link, native share) from Share profile', async () => {
     renderer = await renderScreen();
     expect(renderer.root.findAll((node) => node.props.testID === 'share-profile-sheet')).toHaveLength(0);
+    const menuButton = renderer.root.findAll(
+      node => node.props.accessibilityLabel === 'Profile options' && typeof node.props.onPress === 'function',
+    )[0];
+    await act(async () => { menuButton.props.onPress(); });
     const shareBtn = renderer.root.findAll(
-      node => (node.type as unknown) === 'Pressable'
-        && typeof node.props.onPress === 'function'
-        && textContent(node.props.children).includes('Share profile'),
+      node => node.props.testID === 'profile-menu-sheet-share'
+        && typeof node.props.onPress === 'function',
     )[0];
     expect(shareBtn).toBeTruthy();
     await act(async () => { shareBtn.props.onPress(); });
@@ -790,6 +796,10 @@ describe('buyer profile — Instagram layout', () => {
     for (const gone of ['profile-banner-edit', 'profile-edit-button', 'profile-share-button', 'profile-discover-people']) {
       expect(renderer.root.findAll((node) => node.props.testID === gone), gone).toHaveLength(0);
     }
+    const menuButton = renderer.root.findAll(
+      node => node.props.accessibilityLabel === 'Profile options' && typeof node.props.onPress === 'function',
+    )[0];
+    await act(async () => { menuButton.props.onPress(); });
     const editRow = renderer.root.findAll((node) => node.props.testID === 'profile-menu-sheet-edit-profile' && typeof node.props.onPress === 'function')[0];
     await act(async () => { editRow.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/edit-profile');
@@ -797,6 +807,10 @@ describe('buyer profile — Instagram layout', () => {
 
   it('••• menu: Edit profile · Notifications · Share profile, then Find friends + View as visitor below a separator', async () => {
     renderer = await renderScreen();
+    const menuButton = renderer.root.findAll(
+      node => node.props.accessibilityLabel === 'Profile options' && typeof node.props.onPress === 'function',
+    )[0];
+    await act(async () => { menuButton.props.onPress(); });
     const rows = renderer.root.findAll((node) => typeof node.props.testID === 'string'
       && node.props.testID.startsWith('profile-menu-sheet-') && typeof node.props.onPress === 'function' && typeof node.type !== 'string');
     const keys = [...new Set(rows.map((node) => node.props.testID.replace('profile-menu-sheet-', '')))];

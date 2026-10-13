@@ -130,7 +130,7 @@ function PreviewMenu({ req }: { req: ContextMenuRequest }) {
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={() => close()}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]}>
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.8)' }]} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.8)' }]} /> // theme-exempt: neutral context-menu scrim
         {/* A dim over the blur (Instagram) — the theme background at ~45%, so
             the blurred screen stays visible behind the card. */}
         <View style={[StyleSheet.absoluteFill, styles.previewScrim, { backgroundColor: `${theme.background}73` }]} />

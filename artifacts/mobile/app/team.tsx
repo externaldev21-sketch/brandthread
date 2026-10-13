@@ -550,7 +550,7 @@ const styles = StyleSheet.create({
   radioDot: { width: 12, height: 12, borderRadius: 6 },
   roleDivider: { height: StyleSheet.hairlineWidth },
   // Modal
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 }, // theme-exempt: neutral modal scrim
   modalCard: { borderRadius: 16, borderWidth: 1, padding: 20 },
   modalTitle: { fontSize: 17, fontFamily: FONT.semibold },
   modalSub: { fontSize: 13, fontFamily: FONT.regular, marginTop: 6, lineHeight: 18 },

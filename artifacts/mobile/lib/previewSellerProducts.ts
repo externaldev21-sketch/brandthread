@@ -140,9 +140,9 @@ export function getPreviewSellerProducts(): Product[] {
       priceCents: 3800,
       posterIndex: 0,
       variants: [
-        { size: 'S', color: 'Black', qty: 24 },
-        { size: 'M', color: 'Black', qty: 31 },
-        { size: 'L', color: 'Black', qty: 18 },
+        { size: 'S', color: 'Black', qty: 24 }, // theme-exempt: catalog variant name, not app chrome
+        { size: 'M', color: 'Black', qty: 31 }, // theme-exempt: catalog variant name, not app chrome
+        { size: 'L', color: 'Black', qty: 18 }, // theme-exempt: catalog variant name, not app chrome
       ],
     }),
     buildProduct({
@@ -165,8 +165,8 @@ export function getPreviewSellerProducts(): Product[] {
       priceCents: 24000,
       posterIndex: 2,
       variants: [
-        { size: 'M', color: 'Black', qty: 0 },
-        { size: 'L', color: 'Black', qty: 0 },
+        { size: 'M', color: 'Black', qty: 0 }, // theme-exempt: catalog variant name, not app chrome
+        { size: 'L', color: 'Black', qty: 0 }, // theme-exempt: catalog variant name, not app chrome
       ],
     }),
     buildProduct({

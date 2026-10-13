@@ -94,6 +94,7 @@ export function MenuBlocks({ sections, onClose, testID = 'menu-sheet' }: {
     <View style={styles.blocks} testID={`${testID}-body`}>
       {blocks.map((block, b) => (
         <View key={b} style={[styles.block, { backgroundColor: groupBg }]}>
+          {b > 0 ? <View testID={`${testID}-separator-${block[0].key}`} style={[styles.separator, { backgroundColor: theme.border, marginLeft: 0 }]} /> : null}
           {block.map((item, i) => {
             const color = item.destructive ? theme.error : theme.text;
             return (

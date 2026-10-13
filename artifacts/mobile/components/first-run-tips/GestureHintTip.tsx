@@ -82,13 +82,13 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
     backgroundColor: FILL_ELEVATED, // solid: content never shows through a tip
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1, borderColor: mediaAlpha(MEDIA.foreground, 0.14),
     borderRadius: RADIUS.lg,
     paddingVertical: 10, paddingHorizontal: 14,
     maxWidth: 340,
   },
   glyphSlot: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1, minWidth: 0 },
-  title: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.sm },
+  title: { color: MEDIA.foreground, fontFamily: FONT.semibold, fontSize: FS.sm },
   body: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
 });

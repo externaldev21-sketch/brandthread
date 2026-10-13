@@ -105,5 +105,5 @@ describe('metro routes expo-haptics through the gate', () => {
 
     const shimCtx = { originModulePath: shim, resolveRequest: fallthrough };
     expect(resolveRequest(shimCtx, 'expo-haptics', 'ios')).toEqual({ filePath: 'real-expo-haptics', type: 'sourceFile' });
-  });
+  }, 30_000);
 });

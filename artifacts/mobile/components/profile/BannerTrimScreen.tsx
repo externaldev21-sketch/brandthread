@@ -25,7 +25,7 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, ON_DARK, SP } from '@/lib/theme';
+import { FONT, MEDIA, SP } from '@/lib/theme';
 import { hapticSelection } from '@/lib/haptics';
 import { filmstripTimes, formatTrimClock, trimWindowLayout } from './profileBannerRules';
 
@@ -313,17 +313,17 @@ const styles = StyleSheet.create({
   dimRight: { right: 0 },
   window: {
     position: 'absolute', top: 0, bottom: 0, left: 0,
-    borderTopWidth: 3, borderBottomWidth: 3, borderColor: ON_DARK, borderRadius: 6,
+    borderTopWidth: 3, borderBottomWidth: 3, borderColor: MEDIA.foreground, borderRadius: 6,
   },
   handle: {
-    position: 'absolute', top: -3, bottom: -3, width: HANDLE_WIDTH, backgroundColor: ON_DARK,
+    position: 'absolute', top: -3, bottom: -3, width: HANDLE_WIDTH, backgroundColor: MEDIA.foreground,
     alignItems: 'center', justifyContent: 'center',
   },
   handleLeft: { left: 0, borderTopLeftRadius: 6, borderBottomLeftRadius: 6 },
   handleRight: { right: 0, borderTopRightRadius: 6, borderBottomRightRadius: 6 },
   grip: { width: 2, height: 16, borderRadius: 1, backgroundColor: '#000000' }, // theme-exempt: grip on the white handle
   playhead: {
-    position: 'absolute', top: -6, bottom: -6, left: 0, width: 2, borderRadius: 1, backgroundColor: ON_DARK,
+    position: 'absolute', top: -6, bottom: -6, left: 0, width: 2, borderRadius: 1, backgroundColor: MEDIA.foreground,
   },
   range: { fontFamily: FONT.medium, fontSize: 13, marginTop: SP.sm, fontVariant: ['tabular-nums'] },
   bar: { width: '100%', flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingTop: SP.md, minHeight: 52 },

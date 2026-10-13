@@ -191,19 +191,10 @@ function isRouteFile(full: string, entry: string): boolean {
 // Generated the same way — files rendering a react-native `<Modal` that don't
 // yet reference useSafeAreaInsets/useHeaderTopInset/SafeAreaView anywhere.
 const MODAL_INSETS_ALLOWLIST = new Set([
-  'app/(tabs)/profile.tsx',
-  'app/design-bg-replace.tsx',
   'components/PlanUpsellModal.tsx',
   'components/ProductReviewsSection.tsx',
   'components/SellerTutorialOverlay.tsx',
   'components/SetupCelebration.tsx',
-  'components/buyer-feed/LongPressMenu.tsx',
-  'components/chat/ThemePickerSheet.tsx',
-  'components/discover/DiscoverSafetyMenu.tsx',
-  'components/chat/ThemePickerSheet.tsx',
-  'components/motion/SheetRise.tsx',
-  'components/settings/SettingsKit.tsx',
-  'components/thread-cash/ChatAttachThreadCash.tsx',
 ]);
 
 function isSourceFile(full: string, entry: string): boolean {
@@ -235,7 +226,7 @@ describe('every app/ route renders its title through the shared ScreenHeader', (
       const source = readFileSync(full, 'utf8');
       if (usesSharedHeader(full) || isRedirectOnly(source)) stale.push(`${r} (already migrated — delete this line)`);
     }
-    expect(stale, 'allowlist entries that no longer need to be there — delete them').toEqual([]);
+    expect(stale, `allowlist entries that no longer need to be there:\n${stale.join('\n')}`).toEqual([]);
   });
 });
 

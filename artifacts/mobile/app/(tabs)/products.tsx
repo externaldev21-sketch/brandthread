@@ -992,7 +992,7 @@ const createSheetStyles = (theme: any) => {
   return StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    backgroundColor: 'rgba(0,0,0,0.72)', // theme-exempt: neutral scrim behind product actions
   },
   sheet: {
     position: 'absolute',

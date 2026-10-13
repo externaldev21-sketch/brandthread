@@ -24,9 +24,9 @@ import { getBuyerOrder } from '@/services/orderService';
 import { BuyerOrderView } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER,
+  CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE,
-  SUCCESS, ON_DARK,
+  SUCCESS,
   RED, RED_DIM,
   FONT, FS, SP, RADIUS, COMP,
 } from '@/lib/theme';
@@ -181,7 +181,7 @@ export default function BuyerRefundRequestScreen() {
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
         <ScreenHeader title="Request Refund" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
-          <View style={s.successIcon}><Icon name="check" size={32} color={ON_DARK} /></View>
+          <View style={s.successIcon}><Icon name="check" size={32} color={theme.onAccent} /></View>
           <Text style={s.successTitle}>Order cancelled</Text>
           <Text style={s.successSub}>
             {cancelResult.refunded
@@ -304,7 +304,7 @@ export default function BuyerRefundRequestScreen() {
                       accessibilityLabel={photo.state === 'uploading' ? 'Uploading photo' : "Photo didn't upload"}
                     >
                       {photo.state === 'uploading'
-                        ? <ActivityIndicator size="small" color={ON_DARK} />
+                        ? <ActivityIndicator size="small" color={theme.onAccent} />
                         : <Icon name="alert-circle" size={14} color={RED} />}
                     </View>
                   ) : null}
@@ -362,7 +362,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   textarea: { minHeight: 100, backgroundColor: theme.cardElevated, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md, fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 20 },
   evidenceNote: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, padding: SP.sm, marginBottom: SP.md },
   evidenceNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, flex: 1 },
-  photoState: { position: 'absolute', left: 4, bottom: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
+  photoState: { position: 'absolute', left: 4, bottom: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' },
   disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', lineHeight: 17, marginBottom: SP.lg },
   bottomBar: { paddingHorizontal: SP.md, paddingTop: SP.md, backgroundColor: theme.background, borderTopWidth: 1, borderTopColor: BORDER },
   submitBtn: { borderRadius: RADIUS.lg, overflow: 'hidden' },

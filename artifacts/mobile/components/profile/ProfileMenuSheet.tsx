@@ -39,11 +39,15 @@ export function ProfileMenuSheet({
 }) {
   const everyday: MenuSheetItem[] = items.filter(i => !i.destructive);
   const destructive: MenuSheetItem[] = items.filter(i => i.destructive);
+  const extrasStart = everyday.findIndex(i => i.key === 'find-friends');
+  const sections = extrasStart < 0
+    ? [everyday, destructive]
+    : [everyday.slice(0, extrasStart), everyday.slice(extrasStart), destructive];
   return (
     <MenuSheet
       visible={visible}
       onClose={onClose}
-      sections={[everyday, destructive]}
+      sections={sections}
       accessibilityLabel={title ? `${title} options` : 'Profile options'}
       testID={testID}
     />

@@ -11,6 +11,7 @@ import { SupportChatModal } from '@/components/SupportChatBubble';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAfterModalDismiss } from '@/hooks/useAfterModalDismiss';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
@@ -51,6 +52,7 @@ const POPULAR = FAQS.filter(f => f.popular);
 const SUPPORT_EMAIL = 'support@brandthread.app';
 
 export default function HelpScreen() {
+  const insets = useSafeAreaInsets();
   const api = useApi();
   const { user, isSignedIn } = useUser();
   const [chatOpen, setChatOpen] = useState(false);
@@ -328,12 +330,12 @@ export default function HelpScreen() {
         onRequestClose={() => setArticle(null)}
         onDismiss={articleSheet.onDismiss}
       >
-        <View style={s.sheetBackdrop}>
+        <View style={[s.sheetBackdrop, { paddingTop: insets.top }]}>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setArticle(null)} />
           <View style={s.sheetCard}>
             <SheetHandle />
             {article && (
-              <ScrollView contentContainerStyle={{ padding: SP.md, paddingTop: SP.xs, gap: SP.sm, paddingBottom: SP.xl }} showsVerticalScrollIndicator={false}>
+              <ScrollView contentContainerStyle={{ padding: SP.md, paddingTop: SP.xs, gap: SP.sm, paddingBottom: Math.max(SP.xl, insets.bottom + SP.sm) }} showsVerticalScrollIndicator={false}>
                 <View style={s.sheetCategoryPill}>
                   <Text style={[s.sheetCategoryText, { color: theme.accent }]}>{article.category}</Text>
                 </View>
@@ -380,7 +382,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   submittedText:   { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   sendAnotherText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, textDecorationLine: 'underline' },
 
-  sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }, // theme-exempt: neutral modal scrim
   sheetCard:     { maxHeight: '80%', backgroundColor: theme.background, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, borderWidth: 1, borderColor: theme.border },
   sheetCategoryPill: { alignSelf: 'flex-start', backgroundColor: theme.accentDim, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4 },
   sheetCategoryText: { fontSize: FS.xs, fontFamily: FONT.bold },

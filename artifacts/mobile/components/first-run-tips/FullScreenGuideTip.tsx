@@ -86,7 +86,7 @@ export function FullScreenGuideTip({
 const styles = StyleSheet.create({
   root: { zIndex: 9999, elevation: 9999 },
   // A solid dim over the video (no blur), dark enough to read the rows.
-  dim: { backgroundColor: 'rgba(0,0,0,0.8)' },
+  dim: { backgroundColor: 'rgba(0,0,0,0.8)' }, // theme-exempt: neutral spotlight scrim
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
   title: { color: MEDIA.foreground, fontFamily: FONT.bold, fontSize: FS.xxl, textAlign: 'center' },
   subtitle: { color: MEDIA.muted, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 6, marginBottom: 40 },

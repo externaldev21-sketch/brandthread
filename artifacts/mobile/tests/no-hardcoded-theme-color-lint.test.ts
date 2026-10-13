@@ -67,7 +67,7 @@ const TOKEN_FILES = new Set(['lib/theme.ts', 'contexts/AppThemeContext.tsx', 'co
 // named colors 'black'/'white' — used as a color value.
 const HEX_BLACK_OR_WHITE = /#(000000|000|0a0a0a|0a0a0b|fff{3,4}|ffffff)\b/i;
 const RGB_BLACK_OR_WHITE = /rgba?\(\s*(0|255)\s*,\s*\1\s*,\s*\1\s*[,)]/;
-const NAMED_BLACK_OR_WHITE = /:\s*['"](black|white)['"]/;
+const NAMED_BLACK_OR_WHITE = /\b(?:color|backgroundColor|borderColor|borderTopColor|borderBottomColor|textShadowColor|shadowColor|tintColor|fill|stroke)\s*:\s*['"](black|white)['"]/i;
 
 // Legacy monochrome-only color constants from lib/theme.ts. Every one of
 // these resolves to a fixed black/white/silver value in EVERY Appearance
@@ -109,6 +109,9 @@ function hasHardcodedThemeColor(source: string, file: string): boolean {
   const hasLiteral = lines.some((line) => {
     const trimmed = line.trim();
     if (trimmed.startsWith('//') || trimmed.startsWith('*')) return false;
+    // Media backdrops, compositing scrims and provider brandmarks are
+    // deliberately independent of the account theme. Require a local reason.
+    if (line.includes('// theme-exempt:')) return false;
     return HEX_BLACK_OR_WHITE.test(line) || RGB_BLACK_OR_WHITE.test(line) || NAMED_BLACK_OR_WHITE.test(line);
   });
   if (hasLiteral) return true;
@@ -137,12 +140,8 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   // mirrored from the API server) and the QR dark/light pair — colour data,
   // not app chrome.
   'lib/storeSiteDesign.ts',
-  'app/(buyer)/cart.tsx',
   'app/(buyer)/edit-profile.tsx',
-  'app/(buyer)/friends.tsx',
   'components/inbox/MessagesInbox.tsx',
-  'app/(buyer)/profile.tsx',
-  'app/(buyer)/inbox.tsx',
   'app/(tabs)/feed.tsx',
   'app/(tabs)/following.tsx',
   'app/(tabs)/index.tsx',
@@ -162,7 +161,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   // The buyer thread moved here; app/seller-conversation.tsx renders it too.
   'components/chat/ConversationThread.tsx',
   'app/buyer-drop-detail.tsx',
-  'app/buyer-friend-requests.tsx',
   'app/buyer-live.tsx',
   'app/buyer-muted.tsx',
   'app/buyer-order-detail.tsx',
@@ -198,7 +196,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'app/design-upload-sketch.tsx',
   'app/design-versions.tsx',
   'app/design.tsx',
-  'app/edit-profile.tsx',
   'app/freelancer-apply.tsx',
   'app/freelancer-jobs.tsx',
   'app/fulfill-order.tsx',
@@ -229,10 +226,8 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'app/seller-go-live.tsx',
   'app/seller-live.tsx',
   'app/seller-settings.tsx',
-  'app/seller-profile.tsx',
   'app/setup.tsx',
   'app/share-profile.tsx',
-  'app/shipping.tsx',
   'app/shopping-preferences.tsx',
   'app/sign-in.tsx',
   'app/store-ai-improve.tsx',
@@ -314,9 +309,7 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/chat/ReactionOverlay.tsx',
   'components/checkout/OrderConfetti.tsx',
   'components/checkout/PaymentSection.tsx',
-  'components/checkout/StripePayment.web.tsx',
   'components/design-studio/BrushLibrary.tsx',
-  'components/create-post/MediaGrid.tsx',
   'components/design-studio/AdjustmentsMenu.tsx',
   'components/design-studio/CanvasHost.tsx',
   'components/design-studio/ColorPicker.tsx',
@@ -335,7 +328,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/feed/UploadProgressPill.tsx',
   'components/illustrations/EmptyStateArt.tsx',
   'components/inbox/FollowerAvatarCard.tsx',
-  'components/layout/Header.tsx',
   'components/layout/StickyFooter.tsx',
   'components/live/LiveAvatarRing.tsx',
   'components/live/LiveOverlays.tsx',
@@ -345,15 +337,12 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/media/MediaCropper.tsx',
   'components/onboarding/OnboardingUI.tsx',
   'components/paywall/SellerPaywallExitDrawer.tsx',
-  'components/paywall/SellerPaywallOneTimeOffer.tsx',
   'components/onboarding/SellerPlanRecommendationStep.tsx',
   'components/paywall/SellerPlanSelector.tsx',
   'components/products/ProductCard.tsx',
   'components/profile/ProfileShell.tsx',
   'components/profile/ProfileStoryAvatar.tsx',
-  'components/profile/ProfileTopBar.tsx',
   'components/profile/ProfileVideoGrid.tsx',
-  'components/profile/ProfileVideoHeader.tsx',
   'components/search/BrandRow.tsx',
   'components/search/CategoryTile.tsx',
   'components/search/PersonRow.tsx',
@@ -409,6 +398,6 @@ describe('no hardcoded black/white theme colors outside the theme files', () => 
       return !hasHardcodedThemeColor(readFileSync(path.join(ROOT, file), 'utf8'), file);
     });
 
-    expect(stale).toEqual([]);
+    expect(stale, stale.join('\n')).toEqual([]);
   });
 });

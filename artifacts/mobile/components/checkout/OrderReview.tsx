@@ -236,7 +236,7 @@ export function WalletMark({ kind }: { kind: 'apple' | 'google' }) {
   return (
     <View style={walletStyles.mark} accessibilityLabel={kind === 'apple' ? 'Apple Pay' : 'Google Pay'}>
       {kind === 'apple'
-        ? <FontAwesome name="apple" size={13} color="#000000" />
+        ? <FontAwesome name="apple" size={13} color="#000000" /> // theme-exempt: Apple Pay black-on-white provider mark
         : <Text style={walletStyles.g}>G</Text>}
       <Text style={walletStyles.pay}>Pay</Text>
     </View>
@@ -244,9 +244,9 @@ export function WalletMark({ kind }: { kind: 'apple' | 'google' }) {
 }
 
 const walletStyles = StyleSheet.create({
-  mark: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#FFFFFF', borderRadius: 4, paddingHorizontal: 6, height: 22 },
-  g: { fontFamily: FONT.bold, fontSize: 12, color: '#000000' },
-  pay: { fontFamily: FONT.semibold, fontSize: 12, color: '#000000' },
+  mark: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#FFFFFF', borderRadius: 4, paddingHorizontal: 6, height: 22 }, // theme-exempt: payment provider brand badge
+  g: { fontFamily: FONT.bold, fontSize: 12, color: '#000000' }, // theme-exempt: provider mark on white
+  pay: { fontFamily: FONT.semibold, fontSize: 12, color: '#000000' }, // theme-exempt: provider mark on white
 });
 
 // ─── Totals ───────────────────────────────────────────────────────────────────

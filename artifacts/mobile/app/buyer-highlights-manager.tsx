@@ -435,7 +435,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
 });
 
 const sheet = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }, // theme-exempt: neutral modal scrim
   kbWrap: { justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: RADII.sheet, borderTopRightRadius: RADII.sheet, padding: SPACING.lg },
   handle: { width: 36, height: 4, borderRadius: RADII.pill, alignSelf: 'center', marginBottom: SPACING.md, opacity: 0.5 },

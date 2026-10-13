@@ -186,7 +186,7 @@ function Row({ option, selected, onPress, s, ck, testID }: {
 
 const makeStyles = (ck: CheckoutColors) => StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
-  dim: { backgroundColor: 'rgba(0,0,0,0.35)' },
+  dim: { backgroundColor: 'rgba(0,0,0,0.35)' }, // theme-exempt: neutral scrim behind region picker
   sheet: {
     backgroundColor: ck.bg,
     borderTopLeftRadius: 16,

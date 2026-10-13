@@ -40,7 +40,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { CachedImage } from '@/components/CachedImage';
 import { useApi, type ProfileBannerCrop } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, ON_DARK, SP } from '@/lib/theme';
+import { FONT, MEDIA, SP } from '@/lib/theme';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { emitProfileEvent } from '@/lib/profileEvents';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
@@ -544,7 +544,7 @@ export function EditProfileBanner({
           style={({ pressed }) => [styles.editPill, pressed && styles.pressed]}
           testID="edit-banner-button"
         >
-          {busy ? <ActivityIndicator size="small" color="#000000" /> : <Feather name="film" size={14} color="#000000" />}
+          {busy ? <ActivityIndicator size="small" color={MEDIA.background} /> : <Feather name="film" size={14} color={MEDIA.background} />}
           <Text style={styles.editPillText}>{label}</Text>
         </Pressable>
         )}
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
   cropTitle: { fontFamily: FONT.semibold, fontSize: 17 },
   cropStage: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   cropDim: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.62)' }, // theme-exempt: outside-the-frame dim (TikTok crop)
-  cropFrameBorder: { borderWidth: 1, borderColor: ON_DARK },
+  cropFrameBorder: { borderWidth: 1, borderColor: MEDIA.foreground },
   cropHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingTop: SP.md },
   cropHintText: { fontFamily: FONT.semibold, fontSize: 14 },
   cropBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingTop: SP.md, minHeight: 52 },
@@ -588,8 +588,8 @@ const styles = StyleSheet.create({
   cropBarRight: { alignItems: 'flex-end' },
   cropBarText: { fontFamily: FONT.regular, fontSize: 17 },
   cropBarStrong: { fontFamily: FONT.semibold },
-  gridV: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth, backgroundColor: ON_DARK },
-  gridH: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: ON_DARK },
+  gridV: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth, backgroundColor: MEDIA.foreground },
+  gridH: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: MEDIA.foreground },
 
   editRoot: { alignItems: 'center', paddingBottom: SP.md },
   editBanner: { width: '100%', height: EDIT_BANNER_HEIGHT, overflow: 'hidden', justifyContent: 'center' },

@@ -43,7 +43,10 @@ vi.mock('@/components/ui/BottomSheet', () => ({
 vi.mock('@/services/cartService', () => ({ getBuyerProduct: vi.fn() }));
 // The shared sheet chrome (Reanimated + Gesture Handler) is out of scope
 // here: render its body and expose its props (title, pinned primaryAction).
-vi.mock('@/components/ui/BottomSheet', () => ({ Sheet: nativeComponent('Sheet') }));
+vi.mock('@/components/ui/BottomSheet', () => ({
+  Sheet: nativeComponent('Sheet'),
+  useSheetTransition: () => ({ modalVisible: true, sheetStyle: {}, backdropStyle: {}, panGesture: {}, onSheetLayout: () => {} }),
+}));
 
 import { VariantPickerSheet } from '@/components/buy-now/VariantPickerSheet';
 import type { BuyerProduct } from '@/services/cartTypes';

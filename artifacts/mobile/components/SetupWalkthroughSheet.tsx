@@ -207,7 +207,7 @@ export default function SetupWalkthroughSheet({
 
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
-  backdropFill: { backgroundColor: 'rgba(0,0,0,0.6)' },
+  backdropFill: { backgroundColor: 'rgba(0,0,0,0.6)' }, // theme-exempt: neutral backdrop behind setup walkthrough
   sheet: {
     position: 'absolute',
     left: 0,

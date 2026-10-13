@@ -220,6 +220,10 @@ vi.mock('@/components/ui/BottomSheet', () => {
       React.createElement('View', { testID }, title ? React.createElement('Text', null, title) : null, children),
   };
 });
+vi.mock('@/components/motion/SheetRise', () => ({
+  SheetRise: ({ children }: { children?: React.ReactNode }) =>
+    React.createElement('View', null, children),
+}));
 
 vi.mock('@/components/ui/OptionSheet', () => {
   const React = require('react') as typeof import('react');

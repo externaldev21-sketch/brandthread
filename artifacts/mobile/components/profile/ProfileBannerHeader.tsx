@@ -20,7 +20,7 @@ import { AppState, Pressable, StatusBar, StyleSheet, Text, View } from 'react-na
 import { CachedImage } from '@/components/CachedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { FONT, ON_DARK, ON_DARK_MUTED, SP } from '@/lib/theme';
+import { FONT, MEDIA, ON_DARK_MUTED, SP } from '@/lib/theme';
 import { hapticSelection } from '@/lib/haptics';
 import { ProfileHeroMedia } from './ProfileHeroMedia';
 import type { ProfileStat } from './ProfileControls';
@@ -137,7 +137,7 @@ export function BannerPlaceholder({
           testID={`${testID}-add`}
         >
           <View style={styles.placeholderIcon}>
-            <Feather name="plus" size={16} color={ON_DARK} />
+            <Feather name="plus" size={16} color={MEDIA.foreground} />
           </View>
           <Text style={styles.placeholderText}>Add banner</Text>
         </Pressable>
@@ -333,11 +333,11 @@ const styles = StyleSheet.create({
   bottomMirrored: { flexDirection: 'row-reverse' },
   identityMirrored: { marginRight: 0, marginLeft: SP.md },
   statsMirrored: { gap: 16 },
-  name: { fontFamily: FONT.bold, fontSize: 26, lineHeight: 31, letterSpacing: -0.4, color: ON_DARK, ...TEXT_SHADOW },
+  name: { fontFamily: FONT.bold, fontSize: 26, lineHeight: 31, letterSpacing: -0.4, color: MEDIA.foreground, ...TEXT_SHADOW },
   handle: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 20, color: ON_DARK_MUTED, marginTop: 2, ...TEXT_SHADOW },
   stats: { flexDirection: 'row', alignItems: 'flex-end', gap: 20, marginTop: 12 },
   stat: { alignItems: 'flex-start', minHeight: 40, justifyContent: 'flex-end' },
-  statValue: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 21, color: ON_DARK, fontVariant: ['tabular-nums'], ...TEXT_SHADOW },
+  statValue: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 21, color: MEDIA.foreground, fontVariant: ['tabular-nums'], ...TEXT_SHADOW },
   statLabel: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 17, color: ON_DARK_MUTED },
   pressed: { opacity: 0.6 },
   avatarColumn: { alignItems: 'center' },

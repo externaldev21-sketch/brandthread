@@ -99,14 +99,14 @@ const styles = StyleSheet.create({
   card: {
     width: 280,
     backgroundColor: FILL_ELEVATED, // solid: content never shows through a tip
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1, borderColor: mediaAlpha(MEDIA.foreground, 0.14),
     borderRadius: RADIUS.lg,
     padding: SP.md,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   stepCount: { fontVariant: ['tabular-nums'],  color: TEXT_TERTIARY, fontFamily: FONT.medium, fontSize: FS.xs },
   skip: { color: TEXT_SECONDARY, fontFamily: FONT.semibold, fontSize: FS.xs },
-  title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.md },
+  title: { color: MEDIA.foreground, fontFamily: FONT.bold, fontSize: FS.md },
   body: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, lineHeight: 18 },
   dots: { flexDirection: 'row', gap: 5, marginTop: 14, marginBottom: 14 },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: mediaAlpha(MEDIA.foreground, 0.3) },

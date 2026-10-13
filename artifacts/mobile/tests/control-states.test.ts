@@ -10,7 +10,7 @@ describe('control states', () => {
   it('disabled is the whole control at 30% opacity', () => {
     expect(DISABLED_OPACITY).toBe(0.3);
     const button = read('components/ui/Button.tsx');
-    expect(button).toContain('disabled && { opacity: DISABLED_OPACITY }');
+    expect(button).toContain('isDisabled && { opacity: DISABLED_OPACITY }');
     expect(button).not.toMatch(/isDisabled \? palette\.elevated/);
     const ui = read('components/BrandthreadUI.tsx');
     expect(ui).not.toMatch(/opacity: disabled \? 0\.[45]/);
@@ -23,7 +23,7 @@ describe('control states', () => {
   });
 
   it('text buttons carry no icon; icon-only buttons keep theirs', () => {
-    expect(read('components/ui/Button.tsx')).toContain('{icon && !label && <Feather');
+    expect(read('components/ui/Button.tsx')).toContain('{icon && !label && <Icon');
   });
 
   it('chips are solid when selected and an outline when not', () => {

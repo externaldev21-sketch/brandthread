@@ -89,7 +89,7 @@ describe("runCartReminders", () => {
     await runCartReminders(later);
     await runCartReminders(later);
     expect(sent.pushes.filter((p) => p.userId === recent)).toEqual([
-      { userId: recent, category: "cart", body: "Logo Tee and 1 more is waiting in your cart." },
+      { userId: recent, category: "cart", body: "Logo Tee and 1 more is waiting." },
     ]);
   });
 });

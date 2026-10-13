@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   ring: { position: 'absolute', borderRadius: RADIUS.lg, borderWidth: 2, borderColor: MEDIA.foreground },
   captionWrap: { position: 'absolute', left: SP.xl, right: SP.xl, alignItems: 'center' },
   arrow: { marginBottom: 6 },
-  title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.lg, textAlign: 'center' },
+  title: { color: MEDIA.foreground, fontFamily: FONT.bold, fontSize: FS.lg, textAlign: 'center' },
   body: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 4 },
   dismissHint: { color: TEXT_TERTIARY, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 14 },
 });

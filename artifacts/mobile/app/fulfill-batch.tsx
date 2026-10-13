@@ -407,7 +407,7 @@ const createStyles = (theme: { text: string; muted: string; border: string }) =>
     resultRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 56, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
     totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: SP.md },
     boxRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-    boxChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', gap: 2 },
+    boxChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, gap: 2 },
     boxChipActive: { borderColor: FG },
   });
 };
