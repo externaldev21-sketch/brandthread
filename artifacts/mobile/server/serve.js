@@ -10,7 +10,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const { renderSharePreview } = require('./sharePreview');
+const { renderSharePreview, apiBase } = require('./sharePreview');
+const { matchDropWaitlistPath, handleDropWaitlistRequest } = require('./dropWaitlistPage');
 const { landingPathFor, shouldServeLanding } = require('./landing');
 
 const STATIC_ROOT = path.resolve(
@@ -149,6 +150,23 @@ const server = http.createServer(async (req, res) => {
   if (/^\/account-deletion\/?$/.test(requestedPath)) {
     const page = fs.readFileSync(path.join(__dirname, 'templates', 'account-deletion.html'), 'utf8');
     sendHtml(res, 200, page, acceptEncoding);
+    return;
+  }
+
+  // Public brand drop page (brandthread.app/@handle/drop): a self-contained,
+  // crawlable page with the drop countdown and SMS waitlist form. Rendered
+  // here (not the SPA) from GET /api/v1/public/drop-waitlist/:handle.
+  const dropWaitlistHandle = (req.method === 'GET' || req.method === 'HEAD')
+    ? matchDropWaitlistPath(requestedPath)
+    : null;
+  if (dropWaitlistHandle) {
+    const page = await handleDropWaitlistRequest(dropWaitlistHandle, { apiBase: apiBase(), origin: CANONICAL_ORIGIN });
+    const gzip = /\bgzip\b/.test(acceptEncoding);
+    res.writeHead(page.status, {
+      ...page.headers,
+      ...(gzip ? { 'content-encoding': 'gzip', vary: 'Accept-Encoding' } : {}),
+    });
+    res.end(gzip ? zlib.gzipSync(page.html) : page.html);
     return;
   }
 
