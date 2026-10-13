@@ -37,8 +37,8 @@ import {
   publishingRestriction,
 } from "../lib/safety";
 import { actorFieldsFromProfile, notifyStoryLike, notifyStoryMention, notifyStoryReshare } from "../lib/activityEvents";
-import { viewerRelations, audienceAllows, viewerMayOpenAudience } from "../lib/storyAccess";
-import { normalizeNoteAudience, parseNoteAudience } from "../lib/noteAudience";
+import { viewerRelations, audienceAllows, viewerMayOpenAudience, followGateAllows, closeFriendOfAuthorIds } from "../lib/storyAccess";
+import { normalizeNoteAudience, parseNoteAudience } from '../lib/noteAudience';
 import { sanitizeStoryOverlays, withStickerState, StickerValidationError } from "../lib/storyStickers";
 import { MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
 import { isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs } from "../lib/mediaModerationStore";
@@ -1448,10 +1448,12 @@ router.get("/stories/user/:userId", async (req, res) => {
 
   if (authorId !== myId) {
     if ((await blockRelation(myId, authorId)) !== "none") { res.json([]); return; }
-    if (!(await isFollowing(myId, authorId))) { res.json([]); return; }
     // "Hide story from" (lib/interactionSettings.ts).
     if (await storyHiddenFrom(authorId, myId)) { res.json([]); return; }
   }
+  const rel = await viewerRelations(myId, [authorId]);
+  // Followers, plus people on the author's Close Friends list (CF stories only).
+  if (authorId !== myId && !rel.following.has(authorId) && !rel.closeFriendOf.has(authorId)) { res.json([]); return; }
 
   const rows = await db.select().from(stories)
     .where(and(eq(stories.authorId, authorId), gt(stories.expiresAt, now), storyListedFor(myId)))
@@ -1459,8 +1461,8 @@ router.get("/stories/user/:userId", async (req, res) => {
 
   if (!rows.length) { res.json([]); return; }
 
-  const rel = await viewerRelations(myId, [authorId]);
-  const finalRows = rows.filter((r) => audienceAllows(r.privacyVisibility, authorId, myId, rel));
+  const finalRows = rows.filter((r) => followGateAllows(r.privacyVisibility, authorId, myId, rel)
+    && audienceAllows(r.privacyVisibility, authorId, myId, rel));
 
   if (!finalRows.length) { res.json([]); return; }
 
@@ -1488,7 +1490,7 @@ router.get("/stories/following", async (req, res) => {
       // Muted accounts (Mute > Stories) leave the tray, still followed.
       sql`NOT EXISTS (SELECT 1 FROM account_mutes am WHERE am.user_id = ${myId} AND am.muted_user_id = ${follows.followingId} AND am.mute_stories)`,
     ));
-  const authorIds = Array.from(new Set([myId, ...followingRows.map((r) => r.followingId)]));
+  const authorIds = Array.from(new Set([myId, ...followingRows.map((r) => r.followingId), ...(await closeFriendOfAuthorIds(myId))]));
 
   const rows = await db.select().from(stories)
     .where(and(inArray(stories.authorId, authorIds), gt(stories.expiresAt, now), storyListedFor(myId)))
@@ -1508,7 +1510,8 @@ router.get("/stories/following", async (req, res) => {
     if (r.authorId === myId) return true;
     if (blockedIds.has(r.authorId)) return false;
     if (hidingAuthors.has(r.authorId)) return false;
-    return audienceAllows(r.privacyVisibility, r.authorId, myId, rel);
+    return followGateAllows(r.privacyVisibility, r.authorId, myId, rel)
+      && audienceAllows(r.privacyVisibility, r.authorId, myId, rel);
   });
   if (!visibleRows.length) { res.json([]); return; }
 

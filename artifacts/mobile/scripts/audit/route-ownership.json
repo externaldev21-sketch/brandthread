@@ -189,6 +189,7 @@
     { "match": "/admin-reports", "owner": "growth" },
 
     { "match": "/seller-conversation", "owner": "profilesSocial" },
+    { "match": "/seller-close-friends", "owner": "profilesSocial" },
     { "match": "/seller-inbox", "owner": "profilesSocial" },
     { "match": "/community-chat", "owner": "profilesSocial" },
     { "match": "/community", "owner": "profilesSocial" },
