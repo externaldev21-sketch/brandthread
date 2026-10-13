@@ -172,18 +172,8 @@ async function fetchWithTimeout(
   init: RequestInit,
   timeoutMs: number = REQUEST_TIMEOUT_MS,
 ): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new ApiError(408, JSON.stringify({ error: { message: 'Request timed out. Please try again.', code: 'timeout' } }));
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
+  const { fetchWithTimeout: sharedFetch } = await import('./fetchWithTimeout');
+  return sharedFetch(url, init, timeoutMs);
 }
 
 /**

@@ -8,6 +8,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { resolveAccountKey } from '@/lib/accountStorage';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 import {
   BrandMemory, BrandMemoryField, BrandMemorySummary, DEFAULT_BRAND_MEMORY,
 } from './aiTypes';
@@ -75,14 +76,14 @@ export async function rebuildBrandMemory(authToken?: string | null): Promise<Bra
   // fills the seller's brand memory with made-up demo values.
   const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
   if (!API_BASE || !authToken) throw new Error('Sign in to rebuild brand memory.');
-  const res = await fetch(`${API_BASE}/api/ai/brand-memory/rebuild`, {
+  const res = await fetchWithTimeout(`${API_BASE}/api/ai/brand-memory/rebuild`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${authToken}`,
     },
     body: JSON.stringify({}),
-  });
+  }, 90_000);
   if (!res.ok) throw new Error(`Brand memory rebuild failed (${res.status})`);
   const { fields } = await res.json() as { fields: Record<string, string> };
   const keyMap: Partial<Record<string, keyof BrandMemory>> = {
