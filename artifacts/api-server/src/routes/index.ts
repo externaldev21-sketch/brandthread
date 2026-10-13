@@ -54,6 +54,7 @@ import profileCoverRouter from "./profile-cover";
 import avatarVideoRouter from "./avatar-video";
 import buyerRouter from "./buyer";
 import checkoutIntentRouter, { guestCheckoutIntentRouter } from "./checkout-intent";
+import orderAddOnRouter from "./order-add-on";
 import guestCheckoutRouter from "./guest-checkout";
 import connectRouter, { connectRedirectRouter } from "./connect";
 import {
@@ -369,6 +370,7 @@ router.use("/buyer/cart",                cartDbRouter);
 router.use("/buyer/checkout/payment-intent", checkoutIntentRouter);
 // Post-purchase offer on the order confirmation (seller Checkout settings). Before /buyer.
 router.use("/buyer/post-purchase",       buyerPostPurchaseRouter);
+router.use("/buyer/add-on", orderAddOnRouter);
 router.use("/buyer/notifications",       notificationsFeedRouter);
 router.use("/notifications",             notificationEventsRouter);
 router.use("/social/mutes",              accountMutesRouter); // account mutes (GET/POST/DELETE); the /social routers define no /mutes route

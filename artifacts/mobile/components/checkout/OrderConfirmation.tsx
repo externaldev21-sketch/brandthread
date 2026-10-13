@@ -42,6 +42,7 @@ import { Hairline } from './CheckoutPrimitives';
 import { groupDeliveryWindow } from './OrderSummarySection';
 import { useCheckoutT } from './CheckoutLanguage';
 import { crispPx } from '@/lib/crispPixel';
+import { AddToOrderOffer } from './AddToOrderOffer';
 
 export interface VerifiedOrderRef {
   id: string;
@@ -402,7 +403,11 @@ export function OrderConfirmation({
       </View>
 
       {!finalizing && singleSeller ? (
-        <SellerProductsCarousel sellerId={singleSeller.sellerId} sellerName={singleSeller.sellerName} />
+        <AddToOrderOffer
+          orderId={verifiedOrders.find((o) => o.sellerId === singleSeller.sellerId)?.id}
+          sellerId={singleSeller.sellerId}
+          fallback={<SellerProductsCarousel sellerId={singleSeller.sellerId} sellerName={singleSeller.sellerName} />}
+        />
       ) : null}
     </View>
   );
