@@ -34,9 +34,12 @@ export interface SnackbarProps {
   onDismiss?: () => void;
   /** Distance from the bottom edge. Defaults to just above the safe area; pass a larger value to clear a tab bar or sticky footer. */
   bottomOffset?: number;
+  /** Anchor to the top instead, this far from the top edge (pass at least the
+   *  safe-area/header inset). Used for the PDP "Reminder set" toast (Zalando). */
+  topOffset?: number;
 }
 
-export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction, onDismiss, bottomOffset }: SnackbarProps) {
+export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction, onDismiss, bottomOffset, topOffset }: SnackbarProps) {
   const insets = useSafeAreaInsets();
   const palette = useColors();
   const opacity = useSharedValue(0);
@@ -57,9 +60,12 @@ export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[styles.root, { bottom: bottomOffset ?? Math.max(insets.bottom, SPACING.md) + SPACING.xl }, style]}
+      style={[styles.root, topOffset !== undefined ? { top: topOffset } : { bottom: bottomOffset ?? Math.max(insets.bottom, SPACING.md) + SPACING.xl }, style]}
     >
-      <View style={[styles.pill, { backgroundColor: palette.elevated }]} accessibilityLiveRegion="polite">
+      <View
+        style={[styles.pill, { backgroundColor: palette.elevated }, topOffset !== undefined && { borderWidth: 1, borderColor: palette.border }]}
+        accessibilityLiveRegion="polite"
+      >
         {thumbnailUri && <Image source={{ uri: thumbnailUri }} style={styles.thumb} accessible={false} />}
         <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.footnote, styles.message, { color: palette.foreground }]} numberOfLines={2}>{message}</Text>
         {actionLabel && onAction && (

@@ -8,7 +8,7 @@
  * Layout/interaction reference only: UNIQLO and Alta filter chips.
  */
 import React from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
@@ -48,11 +48,21 @@ export interface ChipProps {
   accessibilityLabel?: string;
   /** Defaults to "button"; option pickers pass "radio". */
   accessibilityRole?: 'button' | 'radio';
+  /** Keeps the `disabled` look and announcement but still fires `onPress` —
+   *  a sold-out size that can be selected to reach "Notify me". On Android
+   *  the a11y `disabled` state is left off: TalkBack will not activate a
+   *  disabled node (the label already says "sold out"). */
+  pressableWhenDisabled?: boolean;
+  accessibilityHint?: string;
+  /** Trailing text after the label, not struck or dimmed (e.g. "Notify me"
+   *  on a sold-out size; Zalando size picker convention). */
+  trailingLabel?: string;
 }
 
 export function Chip({
   label, selected, onPress, count, disabled, testID, icon, iconColor, onRemove, removeAccessibilityLabel, variant = 'default',
   strikethrough = false, accessibilityLabel, accessibilityRole = 'button',
+  pressableWhenDisabled = false, accessibilityHint, trailingLabel,
 }: ChipProps) {
   const { theme } = useAppTheme();
   const palette = useColors();
@@ -64,8 +74,9 @@ export function Chip({
     <Pressable
       accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel ?? (count !== undefined ? `${label}, ${count}` : label)}
-      accessibilityState={{ selected, disabled: !!disabled }}
-      disabled={disabled}
+      accessibilityState={{ selected, disabled: !!disabled && !(pressableWhenDisabled && Platform.OS === 'android') }}
+      accessibilityHint={accessibilityHint}
+      disabled={disabled && !pressableWhenDisabled}
       onPress={() => { hapticToggle(); onPress(); }}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
@@ -80,15 +91,22 @@ export function Chip({
             borderColor: selected ? theme.accent : palette.border,
             borderWidth: isQuickReply ? StyleSheet.hairlineWidth : 1,
             height: isQuickReply ? 32 : undefined,
-            opacity: disabled ? 0.5 : 1,
+            opacity: disabled && !trailingLabel ? 0.5 : 1,
             transform: [{ scale }],
           },
         ]}
       >
-        {icon && <Feather name={icon} size={12} color={iconColor ?? contentColor} />}
-        <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.footnote, isQuickReply && { fontSize: 14 }, { fontFamily: selected ? FONT.semibold : FONT.medium, color: contentColor }, strikethrough && styles.struck]}>
-          {label}
-        </Text>
+        <View style={[styles.lead, disabled && !!trailingLabel && styles.dim]}>
+          {icon && <Feather name={icon} size={12} color={iconColor ?? contentColor} />}
+          <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.footnote, isQuickReply && { fontSize: 14 }, { fontFamily: selected ? FONT.semibold : FONT.medium, color: contentColor }, strikethrough && styles.struck]}>
+            {label}
+          </Text>
+        </View>
+        {!!trailingLabel && (
+          <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.footnote, styles.trailing, { color: theme.text }]}>
+            {trailingLabel}
+          </Text>
+        )}
         {count !== undefined && (
           <View style={[styles.count, { backgroundColor: selected ? `${theme.onAccent}26` : theme.borderSubtle }]}>
             <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.caption, { color: contentColor }]}>{count}</Text>
@@ -148,5 +166,8 @@ const styles = StyleSheet.create({
   },
   count: { borderRadius: RADII.pill, paddingHorizontal: 5, paddingVertical: 1 },
   struck: { textDecorationLine: 'line-through' },
+  lead: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xxs },
+  dim: { opacity: 0.5 },
+  trailing: { fontFamily: FONT.semibold, marginLeft: SPACING.xs },
   group: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs },
 });
