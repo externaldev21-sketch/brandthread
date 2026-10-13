@@ -894,7 +894,7 @@ export function SectionHeader({ title, action, style }: SectionHeaderProps) {
   return (
     <View style={[shS.root, style]}>
       <View style={shS.titleWrap}>
-        <Text accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[shS.title, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
+        <Text accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[shS.title, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail" adjustsFontSizeToFit minimumFontScale={0.8}>{title}</Text>
       </View>
       {action && (
         <PressableScale
