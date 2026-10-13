@@ -30,18 +30,18 @@ describe('seller home dashboard data contract', () => {
 
   it('leads with one hero number and a real, non-fabricated delta line', () => {
     expect(source).toContain('testID="seller-dashboard-hero-value"');
-    expect(source).toContain('describeDashboardDelta(metricAggregate.current, metricAggregate.previous');
-    // No delta is shown for the "all" range, since there is no meaningful
-    // previous all-time period to compare against.
-    expect(source).toContain("range !== 'all' && periodLabel");
+    // "+12% vs yesterday": percent vs the range's real previous period,
+    // never shown for an empty/brand-new store (see describeHomeDelta).
+    expect(source).toContain('describeHomeDelta(metricAggregate.current, metricAggregate.previous, range, { isEmpty: isEmptyChart })');
   });
 
-  it('the hero number and its delta always agree (no count-up on the hero)', () => {
-    // Reported bug: the hero read $0.00 while the delta line already showed
-    // a real "+$162.57 (16.4%)" during the hero's count-up. The count-up is
-    // gone (less-AI pass, item 82), so the hero is the aggregate itself.
-    expect(source).toContain('const heroDisplay = Math.round(activeValue);');
+  it('shows the hero as a static value, so it and the delta line can never disagree', () => {
+    // The hero used to count up while the delta was already final, which
+    // briefly showed a total and a delta that didn't agree. The hero is now
+    // static (no count-up flourish), so there is nothing to wait for.
+    expect(source).toContain('const heroDisplay = Math.round(activeValue)');
     expect(source).not.toContain('useCountUp(');
+    expect(source).toContain('deltaLine && scrubIndex === null ? (');
   });
 
   it('the hero, delta and chart all read the same range-scoped data — no separate period source', () => {
@@ -55,7 +55,9 @@ describe('seller home dashboard data contract', () => {
     // class, though not itself infinite, as app/boost.tsx's "Maximum
     // update depth exceeded" crash — see that fix's own comments).
     expect(source).toContain('const buckets = data?.buckets ?? EMPTY_BUCKETS');
-    expect(source).toContain('metricSeries(metric, buckets)');
+    // 90D folds the same daily buckets into exact 7-day points.
+    expect(source).toContain("range === '90d' ? groupBucketsByWeek(buckets) : buckets");
+    expect(source).toContain('metricSeries(metric, chartBuckets)');
     expect(source).toContain('bucketLabel(b.bucket, range as SellerHomeTimeRange)');
     expect(source).toMatch(/case 'sales': return \{ current: data\.totalCents, previous: previous\.totalCents \}/);
   });
@@ -72,8 +74,8 @@ describe('seller home dashboard data contract', () => {
   });
 
   it('always opens on Today, never a persisted or Week default', () => {
-    expect(source).toContain("useState<SellerDashboardRange>('today')");
-    expect(source).not.toContain("useState<SellerDashboardRange>('week')");
+    expect(source).toContain("useState<SellerHomeDashboardRange>('today')");
+    expect(source).not.toContain("useState<SellerHomeDashboardRange>('7d')");
   });
 
   it('shows the empty-sales message once (in the chart) and hides the flat "—" delta on stat tiles', () => {
@@ -82,7 +84,7 @@ describe('seller home dashboard data contract', () => {
     expect(source).toContain("return { direction: 'flat', label: '' }");
   });
 
-  it('hides action-needed/top-products/recent-orders and shows the setup card for a brand-new seller', () => {
+  it('hides stat tiles/top products and shows the setup card for a brand-new seller', () => {
     expect(source).toContain('const newSeller = everSoldCount !== null && isNewSeller(everSoldCount)');
     expect(source).toContain('newSeller ? (');
     expect(source).toContain('<SellerDashboardSetupCard');
@@ -90,7 +92,10 @@ describe('seller home dashboard data contract', () => {
     // never shown alongside zeroed/fabricated data for a brand-new seller.
     expect(source).toContain('{!newSeller && (');
     expect(source).toContain('{!newSeller && topProducts && topProducts.length > 0 && (');
-    expect(source).toContain('{!newSeller && recentOrders && recentOrders.length > 0 && (');
+    // Recent orders became the Recent activity feed (orders + followers +
+    // reviews) — real rows only, so it simply has nothing to show for a
+    // seller with no activity yet.
+    expect(source).toContain('{activityItems.length > 0 && (');
   });
 
   it('renders a flat baseline chart (never fabricated activity) for a brand-new seller', () => {

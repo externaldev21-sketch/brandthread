@@ -38,6 +38,55 @@ export function smoothPath(points: SmoothPoint[]): string {
   return d;
 }
 
+/**
+ * Monotone cubic interpolation (Fritsch–Carlson, the same rule as d3's
+ * curveMonotoneX) for points with increasing x. Unlike `smoothPath`'s
+ * Catmull-Rom curve, it never overshoots its data: between two points the
+ * curve stays within their y range, so a $0 bucket next to a spike never
+ * dips below the baseline and a local low never dips past its own value.
+ */
+export function monotonePath(points: SmoothPoint[]): string {
+  const n = points.length;
+  if (n < 2) return '';
+  if (n === 2) return `M${points[0].x},${points[0].y} L${points[1].x},${points[1].y}`;
+
+  const h: number[] = [];
+  const s: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const dx = points[i + 1].x - points[i].x;
+    h.push(dx);
+    s.push(dx !== 0 ? (points[i + 1].y - points[i].y) / dx : 0);
+  }
+
+  const t: number[] = new Array(n).fill(0);
+  for (let i = 1; i < n - 1; i++) {
+    const s0 = s[i - 1];
+    const s1 = s[i];
+    if (s0 * s1 <= 0) { t[i] = 0; continue; }
+    // d3's weighted harmonic-style slope, capped so |t| <= 2·min(|s0|,|s1|).
+    const p = (s0 * h[i] + s1 * h[i - 1]) / (h[i - 1] + h[i]);
+    t[i] = (Math.sign(s0) + Math.sign(s1)) * Math.min(Math.abs(s0), Math.abs(s1), 0.5 * Math.abs(p));
+  }
+  // End tangents: one-sided, then clamped to the Fritsch–Carlson bound
+  // (same sign as the segment, |t| <= 3|s|) so the end segments can't overshoot either.
+  const endTangent = (seg: number, inner: number) => {
+    const raw = (3 * seg - inner) / 2;
+    if (raw * seg <= 0) return 0;
+    return Math.sign(seg) * Math.min(Math.abs(raw), 3 * Math.abs(seg));
+  };
+  t[0] = endTangent(s[0], t[1]);
+  t[n - 1] = endTangent(s[n - 2], t[n - 2]);
+
+  let d = `M${points[0].x},${points[0].y}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = points[i];
+    const p1 = points[i + 1];
+    const dx = h[i] / 3;
+    d += ` C${p0.x + dx},${p0.y + dx * t[i]} ${p1.x - dx},${p1.y - dx * t[i + 1]} ${p1.x},${p1.y}`;
+  }
+  return d;
+}
+
 /** Lays out a series of values into evenly-spaced points across `width`/`height`, with a hairline of top/bottom padding so the curve never clips. */
 export function layoutSeriesPoints(values: number[], width: number, height: number): SmoothPoint[] {
   if (values.length === 0 || width <= 0) return [];

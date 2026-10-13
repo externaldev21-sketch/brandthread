@@ -6,7 +6,6 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedReaction,
-  useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
 import { haptics, haptic } from '@/lib/haptics';
@@ -17,12 +16,13 @@ import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { Glass } from '@/components/ui/Glass';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
-import { layoutSeriesPoints, smoothPath } from '@/lib/svgSmoothPath';
+import { layoutSeriesPoints, monotonePath } from '@/lib/svgSmoothPath';
 
 import { selectEvenlySpacedIndices } from '@/lib/sellerHomeChartLabels';
 
-import { BORDER_SUBTLE, FONT, FS, SP } from '@/lib/theme';
+import { BORDER_SUBTLE, FONT, FS, RADIUS, SP } from '@/lib/theme';
 
+import type { SellerHomeDashboardRange } from '@/lib/sellerDashboardHome';
 import { radius } from '@/constants/radii';
 
 import { DASHBOARD_RANGES, SellerDashboardRangePills, type SellerDashboardRange } from '@/components/SellerDashboardRangePills';
@@ -57,13 +57,20 @@ export const AXIS_LABEL_WIDTH = 44;
 // exception: a calendar week only ever has 7 buckets, and showing all 7
 // ("Mon" through "Sun") is both natural and still non-overlapping at phone
 // width.
-const AXIS_LABEL_COUNT: Record<SellerDashboardRange, number> = {
+const AXIS_LABEL_COUNT: Record<SellerDashboardRange | SellerHomeDashboardRange, number> = {
   today: 4, week: 7, month: 5, year: 6, all: 6,
+  // Dashboard rolling ranges: 7D shows every weekday; 30D/90D a few dates.
+  '7d': 7, '30d': 5, '90d': 4,
 };
 
 // Evenly spaced horizontal gridlines drawn behind the empty state — a
 // genuinely-zero chart (a fresh store) reads as an intentional, correctly
 // laid-out chart with no data yet, not as a rendering glitch.
+
+// Scrub bubble size: fixed width so it can be kept fully inside the chart,
+// and an offset that puts its bottom edge 8pt above the scrub point.
+const TOOLTIP_WIDTH = 88;
+const TOOLTIP_OFFSET = 48;
 
 export function SellerDashboardChart({
   values,
@@ -76,12 +83,16 @@ export function SellerDashboardChart({
   formatValue,
   emptyMessage,
   showNowMarker,
+  rangeControl,
 }: {
   values: number[];
   labels: string[];
   theme: AppThemePreset;
-  range: SellerDashboardRange;
-  onRangeChange: (range: SellerDashboardRange) => void;
+  range: SellerDashboardRange | SellerHomeDashboardRange;
+  /** Used by the default range pill row (ignored when `rangeControl` is given). */
+  onRangeChange?: (range: SellerDashboardRange) => void;
+  /** Replaces the default Today/Week/Month/Year/All pill row under the chart (the Dashboard passes its Today/7D/30D/90D control). */
+  rangeControl?: React.ReactNode;
   /** Called with the scrubbed bucket index, or null when the finger lifts. */
   onScrub: (index: number | null) => void;
   isEmpty: boolean;
@@ -95,7 +106,6 @@ export function SellerDashboardChart({
   const [width, setWidth] = useState(0);
   const [tooltipIndex, setTooltipIndex] = useState<number | null>(null);
   const chartHeight = isEmpty ? EMPTY_CHART_HEIGHT : CHART_HEIGHT;
-  const lastHapticIndex = React.useRef<number | null>(null);
 
   const onLayout = useCallback((event: LayoutChangeEvent) => {
     const next = event.nativeEvent.layout.width;
@@ -112,18 +122,16 @@ export function SellerDashboardChart({
     () => (series.length > 0 ? layoutSeriesPoints(series, Math.max(width, 1), chartHeight) : []),
     [series, width, chartHeight],
   );
-  const linePath = useMemo(() => smoothPath(points), [points]);
-  const areaPath = useMemo(() => {
-    if (points.length < 2) return '';
-    const last = points[points.length - 1];
-    const first = points[0];
-    return `${linePath} L${last.x},${chartHeight} L${first.x},${chartHeight} Z`;
-  }, [linePath, points, chartHeight]);
+  // One smooth line only — no area fill under it, no glow.
+  // Monotone cubic: never overshoots the data, so a $0 bucket next to a
+  // spike can't dip below the baseline and a low can't dip past its value.
+  const linePath = useMemo(() => monotonePath(points), [points]);
 
   const scrubX = useSharedValue(0);
   const scrubActive = useSharedValue(0);
   const activeIndex = useSharedValue(-1);
 
+  // No haptic per scrub tick: haptics never fire on a continuous drag.
   const handleIndexChange = useCallback((index: number) => {
     if (lastHapticIndex.current !== index) {
       lastHapticIndex.current = index;
@@ -134,7 +142,6 @@ export function SellerDashboardChart({
   }, [onScrub]);
 
   const handleScrubEnd = useCallback(() => {
-    lastHapticIndex.current = null;
     setTooltipIndex(null);
     onScrub(null);
   }, [onScrub]);
@@ -179,29 +186,20 @@ export function SellerDashboardChart({
     [handleIndexChange],
   );
 
-  const cursorStyle = useAnimatedStyle(() => ({
-    opacity: scrubActive.value,
-    transform: [{ translateX: scrubX.value - 0.5 }],
-  }));
-  const dotStyle = useAnimatedStyle(() => {
-    const point = points[Math.max(0, Math.min(points.length - 1, activeIndex.value))];
-    return {
-      opacity: scrubActive.value,
-      transform: [
-        { translateX: (point?.x ?? 0) - 4 },
-        { translateY: (point?.y ?? chartHeight / 2) - 4 },
-      ],
-    };
-  });
+  // The scrub cursor (line + dot) is placed from React state on the
+  // scrubbed bucket's own point and only mounted while scrubbing. It used to
+  // be an always-mounted animated view whose worklet captured a stale
+  // `points` array (no dependency list), which could leave a stray dot near
+  // x=0 after a range switch.
+  const scrubPoint = !isEmpty && tooltipIndex !== null ? points[tooltipIndex] ?? null : null;
 
-  const gradientId = 'sellerDashboardChartFill';
   // The empty/fresh-seller state must still draw a real, VISIBLE flat line
   // at $0 (never blank space that reads as a broken/missing chart) — just
   // muted rather than the full accent color, so it never implies real
   // activity. theme.borderSubtle (~4% opacity) was invisible against the
   // dark background; theme.muted is the same solid, monochrome tone the
   // rest of the dashboard already uses for secondary/inactive content.
-  const strokeColor = isEmpty ? theme.muted ?? BORDER_SUBTLE : theme.accent;
+  const strokeColor = isEmpty ? theme.muted ?? BORDER_SUBTLE : theme.text;
 
   // Today's chart spreads its labels across even quarters of the day
   // (12am/6am/12pm/6pm, per Shopify's own Analytics "Yesterday"/"Today"
@@ -234,19 +232,12 @@ export function SellerDashboardChart({
         >
           {width > 0 && points.length > 0 && (
             <Svg width={width} height={chartHeight}>
-              <Defs>
-                <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <Stop offset="0" stopColor={strokeColor} stopOpacity={isEmpty ? 0.08 : 0.32} />
-                  <Stop offset="1" stopColor={strokeColor} stopOpacity={0} />
-                </LinearGradient>
-              </Defs>
-              {areaPath ? <Path d={areaPath} fill={`url(#${gradientId})`} stroke="none" /> : null}
               {linePath ? (
                 <Path
                   d={linePath}
                   fill="none"
                   stroke={strokeColor}
-                  strokeWidth={isEmpty ? 1.5 : 2.25}
+                  strokeWidth={isEmpty ? 1.5 : 2}
                   strokeLinejoin="round"
                   strokeLinecap="round"
                 />
@@ -263,10 +254,14 @@ export function SellerDashboardChart({
               </View>
             </View>
           )}
-          {!isEmpty && (
+          {scrubPoint && (
             <>
-              <Animated.View pointerEvents="none" style={[styles.cursorLine, { backgroundColor: theme.border }, cursorStyle]} />
-              <Animated.View pointerEvents="none" style={[styles.cursorDot, { backgroundColor: theme.accent, borderColor: theme.background }, dotStyle]} />
+              <View pointerEvents="none" testID="seller-dashboard-chart-cursor" style={[styles.cursorLine, { backgroundColor: theme.border, left: scrubPoint.x - 0.5 }]} />
+              <View
+                pointerEvents="none"
+                testID="seller-dashboard-chart-cursor-dot"
+                style={[styles.cursorDot, { backgroundColor: theme.text, borderColor: theme.background, left: scrubPoint.x - 4, top: scrubPoint.y - 4 }]}
+              />
             </>
           )}
           {/* "Now" marker for Today: a static dot at the current hour's point
@@ -275,14 +270,14 @@ export function SellerDashboardChart({
               stops at "now" rather than having simply run out of data.
               Hidden while actively scrubbing so it never fights the scrub
               cursor dot for the same spot. */}
-          {showNowMarker && !isEmpty && tooltipIndex === null && points.length > 0 && (
+          {showNowMarker && range === 'today' && !isEmpty && tooltipIndex === null && points.length > 0 && (
             <View
               pointerEvents="none"
               testID="seller-dashboard-chart-now-marker"
               style={[
                 styles.nowMarkerDot,
                 {
-                  backgroundColor: theme.accent,
+                  backgroundColor: theme.text,
                   borderColor: theme.background,
                   left: points[points.length - 1].x - 4,
                   top: points[points.length - 1].y - 4,
@@ -290,6 +285,9 @@ export function SellerDashboardChart({
               ]}
             />
           )}
+          {/* Scrub bubble: a small solid bubble just above the scrub point
+              with the bucket's value and label. Kept inside the chart's
+              width so it never clips at either edge. */}
           {!isEmpty && tooltipIndex !== null && points[tooltipIndex] && (
             <View
               pointerEvents="none"
@@ -297,20 +295,20 @@ export function SellerDashboardChart({
               style={[
                 styles.tooltip,
                 {
-                  left: Math.max(4, Math.min(width - 4, points[tooltipIndex].x)),
-                  top: Math.max(0, points[tooltipIndex].y - 46),
+                  backgroundColor: theme.text,
+                  left: Math.max(0, Math.min(width - TOOLTIP_WIDTH, points[tooltipIndex].x - TOOLTIP_WIDTH / 2)),
+                  top: Math.max(0, points[tooltipIndex].y - TOOLTIP_OFFSET),
                 },
               ]}
             >
-              <Glass solid radius={10} style={StyleSheet.absoluteFill} />
+              <Text style={[styles.tooltipText, { color: theme.background }]} numberOfLines={1}>
+                {(formatValue ?? String)(values[tooltipIndex] ?? 0)}
+              </Text>
               {labels[tooltipIndex] ? (
-                <Text style={[styles.tooltipLabel, { color: theme.muted }]} numberOfLines={1}>
+                <Text style={[styles.tooltipLabel, { color: theme.background }]} numberOfLines={1}>
                   {labels[tooltipIndex]}
                 </Text>
               ) : null}
-              <Text style={[styles.tooltipText, { color: theme.text }]} numberOfLines={1}>
-                {(formatValue ?? String)(values[tooltipIndex] ?? 0)}
-              </Text>
             </View>
           )}
         </View>
@@ -388,7 +386,9 @@ export function SellerDashboardChart({
         </View>
       )}
 
-      <SellerDashboardRangePills range={range} onRangeChange={onRangeChange} theme={theme} />
+      {rangeControl ?? (
+        <SellerDashboardRangePills range={range as SellerDashboardRange} onRangeChange={onRangeChange ?? (() => {})} theme={theme} />
+      )}
     </View>
   );
 }
@@ -440,21 +440,21 @@ const styles = StyleSheet.create({
   },
   tooltip: {
     position: 'absolute',
-    minWidth: 64,
+    width: TOOLTIP_WIDTH,
+    height: 40,
     paddingHorizontal: SP.sm,
     paddingVertical: 6,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    transform: [{ translateX: -32 }],
   },
   tooltipLabel: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    fontSize: 11,
   },
   tooltipText: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.xs,
+    fontFamily: FONT.bold,
+    fontSize: 13,
     fontVariant: ['tabular-nums'],
   },
   axisRow: {

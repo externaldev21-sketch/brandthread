@@ -17,6 +17,8 @@ import {
   floorToLocalYear,
   parseTzOffsetMinutes,
   previousPeriod,
+  ROLLING_DAY_RANGES,
+  rollingDayWindow,
 } from "../lib/analyticsTime";
 import { featureGate } from "../middlewares/featureGate";
 
@@ -142,10 +144,13 @@ router.get("/dashboard", async (req, res) => {
   });
 });
 
-const HOME_RANGES = ["live", "today", "yesterday", "week", "month", "year", "all"] as const;
+// "7d" / "30d" / "90d" are rolling windows (last N days, today included,
+// daily buckets) used by the seller Dashboard's Today/7D/30D/90D control.
+// The calendar "week"/"month"/"year" keys stay for the Analytics screens.
+const HOME_RANGES = ["live", "today", "yesterday", "week", "month", "year", "all", "7d", "30d", "90d"] as const;
 type HomeRange = (typeof HOME_RANGES)[number];
 
-// GET /api/analytics/home?range=live|today|yesterday|week|month|year|all
+// GET /api/analytics/home?range=live|today|yesterday|week|month|year|all|7d|30d|90d
 router.get("/home", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const range: HomeRange = (HOME_RANGES as readonly string[]).includes(String(req.query.range))
@@ -229,21 +234,28 @@ router.get("/home", async (req, res) => {
     }
   }
 
-  const start = range === "live" ? liveStart
+  const rolling = range === "7d" || range === "30d" || range === "90d"
+    ? rollingDayWindow(now, ROLLING_DAY_RANGES[range], tzOffsetMinutes)
+    : null;
+
+  const start = rolling ? rolling.start
+    : range === "live" ? liveStart
     : range === "yesterday" ? yesterday
     : range === "week" ? weekStart
     : range === "month" ? monthStart
     : range === "year" ? yearStart
     : range === "all" ? allStart
     : today;
-  const end = range === "live" ? liveEnd
+  const end = rolling ? rolling.end
+    : range === "live" ? liveEnd
     : range === "yesterday" ? today
     : range === "week" ? weekEnd
     : range === "month" ? monthEnd
     : range === "year" ? yearEnd
     : range === "all" ? allEnd
     : todayEnd;
-  const step = range === "live" ? "10 minutes"
+  const step = rolling ? "1 day"
+    : range === "live" ? "10 minutes"
     : range === "week" ? "1 day"
     : range === "month" ? "1 day"
     : range === "year" ? "1 month"

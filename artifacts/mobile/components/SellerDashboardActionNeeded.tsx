@@ -24,6 +24,9 @@ const ROWS: ActionRowConfig[] = [
   { key: 'returns', icon: 'corner-up-left', title: (n) => `${n} ${n === 1 ? 'return' : 'returns'} to review`, subtitle: 'Buyer-initiated returns awaiting a decision', route: '/(tabs)/orders?filter=all' },
 ];
 
+/** The same rows (copy + routes), reused by the Dashboard's "To do" section. */
+export const DASHBOARD_ACTION_ROWS: readonly ActionRowConfig[] = ROWS;
+
 export function SellerDashboardActionNeeded({
   counts,
   theme,

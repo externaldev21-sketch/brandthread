@@ -49,6 +49,7 @@ vi.mock("../../middlewares/requireAuth", () => ({
 let server: Server;
 let base = "";
 let orderCounter = 0;
+const DAY = 24 * 60 * 60 * 1000;
 
 async function makeOrder(opts: {
   totalCents: number;
@@ -102,7 +103,7 @@ afterAll(async () => {
 });
 
 describe("GET /api/analytics/home — headline == sum(buckets), every range", () => {
-  it.each(["today", "week", "month", "year", "all"])(
+  it.each(["today", "week", "month", "year", "all", "7d", "30d", "90d"])(
     "range=%s: totalCents/netCents/orderCount exactly equal the sum of buckets[]",
     async (range) => {
       // A handful of orders scattered around "now" — exact placement isn't
@@ -302,4 +303,30 @@ describe("GET /api/analytics/home — previous period is a real, distinct compar
 
     await db.delete(orders).where(eq(orders.ownerId, sellerId));
   });
+});
+
+describe("GET /api/analytics/home — rolling 7d/30d/90d (seller Dashboard Today/7D/30D/90D)", () => {
+  it.each([["7d", 7], ["30d", 30], ["90d", 90]] as const)(
+    "range=%s returns exactly %i daily buckets and compares against the prior window",
+    async (range, days) => {
+      const now = new Date();
+      const todayMidnightUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+      // First day of the window (counted) and the day right before it (previous period only).
+      const firstDay = new Date(todayMidnightUtc - (days - 1) * DAY + 12 * 60 * 60 * 1000);
+      const dayBefore = new Date(todayMidnightUtc - days * DAY + 12 * 60 * 60 * 1000);
+      await makeOrder({ totalCents: 1500, createdAt: firstDay });
+      await makeOrder({ totalCents: 700, createdAt: dayBefore });
+
+      const response = await fetch(`${base}/api/analytics/home?range=${range}&tz=0`);
+      const body = await response.json() as any;
+      expect(response.status).toBe(200);
+      expect(body.range).toBe(range);
+      expect(body.buckets).toHaveLength(days);
+      expect(body.totalCents).toBe(1500);
+      expect(body.totalCents).toBe(sumBuckets(body, "totalCents"));
+      expect(body.previous.totalCents).toBe(700);
+
+      await db.delete(orders).where(eq(orders.ownerId, sellerId));
+    },
+  );
 });
