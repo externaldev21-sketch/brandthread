@@ -35,7 +35,7 @@ export interface PushPayload {
 }
 
 /** Bundled new-order sound (artifacts/mobile/assets/sounds, app.json expo-notifications). */
-export const NEW_ORDER_PUSH_SOUND = "order_received.wav";
+export { NEW_ORDER_PUSH_SOUND } from "./newOrderPushSound";
 /** Android channel for new orders when the seller turned the sound off (app/_layout.tsx). */
 export const SILENT_ORDERS_CHANNEL_ID = "orders_silent";
 /** Seller preference key (users.notification_preferences) for the new-order sound. */

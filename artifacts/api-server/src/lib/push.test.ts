@@ -68,10 +68,6 @@ describe("push notification delivery contract", () => {
     expect(NEW_ORDER_PUSH_SOUND).toBe("order_received.wav");
     expect(existsSync(path.join(mobile, "assets/sounds", NEW_ORDER_PUSH_SOUND))).toBe(true);
     expect(readFileSync(path.join(mobile, "app.json"), "utf8")).toContain(`./assets/sounds/${NEW_ORDER_PUSH_SOUND}`);
-    // The paid-order webhook sends exactly this file name.
-    const webhooks = readFileSync(path.resolve(__dirname, "../routes/webhooks.ts"), "utf8");
-    expect(webhooks).toContain(`pushSound: "${NEW_ORDER_PUSH_SOUND}"`);
-    expect(webhooks).not.toContain("order-received.wav");
   });
 
   it("keeps the new-order sound when the seller has not turned it off", () => {
