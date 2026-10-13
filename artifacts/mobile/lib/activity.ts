@@ -631,6 +631,9 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return id ? `/live-cohost-invite?streamId=${q(id)}` : '/live-cohost-invite';
     case 'product':
       return id ? `/buyer-product-detail?productId=${q(id)}` : null;
+    case 'repost_request':
+      // "<Brand> wants to repost your post" — opens Review (approve / decline).
+      return id ? `/repost-request?id=${q(id)}` : null;
     case 'product_question':
       return '/seller-questions';
     case 'user': {
