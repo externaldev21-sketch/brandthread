@@ -102,7 +102,8 @@ async function wheel(page, dy) {
 }
 
 try {
-  for (const demo of [true, false]) {
+  // ONLY=variants shoots just the Variants & stock screen.
+  for (const demo of (process.env.ONLY === 'variants' ? [] : [true, false])) {
     const tag = demo ? 'demo' : 'fresh';
 
     // Products list (default view) + add button.
@@ -144,6 +145,52 @@ try {
     await shot(editor.page, `07-editor-more-${tag}.png`);
     await fitCheck(editor.page, `editor more ${tag}`);
     await editor.context.close();
+  }
+
+  // Variants & stock (app/product-variants.tsx). Its data call is refused
+  // client-side in the seller preview, so this one screen opens with the
+  // buyer preview flag (which lets the request go out) and the variants
+  // request is answered here with a realistic payload: Size S/M/L/XL, one at 0.
+  {
+    const ctx = await openContext(browser, { device, role: 'seller', origin: server.origin, images: {} });
+    ctx.page.setDefaultNavigationTimeout(240_000);
+    const cors = { 'access-control-allow-origin': server.origin, 'access-control-allow-credentials': 'true' };
+    const stamp = '2026-10-01T12:00:00.000Z';
+    const variant = (size, i, stock, priceCents) => ({
+      id: `pv-${size}`, sku: `CREW-BLK-${size}`, size, color: null, options: {}, priceCents, stock,
+      lowStockThreshold: 5, sortOrder: i, createdAt: stamp, updatedAt: stamp,
+    });
+    const payload = {
+      product: { id: 'preview-product-1', name: 'Classic Crew Tee' },
+      axes: [{ name: 'Size', values: ['S', 'M', 'L', 'XL'] }],
+      variants: [variant('S', 0, 24, 3800), variant('M', 1, 31, 3800), variant('L', 2, 4, 3800), variant('XL', 3, 0, 4200)],
+      stockRules: {
+        lowStockThresholdDefault: 5, soldOutBehavior: 'show', limitedQuantityEnabled: false,
+        limitedQuantityTotal: null, showRemainingCounter: false, counterThreshold: null,
+      },
+    };
+    await ctx.page.route('**/product-variants/**', (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify(payload) });
+    });
+    await ctx.page.goto(`${server.origin}/product-variants?productId=preview-product-1&bt_preview=buyer&demo=1`);
+    await ctx.page.getByText('Classic Crew Tee').first().waitFor({ timeout: 60_000 });
+    await ctx.page.waitForTimeout(1500);
+    await shot(ctx.page, '08-variants-stock-demo.png');
+    await fitCheck(ctx.page, 'variants & stock top');
+    await wheel(ctx.page, 420);
+    await shot(ctx.page, '09-variants-table-demo.png');
+    await fitCheck(ctx.page, 'variants & stock table');
+    // Expanded row: AFTER labels the chevron "XL, SKU and low-stock level",
+    // BEFORE "XL, edit details".
+    const expand = ctx.page.getByLabel(/^XL, (SKU and low-stock level|edit details)$/);
+    if (await expand.count()) {
+      await expand.first().click();
+      await ctx.page.waitForTimeout(600);
+      await shot(ctx.page, '10-variants-expanded-demo.png');
+      await fitCheck(ctx.page, 'variants & stock expanded');
+    }
+    await ctx.context.close();
   }
 } finally {
   await browser.close();
