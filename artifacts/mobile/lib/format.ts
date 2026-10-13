@@ -251,6 +251,8 @@ export function formatRelative(value: DateInput, now: number = Date.now(), local
   const diffD = Math.floor(diffH / 24);
   if (diffD < 7) return rel(diffD, 'day', `${diffD}d ago`);
   return formatDate(d, SHORT_DATE, loc);
+}
+
 /**
  * Relative day the way the app says it (docs/VOICE.md): "now", "5m", "2h",
  * "Yesterday", "Mar 4", and "Mar 4, 2025" once it's a different year.

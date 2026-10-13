@@ -102,6 +102,19 @@ function rel(full: string): string {
   return path.relative(ROOT, full).split(path.sep).join('/');
 }
 
+/** Comments and examples in hooks are not rendered native modals. */
+function rendersModal(source: string): boolean {
+  const tree = ts.createSourceFile('screen.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let found = false;
+  function visit(node: ts.Node) {
+    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node))
+      && /^(?:\w+\.)?Modal$/.test(node.tagName.getText(tree))) found = true;
+    ts.forEachChild(node, visit);
+  }
+  visit(tree);
+  return found;
+}
+
 // ─── Rule 1: every app/ route uses ScreenHeader (or is still migrating) ───────
 
 // Generated from the state of `app/` when this test was added (211 of 274
@@ -109,6 +122,8 @@ function rel(full: string): string {
 // 01Cdzzzi (s-v) are migrating these onto ScreenHeader — delete a file's line
 // here in the same change that migrates it.
 const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
+  // The approved Bag redesign uses its shared BagHeader, not ScreenHeader.
+  'app/(buyer)/cart.tsx',
   'app/(buyer)/discover-feed.tsx',
   'app/(buyer)/discover.tsx',
   'app/(buyer)/feed.tsx',
@@ -120,7 +135,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/(tabs)/more.tsx',
   'app/(tabs)/products.tsx',
   'app/(tabs)/profile.tsx',
-  'app/account-type.tsx',
   'app/add-product.tsx',
   'app/automation.tsx', // redirect-only route
   // Renders the shared components/chat/ConversationThread.tsx (own chat header).
@@ -137,17 +151,10 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/design-canvas.tsx',
   // Editor chrome copied from Linktree's design editor: back, undo/redo, Cancel + Save.
   'app/store-design.tsx',
-  'app/design-project.tsx',
-  'app/design-prompt-edit.tsx',
-  'app/design-upload-sketch.tsx',
-  'app/design.tsx',
-  'app/dispute-detail.tsx',
-  'app/drops/[dropId].tsx',
   'app/forgot-password.tsx',
   'app/live-feed.tsx',
   'app/live.tsx',
   'app/manufacturer.tsx',
-  'app/onboarding.tsx',
   'app/privacy.tsx',
   'app/refund-policy.tsx',
   'app/seller-agreement.tsx',
@@ -164,7 +171,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/store-generating.tsx',
   'app/store-preview.tsx',
   'app/terms.tsx',
-  'app/thread-explainer.tsx',
   'app/thread-product-detail.tsx',
 ]);
 
@@ -193,7 +199,6 @@ const MODAL_INSETS_ALLOWLIST = new Set([
   'components/SetupCelebration.tsx',
   'components/buyer-feed/LongPressMenu.tsx',
   'components/discover/DiscoverSafetyMenu.tsx',
-  'components/motion/SheetRise.tsx',
   'components/settings/SettingsKit.tsx',
   'components/thread-cash/ChatAttachThreadCash.tsx',
 ]);
@@ -233,7 +238,7 @@ describe('every app/ route renders its title through the shared ScreenHeader', (
 
 describe('every in-screen <Modal> respects safe-area insets', () => {
   const modalFiles = [...walk(ROOT, isSourceFile)]
-    .filter((full) => /<Modal\b/.test(readFileSync(full, 'utf8')))
+    .filter((full) => rendersModal(readFileSync(full, 'utf8')))
     .map(rel)
     .sort();
 
@@ -258,7 +263,7 @@ describe('every in-screen <Modal> respects safe-area insets', () => {
       const full = path.join(ROOT, r);
       if (!existsSync(full)) { stale.push(`${r} (file no longer exists — delete this line)`); continue; }
       const source = readFileSync(full, 'utf8');
-      if (!source.includes('<Modal')) { stale.push(`${r} (no longer renders <Modal> — delete this line)`); continue; }
+      if (!rendersModal(source)) { stale.push(`${r} (no longer renders <Modal> — delete this line)`); continue; }
       if (hasInsetsRef(source)) stale.push(`${r} (already references insets — delete this line)`);
     }
     expect(stale, 'allowlist entries that no longer need to be there — delete them').toEqual([]);
