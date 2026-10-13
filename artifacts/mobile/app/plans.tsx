@@ -59,11 +59,11 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
-import { useTeamRole } from '@/hooks/useTeamRole';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import {
   ANNUAL_SAVINGS_LABEL, annualPackageFor, canOfferYearly, yearlyDisplayFor, type BillingInterval,
 } from '@/lib/billingInterval';
+import { useTeamRole } from '@/hooks/useTeamRole';
 import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
 import { displayPriceFor } from '@/lib/sellerPlansDisplay';
 import { commissionSummary, wantsProHighlight, DEMO_PERKS, type PerksResponse } from '@/lib/proPerks';
