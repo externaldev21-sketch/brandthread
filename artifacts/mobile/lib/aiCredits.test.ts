@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { classifyAiCreditsError } from './aiCreditsError';
-import { buildCreditsReturnUrl, creditsNoteState, entryLabel, formatDelta, formatResetDate, topUpRoute } from './aiCredits';
+import { OUT_OF_CREDITS_ROUTE, buildCreditsReturnUrl, creditsNoteState, entryLabel, formatDelta, formatResetDate, leadsWithTopUp, topUpPack, topUpRoute } from './aiCredits';
 
 const tools = [{ tool: 'logo', label: 'Logo', cost: 5 }];
 
@@ -47,11 +47,35 @@ describe('inline note state', () => {
     expect(creditsNoteState({ unlimited: false, balance: 0, isLow: true })).toBe('empty');
   });
   it('sends pack buyers to the credits screen and everyone else to plans', () => {
-    expect(topUpRoute({ packs: [{ id: 'credits_500', credits: 500, amountCents: 599, label: '500 credits' }] })).toBe('/ai-credits');
+    expect(topUpRoute({ packs: [{ id: 'credits_500', credits: 500, amountCents: 499, label: '500 credits' }] })).toBe('/ai-credits');
     expect(topUpRoute({ packs: [] })).toBe('/plans');
   });
   it('labels rollover rows', () => {
     expect(entryLabel({ kind: 'rollover', toolKey: null }, [])).toBe('Rolled over from last month');
     expect(entryLabel({ kind: 'rollover_expire', toolKey: null }, [])).toBe('Rollover credits expired');
+  });
+});
+
+const PACKS = [
+  { id: 'credits_1500', credits: 1500, amountCents: 1499, label: '1,500 credits' },
+  { id: 'credits_500', credits: 500, amountCents: 499, label: '500 credits' },
+  { id: 'credits_5000', credits: 5000, amountCents: 4499, label: '5,000 credits' },
+];
+
+describe('top-up', () => {
+  it('picks the cheapest pack the plan may buy', () => {
+    expect(topUpPack({ packs: PACKS })?.id).toBe('credits_500');
+    expect(topUpPack({ packs: [] })).toBeNull();
+    expect(topUpPack(null)).toBeNull();
+  });
+  it('leads with the top-up after a credits refusal or at zero, never for Pro or without packs', () => {
+    expect(leadsWithTopUp({ unlimited: false, balance: 3, packs: PACKS }, 'insufficient')).toBe(true);
+    expect(leadsWithTopUp({ unlimited: false, balance: 0, packs: PACKS })).toBe(true);
+    expect(leadsWithTopUp({ unlimited: false, balance: 300, packs: PACKS })).toBe(false);
+    expect(leadsWithTopUp({ unlimited: false, balance: 0, packs: [] }, 'insufficient')).toBe(false);
+    expect(leadsWithTopUp({ unlimited: true, balance: null, packs: [] }, 'insufficient')).toBe(false);
+  });
+  it('the 402 route asks the credits screen to lead with the top-up', () => {
+    expect(OUT_OF_CREDITS_ROUTE).toBe('/ai-credits?reason=insufficient');
   });
 });
