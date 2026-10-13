@@ -19,7 +19,7 @@ import { useGlobalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useApi, subscribeStoreContext } from '@/lib/api';
 import { isPackerRole } from '@/lib/roleError';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RoleLockedView } from '@/components/RoleLockedView';
@@ -75,8 +75,16 @@ function useActiveStoreRole(): string | null {
   useEffect(() => subscribeStoreContext(() => setContextVersion((v) => v + 1)), []);
 
   useEffect(() => {
-    // Signed-out web preview never calls protected APIs.
-    if (!isLoaded || !isSignedIn || isSellerDevPreview()) {
+    // The web preview never calls protected APIs. Its demo dataset can
+    // preview the packer seat with `&demo=1&team_role=packer`.
+    if (isSellerDevPreview()) {
+      const demoRole = isPreviewDemoMode() && typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('team_role')
+        : null;
+      setRole(demoRole === 'packer' ? 'packer' : null);
+      return;
+    }
+    if (!isLoaded || !isSignedIn) {
       setRole(null);
       return;
     }

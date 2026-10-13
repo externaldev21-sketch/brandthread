@@ -41,7 +41,7 @@ vi.mock("expo-router", () => ({
 vi.mock("@clerk/expo", () => ({
   useAuth: () => ({ isLoaded: true, isSignedIn: state.signedIn, userId: "user_1" }),
 }));
-vi.mock("@/lib/devPreview", () => ({ isSellerDevPreview: () => state.preview }));
+vi.mock("@/lib/devPreview", () => ({ isSellerDevPreview: () => state.preview, isPreviewDemoMode: () => false }));
 vi.mock("@/lib/api", () => {
   const api = {
     team: {
