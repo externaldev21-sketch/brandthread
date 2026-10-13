@@ -70,6 +70,9 @@ import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checko
 import { cashOutThreadCash, computeCashOutPayoutCents } from "../lib/threadCash/cashOut";
 import { stripe } from "../lib/stripe";
 import { liveTipsGate } from "../lib/liveTips";
+import { broadcastToRoom } from "../ws/liveHub";
+import { publicBuyerName } from "../lib/liveShopping";
+import { giftText } from "../lib/livePurchases";
 
 const router = Router();
 router.use(requireAuth);
@@ -476,6 +479,25 @@ router.post("/send", async (req, res) => {
 // gated on mutual follow, never sits pending a claim, unlike /send). The
 // seller's credit lands with source 'live_gift', which cashOut.ts already
 // treats as real, cashable value.
+/** "<name> sent $5 Thread Cash" in the live's chat (host + viewers). Never throws. */
+async function announceLiveGift(streamId: string, buyerId: string, gift: { giftId: string; grossCents: number }): Promise<void> {
+  try {
+    const rows = await db.execute(sql`SELECT display_name, name, username FROM users WHERE clerk_id = ${buyerId} LIMIT 1`);
+    const u = rows.rows[0] as any;
+    broadcastToRoom(streamId, {
+      type: "gift",
+      gift: {
+        id: `gift-${gift.giftId}`,
+        kind: "gift",
+        name: publicBuyerName({ displayName: u?.display_name ?? u?.name, username: u?.username }),
+        text: giftText(gift.grossCents),
+        amountCents: gift.grossCents,
+        at: new Date().toISOString(),
+      },
+    });
+  } catch { /* the gift itself already went through */ }
+}
+
 router.post("/live-gift", liveTipsGate(), async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
   const { streamId, amountCents: rawAmount } = req.body ?? {};
@@ -502,8 +524,11 @@ router.post("/live-gift", liveTipsGate(), async (req, res) => {
       return;
     }
     const gift = await sendLiveGift(buyerId, sellerId, streamId, amountCents, idempotencyKey);
-    void notifyThreadCashReceived({ transferId: gift.giftId, fromUserId: buyerId, toUserId: sellerId, amountCents });
-    res.json({ ok: true, giftId: gift.giftId });
+    if (gift.created) {
+      void notifyThreadCashReceived({ transferId: gift.giftId, fromUserId: buyerId, toUserId: sellerId, amountCents: gift.netCents });
+      void announceLiveGift(streamId, buyerId, gift);
+    }
+    res.json({ ok: true, giftId: gift.giftId, netCents: gift.netCents, feeCents: gift.feeCents });
   } catch (error) {
     if (error instanceof ThreadCashError) {
       res.status(error.status).json({ error: error.message, code: error.code });

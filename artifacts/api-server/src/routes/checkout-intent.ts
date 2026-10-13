@@ -43,6 +43,7 @@ import { bnplMethodsForCart } from "../lib/payments/sellerPaymentSettings";
 import { StockReservationError, releaseStockReservation, reserveStock } from "../lib/money/stockReservation";
 import { applyGiftCardToGroup, trimGiftCardsForMinimumCharge } from "../lib/giftCards/checkout";
 import { GiftCardError, claimCard, giftCentsForCheckouts, reserveForCheckout } from "../lib/giftCards/service";
+import { recordLiveCheckout } from "../lib/livePurchases";
 
 const router = Router();
 
@@ -358,6 +359,14 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
       return;
     }
     throw error;
+  }
+
+  // Shopping from a live: link each group to it so the paid order can be
+  // announced in that live (lib/livePurchases.ts). Best effort.
+  for (let i = 0; i < rows.length; i++) {
+    await recordLiveCheckout({
+      checkoutSessionId: rows[i].id, streamId: body.groups[i]?.liveStreamId, buyerId, sellerId: rows[i].sellerId,
+    });
   }
 
   const releaseAll = async () => {

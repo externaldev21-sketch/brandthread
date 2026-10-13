@@ -50,6 +50,7 @@ import {
 } from "../lib/buyerCancellationPolicy";
 import { consumeBuyerAddressListFailure } from "./release-test-control";
 import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
+import { recordLiveCheckout } from "../lib/livePurchases";
 
 const router = Router();
 router.use(requireAuth);
@@ -1113,6 +1114,9 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     if (!checkoutRecord) throw new Error("Could not create checkout record");
     const csId = checkoutRecord.id;
     checkoutRecordId = csId;
+    await recordLiveCheckout({
+      checkoutSessionId: csId, streamId: typeof liveStreamId === "string" ? liveStreamId : null, buyerId, sellerId,
+    });
 
     if (loyaltyReservation) {
       await bindLoyaltyRedemptionToCheckout(

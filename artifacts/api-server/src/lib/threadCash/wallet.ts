@@ -12,9 +12,10 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import {
-  blocks, db, follows, pool, threadCashConfig, threadCashEntries, threadCashHeartbeats, threadCashStreaks,
+  blocks, db, follows, liveGiftPlatformFees, pool, threadCashConfig, threadCashEntries, threadCashHeartbeats, threadCashStreaks,
   threadCashTransfers, users,
 } from "@workspace/db";
+import { liveGiftFeeBps, splitLiveGift } from "../liveShopping";
 import { DEFAULT_THREAD_CASH_CONFIG, type ThreadCashConfig } from "./streaks";
 import { activeExpiryDays, redemptionCapViolation } from "./rules";
 import { postDueExpiries } from "./expiry";
@@ -850,13 +851,25 @@ export async function sendThreadCash(
  * cashing out and the seller's Thread Cash history both see it correctly
  * with no further plumbing.
  */
+export type LiveGiftResult = {
+  giftId: string;
+  grossCents: number;
+  feeCents: number;
+  /** What the seller was credited (gift minus Brandthread's cut). */
+  netCents: number;
+  /** False when this idempotency key was already used (nothing new moved). */
+  created: boolean;
+};
+
 export async function sendLiveGift(
   buyerId: string,
   sellerId: string,
   streamId: string,
   amountCents: number,
   idempotencyKey: string,
-): Promise<{ giftId: string }> {
+  /** LIVE_GIFT_PLATFORM_FEE_BPS by default; injectable for tests. */
+  feeBps: number = liveGiftFeeBps(),
+): Promise<LiveGiftResult> {
   if (!Number.isInteger(amountCents) || amountCents < 1) {
     throw new ThreadCashError("Enter a valid Thread Cash amount.");
   }
@@ -867,12 +880,19 @@ export async function sendLiveGift(
     throw new ThreadCashError("A valid idempotency key is required.", 400, "THREAD_CASH_IDEMPOTENCY_KEY_REQUIRED");
   }
 
-  async function lookupByKey(executor: DbExecutor): Promise<{ giftId: string } | null> {
-    const [row] = await executor.select({ id: threadCashEntries.id })
+  async function lookupByKey(executor: DbExecutor): Promise<LiveGiftResult | null> {
+    const [row] = await executor.select({ id: threadCashEntries.id, amountCents: threadCashEntries.amountCents })
       .from(threadCashEntries)
       .where(and(eq(threadCashEntries.idempotencyKey, idempotencyKey), eq(threadCashEntries.source, "live_gift_sent")))
       .limit(1);
-    return row ? { giftId: row.id } : null;
+    if (!row) return null;
+    const [fee] = await executor.select({ feeCents: liveGiftPlatformFees.feeCents, netCents: liveGiftPlatformFees.netCents })
+      .from(liveGiftPlatformFees)
+      .where(eq(liveGiftPlatformFees.giftEntryId, row.id))
+      .limit(1);
+    const gross = -row.amountCents;
+    // Gifts sent before the platform fee existed credited the seller in full.
+    return { giftId: row.id, grossCents: gross, feeCents: fee?.feeCents ?? 0, netCents: fee?.netCents ?? gross, created: false };
   }
 
   try {
@@ -923,15 +943,31 @@ export async function sendLiveGift(
         note: `Sent $${(amountCents / 100).toFixed(2)} Thread Cash in a live`,
       }).returning({ id: threadCashEntries.id });
 
-      await tx.insert(threadCashEntries).values({
-        buyerId: sellerId,
-        amountCents,
-        source: "live_gift",
-        referenceId: streamId,
-        note: `Received $${(amountCents / 100).toFixed(2)} Thread Cash gift in a live`,
+      // Brandthread keeps LIVE_GIFT_PLATFORM_FEE_BPS of the gift; the seller
+      // is credited the rest. Thread Cash isn't in the double-entry money
+      // ledger, so the platform's share is recorded in live_gift_platform_fees.
+      const { feeCents, netCents } = splitLiveGift(amountCents, feeBps);
+      if (netCents > 0) {
+        await tx.insert(threadCashEntries).values({
+          buyerId: sellerId,
+          amountCents: netCents,
+          source: "live_gift",
+          referenceId: streamId,
+          note: `Received $${(netCents / 100).toFixed(2)} Thread Cash gift in a live`,
+        });
+      }
+      await tx.insert(liveGiftPlatformFees).values({
+        giftEntryId: debit.id,
+        streamId,
+        buyerId,
+        sellerId,
+        grossCents: amountCents,
+        feeBps: Math.min(9000, Math.max(0, Math.round(feeBps))),
+        feeCents,
+        netCents,
       });
 
-      return { giftId: debit.id };
+      return { giftId: debit.id, grossCents: amountCents, feeCents, netCents, created: true };
     });
   } catch (error: any) {
     if (isUniqueViolation(error)) {
