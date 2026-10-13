@@ -65,6 +65,9 @@ import { Sheet } from '@/components/ui/BottomSheet';
 import { CaptionSpans } from '@/components/social/CaptionText';
 
 import { PollCard } from '@/components/social/PollCard';
+import { Snackbar } from '@/components/ui/Snackbar';
+import { PostOwnerSheet } from '@/components/social/PostOwnerSheet';
+import { pinPostWithReplacePrompt, unpinPost } from '@/services/postPinService';
 import { CaptionsOverlay, type CaptionSegment } from '@/components/social/CaptionsOverlay';
 
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -258,6 +261,30 @@ export default function BuyerPostViewer() {
   const [post, setPost] = useState<BuyerPost | null>(null);
   // The lookup settled (found or not) — gates the "Post not found" state.
   const [postLoaded, setPostLoaded] = useState(false);
+  const [pinBusy, setPinBusy] = useState(false);
+  const [ownerSheetOpen, setOwnerSheetOpen] = useState(false);
+  const [pinToast, setPinToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pinToast) return;
+    const t = setTimeout(() => setPinToast(null), 2500);
+    return () => clearTimeout(t);
+  }, [pinToast]);
+  const togglePin = async () => {
+    if (!post || pinBusy) return;
+    const wasPinned = !!post.pinnedAt;
+    setPinBusy(true);
+    try {
+      const result = wasPinned ? await unpinPost(post.id) : await pinPostWithReplacePrompt(post.id);
+      if (!result) return;
+      Haptics.selectionAsync();
+      setPost((prev) => (prev ? { ...prev, pinnedAt: wasPinned ? null : (result.pinnedAt ?? new Date().toISOString()) } : prev));
+      setPinToast(wasPinned ? 'Post unpinned' : 'Post pinned to your profile');
+    } catch {
+      setPinToast(wasPinned ? "Couldn't unpin. Try again." : "Couldn't pin. Try again.");
+    } finally {
+      setPinBusy(false);
+    }
+  };
   const [comments, setComments] = useState<Comment[]>([]);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
@@ -276,6 +303,8 @@ export default function BuyerPostViewer() {
   // When post is null (not yet loaded or not found in my posts), assume non-owner
   // so report is visible and owner-only controls are hidden.
   const isOwner = post !== null && post.authorId === MY_USER_ID;
+  // Pinning is checked by the server (owner + published); real posts carry the Clerk id as authorId.
+  const canPin = post !== null && !post.isDraft && (isOwner || (!!userId && post.authorId === userId));
 
   const loadPost = useCallback(async () => {
     let found: BuyerPost | null = null;
@@ -466,7 +495,11 @@ export default function BuyerPostViewer() {
       <ScreenHeader
         title={authorName}
         onBack={() => goBackOr(router)}
-        actions={[{ icon: 'send', onPress: handleShare, accessibilityLabel: 'Share' }]}
+        actions={[
+          { icon: 'send', onPress: handleShare, accessibilityLabel: 'Share' },
+          // Owner ••• sheet (Instagram): Pin to your profile / Unpin from profile.
+          ...(canPin ? [{ icon: 'more-horizontal' as const, onPress: () => setOwnerSheetOpen(true), accessibilityLabel: 'More options' }] : []),
+        ]}
       />
       {tileExpandOverlay}
 
@@ -698,6 +731,8 @@ export default function BuyerPostViewer() {
       >
         <Text style={s.modalDesc}>This will permanently remove the post from your profile. This cannot be undone.</Text>
       </Sheet>
+      <PostOwnerSheet visible={ownerSheetOpen} onClose={() => setOwnerSheetOpen(false)} pinned={!!post?.pinnedAt} onTogglePin={() => { void togglePin(); }} />
+      <Snackbar visible={!!pinToast} message={pinToast ?? ''} onDismiss={() => setPinToast(null)} />
     </View>
   );
 }

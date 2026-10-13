@@ -59,6 +59,7 @@ import {
 } from "../lib/safety";
 import { cappedList, cappedUnknown, jsonList, jsonValue, LIMITS, looseBody, optBoolish, optId, optText, validateBody } from "../middlewares/bodySchemas";
 import { z } from "@workspace/api-zod";
+import { pinnedAtByPostId, pinnedFirst } from "../lib/postPins";
 
 const router = Router();
 
@@ -1172,11 +1173,13 @@ router.get("/mine", requireAuth, async (req, res) => {
           ? eq(posts.postStatus, statusFilter)
           : inArray(posts.postStatus, ["draft", "scheduled", "published", "archived"]),
       ))
-      .orderBy(desc(posts.createdAt))
+      // Pinned posts first, newest pin first (Pin to your profile; lib/postPins.ts).
+      .orderBy(pinnedFirst(posts.id), desc(posts.createdAt))
       .limit(limit)
       .offset(offset);
     setPaginationHeaders(res, page.data, rows.length);
-    return res.json(await postDetails(rows, clerkId));
+    const pins = await pinnedAtByPostId(rows.map((row) => row.id));
+    return res.json((await postDetails(rows, clerkId)).map((post: any) => ({ ...post, pinnedAt: pins.get(post.id) ?? null })));
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to fetch seller posts");
     return res.status(500).json({ error: "Failed to fetch seller posts" });

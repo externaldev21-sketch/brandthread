@@ -661,6 +661,8 @@ export interface SellerThreadPost {
   slides?:           PostSlide[];
   /** Where it lives: Threads feed or the author's profile grid. */
   surface?:          'thread' | 'profile';
+  /** Set when the author pinned it to their profile (shown first, with a pin glyph). */
+  pinnedAt?:         string | null;
   /** Per-slide overlay metadata — used to restore draft editors */
   slideOverlays?:    Array<{
     slideIndex: number;
@@ -819,6 +821,7 @@ function mapOwnedApiPost(p: ApiPostRow, userId: string): SellerThreadPost {
     slideOverlays:   Array.isArray(p.slideOverlays) && p.slideOverlays.length > 0 ? p.slideOverlays : undefined,
     slides:          mapSlides(p.slides),
     surface:         p.surface === 'profile' ? 'profile' : 'thread',
+    pinnedAt:        typeof p.pinnedAt === 'string' ? p.pinnedAt : null,
   };
 }
 
@@ -1066,6 +1069,7 @@ export function mapApiPostToSellerThreadPost(p: FeedPostApiRow, idx: number): Se
     aspectRatio:       (p.aspectRatio ?? '9:16') as SellerThreadPost['aspectRatio'],
     slides:            mapSlides(p.slides),
     surface:           p.surface === 'profile' ? 'profile' : 'thread',
+    pinnedAt:          typeof p.pinnedAt === 'string' ? p.pinnedAt : null,
     contentType:       (p.mediaType ?? 'video') as SellerThreadPost['contentType'],
     postStatus:        'published' as const,
     isDraft:           false,

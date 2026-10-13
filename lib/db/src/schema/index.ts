@@ -2979,6 +2979,7 @@ export * from './commentMedia';
 export * from './hashtags';
 export * from './captions';
 export * from './postPolls';
+export * from './postPins';
 export * from './places';
 export * from './productDrafts';
 export * from './liveActivities';

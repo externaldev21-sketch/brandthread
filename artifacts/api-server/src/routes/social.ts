@@ -53,6 +53,7 @@ import { promotePendingRequestsOnFollow } from "../lib/conversationRouting";
 import { viewerCanSeeContent } from "../lib/privateAccount";
 import { afterBlockChange, afterFollowChange } from "../lib/relationshipCaches";
 import { cappedUnknown, jsonList, jsonValue, looseBody, optBoolish, validateBody } from "../middlewares/bodySchemas";
+import { pinnedAtIso, pinnedAtSql, pinnedFirst } from "../lib/postPins";
 
 // Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
 // search endpoint so people search behaves consistently with product/brand
@@ -186,6 +187,7 @@ async function buildBuyerPosts(
     styleTags: posts.styleTags,
     postStatus: posts.postStatus,
     createdAt: posts.createdAt,
+    pinnedAt: pinnedAtSql(posts.id),
     name: users.name,
     displayName: users.displayName,
     username: users.username,
@@ -206,7 +208,8 @@ async function buildBuyerPosts(
       notBlockedWith(viewerId, posts.userId),
       ...(postId ? [eq(posts.id, postId)] : []),
     ))
-    .orderBy(desc(posts.createdAt))
+    // Pinned posts first, newest pin first (Pin to your profile; lib/postPins.ts).
+    .orderBy(pinnedFirst(posts.id), desc(posts.createdAt))
     .limit(limit)
     .offset(offset);
 
@@ -274,6 +277,7 @@ async function buildBuyerPosts(
       savedByMe: stateFor(row.id).savedByMe,
       isArchived: false,
       isDraft: row.postStatus === "draft",
+      pinnedAt: pinnedAtIso(row.pinnedAt),
       createdAt: row.createdAt,
       updatedAt: row.createdAt,
     };
