@@ -99,6 +99,7 @@ import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
+import { finishedVideoIds, loadFinishedVideos, markVideoFinished, reachedEnd, withoutFinished } from '@/lib/finishedVideos';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
@@ -143,6 +144,15 @@ const TOP_TABS_ROW_HEIGHT = 34;
 // no more real pages behind it, so scrolling never dead-ends or shows an
 // end card — see the `canLoopFeed`/`displayItems` comment below.
 const FEED_LOOP_REPEAT = 6;
+// Product tag chip appears this long after a video becomes active (#138).
+const SHOP_TAG_DELAY_MS = 1000;
+
+/** Finished-video ids to filter out, minus the one currently on screen. */
+function servedAgainExcept(activeId: string | null): Set<string> {
+  const ids = finishedVideoIds();
+  if (activeId) ids.delete(activeId.replace(/__loop\d+$/, ''));
+  return ids;
+}
 const CAPTION_BOTTOM_GAP = 10;
 
 // ─── Buyer demand page — sentinel and type guard ──────────────────────────────
@@ -1079,6 +1089,8 @@ type VideoVisualProps = {
    * very first item, to know when it's safe to swap away the plain overlay
    * poster FeedScreen renders above the whole list on first mount. */
   onFirstFramePainted?: () => void;
+  /** Fired once per play-through when the clip reaches its end (or loops). */
+  onFinished?: () => void;
 };
 
 /**
@@ -1190,6 +1202,7 @@ function LiveVideoVisual({
   bottomStripHeight = 0,
   posterPriority,
   onFirstFramePainted,
+  onFinished,
 }: VideoVisualProps) {
   const player = useVideoPlayer(source, p => {
     p.loop = true;
@@ -1257,14 +1270,21 @@ function LiveVideoVisual({
   React.useEffect(() => {
     if (readyToPlay) reportFirstFramePainted();
   }, [readyToPlay, reportFirstFramePainted]);
+  const lastTimeRef = useRef(0);
+  const finishedRef = useRef(false);
   React.useEffect(() => {
     if (progressBottom == null || !isActive) return undefined;
     const subscription = player.addListener('timeUpdate', ({ currentTime }) => {
       const duration = player.duration;
       setProgress(duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0);
+      if (!finishedRef.current && reachedEnd(lastTimeRef.current, currentTime, duration)) {
+        finishedRef.current = true;
+        onFinished?.();
+      }
+      lastTimeRef.current = currentTime;
     });
     return () => subscription.remove();
-  }, [isActive, player, progressBottom]);
+  }, [isActive, player, progressBottom, onFinished]);
   const isScreenFocused = useIsFocused();
   useMeaningfulVideoWatch(player, isActive && !paused && isScreenFocused, onWatched);
   React.useEffect(() => {
@@ -1478,10 +1498,29 @@ function SpotlightPageImpl({
   const [speedActive, setSpeedActive] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
+  useEffect(() => { if (!isActive) setCaptionExpanded(false); }, [isActive]);
   // Shop tag pill's shared expand/collapse state — see ShopSideTab.tsx's
   // module comment for why this is lifted up here (its backdrop and its
   // visual pill render in two different places below).
   const shopTagPillState = useShopTagPill(isActive);
+  // Product tag waits ~1s after the video starts (polish #138), so the
+  // first thing on screen is the video, then the thing to buy. The seller
+  // name and caption stay static (#150).
+  const [shopTagShown, setShopTagShown] = useState(false);
+  const shopTagOpacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!isActive || !item.productTags?.length) {
+      setShopTagShown(false);
+      shopTagOpacity.setValue(0);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setShopTagShown(true);
+      Animated.timing(shopTagOpacity, { toValue: 1, duration: reduceMotion ? 0 : 180, useNativeDriver: true }).start();
+    }, SHOP_TAG_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [isActive, item.productTags?.length, reduceMotion, shopTagOpacity]);
+  const onVideoFinished = useCallback(() => markVideoFinished(item.id), [item.id]);
   // Real rendered height of the caption/sound stack below — see
   // CaptionBlock's `onHeightChange` and ScrubProgressBar's own comment.
   // Starts at the taller of the two nominal minimums so the very first
@@ -1666,6 +1705,7 @@ function SpotlightPageImpl({
                 preload={preload}
                 paused={paused || holdPaused}
                 onWatched={() => onVideoWatched(item.id)}
+                onFinished={onVideoFinished}
                 rate={speedActive ? 2 : 1}
                 muted={!soundOn}
                 posterUri={item.videoPosterUri}
@@ -1725,6 +1765,17 @@ function SpotlightPageImpl({
           FeedScreen, so they no longer scroll away with the page during a
           swipe (each cell used to carry its own copy, which visibly slid
           off with the content). */}
+
+      {/* "more" caption: dim the video a little so the full text reads,
+          TikTok-style (#151). Tapping the dimmed video collapses it. */}
+      {captionExpanded && (
+        <Pressable
+          style={[StyleSheet.absoluteFill, styles.captionDim]}
+          onPress={() => setCaptionExpanded(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Collapse caption"
+        />
+      )}
 
       {/* ─ Shop tag pill (components/buyer-feed/ShopSideTab) ─ resting
           pill now lives inside CaptionBlock's stack (its `topSlot`, below)
@@ -1833,13 +1884,17 @@ function SpotlightPageImpl({
         onToggleCaptionExpanded={() => setCaptionExpanded(v => !v)}
         onOpenCreator={() => onOpenCreator(item)}
         onHeightChange={setCaptionBlockHeight}
-        topSlot={!!item.productTags?.length && (
-          <ShopTagPill
-            tag={item.productTags[0]}
-            extraCount={Math.max(0, item.productTags.length - 1)}
-            onPress={() => onShopTag(item, item.productTags![0])}
-            state={shopTagPillState}
-          />
+        soundActive={isActive}
+        reduceMotion={reduceMotion}
+        topSlot={!!item.productTags?.length && shopTagShown && (
+          <Animated.View style={{ opacity: shopTagOpacity }}>
+            <ShopTagPill
+              tag={item.productTags[0]}
+              extraCount={Math.max(0, item.productTags.length - 1)}
+              onPress={() => onShopTag(item, item.productTags![0])}
+              state={shopTagPillState}
+            />
+          </Animated.View>
         )}
       />
     </View>
@@ -2155,6 +2210,14 @@ export default function FeedScreen({
   const [creatorStartIndex, setCreatorStartIndex] = useState(0);
   const creatorOffsetRef = useRef(0);
   const viewedPostIdsRef = useRef(new Set<string>());
+  /** The post on screen now — a background refresh never pulls it out. */
+  const activePostIdRef = useRef<string | null>(null);
+  /** For You / Following each keep their list, cursor and position (#149). */
+  const tabSnapshotsRef = useRef<Partial<Record<'following' | 'for-you', {
+    posts: SpotlightItem[]; cursor: ReturnType<typeof createThreadFeedCursor>; hasMore: boolean; index: number;
+  }>>>({});
+  const restoringTabRef = useRef<'following' | 'for-you' | null>(null);
+  const pendingRestoreIndexRef = useRef<number | null>(null);
   const api = useApi();
   const feedCursorRef = useRef(createThreadFeedCursor());
   const feedGenerationRef = useRef(0);
@@ -2242,6 +2305,12 @@ export default function FeedScreen({
       return;
     }
     const loadKey = feedTab;
+    // Switching back to a tab already loaded this session: its own list,
+    // cursor and position were restored by switchFeedTab — no refetch (#149).
+    if (initial && restoringTabRef.current === loadKey) {
+      restoringTabRef.current = null;
+      return;
+    }
     if (feedLoadKeyRef.current === loadKey) return;
     feedLoadKeyRef.current = loadKey;
     const generation = feedGenerationRef.current + 1;
@@ -2269,9 +2338,15 @@ export default function FeedScreen({
       const page = await getThreadPostsPage(initialCursor, THREAD_PAGE_SIZE, feedTab);
       if (feedGenerationRef.current !== generation) return;
       const rows = page.posts;
-      const mapped = (Array.isArray(rows) ? rows : [])
-        .map(mapSellerPost)
-        .filter((p): p is SpotlightItem => p !== null);
+      await loadFinishedVideos();
+      if (feedGenerationRef.current !== generation) return;
+      // Videos already watched to the end are not served again (#147).
+      const mapped = withoutFinished(
+        (Array.isArray(rows) ? rows : [])
+          .map(mapSellerPost)
+          .filter((p): p is SpotlightItem => p !== null),
+        servedAgainExcept(activePostIdRef.current),
+      );
       setSellerFeedPosts(mapped);
       setCachedFeedPosts(loadKey, mapped);
       feedCursorRef.current = page.cursor;
@@ -2306,9 +2381,12 @@ export default function FeedScreen({
         : await getThreadPostsPage(cursor, THREAD_PAGE_SIZE, feedTab);
       if (feedGenerationRef.current !== generation) return;
       const rows = page.posts;
-      const mapped = (Array.isArray(rows) ? rows : [])
+      const mappedPage = (Array.isArray(rows) ? rows : [])
         .map(mapSellerPost)
         .filter((p): p is SpotlightItem => p !== null);
+      // A creator's own player shows all their videos; the feeds skip
+      // ones already watched to the end (#147).
+      const mapped = creatorSource && creatorId ? mappedPage : withoutFinished(mappedPage, finishedVideoIds());
 
       setSellerFeedPosts(prev => {
         const existingIds = new Set(prev.map(item => item.id));
@@ -2329,6 +2407,35 @@ export default function FeedScreen({
       if (feedGenerationRef.current === generation) setFeedLoadingMore(false);
     }
   }, [feedLoading, feedRefreshing, feedTab, creatorSource, creatorId]);
+
+  const switchFeedTab = useCallback((next: 'following' | 'for-you') => {
+    if (next === feedTab) return;
+    tabSnapshotsRef.current[feedTab] = {
+      posts: sellerFeedPosts,
+      cursor: feedCursorRef.current,
+      hasMore: feedHasMoreRef.current,
+      index: activeIndex,
+    };
+    const snapshot = tabSnapshotsRef.current[next];
+    if (snapshot && snapshot.posts.length > 0) {
+      restoringTabRef.current = next;
+      // A fetch for the tab being left must not land on this one.
+      feedGenerationRef.current += 1;
+      feedLoadKeyRef.current = null;
+      setSellerFeedPosts(snapshot.posts);
+      feedCursorRef.current = snapshot.cursor;
+      feedHasMoreRef.current = snapshot.hasMore;
+      setFeedHasMore(snapshot.hasMore);
+      setFeedLoading(false);
+      setActiveIndex(snapshot.index);
+      pendingRestoreIndexRef.current = snapshot.index;
+    } else {
+      restoringTabRef.current = null;
+      pendingRestoreIndexRef.current = 0;
+      setActiveIndex(0);
+    }
+    setFeedTab(next);
+  }, [feedTab, sellerFeedPosts, activeIndex]);
 
   useEffect(() => {
     void loadFeed(true);
@@ -2559,9 +2666,12 @@ export default function FeedScreen({
   const canLoopFeed = !searchQuery.trim() && !feedHasMore && filteredContentItems.length > 1 && !isCreatorFeed;
   const displayItems: FeedItem[] = useMemo(() => {
     const base = filteredContentItems as FeedItem[];
+    // Repeats skip videos already watched to the end when anything else is
+    // left to show (#147); the loop itself still never dead-ends.
+    const repeatBase = canLoopFeed ? withoutFinished(base as { id: string }[], finishedVideoIds()) as FeedItem[] : base;
     const content = canLoopFeed
       ? Array.from({ length: FEED_LOOP_REPEAT }, (_, cycle) => (
-          cycle === 0 ? base : base.map(item => ({ ...item, id: `${item.id}__loop${cycle}` }))
+          cycle === 0 ? base : repeatBase.map(item => ({ ...item, id: `${item.id}__loop${cycle}` }))
         )).flat()
       : base;
     if (!buyerMode) return content;
@@ -2571,6 +2681,14 @@ export default function FeedScreen({
   // buyerOffset: used to compute correct isActive for video playback when the
   // demand sentinel sits at index 0.
   const buyerOffset = buyerMode ? 1 : 0;
+  activePostIdRef.current = (displayItems[activeIndex] as { id?: string } | undefined)?.id ?? null;
+  // Land the list on the restored tab's own video once its rows are back.
+  useEffect(() => {
+    const index = pendingRestoreIndexRef.current;
+    if (index == null || displayItems.length <= index || pageHeight <= 0) return;
+    pendingRestoreIndexRef.current = null;
+    feedListRef.current?.scrollToOffset({ offset: index * pageHeight, animated: false });
+  }, [feedTab, displayItems.length, pageHeight]);
 
   // First-poster overlay: see the plain <Image> rendered directly in this
   // component's return below, outside the FlatList entirely. It needs
@@ -3192,7 +3310,8 @@ export default function FeedScreen({
               onShopTag={handleShopTag}
               onNotInterested={handleNotInterested}
               onVideoWatched={handleVideoWatched}
-              soundOn={soundOn}
+              // The mini product sheet keeps the video playing, muted (#139).
+              soundOn={soundOn && !shopSelection}
               onToggleSound={toggleSound}
               onFirstFramePainted={contentIndex === 0 ? handleFirstCellPainted : undefined}
               reduceMotion={!!reduceMotion}
@@ -3398,10 +3517,7 @@ export default function FeedScreen({
                   { id: 'for-you', label: 'Threads' },
                 ]}
                 selectedId={feedTab}
-                onChange={(id) => {
-                  setActiveIndex(0);
-                  setFeedTab(id as 'following' | 'for-you');
-                }}
+                onChange={(id) => switchFeedTab(id as 'following' | 'for-you')}
               />
             </View>
 
@@ -3509,10 +3625,7 @@ export default function FeedScreen({
               <TouchableOpacity
                 key={key}
                 style={styles.feedTab}
-                onPress={() => {
-                  setActiveIndex(0);
-                  setFeedTab(key);
-                }}
+                onPress={() => switchFeedTab(key)}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: feedTab === key }}
               >
@@ -3620,6 +3733,7 @@ const styles = StyleSheet.create({
   pauseOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   mediaPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#17131D' },
   heartBurst: { position: 'absolute', top: '38%', left: '50%', marginLeft: -55, marginTop: -55 },
+  captionDim: { backgroundColor: 'rgba(0,0,0,0.35)' }, // theme-exempt: scrim over media (#151)
   mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
   videoFill: { width: '100%', height: '100%' },
   letterboxBackdrop: { opacity: 0.55 },
