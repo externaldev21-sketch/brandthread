@@ -38,7 +38,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { StarRating } from '@/components/StarRating';
 
 import { CachedImage } from '@/components/CachedImage';
-
+import { PhotoViewer } from '@/components/media/PhotoViewer';
 import { FONT, FS, BORDER_SUBTLE, FG, MUTED, SUBTLE, CARD_ELEVATED } from '@/lib/theme';
 
 import { haptics, haptic } from '@/lib/haptics';
@@ -127,13 +127,7 @@ export function SellerReplyBlock({ reply, repliedAt }: { reply?: string | null; 
 }
 
 function ReviewPhotoViewer({ photos, startIndex, onClose }: { photos: string[]; startIndex: number; onClose: () => void }) {
-  return (
-    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
-      <TouchableOpacity style={photoS.backdrop} activeOpacity={1} onPress={onClose} accessibilityLabel="Close photo">
-        <CachedImage source={{ uri: photos[startIndex] }} style={photoS.image} contentFit="contain" />
-      </TouchableOpacity>
-    </Modal>
-  );
+  return <PhotoViewer visible images={photos} initialIndex={startIndex} onClose={onClose} />;
 }
 
 export function ProductReviewsSection({
@@ -388,9 +382,4 @@ const fitS = StyleSheet.create({
   dotActive: { height: 8, borderRadius: 4 },
   endLabels: { flexDirection: 'row', justifyContent: 'space-between' },
   endLabel: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE },
-});
-
-const photoS = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
-  image: { width: '100%', height: '80%' },
 });

@@ -66,6 +66,7 @@ import { CachedImage } from '@/components/CachedImage';
 
 import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Sheet, Avatar } from '@/components/ui';
 
+import { PhotoViewer } from '@/components/media/PhotoViewer';
 import { ProductPhoto, ProductPhotoPlaceholder } from '@/components/media/ProductPhoto';
 import { productPhotoHeight } from '@/constants/media';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -441,6 +442,7 @@ function ProductGallery({ imageUris, accentColor, brand, name }: { imageUris: st
   const [activeIndex, setActiveIndex] = useState(0);
   // A zoomed photo owns horizontal drags, so the gallery stops paging.
   const [zoomedPhoto, setZoomedPhoto] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   if (!images.length) {
     return (
@@ -459,7 +461,7 @@ function ProductGallery({ imageUris, accentColor, brand, name }: { imageUris: st
           pagingEnabled
           scrollEnabled={!zoomedPhoto}
           showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => <ZoomableGalleryImage uri={item} onZoomChange={setZoomedPhoto} />}
+          renderItem={({ item, index }) => <ZoomableGalleryImage uri={item} brand={brand} name={name} onZoomChange={setZoomedPhoto} onOpen={() => setViewerIndex(index)} />}
           getItemLayout={(_, index) => ({ length: GALLERY_WIDTH, offset: GALLERY_WIDTH * index, index })}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
           onMomentumScrollEnd={(e) => {
@@ -512,6 +514,13 @@ function ProductGallery({ imageUris, accentColor, brand, name }: { imageUris: st
           ))}
         </ScrollView>
       )}
+
+      <PhotoViewer
+        visible={viewerIndex != null}
+        images={images}
+        initialIndex={viewerIndex ?? 0}
+        onClose={() => setViewerIndex(null)}
+      />
     </View>
   );
 }
