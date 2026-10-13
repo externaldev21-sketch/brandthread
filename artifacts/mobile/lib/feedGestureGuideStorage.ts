@@ -3,10 +3,11 @@
  * (kept separate from FeedGestureGuide.tsx, which pulls in RN UI components,
  * so this logic can be unit tested directly).
  *
- * Server is the source of truth (users.feedGesturesTipSeenVersion, via
- * /api/auth/feed-gestures-tip) so the tip stays "seen" across reinstalls,
- * new devices and cleared local storage — not just AsyncStorage on one
- * device. A local cache is kept for fast/offline reads and as the fallback
+ * The server (users.feedGesturesTipSeenVersion, via /api/auth/feed-gestures-tip)
+ * keeps the tip "seen" across reinstalls, new devices and cleared local
+ * storage. The device's own record counts too: the result is the higher of
+ * the two, so a failed server write never makes the tip show again.
+ * AsyncStorage is localStorage on web, so the web preview persists it too. A local cache is kept for fast/offline reads and as the fallback
  * when no backend user exists yet (e.g. a preview/dev session with no real
  * signed-in account): in that case the local flag is authoritative and the
  * tip behaves exactly like it would for a real account.
@@ -50,34 +51,56 @@ async function writeLocalSeenVersion(userId: string | null | undefined, version:
 }
 
 /**
+ * The highest version this account has seen on this device. A tip seen while
+ * the account id was still loading (stored under 'anon') counts for the
+ * account too, so the null → real userId switch can't show it twice.
+ */
+async function readBestLocalSeenVersion(userId: string | null | undefined): Promise<number> {
+  const own = await readLocalSeenVersion(userId);
+  return userId ? Math.max(own, await readLocalSeenVersion(null)) : own;
+}
+
+/**
  * Whether the current user has already seen the current tip version.
- * Tries the server first (source of truth), falling back to the local cache
- * — e.g. offline, or a preview session with no real backend user — so the
- * tip still behaves correctly (shown once, then never again on that device).
+ *
+ * Seen-state only ever goes up: the answer is max(server, local). A server
+ * that still says 0 (because the markSeen PATCH failed: offline, no auth in
+ * a preview, a race) can never un-see a tip this device already showed.
+ * When local is ahead, the server is re-sent markSeen to catch up.
  */
 export async function hasSeenFeedGestureGuide(
   userId: string | null | undefined,
   api?: FeedGesturesTipApi,
 ): Promise<boolean> {
+  const localVersion = await readBestLocalSeenVersion(userId);
+  let seen = localVersion;
   if (api) {
     try {
       const { seenVersion } = await api.feedGesturesTip.get();
-      await writeLocalSeenVersion(userId, seenVersion);
-      return seenVersion >= FEED_GESTURES_TIP_VERSION;
+      seen = Math.max(seenVersion, localVersion);
+      if (localVersion > seenVersion) {
+        void api.feedGesturesTip.markSeen(localVersion).catch(() => {});
+      }
     } catch {
-      // Fall through to the local cache below.
+      // Offline / no backend user: the local value stands.
     }
   }
-  const localVersion = await readLocalSeenVersion(userId);
-  return localVersion >= FEED_GESTURES_TIP_VERSION;
+  if (seen > (await readLocalSeenVersion(userId))) await writeLocalSeenVersion(userId, seen);
+  return seen >= FEED_GESTURES_TIP_VERSION;
 }
 
-/** Marks the current tip version as seen, locally and (best-effort) on the server. */
+/**
+ * Marks the current tip version as seen, locally and (best-effort) on the
+ * server. Called the moment the tip is SHOWN, so swiping it away, switching
+ * tabs or killing the app all count. Never lowers a newer stored version.
+ */
 export async function markFeedGestureGuideSeen(
   userId: string | null | undefined,
   api?: FeedGesturesTipApi,
 ): Promise<void> {
-  await writeLocalSeenVersion(userId, FEED_GESTURES_TIP_VERSION);
+  if ((await readLocalSeenVersion(userId)) < FEED_GESTURES_TIP_VERSION) {
+    await writeLocalSeenVersion(userId, FEED_GESTURES_TIP_VERSION);
+  }
   if (api) {
     try { await api.feedGesturesTip.markSeen(FEED_GESTURES_TIP_VERSION); } catch {}
   }

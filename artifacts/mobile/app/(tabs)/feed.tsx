@@ -75,6 +75,7 @@ import { FeedGestureGuide } from '@/components/FeedGestureGuide';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 import { getCachedFeedPosts, hydrateFeedPostsCache, setCachedFeedPosts } from '@/lib/feedPostsCache';
 import { useCommentCountDelta } from '@/lib/commentCountBus';
 import type { BuyerProduct } from '@/services/cartTypes';
@@ -2084,7 +2085,7 @@ export default function FeedScreen({
   // comment on SpotlightPageImpl for why the two must stay separate.
   const buyerBarTopInset = useBuyerTabBarTopInset('compact');
   const router = useRouter();
-  const { userId } = useAuth();
+  const { userId, isLoaded: authLoaded } = useAuth();
   // Guests browse the feed; like/save/repost/follow prompt sign-in (returnTo).
   const { requireSignIn } = useSignInGate();
   const { push } = useThreadPull();
@@ -2192,19 +2193,30 @@ export default function FeedScreen({
   // once more per FEED_GESTURES_TIP_VERSION bump). Server is the source of
   // truth so it stays seen across reinstalls/devices; `api` falls back to
   // the local cache when there's no real backend user (e.g. preview/dev).
+  //
+  // It waits for auth to settle (so a null → real userId switch can't show
+  // it twice), shows at most once per app session, and is marked seen the
+  // moment it appears: swiping it away, switching tabs or killing the app
+  // all count as having seen it.
+  const gestureGuideShownRef = useRef(false);
   useEffect(() => {
-    if (!isBuyerSurface) return;
+    // The buyer web preview renders without waiting for Clerk; it has no real
+    // account, so its device-local record (localStorage) is the one that counts.
+    const authSettled = authLoaded || isBuyerDevPreview();
+    if (!isBuyerSurface || !authSettled || gestureGuideShownRef.current) return;
     let active = true;
     void hasSeenFeedGestureGuide(userId, api).then(seen => {
-      if (active && !seen) setShowGestureGuide(true);
+      if (!active || seen || gestureGuideShownRef.current) return;
+      gestureGuideShownRef.current = true;
+      setShowGestureGuide(true);
+      void markFeedGestureGuideSeen(userId, api);
     });
     return () => { active = false; };
-  }, [isBuyerSurface, userId, api]);
+  }, [isBuyerSurface, authLoaded, userId, api]);
 
   const dismissGestureGuide = useCallback(() => {
     setShowGestureGuide(false);
-    void markFeedGestureGuideSeen(userId, api);
-  }, [userId, api]);
+  }, []);
 
   // Load published seller posts and subscribe to real-time changes
   const loadFeed = useCallback(async (initial = false) => {
