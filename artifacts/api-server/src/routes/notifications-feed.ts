@@ -431,6 +431,11 @@ type PublishInput = {
   ringThroughMutes?: boolean;
   /** Device notification category (action buttons), e.g. "new_order" → Ship now. */
   pushCategoryId?: string;
+  /** Device-only copy (e.g. the Watch-friendly sale ping); the feed row keeps title/body. */
+  pushTitle?: string;
+  pushBody?: string;
+  /** Extra push data for the device (e.g. the seller widget delta). */
+  pushData?: Record<string, unknown>;
 };
 
 /** conversation_participants.muted_until in the future (Chat details > Mute). */
@@ -450,9 +455,10 @@ async function sendFeedlessPush(n: PublishInput, pushCategory: PushEventCategory
   if (!n.ringThroughMutes && await isConversationMutedFor(n)) return;
   const [badge, imageUrl] = await Promise.all([pushBadgeFor(n.userId), pushImageFor(n)]);
   await sendPushToUser(n.userId, {
-    title: n.title,
-    body: n.body ?? "",
+    title: n.pushTitle ?? n.title,
+    body: n.pushBody ?? n.body ?? "",
     data: {
+      ...n.pushData,
       type: n.type,
       category: n.category,
       targetId: n.targetId,
@@ -552,10 +558,12 @@ export async function publishNotification(n: PublishInput): Promise<void> {
     // Exact app-icon badge: the recipient's unread count including this row.
     const [badge, imageUrl] = await Promise.all([pushBadgeFor(n.userId), pushImageFor(n)]);
     await sendPushToUser(n.userId, {
-      title: n.title,
-      body: n.body ?? "",
+      title: n.pushTitle ?? n.title,
+      body: n.pushBody ?? n.body ?? "",
       badge: Number(unread?.count ?? 0),
       data: {
+        ...n.pushData,
+        notificationId: notification.id,
         type: n.type,
         category: n.category,
         targetId: n.targetId,

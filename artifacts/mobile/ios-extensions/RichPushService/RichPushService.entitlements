@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Shared with the app and the widget extension: the seller widget
+	     snapshot lives in this group's UserDefaults. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.brandthread.mobile.liveactivity</string>
+	</array>
+</dict>
+</plist>

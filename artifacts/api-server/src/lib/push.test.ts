@@ -170,6 +170,15 @@ describe("rich pushes, actions and badge", () => {
     }
   });
 
+  it("marks a push carrying the seller widget delta as mutable (the iOS service extension applies it)", () => {
+    const [message] = buildExpoPushMessages([{ token: "t" }], {
+      title: "New order · $98", body: "Desires Tee",
+      data: { type: "new_order_received", widgetDelta: { salesCents: 9800, orders: 1, toShip: 1 } },
+    });
+    expect(message.mutableContent).toBe(true);
+    expect(message.richContent).toBeUndefined();
+  });
+
   it("does not mirror a very long signed URL into data (APNs 4 KB limit)", () => {
     const long = `https://storage.example.com/obj?sig=${"a".repeat(1500)}`;
     const [message] = buildExpoPushMessages([{ token: "t" }], { title: "t", body: "b", imageUrl: long });

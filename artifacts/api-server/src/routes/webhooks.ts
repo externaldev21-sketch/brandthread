@@ -66,6 +66,7 @@ import {
   sendPayoutEmail,
 } from "../lib/brandthreadEmail";
 import { isChannelEnabledForUser } from "../lib/notificationChannels";
+import { salePingPushFields } from "../lib/salePing";
 import { publishNotification } from "./notifications-feed";
 import { shouldNotifyRestricted } from "../lib/connectOnboarding";
 import { processDisputeEvent } from "../lib/disputes/webhook";
@@ -1543,6 +1544,14 @@ export async function handleCheckoutPaid(
             targetImageUrl: productThumbnail(firstItem?.images),
             ...newOrderPushDelivery(sellerPrefs?.preferences),
             pushCategoryId: "new_order",
+            // "New order · $98" / product name: short enough for Apple Watch
+            // (nativeSurfaces flag only).
+            ...(await salePingPushFields({
+              totalCents: createdOrder.totalCents,
+              productName: firstItem?.productName,
+              itemCount: lineItems.length,
+              orderNumber: createdOrder.orderNumber,
+            })),
           });
           // The buyer's side of the same event (guest checkouts have no feed).
           if (buyerId) {

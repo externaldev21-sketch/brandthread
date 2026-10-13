@@ -33,6 +33,11 @@ export interface PushPayload {
   /** The user asked for this exact push (e.g. a per-drop "notify me"). */
   explicitRequest?: boolean;
   silent?: boolean;
+  /**
+   * Product/target image shown in the expanded notification. Only https URLs
+   * are forwarded (see safePushImageUrl). Android renders it natively; iOS
+   * needs the Notification Service Extension (BT_IOS_RICH_PUSH=1 builds).
+   */
   imageUrl?: string | null;
   /** Expo delivery priority; 'high' wakes the device (incoming calls). Omitted = Expo default. */
   priority?: "default" | "normal" | "high";
@@ -291,6 +296,7 @@ export function buildExpoPushMessages(
       sound: payload.silent ? null : (payload.sound ?? "default"),
       badge: safeBadge,
       ...(image ? {richContent: {image}, mutableContent: true} : {}),
+      ...(payload.data && "widgetDelta" in payload.data ? { mutableContent: true } : {}),
       channelId: payload.channelId,
       ...(categoryId !== undefined ? { categoryId } : {}),
       ...(payload.priority ? { priority: payload.priority } : {}),
