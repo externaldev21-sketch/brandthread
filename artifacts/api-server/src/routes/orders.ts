@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions, shopifyOrderLinks } from "@workspace/db";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
 import { executeOrderRelease, requestOrderRelease } from "../lib/money/escrow";
-import { withItemProductIds } from "../lib/orderItemProducts";
+import { loadOrderListThumbs, ORDER_LIST_THUMB_LIMIT, withItemImages, withOrderImage } from "../lib/orderItemImages";
 import { refundOrder, RefundError } from "../lib/money/refunds";
 import { orderStatusMachine, type OrderStatus } from "../lib/money/stateMachines";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -131,8 +131,15 @@ router.get("/", async (req, res) => {
     .where(buyerId ? and(eq(orders.ownerId, ownerId), eq(orders.buyerId, buyerId)) : eq(orders.ownerId, ownerId))
     .groupBy(orders.id, customers.name, customers.email, drops.name, drops.type, users.displayName, users.name, users.email)
     .orderBy(desc(orders.createdAt));
+  // Item 55: first few lines with their product thumbnail (additive; the
+  // full count stays in itemCount).
+  const thumbs = await loadOrderListThumbs(rows.map((row) => row.id), { itemLimit: ORDER_LIST_THUMB_LIMIT });
   // Seller-only Radar summary: one `risk` object instead of the raw columns.
-  res.json(rows.map(withRiskView));
+  res.json(rows.map((row) => ({
+    ...withRiskView(row),
+    items: thumbs.get(row.id)?.items ?? [],
+    thumbnailUrl: thumbs.get(row.id)?.thumbnailUrl ?? null,
+  })));
 });
 
 // POST /api/orders — transactional, server-side prices, stock validation (manager+)
@@ -309,7 +316,7 @@ router.get("/:id", async (req, res) => {
     .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
     .limit(1);
   if (!order) { res.status(404).json({ error: "Not found" }); return; }
-  const items = await withItemProductIds(
+  const items = await withItemImages(
     await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
   );
 
@@ -573,7 +580,7 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
   };
   const notif = notifMap[status];
   if (transitioned.buyerId && notif) {
-    publishNotification({
+    withOrderImage(transitioned.id, {
       userId:     transitioned.buyerId,
       category:   "orders",
       type:       notif.type,
@@ -581,7 +588,7 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
       body:       notif.body,
       targetId:   transitioned.id,
       targetType: "order",
-    }).catch(() => { /* non-critical */ });
+    }).then(publishNotification).catch(() => { /* non-critical */ });
   }
   if (status === "shipped") {
     void notifyOrderShipped(transitioned).catch((err) => {
@@ -789,7 +796,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
   // Notify buyer only when status genuinely transitioned to shipped
   if (statusTransition?.buyerId) {
     const carrierLabel = updated.carrier ?? carrier ?? "carrier";
-    publishNotification({
+    withOrderImage(statusTransition.id, {
       userId:     statusTransition.buyerId,
       category:   "orders",
       type:       "order_shipped",
@@ -797,7 +804,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
       body:       `Order #${statusTransition.orderNumber} is on its way via ${carrierLabel} — tracking: ${updated.trackingNumber ?? "not available yet"}`,
       targetId:   statusTransition.id,
       targetType: "order",
-    }).catch(() => { /* non-critical */ });
+    }).then(publishNotification).catch(() => { /* non-critical */ });
   }
   const trackingAlertMap: Partial<Record<typeof TRACKING_STATUSES[number], {
     type: string;
@@ -823,7 +830,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
   const trackingAlert = trackingStatusTransition
     && trackingAlertMap[trackingStatusTransition.trackingStatus as typeof TRACKING_STATUSES[number]];
   if (trackingAlert && updated.buyerId) {
-    publishNotification({
+    withOrderImage(updated.id, {
       userId:     updated.buyerId,
       category:   "orders",
       pushCategory: "order",
@@ -832,7 +839,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
       body:       trackingAlert.body,
       targetId:   updated.id,
       targetType: "buyer_order",
-    }).catch(() => { /* non-critical */ });
+    }).then(publishNotification).catch(() => { /* non-critical */ });
   }
   if (statusTransition) {
     void notifyOrderShipped(updated).catch((err) => {
@@ -905,12 +912,12 @@ router.patch("/:id/items-tracking", requireRole("staff"), async (req, res) => {
     );
   }
   if (result.buyerId) {
-    publishNotification({
+    withOrderImage(req.params.id, {
       userId: result.buyerId, category: "orders", pushCategory: "order", type: "order_shipped",
       title: "Part of your order has shipped!",
       body: `Order #${result.orderNumber} is on its way via ${carrier ?? "carrier"} — tracking: ${trackingNumber}`,
       targetId: req.params.id, targetType: "buyer_order",
-    }).catch(() => { /* non-critical */ });
+    }).then(publishNotification).catch(() => { /* non-critical */ });
   }
   const [order] = await db.select().from(orders).where(eq(orders.id, req.params.id)).limit(1);
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, req.params.id));

@@ -23,6 +23,7 @@ import { publishNotification } from "../routes/notifications-feed";
 import { actorFieldsFromProfile } from "./activityEvents";
 import { profilesById } from "./safety";
 import { logger } from "./logger";
+import { orderThumbnailPath } from "./orderItemImages";
 
 export const formatOrderCents = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
 
@@ -73,6 +74,7 @@ export async function notifyBuyerOrderCancelled(input: {
       ...copy,
       targetId: input.orderId,
       targetType: "buyer_order",
+      targetImageUrl: await orderThumbnailPath(input.orderId),
     });
   } catch (err) {
     logger.warn({ err, orderId: input.orderId }, "Order cancelled notification failed");
@@ -101,6 +103,7 @@ export async function notifySellerOrderCancelledByBuyer(input: {
       ...(actor ?? {}),
       targetId: input.orderId,
       targetType: "order",
+      targetImageUrl: await orderThumbnailPath(input.orderId),
     });
   } catch (err) {
     logger.warn({ err, orderId: input.orderId }, "Seller order-cancelled notification failed");
@@ -113,6 +116,8 @@ export async function notifySellerReturnRequested(input: {
   buyerId: string;
   returnId: string;
   orderNumber: string;
+  /** The returned order, for the row's product thumbnail (item 55). */
+  orderId?: string;
 }): Promise<void> {
   try {
     const profile = (await profilesById([input.buyerId])).get(input.buyerId);
@@ -128,6 +133,7 @@ export async function notifySellerReturnRequested(input: {
       targetId: input.returnId,
       targetType: "return",
       cta: "Review return",
+      targetImageUrl: input.orderId ? await orderThumbnailPath(input.orderId) : null,
     });
   } catch (err) {
     logger.warn({ err, returnId: input.returnId }, "Seller return-requested notification failed");

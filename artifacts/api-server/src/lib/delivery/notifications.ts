@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { db, users } from "@workspace/db";
 import { publishNotification } from "../../routes/notifications-feed";
 import { logger } from "../logger";
+import { withOrderImage } from "../orderItemImages";
 import { formatOrderCents } from "../orderNotifications";
 import { formatDeadline, warningLabel } from "./policy";
 
@@ -15,7 +16,8 @@ type Notify = Parameters<typeof publishNotification>[0];
 
 async function send(input: Notify): Promise<void> {
   try {
-    await publishNotification(input);
+    // Every row here targets an order: show its product (item 55).
+    await publishNotification(input.targetId ? await withOrderImage(input.targetId, input) : input);
   } catch (err) {
     logger.warn({ err, type: input.type, targetId: input.targetId }, "Delivery notification failed");
   }

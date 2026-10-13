@@ -282,6 +282,7 @@ router.post("/", async (req, res) => {
       buyerId: clerkUserId,
       returnId: created.id,
       orderNumber: order.orderNumber,
+      orderId: order.id,
     });
     return res.status(201).json(await signEvidence(created));
   } catch (err: any) {
