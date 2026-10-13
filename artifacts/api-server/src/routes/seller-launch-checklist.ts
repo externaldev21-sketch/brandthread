@@ -9,6 +9,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { db, products, storefronts, users } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { deriveLaunchChecklist } from "../lib/launchChecklist";
+import { profileBannerFromRow } from "../lib/profileCover";
 
 const router = Router();
 router.use(requireAuth);
@@ -22,6 +23,9 @@ router.get("/", async (req, res): Promise<void> => {
       username: users.username,
       logoUrl: users.logoUrl,
       bannerUrl: users.bannerUrl,
+      coverVideoUrl: users.coverVideoUrl,
+      coverImageUrl: users.coverImageUrl,
+      coverMediaType: users.coverMediaType,
       storeAccentColor: users.storeAccentColor,
       socialLinks: users.socialLinks,
       storePreviewedAt: users.storePreviewedAt,
@@ -39,8 +43,11 @@ router.get("/", async (req, res): Promise<void> => {
     return;
   }
 
+  // One banner: the profile banner (or a not-yet-adopted storefront banner) counts.
+  const hasBanner = !!profileBannerFromRow(user) || !!user.bannerUrl;
   const checklist = deriveLaunchChecklist({
     ...user,
+    bannerUrl: hasBanner ? "set" : null,
     productCount: Number(productRow?.n ?? 0),
     storePublished: store?.status === "published",
   });

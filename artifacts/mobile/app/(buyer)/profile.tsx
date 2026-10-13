@@ -8,7 +8,8 @@
  *    (`ProfileVideoHeader`); with no video the same layout sits on the plain
  *    background;
  *  - Posts · Followers · Following as number-over-label columns;
- *  - Edit profile · Share profile · discover-people (shared `Button`);
+ *  - Edit profile · Notifications · Share profile live in the ••• sheet
+ *    (Instagram's profile action sheet); no button row under the bio;
  *  - Story Highlights row (circles + "New");
  *  - the Thread Cash streak card;
  *  - icon-only tabs with an underline (Posts / Saved / Liked / Orders) over a
@@ -54,12 +55,16 @@ import { ProfileMeta } from '@/components/profile/ProfileShell';
 import { ProfileChip, ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
 import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
-import { ProfileVideoHeader, useHeroPosterOnly } from '@/components/profile/ProfileVideoHeader';
+import { useHeroPosterOnly } from '@/components/profile/ProfileVideoHeader';
 import { ProfileStoryAvatar } from '@/components/profile/ProfileStoryAvatar';
+import { ProfileBannerHeader } from '@/components/profile/ProfileBannerHeader';
+import { bannerCoversStatusBar, bannerHeight, resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
+import { useProfileBannerState } from '@/components/profile/useProfileBanner';
+import { useProfileNote } from '@/components/profile/useProfileNote';
+import { useProfileBanner } from '@/components/profile/ProfileBannerEditor';
 import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
 import { ProfileStoriesRow, type ProfileStoryItem } from '@/components/profile/ProfileStoriesRow';
 import { loadHighlights, type Highlight } from '@/lib/highlightsService';
-import { Button } from '@/components/ui/Button';
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { ProfileEmptyAreaContext } from '@/components/profile/ProfileEmptyAreaContext';
@@ -74,7 +79,8 @@ import { isPreviewThreadCashEnabled, getPreviewThreadCashStatus } from '@/lib/pr
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
-import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
+import { ProfileMenuSheet } from '@/components/profile/ProfileMenuSheet';
+import { buyerOwnMenuItems } from '@/components/profile/buyerProfileMenu';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { taggedItemHref } from '@/services/profileService';
 import { radius } from '@/constants/radii';
@@ -374,6 +380,21 @@ export default function ProfileScreen() {
   const [heroHeight, setHeroHeight] = useState(0);
   const [heroOnScreen, setHeroOnScreen] = useState(true);
   const coverFlow = useProfileCover({ own: true, cover: serverCover, userId: user?.id });
+  // TikTok-style banner (image or looping video): replaces the header when set.
+  const [serverBanner, setServerBanner] = useState<ProfileBanner | null>(null);
+  const banner = useProfileBannerState({ server: serverBanner, ownerId: user?.id, own: true });
+  const bannerNote = useProfileNote({
+    userId: user?.id,
+    own: true,
+    enabled: true,
+    onCompose: () => router.push('/(buyer)/inbox' as any),
+  });
+  // Own profile: always the banner layout; no banner = a dark "Add banner"
+  // placeholder that opens the same Edit banner sheet as Edit profile.
+  const bannerFlow = useProfileBanner({ banner, userId: user?.id });
+  const { height: windowHeight } = useWindowDimensions();
+  const bannerH = bannerHeight(windowHeight);
+  useEffect(() => { setHeroHeight(bannerH); }, [bannerH]);
 
   // Sheets
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
@@ -397,6 +418,7 @@ export default function ProfileScreen() {
       if (accountRef.current !== id || !data) return;
       setSocialCounts({ followers: Number(data.followersCount ?? 0), following: Number(data.followingCount ?? 0) });
       setServerCover({ videoUrl: (data as any).coverVideoUrl ?? null, posterUrl: (data as any).coverPosterUrl ?? null });
+      setServerBanner(resolveProfileBanner(data as any));
     } catch { /* keep the last known counts */ }
   }, [api, user?.id]);
 
@@ -486,10 +508,14 @@ export default function ProfileScreen() {
   // be imperative to actually work on web, which is where this ships.)
   const scrollYRef = useRef(0);
   const listRef = useRef<FlatList<ListRow> | null>(null);
+  // Banner mode: at rest at the top, the banner runs up behind the status bar.
+  const [bannerCoversTop, setBannerCoversTop] = useState(true);
   const handleScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
     scrollYRef.current = event.nativeEvent.contentOffset.y;
     const next = event.nativeEvent.contentOffset.y < Math.max(heroHeight, 1);
     setHeroOnScreen((prev) => (prev === next ? prev : next));
+    const covers = bannerCoversStatusBar(event.nativeEvent.contentOffset.y);
+    setBannerCoversTop((prev) => (prev === covers ? prev : covers));
   }, [heroHeight]);
 
   useFocusEffect(useCallback(() => {
@@ -779,7 +805,6 @@ export default function ProfileScreen() {
     );
   }
 
-  const hasCover = coverFlow.hasCover;
   const hasActiveStory = myStoryIds.length > 0;
   const heroActive = focused && heroOnScreen && !heroPosterOnly;
 
@@ -809,118 +834,101 @@ export default function ProfileScreen() {
     id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor, imageUri: h.coverUrl ?? null,
   }));
 
-  const topBar = (
-    <>
-      <ProfileAccountSwitcher
-        label={displayHandle || displayName}
-        onPress={() => { hapticLight(); setAccountSwitcherOpen(true); }}
-        overMedia={hasCover}
-        accessibilityLabel="Switch account"
-        testID="buyer-profile-account-switcher"
-      />
-      <ProfileTopBarIconRow>
-        {threadCashEnabled ? (
-          <CompactWalletChip
-            balanceLabel={formatCents(threadCashBalanceCents)}
-            onPress={() => router.push('/thread-cash' as never)}
-            onLongPress={__DEV__ ? () => celebrateThreadCash({ amount: 500, from: 'Daily reward' }) : undefined}
-            theme={theme}
-          />
-        ) : null}
-        <ProfileTopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" />
-        <ProfileTopBarIcon
-          name="more-horizontal"
-          onPress={() => { hapticLight(); setMenuOpen(true); }}
-          accessibilityLabel="Profile options"
-          testID="buyer-profile-more"
+  const accountSwitcherNode = (
+    <ProfileAccountSwitcher
+      label={displayHandle || displayName}
+      onPress={() => { hapticLight(); setAccountSwitcherOpen(true); }}
+      overMedia
+      accessibilityLabel="Switch account"
+      testID="buyer-profile-account-switcher"
+    />
+  );
+  const topBarIcons = (
+    <ProfileTopBarIconRow>
+      {threadCashEnabled ? (
+        <CompactWalletChip
+          balanceLabel={formatCents(threadCashBalanceCents)}
+          onPress={() => router.push('/thread-cash' as never)}
+          onLongPress={__DEV__ ? () => celebrateThreadCash({ amount: 500, from: 'Daily reward' }) : undefined}
+          theme={theme}
         />
-        <ProfileTopBarIcon name="menu" onPress={handleMenu} accessibilityLabel="More options" />
-      </ProfileTopBarIconRow>
+      ) : null}
+      <ProfileTopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" />
+      <ProfileTopBarIcon
+        name="more-horizontal"
+        onPress={() => { hapticLight(); setMenuOpen(true); }}
+        accessibilityLabel="Profile options"
+        testID="buyer-profile-more"
+      />
+      <ProfileTopBarIcon name="menu" onPress={handleMenu} accessibilityLabel="More options" />
+    </ProfileTopBarIconRow>
+  );
+
+  const profileAvatar = (
+    <ProfileStoryAvatar
+      uri={avatarUri}
+      videoUri={avatarVideoUri}
+      initials={avatarInitials}
+      hasActiveStory={hasActiveStory}
+      accessibilityLabel={hasActiveStory ? 'View your story' : 'Create a story'}
+      onPress={() => {
+        hapticSelection();
+        if (hasActiveStory) {
+          router.push({ pathname: '/buyer-story-viewer' as any, params: { storyId: myStoryIds[0], allStoryIds: myStoryIds.join(',') } });
+        } else {
+          router.push('/buyer-story-create' as any);
+        }
+      }}
+      onPressBadge={() => { hapticSelection(); router.push('/buyer-story-create' as any); }}
+    />
+  );
+  const profileMeta = (profile?.bio || profile?.website || profile?.location) ? (
+    <ProfileMeta
+      bio={profile?.bio}
+      website={profile?.website}
+      location={profile?.location}
+      onOpenWebsite={(url) => { void Linking.openURL(url); }}
+    />
+  ) : null;
+  // Banner layout: the @username ▾ account switcher leads the top bar (Edit
+  // profile lives only in the ••• menu).
+  const bannerTopBar = (
+    <>
+      <View style={topBarStyles.bannerLeft}>
+        <View style={topBarStyles.bannerSwitcher}>{accountSwitcherNode}</View>
+      </View>
+      {topBarIcons}
     </>
   );
 
   const header = (
     <View onLayout={handleHeaderLayout}>
-      {/* ── Video hero + identity: the profile video (when set) runs from the
-          very top of the screen, behind the top bar, avatar, name/@handle/
-          chip and bio, and fades into the solid background exactly where the
-          stats row begins. No video → the same layout on the plain page. ── */}
-      <ProfileVideoHeader
-        hero={{ videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl }}
-        heroActive={heroActive}
+      {/* ── Banner + identity (TikTok): always the banner layout on your own
+          profile; no banner yet → a subtle dark "Add banner" placeholder. ── */}
+      <ProfileBannerHeader
+        banner={banner}
+        height={bannerH}
+        active={heroActive}
         posterOnly={heroPosterOnly}
         topPad={topPad}
-        onHeroHeight={setHeroHeight}
-        topBar={topBar}
-        avatar={(
-          <ProfileStoryAvatar
-            uri={avatarUri}
-            videoUri={avatarVideoUri}
-            initials={avatarInitials}
-            hasActiveStory={hasActiveStory}
-            accessibilityLabel={hasActiveStory ? 'View your story' : 'Create a story'}
-            onPress={() => {
-              hapticSelection();
-              if (hasActiveStory) {
-                router.push({ pathname: '/buyer-story-viewer' as any, params: { storyId: myStoryIds[0], allStoryIds: myStoryIds.join(',') } });
-              } else {
-                router.push('/buyer-story-create' as any);
-              }
-            }}
-            onPressBadge={() => { hapticSelection(); router.push('/buyer-story-create' as any); }}
-          />
-        )}
+        topBar={bannerTopBar}
+        avatar={profileAvatar}
+        note={bannerNote}
         name={displayName}
         handle={displayHandle && displayHandle !== displayName ? displayHandle : null}
-        chip={<ProfileChip label="Buyer" icon="user" />}
-        meta={(profile?.bio || profile?.website || profile?.location) ? (
-          <ProfileMeta
-            bio={profile?.bio}
-            website={profile?.website}
-            location={profile?.location}
-            onOpenWebsite={(url) => { void Linking.openURL(url); }}
-          />
-        ) : null}
         stats={stats}
+        // Buyer's own profile: avatar on the left, name / @handle / stats to its right.
+        avatarSide="left"
         statsLoading={loading}
+        coversTop={focused && bannerCoversTop}
+        onAddBanner={bannerFlow.openSheet}
       />
-
-      {/* ── Edit profile · Share profile · discover people (shared Button) ── */}
-      <View style={styles.actionsRow}>
-        <View style={styles.actionFlex}>
-          <Button
-            label="Edit profile"
-            variant="secondary"
-            size="compact"
-            fullWidth
-            onPress={() => router.push('/(buyer)/edit-profile')}
-            style={[styles.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
-            testID="profile-edit-button"
-          />
-        </View>
-        <View style={styles.actionFlex}>
-          <Button
-            label="Share profile"
-            variant="secondary"
-            size="compact"
-            fullWidth
-            onPress={handleShareProfile}
-            accessibilityHint="Opens your shareable profile link and QR code"
-            style={[styles.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
-            testID="profile-share-button"
-          />
-        </View>
-        <Button
-          label=""
-          icon="user-plus"
-          variant="secondary"
-          size="compact"
-          accessibilityLabel="Discover people"
-          onPress={() => router.push('/(buyer)/friends' as any)}
-          style={[styles.actionButton, styles.actionSquare, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
-          testID="profile-discover-people"
-        />
+      {/* Below the banner the profile continues as before: chip, bio, link. */}
+      <View style={topBarStyles.bannerBelow} testID="profile-banner-below">
+        <View style={topBarStyles.bannerChips}><ProfileChip label="Buyer" icon="user" /></View>
+        {profileMeta}
       </View>
+
 
       {/* ── Story Highlights: circles + "New" ── */}
       <View style={styles.highlightsWrap} testID="profile-highlights">
@@ -997,18 +1005,27 @@ export default function ProfileScreen() {
       />
       <CoverManageSheet visible={coverFlow.manageOpen} onChange={coverFlow.changeFromManage} onRemove={() => { void coverFlow.remove(); }} onClose={coverFlow.closeManage} />
       <CoverTrimSheet source={coverFlow.trimSource} onCancel={coverFlow.cancelTrim} onConfirm={coverFlow.confirmTrim} />
+      {/* "Add banner" on the placeholder: the same Edit banner sheet as Edit profile. */}
+      {bannerFlow.sheet}
 
+      {/* ••• (Instagram's profile action sheet): Edit profile · Notifications ·
+          Share profile, then Find friends + the existing extras below a
+          separator. These replaced the Edit / Share / add-friend button row
+          under the bio. */}
       <ProfileMenuSheet
         visible={menuOpen}
-        title={displayName}
+        title={displayHandle || displayName}
+        appearance="list"
         onClose={() => setMenuOpen(false)}
-        items={[
-          caps.showShare && { key: 'share', icon: 'share-2', label: 'Share profile', onPress: handleShareProfile },
-          caps.showViewAsVisitor && user?.id && {
-            key: 'view-as-visitor', icon: 'eye', label: 'View as visitor',
-            onPress: () => router.push(viewAsVisitorHref('buyer', user.id) as never),
-          },
-        ].filter(Boolean) as ProfileMenuItem[]}
+        items={buyerOwnMenuItems({
+          onEditProfile: () => router.push('/(buyer)/edit-profile'),
+          onNotifications: () => router.push('/buyer-notifications' as any),
+          onShareProfile: caps.showShare ? handleShareProfile : null,
+          onFindFriends: () => router.push('/(buyer)/friends' as any),
+          onViewAsVisitor: caps.showViewAsVisitor && user?.id
+            ? () => router.push(viewAsVisitorHref('buyer', user.id) as never)
+            : null,
+        })}
       />
 
       <ShareProfileSheet
@@ -1044,13 +1061,7 @@ function makeStyles(theme: AppThemePreset) {
     errorRoot: { flex: 1, backgroundColor: theme.background, justifyContent: 'center' },
     gridRow: { gap: 1 },
 
-    // Stats row → buttons: 16pt. Instagram proportions: two equal buttons
-    // plus a square discover-people button, 6pt apart, 8pt corners.
-    actionsRow: { flexDirection: 'row', gap: 6, paddingHorizontal: SP.md, paddingTop: 16, alignItems: 'center' },
-    actionFlex: { flex: 1, minWidth: 0 },
-    actionButton: { borderRadius: 8, paddingHorizontal: SP.sm },
-    actionSquare: { width: 36, paddingHorizontal: 0 },
-    // Buttons → highlights: 16pt.
+    // Bio → highlights: 16pt.
     highlightsWrap: { paddingTop: 16 },
     // Highlights → streak card (or tabs, when Thread Cash is off): 16pt.
     streakWrap: { marginTop: 16 },
@@ -1061,6 +1072,11 @@ function makeStyles(theme: AppThemePreset) {
 }
 
 const topBarStyles = StyleSheet.create({
+  // Banner layout (TikTok): pencil + account switcher, chips/bio below the banner.
+  bannerLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginRight: SP.sm },
+  bannerSwitcher: { flex: 1, minWidth: 0, overflow: 'hidden' },
+  bannerBelow: { paddingHorizontal: SP.md, paddingTop: 12, gap: SP.xs },
+  bannerChips: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   walletChip: {
     height: 28, borderRadius: radius.sm, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
     gap: 4, paddingHorizontal: 8, overflow: 'hidden',
