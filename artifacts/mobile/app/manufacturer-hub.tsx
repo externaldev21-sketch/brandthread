@@ -544,8 +544,10 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           </TouchableOpacity>
         </View>
 
-        {/* Category chips */}
-        <ChipRow contentContainerStyle={s.categoryRow} selectedIndex={CATEGORY_CHIPS.indexOf(filters.category as string)} hapticOnSelect={false} bleed={SP.md} gap={SP.sm}>
+        {/* Category chips — the header sits inside two 16pt gutters (grid +
+            intro), so the row bleeds 32 to reach the screen edge while the
+            first chip stays aligned with the rest of the page. */}
+        <ChipRow contentContainerStyle={s.categoryRow} selectedIndex={CATEGORY_CHIPS.indexOf(filters.category as string)} hapticOnSelect={false} bleed={SP.md * 2} inset={SP.md * 2} gap={SP.sm}>
           {CATEGORY_CHIPS.map((category) => (
             <FilterChip key={category} label={category} active={filters.category === category} onPress={() => toggleCategory(category)} />
           ))}
