@@ -1447,7 +1447,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   sortRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: 10, paddingBottom: 6 },
   sortChip: {
     height: 32, paddingHorizontal: 14, borderRadius: RADIUS.pill,
-    alignItems: 'center', justifyContent: 'center', backgroundColor: SURFACE,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: SUBTLE_WASH,
   },
   sortChipOn: { backgroundColor: FG },
   sortChipText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
