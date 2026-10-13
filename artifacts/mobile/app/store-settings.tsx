@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TextInput,
@@ -17,6 +17,7 @@ import { hapticToggle } from '@/lib/haptics';
 import { getStorefront, updateSettings } from '@/services/storeService';
 import { Storefront, StoreSettings, StorePublishStatus } from '@/services/storeTypes';
 import { radius } from '@/constants/radii';
+import { useApi } from '@/lib/api';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -81,6 +82,27 @@ export default function StoreSettingsScreen() {
   });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Discover > Brands "Rising this week" opt-in. Lives on the seller's
+  // account (users.rising_brands_opt_in), not the local storefront blob, so
+  // it saves on its own the moment it is flipped. Off by default.
+  const api = useApi();
+  const [risingOptIn, setRisingOptIn] = useState(false);
+  useEffect(() => {
+    let active = true;
+    api.seller.getProfile()
+      .then((p) => { if (active) setRisingOptIn(!!p?.risingBrandsOptIn); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [api]);
+  const toggleRising = useCallback(async (next: boolean) => {
+    setRisingOptIn(next);
+    try {
+      const res = await api.seller.setRisingBrandsOptIn(next);
+      setRisingOptIn(!!res?.risingBrandsOptIn);
+    } catch {
+      setRisingOptIn(!next);
+    }
+  }, [api]);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -308,6 +330,16 @@ export default function StoreSettingsScreen() {
           />
         </BrandthreadCard>
 
+        {/* DISCOVER */}
+        <SectionHeader title="DISCOVER" style={ss.sectionHeader} />
+        <BrandthreadCard style={ss.card}>
+          <SwitchRow
+            label="Show in Rising brands"
+            value={risingOptIn}
+            onValueChange={toggleRising}
+          />
+        </BrandthreadCard>
+
         <PrimaryButton label="Save Settings" onPress={handleSave} loading={saving} style={ss.saveBtn} />
       </ScrollView>
       )}
@@ -325,7 +357,7 @@ function FieldRow({ ss, label, children }: { ss: ReturnType<typeof makeStyles>; 
 }
 
 function SwitchRow({ label, description, value, onValueChange }: {
-  label: string; description: string; value: boolean; onValueChange: (v: boolean) => void;
+  label: string; description?: string; value: boolean; onValueChange: (v: boolean) => void;
 }) {
   return (
     <ListRow
