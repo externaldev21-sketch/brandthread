@@ -665,6 +665,16 @@ export default function SellerProfileScreen() {
         </Pressable>
       ) : null}
       {shipsIn ? <ProfileChip label={shipsIn} icon="truck" /> : null}
+      {seller.verified ? (
+        <Pressable
+          onPress={() => router.push('/verified-brands' as never)}
+          accessibilityRole="button"
+          accessibilityLabel="Verified brand. What this means"
+          testID="seller-profile-verified-chip"
+        >
+          <ProfileChip label="Verified brand" icon="check-circle" />
+        </Pressable>
+      ) : null}
       {caps.showPlanChip && plan ? (
         <ProfileChip
           label={planChipLabel(plan)}
