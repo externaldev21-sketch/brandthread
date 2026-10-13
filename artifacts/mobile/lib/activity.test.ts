@@ -686,3 +686,14 @@ describe('isOrderUpdateRow', () => {
     expect(isOrderUpdateRow(null)).toBe(false);
   });
 });
+
+describe('aggregateActivity — follows stay separate unless back to back', () => {
+  it('keeps a lone follower as its own row when other events sit between', () => {
+    const follow = (name: string) => item({ type: 'new_follower', title: `${name} started following you`, actorName: name, actorId: `user_${name}`, targetId: `user_${name}`, cta: 'Follow back' });
+    const rows = aggregateActivity([follow('Jay'), like('Mina', 'post1'), follow('Ola'), follow('Kai')]);
+    expect(rows.map((r) => [r.type, r.actorCount])).toEqual([
+      ['new_follower', 1], ['post_like', 1], ['new_follower', 2],
+    ]);
+  });
+});
+

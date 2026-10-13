@@ -208,6 +208,7 @@ function sameActor(a: ActivityActor, b: ActivityActor): boolean {
  * Merge repeat social events (same aggregation key) into single rows
  * carrying the distinct actors — every like on one post becomes "Jay and 12
  * others liked your post", even when other events landed in between.
+ * Follows merge only when back to back.
  * Each merged row sits where its newest event was. Call once per section
  * so a merged row never spans New and read items. Non-aggregating types
  * pass through as single-item rows.
@@ -218,7 +219,14 @@ export function aggregateActivity(items: readonly ActivityItem[]): ActivityRow[]
 
   for (const item of items) {
     const key = aggregationKey(item);
-    const existing = key ? rowByKey.get(key) : undefined;
+    // Follows only merge when back to back — Instagram keeps a lone
+    // follower as its own row with an inline "Follow back".
+    const last = rows[rows.length - 1];
+    const existing = !key
+      ? undefined
+      : key === 'new_follower'
+        ? (last && last.type === 'new_follower' && rowByKey.get(key) === last ? last : undefined)
+        : rowByKey.get(key);
     if (existing) {
       existing.ids.push(item.id);
       existing.isRead = existing.isRead && item.isRead;

@@ -434,7 +434,8 @@ export const ActivityRowView = React.memo(function ActivityRowView({
         <View style={styles.center}>
           <Text style={styles.message} numberOfLines={2}>
             {parts.map((part, index) => (
-              <Text key={index} style={part.bold ? styles.messageBold : styles.messageMuted}>{part.text}</Text>
+              // Order status is plain white text, not the gray verb tone.
+              <Text key={index} style={part.bold ? styles.messageBold : isOrderUpdateRow(row.type) ? undefined : styles.messageMuted}>{part.text}</Text>
             ))}
             <Text style={styles.time}>{'  '}{relativeTime(row.createdAt, now, { compact: true })}</Text>
           </Text>
