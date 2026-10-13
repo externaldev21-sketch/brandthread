@@ -56,14 +56,17 @@ export default function BuyerPrivacySettings() {
   const [serverPrivate, setServerPrivate] = useState<boolean | null>(null);
   const [privateBusy, setPrivateBusy] = useState(false);
   const [requestCount, setRequestCount] = useState(0);
+  // "Saved by people you follow" on product pages — server-backed, written on toggle.
+  const [showSaves, setShowSaves] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
       getPrivacySettings().then(setSettings);
       // Load server-side DM privacy setting
-      api.privacy.get().then(({ dmPrivacy: p, isPrivate }) => {
+      api.privacy.get().then(({ dmPrivacy: p, isPrivate, showSavesToFollowers }) => {
         setDmPrivacy(p);
         if (typeof isPrivate === 'boolean') setServerPrivate(isPrivate);
+        if (typeof showSavesToFollowers === 'boolean') setShowSaves(showSavesToFollowers);
       }).catch(() => {});
       api.followRequests.list(50, 0).then((rows) => setRequestCount(Array.isArray(rows) ? rows.length : 0)).catch(() => {});
     }, [])
@@ -110,6 +113,18 @@ export default function BuyerPrivacySettings() {
       setSaveError("Couldn't update your account privacy. Try again.");
     } finally {
       setPrivateBusy(false);
+    }
+  }
+
+  async function applyShowSaves(next: boolean) {
+    setShowSaves(next);
+    try {
+      const res = await api.privacy.update({ showSavesToFollowers: next });
+      if (typeof res.showSavesToFollowers === 'boolean') setShowSaves(res.showSavesToFollowers);
+      setSaveError(null);
+    } catch {
+      setShowSaves(!next);
+      setSaveError("Couldn't save. Try again.");
     }
   }
 
@@ -228,6 +243,14 @@ export default function BuyerPrivacySettings() {
             title="Read receipts"
             subtitle="Show when you've read messages"
             toggle={{ value: settings.readReceiptsEnabled, onChange: v => update('readReceiptsEnabled', v) }}
+          />
+          <View style={styles.divider} />
+          <ListRow
+            icon="bookmark"
+            title="Show your saves"
+            subtitle="Followers can see products you save"
+            toggle={{ value: showSaves, onChange: applyShowSaves }}
+            testID="privacy-show-saves"
           />
         </Card>
 
