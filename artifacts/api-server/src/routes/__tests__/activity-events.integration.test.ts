@@ -56,7 +56,8 @@ const likerA = `activity-liker-a-${suffix}`;
 const likerB = `activity-liker-b-${suffix}`;
 const sellerId = `activity-seller-${suffix}`;
 const shopperId = `activity-shopper-${suffix}`;
-const userIds = [ownerId, likerA, likerB, sellerId, shopperId];
+const groupsUserId = `activity-groups-${suffix}`;
+const userIds = [ownerId, likerA, likerB, sellerId, shopperId, groupsUserId];
 const POST_THUMB = `https://cdn.example.test/${suffix}/post-thumb.jpg`;
 const PRODUCT_IMAGE = `https://cdn.example.test/${suffix}/product.jpg`;
 
@@ -434,11 +435,55 @@ describe("feed paging", () => {
     const orders = await call("GET", "/api/buyer/notifications?limit=30&filter=orders", ownerId);
     expect(orders.body).toHaveLength(0);
     const social = await call("GET", "/api/buyer/notifications?limit=30&filter=social", ownerId);
-    expect(social.body).toHaveLength(total);
+    // The Thread Cash received earlier is Money now, not Social.
+    const money = await call("GET", "/api/buyer/notifications?limit=30&filter=money", ownerId);
+    expect((money.body as any[]).map((row) => row.type)).toEqual(["thread_cash_received"]);
+    expect(social.body).toHaveLength(total - 1);
 
     const unread = await call("GET", "/api/buyer/notifications/unread-count", ownerId);
     expect(unread.body).toMatchObject({ count: total });
     await call("PATCH", `/api/buyer/notifications/${first.body[0].id}/read`, ownerId, {});
     expect((await call("GET", "/api/buyer/notifications/unread-count", ownerId)).body).toMatchObject({ count: total - 1 });
+  });
+});
+
+describe("Orders / Social / Money groups", () => {
+  it("puts every row in exactly one of filter=orders|social|money", async () => {
+    const rows: { category: string; type: string; group: "orders" | "social" | "money" | null }[] = [
+      { category: "orders", type: "order_shipped", group: "orders" },
+      { category: "returns", type: "return_approved", group: "orders" },
+      { category: "production", type: "manufacturer_order_status", group: "orders" },
+      { category: "system", type: "low_stock", group: "orders" },
+      { category: "social", type: "post_like", group: "social" },
+      { category: "stock", type: "price_drop", group: "social" },
+      { category: "payout", type: "payout_sent", group: "money" },
+      { category: "orders", type: "payout_sent", group: "money" },
+      { category: "payment", type: "payment_reversed", group: "money" },
+      { category: "production", type: "manufacturer_payment_received", group: "money" },
+      { category: "returns", type: "return_refunded", group: "money" },
+      { category: "orders", type: "order_auto_refunded", group: "money" },
+      { category: "social", type: "thread_cash_received", group: "money" },
+      { category: "finance", type: "thread_cash_expiring", group: "money" },
+      { category: "social", type: "referral_reward", group: "money" },
+      { category: "subscription", type: "subscription_trial_day_4", group: "money" },
+      { category: "system", type: "announcement", group: null },
+    ];
+    await db.insert(notificationsFeed).values(rows.map((row) => ({
+      userId: groupsUserId, category: row.category, type: row.type, title: `${row.category}/${row.type}`,
+    })));
+
+    const typesFor = async (filter: string) => {
+      const res = await call("GET", `/api/buyer/notifications?limit=100&filter=${filter}`, groupsUserId);
+      expect(res.status).toBe(200);
+      return (res.body as { title: string }[]).map((row) => row.title).sort();
+    };
+    const expected = (group: string) => rows.filter((row) => row.group === group).map((row) => `${row.category}/${row.type}`).sort();
+    const [orders, social, money] = await Promise.all([typesFor("orders"), typesFor("social"), typesFor("money")]);
+    expect(orders).toEqual(expected("orders"));
+    expect(social).toEqual(expected("social"));
+    expect(money).toEqual(expected("money"));
+
+    const all = await call("GET", "/api/buyer/notifications?limit=100", groupsUserId);
+    expect((all.body as unknown[]).length).toBe(rows.length);
   });
 });

@@ -104,8 +104,25 @@ async function resolveTargetImage(value: string | null): Promise<string | null> 
   }
 }
 
-/** Feed categories the Activity Center shows under "Orders". */
-export const ORDER_ACTIVITY_CATEGORIES = ["orders", "order", "payout", "payouts", "payment", "production", "returns"] as const;
+/**
+ * The Activity Center groups the feed into Orders / Social / Money, and the
+ * three never overlap: Money (payouts, payments, refunds, Thread Cash,
+ * subscription billing) is matched first, by category or by type, so a payout
+ * or refund published under an orders/returns/production/social category
+ * still only shows under Money. Mirrors activityKind in
+ * artifacts/mobile/lib/activity.ts.
+ */
+export const MONEY_ACTIVITY_CATEGORIES = ["payout", "payouts", "payment", "finance", "subscription"] as const;
+export const MONEY_ACTIVITY_TYPES = [
+  "payout_sent", "payout_setup_restricted",
+  "manufacturer_payment_received", "manufacturer_payment_reversed",
+  "manufacturer_payouts_ready", "manufacturer_payouts_restricted",
+  "return_refunded", "order_auto_refunded", "order_auto_refunded_seller",
+  "thread_cash_received", "thread_cash_expiring", "referral_reward", "referral_joined",
+  "subscription_trial_day_4", "subscription_trial_will_end",
+] as const;
+/** Feed categories the Activity Center shows under "Orders" (minus Money rows). */
+export const ORDER_ACTIVITY_CATEGORIES = ["orders", "order", "production", "returns"] as const;
 /** Inventory alerts are inserted without an orders category but belong there. */
 export const ORDER_ACTIVITY_TYPES = ["low_stock", "out_of_stock"] as const;
 /**
@@ -116,17 +133,40 @@ export const ORDER_ACTIVITY_TYPES = ["low_stock", "out_of_stock"] as const;
  */
 export const SOCIAL_ACTIVITY_TYPES = ["price_drop", "back_in_stock", "waitlist_restock", "product_restocked", "new_product"] as const;
 
+function moneyCondition(): SQL {
+  return or(
+    inArray(notificationsFeed.category, [...MONEY_ACTIVITY_CATEGORIES]),
+    inArray(notificationsFeed.type, [...MONEY_ACTIVITY_TYPES]),
+  )!;
+}
+
+function notMoneyCondition(): SQL {
+  return and(
+    notInArray(notificationsFeed.category, [...MONEY_ACTIVITY_CATEGORIES]),
+    notInArray(notificationsFeed.type, [...MONEY_ACTIVITY_TYPES]),
+  )!;
+}
+
 function filterCondition(filter: unknown): SQL | undefined {
+  if (filter === "money") return moneyCondition();
   if (filter === "orders") {
-    return or(
-      inArray(notificationsFeed.category, [...ORDER_ACTIVITY_CATEGORIES]),
-      inArray(notificationsFeed.type, [...ORDER_ACTIVITY_TYPES]),
+    return and(
+      or(
+        inArray(notificationsFeed.category, [...ORDER_ACTIVITY_CATEGORIES]),
+        inArray(notificationsFeed.type, [...ORDER_ACTIVITY_TYPES]),
+      ),
+      notMoneyCondition(),
     );
   }
   if (filter === "social") {
-    return or(
-      eq(notificationsFeed.category, "social"),
-      inArray(notificationsFeed.type, [...SOCIAL_ACTIVITY_TYPES]),
+    return and(
+      or(
+        eq(notificationsFeed.category, "social"),
+        inArray(notificationsFeed.type, [...SOCIAL_ACTIVITY_TYPES]),
+      ),
+      notMoneyCondition(),
+      // Same precedence as the client: an order-category row is Orders.
+      notInArray(notificationsFeed.category, [...ORDER_ACTIVITY_CATEGORIES]),
     );
   }
   return undefined;

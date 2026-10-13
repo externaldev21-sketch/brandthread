@@ -9,6 +9,7 @@ import {
   activityRowHref,
   activityIcon,
   activityKind,
+  matchesFilter,
   activityMessage,
   aggregateActivity,
   followControlState,
@@ -347,8 +348,10 @@ describe('classification and routing', () => {
       expect(activityHref(item({ type, category: 'orders', targetType: 'order', targetId: 'o2' }), 'seller')).toBe('/order-detail?id=o2');
       expect(isBuyerOrderNotification(type)).toBe(false);
     }
-    // Return status rows: Orders filter, and the same screen the push opens.
-    expect(activityKind({ category: 'returns', type: 'return_refunded' })).toBe('orders');
+    // Return status rows: Orders filter (the refund itself is Money), and the
+    // same screen the push opens.
+    expect(activityKind({ category: 'returns', type: 'return_approved' })).toBe('orders');
+    expect(activityKind({ category: 'returns', type: 'return_refunded' })).toBe('money');
     expect(activityHref(item({ type: 'return_approved', category: 'returns', targetType: 'return', targetId: 'r1' })))
       .toBe('/return-detail?returnId=r1');
     expect(activityIcon({ type: 'order_confirmed', category: 'orders' })).toBe('check-circle');
@@ -390,8 +393,8 @@ describe('classification and routing', () => {
 describe('filter chips', () => {
   const of = (type: string, category = 'social') => item({ type, category });
 
-  it('offers exactly All / Follows / Likes / Comments / Orders / Thread Cash, in that order', () => {
-    expect(ACTIVITY_CHIPS.map((c) => c.label)).toEqual(['All', 'Follows', 'Likes', 'Comments', 'Orders', 'Thread Cash']);
+  it('offers exactly All / Follows / Likes / Comments / Orders / Money, in that order', () => {
+    expect(ACTIVITY_CHIPS.map((c) => c.label)).toEqual(['All', 'Follows', 'Likes', 'Comments', 'Orders', 'Money']);
   });
 
   it('puts each notification type under one chip', () => {
@@ -403,10 +406,10 @@ describe('filter chips', () => {
     expect(activityCategory(of('mention'))).toBe('comments');
     expect(activityCategory(of('story_mention'))).toBe('comments');
     expect(activityCategory(of('story_reshare'))).toBe('other');
-    expect(activityCategory(of('thread_cash_received'))).toBe('thread_cash');
+    expect(activityCategory(of('thread_cash_received'))).toBe('money');
     expect(activityCategory(of('order_shipped', 'orders'))).toBe('orders');
     expect(activityCategory(of('order_delivered', 'orders'))).toBe('orders');
-    expect(activityCategory(of('payout_sent', 'payout'))).toBe('orders');
+    expect(activityCategory(of('payout_sent', 'payout'))).toBe('money');
     expect(activityCategory(of('low_stock', 'stock'))).toBe('orders');
     expect(activityCategory(of('repost'))).toBe('other');
   });
@@ -422,7 +425,7 @@ describe('filter chips', () => {
   it('has a specific empty message for every chip', () => {
     const messages = ACTIVITY_CHIPS.map((c) => activityChipEmpty(c.key).message);
     expect(new Set(messages).size).toBe(ACTIVITY_CHIPS.length);
-    expect(activityChipEmpty('thread_cash').message).toContain('Thread Cash');
+    expect(activityChipEmpty('money').message).toContain('Thread Cash');
   });
 
   it('gives every chip a title, for both roles, and phrases follows/orders for a seller', () => {
@@ -441,7 +444,8 @@ describe('filter chips', () => {
     expect(activityChipEmpty('follows', 'seller').action).toEqual({ label: 'Share your store', href: '/share-store' });
     expect(activityChipEmpty('orders').action?.href).toBe('/(buyer)/discover');
     expect(activityChipEmpty('orders', 'seller').action?.href).toBe('/share-store');
-    expect(activityChipEmpty('thread_cash', 'seller').action?.href).toBe('/thread-cash');
+    expect(activityChipEmpty('money').action?.href).toBe('/thread-cash');
+    expect(activityChipEmpty('money', 'seller').action?.href).toBe('/payouts');
     for (const role of ['buyer', 'seller'] as const) {
       expect(activityChipEmpty('likes', role).action).toBeUndefined();
       expect(activityChipEmpty('comments', role).action).toBeUndefined();
@@ -650,5 +654,77 @@ describe('delete with undo', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(d.isPending('n1')).toBe(false);
     expect(onFailed).toHaveBeenCalledWith(['n2']);
+  });
+});
+
+describe('Orders / Social / Money groups', () => {
+  // Every [category, type] pair the API server publishes into
+  // notifications_feed (grep publishNotification / insert(notificationsFeed)
+  // in artifacts/api-server/src), with the group it must land in.
+  const PUBLISHED: [string, string, ReturnType<typeof activityKind>][] = [
+    // Orders
+    ['orders', 'order_confirmed', 'orders'], ['orders', 'order_shipped', 'orders'],
+    ['orders', 'order_out_for_delivery', 'orders'], ['orders', 'order_delivered', 'orders'],
+    ['orders', 'order_cancelled', 'orders'], ['orders', 'order_exception', 'orders'],
+    ['orders', 'order_returned_to_sender', 'orders'], ['orders', 'order_preparing', 'orders'],
+    ['orders', 'order_refund_warning', 'orders'], ['orders', 'order_refund_paused', 'orders'],
+    ['orders', 'new_order_received', 'orders'], ['orders', 'order_cancelled_by_buyer', 'orders'],
+    ['orders', 'shopify_order_cancelled', 'orders'], ['orders', 'return_request_received', 'orders'],
+    ['returns', 'return_requested', 'orders'], ['returns', 'return_approved', 'orders'],
+    ['returns', 'return_denied', 'orders'],
+    ['production', 'manufacturer_order_status', 'orders'], ['production', 'manufacturer_order_card', 'orders'],
+    ['production', 'manufacturer_order_cancelled', 'orders'], ['production', 'manufacturer_sample_request', 'orders'],
+    ['system', 'low_stock', 'orders'], ['stock', 'out_of_stock', 'orders'],
+    // Social
+    ['social', 'new_follower', 'social'], ['social', 'post_like', 'social'], ['social', 'story_like', 'social'],
+    ['social', 'comment_like', 'social'], ['social', 'post_comment', 'social'], ['social', 'comment_reply', 'social'],
+    ['social', 'mention', 'social'], ['social', 'story_mention', 'social'], ['social', 'repost', 'social'],
+    ['social', 'story_reshare', 'social'], ['social', 'post_save', 'social'], ['social', 'post_share', 'social'],
+    ['social', 'post_tag', 'social'], ['social', 'follow_request', 'social'], ['social', 'follow_request_accepted', 'social'],
+    ['stock', 'price_drop', 'social'], ['stock', 'back_in_stock', 'social'], ['social', 'waitlist_restock', 'social'], ['order', 'waitlist_restock', 'orders'],
+    ['social', 'new_product', 'social'],
+    // Money
+    ['payout', 'payout_sent', 'money'], ['orders', 'payout_sent', 'money'],
+    ['payout', 'payout_setup_restricted', 'money'],
+    ['production', 'manufacturer_payment_received', 'money'], ['production', 'manufacturer_payment_reversed', 'money'],
+    ['production', 'manufacturer_payouts_ready', 'money'], ['production', 'manufacturer_payouts_restricted', 'money'],
+    ['payment', 'payment_reversed', 'money'],
+    ['returns', 'return_refunded', 'money'], ['orders', 'order_auto_refunded', 'money'],
+    ['orders', 'order_auto_refunded_seller', 'money'],
+    ['social', 'thread_cash_received', 'money'], ['finance', 'thread_cash_expiring', 'money'],
+    ['social', 'referral_reward', 'money'], ['social', 'referral_joined', 'money'],
+    ['subscription', 'subscription_trial_day_4', 'money'],
+    // Other (All only)
+    ['system', 'announcement', 'other'], ['messages', 'new_friend_message', 'other'],
+    ['giveaways', 'giveaway_won', 'other'], ['drops', 'drop_live', 'other'], ['live', 'live_started', 'other'],
+  ];
+
+  it.each(PUBLISHED)('%s/%s lands in %s', (category, type, group) => {
+    expect(activityKind({ category, type })).toBe(group);
+  });
+
+  it('puts every known row in exactly one of Orders / Social / Money (or none)', () => {
+    for (const [category, type, group] of PUBLISHED) {
+      const row = item({ category, type });
+      const groups = (['orders', 'social', 'money'] as const).filter((g) => matchesFilter(row, g));
+      expect(groups).toEqual(group === 'other' ? [] : [group]);
+    }
+  });
+
+  it('shows every Money row under the Money chip and nowhere in Orders', () => {
+    for (const [category, type, group] of PUBLISHED) {
+      const row = item({ category, type });
+      expect(matchesActivityChip(row, 'money')).toBe(group === 'money');
+      if (group === 'money') {
+        expect(matchesActivityChip(row, 'orders')).toBe(false);
+        expect(matchesActivityChip(row, 'all')).toBe(true);
+      }
+    }
+  });
+
+  it('keeps every former Thread Cash chip row under Money', () => {
+    for (const type of ['thread_cash_received', 'referral_joined', 'referral_reward']) {
+      expect(activityCategory(item({ category: 'social', type }))).toBe('money');
+    }
   });
 });

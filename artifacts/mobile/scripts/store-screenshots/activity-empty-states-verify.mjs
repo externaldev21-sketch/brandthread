@@ -27,7 +27,7 @@ import { DEMO_NOW } from './demo-data.mjs';
 const OUT = path.resolve(process.argv[2] ?? path.join(MOBILE_ROOT, 'docs/pr-review/activity-empty-states'));
 mkdirSync(OUT, { recursive: true });
 const VIEW_H = 844;
-const CHIPS = ['all', 'follows', 'likes', 'comments', 'orders', 'thread_cash'];
+const CHIPS = ['all', 'follows', 'likes', 'comments', 'orders', 'money'];
 
 const ONE_COMMENT = [{
   id: 'c1', category: 'social', type: 'post_comment', title: 'Cory Commenter commented on your post', body: 'love this fit',
@@ -153,7 +153,7 @@ async function run(browser, images, origin, role) {
     const landed = `${url.pathname}${url.search}`;
     const errorShown = await page.evaluate(() => /could(n.t| not) load|not found|something went wrong|unmatched route/i.test(document.body.innerText));
     // Where each button is meant to go — a redirect elsewhere is a dead end.
-    const intended = { 'Find people to follow': '/buyer-search', 'Share your store': '/share-store', 'Start shopping': '/discover', 'Open Thread Cash': '/thread-cash' }[result.newUser[chip].action];
+    const intended = { 'Find people to follow': '/buyer-search', 'Share your store': '/share-store', 'Start shopping': '/discover', 'Open Thread Cash': '/thread-cash', 'Open payouts': '/payouts' }[result.newUser[chip].action];
     result.ctas[chip] = {
       label: result.newUser[chip].action, landed, navigated: page.url() !== before,
       landedWhereIntended: url.pathname === intended, errorShown,
