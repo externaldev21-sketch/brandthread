@@ -5,12 +5,13 @@
  * CachedImage component (components/CachedImage.tsx) so caching/placeholder
  * behavior is consistent with the rest of the app.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { ImageStyle, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
+import { initialsOf } from '@/lib/initials';
 
 export interface AvatarProps {
   uri?: string | null;
@@ -20,21 +21,23 @@ export interface AvatarProps {
 }
 
 function initialsFor(name?: string) {
-  if (!name) return '?';
-  const parts = name.trim().split(/\s+/).slice(0, 2);
-  return parts.map((part) => part[0]?.toUpperCase() ?? '').join('') || '?';
+  return initialsOf(name) || '?';
 }
 
 export function Avatar({ uri, name, size = 40, style }: AvatarProps) {
   const { theme } = useAppTheme();
   const dimension = { width: size, height: size, borderRadius: RADII.avatar };
+  // A photo that fails to load falls back to the initials, never a blank
+  // circle or a generic person glyph (less-AI pass, item 50).
+  const [failedUri, setFailedUri] = useState<string | null>(null);
 
-  if (uri) {
+  if (uri && failedUri !== uri) {
     return (
       <CachedImage
         source={{ uri }}
         style={[dimension, style] as StyleProp<ImageStyle>}
         accessibilityLabel={name ? `${name}'s avatar` : 'Avatar'}
+        onError={() => setFailedUri(uri)}
       />
     );
   }

@@ -277,10 +277,12 @@ export default function BuyerSearchScreen() {
   const videoResultsRaw = useMemo(() => results.filter((r): r is VideoResult => r.kind === 'video'), [results]);
   // Blend in bundled preview posts/products when the live API has nothing
   // for this query — matched against name/author/brand, not just caption.
+  // Dev preview only: a real search never shows bundled sample posts (no
+  // fake data, no AI-generated people — less-AI pass, item 47).
   const videoResults = videoResultsRaw.length > 0 ? videoResultsRaw
-    : (trimmedQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], trimmedQuery)) : []);
+    : (previewMode && trimmedQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], trimmedQuery)) : []);
   const productResults = productResultsRaw.length > 0 ? productResultsRaw
-    : (trimmedQuery.length > 0 && activeFilterCount === 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
+    : (previewMode && trimmedQuery.length > 0 && activeFilterCount === 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
   const brandRows: SearchBrandRow[] = brandResultsRaw.map((b) => ({ id: b.id, name: b.name, handle: (b as any).handle ?? '', color: b.color, initials: b.initials }));
   // Server-side hashtag search first (real post counts), then tags derived
   // from the matched captions for anything the index does not know yet.

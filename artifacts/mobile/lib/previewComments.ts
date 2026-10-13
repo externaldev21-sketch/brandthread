@@ -9,7 +9,6 @@
  * the creator has liked), and posting a new comment actually appends it to
  * local state so the preview never hits that dead end again.
  */
-import { Asset } from 'expo-asset';
 import type { ThreadComment, ProfileSummary } from '@/lib/safetyTypes';
 import type { MentionPerson } from '@/services/socialTypes';
 
@@ -17,31 +16,10 @@ export interface PreviewComment extends ThreadComment {
   replies: PreviewComment[];
 }
 
-// Same bundled-asset-as-stand-in-photo convention as lib/previewActivity.ts /
-// lib/previewCatalog.ts / lib/previewInbox.ts: every preview comment gets a
-// real (if generic) photo avatar instead of a bare initials circle, with no
-// network dependency.
-const AVATAR_SOURCES = [
-  require('../assets/videos/fashion_runway_01.jpg'),
-  require('../assets/videos/fashion_runway_02.jpg'),
-  require('../assets/videos/fashion_runway_03.jpg'),
-  require('../assets/videos/fashion_runway_04.jpg'),
-  require('../assets/videos/fashion_runway_05.jpg'),
-  require('../assets/videos/fashion_runway_06.jpg'),
-  require('../assets/videos/fashion_runway_07.jpg'),
-  require('../assets/videos/fashion_runway_08.jpg'),
-  require('../assets/videos/fashion_runway_09.jpg'),
-  require('../assets/videos/fashion_runway_10.jpg'),
-];
-
 function hashString(input: string): number {
   let h = 0;
   for (let i = 0; i < input.length; i++) h = (h * 31 + input.charCodeAt(i)) >>> 0;
   return h;
-}
-
-function avatarUriFor(handle: string): string {
-  return Asset.fromModule(AVATAR_SOURCES[hashString(handle) % AVATAR_SOURCES.length]).uri;
 }
 
 function profile(name: string, handle: string, color?: string): ProfileSummary {
@@ -50,7 +28,8 @@ function profile(name: string, handle: string, color?: string): ProfileSummary {
     name,
     handle,
     initials: name.split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase(),
-    avatarUrl: avatarUriFor(handle),
+    // Initials, never an AI-generated face (less-AI pass, item 47).
+    avatarUrl: null,
     accountType: null,
     suspended: false,
     deleted: false,

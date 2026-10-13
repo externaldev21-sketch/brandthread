@@ -416,10 +416,12 @@ const BOOTS_TAG_IMAGE_URI = Asset.fromModule(
 // time the feed's own <SpotlightPage> for index 0 mounts and asks for it,
 // so ExpoImage/the browser HTTP cache just serves the in-flight/completed
 // request instead of starting a fresh one.
-if (FASHION_PREVIEW_POSTER_URIS[0]) {
+// Dev builds only: these sample posts only ever render behind __DEV__, so a
+// release build never downloads them (less-AI pass, item 47).
+if (__DEV__ && FASHION_PREVIEW_POSTER_URIS[0]) {
   ExpoImage.prefetch(FASHION_PREVIEW_POSTER_URIS[0]).catch(() => {});
 }
-if (FASHION_PREVIEW_VIDEO_URIS[0]) {
+if (__DEV__ && FASHION_PREVIEW_VIDEO_URIS[0]) {
   Asset.fromModule(FASHION_PREVIEW_VIDEO_SOURCES[0] as number)
     .downloadAsync()
     .catch(() => {});
