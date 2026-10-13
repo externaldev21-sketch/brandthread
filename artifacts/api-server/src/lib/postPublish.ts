@@ -14,6 +14,7 @@ import { setComposedMediaVisibility } from "../routes/post-video";
 import { publishNotification } from "../routes/notifications-feed";
 import { postThumbnail } from "./activityEvents";
 import { logger } from "./logger";
+import { notifyPostUserTags } from "./postUserTags";
 
 export const MIN_SCHEDULE_LEAD_MS = 5 * 60_000;
 export const MAX_SCHEDULE_LEAD_MS = 75 * 24 * 60 * 60_000;
@@ -92,6 +93,8 @@ export async function onPostPublished(
   } catch (err) {
     logger.error({ err, postId: post.id }, "Could not promote media of a post that went live");
   }
+  // A draft / scheduled post going live tells the people tagged in it.
+  await notifyPostUserTags(post.id).catch((err) => logger.warn({ err, postId: post.id }, "Post tag notification failed"));
   if (opts.notifyAuthor) {
     try {
       await notifyScheduledPostLive(post);
