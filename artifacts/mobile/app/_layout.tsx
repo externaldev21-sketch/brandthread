@@ -96,7 +96,7 @@ import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notific
 import { getDevWebPreviewRole } from '@/lib/devPreview';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import NotificationBanner from '@/components/notifications/NotificationBanner';
-import { ActionSheetHost } from '@/components/ui/ActionSheet';
+import { ActionSheetHost, installConfirmationSheets } from '@/components/ui/ActionSheet';
 import { AppAlertHost } from '@/components/ui/AppAlertHost';
 import { ContextMenuHost } from '@/components/ui/ContextMenuHost';
 import { PushPrePromptHost } from '@/components/PushPrePromptHost';
@@ -123,6 +123,10 @@ import { emitThreadCashChanged, isThreadCashNotification } from '@/lib/threadCas
 import { hydrateHapticsPreference } from '@/lib/hapticsPreference';
 import { installPushGuard } from '@/lib/navigation/pushGuard';
 import { bannerHapticFor, getSaleAlertPrefs, hydrateSaleAlertPrefs } from '@/lib/saleAlerts';
+
+// Every confirmation (an Alert with 2+ choices) is a bottom action sheet,
+// never a centered alert — see components/ui/ActionSheet.tsx.
+installConfirmationSheets();
 
 // Generated API hooks share this guard with the app-local API clients so
 // signed-out seller preview never reaches the backend through an alternate

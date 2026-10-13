@@ -1,30 +1,13 @@
 /**
- * Brandthread Design System — Snackbar / Toast (Phase 1)
+ * Brandthread Design System — Snackbar / Toast
  *
- * Dark pill anchored to the bottom, with an optional thumbnail and a single
- * action label ("View bag", "Undo"). `components/BrandthreadUI.tsx` already
- * exports an inline `Toast` and an `UndoToastProvider` for the undo pattern
- * specifically — this is the general-purpose variant with a thumbnail slot,
- * used for "Added to bag" / "Now following" style confirmations.
- *
- * Layout/interaction reference only: Faire snackbar with Undo, CHOPT
- * added-to-cart toast, Apple Store centered check toast.
+ * Same props as before; now drawn as the app's one toast: a dark pill at the
+ * top (components/ui/TopToast.tsx) with an icon or thumbnail, a few words,
+ * an optional action ("Undo", "View bag"), auto-hide after 2s (4s with an
+ * action) and swipe up to dismiss.
  */
-import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { CachedImage as Image } from '@/components/CachedImage';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Icon } from '@/components/ui/Icon';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { PressableScale } from '@/components/BrandthreadUI';
-import { identityOrNone } from '@/lib/animationUtils';
-import { useColors } from '@/hooks/useColors';
-import { FONT } from '@/lib/theme';
-import { TYPE_SCALE } from '@/constants/typography';
-import { SPACING } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
-import { FADE_MS } from '@/constants/motion';
-import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+import React from 'react';
+import { TopToast } from './TopToast';
 
 export interface SnackbarProps {
   visible: boolean;
@@ -33,66 +16,19 @@ export interface SnackbarProps {
   actionLabel?: string;
   onAction?: () => void;
   onDismiss?: () => void;
-  /** Distance from the bottom edge. Defaults to just above the safe area; pass a larger value to clear a tab bar or sticky footer. */
+  /** @deprecated Toasts sit at the top now; kept so existing callers compile. */
   bottomOffset?: number;
 }
 
-export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction, onDismiss, bottomOffset }: SnackbarProps) {
-  const insets = useSafeAreaInsets();
-  const palette = useColors();
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(12);
-
-  useEffect(() => {
-    opacity.set(withTiming(visible ? 1 : 0, { duration: FADE_MS, easing: Easing.out(Easing.cubic) }));
-    translateY.set(withTiming(visible ? 0 : 12, { duration: FADE_MS }));
-  }, [visible, opacity, translateY]);
-
-  // While shown at rest translateY.value is 0; `identityOrNone` drops the
-  // transform then instead of leaving this toast's message text pinned to a
-  // permanent identity-matrix compositing layer for its whole visible time.
-  const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: identityOrNone([{ translateY: translateY.value }]) }));
-
+export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction, onDismiss }: SnackbarProps) {
   if (!visible) return null;
-
   return (
-    <Animated.View
-      pointerEvents="box-none"
-      style={[styles.root, { bottom: bottomOffset ?? Math.max(insets.bottom, SPACING.md) + SPACING.xl }, style]}
-    >
-      <View style={[styles.pill, { backgroundColor: palette.elevated }]} accessibilityLiveRegion="polite">
-        {thumbnailUri && <Image cachePolicy="memory-disk" source={{ uri: thumbnailUri }} style={styles.thumb} accessible={false} />}
-        <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.footnote, styles.message, { color: palette.foreground }]} numberOfLines={2}>{message}</Text>
-        {actionLabel && onAction && (
-          <PressableScale
-            onPress={onAction}
-            accessibilityRole="button"
-            accessibilityLabel={actionLabel}
-            style={styles.actionHit}
-          >
-            <Text style={[TYPE_SCALE.footnote, styles.action, { color: palette.foreground }]}>{actionLabel}</Text>
-          </PressableScale>
-        )}
-        {onDismiss && !actionLabel && (
-          <PressableScale onPress={onDismiss} accessibilityRole="button" accessibilityLabel="Dismiss" style={styles.actionHit}>
-            <Icon name="x" size={16} color={palette.foreground} />
-          </PressableScale>
-        )}
-      </View>
-    </Animated.View>
+    <TopToast
+      message={message}
+      thumbnailUri={thumbnailUri}
+      actionLabel={actionLabel}
+      onAction={onAction}
+      onDismiss={onDismiss}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  root: { position: 'absolute', left: SPACING.md, right: SPACING.md, alignItems: 'center' },
-  pill: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
-    borderRadius: RADII.pill,
-    paddingVertical: SPACING.xs, paddingHorizontal: SPACING.sm,
-    maxWidth: 480, width: '100%',
-  },
-  thumb: { width: 28, height: 28, borderRadius: RADII.chip },
-  message: { flex: 1, fontFamily: FONT.medium },
-  action: { fontFamily: FONT.bold },
-  actionHit: { paddingHorizontal: SPACING.xs, minHeight: 32, justifyContent: 'center' },
-});

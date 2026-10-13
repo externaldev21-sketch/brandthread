@@ -24,7 +24,7 @@
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { a11yModalProps } from '@/lib/a11y/modal';
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActionSheetIOS, Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,6 +32,8 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { WebAlertHost } from '@/components/ui/WebAlertHost';
 import { FONT } from '@/lib/theme';
+import { isConfirmationAlert, toIOSActionSheetOptions } from '@/lib/confirmationSheet';
+export { isConfirmationAlert, toIOSActionSheetOptions };
 import { useSheetTransition } from '@/components/ui/useSheetTransition';
 import { sheetSurfaceColor } from '@/lib/sheetSurface';
 import { SHEET_BACKDROP_OPACITY } from '@/constants/motion';
@@ -179,15 +181,51 @@ function registerActionSheetHost(fn: typeof hostOpen) {
  * themed action sheet from `<ActionSheetHost />` (mounted once near the app
  * root, in app/_layout.tsx) on every platform.
  */
-export function showActionSheet(title: string | undefined, message: string | undefined, buttons: ActionSheetButton[]): void {
-  if (!hostOpen) {
-    // Host not mounted yet (e.g. called before first render finishes): use
-    // the OS alert on native rather than silently doing nothing.
-    if (__DEV__) console.warn('[ActionSheet] shown before <ActionSheetHost /> mounted');
-    Alert.alert(title ?? '', message, buttons);
+export function presentActionSheet(title: string | undefined, message: string | undefined, buttons: ActionSheetButton[]): void {
+  const list = buttons.length ? buttons : [{ text: 'Cancel', style: 'cancel' as const }];
+  if (Platform.OS === 'ios') {
+    ActionSheetIOS.showActionSheetWithOptions(
+      toIOSActionSheetOptions(title, message, list),
+      (index) => list[index]?.onPress?.(),
+    );
     return;
   }
-  hostOpen(title, message, buttons);
+  if (!hostOpen) {
+    // Host not mounted yet — fall back to the platform alert rather than
+    // silently dropping the confirmation.
+    if (__DEV__) console.warn('[ActionSheet] shown before <ActionSheetHost /> mounted');
+    originalAlert?.(title ?? '', message, list);
+    return;
+  }
+  hostOpen(title, message, list);
+}
+
+/**
+ * Drop-in replacement for `Alert.alert(title, message, buttons)` — always a
+ * bottom action sheet (see presentActionSheet).
+ */
+export function showActionSheet(title: string | undefined, message: string | undefined, buttons: ActionSheetButton[]): void {
+  presentActionSheet(title, message, buttons);
+}
+
+type AlertFn = typeof Alert.alert;
+let originalAlert: AlertFn | null = null;
+
+/**
+ * Route every confirmation `Alert.alert` (2+ buttons) to a bottom action
+ * sheet. Idempotent; call once at startup.
+ */
+export function installConfirmationSheets(): void {
+  if (originalAlert) return;
+  originalAlert = Alert.alert.bind(Alert);
+  const patched: AlertFn = (title, message, buttons, options) => {
+    if (isConfirmationAlert(buttons)) {
+      presentActionSheet(title || undefined, message || undefined, buttons as ActionSheetButton[]);
+      return;
+    }
+    originalAlert!(title, message, buttons, options);
+  };
+  Alert.alert = patched;
 }
 
 const styles = StyleSheet.create({

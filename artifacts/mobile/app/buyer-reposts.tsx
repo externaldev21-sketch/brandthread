@@ -7,7 +7,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@clerk/expo';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -119,7 +119,7 @@ export default function BuyerReposts() {
                 ? <CachedImage source={{ uri: item.thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
                 : null}
               {item.mediaType === 'video' ? (
-                <Feather name="play" size={14} color="#FFFFFF" style={styles.badge} />
+                <Icon name="play" size={14} color="#FFFFFF" style={styles.badge} />
               ) : null}
               <Text numberOfLines={1} style={styles.author}>{item.authorName}</Text>
             </Pressable>

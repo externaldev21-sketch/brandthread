@@ -9,6 +9,7 @@
  * - Fully accessible: accessibilityLabel, accessibilityState, accessibilityRole
  */
 
+import { TopToast, TOAST_DURATION_MS } from '@/components/ui/TopToast';
 import React, {
   useRef,
   useState,
@@ -73,7 +74,7 @@ export function FeedToastProvider({ children }: { children: React.ReactNode }) {
       setToasts(prev => [...prev.slice(-1), { id, message, variant }]);
       setTimeout(() => {
         setToasts(prev => prev.filter(t => t.id !== id));
-      }, 3200);
+      }, TOAST_DURATION_MS);
     },
     [],
   );
@@ -89,75 +90,14 @@ export function FeedToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 function FeedToastBanner({ entry }: { entry: ToastEntry }) {
-  const colors = useColors();
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(8)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: ANIM.fast, useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: 0, duration: ANIM.fast, useNativeDriver: true }),
-    ]).start();
-    const hide = setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(opacity, { toValue: 0, duration: ANIM.fast, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 8, duration: ANIM.fast, useNativeDriver: true }),
-      ]).start();
-    }, 2700);
-    return () => clearTimeout(hide);
-  }, []);
-
-  const isError = entry.variant === 'error';
-
+  // The app's one toast: dark pill at the top, icon + a few words.
   return (
-    <Animated.View
-      accessibilityLiveRegion="polite"
-      accessibilityRole="alert"
-      style={[
-        toastStyles.banner,
-        isError ? toastStyles.errorBanner : [toastStyles.infoBanner, { backgroundColor: colors.card, borderColor: colors.border }],
-        { opacity, transform: [{ translateY }] },
-      ]}
-      pointerEvents="none"
-    >
-      <Icon
-        name={isError ? 'alert-circle' : 'check-circle'}
-        size={14}
-        color={isError ? RED : SUCCESS}
-        style={{ marginRight: 6 }}
-      />
-      <Text style={[toastStyles.text, { color: colors.foreground }]} numberOfLines={2}>{entry.message}</Text>
-    </Animated.View>
+    <TopToast
+      message={entry.message}
+      icon={entry.variant === 'error' ? 'alert-circle' : 'check'}
+    />
   );
 }
-
-const toastStyles = StyleSheet.create({
-  banner: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 110,
-    borderRadius: RADIUS.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.sm + 4,
-    paddingVertical: SP.sm,
-    borderWidth: 1,
-    zIndex: 9999,
-    elevation: 9999,
-  },
-  errorBanner: {
-    backgroundColor: '#1a0d0d',
-    borderColor: RED,
-  },
-  infoBanner: {},
-  text: {
-    flex: 1,
-    fontFamily: FONT.medium,
-    fontSize: FS.xs,
-    lineHeight: 17,
-  },
-});
 
 // ─── useFeedToast ─────────────────────────────────────────────────────────────
 

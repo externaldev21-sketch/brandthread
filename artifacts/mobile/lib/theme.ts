@@ -37,6 +37,17 @@ export const SELLER_DASHBOARD_GLASS_ELEVATED = '#000000'; // plain black, no bor
 export const FILL_ELEVATED = '#1C1C1E';
 
 
+// ─── Elevation (Dev, Oct 13: "one elevation system, nothing else") ──────────
+// Page #000 → cards and sheets #1C1C1E → inputs #2C2C2E (iOS dark system
+// grouped backgrounds). Supersedes the "never a grey fill" note above for
+// cards, sheets, inputs and toasts.
+export const ELEVATION = {
+  background: '#000000',
+  card: '#1C1C1E',
+  sheet: '#1C1C1E',
+  input: '#2C2C2E',
+} as const;
+
 // ─── Borders ─────────────────────────────────────────────────────────────────
 // Borders belong only to text inputs, outline buttons, the selected state of
 // a chip/size option, and hairline dividers between list rows — never to a
