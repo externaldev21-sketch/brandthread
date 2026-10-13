@@ -4,7 +4,7 @@
  * for exact values. The wall-clock pair is converted to a UTC instant by the
  * caller with lib/dropSchedule#zonedTimeToUtc.
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
@@ -45,20 +45,31 @@ export function parseWallClock(dateStr: string, timeStr: string) {
 }
 
 export function LaunchTimePicker({
-  dateValue, timeValue, onDateChange, onTimeChange,
+  dateValue, timeValue, onDateChange, onTimeChange, scrollToSelected = false,
 }: {
   dateValue: string; timeValue: string; onDateChange: (v: string) => void; onTimeChange: (v: string) => void;
+  /** Opt-in: on mount, scroll each chip row so the selected chip is in view (e.g. a 2:30 PM default). */
+  scrollToSelected?: boolean;
 }) {
   const colors = useColors();
   const [customOpen, setCustomOpen] = useState(false);
+  const dayRow = useRef<ScrollView>(null);
+  const timeRow = useRef<ScrollView>(null);
+  const scrolled = useRef({ day: false, time: false });
+  const revealChip = (row: 'day' | 'time', x: number) => {
+    if (!scrollToSelected || scrolled.current[row]) return;
+    scrolled.current[row] = true;
+    (row === 'day' ? dayRow : timeRow).current?.scrollTo({ x: Math.max(0, x - SP.md), animated: false });
+  };
   const showCustom = customOpen
     || (!!dateValue && !DAY_CHIPS.some((c) => c.value === dateValue))
     || (!!timeValue && !TIME_CHIPS.some((c) => c.value === timeValue));
 
-  const chip = (label: string, active: boolean, onPress: () => void, key: string) => (
+  const chip = (label: string, active: boolean, onPress: () => void, key: string, row?: 'day' | 'time') => (
     <TouchableOpacity
       key={key}
       onPress={onPress}
+      onLayout={active && row ? (e) => revealChip(row, e.nativeEvent.layout.x) : undefined}
       style={[s.chip, { borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.primary : colors.card }]}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
@@ -69,11 +80,11 @@ export function LaunchTimePicker({
 
   return (
     <View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.bleed} contentContainerStyle={s.chipRow}>
-        {DAY_CHIPS.map((c) => chip(c.label, dateValue === c.value, () => onDateChange(c.value), c.value))}
+      <ScrollView ref={dayRow} horizontal showsHorizontalScrollIndicator={false} style={s.bleed} contentContainerStyle={s.chipRow}>
+        {DAY_CHIPS.map((c) => chip(c.label, dateValue === c.value, () => onDateChange(c.value), c.value, 'day'))}
       </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.bleed, { marginTop: 8 }]} contentContainerStyle={s.chipRow}>
-        {TIME_CHIPS.map((c) => chip(c.label, timeValue === c.value, () => onTimeChange(c.value), c.value))}
+      <ScrollView ref={timeRow} horizontal showsHorizontalScrollIndicator={false} style={[s.bleed, { marginTop: 8 }]} contentContainerStyle={s.chipRow}>
+        {TIME_CHIPS.map((c) => chip(c.label, timeValue === c.value, () => onTimeChange(c.value), c.value, 'time'))}
       </ScrollView>
       <TouchableOpacity onPress={() => setCustomOpen((v) => !v)} style={s.customToggle} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <Feather name={showCustom ? 'chevron-up' : 'chevron-down'} size={13} color={colors.mutedForeground} />
