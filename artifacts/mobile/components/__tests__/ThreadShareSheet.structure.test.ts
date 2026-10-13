@@ -9,7 +9,7 @@ describe('Thread video sharing flow', () => {
   it('opens Brandthread sharing before the native system sheet', () => {
     expect(feed).toContain('setShareOpen(true)');
     expect(feed).toContain('<ThreadShareSheet');
-    expect(source).toContain('<Text style={styles.title}>Share to</Text>');
+    expect(source).toContain('title="Share to"');
   });
 
   it('provides real recipient, external share, moderation, and download actions', () => {

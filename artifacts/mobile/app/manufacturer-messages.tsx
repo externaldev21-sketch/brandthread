@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -466,24 +467,18 @@ export default function ManufacturerMessagesScreen() {
       />
 
       {/* Attach sheet */}
-      <Modal visible={attachOpen} transparent animationType="slide" onRequestClose={() => setAttachOpen(false)}>
-        <Pressable style={s.backdrop} onPress={() => setAttachOpen(false)}>
-          <Pressable style={[s.sheet, { paddingBottom: Math.max(insets.bottom, SP.lg) }]}>
-            <View style={s.grabber} />
-            <Text style={s.sheetTitle}>Share photos</Text>
-            {([
-              { key: 'camera', icon: 'camera', label: 'Take a photo', hint: 'Samples, fabric, fit on body' },
-              { key: 'library', icon: 'image', label: 'Choose from camera roll', hint: `Up to ${MAX_PHOTOS} at once` },
-            ] as const).map((option) => (
-              <TouchableOpacity key={option.key} style={s.sheetRow} onPress={() => void pickPhotos(option.key)} testID={`attach-${option.key}`}>
-                <View style={s.sheetIcon}><Feather name={option.icon} size={18} color={theme.text} /></View>
-                <View style={{ flex: 1 }}><Text style={s.sheetLabel}>{option.label}</Text><Text style={s.sheetHint}>{option.hint}</Text></View>
-                <Feather name="chevron-right" size={16} color={theme.subtle} />
-              </TouchableOpacity>
-            ))}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <Sheet visible={attachOpen} onClose={() => setAttachOpen(false)} title="Share photos" testID="manufacturer-attach-sheet">
+        {([
+          { key: 'camera', icon: 'camera', label: 'Take a photo', hint: 'Samples, fabric, fit on body' },
+          { key: 'library', icon: 'image', label: 'Choose from camera roll', hint: `Up to ${MAX_PHOTOS} at once` },
+        ] as const).map((option) => (
+          <TouchableOpacity key={option.key} style={s.sheetRow} onPress={() => void pickPhotos(option.key)} testID={`attach-${option.key}`}>
+            <View style={s.sheetIcon}><Feather name={option.icon} size={18} color={theme.text} /></View>
+            <View style={{ flex: 1 }}><Text style={s.sheetLabel}>{option.label}</Text><Text style={s.sheetHint}>{option.hint}</Text></View>
+            <Feather name="chevron-right" size={16} color={theme.subtle} />
+          </TouchableOpacity>
+        ))}
+      </Sheet>
 
       {/* Full-screen photo viewer */}
       <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
@@ -534,10 +529,6 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   previewImage: { width: '100%', height: '100%' },
   previewRemove: { position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
   iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.lg, gap: SP.sm },
-  grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, marginBottom: SP.sm },
-  sheetTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text, marginBottom: 4 },
   sheetRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm + 2 },
   sheetIcon: { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' },
   sheetLabel: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
