@@ -36,11 +36,11 @@ Keyboard follow uses `useAnimatedKeyboard` inside a component mounted only while
 Dashboard · Products · Feed (center pill) · More · Profile
 
 ## Approved buyer resize motion
-The owner explicitly approved smoother compact-to-regular resizing on the buyer tab bar. This approval does not authorize changes to the seller swipe/glow or either bar's appearance.
+The owner explicitly approved smoother compact-to-regular resizing and a mirror-image grow/shrink trajectory on the buyer tab bar. These approvals are for motion only: keep its endpoint shapes, sizes, colors, and glow identical, and do not change the seller swipe/glow.
 
-**Why:** The buyer resize request is an intentional exception to the standing tab-bar preservation constraint, not permission for an app-wide animation redesign.
+**Why:** The buyer pill previously moved ahead of its capsule in one resize direction. The approved correction addresses that asymmetry; it is an intentional exception to the standing tab-bar preservation constraint, not permission for an app-wide visual redesign.
 
-**How to apply:** Preserve the approved buyer resize behavior during merges; keep seller swipe/glow unchanged unless separately approved.
+**How to apply:** Preserve both buyer resize directions and their unchanged resting geometry during merges; keep seller swipe/glow unchanged unless separately approved.
 
 ## AuthGate routing
 - `storedRole === 'buyer'` → `/(buyer)/` (Thread)
