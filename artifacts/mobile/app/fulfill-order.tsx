@@ -33,6 +33,7 @@ import {
 } from '@/services/orderService';
 import { sharePackingSlip } from '@/lib/packingSlip';
 import { radius } from '@/constants/radii';
+import { HelpLink } from '@/components/help/HelpLink';
 
 const LAST_PACKAGE_KEY = '@brandthread/fulfill-last-package:v1';
 const CARRIERS = ['USPS', 'UPS', 'FedEx', 'DHL', 'Other'] as const;
@@ -603,6 +604,7 @@ export default function FulfillOrderScreen() {
             {!label && !manualMode && parcelDims && (
               <>
                 <SectionHeader title="Shipping rates" />
+                <HelpLink article="shipping-labels" />
                 {loadingRates ? (
                   <View style={s.centeredInline}>
                     <ActivityIndicator color={ACCENT} />

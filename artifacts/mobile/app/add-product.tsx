@@ -47,6 +47,7 @@ import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { FeeBreakdown } from '@/components/money/FeeBreakdown';
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { HelpLink } from '@/components/help/HelpLink';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -1058,6 +1059,7 @@ export default function AddProductScreen() {
           <Text style={s.photoRowTitle}>Photos</Text>
           <Text style={s.photoRowCount}>{media.length}/10</Text>
         </View>
+        <HelpLink article="background-removal" />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.photoRowContent}>
           {Array.from({ length: visibleSlotCount }, (_, idx) => {
             const m = media[idx];
