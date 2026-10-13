@@ -350,6 +350,15 @@ export const products = pgTable('products', {
   // A photo of the seller's own size chart — distinct from the structured
   // table data above. Optional; shown to buyers as a "Size guide" link.
   sizeChartImageUrl:     text('size_chart_image_url'),
+  // ── Product page details (migration 270) ─────────────────────────────────
+  // "Model is 6'1", wearing L", the fabric / care / origin rows, and one
+  // photo per colour so a colour swatch shows (and switches to) its photo.
+  modelHeightCm:         integer('model_height_cm'),
+  modelSizeWorn:         text('model_size_worn'),
+  fabric:                text('fabric'),
+  care:                  text('care'),
+  origin:                text('origin'),
+  colorImages:           jsonb('color_images').$type<Record<string, string>>().notNull().default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

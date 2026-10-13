@@ -65,7 +65,7 @@ import { SaveHeart } from '@/components/SaveHeart';
 
 import { CachedImage } from '@/components/CachedImage';
 
-import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Sheet, Avatar } from '@/components/ui';
+import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Sheet, Avatar, SuccessCheck, SegmentedControl } from '@/components/ui';
 
 import { PhotoViewer } from '@/components/media/PhotoViewer';
 import { ProductPhoto, ProductPhotoPlaceholder } from '@/components/media/ProductPhoto';
@@ -100,6 +100,16 @@ import { ProductShippingLine } from '@/components/products/ProductShippingLine';
 
 import { POLICY_NOT_LISTED, readSellerPolicies, readSellerShipping } from '@/lib/productTrust';
 
+import { GalleryLoupe, useGalleryLoupe } from '@/components/products/GalleryLoupe';
+import { GalleryVideoSlide, useGalleryVideo } from '@/components/products/GalleryVideoSlide';
+import {
+  chartUnitOf, colorImageFor, convertChartValue, galleryCountLabel, percentOff, readProductPageDetails,
+  type ChartUnit, type ProductPageDetails,
+} from '@/lib/productPageDetails';
+import { InBagCount, ModelInfoLine, ProductDetailRows } from '@/components/products/ProductDetailRows';
+import { SoldOutAlternatives } from '@/components/products/SoldOutAlternatives';
+import { BagPlusOne } from '@/components/products/BagPlusOne';
+import type { ProductVideoInfo } from '@/lib/api';
 import { ProductQuestionsSection } from '@/components/ProductQuestionsSection';
 
 import { SizeRecommendationBadge, RecommendedTag, useSizeBadgeModel } from '@/components/SizeRecommendationBadge';
@@ -247,6 +257,35 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
   };
 }
 
+/**
+ * Polish 93/94: the seller's one-photo-per-colour choice (migration 270)
+ * becomes the colour swatch's photo and each variant's photo, so the swatch
+ * shows the real colour and the bag line shows the colour that was picked.
+ */
+function withColorPhotos(product: BuyerProduct, colorImages: Record<string, string>): BuyerProduct {
+  if (!Object.keys(colorImages).length) return product;
+  const colorOption = product.options.find(o => o.id === 'opt_color');
+  if (!colorOption) return product;
+  const photoByValueId = new Map<string, string>();
+  for (const value of colorOption.values) {
+    const uri = colorImageFor(colorImages, value.label);
+    if (uri) photoByValueId.set(value.id, uri);
+  }
+  if (!photoByValueId.size) return product;
+  return {
+    ...product,
+    options: product.options.map(o => o.id !== 'opt_color' ? o : {
+      ...o,
+      values: o.values.map(v => photoByValueId.has(v.id) ? { ...v, imageUri: photoByValueId.get(v.id) } : v),
+    }),
+    variants: product.variants.map(v => {
+      const color = v.optionValues.find(ov => ov.optionId === 'opt_color');
+      const uri = color ? photoByValueId.get(color.valueId) : undefined;
+      return uri ? { ...v, imageUri: uri } : v;
+    }),
+  };
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmtPrice = formatCents;
@@ -294,12 +333,13 @@ const DOUBLE_TAP_ZOOM = 2.5;
  * an unzoomed photo still swipes the gallery; `onZoomChange` lets the
  * gallery lock paging while a photo is zoomed.
  */
-function ZoomableGalleryImage({ uri, brand, name, onOpen, onZoomChange }: {
+function ZoomableGalleryImage({ uri, brand, name, onOpen, onZoomChange, onLoupeChange }: {
   uri: string;
   brand?: string;
   name?: string;
   onOpen?: () => void;
   onZoomChange?: (zoomed: boolean) => void;
+  onLoupeChange?: (active: boolean) => void;
 }) {
   const [failed, setFailed] = useState(false);
   const scale = useSharedValue(1);
@@ -404,7 +444,7 @@ function ZoomableGalleryImage({ uri, brand, name, onOpen, onZoomChange }: {
 
   return (
     <GestureDetector gesture={gesture}>
-      <View style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT, overflow: 'hidden' }} testID="product-gallery-photo">
+      <View style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT, overflow: 'hidden' }} testID="product-gallery-photo" {...loupe.touchHandlers}>
         <Reanimated.View style={[StyleSheet.absoluteFill, imageStyle]}>
           <CachedImage
             source={{ uri }}
@@ -414,6 +454,7 @@ function ZoomableGalleryImage({ uri, brand, name, onOpen, onZoomChange }: {
             accessibilityLabel="Product photo. Pinch or double-tap to zoom."
           />
         </Reanimated.View>
+        {loupe.point && <GalleryLoupe uri={uri} point={loupe.point} width={GALLERY_WIDTH} height={GALLERY_HEIGHT} />}
         {zoomed && (
           <TouchableOpacity style={galleryStyles.resetZoom} onPress={resetZoom} accessibilityRole="button" accessibilityLabel="Reset product photo zoom">
             <AppIcon name="minimize-2" size={14} color={ON_DARK} />
@@ -433,6 +474,15 @@ const galleryStyles = StyleSheet.create({
     position: 'absolute', left: 0, right: 0, bottom: 0, height: 96,
     backgroundColor: 'rgba(0,0,0,0.17)',
   },
+  galleryMeta: {
+    position: 'absolute', left: SP.md, bottom: SP.md, flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 10, paddingVertical: 7, borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.58)',
+  },
+  galleryMetaText: { color: ON_DARK, fontFamily: FONT.medium, fontSize: FS.xs },
+  galleryCount: {
+    position: 'absolute', right: SP.md, bottom: SP.md,
+    paddingHorizontal: 10, paddingVertical: 7, borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.58)', // theme-exempt: same scrim as the zoom pill over the photo
+  },
   dots: { position: 'absolute', bottom: 21, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   dot: { height: 6, borderRadius: 3, backgroundColor: ON_DARK },
   resetZoom: {
@@ -446,18 +496,42 @@ const galleryStyles = StyleSheet.create({
     borderWidth: 2, borderColor: 'transparent',
   },
   thumbImage: { width: '100%', height: '100%' },
+  thumbVideo: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.58)' }, // theme-exempt: scrim behind the play glyph
 });
 
-function ProductGallery({ imageUris, accentColor, brand, name }: { imageUris: string[]; accentColor: string; brand?: string; name?: string }) {
+type GallerySlide = { kind: 'video'; uri: string; poster: string | null } | { kind: 'image'; uri: string };
+
+function ProductGallery({ imageUris, accentColor, video, focusUri, brand, name }: {
+  brand?: string; name?: string;
+  imageUris: string[];
+  accentColor: string;
+  /** Polish 83: the seller's product video leads the gallery. */
+  video?: ProductVideoInfo | null;
+  /** Polish 94: picking a colour pages the gallery to that colour's photo. */
+  focusUri?: string;
+}) {
   const images = imageUris.filter(Boolean);
+  const slides: GallerySlide[] = [
+    ...(video?.videoUrl ? [{ kind: 'video' as const, uri: video.videoUrl, poster: video.posterUrl }] : []),
+    ...images.map(uri => ({ kind: 'image' as const, uri })),
+  ];
   const scrollX = useRef(new Animated.Value(0)).current;
-  const listRef = useRef<Animated.FlatList<string>>(null);
+  const listRef = useRef<Animated.FlatList<GallerySlide>>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  // A zoomed photo owns horizontal drags, so the gallery stops paging.
+  const [loupeActive, setLoupeActive] = useState(false);
   const [zoomedPhoto, setZoomedPhoto] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
-  if (!images.length) {
+  useEffect(() => {
+    if (!focusUri) return;
+    const index = slides.findIndex(slide => slide.kind === 'image' && slide.uri === focusUri);
+    if (index < 0) return;
+    listRef.current?.scrollToIndex({ index, animated: true });
+    setActiveIndex(index);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusUri]);
+
+  if (!slides.length) {
     return (
       <ProductPhotoPlaceholder brand={brand} name={name} style={galleryStyles.gallery} />
     );
@@ -468,25 +542,41 @@ function ProductGallery({ imageUris, accentColor, brand, name }: { imageUris: st
       <View style={galleryStyles.gallery}>
         <Animated.FlatList
           ref={listRef}
-          data={images}
-          keyExtractor={(uri, index) => `${uri}-${index}`}
+          data={slides}
+          keyExtractor={(slide, index) => `${slide.kind}-${slide.uri}-${index}`}
           horizontal
           pagingEnabled
-          scrollEnabled={!zoomedPhoto}
+          scrollEnabled={!loupeActive && !zoomedPhoto}
           showsHorizontalScrollIndicator={false}
-          renderItem={({ item, index }) => <ZoomableGalleryImage uri={item} brand={brand} name={name} onZoomChange={setZoomedPhoto} onOpen={() => setViewerIndex(index)} />}
+          renderItem={({ item, index }) => item.kind === 'video'
+            ? <GalleryVideoSlide video={video!} active={index === activeIndex} width={GALLERY_WIDTH} height={GALLERY_HEIGHT} />
+            : <ZoomableGalleryImage uri={item.uri} brand={brand} name={name} onZoomChange={setZoomedPhoto} onOpen={() => setViewerIndex(images.indexOf(item.uri))} onLoupeChange={setLoupeActive} />}
           getItemLayout={(_, index) => ({ length: GALLERY_WIDTH, offset: GALLERY_WIDTH * index, index })}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
           onMomentumScrollEnd={(e) => {
             const next = Math.round(e.nativeEvent.contentOffset.x / GALLERY_WIDTH);
-            setActiveIndex(Math.max(0, Math.min(images.length - 1, next)));
+            setActiveIndex(Math.max(0, Math.min(slides.length - 1, next)));
           }}
           scrollEventThrottle={16}
         />
         <View style={galleryStyles.galleryShade} pointerEvents="none" />
-        {images.length > 1 && (
+        {slides[activeIndex]?.kind !== 'video' && (
+          <View style={galleryStyles.galleryMeta} pointerEvents="none">
+            <AppIcon name="maximize-2" size={13} color={ON_DARK} />
+            <Text style={galleryStyles.galleryMetaText}>Pinch to zoom</Text>
+          </View>
+        )}
+        {/* Polish 81: "3/8" next to the dots. */}
+        {galleryCountLabel(activeIndex, slides.length) && (
+          <View style={galleryStyles.galleryCount} pointerEvents="none" testID="gallery-count">
+            <Text style={galleryStyles.galleryMetaText} accessibilityLabel={`Photo ${activeIndex + 1} of ${slides.length}`}>
+              {galleryCountLabel(activeIndex, slides.length)}
+            </Text>
+          </View>
+        )}
+        {slides.length > 1 && (
           <View style={galleryStyles.dots} pointerEvents="none">
-            {images.map((_, index) => {
+            {slides.map((_, index) => {
               const width = scrollX.interpolate({
                 inputRange: [(index - 1) * GALLERY_WIDTH, index * GALLERY_WIDTH, (index + 1) * GALLERY_WIDTH],
                 outputRange: [6, 16, 6],
@@ -504,25 +594,32 @@ function ProductGallery({ imageUris, accentColor, brand, name }: { imageUris: st
       </View>
 
       {/* Thumbnail rail — tap a thumbnail to jump the main gallery to it */}
-      {images.length > 1 && (
+      {slides.length > 1 && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={galleryStyles.thumbRail}
         >
-          {images.map((uri, index) => (
+          {slides.map((slide, index) => (
             <TouchableOpacity
-              key={`${uri}-${index}`}
+              key={`${slide.uri}-${index}`}
               onPress={() => {
                 listRef.current?.scrollToIndex({ index, animated: true });
                 setActiveIndex(index);
               }}
               style={[galleryStyles.thumb, index === activeIndex && { borderColor: accentColor }]}
               accessibilityRole="button"
-              accessibilityLabel={`View photo ${index + 1} of ${images.length}`}
+              accessibilityLabel={slide.kind === 'video' ? 'Play product video' : `View photo ${index + 1} of ${slides.length}`}
               accessibilityState={{ selected: index === activeIndex }}
             >
-              <CachedImage source={{ uri }} style={galleryStyles.thumbImage} contentFit="cover" />
+              {slide.kind === 'video'
+                ? (
+                  <View style={[galleryStyles.thumbImage, galleryStyles.thumbVideo]}>
+                    {slide.poster ? <CachedImage source={{ uri: slide.poster }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
+                    <Feather name="play" size={16} color={ON_DARK} />
+                  </View>
+                )
+                : <CachedImage source={{ uri: slide.uri }} style={galleryStyles.thumbImage} contentFit="cover" />}
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -569,6 +666,23 @@ function OptionPicker({ product, option, selections, onSelect, recommendedLabel 
           const isSelected = selections[option.id] === val.id;
           const { [option.id]: _ignored, ...rest } = selections;
           const available = isVariantComboAvailable(product, option.id, val.id, rest);
+
+          if (isColor && val.imageUri) {
+            return (
+              <TouchableOpacity
+                key={val.id}
+                style={[op.photoSwatch, isSelected && op.photoSwatchSelected, !available && op.unavail]}
+                onPress={() => { if (available) { hapticToggle(); onSelect(option.id, val.id); } }}
+                activeOpacity={0.8}
+                accessibilityRole="radio"
+                accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}
+                accessibilityState={{ selected: isSelected, disabled: !available }}
+                testID={`option-${option.id}-${val.id}`}
+              >
+                <CachedImage source={{ uri: val.imageUri }} style={op.photoSwatchImage} contentFit="cover" />
+              </TouchableOpacity>
+            );
+          }
 
           if (isColor && val.colorHex) {
             return (
@@ -763,6 +877,13 @@ const makeOptionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   colorSwatchSelected: { borderColor: PURPLE },
   colorDot: { width: 28, height: 28, borderRadius: RADII.chip - 2 },
+  // lululemon's round photo swatch: the colour's own photo, ringed when picked.
+  photoSwatch: {
+    width: 48, height: 48, borderRadius: 24, padding: 3,
+    borderWidth: 2, borderColor: 'transparent',
+  },
+  photoSwatchSelected: { borderColor: theme.text },
+  photoSwatchImage: { width: '100%', height: '100%', borderRadius: 19, backgroundColor: theme.card },
   unavail: { opacity: 0.4 },
   slashOverlay: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   slash: { fontSize: 17, color: RED, fontFamily: FONT.bold },
@@ -902,6 +1023,12 @@ export default function BuyerProductDetailScreen() {
   const [demandRemainingUnits, setDemandRemainingUnits] = useState<number>(0);
   const [demandCount,          setDemandCount]          = useState<number | null>(null);
   const [demandEndsAt,         setDemandEndsAt]         = useState<string | null>(null);
+  // Polish 87/88/93/94: seller-set model line, fabric/care/origin, colour photos.
+  const [pageDetails, setPageDetails] = useState<ProductPageDetails | null>(null);
+  // Polish 103: "+N" off the bag icon on each successful add.
+  const [bagPlusOne, setBagPlusOne] = useState({ trigger: 0, quantity: 1 });
+  // Polish 83: the product video leads the gallery when the seller added one.
+  const galleryVideo = useGalleryVideo(productId);
 
   useEffect(() => {
     let cancelled = false;
@@ -969,13 +1096,14 @@ export default function BuyerProductDetailScreen() {
                 setDemandRemainingUnits(typeof row.remainingUnits === 'number' ? row.remainingUnits : 0);
                 setDemandCount(typeof row.demandCount === 'number' ? row.demandCount : null);
                 setDemandEndsAt(row.endsAt ?? null);
+                setPageDetails(readProductPageDetails(row));
               }
               // Adapt the product and check payment readiness together as soon
               // as the product supplies the seller ID. A payment-status failure
               // is non-fatal: Buy Now performs its own safety check on tap.
               if (isOwnerPreviewRow(row)) previewKind = 'server';
               [prod, paymentStatus] = await Promise.all([
-                Promise.resolve(adaptApiProductToBuyerProduct(row)),
+                Promise.resolve(withColorPhotos(adaptApiProductToBuyerProduct(row), readProductPageDetails(row).colorImages)),
                 row.ownerId && isSignedIn && !isOwnerPreviewRow(row)
                   ? api.buyer.sellerPaymentStatus(row.ownerId).catch(() => null)
                   : Promise.resolve(null),
@@ -1277,6 +1405,7 @@ export default function BuyerProductDetailScreen() {
       return;
     }
     if (!variant) return;
+    // One haptic per add (the Success one below), per the haptics rule.
     setAddingToCart(true);
     const result = editCartItemId
       ? await replaceCartItemVariant(editCartItemId, product!, variant, qty)
@@ -1290,6 +1419,7 @@ export default function BuyerProductDetailScreen() {
       setAddedToCart(true);
       setCartCount(result.cart.items.reduce((sum, item) => sum + item.quantity, 0));
       bumpCart();
+      setBagPlusOne(prev => ({ trigger: prev.trigger + 1, quantity: qty }));
       // Auto-clear the icon-button checkmark after 2.5s; the sheet itself
       // stays open until the buyer taps View bag or Keep shopping.
       if (addedBannerTimerRef.current) clearTimeout(addedBannerTimerRef.current);
@@ -1400,7 +1530,7 @@ export default function BuyerProductDetailScreen() {
       >
         {/* Immersive product gallery */}
         <View style={s.imageArea} ref={galleryRef} collapsable={false}>
-          <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} brand={product.sellerName} name={product.name} />
+          <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} video={galleryVideo} focusUri={product.options.find(o => o.id === "opt_color")?.values.find(v => v.id === selections.opt_color)?.imageUri} brand={product.sellerName} name={product.name} />
           {sellerPreview && (
             <View
               style={[s.previewMarkerWrap, { top: headerTopInset + SP.sm + 8 }]}
@@ -1416,6 +1546,8 @@ export default function BuyerProductDetailScreen() {
         </View>
 
         <ResponsiveContainer style={s.body}>
+          {/* Polish 87: lululemon's model line, directly under the photos. */}
+          <ModelInfoLine details={pageDetails} />
           {/* Badges */}
           <View style={s.badgeRow}>
             {product.isPreOrder && (
@@ -1450,10 +1582,16 @@ export default function BuyerProductDetailScreen() {
           <View style={s.priceRow}>
             <Text style={s.price}>{formatCents(variantPrice)}</Text>
             {hasDiscount && <Text style={s.comparePrice}>{fmtPrice(variantCompare!)}</Text>}
-            {hasDiscount && <Text style={s.savings}>Save {fmtPrice(savingsAmt)}</Text>}
+            {hasDiscount && (
+              <Text style={s.savings}>
+                {percentOff(variantPrice, variantCompare) != null ? `${percentOff(variantPrice, variantCompare)}% off` : `Save ${fmtPrice(savingsAmt)}`}
+              </Text>
+            )}
           </View>
           <ProductShippingLine shipping={product.sellerShipping} />
           <PayLaterLine sellerId={product.sellerId} priceCents={variantPrice} />
+          {/* Polish 91: real counts from other shoppers' bags, shown from 3. */}
+          <InBagCount productId={product.id} />
 
           {!sellerPreview && <LaunchCountdown productId={product.id} onLaunchingChange={setLaunching} />}
 
@@ -1649,6 +1787,12 @@ export default function BuyerProductDetailScreen() {
             </TouchableOpacity>
           )}
 
+          {/* Polish 97: an in-stock alternative whenever what's picked (or the whole product) is sold out. */}
+          {!product.isPreOrder && ((allSelected && variant && !variant.isAvailable) ||
+            (product.variants.length > 0 && product.variants.every(v => !v.isAvailable))) && (
+            <SoldOutAlternatives productId={product.id} />
+          )}
+
           {/* Quantity */}
           {allSelected && inStock && (
             <View style={[qs.root, { marginVertical: SP.md }]}>
@@ -1724,8 +1868,10 @@ export default function BuyerProductDetailScreen() {
               </InfoRow>
             ) : null}
           </View>
+          <ProductDetailRows details={pageDetails} />
 
-          <ProductVideo productId={product.id} />
+          {/* Shown in the gallery instead when it loaded there (polish 83). */}
+          {!galleryVideo && <ProductVideo productId={product.id} />}
 
           {/* Purchase protection — exactly once (it also rendered, compact,
               under the seller row). */}
@@ -1996,8 +2142,26 @@ interface SizeChart { columns: string[]; rows: { size: string; values: string[] 
 function SizeChartViewer({ chart }: { chart: SizeChart }) {
   const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, GOLD } = useThemeAliases();
   const sch = makeSizeChartStyles(theme);
+  // Polish 85: in/cm toggle when the seller's chart is in inches or centimetres.
+  const sellerUnit = chartUnitOf(chart?.unit);
+  const [unit, setUnit] = useState<ChartUnit | null>(sellerUnit);
   if (!chart?.columns?.length) return null;
+  const shownUnit = sellerUnit ? (unit ?? sellerUnit) : null;
+  const cell = (v: string) => (sellerUnit && shownUnit ? convertChartValue(v, sellerUnit, shownUnit) : v);
   return (
+    <View>
+    {sellerUnit && (
+      <View style={{ alignSelf: 'flex-start', marginTop: SP.sm, minWidth: 200 }}>
+        {/* lululemon's size guide: underlined "Inches / Centimeters" tabs. */}
+        <SegmentedControl
+          options={[{ id: 'in', label: 'Inches' }, { id: 'cm', label: 'Centimeters' }]}
+          selectedId={shownUnit!}
+          onChange={id => setUnit(id as ChartUnit)}
+          variant="underline"
+          testID="size-chart-unit-toggle"
+        />
+      </View>
+    )}
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: SP.sm }}>
       <View>
         <View style={sch.row}>
@@ -2006,7 +2170,7 @@ function SizeChartViewer({ chart }: { chart: SizeChart }) {
           </View>
           {chart.columns.map((col, i) => (
             <View key={i} style={[sch.cell, sch.headerCell]}>
-              <Text style={sch.headerText}>{col}{chart.unit ? ` (${chart.unit})` : ''}</Text>
+              <Text style={sch.headerText}>{col}{shownUnit ? ` (${shownUnit})` : chart.unit ? ` (${chart.unit})` : ''}</Text>
             </View>
           ))}
         </View>
@@ -2017,7 +2181,7 @@ function SizeChartViewer({ chart }: { chart: SizeChart }) {
             </View>
             {row.values.map((v, ci) => (
               <View key={ci} style={sch.cell}>
-                <Text style={sch.valueText}>{v || '—'}</Text>
+                <Text style={sch.valueText}>{v ? cell(v) : '—'}</Text>
               </View>
             ))}
           </View>
@@ -2025,6 +2189,7 @@ function SizeChartViewer({ chart }: { chart: SizeChart }) {
         {chart.notes ? <Text style={sch.notes}>{chart.notes}</Text> : null}
       </View>
     </ScrollView>
+    </View>
   );
 }
 

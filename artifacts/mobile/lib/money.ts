@@ -28,18 +28,38 @@ export function parseDecimalToCents(value: string): number | null {
   return Number.isSafeInteger(cents) ? cents : null;
 }
 
+const currencyFormatters = new Map<string, Intl.NumberFormat | null>();
+
+function currencyFormatter(currency: string, locale?: string): Intl.NumberFormat | null {
+  const key = `${locale ?? ''}|${currency}`;
+  if (!currencyFormatters.has(key)) {
+    try {
+      currencyFormatters.set(key, new Intl.NumberFormat(locale, { style: 'currency', currency }));
+    } catch {
+      currencyFormatters.set(key, null);
+    }
+  }
+  return currencyFormatters.get(key) ?? null;
+}
+
 /**
- * Format integer minor units (cents) only; formatting is deliberately a
- * UI-boundary operation.
+ * Format integer cents only; formatting is deliberately a UI-boundary operation.
  *
- * USD with no explicit locale keeps the app's long-standing "$1,234.56"
- * output byte-for-byte. Any other currency, or an explicit `locale`, goes
- * through Intl so the symbol position, spacing and separators follow that
- * locale's rules (polish #70) — e.g. "12,50 €" in de-DE, "€12.50" in en-IE,
- * "¥1,250" for JPY (zero minor digits).
+ * Polish 106: the number follows the device locale ("$98.00" in the US,
+ * "98,00 $" in Germany, "US$98.00" in Canada). The currency itself is the
+ * one the price is charged in; nothing is converted. Falls back to the
+ * fixed en-US style if Intl is unavailable. `locale` is for tests.
  */
 export function formatCents(cents: number, currency = 'USD', locale?: string): string {
   assertCents(cents);
+  const formatter = currencyFormatter(currency.toUpperCase(), locale);
+  if (formatter) {
+    try {
+      return formatter.format(cents / (10 ** (formatter.resolvedOptions().maximumFractionDigits ?? 2)));
+    } catch {
+      // fall through to the fixed format
+    }
+  }
   const sign = cents < 0 ? '-' : '';
   const absolute = Math.abs(cents);
   if (currency === 'USD' && !locale) {

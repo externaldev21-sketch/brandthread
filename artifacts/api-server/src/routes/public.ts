@@ -45,6 +45,7 @@ import { remixCredits } from "../lib/remix";
 import { productReadAccess } from "../lib/productPreviewAccess";
 import { loadPublicProductTrust } from "../lib/publicProductTrust";
 import { goneProductBody } from "../lib/goneProduct";
+import { inPriceBand } from "../lib/productPageDetails";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -119,14 +120,19 @@ function productTags(product: { tags: unknown; styleTags: unknown }): Set<string
 /** Stable, intentionally simple ranking for the public related-products shelf. */
 export function rankRelatedProducts<T extends {
   id: string; ownerId: string; category: string; tags: unknown; styleTags: unknown; createdAt: Date;
-}>(current: T, candidates: T[]): T[] {
+}>(current: T, candidates: T[], lowestPriceCents?: ReadonlyMap<string, number>): T[] {
   const currentTags = productTags(current);
   const overlap = (candidate: T) => [...productTags(candidate)].filter((tag) => currentTags.has(tag)).length;
+  // Polish 102: within the same category, items in the same price band rank first.
+  const currentPrice = lowestPriceCents?.get(current.id);
+  const inBand = (candidate: T) => Number(inPriceBand(currentPrice, lowestPriceCents?.get(candidate.id)));
   return [...candidates].sort((a, b) => {
     const sellerDifference = Number(b.ownerId === current.ownerId) - Number(a.ownerId === current.ownerId);
     if (sellerDifference) return sellerDifference;
     const categoryDifference = Number(b.category === current.category) - Number(a.category === current.category);
     if (categoryDifference) return categoryDifference;
+    const bandDifference = inBand(b) - inBand(a);
+    if (bandDifference) return bandDifference;
     const overlapDifference = overlap(b) - overlap(a);
     if (overlapDifference) return overlapDifference;
     const newnessDifference = b.createdAt.getTime() - a.createdAt.getTime();
@@ -421,7 +427,13 @@ router.get("/products/:id/related", async (req, res) => {
     // Ranking is application-side because tags/styleTags are JSON arrays.
     const candidates = await db.select().from(products)
       .where(and(eq(products.status, "active"), isNull(products.deletedAt), ne(products.id, current.id), notBlockedWith(viewerId, products.ownerId)));
-    const ranked = rankRelatedProducts(current, candidates).slice(0, lim);
+    const priceRows = await db
+      .select({ productId: productVariants.productId, cents: sql<number>`min(${productVariants.priceCents})::int` })
+      .from(productVariants)
+      .where(inArray(productVariants.productId, [current.id, ...candidates.map((c) => c.id)]))
+      .groupBy(productVariants.productId);
+    const lowestPriceCents = new Map(priceRows.map((r) => [r.productId, Number(r.cents)]));
+    const ranked = rankRelatedProducts(current, candidates, lowestPriceCents).slice(0, lim);
     if (ranked.length === 0) return res.json([]);
 
     const productIds = ranked.map((product) => product.id);
