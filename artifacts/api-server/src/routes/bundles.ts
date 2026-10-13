@@ -12,11 +12,20 @@
  *
  * Public (no auth):
  *   GET    /api/bundles/public/:sellerId   — active bundles for a seller storefront
+ *   GET    /api/bundles/public/product/:productId
+ *          — active bundles holding this product, priced like checkout prices
+ *            them (lib/bundles), for the product page's "Buy the set" block.
+ *            Only bundles every item of which can be bought now, and which
+ *            save the buyer something.
  */
 import { Router } from "express";
 import { db, productBundles, bundleItems, products, productVariants } from "@workspace/db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { setPublicCacheHeaders } from "../lib/httpCache";
+import { toPublicVariant } from "../lib/publicProfile";
+import { isUuid } from "../lib/productPairings";
+import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
 
 const router = Router();
 
@@ -60,6 +69,88 @@ router.get("/public/:sellerId", async (req, res) => {
   });
 
   res.json(bundles.map((b) => ({ ...b, items: itemsByBundle[b.id] ?? [] })));
+});
+
+// ── Public: GET /api/bundles/public/product/:productId ───────────────────────
+
+router.get("/public/product/:productId", async (req, res) => {
+  const { productId } = req.params;
+  if (!isUuid(productId)) { res.json([]); return; }
+  try {
+    setPublicCacheHeaders(res);
+    const bundles = await db.selectDistinct({
+      id: productBundles.id, ownerId: productBundles.ownerId, name: productBundles.name,
+      bundlePriceCents: productBundles.bundlePriceCents, createdAt: productBundles.createdAt,
+    })
+      .from(productBundles)
+      .innerJoin(bundleItems, eq(bundleItems.bundleId, productBundles.id))
+      .innerJoin(products, eq(products.id, bundleItems.productId))
+      .where(and(eq(bundleItems.productId, productId), eq(productBundles.status, "active"), eq(products.ownerId, productBundles.ownerId)))
+      .orderBy(desc(productBundles.createdAt));
+    if (bundles.length === 0) { res.json([]); return; }
+
+    const items = await db.select().from(bundleItems).where(inArray(bundleItems.bundleId, bundles.map((b) => b.id)));
+    const productIds = [...new Set(items.map((i) => i.productId))];
+    const [productRows, variantRows] = await Promise.all([
+      db.select({
+        id: products.id, ownerId: products.ownerId, name: products.name, images: products.images,
+        isPreOrder: products.isPreOrder, status: products.status,
+      }).from(products).where(and(inArray(products.id, productIds), isNull(products.deletedAt))),
+      db.select().from(productVariants).where(inArray(productVariants.productId, productIds)),
+    ]);
+    const productById = new Map(productRows.map((p) => [p.id, p]));
+    // Prices as checkout charges them (automatic sales included).
+    const priced = new Map<string, number>();
+    for (const v of variantRows) {
+      const owner = productById.get(v.productId)?.ownerId;
+      if (!owner) continue;
+      priced.set(v.id, (await effectiveUnitPrice({
+        productId: v.productId, sellerId: owner, priceCents: v.priceCents, compareAtPriceCents: v.compareAtPriceCents,
+      })).priceCents);
+    }
+
+    const out = [];
+    for (const bundle of bundles) {
+      const rows = items.filter((i) => i.bundleId === bundle.id);
+      let complete = rows.length > 1 || rows.some((r) => r.quantity > 1);
+      let itemsTotalCents = 0;
+      const shaped = rows.map((row) => {
+        const product = productById.get(row.productId);
+        const variants = variantRows
+          .filter((v) => v.productId === row.productId && (!row.variantId || v.id === row.variantId))
+          .map((v) => ({ ...toPublicVariant(v), stock: v.stock, priceCents: priced.get(v.id) ?? v.priceCents }));
+        const buyable = variants.filter((v) => product?.isPreOrder || (v.stock ?? 0) >= row.quantity);
+        if (!product || product.status !== "active" || product.ownerId !== bundle.ownerId || buyable.length === 0) complete = false;
+        const priceCents = buyable.length ? Math.min(...buyable.map((v) => v.priceCents)) : 0;
+        itemsTotalCents += priceCents * row.quantity;
+        return {
+          productId: row.productId,
+          variantId: row.variantId,
+          quantity: row.quantity,
+          name: product?.name ?? "",
+          image: product?.images?.[0] ?? null,
+          isPreOrder: product?.isPreOrder ?? false,
+          priceCents,
+          variants,
+        };
+      });
+      if (!complete || bundle.bundlePriceCents <= 0 || itemsTotalCents <= bundle.bundlePriceCents) continue;
+      // The viewed product first, like the reference layout.
+      shaped.sort((a, b) => Number(b.productId === productId) - Number(a.productId === productId));
+      out.push({
+        id: bundle.id,
+        sellerId: bundle.ownerId,
+        name: bundle.name,
+        bundlePriceCents: bundle.bundlePriceCents,
+        itemsTotalCents,
+        items: shaped,
+      });
+    }
+    res.json(out);
+  } catch (err) {
+    req.log.error({ err, productId }, "Failed to fetch product bundles");
+    res.status(500).json({ error: "Failed to fetch bundles" });
+  }
 });
 
 // ── All routes below require auth ─────────────────────────────────────────────

@@ -116,6 +116,9 @@ type GroupBreakdown = {
   subtotalCents: number;
   shippingCents: number;
   discountCents: number;
+  /** Seller bundle part of discountCents ("Buy the set"). */
+  bundleDiscountCents: number;
+  bundles?: Array<{ bundleId: string; name: string; copies: number; discountCents: number }>;
   taxCents: number;
   /** Covered by a store gift card; totalCents is what is left for the card payment. */
   giftCardCents: number;
@@ -131,7 +134,8 @@ function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gi
       checkoutSessionId: row.id,
       subtotalCents: subtotal,
       shippingCents: row.shippingCents ?? 0,
-      discountCents: row.discountCodeAmountCents ?? 0,
+      discountCents: (row.discountCodeAmountCents ?? 0) + (row.bundleDiscountCents ?? 0),
+      bundleDiscountCents: row.bundleDiscountCents ?? 0,
       taxCents: row.taxCents ?? 0,
       giftCardCents: gift.get(row.id) ?? 0,
       totalCents: row.amountTotalCents ?? 0,
@@ -189,6 +193,8 @@ function breakdown(priced: PricedCartGroup[], rows?: Array<{ id: string }>): Gro
     subtotalCents: group.subtotalCents,
     shippingCents: group.shippingCents,
     discountCents: group.discountCents,
+    bundleDiscountCents: group.bundleDiscountCents,
+    bundles: group.bundles,
     taxCents: group.taxCents,
     giftCardCents: group.giftCardCents,
     totalCents: group.totalCents,
@@ -330,7 +336,8 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
           platformFeeCents: group.platformFeeCents,
           platformFeeBps: group.platformFeeBps,
           processingFeeEstimateCents: group.processingFeeEstimateCents,
-          ...(group.discountCodeId ? { discountCodeId: group.discountCodeId, discountCodeAmountCents: group.discountCents } : {}),
+          ...(group.discountCodeId ? { discountCodeId: group.discountCodeId, discountCodeAmountCents: group.promoDiscountCents } : {}),
+          bundleDiscountCents: group.bundleDiscountCents,
           amountTotalCents: group.totalCents,
           shippingCents: group.shippingCents,
           taxCents: group.taxCents,

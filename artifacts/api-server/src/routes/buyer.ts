@@ -50,6 +50,7 @@ import {
 } from "../lib/buyerCancellationPolicy";
 import { consumeBuyerAddressListFailure } from "./release-test-control";
 import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
+import { bundleDiscountsForGroup } from "../lib/bundles/activeBundles";
 
 const router = Router();
 router.use(requireAuth);
@@ -926,8 +927,16 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         quantity: 1,
       });
     }
+    // ── Seller bundles ("Buy the set", lib/bundles): off merchandise first,
+    // seller-funded like the discount code, same rule as the one-page checkout.
+    const bundleResult = await bundleDiscountsForGroup(sellerId, cartItems.map((item, index) => ({
+      productId: discountLines[index].productId, variantId: item.variantId,
+      unitPriceCents: item.priceCents, quantity: item.quantity,
+    })));
+    const bundleDiscountCents = Math.min(bundleResult.totalDiscountCents, subtotalCents);
+
     // ── Discount code (validated fresh at charge time — never trusts the
-    // client's earlier /cart/validate check) ──────────────────────────────
+    // client's earlier /cart/validate check), on what the bundles left ────
     let discountApplication: Awaited<ReturnType<typeof validateDiscountCode>> | null = null;
     if (typeof discountCode === "string" && discountCode.trim()) {
       try {
@@ -935,8 +944,8 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
           sellerId,
           code: discountCode,
           customerKey: buyerId,
-          cartSubtotalCents: subtotalCents,
-          lines: discountLines,
+          cartSubtotalCents: subtotalCents - bundleDiscountCents,
+          lines: discountLines.map((line, index) => ({ ...line, reductionCents: bundleResult.lineDiscountCents[index] ?? 0 })),
           liveStreamId: typeof liveStreamId === "string" ? liveStreamId : null,
         });
       } catch (err) {
@@ -949,7 +958,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     }
     const discountShippingCents = discountApplication?.freeShipping ? 0 : shippingCents;
     const discountCodeAmountCents = discountApplication
-      ? Math.min(discountApplication.appliedAmountCents + (shippingCents - discountShippingCents), subtotalCents + shippingCents)
+      ? Math.min(
+        Math.min(discountApplication.appliedAmountCents, subtotalCents - bundleDiscountCents) + (shippingCents - discountShippingCents),
+        subtotalCents - bundleDiscountCents + shippingCents,
+      )
       : 0;
 
     const totalBeforeLoyaltyDiscountCents = subtotalCents + shippingCents;
@@ -965,7 +977,8 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         buyerId,
         normalizedLoyaltyToken,
         reservationId,
-        totalBeforeLoyaltyDiscountCents,
+        // The bundle already came off; loyalty can't cover more than is left.
+        totalBeforeLoyaltyDiscountCents - bundleDiscountCents,
       );
       loyaltyReservation = { buyerId, token: reserved.token, reservationId };
       loyaltyRedemption = {
@@ -976,7 +989,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
 
     // Loyalty points and a discount code both reduce the fee basis (they are
     // seller-funded). Thread Cash never does — see below.
-    const combinedDiscountCents = (loyaltyRedemption?.discountCents ?? 0) + discountCodeAmountCents;
+    const combinedDiscountCents = (loyaltyRedemption?.discountCents ?? 0) + discountCodeAmountCents + bundleDiscountCents;
 
     // ── Thread Cash reservation ────────────────────────────────────────────
     // Attaches the buyer's already-redeemed Thread Cash token (see POST
@@ -1057,6 +1070,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         discountCodeId: discountApplication.discount.id,
         discountCodeAmountCents: discountCodeAmountCents,
       } : {}),
+      bundleDiscountCents,
       ...(threadCashRedemption ? {
         threadCashToken: threadCashRedemption.token,
         threadCashDiscountCents: threadCashRedemption.discountCents,
@@ -1142,6 +1156,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     let combinedCouponId: string | undefined;
     if (stripeChargeDiscountCents > 0) {
       const nameParts = [
+        bundleDiscountCents > 0 ? "Bundle" : null,
         loyaltyRedemption ? "Brandthread rewards" : null,
         discountApplication ? discountApplication.discount.code : null,
         threadCashRedemption ? "Thread Cash" : null,

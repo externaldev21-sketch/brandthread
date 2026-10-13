@@ -38,7 +38,11 @@ export interface CartLine {
   productId: string;
   priceCents: number;
   quantity: number;
+  /** Cents already taken off this line (a seller bundle); the code works on what is left. */
+  reductionCents?: number;
 }
+
+const lineCents = (l: CartLine) => Math.max(0, l.priceCents * l.quantity - Math.max(0, l.reductionCents ?? 0));
 
 export interface DiscountApplication {
   discount: DiscountCodeRow;
@@ -177,7 +181,7 @@ export async function validateDiscountCode(input: {
       });
     }
   }
-  const eligibleCents = eligible.reduce((sum, l) => sum + l.priceCents * l.quantity, 0);
+  const eligibleCents = eligible.reduce((sum, l) => sum + lineCents(l), 0);
   if (eligibleCents <= 0 && discount.type !== "free_shipping") {
     throw new DiscountValidationError("NO_ELIGIBLE_ITEMS", discount.appliesTo === "entire_store" ? "No items in your cart are eligible for this code." : "This code only applies to selected products in this shop.");
   }
@@ -203,7 +207,7 @@ export async function validateDiscountCode(input: {
       break;
     case "free_item": {
       const cheapest = eligible.reduce<CartLine | null>((min, l) => (!min || l.priceCents < min.priceCents ? l : min), null);
-      appliedAmountCents = cheapest ? cheapest.priceCents : 0;
+      appliedAmountCents = cheapest ? Math.min(cheapest.priceCents, eligibleCents) : 0;
       description = "Free item";
       break;
     }

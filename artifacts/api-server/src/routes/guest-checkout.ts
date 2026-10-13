@@ -12,6 +12,8 @@ import {
 } from "@workspace/db";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { mapStripeError, requireStripe } from "../lib/stripe";
+import { bundleDiscountsForGroup } from "../lib/bundles/activeBundles";
+import type { BundleCartLine } from "../lib/bundles/applyBundleDiscounts";
 import { resolveSellerPlatformFeeBps } from "../lib/planPerks";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
@@ -121,6 +123,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     // can feed weight-tiered shipping zones without changing the shape of
     // the stored cart item snapshot.
     let cartWeightGrams = 0;
+    const bundleLines: BundleCartLine[] = [];
 
     // Batch-fetch every variant+product pair in one round trip instead of one
     // query per cart line (was: 1 query per item, O(N) round trips; now: 1
@@ -159,6 +162,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       const variantLabel = [variant.size, variant.color].filter(Boolean).join(" / ");
       cartItems.push({ variantId: variant.variantId, productName: variant.productName, variantLabel, quantity, priceCents: variant.priceCents });
       cartWeightGrams += (variant.weightGrams ?? 0) * quantity;
+      bundleLines.push({ productId: variant.productId, variantId: variant.variantId, unitPriceCents: variant.priceCents, quantity });
       lineItems.push({ price_data: { currency: "usd", unit_amount: variant.priceCents, tax_behavior: "exclusive", product_data: {
         name: variant.productName, ...(variantLabel ? { description: variantLabel } : {}),
         ...(Array.isArray(variant.images) && variant.images[0] ? { images: [variant.images[0]] } : {}),
@@ -247,12 +251,15 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       tax_behavior: "exclusive",
       product_data: { name: shippingLineName },
     }, quantity: 1 });
+    // Seller bundles ("Buy the set", lib/bundles): seller-funded, so they
+    // lower the fee basis, same rule as the signed-in checkouts.
+    const bundleDiscountCents = Math.min((await bundleDiscountsForGroup(sellerId, bundleLines)).totalDiscountCents, subtotalCents);
     const platformFeeBps = await resolveSellerPlatformFeeBps(sellerId);
     const money = paymentIntentMoney({
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
-      merchandiseCents: subtotalCents,
-      preTaxTotalCents: subtotalCents + shippingCents,
+      merchandiseCents: subtotalCents - bundleDiscountCents,
+      preTaxTotalCents: subtotalCents + shippingCents - bundleDiscountCents,
       platformFeeBps,
     });
     const checkoutIdValue = crypto.randomUUID();
@@ -268,6 +275,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
         platformFeeCents: money.platformFeeCents,
         platformFeeBps,
         processingFeeEstimateCents: money.processingFeeEstimateCents,
+        bundleDiscountCents,
       }).returning({ id: checkoutSessions.id });
     } catch (error: any) {
       // A concurrent duplicate request lost the DB uniqueness race. Reuse only
@@ -294,9 +302,13 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     checkoutId = checkout.id;
     const validDropId = chargePlan.dropId ?? undefined;
     stripeStarted = true;
+    const bundleCoupon = bundleDiscountCents > 0
+      ? await stripe.coupons.create({ amount_off: bundleDiscountCents, currency: "usd", duration: "once", max_redemptions: 1, name: "Bundle" })
+      : null;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: lineItems,
+      ...(bundleCoupon ? { discounts: [{ coupon: bundleCoupon.id }] } : {}),
       automatic_tax: {
         enabled: true,
         liability: { type: "account", account: seller.stripeAccountId },
