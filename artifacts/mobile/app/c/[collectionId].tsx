@@ -24,6 +24,8 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { radius } from '@/constants/radii';
 import { MissingItemState } from '@/components/states/MissingItemState';
 import { formatMoney } from '@/lib/format';
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 
 const GAP = SP.sm;
 
@@ -164,13 +166,7 @@ export default function PublicCollectionScreen() {
             contentContainerStyle={{ gap: GAP, marginTop: SP.lg }}
             renderItem={({ item }) => (
               <View style={[styles.tile, tileSize]}>
-                {item.image ? (
-                  <Image cachePolicy="memory-disk" source={{ uri: item.image }} style={[styles.tileImage, tileImageSize]} />
-                ) : (
-                  <View style={[styles.tileImage, styles.coverPlaceholder]}>
-                    <Icon name="shopping-bag" size={20} color={MUTED} />
-                  </View>
-                )}
+                <ProductPhoto uri={item.image} brand={item.brand} name={item.title} style={[styles.tileImage, tileImageSize]} />
                 <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
                 {item.priceCents != null ? <Text style={styles.tilePrice}>{formatMoney(item.priceCents)}</Text> : null}
               </View>

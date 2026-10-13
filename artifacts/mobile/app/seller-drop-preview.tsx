@@ -27,6 +27,8 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState as LayoutEmptyState } from '@/components/layout';
 import { MissingItemState } from '@/components/states/MissingItemState';
+import { ProductPhotoPlaceholder } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 
 
 interface PreviewProduct {
@@ -94,7 +96,7 @@ export default function SellerDropPreview() {
         <View style={{ padding: SP.md, gap: 10 }}>
           <LoadingSkeleton height={16} style={{ width: 100 }} />
           <View style={styles.grid}>
-            {[0, 1].map(i => <LoadingSkeleton key={i} height={(W - SP.md * 2 - 10) * 0.68 + 40} style={{ width: (W - SP.md * 2 - 10) / 2 }} />)}
+            {[0, 1].map(i => <LoadingSkeleton key={i} height={productPhotoHeight((W - SP.md * 2 - 10) / 2) + 40} style={{ width: (W - SP.md * 2 - 10) / 2 }} />)}
           </View>
         </View>
       </View>
@@ -169,9 +171,7 @@ export default function SellerDropPreview() {
                 {p.images?.[0] ? (
                   <Image cachePolicy="memory-disk" source={{ uri: p.images[0] }} style={[styles.tileImage, { height: tileImageH }]} contentFit="cover" />
                 ) : (
-                  <View style={[styles.tileImage, { alignItems: 'center', justifyContent: 'center' }]}>
-                    <Icon name="image" size={22} color={theme.muted} />
-                  </View>
+                  <ProductPhotoPlaceholder name={p.name} style={styles.tileImage} />
                 )}
                 <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm, padding: 8 }} numberOfLines={2}>{p.name}</Text>
               </View>

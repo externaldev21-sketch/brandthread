@@ -33,6 +33,7 @@ import { StatusBadge, PressableScale } from '@/components/BrandthreadUI';
 
 import { CachedImage } from '@/components/CachedImage';
 
+import { ProductPhoto } from '@/components/media/ProductPhoto';
 import { Product } from '@/services/productTypes';
 
 import { formatCents, integerPercent } from '@/lib/money';
@@ -86,7 +87,6 @@ export const ProductCard = React.memo(function ProductCard({
   const swipeRef = useRef<Swipeable>(null);
 
   const coverUri = product.media.find(m => m.isCover)?.uri ?? product.media[0]?.uri;
-  const gradColors = getCategoryColors(product.category, theme);
 
   const stock = product.inventory.totalStock;
   const threshold = product.inventory.lowStockThreshold;
@@ -151,11 +151,7 @@ export const ProductCard = React.memo(function ProductCard({
               accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatMoney(price)}`}
             >
             <View style={{ height: imageHeight, width: '100%', opacity: soldOut ? 0.4 : 1 }}>
-            {coverUri ? (
-              <CachedImage source={{ uri: coverUri }} style={s.image} contentFit="cover" recyclingKey={product.id} fallbackLabel={product.name ?? ''} />
-            ) : (
-              <LinearGradient colors={gradColors} style={s.image} />
-            )}
+            <ProductPhoto uri={coverUri} name={product.name} style={s.image} recyclingKey={product.id} />
 
             {/* Status chip */}
             <View style={[s.chipTopLeft, { backgroundColor: theme.background, borderRadius: RADIUS.pill }]}>

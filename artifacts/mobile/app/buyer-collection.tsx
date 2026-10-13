@@ -57,6 +57,8 @@ import { buildCanonicalCollectionUrl } from '@/lib/shareCollection';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { PRODUCT_PHOTO_ASPECT } from '@/constants/media';
 
 import { openPullDownMenu } from '@/lib/contextMenu';
 
@@ -208,13 +210,7 @@ export default function BuyerCollection() {
         activeOpacity={0.85}
       >
         <View style={styles.tileImageWrap}>
-          {item.image ? (
-            <CachedImage source={{ uri: item.image }} style={styles.tileImage} />
-          ) : (
-            <View style={[styles.tileImage, styles.tilePlaceholder, { backgroundColor: item.accentColor || theme.accentDim }]}>
-              <Icon name="shopping-bag" size={22} color={theme.accent} />
-            </View>
-          )}
+          <ProductPhoto uri={item.image} brand={item.brand} name={item.title} style={styles.tileImage} />
           {item.priceDropped ? (
             <View style={styles.dropTag} testID="collection-price-drop-tag">
               <Text style={styles.dropTagText}>Price drop</Text>
@@ -335,7 +331,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], TILE_SIZE: n
   publicDesc: { color: MUTED, fontSize: FS.xs, marginTop: 1 },
   gridContent: { paddingHorizontal: SP.md, paddingTop: SP.sm, gap: GAP, paddingBottom: SP.xxl },
   tile: { width: TILE_SIZE, marginBottom: GAP },
-  tileImageWrap: { width: TILE_SIZE, aspectRatio: 1, borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: BORDER },
+  tileImageWrap: { width: TILE_SIZE, aspectRatio: PRODUCT_PHOTO_ASPECT, borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: BORDER },
   tileImage: { width: '100%', height: '100%' },
   tilePlaceholder: { alignItems: 'center', justifyContent: 'center' },
   tileInfo: { paddingTop: SP.xs, gap: 1 },

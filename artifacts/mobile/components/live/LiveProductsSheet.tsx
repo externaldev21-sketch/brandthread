@@ -9,6 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { Sheet } from '@/components/ui/BottomSheet';
 import { CachedImage } from '@/components/CachedImage';
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatMoney as formatCents } from '@/lib/format';
@@ -100,7 +102,7 @@ const styles = StyleSheet.create({
   subHeader: { marginTop: 0, marginBottom: SP.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: RADIUS.md, padding: 8 },
   index: { fontFamily: FONT.semibold, fontSize: FS.xs, width: 14, textAlign: 'center' },
-  thumb: { width: 56, height: 56, borderRadius: RADIUS.xs, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  thumb: { width: 56, height: productPhotoHeight(56), borderRadius: RADIUS.xs, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   liveChip: { alignSelf: 'flex-start', borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1, marginBottom: 3 },
   liveChipText: { fontFamily: FONT.bold, fontSize: 11 },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm },

@@ -17,7 +17,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale, ProductGridSkeleton } from '@/components/BrandthreadUI';
 import { EmptyState as SharedEmptyState } from '@/components/layout/EmptyState';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
-import { CachedImage } from '@/components/CachedImage';
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -127,12 +128,8 @@ export default function ProfileProductsScreen() {
         >
           {(state) => (
             <>
-              <View style={[styles.image, { height: Math.round(cardWidth * 1.25) }]}>
-                {item.imageUri ? (
-                  <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
-                ) : (
-                  <Icon name="image" size={26} color={theme.muted} />
-                )}
+              <View style={[styles.image, { height: productPhotoHeight(cardWidth) }]}>
+                <ProductPhoto uri={item.imageUri} brand={params.sellerName} name={item.name} style={StyleSheet.absoluteFill} />
                 {!item.inStock ? <View style={styles.soldOutVeil} pointerEvents="none" /> : null}
               </View>
               <View style={styles.info}>

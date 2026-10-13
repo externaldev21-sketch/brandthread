@@ -17,10 +17,10 @@ import { describe, expect, it } from 'vitest';
 const sheet = readFileSync(resolve(__dirname, '../ShopProductSheet.tsx'), 'utf8');
 
 describe('Swipeable image carousel, dot-only paging (no numeric badge)', () => {
-  it('renders a horizontal, paged gallery of every product image, at a fixed 3:4 aspect', () => {
+  it('renders a horizontal, paged gallery of every product image, at the fixed 4:5 product frame', () => {
     expect(sheet).toContain('function ProductImageCarousel(');
-    expect(sheet).toContain('<ProductImageCarousel imageUris={product.imageUris} />');
-    expect(sheet).toContain('const pageHeight = Math.round(pageWidth * (4 / 3));');
+    expect(sheet).toContain('<ProductImageCarousel imageUris={product.imageUris} brand={product.sellerName} name={product.name} />');
+    expect(sheet).toContain('const pageHeight = productPhotoHeight(pageWidth);');
     expect(sheet).toContain('contentFit="contain"');
     expect(sheet).toContain('pagingEnabled');
   });

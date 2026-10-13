@@ -23,6 +23,8 @@ import { Feather } from '@expo/vector-icons';
 
 import { CachedImage } from '@/components/CachedImage';
 
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 import { PrimaryButton } from '@/components/BrandthreadUI';
 
 import { Header } from '@/components/layout';
@@ -184,7 +186,7 @@ export default function ProductPairingsScreen() {
                 accessibilityState={{ checked, disabled: blocked }}
                 accessibilityLabel={c.name}
               >
-                <Thumb uri={c.image} s={s} colors={colors} />
+                <Thumb uri={c.image} name={c.name} s={s} colors={colors} />
                 <Text style={[s.name, blocked && { color: TEXT_DISABLED }]}>{c.name}</Text>
                 <View style={[s.checkbox, checked && s.checkboxOn]}>
                   {checked ? <Icon name="check" size={14} color={colors.primaryForeground} /> : null}
@@ -222,7 +224,7 @@ export default function ProductPairingsScreen() {
           </View>
           {paired.map((p, index) => (
             <View key={p.id} style={s.row}>
-              <Thumb uri={p.image} s={s} colors={colors} />
+              <Thumb uri={p.image} name={p.name} s={s} />
               <View style={{ flex: 1 }}>
                 <Text style={s.name}>{p.name}</Text>
                 {!p.active ? <Text style={s.hidden}>Hidden from shoppers</Text> : null}
@@ -249,10 +251,10 @@ export default function ProductPairingsScreen() {
   );
 }
 
-function Thumb({ uri, s, colors }: { uri: string | null; s: ReturnType<typeof makeStyles>; colors: ReturnType<typeof useColors> }) {
+function Thumb({ uri, name, s }: { uri: string | null; name?: string; s: ReturnType<typeof makeStyles>; colors?: ReturnType<typeof useColors> }) {
   return (
     <View style={s.thumb}>
-      {uri ? <CachedImage source={{ uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : <Icon name="image" size={18} color={colors.mutedForeground} />}
+      <ProductPhoto uri={uri} name={name} style={{ width: '100%', height: '100%' }} />
     </View>
   );
 }
@@ -279,7 +281,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
     paddingHorizontal: SP.md, paddingVertical: SP.sm,
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border,
   },
-  thumb: { width: 52, height: 52, borderRadius: RADIUS.sm, backgroundColor: c.card, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  thumb: { width: 52, height: productPhotoHeight(52), borderRadius: RADIUS.sm, backgroundColor: c.card, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   addThumb: { borderWidth: 1, borderColor: c.border, backgroundColor: c.background },
   name: { flex: 1, fontSize: FS.base, fontFamily: FONT.medium, color: c.foreground },
   hidden: { fontSize: FS.xs, fontFamily: FONT.medium, color: c.mutedForeground, marginTop: 2 },

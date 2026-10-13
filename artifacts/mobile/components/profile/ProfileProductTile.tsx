@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Icon } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
+import { ProductPhotoPlaceholder } from '@/components/media/ProductPhoto';
 import { SaveHeart } from '@/components/SaveHeart';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
@@ -21,9 +22,11 @@ import { PROFILE_GRID_GAP } from './profileLayout';
 import { formatMoney } from '@/lib/format';
 
 export const ProfileProductTile = React.memo(function ProfileProductTile({
-  product, width, height, owner, onPress,
+  product, brand, width, height, owner, onPress,
 }: {
   product: ShopProduct;
+  /** The store's name — its initial fills a tile with no photo. */
+  brand?: string;
   width: number;
   height: number;
   /** Owner mode: edit affordance instead of buying. */
@@ -54,9 +57,7 @@ export const ProfileProductTile = React.memo(function ProfileProductTile({
             {product.imageUri ? (
               <CachedImage source={{ uri: product.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={150} />
             ) : (
-              <View style={[StyleSheet.absoluteFill, styles.placeholder]}>
-                <Icon name="shopping-bag" size={22} color={theme.muted} />
-              </View>
+              <ProductPhotoPlaceholder brand={brand} name={product.name} style={StyleSheet.absoluteFill} />
             )}
             <LinearGradient
               pointerEvents="none"

@@ -27,6 +27,8 @@ import { CachedImage } from '@/components/CachedImage';
 
 import { Sheet } from '@/components/ui';
 
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 import { useColors } from '@/hooks/useColors';
 
 import { useApi, type PublicPairedProduct } from '@/lib/api';
@@ -181,11 +183,7 @@ export function CompleteTheFit({ productId }: { productId: string }) {
                 onPress={() => router.push({ pathname: '/buyer-product-detail' as any, params: { productId: item.id } })}
               >
                 <View style={s.thumb}>
-                  {item.image ? (
-                    <CachedImage source={{ uri: item.image }} style={{ width: '100%', height: '100%' }} contentFit="cover" recyclingKey={item.image} />
-                  ) : (
-                    <View style={s.thumbEmpty}><Icon name="image" size={24} color={colors.mutedForeground} /></View>
-                  )}
+                  <ProductPhoto uri={item.image} brand={item.product?.sellerName} name={item.name} style={{ width: '100%', height: '100%' }} recyclingKey={item.image ?? undefined} />
                 </View>
               </TouchableOpacity>
               {item.product ? (
@@ -229,14 +227,16 @@ export function CompleteTheFit({ productId }: { productId: string }) {
   );
 }
 
+const THUMB_HEIGHT = productPhotoHeight(140);
+
 const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   divider: { height: 1, backgroundColor: c.border, marginVertical: SP.md },
   header: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.mutedForeground, marginBottom: SP.sm },
   card: { width: 140 },
-  thumb: { width: 140, height: 180, backgroundColor: c.card, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SP.sm },
+  thumb: { width: 140, height: THUMB_HEIGHT, backgroundColor: c.card, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SP.sm },
   thumbEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   addBtn: {
-    position: 'absolute', top: 180 - 36 - 8 + 0, right: 8,
+    position: 'absolute', top: THUMB_HEIGHT - 36 - 8 + 0, right: 8,
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: c.background, borderWidth: 1, borderColor: c.border,
     alignItems: 'center', justifyContent: 'center',

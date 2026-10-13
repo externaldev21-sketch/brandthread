@@ -7,6 +7,7 @@ import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
+import { ProductPhoto } from '@/components/media/ProductPhoto';
 import { SaveHeart } from '@/components/SaveHeart';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -107,15 +108,8 @@ export function ProductTile({ item, accent: _accent, onPress, width }: {
       accessibilityLabel={`Open ${item.name}, ${item.brand}`}
     >
       <Animated.View style={[styles.card, { width, transform: [{ scale }] }]}>
-        <View ref={mediaRef} collapsable={false} style={[styles.media, { width, height: width / GRID_CARD_ASPECT, backgroundColor: item.color }]}>
-          {item.imageUri ? (
-            <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" fallbackLabel={item.name ?? ''} />
-          ) : (
-            <View style={styles.fallback}>
-              <Text style={styles.fallbackInitials}>{item.initials}</Text>
-              <View style={styles.fallbackLine} />
-            </View>
-          )}
+        <View ref={mediaRef} collapsable={false} style={[styles.media, { width, height: width / GRID_CARD_ASPECT }]}>
+          <ProductPhoto uri={item.imageUri} brand={item.brand} name={item.name} style={StyleSheet.absoluteFill} />
           {typeof item.priceCents === 'number' && (
             <View style={styles.priceChip}>
               <Text style={styles.priceText}>{formatMoney(item.priceCents)}</Text>

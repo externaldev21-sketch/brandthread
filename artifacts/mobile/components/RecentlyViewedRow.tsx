@@ -10,7 +10,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { CachedImage } from '@/components/CachedImage';
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 import { formatCents } from '@/lib/money';
 import { prefetchProductOnPressIn } from '@/lib/detailPrefetch';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -67,13 +68,7 @@ export function RecentlyViewedRow({ style }: { style?: object }) {
               router.push(`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}` as never);
             }}
           >
-            {item.image ? (
-              <CachedImage source={{ uri: item.image }} style={[s.image, { backgroundColor: theme.cardElevated }]} contentFit="cover" />
-            ) : (
-              <View style={[s.image, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
-                <Icon name="image" size={18} color={theme.muted} />
-              </View>
-            )}
+            <ProductPhoto uri={item.image} brand={item.brand} name={item.name} style={s.image} />
             <Text style={[s.name, { color: theme.text }]} numberOfLines={2}>{item.name}</Text>
             {item.priceCents != null && (
               <Text style={[s.price, { color: theme.muted }]}>{formatCents(item.priceCents)}</Text>
@@ -90,7 +85,7 @@ const s = StyleSheet.create({
     fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: SP.sm,
   },
   card: { width: 104 },
-  image: { width: 104, height: 104, borderRadius: RADIUS.md },
+  image: { width: 104, height: productPhotoHeight(104), borderRadius: RADIUS.md },
   // Two fixed lines so long product names wrap instead of clipping with an ellipsis,
   // and every card in the row stays the same height.
   name: { fontSize: FS.xs, lineHeight: 15, height: 30, fontFamily: FONT.medium, marginTop: 6 },

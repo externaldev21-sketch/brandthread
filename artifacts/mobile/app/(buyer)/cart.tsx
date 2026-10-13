@@ -20,6 +20,8 @@ import { CachedImage } from '@/components/CachedImage';
 
 import { Icon } from '@/components/ui/Icon';
 
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 import { useRouter, useFocusEffect } from 'expo-router';
 
 import { applyCartQuantity } from '@/lib/cartOptimistic';

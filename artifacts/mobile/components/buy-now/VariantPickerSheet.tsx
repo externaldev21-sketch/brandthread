@@ -27,6 +27,8 @@ import { haptics } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { Sheet } from '@/components/ui/BottomSheet';
 import { CachedImage } from '@/components/CachedImage';
+import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Chip } from '@/components/ui/Chip';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
@@ -266,7 +268,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   centerBox: { alignItems: 'center', justifyContent: 'center', paddingVertical: SP.xl },
   scrollContent: { paddingTop: SP.xs, paddingBottom: SP.sm },
   productRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.lg, alignItems: 'center' },
-  thumb: { width: 68, height: 68, borderRadius: RADIUS.md, backgroundColor: theme.cardElevated },
+  thumb: { width: 68, height: productPhotoHeight(68), borderRadius: RADIUS.md, backgroundColor: theme.cardElevated },
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   productName: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
   productPrice: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.accent, marginTop: 3, fontVariant: ['tabular-nums'] },

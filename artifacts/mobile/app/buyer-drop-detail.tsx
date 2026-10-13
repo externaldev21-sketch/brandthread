@@ -48,6 +48,8 @@ import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { buildCanonicalDropUrl } from '@/lib/shareDrop';
 
 import { computeCountdownParts, type CountdownParts } from '@/lib/dropCountdown';
+import { ProductPhotoPlaceholder } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 
 import { crispPx } from '@/lib/crispPixel';
 
@@ -233,9 +235,10 @@ function Countdown({
 }
 
 function ProductTile({
-  product, locked, isLive, onPress,
+  product, brand, locked, isLive, onPress,
 }: {
   product: DropProduct;
+  brand?: string;
   locked: boolean;
   isLive: boolean;
   onPress: () => void;
@@ -276,7 +279,7 @@ function ProductTile({
           {imageUri && !locked ? (
             <CachedImage source={{ uri: imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
-            <View style={styles.productFallback}>{locked ? null : <Icon name="image" size={28} color={SUBTLE} />}</View>
+            <View style={styles.productFallback}>{locked ? null : <ProductPhotoPlaceholder brand={brand} name={product.name} style={StyleSheet.absoluteFill} />}</View>
           )}
           {soldOut && (
             <View style={StyleSheet.absoluteFill}>
@@ -684,6 +687,7 @@ export default function BuyerDropDetail() {
                 <ProductTile
                   key={product.id}
                   product={product}
+                  brand={sellerName}
                   locked={!showRecap && !isLive}
                   isLive={isLive && !showRecap}
                   onPress={() => handleProductPress(product)}

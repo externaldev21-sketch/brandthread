@@ -66,6 +66,8 @@ import { CachedImage } from '@/components/CachedImage';
 
 import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Sheet, Avatar } from '@/components/ui';
 
+import { ProductPhoto, ProductPhotoPlaceholder } from '@/components/media/ProductPhoto';
+import { productPhotoHeight } from '@/constants/media';
 import { TYPE_SCALE } from '@/constants/typography';
 
 import { SPACING } from '@/constants/spacing';
@@ -248,13 +250,7 @@ const fmtPrice = formatCents;
 /** How long Add to cart reads "In bag ✓" after a successful add (item 131). */
 export const IN_BAG_CONFIRM_MS = 2000;
 const GALLERY_WIDTH = Dimensions.get('window').width;
-// 3:4 — matches how product photos are now saved (cropped by the seller to
-// 3:4 at upload time; see ShopProductSheet's ProductImageCarousel, fixed the
-// same way in an earlier photo-audit pass).
-// Capped at 60% of the window so photo, brand, name, price, the size row and
-// the purchase bar all fit on one screen (item 129). Only bites on short
-// phones (390×844: 520 → 506pt); the photo stays cover-fit.
-const GALLERY_HEIGHT = Math.min(GALLERY_WIDTH * 4 / 3, Dimensions.get('window').height * 0.6);
+const GALLERY_HEIGHT = Math.min(productPhotoHeight(GALLERY_WIDTH), Dimensions.get('window').height * 0.6);
 
 function renderStars(rating: number): string {
   const full = Math.round(Math.max(0, Math.min(5, rating)));
@@ -389,6 +385,10 @@ function ZoomableGalleryImage({ uri, onZoomChange }: { uri: string; onZoomChange
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
   }));
 
+  if (failed) {
+    return <ProductPhotoPlaceholder brand={brand} name={name} style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT }} />;
+  }
+
   return (
     <GestureDetector gesture={gesture}>
       <View style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT, overflow: 'hidden' }}>
@@ -428,13 +428,13 @@ const galleryStyles = StyleSheet.create({
   resetZoomText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.xs },
   thumbRail: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
   thumb: {
-    width: 56, height: 56, borderRadius: RADIUS.sm, overflow: 'hidden',
+    width: 56, height: productPhotoHeight(56), borderRadius: RADIUS.sm, overflow: 'hidden',
     borderWidth: 2, borderColor: 'transparent',
   },
   thumbImage: { width: '100%', height: '100%' },
 });
 
-function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accentColor: string }) {
+function ProductGallery({ imageUris, accentColor, brand, name }: { imageUris: string[]; accentColor: string; brand?: string; name?: string }) {
   const images = imageUris.filter(Boolean);
   const scrollX = useRef(new Animated.Value(0)).current;
   const listRef = useRef<Animated.FlatList<string>>(null);
@@ -444,10 +444,7 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
 
   if (!images.length) {
     return (
-      <View style={[galleryStyles.gallery, galleryStyles.galleryEmpty]}>
-        <AppIcon name="image" size={ICON.xxl} color={MUTED} />
-        <Text style={galleryStyles.emptyText}>Product image unavailable</Text>
-      </View>
+      <ProductPhotoPlaceholder brand={brand} name={name} style={galleryStyles.gallery} />
     );
   }
 
@@ -1253,7 +1250,7 @@ export default function BuyerProductDetailScreen() {
       >
         {/* Immersive product gallery */}
         <View style={s.imageArea} ref={galleryRef} collapsable={false}>
-          <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} />
+          <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} brand={product.sellerName} name={product.name} />
           {/* Back button — solid dark chrome over the full-bleed gallery. A
               BlurView-based "glass" variant re-samples whatever sits behind
               it every frame; on a swipeable gallery that reads as the same
