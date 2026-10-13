@@ -92,6 +92,11 @@ interface Participant {
   initials: string; color: string; accountType: string;
   /** Chat details > Nicknames: the current viewer's nickname for them, if set. */
   nickname?: string;
+  /** Public profile photo, when they have one. */
+  avatarUri?: string;
+  /** Activity status — sent only when both people share it. */
+  isOnline?: boolean;
+  lastSeenAt?: string;
 }
 interface ConvView {
   id: string; type: string; participants: Participant[];
@@ -1356,6 +1361,8 @@ export default function SellerConversationScreen() {
           <ChatAttachmentCard
             theme={theme}
             isMe={isOwn}
+            bubbleColor={isOwn ? sentBubbleColor : receivedBubbleColor}
+            bubbleTextColor={isOwn ? sentTextColor : receivedTextColor}
             imageUri={isProduct ? att.uri : undefined}
             icon={isProduct ? 'shopping-bag' : 'package'}
             iconColor={PURPLE}

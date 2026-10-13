@@ -46,6 +46,8 @@ interface Participant {
   userId: string; name: string; handle: string;
   initials: string; color: string; accountType: string;
   avatarUri?: string;
+  /** Activity status — sent only when both people share it. */
+  isOnline?: boolean;
 }
 interface ConvView {
   id: string; type: string;

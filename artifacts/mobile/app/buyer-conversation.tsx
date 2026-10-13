@@ -1841,6 +1841,8 @@ export default function BuyerConversationScreen() {
           <ChatAttachmentCard
             theme={theme}
             isMe={isOwn}
+            bubbleColor={isOwn ? sentBubbleColor : receivedBubbleColor}
+            bubbleTextColor={isOwn ? sentTextColor : receivedTextColor}
             imageUri={isProduct ? att.uri : undefined}
             icon={isProduct ? 'shopping-bag' : 'package'}
             iconColor={theme.accent}
