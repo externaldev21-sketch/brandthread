@@ -1,8 +1,8 @@
 /**
  * LIVE viewer Thread Cash gift sheet — the rail's bill icon. TikTok LIVE
  * gift-sheet structure (balance at top, grid of tip amounts, one Send CTA),
- * in the app's own monochrome + Thread Cash green tokens. Built on the same
- * Modal + SheetRise + useAppTheme() pattern as LiveProductsSheet.tsx.
+ * in the app's own monochrome + Thread Cash green tokens, on the shared
+ * `<Sheet>` with Send pinned above the home indicator.
  *
  * When `recipientId` and `streamId` are both real (the app/live.tsx pager),
  * sending is a real `api.threadCash.liveGift()` call — instant, never
@@ -13,19 +13,17 @@
  * decrements the shown balance and the caller posts a chat line.
  */
 import React, { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { randomUUID } from 'expo-crypto';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
-import { hapticLight } from '@/lib/haptics';
+import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
 
 const TIP_AMOUNTS_CENTS = [100, 500, 1000, 2000, 5000, 10000];
@@ -49,7 +47,6 @@ export function LiveThreadCashSheet({
   onSendFailed?: (message: string) => void;
 }) {
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
   const api = useApi();
   const [balanceCents, setBalanceCents] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
@@ -92,7 +89,6 @@ export function LiveThreadCashSheet({
   async function handleSend() {
     if (!selected || sending || balanceCents == null || selected > balanceCents) return;
     setSending(true);
-    hapticLight();
     if (recipientId && streamId && !isPreviewThreadCashEnabled()) {
       try {
         await api.threadCash.liveGift({
@@ -107,6 +103,7 @@ export function LiveThreadCashSheet({
       }
     }
     setBalanceCents(prev => (prev == null ? prev : Math.max(0, prev - selected)));
+    hapticSuccess();
     setJustSentCents(selected);
     onSent(selected);
     setSending(false);
@@ -114,89 +111,65 @@ export function LiveThreadCashSheet({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close Thread Cash" />
-      <SheetRise style={[styles.sheet, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.md }]} testID="live-thread-cash-sheet">
-        <View style={[styles.handle, { backgroundColor: theme.border }]} />
-        <View style={styles.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: theme.text }]}>Send Thread Cash</Text>
-            <Text style={[styles.sub, { color: theme.muted }]}>To {brandName}</Text>
-          </View>
-          <Pressable onPress={onClose} style={[styles.close, { backgroundColor: theme.cardElevated }]} accessibilityRole="button" accessibilityLabel="Close" hitSlop={6}>
-            <Feather name="x" size={18} color={theme.text} />
-          </Pressable>
-        </View>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Send Thread Cash"
+      testID="live-thread-cash-sheet"
+      primaryAction={{
+        label: selected ? `Send ${formatCents(selected)}` : 'Select an amount',
+        onPress: () => { void handleSend(); },
+        disabled: !selected || sending || balanceCents == null || selected > balanceCents,
+        loading: sending,
+        accessibilityLabel: selected ? `Send ${formatCents(selected)}` : 'Send',
+      }}
+    >
+      <Text style={[styles.sub, { color: theme.muted }]}>To {brandName}</Text>
 
-        <View style={[styles.balancePill, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
-          <ThreadCashBillIcon size={16} />
-          <Text style={[styles.balanceText, { color: theme.text }]} testID="live-thread-cash-balance">
-            {balanceCents == null ? '···' : `${formatCents(balanceCents)} available`}
-          </Text>
-        </View>
+      <View style={[styles.balancePill, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
+        <ThreadCashBillIcon size={16} />
+        <Text style={[styles.balanceText, { color: theme.text }]} testID="live-thread-cash-balance">
+          {balanceCents == null ? '···' : `${formatCents(balanceCents)} available`}
+        </Text>
+      </View>
 
-        {justSentCents != null && (
-          <Animated.View style={[styles.sentBanner, { borderColor: THREAD_CASH_GREEN_MID }, popStyle]}>
-            <Text style={[styles.sentBannerText, { color: theme.text }]}>Sent {formatCents(justSentCents)} 🎉</Text>
-          </Animated.View>
-        )}
+      {justSentCents != null && (
+        <Animated.View style={[styles.sentBanner, { borderColor: THREAD_CASH_GREEN_MID }, popStyle]}>
+          <Text style={[styles.sentBannerText, { color: theme.text }]}>Sent {formatCents(justSentCents)} 🎉</Text>
+        </Animated.View>
+      )}
 
-        <View style={styles.grid}>
-          {TIP_AMOUNTS_CENTS.map(cents => {
-            const isSelected = selected === cents;
-            const affordable = balanceCents == null || cents <= balanceCents;
-            return (
-              <Pressable
-                key={cents}
-                disabled={!affordable}
-                onPress={() => { hapticLight(); setSelected(cents); }}
-                style={[
-                  styles.tip,
-                  { borderColor: isSelected ? theme.accent : theme.border },
-                  isSelected && { backgroundColor: theme.accent },
-                  !affordable && styles.tipDisabled,
-                ]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isSelected, disabled: !affordable }}
-                accessibilityLabel={`Select ${formatCents(cents)}`}
-              >
-                <ThreadCashBillIcon size={18} style={isSelected ? { opacity: 0.85 } : undefined} />
-                <Text style={[styles.tipText, { color: isSelected ? theme.onAccent : theme.text }]}>{formatCents(cents)}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Pressable
-          onPress={handleSend}
-          disabled={!selected || sending || balanceCents == null || selected > balanceCents}
-          style={[
-            styles.sendBtn,
-            { backgroundColor: theme.accent },
-            (!selected || sending || balanceCents == null || selected > balanceCents) && styles.sendBtnDisabled,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={selected ? `Send ${formatCents(selected)}` : 'Send'}
-        >
-          <Text style={[styles.sendBtnText, { color: theme.onAccent }]}>{selected ? `Send ${formatCents(selected)}` : 'Select an amount'}</Text>
-        </Pressable>
-      </SheetRise>
-    </Modal>
+      <View style={styles.grid}>
+        {TIP_AMOUNTS_CENTS.map(cents => {
+          const isSelected = selected === cents;
+          const affordable = balanceCents == null || cents <= balanceCents;
+          return (
+            <Pressable
+              key={cents}
+              disabled={!affordable}
+              onPress={() => { hapticLight(); setSelected(cents); }}
+              style={[
+                styles.tip,
+                { borderColor: isSelected ? theme.accent : theme.border },
+                isSelected && { backgroundColor: theme.accent },
+                !affordable && styles.tipDisabled,
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSelected, disabled: !affordable }}
+              accessibilityLabel={`Select ${formatCents(cents)}`}
+            >
+              <ThreadCashBillIcon size={18} style={isSelected ? { opacity: 0.85 } : undefined} />
+              <Text style={[styles.tipText, { color: isSelected ? theme.onAccent : theme.text }]}>{formatCents(cents)}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
-    borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-    paddingHorizontal: SP.md, paddingTop: SP.xs,
-  },
-  handle: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: SP.sm },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: SP.sm },
-  title: { fontFamily: FONT.bold, fontSize: FS.md },
-  sub: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
-  close: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  sub: { fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: SP.sm },
   balancePill: {
     flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
     borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6, marginBottom: SP.sm,
@@ -213,7 +186,4 @@ const styles = StyleSheet.create({
   },
   tipDisabled: { opacity: 0.35 },
   tipText: { fontFamily: FONT.bold, fontSize: FS.sm },
-  sendBtn: { height: 46, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  sendBtnDisabled: { opacity: 0.4 },
-  sendBtnText: { fontFamily: FONT.bold, fontSize: FS.sm },
 });

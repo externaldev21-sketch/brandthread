@@ -40,7 +40,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { OptionSheet } from '@/components/ui/OptionSheet';
-import { hapticDestructiveConfirm } from '@/lib/haptics';
+import { hapticDestructiveConfirm, hapticSuccess } from '@/lib/haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { profileHref } from '@/lib/profileNavigation';
 import { InteractionLayer, ProfileChip } from '@/components/profile/ProfileControls';
@@ -262,6 +262,7 @@ export default function ConnectionsScreen() {
       await removeFollower(row.id);
       setFollowers((prev) => prev.filter((u) => u.id !== row.id));
       setRemoveTarget(null);
+      hapticSuccess();
       showToast('Removed');
     } catch {
       // Sheet stays open; the person can retry or cancel.

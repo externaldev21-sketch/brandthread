@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const bottomSheet = readFileSync(resolve(__dirname, '../components/ui/BottomSheet.tsx'), 'utf8');
+const bottomSheet = readFileSync(resolve(__dirname, '../components/ui/useSheetTransition.ts'), 'utf8');
 
 describe('useSheetTransition open path never gets stuck offscreen', () => {
   it('the sheet transform always keeps the `transform` key present — never drops it via identityOrNone', () => {
@@ -30,14 +30,19 @@ describe('useSheetTransition open path never gets stuck offscreen', () => {
     expect(bottomSheet).toContain('const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));');
   });
 
-  it('the open target is always driven by withTiming on SHEET_TIMING — never a bare value assignment, regardless of reduceMotion', () => {
-    // No `reduceMotion`-gated instant `.set(0)`/`.value = 0` shortcut for
-    // translateY/backdropOpacity in the open branch — every write goes
-    // through `withTiming`, which reliably forces the DOM to update even in
-    // the reduced-motion case that previously broke instantly.
+  it('the open target is always animated (spring, or a short timing under Reduce Motion) — never a bare value assignment', () => {
+    // No instant `.set(0)`/`.value = 0` shortcut for translateY in the open
+    // branch — every write goes through an animation function, which reliably
+    // forces the DOM to update even in the reduced-motion case that
+    // previously broke instantly.
     expect(bottomSheet).not.toMatch(/translateY\.(set|value)\(?\s*=?\s*0\)?;/);
-    expect(bottomSheet).toContain('translateY.set(withTiming(0, { duration: SHEET_OPEN_MS, easing: SHEET_EASING }));');
-    expect(bottomSheet).toContain('backdropOpacity.set(withTiming(1, { duration: SHEET_OPEN_MS, easing: SHEET_EASING }));');
+    expect(bottomSheet).toContain('translateY.set(toRest());');
+    expect(bottomSheet).toContain("withSpring(0, { ...SHEET_SPRING, velocity })");
+    expect(bottomSheet).toContain("withTiming(0, { duration: 150, easing: SHEET_EASING })");
+  });
+
+  it('the backdrop is derived from the sheet position, so it fades in sync on open, close and mid-drag', () => {
+    expect(bottomSheet).toMatch(/const backdropStyle = useAnimatedStyle\(\(\) => \(\{\s*opacity: interpolate\(\s*translateY\.value/);
   });
 
   it('closeDistance is independent of the measured sheet height (onSheetLayout only feeds the swipe threshold)', () => {

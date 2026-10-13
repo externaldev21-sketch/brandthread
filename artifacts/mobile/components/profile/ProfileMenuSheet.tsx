@@ -5,15 +5,14 @@
  * in by the caller from `profileCapabilities`, so this component has no
  * opinion about who may see what.
  *
- * A real sheet (not Alert.alert) so the buttons also work on web.
+ * Renders the shared `MenuSheet` (Instagram's "More options" sheet): no
+ * title row, everyday rows in one rounded block, destructive rows (Report,
+ * Block) in their own block below. `title` names the sheet for screen
+ * readers.
  */
-import React, { useMemo } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PressableScale } from '@/components/BrandthreadUI';
-import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import React from 'react';
+import type { Feather } from '@expo/vector-icons';
+import { MenuSheet, type MenuSheetItem } from '@/components/ui/MenuSheet';
 
 export interface ProfileMenuItem {
   key: string;
@@ -32,45 +31,15 @@ export function ProfileMenuSheet({
   onClose: () => void;
   testID?: string;
 }) {
-  const { theme } = useAppTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
+  const everyday: MenuSheetItem[] = items.filter(i => !i.destructive);
+  const destructive: MenuSheetItem[] = items.filter(i => i.destructive);
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.root} testID={testID}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close menu" />
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }]}>
-          <View style={styles.handle} />
-          {title ? <Text style={styles.title} numberOfLines={1}>{title}</Text> : null}
-          {items.map((item) => (
-            <PressableScale
-              key={item.key}
-              style={styles.row}
-              onPress={() => { onClose(); item.onPress(); }}
-              accessibilityRole="button"
-              accessibilityLabel={item.label}
-              testID={`${testID}-${item.key}`}
-            >
-              <Feather name={item.icon} size={20} color={item.destructive ? theme.error : theme.text} />
-              <Text style={[styles.label, { color: item.destructive ? theme.error : theme.text }]}>{item.label}</Text>
-            </PressableScale>
-          ))}
-        </View>
-      </View>
-    </Modal>
+    <MenuSheet
+      visible={visible}
+      onClose={onClose}
+      sections={[everyday, destructive]}
+      accessibilityLabel={title ? `${title} options` : 'Profile options'}
+      testID={testID}
+    />
   );
-}
-
-function makeStyles(theme: AppThemePreset) {
-  return StyleSheet.create({
-    root: { flex: 1, justifyContent: 'flex-end', backgroundColor: `${theme.shadowColor}8C` },
-    sheet: {
-      backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-      borderWidth: 1, borderBottomWidth: 0, borderColor: theme.border, paddingTop: SP.sm,
-    },
-    handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginBottom: SP.sm },
-    title: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
-    row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: SP.md, minHeight: 52 },
-    label: { flex: 1, fontFamily: FONT.medium, fontSize: FS.base },
-  });
 }

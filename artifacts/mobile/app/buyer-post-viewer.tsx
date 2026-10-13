@@ -10,11 +10,10 @@ import { buildPostUrl } from '@/lib/shareLinks';
 import { QuotedPostCard } from '@/components/social/QuotedPostCard';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Modal, Share, Animated, useWindowDimensions, Platform,
+  TextInput, Share, Animated, useWindowDimensions, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { Button } from '@/components/ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -24,8 +23,8 @@ import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import {
-  BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
-  FONT, FS, SP, RADIUS, ICON, OVERLAY, RED, COMP,
+  BG, SURFACE, BORDER, FG, MUTED, SUBTLE, ON_DARK,
+  FONT, FS, SP, RADIUS, ICON, RED, COMP,
 } from '@/lib/theme';
 import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
 import {
@@ -40,7 +39,7 @@ import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { Sheet } from '@/components/ui/BottomSheet';
 import { CaptionSpans } from '@/components/social/CaptionText';
 import { CaptionsOverlay, type CaptionSegment } from '@/components/social/CaptionsOverlay';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -515,47 +514,36 @@ export default function BuyerPostViewer() {
         )}
       </Animated.ScrollView>
 
-      {/* Edit caption modal */}
-      <Modal visible={editOpen} transparent animationType="fade" onRequestClose={() => setEditOpen(false)}>
-        <ModalSafeArea>
-          <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setEditOpen(false)}>
-            <TouchableOpacity activeOpacity={1} style={s.modalSheet}>
-              <View style={s.modalHandle} />
-              <Text style={s.modalTitle}>Edit Caption</Text>
-              <TextInput
-                style={s.captionInput}
-                value={editCaption}
-                onChangeText={setEditCaption}
-                placeholder="Write a caption…"
-                placeholderTextColor={SUBTLE}
-                multiline
-                autoFocus
-              />
-              <View style={s.modalActions}>
-                <Button label="Cancel" variant="secondary" style={s.modalActionBtn} onPress={() => setEditOpen(false)} />
-                <Button label="Save" variant="primary" style={s.modalActionBtn} onPress={handleSaveCaption} />
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </ModalSafeArea>
-      </Modal>
+      {/* Edit caption sheet */}
+      <Sheet
+        visible={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Edit caption"
+        testID="post-edit-caption-sheet"
+        primaryAction={{ label: 'Save', onPress: () => { void handleSaveCaption(); } }}
+      >
+        <TextInput
+          style={s.captionInput}
+          value={editCaption}
+          onChangeText={setEditCaption}
+          placeholder="Write a caption…"
+          placeholderTextColor={SUBTLE}
+          multiline
+          autoFocus
+        />
+      </Sheet>
 
-      {/* Delete confirm modal */}
-      <Modal visible={deleteConfirm} transparent animationType="fade" onRequestClose={() => setDeleteConfirm(false)}>
-        <ModalSafeArea>
-          <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setDeleteConfirm(false)}>
-            <TouchableOpacity activeOpacity={1} style={s.modalSheet}>
-              <View style={s.modalHandle} />
-              <Text style={s.modalTitle}>Delete post?</Text>
-              <Text style={s.modalDesc}>This will permanently remove the post from your profile. This cannot be undone.</Text>
-              <View style={s.modalActions}>
-                <Button label="Cancel" variant="secondary" style={s.modalActionBtn} onPress={() => setDeleteConfirm(false)} />
-                <Button label="Delete" variant="destructive" style={s.modalActionBtn} onPress={handleDelete} />
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </ModalSafeArea>
-      </Modal>
+      {/* Delete confirm sheet */}
+      <Sheet
+        visible={deleteConfirm}
+        onClose={() => setDeleteConfirm(false)}
+        title="Delete post?"
+        testID="post-delete-sheet"
+        primaryAction={{ label: 'Delete', variant: 'destructive', onPress: () => { void handleDelete(); } }}
+        secondaryAction={{ label: 'Cancel', onPress: () => setDeleteConfirm(false) }}
+      >
+        <Text style={s.modalDesc}>This will permanently remove the post from your profile. This cannot be undone.</Text>
+      </Sheet>
     </View>
   );
 }
@@ -590,13 +578,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   captionsBtnText: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.md, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: RED + '44', justifyContent: 'center' },
   deleteBtnText: { fontFamily: FONT.medium, fontSize: FS.base, color: RED },
-  modalBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.lg, paddingBottom: 40 },
-  modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.md },
-  modalTitle: { fontFamily: FONT.bold, fontSize: FS.lg, color: FG, marginBottom: SP.sm },
   modalDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, lineHeight: 20, marginBottom: SP.md },
   captionInput: { borderWidth: 1, borderColor: BORDER_ACTIVE, borderRadius: RADIUS.md, padding: SP.md, color: FG, fontFamily: FONT.regular, fontSize: FS.base, minHeight: 100, textAlignVertical: 'top', marginBottom: SP.md },
-  modalActions: { flexDirection: 'row', gap: SP.sm },
-  modalActionBtn: { flex: 1 },
   });
 };

@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { UploadProgressPill } from '@/components/feed/UploadProgressPill';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
-  Animated, TextInput, Modal, Pressable, PanResponder,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  Animated, TextInput, Pressable, PanResponder,
   AccessibilityInfo, ScrollView, RefreshControl, ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
@@ -88,7 +88,7 @@ import { formatCount } from '@/lib/engagementUtils';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { Sheet } from '@/components/ui/BottomSheet';
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { RADII, radius } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
@@ -3527,68 +3527,46 @@ export default function FeedScreen({
 
       {/* Notifications now open the real /buyer-notifications screen instead of
           this hardcoded fake sheet — see the bell button's onPress above. */}
-      <Modal
+      <Sheet
         visible={showRepostEducation}
-        animationType="fade"
-        transparent
-        statusBarTranslucent
-        onRequestClose={() => setShowRepostEducation(false)}
+        onClose={() => setShowRepostEducation(false)}
+        headerRight="close"
+        accessibilityLabel="About reposts"
+        testID="repost-education-sheet"
+        primaryAction={{ label: 'OK', onPress: () => setShowRepostEducation(false), accessibilityLabel: 'Got it' }}
       >
-        <View style={styles.repostEducationBackdrop}>
-          <TouchableWithoutFeedback onPress={() => setShowRepostEducation(false)}>
-            <View style={StyleSheet.absoluteFill} />
-          </TouchableWithoutFeedback>
-          <SheetRise style={[styles.repostEducationSheet, { paddingBottom: Math.max(previewBottomInset, 16) }]}>
-            <TouchableOpacity
-              style={styles.repostEducationClose}
-              onPress={() => setShowRepostEducation(false)}
-              accessibilityRole="button"
-              accessibilityLabel="Close repost information"
-            >
-              <Feather name="x" size={24} color={FG} />
-            </TouchableOpacity>
-            <View style={styles.repostEducationPreview}>
-              <View style={styles.repostEducationPreviewMedia}>
-                <View style={styles.repostEducationPreviewBadge}>
-                  <View style={styles.repostEducationPreviewAvatar}>
-                    <Feather name="user" size={11} color="#FFFFFF" />
-                  </View>
-                  <Text style={styles.repostEducationPreviewBadgeText}>You reposted</Text>
-                </View>
-                <Feather name="more-horizontal" size={18} color="#FFFFFF99" style={styles.repostEducationPreviewMore} />
-                <View style={styles.repostEducationPreviewLines}>
-                  <View style={styles.repostEducationPreviewLineShort} />
-                  <View style={styles.repostEducationPreviewLineLong} />
-                </View>
-                <Feather name="corner-up-right" size={30} color="#FFFFFF99" style={styles.repostEducationPreviewShare} />
+        <View style={styles.repostEducationPreview}>
+          <View style={styles.repostEducationPreviewMedia}>
+            <View style={styles.repostEducationPreviewBadge}>
+              <View style={styles.repostEducationPreviewAvatar}>
+                <Feather name="user" size={11} color="#FFFFFF" />
               </View>
+              <Text style={styles.repostEducationPreviewBadgeText}>You reposted</Text>
             </View>
-            <Text style={styles.repostEducationTitle}>Introduce this post to others by reposting</Text>
-            <View style={styles.repostEducationPoint}>
-              <Feather name="users" size={22} color={FG} />
-              <Text style={styles.repostEducationPointText}>Your repost can appear to friends in their Thread.</Text>
+            <Feather name="more-horizontal" size={18} color="#FFFFFF99" style={styles.repostEducationPreviewMore} />
+            <View style={styles.repostEducationPreviewLines}>
+              <View style={styles.repostEducationPreviewLineShort} />
+              <View style={styles.repostEducationPreviewLineLong} />
             </View>
-            <View style={styles.repostEducationPoint}>
-              <Feather name="repeat" size={22} color={FG} />
-              <Text style={styles.repostEducationPointText}>Use the Repost button again at any time to remove it.</Text>
-            </View>
-            <View style={styles.repostEducationPrivacy}>
-              <Feather name="lock" size={15} color={MUTED} />
-              <Text style={styles.repostEducationPrivacyText}>
-                Only mutual friends can see your profile on a repost.
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.repostEducationOkay, { backgroundColor: theme.accent }]}
-              onPress={() => setShowRepostEducation(false)}
-              accessibilityRole="button"
-              accessibilityLabel="Got it"
-            >
-              <Text style={[styles.repostEducationOkayText, { color: theme.onAccent }]}>OK</Text>
-            </TouchableOpacity>
-          </SheetRise>
+            <Feather name="corner-up-right" size={30} color="#FFFFFF99" style={styles.repostEducationPreviewShare} />
+          </View>
         </View>
-      </Modal>
+        <Text style={styles.repostEducationTitle}>Introduce this post to others by reposting</Text>
+        <View style={styles.repostEducationPoint}>
+          <Feather name="users" size={22} color={FG} />
+          <Text style={styles.repostEducationPointText}>Your repost can appear to friends in their Thread.</Text>
+        </View>
+        <View style={styles.repostEducationPoint}>
+          <Feather name="repeat" size={22} color={FG} />
+          <Text style={styles.repostEducationPointText}>Use the Repost button again at any time to remove it.</Text>
+        </View>
+        <View style={styles.repostEducationPrivacy}>
+          <Feather name="lock" size={15} color={MUTED} />
+          <Text style={styles.repostEducationPrivacyText}>
+            Only mutual friends can see your profile on a repost.
+          </Text>
+        </View>
+      </Sheet>
       {shopSelection && (
         <ShopProductSheet
           selection={shopSelection}
@@ -3806,16 +3784,6 @@ const styles = StyleSheet.create({
   },
 
   modalBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
-  repostEducationBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.56)', justifyContent: 'flex-end' },
-  repostEducationSheet: {
-    backgroundColor: CARD, borderTopLeftRadius: 22, borderTopRightRadius: 22,
-    paddingHorizontal: 24, paddingTop: 22,
-    borderWidth: 1, borderBottomWidth: 0, borderColor: BORDER,
-  },
-  repostEducationClose: {
-    position: 'absolute', top: 12, right: 12, zIndex: 2,
-    width: 42, height: 42, alignItems: 'center', justifyContent: 'center',
-  },
   repostEducationPreview: { alignItems: 'center', marginBottom: 20 },
   repostEducationPreviewMedia: {
     width: 220, height: 150, borderRadius: 18, backgroundColor: '#313136',
@@ -3849,10 +3817,6 @@ const styles = StyleSheet.create({
     gap: 7, marginTop: 1, marginBottom: 18,
   },
   repostEducationPrivacyText: { color: MUTED, fontFamily: FONT.regular, fontSize: 12 },
-  repostEducationOkay: {
-    minHeight: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-  },
-  repostEducationOkayText: { fontFamily: FONT.bold, fontSize: FS.base },
   commentsSheet: {
     backgroundColor: SURFACE, borderTopLeftRadius: 20, borderTopRightRadius: 20,
     paddingTop: 10, paddingHorizontal: 18,
