@@ -63,6 +63,7 @@ import cartDbRouter from "./cart-db";
 import notificationsFeedRouter from "./notifications-feed";
 import notificationPrefsRouter from "./notification-prefs";
 import postsRouter from "./posts";
+import fitsRouter, { productFitChecksRouter } from "./fits";
 import postCaptionsRouter from "./post-captions";
 import feedRouter from "./feed";
 import reportsRouter from "./reports";
@@ -227,6 +228,7 @@ router.use("/auth",            ageRouter); // POST /auth/age (age gate)
 // This route is intentionally before paid AI mounts: it is the single,
 // server-enforced sample offered during seller onboarding.
 router.use("/onboarding-sample", aiSafetyGuard("onboarding-logo"), logoRouter);
+router.use("/products",        productFitChecksRouter); // public GET /:id/fit-checks (F6 fits)
 router.use("/products",        tc, productsRouter);
 router.use("/orders",          tc, ordersRouter);
 router.use("/customers",       tc, customersRouter);
@@ -306,6 +308,7 @@ router.use("/product-qa",                tc, productQaRouter);
 router.use("/posts",                     postCommentsRouter);
 router.use("/posts",                     postCaptionsRouter);
 router.use("/posts",                     tc, postsRouter);
+router.use("/fits",                      fitsRouter); // stitches, buyer fit checks, brand repost requests
 router.use("/feed",                      feedRouter); // buyer-scoped (For You ranking + event ingestion); no tc
 router.use("/reports",                   reportsRouter);
 router.use("/moderation",                auditModerationActions, moderationRouter);

@@ -54,6 +54,7 @@ import { LaunchCountdown } from '@/components/products/LaunchCountdown';
 import { PreOrderShipBy } from '@/components/products/PreOrderShipBy';
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
 import { CompleteTheFit } from '@/components/products/CompleteTheFit';
+import { FitChecksStrip } from '@/components/products/FitChecksStrip';
 import { ProductVideo } from '@/components/products/ProductVideo';
 import { ProductQuestionsSection } from '@/components/ProductQuestionsSection';
 import { SizeRecommendationBadge, RecommendedTag, useSizeBadgeModel } from '@/components/SizeRecommendationBadge';
@@ -1306,6 +1307,9 @@ export default function BuyerProductDetailScreen() {
 
           {/* Worn in these videos */}
           <WornInVideos productId={product.id} productName={product.name} />
+
+          {/* Fit checks — buyers' posts wearing it (verified purchases). */}
+          <FitChecksStrip productId={product.id} productName={product.name} />
 
           <CompleteTheFit productId={product.id} />
 

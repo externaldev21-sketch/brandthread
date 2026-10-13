@@ -46,6 +46,7 @@ import { CaptionsOverlay, type CaptionSegment } from '@/components/social/Captio
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useCaptionsPreference, useReadyCaptionTrack } from '@/lib/captions';
 import { LocationTag } from '@/components/social/LocationTag';
+import { usePostFits } from '@/components/social/PostFits';
 
 function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () => void; captions?: CaptionSegment[] }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; p.timeUpdateEventInterval = 0.25; });
@@ -208,6 +209,7 @@ export default function BuyerPostViewer() {
   // When post is null (not yet loaded or not found in my posts), assume non-owner
   // so report is visible and owner-only controls are hidden.
   const isOwner = post !== null && post.authorId === MY_USER_ID;
+  const fits = usePostFits({ postId: params.postId, isOwner });
 
   const loadPost = useCallback(async () => {
     let found: BuyerPost | null = null;
@@ -314,7 +316,10 @@ export default function BuyerPostViewer() {
       <ScreenHeader
         title={authorName}
         onBack={() => goBackOr(router)}
-        actions={[{ icon: 'send', onPress: handleShare, accessibilityLabel: 'Share' }]}
+        actions={[
+          { icon: 'send', onPress: handleShare, accessibilityLabel: 'Share' },
+          ...(fits.openMenu ? [{ icon: 'more-horizontal' as const, onPress: fits.openMenu, accessibilityLabel: 'More options' }] : []),
+        ]}
       />
       {tileExpandOverlay}
 
@@ -375,6 +380,8 @@ export default function BuyerPostViewer() {
             />
           </View>
         ) : null}
+
+        {fits.info}
 
         {post?.location ? (
           <LocationTag location={post.location} style={{ marginHorizontal: SP.md, marginTop: SP.sm }} />

@@ -1583,6 +1583,9 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="buyer-settings-menu"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-post-viewer"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="quote-post"                options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="stitch-post"               options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="fit-check-product"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="repost-request"            options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-drop-detail"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-drops"              options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-category"           options={{ headerShown: false, animation: 'ios_from_right' }} />
