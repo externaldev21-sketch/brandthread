@@ -24,6 +24,8 @@ type Customer = {
   id: string;
   name: string;
   email: string;
+  /** @username for signed-in buyers (no account email is shared). */
+  handle?: string | null;
   phone?: string;
   totalSpentCents: number;
   orderCount: number;
@@ -67,6 +69,9 @@ export default function CustomerOrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestGeneration = useRef(0);
+  // The server counts non-cancelled orders (lifetime spend is net of refunds);
+  // the history below still lists every order, cancelled ones included.
+  const orderCount = typeof customer?.orderCount === 'number' ? customer.orderCount : orders.length;
 
   useEffect(() => {
     requestGeneration.current += 1;
@@ -139,7 +144,9 @@ export default function CustomerOrdersScreen() {
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={[s.custName, { color: colors.foreground }]}>{customer.name}</Text>
-                  <Text style={[s.custEmail, { color: colors.mutedForeground }]}>{customer.email}</Text>
+                  {customer.email || customer.handle ? (
+                    <Text style={[s.custEmail, { color: colors.mutedForeground }]}>{customer.email || customer.handle}</Text>
+                  ) : null}
                   {customer.phone ? <Text style={[s.custEmail, { color: colors.mutedForeground }]}>{customer.phone}</Text> : null}
                 </View>
               </View>
@@ -147,7 +154,7 @@ export default function CustomerOrdersScreen() {
               {/* Stats */}
               <View style={[s.statsRow, { backgroundColor: colors.surface }]}>
                 <View style={s.stat}>
-                  <Text style={[s.statVal, { color: colors.foreground }]}>{orders.length}</Text>
+                  <Text style={[s.statVal, { color: colors.foreground }]}>{orderCount}</Text>
                   <Text style={[s.statLabel, { color: colors.mutedForeground }]}>Orders</Text>
                 </View>
                 <View style={[s.statDiv, { backgroundColor: colors.border }]} />
@@ -158,8 +165,8 @@ export default function CustomerOrdersScreen() {
                 <View style={[s.statDiv, { backgroundColor: colors.border }]} />
                 <View style={s.stat}>
                   <Text style={[s.statVal, { color: colors.foreground }]}>
-                    {customer.totalSpentCents > 0 && orders.length > 0
-                      ? cents(Math.round(customer.totalSpentCents / orders.length))
+                    {customer.totalSpentCents > 0 && orderCount > 0
+                      ? cents(Math.round(customer.totalSpentCents / orderCount))
                       : '—'}
                   </Text>
                   <Text style={[s.statLabel, { color: colors.mutedForeground }]}>Avg order</Text>
