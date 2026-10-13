@@ -90,7 +90,7 @@ None. No third-party service, no key, and no paid API are involved. In the signe
   ```
 - I re-ran all 31 API test files that import the posts, feed or public routers on this branch and on `origin/dev`. **No new failures.** The 24 failures that remain also fail on dev: post-slide-validation needs `PRIVATE_OBJECT_DIR`, and post-quotes, media-moderation and profile-privacy fail for reasons outside these files. `connectivity-dm-routing` failed once on this branch, then passed twice in a row on re-run, so it is flaky and not touched here.
 - Mobile: `lib/captionMentions.test.ts` (7 tests). `lib/createPost/__tests__/publish.test.ts` now mocks `postExtrasService` and asserts that `syncPostExtras('p1', details, {editing:false})` is called after create.
-- Full mobile vitest, compared as FAIL lists: origin/dev has 119 failing entries, and this branch has the same 119 with **0 new**.
+- Full mobile vitest, compared as FAIL lists: origin/dev has 119 failing entries and this branch has 118, with **0 new** (`tests/a11y-icon-only-lint.test.ts` now passes on this branch).
 - `tsc --noEmit`: api-server 0 errors and mobile 0 errors (after `tsc --build` of the libs).
 - Screenshots come from `node artifacts/mobile/scripts/f6-mentions-bts-screenshots.mjs` at 390x844 and are saved in `docs/pr-assets/mentions-bts/ours/`.
 
