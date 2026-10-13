@@ -1089,7 +1089,7 @@ const styles = StyleSheet.create({
   returnReason: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   rateName: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   rateSub: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  rateAmount: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  rateAmount: { fontSize: 14, fontFamily: 'Inter_700Bold', fontVariant: ['tabular-nums'] },
   shipFromRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowLabelStrong: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   countryPill: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 8 },

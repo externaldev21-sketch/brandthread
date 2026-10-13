@@ -1035,7 +1035,7 @@ const styles = StyleSheet.create({
   infoBox:         { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1 },
   infoBoxText:     { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 18 },
   textInputField:  { borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, paddingVertical: SP.sm, fontSize: FS.base, fontFamily: FONT.regular, marginTop: SP.xs },
-  charCount:       { fontSize: FS.xs, fontFamily: FONT.regular, alignSelf: 'flex-end', marginTop: 2 },
+  charCount:       { fontSize: FS.xs, fontFamily: FONT.regular, alignSelf: 'flex-end', marginTop: 2, fontVariant: ['tabular-nums'] },
   textArea:        { borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, paddingVertical: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, minHeight: 70, marginTop: SP.xs },
   ctaChip:         { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
   ctaChipText:     { fontSize: FS.sm, fontFamily: FONT.semibold },

@@ -216,7 +216,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   mfrUnitCost:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
   mfrStats: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: SP.sm },
   mfrStat:  { flex: 1, alignItems: 'center', gap: 3 },
-  mfrStatValue:{ fontSize: FS.base, fontFamily: FONT.bold, color: colors.foreground },
+  mfrStatValue:{ fontSize: FS.base, fontFamily: FONT.bold, color: colors.foreground, fontVariant: ['tabular-nums'] },
   mfrStatLabel:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
   mfrWarning:{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm, paddingTop: SP.sm, borderTopWidth: 1, borderTopColor: colors.border },
   mfrWarningText:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.subtle },

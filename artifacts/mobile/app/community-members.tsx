@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   searchWrap: { paddingHorizontal: SP.md, paddingTop: SP.md },
   pad: { paddingHorizontal: SP.md, paddingTop: SP.sm },
-  count: { fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: SP.xs },
+  count: { fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: SP.xs, fontVariant: ['tabular-nums'] },
   notice: { fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 19, marginVertical: SP.sm },
   section: { marginTop: SP.md },
   settings: { marginTop: SP.md, marginBottom: 0 },

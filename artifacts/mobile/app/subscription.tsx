@@ -637,7 +637,7 @@ const createStyles = (theme: AppThemePreset) => {
   planName:           { color: FG, fontSize: FS.lg, fontFamily: FONT.semibold },
   planTagline:        { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   planPriceCol:       { alignItems: 'flex-end' },
-  planPrice:          { color: FG, fontSize: FS.xl, fontFamily: FONT.semibold },
+  planPrice:          { color: FG, fontSize: FS.xl, fontFamily: FONT.semibold, fontVariant: ['tabular-nums'] },
   planPeriod:         { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular },
   featureList:        { gap: SP.sm, marginBottom: SP.md },
   featureRow:         { flexDirection: 'row', alignItems: 'center', gap: SP.sm },

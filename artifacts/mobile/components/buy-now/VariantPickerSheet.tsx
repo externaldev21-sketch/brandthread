@@ -275,7 +275,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   thumb: { width: 68, height: 68, borderRadius: RADIUS.md, backgroundColor: theme.cardElevated },
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   productName: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
-  productPrice: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.accent, marginTop: 3 },
+  productPrice: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.accent, marginTop: 3, fontVariant: ['tabular-nums'] },
   lowStockRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   lowStockText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.warning },
   optionSection: { marginBottom: SP.lg },

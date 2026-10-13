@@ -156,7 +156,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   breakRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm + 1 },
   breakLabel:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },
   breakSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
-  breakRevenue:{ fontSize: FS.base, fontFamily: FONT.bold, color: colors.foreground },
+  breakRevenue:{ fontSize: FS.base, fontFamily: FONT.bold, color: colors.foreground, fontVariant: ['tabular-nums'] },
   breakShare:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
   xRow:     { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   xLabel:   { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.subtle },

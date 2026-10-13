@@ -176,12 +176,12 @@ function makeStyles(ck: CheckoutColors) {
     center: { alignItems: 'center', paddingTop: SP.xl, gap: SP.xs },
     emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text },
     label: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1, textTransform: 'uppercase', color: ck.muted },
-    total: { fontFamily: FONT.bold, fontSize: 34, color: ck.text, marginTop: SP.xs },
+    total: { fontFamily: FONT.bold, fontSize: 34, color: ck.text, marginTop: SP.xs, fontVariant: ['tabular-nums'] },
     fine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.muted },
     cardWrap: { marginTop: SP.md },
     history: { paddingTop: SP.sm, gap: SP.sm },
     historyRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.xs },
     historyLabel: { fontFamily: FONT.medium, fontSize: FS.base, color: ck.text },
-    historyAmount: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
+    historyAmount: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text, fontVariant: ['tabular-nums'] },
   });
 }

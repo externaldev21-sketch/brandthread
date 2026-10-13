@@ -128,6 +128,6 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   icon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   label: { fontFamily: FONT.medium, fontSize: FS.sm },
   date: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 1 },
-  amount: { fontFamily: FONT.bold, fontSize: FS.sm },
-  runningBalance: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 1 },
+  amount: { fontFamily: FONT.bold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
+  runningBalance: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 1, fontVariant: ['tabular-nums'] },
 });

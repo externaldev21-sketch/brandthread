@@ -1292,6 +1292,7 @@ const createStyles = (theme: any) => {
     letterSpacing: 0.5,
   },
   sectionCount: {
+    fontVariant: ['tabular-nums'],
     fontSize: FS.xs,
     fontFamily: FONT.medium,
     color: SUBTLE,
@@ -1452,6 +1453,7 @@ const createStyles = (theme: any) => {
     flexShrink: 0,
   },
   orderAmount: {
+    fontVariant: ['tabular-nums'],
     fontSize: FS.sm,
     fontFamily: FONT.bold,
     color: FG,
@@ -1611,6 +1613,7 @@ const createStyles = (theme: any) => {
     borderTopColor: BORDER_ACTIVE,
   },
   bulkCount: {
+    fontVariant: ['tabular-nums'],
     fontSize: FS.sm,
     fontFamily: FONT.bold,
     color: FG,

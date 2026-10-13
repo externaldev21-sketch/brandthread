@@ -754,6 +754,7 @@ const s = StyleSheet.create({
     fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginTop: 4, minHeight: 32,
   },
   catalogPrice: {
+    fontVariant: ['tabular-nums'],
     fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT,
   },
   catalogMeta: {
@@ -769,6 +770,7 @@ const s = StyleSheet.create({
     fontSize: 10, fontFamily: FONT.regular, color: SUBTLE,
   },
   tierMiniPrice: {
+    fontVariant: ['tabular-nums'],
     fontSize: 10, fontFamily: FONT.semibold, color: FG,
   },
 });

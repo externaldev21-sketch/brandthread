@@ -27,6 +27,19 @@ export function formatCentsCompact(cents: number): string {
 }
 
 /**
+ * Compact whole-dollar label for chart axes and bar values: whole dollars
+ * under $1,000 ("$842"), then the same K/M/B form as every other short
+ * number in the app ("$1.2K", "$12.4K") — one rule, uppercase suffix.
+ */
+export function formatDollarsCompact(cents: number): string {
+  const sign = cents < 0 ? '-' : '';
+  const dollars = Math.round(Math.abs(cents) / 100);
+  if (dollars < 1000) return `${sign}$${dollars}`;
+  const short = dollars < 10_000 ? tryScale(dollars, 1_000, 'K') : formatCompactCount(dollars);
+  return `${sign}$${short}`;
+}
+
+/**
  * One decimal place, scaled by threshold, with its suffix — but only when
  * the rounded result still fits under 1000 in that unit (e.g. 999.95K must
  * not render as "1000.0K"); returns null to signal the caller should retry

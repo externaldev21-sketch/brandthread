@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth,
   },
   topLine: { flexDirection: 'row', alignItems: 'baseline', gap: SP.sm },
-  amount: { fontSize: FS.md, fontFamily: FONT.bold },
+  amount: { fontSize: FS.md, fontFamily: FONT.bold, fontVariant: ['tabular-nums'] },
   meta: { fontSize: FS.sm, fontFamily: FONT.regular },
   chips: { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
   chip: {

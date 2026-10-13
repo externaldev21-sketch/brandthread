@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   expName: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   expMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   expDate: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  expAmount: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  expAmount: { fontSize: 14, fontFamily: 'Inter_600SemiBold', fontVariant: ['tabular-nums'] },
   docRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   docIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   docLabel: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },

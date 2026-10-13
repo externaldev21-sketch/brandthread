@@ -115,5 +115,5 @@ const styles = StyleSheet.create({
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 20 },
   badge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontSize: FS.xs, fontFamily: FONT.bold },
-  quietCount: { fontSize: FS.xs, fontFamily: FONT.medium },
+  quietCount: { fontSize: FS.xs, fontFamily: FONT.medium, fontVariant: ['tabular-nums'] },
 });

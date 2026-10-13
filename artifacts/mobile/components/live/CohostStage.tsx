@@ -162,7 +162,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: RADIUS.pill,
     paddingHorizontal: 10, paddingVertical: 5, backgroundColor: theme.card,
   },
-  countText: { color: theme.text, fontFamily: FONT.semibold, fontSize: 12 },
+  countText: { color: theme.text, fontFamily: FONT.semibold, fontSize: 12, fontVariant: ['tabular-nums'] },
   chat: { position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: 220, paddingHorizontal: SP.md },
   chatContent: { gap: 4 },
   chatLine: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.meta },

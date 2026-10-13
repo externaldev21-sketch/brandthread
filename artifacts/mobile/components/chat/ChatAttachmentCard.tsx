@@ -197,6 +197,7 @@ const s = StyleSheet.create({
     fontFamily: FONT.semibold,
   },
   price: {
+    fontVariant: ['tabular-nums'],
     fontSize: FS.sm,
     fontFamily: FONT.bold,
     marginTop: 2,

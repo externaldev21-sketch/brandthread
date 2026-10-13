@@ -262,5 +262,5 @@ const s = StyleSheet.create({
   orderDate:    { fontSize: 11, fontFamily: 'Inter_400Regular' },
   trackingText: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', fontStyle: 'italic' },
   orderRight:   { alignItems: 'flex-end', gap: 6 },
-  orderTotal:   { fontSize: FS.sm, fontFamily: 'Inter_700Bold' },
+  orderTotal:   { fontSize: FS.sm, fontFamily: 'Inter_700Bold', fontVariant: ['tabular-nums'] },
 });

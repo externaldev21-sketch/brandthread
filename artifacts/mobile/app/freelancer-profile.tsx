@@ -419,7 +419,7 @@ export default function FreelancerProfileScreen() {
                 </View>
                 <View style={[styles.feeRow, { marginTop: 2 }]}>
                   <Text style={[styles.feeLabel, { color: theme.text }]}>Freelancer receives</Text>
-                  <Text style={[styles.feeValue, { color: theme.success }]}>{formatPrice(netCents)}</Text>
+                  <Text style={[styles.feeValue, { color: theme.text }]}>{formatPrice(netCents)}</Text>
                 </View>
               </View>
             )}
@@ -484,7 +484,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   statBox: { flex: 1, alignItems: 'center', gap: 2 },
   statDivider: { width: 1, height: 28, backgroundColor: theme.border },
-  statValue: { color: theme.text, fontSize: FS.sm, fontFamily: FONT.bold },
+  statValue: { color: theme.text, fontSize: FS.sm, fontFamily: FONT.bold, fontVariant: ['tabular-nums'] },
   statLabel: { color: theme.subtle, fontSize: FS.xs, fontFamily: FONT.regular },
   payBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,

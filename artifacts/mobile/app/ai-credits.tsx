@@ -344,7 +344,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   radioOn: { borderColor: theme.text },
   radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: theme.text },
   packTitle: { flex: 1, fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
-  packPrice: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.text },
+  packPrice: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.text, fontVariant: ['tabular-nums'] },
   footnote: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', marginTop: SP.sm },
   historyRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 60 },
   historyDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.borderSubtle },

@@ -263,7 +263,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => {
   fieldRow: { gap: 6 },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   fieldLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
-  charCount: { fontSize: FS.xs, fontFamily: FONT.medium },
+  charCount: { fontSize: FS.xs, fontFamily: FONT.medium, fontVariant: ['tabular-nums'] },
   hint: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 4 },
   input: {
     fontSize: FS.base, fontFamily: FONT.regular, color: FG,

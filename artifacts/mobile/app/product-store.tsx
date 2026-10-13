@@ -771,11 +771,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexWrap: 'wrap',
   },
   retailPrice: {
+    fontVariant: ['tabular-nums'],
     fontSize: FS.xl,
     fontFamily: FONT.bold,
     color: FG,
   },
   comparePrice: {
+    fontVariant: ['tabular-nums'],
     fontSize: FS.md,
     fontFamily: FONT.regular,
     color: MUTED,
@@ -788,6 +790,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingVertical: 3,
   },
   discountText: {
+    fontVariant: ['tabular-nums'],
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: RED,
@@ -801,6 +804,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: 3,
   },
   starCount: {
+    fontVariant: ['tabular-nums'],
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     color: MUTED,
@@ -994,6 +998,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: FG,
   },
   relatedPrice: {
+    fontVariant: ['tabular-nums'],
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
     color: MUTED,

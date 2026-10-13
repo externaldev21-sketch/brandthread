@@ -614,7 +614,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   phoneStatRow: { flexDirection: 'row', gap: 8 },
   phoneStatCard: { flex: 1, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, padding: 8, gap: 2 },
   phoneStatLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
-  phoneStatValue: { fontSize: 13, fontFamily: FONT.semibold, color: theme.text },
+  phoneStatValue: { fontSize: 13, fontFamily: FONT.semibold, color: theme.text, fontVariant: ['tabular-nums'] },
   phoneChart: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 4,
     height: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, padding: 6,

@@ -48,6 +48,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { diffCount } from '@/lib/engagementUtils';
 import { identityOrNone } from '@/lib/animationUtils';
+import { TABULAR_NUMS } from '@/constants/typography';
 
 const TICK_MS = 240;
 const TICK_EASING = Easing.out(Easing.cubic);
@@ -113,7 +114,7 @@ function Roll({
   );
 }
 
-export function TickingCount({ value, style, lineHeight = 15, testID }: TickingCountProps) {
+export function TickingCount({ value, style: styleProp, lineHeight = 15, testID }: TickingCountProps) {
   // The value this component is at rest showing (no roll in flight).
   const [displayed, setDisplayed] = useState(value);
   // The (from -> to) pair for an in-progress roll, or null at rest.
@@ -154,6 +155,9 @@ export function TickingCount({ value, style, lineHeight = 15, testID }: TickingC
   const from = tick ? tick.from : displayed;
   const to = tick ? tick.to : displayed;
   const diff = diffCount(to, from);
+  // Tabular figures: every digit is the same width, so a rolling count
+  // never nudges the icon or the characters beside it.
+  const style: StyleProp<TextStyle> = [TABULAR_NUMS, styleProp];
 
   if (diff.kind === 'none') {
     return <Text style={style} testID={testID}>{diff.text}</Text>;

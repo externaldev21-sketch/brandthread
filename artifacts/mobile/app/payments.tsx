@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
 
   payoutInfo: { flex: 1 },
   payoutLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium', marginBottom: 3, letterSpacing: 0.3 },
-  payoutAccount: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  payoutAccount: { fontSize: 12, fontFamily: 'Inter_600SemiBold', fontVariant: ['tabular-nums'] },
   viewPayoutsLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
 
 
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   sectionDot: { width: 8, height: 8, borderRadius: 4 },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', flex: 1 },
-  sectionCount: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  sectionCount: { fontSize: 13, fontFamily: 'Inter_400Regular', fontVariant: ['tabular-nums'] },
 
   // Note banners
   preOrderNote: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 12 },

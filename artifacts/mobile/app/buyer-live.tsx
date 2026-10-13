@@ -735,7 +735,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   purchaseClose: { width: 38, height: 38, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: BORDER },
   purchaseScroll: { marginTop: SP.sm },
   purchaseContent: { paddingBottom: SP.md, gap: SP.sm },
-  purchasePrice: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl },
+  purchasePrice: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl, fontVariant: ['tabular-nums'] },
   fieldLabel: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: SP.xs },
   variantRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
   variantChip: { borderWidth: 1, borderColor: BORDER, borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: SP.xs },

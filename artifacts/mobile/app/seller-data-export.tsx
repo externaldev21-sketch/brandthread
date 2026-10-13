@@ -214,5 +214,5 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   countsRow:    { flexDirection: 'row', gap: 10, marginTop: 4 },
   countChip:    { flex: 1, backgroundColor: theme.surface, borderRadius: 8, padding: 10, alignItems: 'center', gap: 2 },
   countVal:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: theme.text },
-  countLabel:   { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: theme.muted },
+  countLabel:   { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: theme.muted, fontVariant: ['tabular-nums'] },
 });

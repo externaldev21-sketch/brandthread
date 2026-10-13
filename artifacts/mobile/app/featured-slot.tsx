@@ -281,7 +281,7 @@ function makeStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
   },
   optionOn: { borderColor: FG },
   optionTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
-  optionPrice: { fontFamily: FONT.bold, fontSize: FS.md, color: FG },
+  optionPrice: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, fontVariant: ['tabular-nums'] },
   meta: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginTop: 2 },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: MUTED, alignItems: 'center', justifyContent: 'center' },
   radioOn: { borderColor: FG },

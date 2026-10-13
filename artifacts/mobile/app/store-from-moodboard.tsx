@@ -515,7 +515,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   card: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.md },
   bannerRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start' },
   bannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
-  countLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, textAlign: 'center', marginBottom: SP.sm },
+  countLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, textAlign: 'center', marginBottom: SP.sm, fontVariant: ['tabular-nums'] },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.md },
   imageWrap: { position: 'relative' },
   gridImage: { width: 120, height: 120, borderRadius: RADIUS.md },

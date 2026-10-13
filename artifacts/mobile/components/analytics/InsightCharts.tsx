@@ -16,6 +16,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { TrendChip } from '@/components/analytics/AnalyticsKit';
 import { bucketLabel, selectEvenlySpacedIndices } from '@/lib/sellerHomeChartLabels';
 import type { InsightRange } from '@/services/sellerInsightsService';
+import { formatDollarsCompact } from '@/lib/compactFormat';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -202,11 +203,8 @@ export function ShareBarRow({ label, value, pct, last }: { label: string; value:
   );
 }
 
-/** Axis money labels: whole dollars under $1k, "$1.2k" above. */
-export function formatAxisMoney(cents: number): string {
-  const d = cents / 100;
-  return d >= 1000 ? `$${(d / 1000).toFixed(1).replace(/\.0$/, '')}k` : `$${Math.round(d)}`;
-}
+/** Axis money labels: whole dollars under $1K, "$1.2K" above. */
+export const formatAxisMoney = formatDollarsCompact;
 
 /** Short, honest empty line inside a card (no filler copy). */
 export function EmptyLine({ text }: { text: string }) {

@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   linkText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', textDecorationLine: 'underline' },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 4 },
-  price: { fontSize: 28, fontFamily: 'Inter_700Bold' },
+  price: { fontSize: 28, fontFamily: 'Inter_700Bold', fontVariant: ['tabular-nums'] },
   priceSuffix: { fontSize: 13, fontFamily: 'Inter_400Regular' },
   nextBillText: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 14 },
   infoBox: { flexDirection: 'row', gap: 10, borderRadius: 12, padding: 14, marginBottom: 14 },
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
   billRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, gap: 10 },
   billId: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   billNote: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  billAmount: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  billAmount: { fontSize: 14, fontFamily: 'Inter_600SemiBold', fontVariant: ['tabular-nums'] },
   statusPill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   statusText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
 });

@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   textBtnLabel: { fontFamily: FONT.semibold, fontSize: FS.base },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   label: { fontFamily: FONT.semibold, fontSize: FS.base },
-  count: { fontFamily: FONT.regular, fontSize: FS.meta },
+  count: { fontFamily: FONT.regular, fontSize: FS.meta, fontVariant: ['tabular-nums'] },
   field: { minHeight: COMP.inputH, borderRadius: RADIUS.md, paddingHorizontal: SP.md, fontFamily: FONT.regular, fontSize: FS.base },
   multiline: { minHeight: 96, paddingTop: SP.md - 2, textAlignVertical: 'top' },
   note: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17 },

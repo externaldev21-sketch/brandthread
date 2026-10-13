@@ -312,5 +312,5 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 4,
     borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3,
   },
-  chipCount: { fontSize: FS.xs, fontFamily: FONT.semibold },
+  chipCount: { fontSize: FS.xs, fontFamily: FONT.semibold, fontVariant: ['tabular-nums'] },
 });

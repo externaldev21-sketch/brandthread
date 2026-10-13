@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   liveChip: { alignSelf: 'flex-start', borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1, marginBottom: 3 },
   liveChipText: { fontFamily: FONT.bold, fontSize: 8.5, letterSpacing: 0.8 },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  price: { fontFamily: FONT.bold, fontSize: FS.sm, marginTop: 2 },
+  price: { fontFamily: FONT.bold, fontSize: FS.sm, marginTop: 2, fontVariant: ['tabular-nums'] },
   buy: { height: 32, paddingHorizontal: 16, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   buyText: { fontFamily: FONT.bold, fontSize: FS.xs },
 });

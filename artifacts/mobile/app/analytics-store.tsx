@@ -197,7 +197,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   funnelLeft:{ flex: 1, gap: 6 },
   funnelLabel:{ fontSize: FS.sm, fontFamily: FONT.medium, color: colors.foreground },
   funnelRight:{ alignItems: 'flex-end', marginLeft: SP.sm, minWidth: 60 },
-  funnelCount:{ fontSize: FS.base, fontFamily: FONT.bold, color: colors.foreground },
+  funnelCount:{ fontSize: FS.base, fontFamily: FONT.bold, color: colors.foreground, fontVariant: ['tabular-nums'] },
   funnelDrop:{ fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   secRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm + 3, minHeight: COMP.minTouchTarget },
   secLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground, marginBottom: 4 },

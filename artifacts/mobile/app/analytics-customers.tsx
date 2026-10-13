@@ -242,7 +242,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   cohortLabelCell:{ width: 90, textAlign: 'left', fontFamily: FONT.medium },
   locRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm + 1, minHeight: COMP.minTouchTarget },
   locName:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },
-  locCount: { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },
+  locCount: { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground, fontVariant: ['tabular-nums'] },
   locShare: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
   customerRow: { flexDirection: 'row', alignItems: 'center', minHeight: COMP.minTouchTarget, paddingHorizontal: SP.md, paddingVertical: SP.sm + 1, gap: SP.sm },
   customerRank: { width: 28, height: 28, borderRadius: RADIUS.pill, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },

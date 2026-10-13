@@ -103,7 +103,7 @@ const st = StyleSheet.create({
   statRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: SP.md },
   statLabel: { fontFamily: FONT.semibold, fontSize: FS.base },
   statNote: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
-  statValue: { fontFamily: FONT.bold, fontSize: FS.base },
+  statValue: { fontFamily: FONT.bold, fontSize: FS.base, fontVariant: ['tabular-nums'] },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.pill, alignSelf: 'flex-start' },
   pillText: { fontFamily: FONT.semibold, fontSize: FS.xs },
   btn: { minHeight: 48, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md },

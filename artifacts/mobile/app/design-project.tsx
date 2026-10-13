@@ -101,7 +101,7 @@ const sh = StyleSheet.create({
   root:     { paddingHorizontal: SP.lg, paddingTop: SP.md, paddingBottom: SP.sm },
   barBg:    { height: 3, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden', marginBottom: SP.md },
   barFill:  { height: 3, borderRadius: 2 },
-  stepCount:{ fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED, marginBottom: SP.xs },
+  stepCount:{ fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED, marginBottom: SP.xs, fontVariant: ['tabular-nums'] },
   title:    { fontFamily: FONT.bold, fontSize: FS.xl, color: FG, marginBottom: 4 },
   subtitle: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
 });

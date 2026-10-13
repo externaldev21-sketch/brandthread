@@ -253,7 +253,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   heroChange:{ fontSize: FS.xs, fontFamily: FONT.medium, color: colors.success },
   recoveredRow:{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   recoveredText:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
-  recoveredAmount:{ fontSize: FS.sm, fontFamily: FONT.bold },
+  recoveredAmount:{ fontSize: FS.sm, fontFamily: FONT.bold, fontVariant: ['tabular-nums'] },
   rowItem:{ flexDirection: 'row', alignItems: 'center', minHeight: COMP.minTouchTarget, paddingHorizontal: SP.md, paddingVertical: SP.sm + 1, gap: SP.sm },
   rowIcon:{ width: 32, height: 32, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   rowTitle:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground, marginBottom: 2 },

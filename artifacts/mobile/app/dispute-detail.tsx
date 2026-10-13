@@ -622,7 +622,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   alertClaim:         { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
   alertAmountRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: SP.xs },
   alertAmountLabel:   { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  alertAmount:        { fontSize: FS.lg, fontFamily: FONT.bold, color: RED },
+  alertAmount:        { fontSize: FS.lg, fontFamily: FONT.bold, color: RED, fontVariant: ['tabular-nums'] },
   deadlineRow:        { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.xs },
   deadlineText:       { fontSize: FS.sm, fontFamily: FONT.semibold },
   claimBlock:         {

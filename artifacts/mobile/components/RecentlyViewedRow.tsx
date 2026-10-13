@@ -93,5 +93,5 @@ const s = StyleSheet.create({
   // Two fixed lines so long product names wrap instead of clipping with an ellipsis,
   // and every card in the row stays the same height.
   name: { fontSize: FS.xs, lineHeight: 15, height: 30, fontFamily: FONT.medium, marginTop: 6 },
-  price: { fontSize: FS.xs, fontFamily: FONT.bold, marginTop: 2 },
+  price: { fontSize: FS.xs, fontFamily: FONT.bold, marginTop: 2, fontVariant: ['tabular-nums'] },
 });
