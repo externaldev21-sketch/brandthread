@@ -468,6 +468,8 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'waitlist_restock':
     case 'product_restocked': return 'refresh-cw';
     case 'new_product': return 'star';
+    case 'digest': return 'layers';
+    case 'order_anniversary': return 'calendar';
     case 'new_order_received': return 'shopping-bag';
     case 'payout_sent': return 'dollar-sign';
     case 'low_stock': return 'alert-triangle';
@@ -573,6 +575,9 @@ export function groupedPeopleHref(row: Pick<ActivityRow, 'type' | 'ids'>): strin
   return `/activity-people?type=${q(row.type)}&ids=${q(ids)}`;
 }
 
+/** Home with its Following tab selected (app/(tabs)/feed.tsx reads `tab`). */
+export const FOLLOWING_FEED_HREF = '/(buyer)?tab=following';
+
 /**
  * Where tapping a row goes, or null when there is nowhere useful to go.
  * Routes match the push-notification handler (lib/notificationNavigation.ts)
@@ -656,6 +661,9 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return '/payouts';
     case 'subscription_invoice':
       return '/subscription';
+    case 'following_feed':
+      // Weekly "This week from brands you follow" digest.
+      return FOLLOWING_FEED_HREF;
     default:
       break;
   }

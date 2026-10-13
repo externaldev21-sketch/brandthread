@@ -95,6 +95,15 @@ export function createNotificationResponseHandler(
       router.push('/(buyer)/cart');
       return;
     }
+    // Weekly followed-brands digest opens Home on the Following tab.
+    if (data?.targetType === 'following_feed') {
+      const href = activityHref({
+        id: '', category: 'social', title: '', body: '', isRead: true, createdAt: '',
+        type: typeof data.type === 'string' ? data.type : '', targetType: data.targetType,
+      });
+      if (href) router.push(href);
+      return;
+    }
     if (data?.targetType === 'drop' && typeof data.targetId === 'string' && data.targetId) {
       router.push(`/buyer-drop-detail?id=${encodeURIComponent(data.targetId)}`);
       return;

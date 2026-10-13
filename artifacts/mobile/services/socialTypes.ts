@@ -542,6 +542,7 @@ export type NotificationType =
   | 'product_restocked' | 'drop_live' | 'live_reminder' | 'live_started' | 'preorder_closing'
   | 'price_drop' | 'saved_product_update'
   | 'new_friend_message' | 'new_seller_reply' | 'new_order_message' | 'message_request'
+  | 'digest' | 'order_anniversary'
   | 'system' | 'marketing';
 
 export interface Notification {

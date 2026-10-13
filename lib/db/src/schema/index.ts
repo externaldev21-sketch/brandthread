@@ -6,6 +6,7 @@ export * from './freelancers';
 export * from './subscriptionEntitlements';
 export * from './productVariantsStock';
 export * from './security';
+export * from './retentionPushes';
 export * from './money';
 export * from './productLaunches';
 export * from './threadCash';
@@ -182,6 +183,9 @@ export const users = pgTable('users', {
   quietHoursStart:    text('quiet_hours_start'),
   quietHoursEnd:       text('quiet_hours_end'),
   quietHoursTimezone: text('quiet_hours_timezone').notNull().default('UTC'),
+  // Device IANA timezone (e.g. 'Europe/London'), reported with the push token
+  // (POST /api/push/register, migration 532). Null until a device reports it.
+  timezone: text('timezone'),
   // A tombstone is retained after an account erasure request.  Keeping the
   // Clerk subject prevents a delayed client sync from creating a fresh profile.
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
