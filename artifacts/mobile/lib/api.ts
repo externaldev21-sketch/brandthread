@@ -40,6 +40,13 @@ import type { MentionPerson, Story, StoryMentionItem, StoryStickerState } from '
 import type { LiveModerationState, LiveCohostCandidate, LiveCohostInvite, LiveCohostPerson } from '@/lib/live/moderationTypes';
 
 /** Server story highlight (GET /api/social/highlights/*). */
+/** GET/PUT /api/notification-prefs/sms — opt-in SMS order updates. */
+export interface SmsOrderUpdatesState {
+  available: boolean;
+  phone: string | null;
+  enabled: boolean;
+}
+
 export interface ServerHighlight {
   id: string; userId: string; title: string;
   coverUrl: string | null; coverEmoji: string | null; coverColor: string | null;
@@ -1619,6 +1626,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           categories: Record<string, boolean>;
           channels: Record<'push' | 'inApp' | 'email', Record<string, boolean>>;
         }>('/api/notification-prefs', body),
+      /** Opt-in SMS order updates. `available` is false when the server has no Twilio keys. */
+      sms: {
+        get: () => get<SmsOrderUpdatesState>('/api/notification-prefs/sms'),
+        update: (body: { enabled: boolean; phone?: string }) =>
+          put<SmsOrderUpdatesState & { codeSentTo?: string }>('/api/notification-prefs/sms', body),
+        verify: (code: string) => post<SmsOrderUpdatesState>('/api/notification-prefs/sms/verify', { code }),
+      },
     },
     logo: {
       generate: (brandName: string, style: string) => postExpensive<any>('/api/logo/generate', { brandName, style }),
