@@ -84,6 +84,11 @@ import { formatCents } from '@/lib/money';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 
 import { BUYER_CART_STEPS } from '@/lib/firstRunTips/content';
+import { GroupShippingLine } from '@/components/cart/GroupShippingLine';
+import { StockLimitNote } from '@/components/cart/StockLimitNote';
+import { useBagShippingRates } from '@/hooks/useBagShippingRates';
+import { bagShippingTotal } from '@/lib/cart/bagShipping';
+import { knownStockLimit, showsLimitNote, stepperMax } from '@/lib/cart/quantityLimit';
 
 import { useScreenInteractive } from '@/lib/perf';
 

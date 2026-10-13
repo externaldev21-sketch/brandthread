@@ -10,12 +10,13 @@ import { Icon } from '@/components/ui/Icon';
 
 import { useColors } from '@/hooks/useColors';
 
-import { haptics, hapticToggle } from '@/lib/haptics';
+import { haptics, hapticToggle, hapticWarning } from '@/lib/haptics';
 
 
 import { FONT, TEXT_DISABLED } from '@/lib/theme';
 
 
+import { stepQuantity } from '@/lib/cart/quantityLimit';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 
 import { radius } from '@/constants/radii';
@@ -40,23 +41,42 @@ export interface QuantityStepperProps {
   onRemoveAtMin?: () => void;
   /** Accessible name for the item, used in the remove label. */
   itemLabel?: string;
+  /** Opt-in: at `max`, + stays pressable (still dimmed) and a tap gives one
+   *  warning haptic and calls this instead of silently doing nothing (the
+   *  cart shows "Only N left"). Omit it and + is disabled at max as before. */
+  onMaxReached?: (max: number) => void;
 }
 
 export function QuantityStepper({
-  value, onChange, min = 1, max = 99, disabled, testID, size = 'default', onRemoveAtMin, itemLabel,
+  value, onChange, min = 1, max = 99, disabled, testID, size = 'default', onRemoveAtMin, itemLabel, onMaxReached,
 }: QuantityStepperProps) {
   const palette = useColors();
   const removeMode = !!onRemoveAtMin && value <= min;
   const canDecrement = !disabled && (value > min || removeMode);
   const canIncrement = !disabled && value < max;
+  // At the limit with onMaxReached: still pressable so the tap can explain itself.
+  const incrementPressable = canIncrement || (!disabled && !!onMaxReached);
   const sm = size === 'sm';
 
   const step = (delta: number) => {
     onChange(Math.min(max, Math.max(min, value + delta)));
   };
 
+  const increment = () => {
+    if (onMaxReached) {
+      const result = stepQuantity(value, 1, min, max);
+      if (result.kind === 'at-max') {
+        hapticWarning();
+        onMaxReached(result.max);
+        return;
+      }
+    }
+    step(1);
+  };
+
   const decrement = () => {
     if (removeMode) {
+      // No tick here: the remove handler gives the line's one haptic.
       onRemoveAtMin?.();
       return;
     }
@@ -88,9 +108,10 @@ export function QuantityStepper({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Increase quantity"
-        disabled={!canIncrement}
-        onPress={() => step(1)}
-        style={[styles.btn, sm && styles.btnSm]}
+        disabled={!incrementPressable}
+        accessibilityHint={!canIncrement && onMaxReached ? `Limit reached, ${max} available` : undefined}
+        onPress={increment}
+        style={[styles.btn, sm && styles.btnSm, !canIncrement && styles.disabled]}
         hitSlop={8}
         testID={testID ? `${testID}-increment` : undefined}
       >

@@ -513,6 +513,7 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
     cart.items[existingIdx] = {
       ...existing,
       quantity: newQty,
+      maxQuantity: variant.inventoryQuantity > 0 ? variant.inventoryQuantity : existing.maxQuantity,
       ...(attribution?.sourceLiveStreamId ? { sourceLiveStreamId: attribution.sourceLiveStreamId } : {}),
     };
   } else {
@@ -870,7 +871,7 @@ export function calculateCartSummary(items: CartItem[], discountTotalCents = 0, 
  * Returns seller-configured rate details in dollars. It deliberately throws on
  * failure so checkout never labels an unavailable rate as free shipping.
  */
-async function fetchShippingRateDetails(
+export async function fetchShippingRateDetails(
   sellerId: string,
   subtotalCents: number,
 ): Promise<{ id: string; name: string; amountCents: number; processingDays: number | null }> {
