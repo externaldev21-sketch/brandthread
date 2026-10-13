@@ -206,8 +206,15 @@ export default function CustomersScreen() {
           return (
             <PressableScale
               key={s.key}
-              onPress={() => { if (!active) { hapticSelection(); setSegment(s.key); } }}
-              style={[styles.segmentTab, active && { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => {
+                if (active) return;
+                hapticSelection();
+                setSegment(s.key);
+                // Top 20 opens ranked by lifetime spend; the sort chips still re-order it.
+                if (s.key === 'top') setSortBy('spend');
+              }}
+              noMinHeight
+              style={[styles.segmentTab, active && { backgroundColor: colors.surface }]}
               accessibilityRole="tab"
               accessibilityLabel={s.label}
               accessibilityState={{ selected: active }}
@@ -360,7 +367,7 @@ const styles = StyleSheet.create({
   custOrders: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   custSpend: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 2 },
   segmentTabs: { flexDirection: 'row', gap: 4, marginBottom: 12 },
-  segmentTab: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1, borderColor: 'transparent' },
+  segmentTab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.sm },
   segmentTabText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   custRight: { alignItems: 'flex-end', justifyContent: 'center' },
   tagsRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },

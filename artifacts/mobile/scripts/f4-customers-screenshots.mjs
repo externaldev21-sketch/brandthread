@@ -7,6 +7,11 @@
  *   node scripts/f4-customers-screenshots.mjs <buildDir> <outDir> <before|after> [width] [height]
  *
  * Defaults to 393x852. Before/after comparisons are captured at 390x844.
+ *
+ * The demo Clerk account is signed in, but `?bt_preview=seller` in the URL
+ * turns on the signed-out-preview API guard (lib/api.ts / serviceConfig.ts),
+ * so the target screens are opened with `?bt_preview=buyer` first in the
+ * query: the real signed-in code path, answered by the fake API below.
  */
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -97,10 +102,24 @@ async function overflowCheck(page, label) {
   console.log(`overflow[${label}]:`, issues.length ? JSON.stringify(issues) : 'none');
 }
 
-async function waitText(page, target, text) {
+async function waitText(page, target, text, retryText = 'Try again', pushFirst = false) {
   for (let attempt = 0; attempt < 6; attempt++) {
-    try { await page.getByText(text, { exact: true }).first().waitFor({ timeout: 12_000 }); return; } catch (error) {
-      if (attempt === 5) throw error;
+    try {
+      // A screen that mounted before the demo session's token was ready shows its retry state.
+      if (pushFirst && attempt === 0) {
+        await page.evaluate((url) => { history.pushState(history.state, '', url); dispatchEvent(new PopStateEvent('popstate')); }, target);
+      }
+      const retry = page.getByText(retryText, { exact: true }).first();
+      await page.getByText(text, { exact: true }).first().or(retry).waitFor({ timeout: 12_000 });
+      if (await retry.isVisible().catch(() => false)) { await retry.click(); await page.waitForTimeout(1500); }
+      await page.getByText(text, { exact: true }).first().waitFor({ timeout: 4_000 });
+      return;
+    } catch (error) {
+      if (attempt === 5) {
+        await page.screenshot({ path: path.join(WORK_DIR, 'f4-customers-debug.png') });
+        console.log(page.url(), (await page.locator('body').innerText()).slice(0, 500));
+        throw error;
+      }
       await page.evaluate((url) => { history.pushState(history.state, '', url); dispatchEvent(new PopStateEvent('popstate')); }, `${target}${target.includes('?') ? '&' : '?'}bt_preview=seller`);
     }
   }
@@ -109,6 +128,10 @@ async function waitText(page, target, text) {
 async function seller(browser, images, origin, opts = {}) {
   const device = { viewport: VIEWPORT, scale: 2, isMobile: true, userAgent: UA };
   const { context, page, activity } = await openContext(browser, { device, role: 'seller', origin, images });
+  if (process.env.F4_DEBUG) {
+    page.on('response', (r) => { if (r.url().startsWith(API)) console.log('RES', r.status(), r.request().method(), r.url()); });
+    page.on('console', (m) => { if (m.type() === 'error') console.log('CONSOLE', m.text().slice(0, 300)); });
+  }
   await context.route(`${API}/**`, async (route) => {
     const request = route.request();
     if (request.method() === 'OPTIONS') return route.fallback();
@@ -149,8 +172,8 @@ async function seller(browser, images, origin, opts = {}) {
 
 async function customers(browser, images, origin) {
   const { context, page, activity } = await seller(browser, images, origin);
-  await openScreen(page, activity, origin, 'seller', '/customers');
-  await waitText(page, '/customers', 'Leo Martins');
+  await openScreen(page, activity, origin, 'seller', '/customers?bt_preview=buyer');
+  await waitText(page, '/customers?bt_preview=buyer', 'Leo Martins');
   await waitForQuietNetwork(activity, 900, 15_000);
   await page.waitForTimeout(800);
   await shot(page, `${MODE}-${TAG}-01-customers`);
@@ -160,7 +183,9 @@ async function customers(browser, images, origin) {
     await page.waitForTimeout(700);
     await shot(page, `${MODE}-${TAG}-02-customers-top-20`);
     await overflowCheck(page, 'top-20');
-    await page.getByText('Leo Martins', { exact: true }).first().click();
+    // The row opens /customer-orders?customerId=<id>; navigate there with the
+    // same query so the signed-in demo account keeps its API access.
+    await waitText(page, '/customer-orders?customerId=buyer_u3&bt_preview=buyer', 'Order History', /^(Try again|Retry)$/, true);
     await page.waitForTimeout(1500);
     await waitForQuietNetwork(activity, 900, 10_000);
     await shot(page, `${MODE}-${TAG}-03-customer-detail`);
@@ -171,8 +196,8 @@ async function customers(browser, images, origin) {
 
 async function push(browser, images, origin) {
   const { context, page, activity } = await seller(browser, images, origin);
-  await openScreen(page, activity, origin, 'seller', '/seller-push-broadcast');
-  await waitText(page, '/seller-push-broadcast', 'Title');
+  await openScreen(page, activity, origin, 'seller', '/seller-push-broadcast?bt_preview=buyer');
+  await waitText(page, '/seller-push-broadcast?bt_preview=buyer', 'Title');
   await waitForQuietNetwork(activity, 900, 15_000);
   await page.waitForTimeout(800);
   await shot(page, `${MODE}-${TAG}-04-push-composer`);
@@ -187,14 +212,16 @@ async function push(browser, images, origin) {
     await overflowCheck(page, 'push-past-buyers');
     await page.getByText('Review', { exact: true }).last().click();
     await page.waitForTimeout(1200);
+    await page.evaluate(() => document.querySelectorAll('*').forEach((e) => { if (e.scrollTop > 0) e.scrollTop = 0; }));
+    await page.waitForTimeout(300);
     await shot(page, `${MODE}-${TAG}-06-push-past-buyers-review`);
     await overflowCheck(page, 'push-review');
   }
   await context.close();
   if (MODE === 'after') {
     const s = await seller(browser, images, origin, { pastBuyersLimited: true });
-    await openScreen(s.page, s.activity, origin, 'seller', '/seller-push-broadcast');
-    await waitText(s.page, '/seller-push-broadcast', 'Title');
+    await openScreen(s.page, s.activity, origin, 'seller', '/seller-push-broadcast?bt_preview=buyer');
+    await waitText(s.page, '/seller-push-broadcast?bt_preview=buyer', 'Title');
     await s.page.getByRole('radio', { name: /Past buyers/ }).click();
     await s.page.waitForTimeout(500);
     await shot(s.page, `${MODE}-${TAG}-07-push-past-buyers-limited`);

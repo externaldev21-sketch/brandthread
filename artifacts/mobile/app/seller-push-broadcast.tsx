@@ -3,6 +3,9 @@
  * live notification preview, then send. One broadcast per rolling 24 hours,
  * enforced by the server; this screen shows when the next one opens.
  * Mobbin reference: Instagram "New reel" share form (rows + bottom Share button).
+ * Audience picker (Followers / Past buyers): Instagram "Audience" screen rows.
+ * Past buyers have their own server-enforced window (one per 7 days, capped
+ * recipients) next to the follower push's 24 hours.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
