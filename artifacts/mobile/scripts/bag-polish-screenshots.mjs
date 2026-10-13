@@ -101,15 +101,17 @@ async function run() {
     await shot(page, '01-bag-top');
     await scrollTo(page, `cart-group-checkout-${SELLER_USER.id}`, 330);
     await shot(page, '02-brand1-footer');
+    await scrollTo(page, 'cart-group-checkout-user_field', 330);
+    await shot(page, '03-brand2-footer');
     await scrollTo(page, 'cart-order-summary', 380);
-    await shot(page, '03-brand2-footer-and-summary');
+    await shot(page, '04-order-summary');
 
     // Stepper: jacket 1 → 5 (its stock), then + once more at the limit.
     await scrollTo(page, `cart-row-${JACKET}`, 160);
     const inc = page.getByTestId(`cart-qty-${JACKET}-increment`);
     for (let i = 0; i < JACKET_STOCK - 1; i++) { await inc.click(); await page.waitForTimeout(800); }
     if (await inc.isEnabled()) { await inc.click(); await page.waitForTimeout(600); }
-    await shot(page, '04-stepper-at-stock-limit');
+    await shot(page, '05-stepper-at-stock-limit');
     const body = await page.evaluate(() => document.body.innerText);
     console.log('  rate calls:', rateCalls.join(', ') || '(none)');
     console.log('  shipping lines:', (body.match(/(Shipping \$[\d.]+|Free shipping)/g) ?? []).join(' | '));
