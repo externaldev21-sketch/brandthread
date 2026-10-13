@@ -19,6 +19,7 @@ import {
 } from "../lib/storeIdentity";
 import { normalizeUploadedImage } from "../lib/productImageResize";
 import { MEDIA_REJECTED_MESSAGE, screenImageBuffer } from "../lib/mediaModeration";
+import { SELLER_CANCEL_WINDOW_HOURS, parseSellerCancelWindowHours } from "../lib/buyerCancellationPolicy";
 
 // ─── Startup migration — add tutorial flag + questionnaire + profile columns ───
 (async () => {
@@ -34,6 +35,7 @@ import { MEDIA_REJECTED_MESSAGE, screenImageBuffer } from "../lib/mediaModeratio
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS logo_url TEXT`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banner_url TEXT`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS store_accent_color TEXT`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS buyer_cancel_window_hours INTEGER`);
   } catch (err) {
     logger.error({ err }, "Seller profile migration failed");
   }
@@ -385,6 +387,40 @@ router.put("/social-links", async (req, res): Promise<void> => {
   }
   await db.update(users).set({ socialLinks: merged, updatedAt: new Date() }).where(eq(users.clerkId, clerkId));
   res.json({ socialLinks: merged });
+});
+
+// ─── GET / PUT /api/seller/cancel-window ──────────────────────────────────────
+// How long buyers can cancel an order themselves (migration 272). `hours` is
+// one of SELLER_CANCEL_WINDOW_HOURS, or null for the default ("until shipped",
+// capped at day 21; see lib/buyerCancellationPolicy.ts).
+router.get("/cancel-window", async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const [seller] = await db.select({ hours: users.buyerCancelWindowHours }).from(users)
+    .where(eq(users.clerkId, clerkId)).limit(1);
+  if (!seller) {
+    res.status(404).json({ error: "Seller profile not found" });
+    return;
+  }
+  res.json({ hours: parseSellerCancelWindowHours(seller.hours).ok ? seller.hours : null, options: SELLER_CANCEL_WINDOW_HOURS });
+});
+
+router.put("/cancel-window", async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const parsed = parseSellerCancelWindowHours(req.body?.hours);
+  if (!parsed.ok) {
+    res.status(400).json({ error: "Choose one of the available cancellation windows." });
+    return;
+  }
+  const [updated] = await db
+    .update(users)
+    .set({ buyerCancelWindowHours: parsed.hours, updatedAt: new Date() })
+    .where(eq(users.clerkId, clerkId))
+    .returning({ hours: users.buyerCancelWindowHours });
+  if (!updated) {
+    res.status(404).json({ error: "Seller profile not found" });
+    return;
+  }
+  res.json(updated);
 });
 
 // ─── PATCH /api/seller/policy ─────────────────────────────────────────────────

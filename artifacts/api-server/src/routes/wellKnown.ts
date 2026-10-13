@@ -25,6 +25,8 @@ export const DEEP_LINK_PATHS = [
   "/place/*",
   "/onboarding*",
   "/team-invite*",
+  // Order emails' "Track order" button (lib/brandthreadEmail.ts orderDeepLink).
+  "/buyer-order-detail*",
 ];
 
 function appleAppId(): string | null {

@@ -176,6 +176,9 @@ export const users = pgTable('users', {
   // transactional category toggles in notificationPreferences and OFF by
   // default; enforced server-side in lib/pushPolicy.ts / sendPushToUser.
   promoPushOptIn: boolean('promo_push_opt_in').notNull().default(false),
+  // Seller-set buyer cancellation window in hours (migration 272). NULL =
+  // the platform default in api-server lib/buyerCancellationPolicy.ts.
+  buyerCancelWindowHours: integer('buyer_cancel_window_hours'),
   // Quiet hours: local wall-clock "HH:MM" strings evaluated in quietHoursTimezone.
   // A push falling inside the window is suppressed (feed row still written);
   // null start/end means quiet hours are off.
