@@ -1,0 +1,41 @@
+# Buy a product: product page → add to bag → checkout → place order.
+# Needs a signed-in buyer (run sign-up first) and PRODUCT_ID of an in-stock
+# product with no required size. Pays with Stripe's test card in test mode.
+appId: com.brandthread.mobile
+name: buy
+---
+- openLink: brandthread://buyer-product-detail?productId=${PRODUCT_ID}
+- extendedWaitUntil:
+    visible:
+      id: product-add-to-cart
+    timeout: 20000
+- tapOn:
+    id: product-add-to-cart
+- openLink: brandthread://buyer-checkout
+- extendedWaitUntil:
+    visible:
+      id: checkout-footer
+    timeout: 20000
+- repeat:
+    while:
+      notVisible:
+        id: checkout-place-order
+    times: 4
+    commands:
+      - tapOn:
+          id: checkout-next-step
+- tapOn:
+    id: checkout-place-order
+- runFlow:
+    when:
+      visible: "Card number"
+    commands:
+      - tapOn: "Card number"
+      - inputText: "4242424242424242"
+      - inputText: "1234"
+      - inputText: "123"
+      - inputText: "10001"
+      - tapOn:
+          text: "Pay.*"
+- assertNotVisible:
+    id: checkout-error

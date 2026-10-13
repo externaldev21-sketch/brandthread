@@ -1,0 +1,60 @@
+# Sign up as a buyer with an email account, through every onboarding step.
+# Uses a Clerk test address (+clerk_test) so the code is always 424242.
+# Only works against a Clerk *development* instance.
+appId: com.brandthread.mobile
+name: sign-up
+env:
+  EMAIL: e2e+clerk_test_${MAESTRO_RUN_ID}@example.com
+  USERNAME: e2e_${MAESTRO_RUN_ID}
+---
+- clearState
+- launchApp
+- tapOn:
+    id: onboarding-welcome-get-started
+- tapOn: "I'm here to shop"
+- tapOn: "Continue"
+- tapOn: "Email address"
+- inputText: ${EMAIL}
+- tapOn: "First name"
+- inputText: "Jordan"
+- tapOn: "Last name"
+- inputText: "Tester"
+- tapOn: "Password"
+- inputText: "Brandthread-e2e-1"
+- tapOn: "Confirm password"
+- inputText: "Brandthread-e2e-1"
+- tapOn:
+    id: onboarding-username-input
+- inputText: ${USERNAME}
+- tapOn:
+    id: onboarding-dob-input
+- inputText: "01/01/1995"
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Create account"
+- tapOn: "Create account"
+- extendedWaitUntil:
+    visible: "Verification code"
+    timeout: 15000
+- tapOn: "Verification code"
+- inputText: "424242"
+- tapOn: "Verify email"
+# Name step is prefilled from the account form.
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 15000
+- tapOn: "Continue"
+# Style and sizes are skippable.
+- tapOn: "Skip for now"
+- tapOn: "Skip for now"
+# Brands
+- tapOn: "Continue"
+# Notifications are asked in context later, never forced here.
+- extendedWaitUntil:
+    visible:
+      id: onboarding-notifications-skip
+    timeout: 20000
+- tapOn:
+    id: onboarding-notifications-skip
+- tapOn: "Start exploring"
+- assertNotVisible: "Create account"
