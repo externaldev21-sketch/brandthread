@@ -26,6 +26,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { radius } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+import { DISABLED_OPACITY } from '@/constants/states';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 import { minHitSlop } from '@/lib/hitSlop';
 import { splitButtonStyle } from '@/lib/buttonStyle';
@@ -112,16 +113,16 @@ export function Button({
 
   const variantStyle = ((): { bg: string; fg: string; border?: string } => {
     switch (variant) {
-      // Disabled fill: the one elevated grey (BRANDTHREAD_DESIGN.md addendum) on
-      // Monochrome, where cardElevated is pure black and the button vanished.
-      case 'primary': return { bg: isDisabled ? disabledFill : theme.accent, fg: isDisabled ? palette.mutedForeground : theme.onAccent };
-      case 'secondary': return { bg: 'transparent', fg: isDisabled ? palette.mutedForeground : palette.foreground, border: isDisabled ? palette.border : palette.foreground };
-      case 'tertiary': return { bg: 'transparent', fg: isDisabled ? palette.mutedForeground : theme.accentLight };
-      case 'destructive': return { bg: isDisabled ? disabledFill : RED, fg: isDisabled ? palette.mutedForeground : palette.background };
+      // Disabled keeps these colours; the whole control drops to
+      // DISABLED_OPACITY below. Destructive is red text only, no red fill.
+      case 'primary': return { bg: theme.accent, fg: theme.onAccent };
+      case 'secondary': return { bg: 'transparent', fg: palette.foreground, border: palette.foreground };
+      case 'tertiary': return { bg: 'transparent', fg: theme.accentLight };
+      case 'destructive': return { bg: 'transparent', fg: RED };
     }
   })();
 
-  const isFilled = variant === 'primary' || variant === 'destructive';
+  const isFilled = variant === 'primary';
   // Filled buttons darken on press; outline/ghost buttons pick up a faint
   // theme-tinted fill. Never a separate translucent circle/pill layer, and
   // no android_ripple — the ripple's spreading-circle wash is exactly the
@@ -154,8 +155,7 @@ export function Button({
           // Keep disabled filled controls visible without card-like borders or shadows.
           isFilled && isDisabled && { backgroundColor: palette.border },
           fullWidth && styles.fullWidth,
-          // The disabled fill matches the dark page, so outline it to keep it reading as a button.
-          isDisabled && isFilled && { borderWidth: 1, borderColor: palette.border },
+          isDisabled && { opacity: DISABLED_OPACITY },
           innerStyle,
         ]}
       >
@@ -166,9 +166,9 @@ export function Button({
           <ActivityIndicator color={variantStyle.fg} size="small" />
         ) : (
           <>
-            {icon && <Icon name={icon} size={size === 'compact' ? 17 : 20} color={variantStyle.fg} />}
-            {/* An icon-only button passes label="" (with an accessibilityLabel)
-                — no empty Text, so the icon sits dead centre. */}
+            {/* Icons only on icon-only buttons (label="" with an
+                accessibilityLabel) — a text button is just its words. */}
+            {icon && !label && <Icon name={icon} size={size === 'compact' ? 16 : 18} color={variantStyle.fg} />}
             {label ? (
               <Text style={[styles.label, labelType, { color: variantStyle.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}>
                 {label}

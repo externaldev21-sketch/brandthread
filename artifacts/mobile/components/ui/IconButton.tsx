@@ -16,6 +16,7 @@ import { Glass } from '@/components/ui/Glass';
 import { iconAccessibilityLabel } from '@/lib/a11y/iconLabels';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 import { crispPx } from '@/lib/crispPixel';
+import { DISABLED_OPACITY } from '@/constants/states';
 
 export interface IconButtonProps {
   name: IconName;
@@ -74,6 +75,7 @@ export function IconButton({
           styles.root,
           variant === 'filled' && { backgroundColor: palette.card, borderRadius: RADII.chip },
           variant === 'glass' && { borderRadius: RADII.pill, overflow: 'hidden' },
+          disabled && { opacity: DISABLED_OPACITY },
           { transform: [{ scale }] },
           style,
         ]}
