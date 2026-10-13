@@ -30,14 +30,17 @@ describe('parseAspectRatio', () => {
 
 describe('tileAspectRatio', () => {
   it('uses the real ratio when known, clamped', () => {
-    expect(tileAspectRatio(post('x', { aspectRatio: 0.8 }))).toBeCloseTo(0.8);
-    expect(tileAspectRatio(post('x', { aspectRatio: 0.2 }))).toBe(MIN_ASPECT);
-    expect(tileAspectRatio(post('x', { aspectRatio: 3 }))).toBe(MAX_ASPECT);
+    expect(tileAspectRatio(post('x', { aspectRatio: 0.8, imageUri: 'a.jpg' }))).toBeCloseTo(0.8);
+    expect(tileAspectRatio(post('x', { aspectRatio: 0.2, imageUri: 'a.jpg' }))).toBe(MIN_ASPECT);
+    expect(tileAspectRatio(post('x', { aspectRatio: 3, imageUri: 'a.jpg' }))).toBe(MAX_ASPECT);
+  });
+  it('keeps text-only tiles square', () => {
+    expect(tileAspectRatio(post('x', { aspectRatio: 0.5 }))).toBe(1);
   });
   it('falls back to a deterministic, varied ratio', () => {
     const ids = Array.from({ length: 24 }, (_, i) => `post_${i}`);
-    const first = ids.map((id) => tileAspectRatio(post(id)));
-    const second = ids.map((id) => tileAspectRatio(post(id)));
+    const first = ids.map((id) => tileAspectRatio(post(id, { imageUri: 'a.jpg' })));
+    const second = ids.map((id) => tileAspectRatio(post(id, { imageUri: 'a.jpg' })));
     expect(second).toEqual(first);
     expect(new Set(first).size).toBeGreaterThan(2);
     for (const a of first) {

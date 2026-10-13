@@ -40,8 +40,12 @@ function hashOf(id: string): number {
   return hash;
 }
 
+/** Text-only tiles (no photo) stay square so they never read as tall empty blocks. */
+export const TEXT_TILE_ASPECT = 1;
+
 /** Width:height for a tile — the post's real ratio when known, otherwise a stable varied one. */
-export function tileAspectRatio(post: Pick<DiscoverPost, 'id' | 'aspectRatio'>): number {
+export function tileAspectRatio(post: Pick<DiscoverPost, 'id' | 'aspectRatio' | 'imageUri'>): number {
+  if (!post.imageUri) return TEXT_TILE_ASPECT;
   const real = typeof post.aspectRatio === 'number' && post.aspectRatio > 0 ? post.aspectRatio : null;
   if (real) return clamp(real);
   return FALLBACK_ASPECTS[hashOf(post.id) % FALLBACK_ASPECTS.length];
