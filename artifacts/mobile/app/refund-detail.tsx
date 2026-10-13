@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
@@ -29,8 +29,20 @@ const REFUND_TYPES: { key: RefundType; label: string }[] = [
   { key: 'partial',      label: 'Partial' },
   { key: 'shipping',     label: 'Shipping Only' },
   { key: 'item',         label: 'Item-Level' },
-  { key: 'store_credit', label: 'Store Credit' },
 ];
+
+// How the buyer is paid back (items 113/114) — Shopify's refund screen
+// "Refund method" (https://mobbin.com/screens/553767d9-701a-4000-a0e6-27804b6ed499).
+// Store credit used to be a "Refund Type" chip; it is a method, not an amount.
+type SellerRefundMethod = 'original' | 'store_credit';
+const REFUND_METHODS: { key: SellerRefundMethod; label: string }[] = [
+  { key: 'original',     label: 'Original payment' },
+  { key: 'store_credit', label: 'Store credit' },
+];
+
+function newRequestId(): string {
+  return `rf_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
 
 // ─── Qty Selector ─────────────────────────────────────────────────────────────
 
@@ -79,6 +91,13 @@ export default function RefundDetailScreen() {
   const [includeShipping, setIncludeShipping] = useState(false);
   const [refundReason, setRefundReason] = useState('');
   const [restockInventory, setRestockInventory] = useState(false);
+  const [refundMethod, setRefundMethod] = useState<SellerRefundMethod>('original');
+  const [refundedCents, setRefundedCents] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [done, setDone] = useState<{ amountCents: number; method: SellerRefundMethod } | null>(null);
+  // One refund per visit: a double tap or retry reuses the same request id.
+  const requestId = useMemo(newRequestId, []);
 
   const load = useCallback(async () => {
     // No order id at all (e.g. a bad/incomplete deep link) — nothing to
@@ -93,6 +112,7 @@ export default function RefundDetailScreen() {
     try {
       const raw = await api.orders.get(orderId);
       const o = raw ? adaptApiOrder(raw) : null;
+      setRefundedCents(Math.max(0, Number((raw as { refundedCents?: number } | null)?.refundedCents ?? 0) || 0));
       if (o) {
         setOrder(o);
         // Initialize selected items to max qty
@@ -127,8 +147,8 @@ export default function RefundDetailScreen() {
     );
   }
 
-  const maxRefundable = order.payment.amountPaidCents - order.payment.amountRefundedCents;
-  const alreadyRefunded = order.payment.amountRefundedCents;
+  const alreadyRefunded = Math.max(order.payment.amountRefundedCents, refundedCents);
+  const maxRefundable = Math.max(0, order.payment.amountPaidCents - alreadyRefunded);
 
   // Compute item total from selections
   const itemTotal = (() => {
@@ -161,30 +181,59 @@ export default function RefundDetailScreen() {
 
   const overMax = computedTotal > maxRefundable;
 
-  // Issuing a refund isn't wired to a real payment API yet — showing a fake
-  // "Refund Initiated" success screen here would misrepresent that money
-  // moved. The submit action below is disabled until that's built; a seller
-  // that needs to refund this order today should do it from Stripe directly.
-  const confirmAndSubmit = () => {
-    if (computedTotal <= 0 || overMax) return;
-    Alert.alert(
-      `Refund ${formatCents(computedTotal)} to ${order.customer.name}?`,
-      'This can’t be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: `Refund ${formatCents(computedTotal)}`,
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Refunds aren’t available here yet',
-              'Issue this refund from your Stripe dashboard for now.',
-            );
-          },
-        },
-      ],
-    );
+  // POST /api/orders/:id/refund — the same refund service as cancellations
+  // and returns. Original payment refunds the card; store credit issues a
+  // gift card for this store and the seller keeps the payment.
+  const submit = async () => {
+    if (computedTotal <= 0 || overMax || submitting) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const result = await api.orders.refund(order.id, {
+        amountCents: computedTotal,
+        method: refundMethod,
+        clientRequestId: requestId,
+        ...(refundReason.trim() ? { note: refundReason.trim() } : {}),
+        restock: restockInventory,
+        items: order.lineItems
+          .map(li => ({ lineItemId: li.id, quantity: refundType === 'full' ? li.quantity : (selectedItems[li.id] ?? 0) }))
+          .filter(li => li.quantity > 0),
+      });
+      setDone({ amountCents: result.amountCents, method: result.method });
+    } catch (err) {
+      const raw = (err as { body?: string } | null)?.body ?? '';
+      let message = '';
+      try {
+        const parsed = JSON.parse(raw)?.error;
+        message = typeof parsed === 'string' ? parsed : typeof parsed?.message === 'string' ? parsed.message : '';
+      } catch { message = ''; }
+      setSubmitError(message || 'Couldn’t issue this refund. Check your connection and try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (done) {
+    return (
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ScreenHeader title="Issue Refund" onBack={() => goBackOr(router)} />
+        <View style={styles.successWrap}>
+          <BrandthreadCard elevated style={styles.successCard}>
+            <Feather name="check-circle" size={32} color={colors.foreground} style={styles.successIcon} />
+            <Text style={[styles.successTitle, { color: colors.foreground }]}>
+              {done.method === 'store_credit' ? `${formatCents(done.amountCents)} store credit issued` : `${formatCents(done.amountCents)} refunded`}
+            </Text>
+            <Text style={[styles.successSub, { color: colors.mutedForeground }]}>
+              {done.method === 'store_credit'
+                ? `${order.customer.name} got a gift card for your store by email.`
+                : `Back to ${order.customer.name}’s original payment in 5–10 business days.`}
+            </Text>
+          </BrandthreadCard>
+          <PrimaryButton label="Back to order" onPress={() => goBackOr(router)} />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
@@ -195,14 +244,6 @@ export default function RefundDetailScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl, gap: SP.md }}
       >
-        {/* 2. REFUND NOTICE */}
-        <View style={styles.demoNotice}>
-          <Feather name="alert-triangle" size={ICON.sm} color={ORANGE} />
-          <Text style={styles.demoText}>
-            Issuing a refund from the app isn{'’'}t available yet. Use this screen to prepare the amount, then complete the refund from your Stripe dashboard.
-          </Text>
-        </View>
-
         {/* 3. ORIGINAL PAYMENT SUMMARY */}
         <BrandthreadCard elevated style={styles.section}>
           <Text style={styles.sectionTitle}>Original Payment</Text>
@@ -240,6 +281,39 @@ export default function RefundDetailScreen() {
               ))}
             </View>
           </ScrollView>
+        </View>
+
+        {/* 4b. REFUND METHOD */}
+        <View>
+          <Text style={styles.sectionHeader}>Refund method</Text>
+          <BrandthreadCard style={styles.section}>
+            {REFUND_METHODS.map((m, idx) => {
+              const selected = refundMethod === m.key;
+              return (
+                <TouchableOpacity
+                  key={m.key}
+                  style={[styles.methodRow, idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
+                  onPress={() => setRefundMethod(m.key)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={m.label}
+                  testID={`seller-refund-method-${m.key}`}
+                >
+                  <View style={[styles.radio, { borderColor: selected ? colors.foreground : colors.border }]}>
+                    {selected ? <View style={[styles.radioDot, { backgroundColor: colors.foreground }]} /> : null}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.switchLabel, { color: colors.foreground }]}>{m.label}</Text>
+                    <Text style={[styles.methodDetail, { color: colors.mutedForeground }]}>
+                      {m.key === 'original'
+                        ? 'Refund the buyer’s card. Your payout is adjusted.'
+                        : 'A gift card for your store. You keep the payment.'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </BrandthreadCard>
         </View>
 
         {/* 5. LINE ITEMS */}
@@ -351,13 +425,18 @@ export default function RefundDetailScreen() {
           )}
         </BrandthreadCard>
 
-        {/* 11. SUBMIT — no real refund API is wired yet (see the notice above),
-              so this never fakes success; it only confirms the amount and
-              then tells the seller to finish the refund in Stripe. */}
+        {/* 11. SUBMIT */}
+        {submitError ? (
+          <View style={styles.warningRow} accessibilityRole="alert">
+            <Feather name="alert-circle" size={ICON.xs} color={colors.foreground} />
+            <Text style={[styles.warningText, { color: colors.foreground }]}>{submitError}</Text>
+          </View>
+        ) : null}
         <PrimaryButton
-          label="Issue Refund"
-          onPress={confirmAndSubmit}
-          disabled={computedTotal <= 0 || overMax}
+          label={refundMethod === 'store_credit' ? `Issue ${formatCents(computedTotal)} store credit` : `Refund ${formatCents(computedTotal)}`}
+          onPress={submit}
+          loading={submitting}
+          disabled={computedTotal <= 0 || overMax || submitting}
           icon="dollar-sign"
         />
       </ScrollView>
@@ -408,4 +487,8 @@ const styles = StyleSheet.create({
   itemSubtotal:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: CYAN, marginTop: SP.xs },
   switchRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   switchLabel:    { fontSize: FS.sm, fontFamily: FONT.medium, color: FG, flex: 1 },
+  methodRow:      { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 52, paddingVertical: SP.xs },
+  methodDetail:   { fontSize: FS.xs + 1, fontFamily: FONT.regular, marginTop: 2, lineHeight: 18 },
+  radio:          { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  radioDot:       { width: 9, height: 9, borderRadius: 5 },
 });

@@ -309,7 +309,7 @@ export type BuyerReturnReason =
   | 'not_as_described' | 'changed_mind' | 'late_delivery'
   | 'missing_item' | 'other';
 
-export type BuyerReturnResolution = 'refund' | 'exchange' | 'store_credit' | 'replacement';
+export type BuyerReturnResolution = 'refund' | 'exchange' | 'store_credit' | 'replacement' | 'thread_cash';
 
 export interface BuyerReturnRequest {
   id: string;

@@ -15,8 +15,8 @@
  * the sweep can run it any number of times.
  */
 import type Stripe from "stripe";
-import { and, eq, sql } from "drizzle-orm";
-import { db, ledgerTransactions, orders, users } from "@workspace/db";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { db, giftCards, ledgerTransactions, orders, users } from "@workspace/db";
 import { logger } from "../logger";
 import { postLedgerTransaction, type DbExecutor } from "../money/ledger";
 import { refundForOrder, settledRedemptions } from "./service";
@@ -25,11 +25,26 @@ type StripeTransfers = Pick<Stripe, "transfers">;
 
 const payoutKey = (orderId: string) => `gift-card-payout/${orderId}`;
 
+/**
+ * Only PURCHASED cards are backed by money Brandthread holds. A seller-issued
+ * card (a store's own credit, including store-credit refunds) was never paid
+ * for, so redeeming it is a discount the seller gives: nothing is owed to
+ * them and nothing may be transferred.
+ */
+async function purchasedCardIds(exec: DbExecutor, cardIds: string[]): Promise<Set<string>> {
+  if (cardIds.length === 0) return new Set();
+  const rows = await exec.select({ id: giftCards.id }).from(giftCards)
+    .where(and(inArray(giftCards.id, cardIds), eq(giftCards.source, "purchase")));
+  return new Set(rows.map((row) => row.id));
+}
+
 export async function payoutSellerForOrder(stripeClient: StripeTransfers | null, orderId: string): Promise<"paid" | "already" | "none" | "failed"> {
   const [order] = await db.select({ id: orders.id, ownerId: orders.ownerId, status: orders.status })
     .from(orders).where(eq(orders.id, orderId)).limit(1);
   if (!order) return "none";
-  const amount = (await settledRedemptions(db, orderId)).reduce((sum, r) => sum + r.amountCents, 0);
+  const settled = await settledRedemptions(db, orderId);
+  const purchased = await purchasedCardIds(db, settled.map((r) => r.cardId));
+  const amount = settled.filter((r) => purchased.has(r.cardId)).reduce((sum, r) => sum + r.amountCents, 0);
   if (amount <= 0) return "none";
   const [done] = await db.select({ id: ledgerTransactions.id }).from(ledgerTransactions)
     .where(eq(ledgerTransactions.idempotencyKey, payoutKey(orderId))).limit(1);
@@ -77,6 +92,7 @@ export async function payoutSellerForOrder(stripeClient: StripeTransfers | null,
 export async function sweepGiftCardPayouts(stripeClient: StripeTransfers | null, limit = 50): Promise<number> {
   const due = ((await db.execute(sql`
     SELECT DISTINCT t.order_id FROM gift_card_transactions t
+    JOIN gift_cards c ON c.id = t.gift_card_id AND c.source = 'purchase'
     WHERE t.type = 'settle' AND t.order_id IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM ledger_transactions l WHERE l.idempotency_key = 'gift-card-payout/' || t.order_id::text)
       AND NOT EXISTS (SELECT 1 FROM gift_card_transactions r WHERE r.type = 'refund' AND r.order_id = t.order_id)
@@ -102,7 +118,10 @@ export async function restoreGiftCardsOnFullRefund(
 ): Promise<void> {
   const restored = await refundForOrder(tx, input.orderId);
   if (restored.length === 0) return;
-  const total = restored.reduce((sum, r) => sum + r.amountCents, 0);
+  // Only purchased cards were ever paid out to the seller (see purchasedCardIds).
+  const purchased = await purchasedCardIds(tx, restored.map((r) => r.cardId));
+  const total = restored.filter((r) => purchased.has(r.cardId)).reduce((sum, r) => sum + r.amountCents, 0);
+  if (total <= 0) return;
   const [payout] = await tx.select({ stripeObjectId: ledgerTransactions.stripeObjectId }).from(ledgerTransactions)
     .where(and(eq(ledgerTransactions.idempotencyKey, payoutKey(input.orderId)))).limit(1);
   if (!payout?.stripeObjectId) return; // never paid to the seller: nothing to claw back

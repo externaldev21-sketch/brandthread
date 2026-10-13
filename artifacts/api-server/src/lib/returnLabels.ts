@@ -12,7 +12,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, orders, returns, shippingLabels } from "@workspace/db";
 import { createShipment, findTransaction, purchaseTransaction, type ShippoRate } from "./shippo";
 import { recordLabelPurchased, recoverLabelCost } from "./money/escrow";
-import { orderGrossCents, refundOrder, RefundError } from "./money/refunds";
+import { orderGrossCents, refundMethodForResolution, refundOrderAsChosen, RefundError } from "./money/refunds";
 import { reversePurchasePointsOnce } from "../routes/loyalty";
 import { publishNotification } from "../routes/notifications-feed";
 import { logger } from "./logger";
@@ -166,7 +166,8 @@ export async function refundReturn(returnId: string): Promise<"refunded" | "skip
   const [ret] = await db.select().from(returns).where(eq(returns.id, returnId)).limit(1);
   if (!ret || ret.status !== "approved") return "skipped";
   try {
-    const result = await refundOrder({
+    const result = await refundOrderAsChosen({
+      method: refundMethodForResolution(ret.resolutionRequested),
       orderId: ret.orderId,
       amountCents: ret.refundAmountCents ?? undefined,
       reason: "return_approved",
