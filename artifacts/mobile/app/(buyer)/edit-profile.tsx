@@ -767,7 +767,7 @@ const styles = StyleSheet.create({
   sectionHint: { fontSize: 12.5, fontFamily: 'Inter_400Regular', paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12 },
   card: { marginHorizontal: 14, marginTop: 8, borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, gap: 12 },
-  rowLabel: { fontSize: 15, fontFamily: 'Inter_400Regular', width: 90, flexShrink: 0 },
+  rowLabel: { fontSize: 15, fontFamily: 'Inter_400Regular', minWidth: 90, flexShrink: 0 },
   rowHint: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
   rowInput: { flex: 1, minWidth: 0, fontSize: 15, fontFamily: 'Inter_400Regular', padding: 0, textAlign: 'right' },
   chevronLabel: { fontSize: 13.5, fontFamily: 'Inter_400Regular' },
