@@ -188,7 +188,7 @@ export default function SellerDataExportScreen() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.border },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
   headerTitle:  { fontSize: 17, fontFamily: 'Inter_700Bold', color: theme.text },
   scroll:       { padding: 16, paddingBottom: 100, gap: 16 },
   sectionLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: -8 },

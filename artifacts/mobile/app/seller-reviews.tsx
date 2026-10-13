@@ -276,7 +276,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const ON_ACCENT = theme.onAccent;
   return StyleSheet.create({
   root:       { flex: 1, backgroundColor: 'transparent' },
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
+  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
   headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: FG },
 
   statsRow:   { flexDirection: 'row', padding: 16, gap: 0, borderBottomWidth: 1, borderBottomColor: BORDER },

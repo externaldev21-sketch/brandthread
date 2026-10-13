@@ -100,7 +100,7 @@ import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
 import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
-import { StatusBarMask, useSceneBottomClearance } from '@/components/layout/ScreenChrome';
+import { StatusBarScrollEdge, useSceneBottomClearance } from '@/components/layout/ScreenChrome';
 import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 import { MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
@@ -1341,7 +1341,7 @@ function RootLayoutNav() {
           <AppStack />
         </View>
       </Pressable>
-      <StatusBarMask />
+      <StatusBarScrollEdge />
       <SellerBarGate />
       <AuthGate />
       <ServiceConfigurer />

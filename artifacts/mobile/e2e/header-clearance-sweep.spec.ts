@@ -8,10 +8,9 @@
  *     bottom (every scroll container), and NO visible content element may
  *     overlap the floating tab bar — the last element's bottom sits above
  *     the bar's top edge.
- *  2. Nothing under the notch: after scrolling, the whole status-bar strip
- *     [0, safe-area top) is the solid mask on every one of those screens
- *     (document.elementFromPoint across the strip), and no visible element
- *     is on top of it.
+ *  2. Top edge: every one of those screens has the status-bar scroll-edge
+ *     fade (a gradient, never a solid strip, never taking touches), and at
+ *     rest nothing in the top 140px draws a horizontal border line.
  *  3. Headers: bare back arrow + title — no subtitle text, no divider —
  *     on screens that used to carry one ("Last 7 days", "30 days", ...).
  *  4. Analytics tab: range pills (Today), EQUAL Visits/Revenue tiles, empty
@@ -181,7 +180,7 @@ const UNDER_BAR_SCAN = `(() => {
   let lowest = -Infinity;
   for (const el of document.body.querySelectorAll('*')) {
     if (bar.contains(el)) continue;
-    if (el.closest('[data-testid="status-bar-mask"]')) continue;
+    if (el.closest('[data-testid="status-bar-scroll-edge"]')) continue;
     if (el.closest('[data-testid="scene-bottom-clearance"]') === null && false) continue;
     if (!isContent(el)) continue;
     const r = el.getBoundingClientRect();
@@ -198,20 +197,32 @@ const UNDER_BAR_SCAN = `(() => {
   return { barTop, offenders, lowest };
 })()`;
 
-/** The status strip: every probed point in [0, mask height) must land on
- *  the mask itself. */
-const TOP_STRIP_SCAN = `(() => {
-  const mask = document.querySelector('[data-testid="status-bar-mask"]');
-  if (!mask) return { maskHeight: 0, misses: ['no mask'] };
-  const h = mask.getBoundingClientRect().height;
-  const misses = [];
-  for (let y = 1; y < h; y += 6) {
-    for (let x = 2; x < window.innerWidth; x += 24) {
-      const hit = document.elementFromPoint(x, y);
-      if (hit !== mask && !mask.contains(hit)) misses.push({ x, y, tag: hit?.tagName, text: (hit?.textContent || '').trim().slice(0, 30), testID: hit?.closest('[data-testid]')?.getAttribute('data-testid') ?? null });
+/** The top edge: the scroll-edge fade is a non-interactive gradient over the
+ *  status bar, and no element near the top draws a wide horizontal line. */
+const TOP_EDGE_SCAN = `(() => {
+  const fade = document.querySelector('[data-testid="status-bar-scroll-edge"]');
+  const fs = fade ? getComputedStyle(fade) : null;
+  const lines = [];
+  for (const el of document.body.querySelectorAll('*')) {
+    const r = el.getBoundingClientRect();
+    if (r.top > 140 || r.bottom < 0 || r.width < window.innerWidth * 0.4) continue;
+    const s = getComputedStyle(el);
+    if (s.display === 'none' || s.visibility === 'hidden') continue;
+    for (const side of ['Top', 'Bottom']) {
+      const w = parseFloat(s['border' + side + 'Width']);
+      const c = s['border' + side + 'Color'];
+      const y = side === 'Top' ? r.top : r.bottom;
+      if (w > 0 && y <= 140 && !/rgba\(\s*\d+,\s*\d+,\s*\d+,\s*0\s*\)|transparent/.test(c)) {
+        lines.push({ side, y: Math.round(y), w, testID: el.closest('[data-testid]')?.getAttribute('data-testid') ?? null });
+      }
     }
   }
-  return { maskHeight: h, misses };
+  return {
+    fadeHeight: fade ? fade.getBoundingClientRect().height : 0,
+    fadeIsGradient: !!fs && /gradient/.test(fs.backgroundImage),
+    fadeTakesTouches: !!fs && fs.pointerEvents !== 'none',
+    lines,
+  };
 })()`;
 
 const TEXT_FIT_SCAN = `((rootSel) => {
@@ -333,7 +344,15 @@ test.describe('Header + bottom-clearance sweep @ 393x852', () => {
     test(`${screen.name}: scrolled to the bottom nothing sits under the tab bar; scrolled, nothing sits under the notch`, async () => {
       const page = await openSeller(h, browser, origin, screen.target);
       try {
-        // Scroll a little first: the status strip must still be solid.
+        // At rest: the fade is in place and nothing near the top draws a line.
+        const top = await page.evaluate(TOP_EDGE_SCAN);
+        await page.screenshot({ path: path.join(OUT_DIR, `top-${screen.name}.png`), clip: { x: 0, y: 0, width: 393, height: 140 } });
+        expect(top.fadeHeight, `${screen.name}: status-bar fade height`).toBeGreaterThanOrEqual(54);
+        expect(top.fadeIsGradient, `${screen.name}: status-bar fade is a gradient, not a solid strip`).toBe(true);
+        expect(top.fadeTakesTouches, `${screen.name}: status-bar fade must not take touches`).toBe(false);
+        expect(top.lines, `${screen.name}: lines at the top of the screen: ${JSON.stringify(top.lines.slice(0, 5))}`).toEqual([]);
+
+        // Scrolled a little: content fades under the clock (screenshot only).
         await page.evaluate(() => {
           for (const el of Array.from(document.querySelectorAll<HTMLElement>('*'))) {
             const s = getComputedStyle(el);
@@ -341,10 +360,7 @@ test.describe('Header + bottom-clearance sweep @ 393x852', () => {
           }
         });
         await page.waitForTimeout(400);
-        const top = await page.evaluate(TOP_STRIP_SCAN);
-        await page.screenshot({ path: path.join(OUT_DIR, `top-${screen.name}.png`), clip: { x: 0, y: 0, width: 393, height: 140 } });
-        expect(top.maskHeight, `${screen.name}: status mask height`).toBeGreaterThanOrEqual(54);
-        expect(top.misses, `${screen.name}: elements under the notch: ${JSON.stringify(top.misses.slice(0, 5))}`).toEqual([]);
+        await page.screenshot({ path: path.join(OUT_DIR, `top-scrolled-${screen.name}.png`), clip: { x: 0, y: 0, width: 393, height: 140 } });
 
         await scrollAllToBottom(page);
         const bottom = await page.evaluate(UNDER_BAR_SCAN);

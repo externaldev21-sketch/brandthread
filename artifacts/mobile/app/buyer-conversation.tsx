@@ -3026,8 +3026,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     backgroundColor: theme.background,
     paddingLeft: SP.xs,
     paddingBottom: SP.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.border,
     zIndex: 5,
   },
   // flex: 1 + minWidth: 0 all the way down this chain (leftGroup -> center

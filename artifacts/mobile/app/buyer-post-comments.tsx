@@ -1399,7 +1399,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    height: 52, paddingHorizontal: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER,
+    height: 52, paddingHorizontal: SP.sm,
   },
   headerSide: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontFamily: FONT.bold, fontSize: FS.sm, color: FG },

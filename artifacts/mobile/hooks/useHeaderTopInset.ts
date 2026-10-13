@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { PixelRatio, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /** Comfortable minimum clearance from a web browser's own chrome (tabs,
@@ -23,5 +23,20 @@ const WEB_MIN_TOP_INSET = 54;
  */
 export function useHeaderTopInset(): number {
   const insets = useSafeAreaInsets();
-  return Platform.OS === 'web' ? Math.max(insets.top, WEB_MIN_TOP_INSET) : insets.top;
+  return roundToDevicePixel(Platform.OS === 'web' ? Math.max(insets.top, WEB_MIN_TOP_INSET) : insets.top);
+}
+
+/**
+ * Snaps a top inset to a whole device pixel. A fractional inset (some
+ * Android densities, scaled web frames) puts the top edge of every header
+ * on a half pixel, which antialiases into a faint line at the top of the
+ * screen. Test environments that mock react-native without PixelRatio fall
+ * back to whole points.
+ */
+export function roundToDevicePixel(value: number): number {
+  try {
+    return PixelRatio.roundToNearestPixel(value);
+  } catch {
+    return Math.round(value);
+  }
 }

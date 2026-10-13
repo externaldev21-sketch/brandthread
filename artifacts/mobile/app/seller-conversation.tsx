@@ -2480,7 +2480,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     // group is hard-right-aligned to the edge, evenly spaced, 16pt inset
     // from the screen edge.
     paddingLeft: SP.md, paddingBottom: SP.sm,
-    borderBottomWidth: 1, borderBottomColor: BORDER,
   },
   // flex: 1 + minWidth: 0 all the way down this chain (leftGroup ->
   // centerRow -> center -> name) is what actually lets the name truncate
