@@ -203,7 +203,10 @@ export default function RefundDetailScreen() {
     } catch (err) {
       const raw = (err as { body?: string } | null)?.body ?? '';
       let message = '';
-      try { message = JSON.parse(raw)?.error ?? ''; } catch { message = ''; }
+      try {
+        const parsed = JSON.parse(raw)?.error;
+        message = typeof parsed === 'string' ? parsed : typeof parsed?.message === 'string' ? parsed.message : '';
+      } catch { message = ''; }
       setSubmitError(message || 'Couldn’t issue this refund. Check your connection and try again.');
     } finally {
       setSubmitting(false);
