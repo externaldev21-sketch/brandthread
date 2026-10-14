@@ -49,6 +49,8 @@ export function toPublicSellerProfile(seller: Row): Row {
     brandType: seller.brandType ?? null,
     accountType: seller.accountType,
     username: seller.username ?? null,
+    // Store page layout the buyer app renders: 'grid' or 'lookbook' (migration 295).
+    storeLayout: seller.storeLayout === "lookbook" ? "lookbook" : "grid",
   };
 }
 

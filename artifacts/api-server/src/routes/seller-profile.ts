@@ -99,6 +99,7 @@ router.get("/profile", async (req, res): Promise<void> => {
         logoUrl:             users.logoUrl,
         bannerUrl:           users.bannerUrl,
         storeAccentColor:    users.storeAccentColor,
+        storeLayout:         users.storeLayout,
         category:            users.category,
         tags:                users.tags,
         location:            users.location,
@@ -348,6 +349,34 @@ router.put("/profile/accent", async (req, res): Promise<void> => {
     .set({ storeAccentColor: color, updatedAt: new Date() })
     .where(eq(users.clerkId, clerkId))
     .returning({ storeAccentColor: users.storeAccentColor });
+  if (!updated) {
+    res.status(404).json({ error: "Seller profile not found" });
+    return;
+  }
+  res.json(updated);
+});
+
+// ─── PUT /api/seller/profile/store-layout ─────────────────────────────────────
+// Store Settings > "Lookbook": the buyer store page layout, 'grid' (default)
+// or 'lookbook' (full-screen editorial swipe). Migration 295.
+export const STORE_LAYOUTS = ["grid", "lookbook"] as const;
+export type StoreLayout = (typeof STORE_LAYOUTS)[number];
+export function parseStoreLayout(value: unknown): StoreLayout | null {
+  return typeof value === "string" && (STORE_LAYOUTS as readonly string[]).includes(value) ? value as StoreLayout : null;
+}
+
+router.put("/profile/store-layout", async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const layout = parseStoreLayout(req.body?.layout);
+  if (!layout) {
+    res.status(400).json({ error: "layout must be 'grid' or 'lookbook'" });
+    return;
+  }
+  const [updated] = await db
+    .update(users)
+    .set({ storeLayout: layout, updatedAt: new Date() })
+    .where(eq(users.clerkId, clerkId))
+    .returning({ storeLayout: users.storeLayout });
   if (!updated) {
     res.status(404).json({ error: "Seller profile not found" });
     return;

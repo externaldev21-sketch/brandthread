@@ -124,6 +124,10 @@ export const users = pgTable('users', {
   logoUrl:   text('logo_url'),
   bannerUrl: text('banner_url'),
   storeAccentColor: text('store_accent_color'),
+  // Buyer store page layout (migration 295): 'grid' (default) or 'lookbook',
+  // a full-screen editorial swipe through products. Read by the public seller
+  // endpoint, set from Store Settings > Lookbook.
+  storeLayout: text('store_layout').notNull().default('grid'),
   // Profile cover video (all account types) — a short, always-muted looping
   // clip shown in the profile hero. Separate from the avatar. Server-rendered
   // compressed rendition + poster frame, both public object paths served via
