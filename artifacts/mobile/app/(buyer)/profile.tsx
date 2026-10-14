@@ -79,6 +79,7 @@ import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { taggedItemHref } from '@/services/profileService';
 import { radius } from '@/constants/radii';
 import { getClosetOutfits, getClosetPieces, type ClosetOutfit, type ClosetPiece } from '@/services/closetService';
+import { WrappedProfileCard } from '@/components/closet/WrappedProfileCard';
 import { ClosetEmpty, ClosetOutfitTile, ClosetPieceTile, ClosetSubBar, type ClosetView } from '@/components/closet/ClosetViews';
 
 // Realistic identity shown only when there is truly no signed-in user at all
@@ -1000,6 +1001,9 @@ export default function ProfileScreen() {
           }}
         />
       </View>
+
+      {/* Monthly Wrapped: the one card, days 1–7 only, dismissible for good. */}
+      <WrappedProfileCard userId={user?.id} />
 
       {threadCashEnabled ? (
         <View style={styles.streakWrap}>
