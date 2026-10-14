@@ -57,7 +57,7 @@ describe("Dev's onboarding items", () => {
   });
 
   it("8: buyer onboarding ends with styles and brands to follow", () => {
-    expect(BUYER_STEPS.slice(-3)).toEqual(["STYLE", "SIZES", "BRANDS"]);
+    expect(BUYER_STEPS.slice(-5)).toEqual(["STYLE", "TASTE", "SIZES", "BRANDS", "FEED_PREVIEW"]);
     expect(source).toContain("<BrandsToFollowStep");
   });
 

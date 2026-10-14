@@ -172,28 +172,18 @@ export function LaunchCountdown({
         ]}
         accessibilityRole="button"
         accessibilityState={{ selected: subscribed }}
-<<<<<<< HEAD
-        accessibilityLabel={subscribed ? "You'll be notified when it drops. Tap to turn off" : 'Notify me when it drops'}
-=======
         accessibilityLabel={subscribed ? "Notifications on. Tap to turn off" : 'Notify me'}
->>>>>>> origin/pr1017
         testID="launch-notify-me"
       >
         {busy ? (
           <ActivityIndicator size="small" color={subscribed ? colors.foreground : colors.background} />
         ) : (
-<<<<<<< HEAD
           <>
             <Icon name={subscribed ? 'check' : 'bell'} size={ICON.sm} color={subscribed ? colors.foreground : colors.primaryForeground} />
             <Text style={[s.btnText, { color: subscribed ? colors.foreground : colors.primaryForeground }]}>
-              {subscribed ? "You'll be notified" : 'Notify me'}
+              {subscribed ? 'Notifications on' : 'Notify me'}
             </Text>
           </>
-=======
-          <Text style={[s.btnText, { color: subscribed ? colors.foreground : colors.background }]}>
-            {subscribed ? 'Notifications on' : 'Notify me'}
-          </Text>
->>>>>>> origin/pr1017
         )}
       </PressableScale>
     </View>

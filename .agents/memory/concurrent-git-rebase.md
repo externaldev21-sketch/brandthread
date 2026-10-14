@@ -63,3 +63,9 @@ Preserve established financial field semantics when merging independently design
 **Why:** Parallel bundle implementations used different meanings for the same discount field and different shipping assumptions. Blindly combining them risks double discounts, misleading totals, and broken fee validation even when each isolated branch passes.
 
 **How to apply:** Check explicit versus automatic eligibility, keep them mutually exclusive, preserve the existing quote and ledger contracts, and reconcile incoming fixtures with actual shipping and fee inputs. Verify both backend charges and customer-facing savings.
+
+After stacked merges, scan source content for conflict markers as well as checking Git's unmerged index.
+
+**Why:** A partially reconciled component retained embedded markers after the index was resolved; later merges carried them forward without listing that file as an unresolved conflict.
+
+**How to apply:** Before final compilation and restart, check tracked runtime sources for marker lines. A clean Git merge status alone does not establish syntactically valid source.

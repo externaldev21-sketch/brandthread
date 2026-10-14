@@ -128,20 +128,26 @@ describe("Tell me if the price drops", () => {
 
   it("pushes only to the opted-in buyer, once per new low", async () => {
     const { notifyPriceDrop } = await import("../../lib/stockNotifications");
+    const { drainSavedProductAlerts } = await import("../../lib/savedProductAlerts");
     const drop = { productId, ownerId: sellerId, productName: "Field Shell Jacket", previousPriceCents: 22000, newPriceCents: 19000 };
+    await db.update(productVariants).set({ priceCents: drop.newPriceCents }).where(eq(productVariants.productId, productId));
     await notifyPriceDrop(drop);
-    const calls = spies.publish.mock.calls.map(([n]: any[]) => ({ userId: n.userId, push: n.pushExplicitRequest, type: n.type }));
+    await drainSavedProductAlerts();
+    const calls = spies.publish.mock.calls.map(([n]: any[]) => ({ userId: n.userId, channel: n.pushChannelId, type: n.type }));
     expect(calls).toEqual(expect.arrayContaining([
-      { userId: alertBuyer, push: true, type: "price_drop" },
-      { userId: quietBuyer, push: false, type: "price_drop" },
+      { userId: alertBuyer, channel: "stock", type: "price_drop" },
     ]));
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(1);
+    expect(calls.some((call) => call.userId === quietBuyer)).toBe(false);
 
     spies.publish.mockClear();
     await notifyPriceDrop(drop);
+    await drainSavedProductAlerts();
     expect(spies.publish).not.toHaveBeenCalled();
 
+    await db.update(productVariants).set({ priceCents: 17500 }).where(eq(productVariants.productId, productId));
     await notifyPriceDrop({ ...drop, previousPriceCents: 19000, newPriceCents: 17500 });
-    expect(spies.publish).toHaveBeenCalledTimes(2);
+    await drainSavedProductAlerts();
+    expect(spies.publish).toHaveBeenCalledTimes(1);
   });
 });

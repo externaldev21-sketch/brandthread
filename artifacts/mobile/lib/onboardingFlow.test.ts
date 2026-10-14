@@ -30,7 +30,7 @@ describe('step order', () => {
   });
 
   it('buyer onboarding ends with a real feed preview after picking styles and following brands', () => {
-    expect(BUYER_STEPS.slice(-4)).toEqual(['STYLE', 'SIZES', 'BRANDS', 'FEED_PREVIEW']);
+    expect(BUYER_STEPS.slice(-5)).toEqual(['STYLE', 'TASTE', 'SIZES', 'BRANDS', 'FEED_PREVIEW']);
   });
 
   it('seller follows Shopify: questions and location before the account, store preview, then plan', () => {

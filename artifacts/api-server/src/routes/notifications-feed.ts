@@ -563,7 +563,6 @@ export async function publishNotification(n: PublishInput): Promise<void> {
       badge: Number(unread?.count ?? 0),
       data: {
         ...n.pushData,
-        notificationId: notification.id,
         type: n.type,
         category: n.category,
         targetId: n.targetId,

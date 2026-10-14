@@ -109,3 +109,4 @@
 - [Haptics control boundary](haptics-control-boundary.md) — one shared Sounds & haptics control; off silences every haptic, while the new-order sound setting is audio only.
 - [Native UI test harness](native-ui-test-harness.md) — incomplete cache and animation mocks can masquerade as product-load failures or native component crashes.
 - [Pinned-post consolidation](pinned-post-model.md) — owner requires one persistence model, canonical pin API and pin UI across competing implementations.
+- [Saved alert consolidation](saved-alert-consolidation.md) — one preference and delivery path; new saves opt in while existing preferences remain intact.

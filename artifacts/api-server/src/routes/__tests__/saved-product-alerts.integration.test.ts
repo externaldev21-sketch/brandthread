@@ -86,6 +86,9 @@ async function saveForEveryone(productId: string, name: string) {
     // Client sends a stale price; the server snapshots the live one.
     const saved = await call("POST", "/api/buyer/saved", buyer, { type: "product", targetId: productId, title: name, priceCents: 1 });
     expect(saved.status).toBe(201);
+    // Alert scenarios explicitly opt in; saving alone no longer opts a buyer in.
+    const optedIn = await call("PATCH", `/api/buyer/saved/${productId}`, buyer, { notifyOnPriceDrop: true });
+    expect(optedIn.status).toBe(200);
   }
   const off = await call("PATCH", `/api/buyer/saved/${productId}`, buyerItemOff, { notifyOnPriceDrop: false, notifyOnBackInStock: false });
   expect(off.status).toBe(200);
@@ -204,7 +207,7 @@ describe("saving a product", () => {
     const { productId } = await createProduct("Snapshot Tee", [{ stock: 2, priceCents: 6400 }, { stock: 0, priceCents: 5900 }]);
     const saved = await call("POST", "/api/buyer/saved", buyerA, { type: "product", targetId: productId, title: "Snapshot Tee", priceCents: 1 });
     expect(saved.status).toBe(201);
-    expect(saved.body).toMatchObject({ type: "product", targetId: productId, priceCents: 5900, notifyOnPriceDrop: true, notifyOnBackInStock: true });
+    expect(saved.body).toMatchObject({ type: "product", targetId: productId, priceCents: 5900, notifyOnPriceDrop: false, notifyOnBackInStock: true });
     const [row] = await db.select().from(savedItems).where(and(eq(savedItems.userId, buyerA), eq(savedItems.targetId, productId)));
     expect(row.savedPriceCents).toBe(5900);
     expect(row.lastNotifiedPriceCents).toBe(5900);
@@ -212,7 +215,7 @@ describe("saving a product", () => {
     const bad = await call("PATCH", `/api/buyer/saved/${productId}`, buyerA, { notifyOnPriceDrop: "no" });
     expect(bad.status).toBe(400);
     // Toggling alerts never un-files the item from its collection.
-    const toggled = await call("PATCH", `/api/buyer/saved/${productId}`, buyerA, { notifyOnBackInStock: false });
+    const toggled = await call("PATCH", `/api/buyer/saved/${productId}`, buyerA, { notifyOnBackInStock: false, notifyOnPriceDrop: true });
     expect(toggled.body).toMatchObject({ notifyOnPriceDrop: true, notifyOnBackInStock: false });
   });
 });

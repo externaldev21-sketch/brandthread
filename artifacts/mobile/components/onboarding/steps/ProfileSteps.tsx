@@ -14,11 +14,12 @@ import { AvailableCheck, ClearButton } from './FieldAccessories';
 
 export const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,30}$/;
 
-export function NameStep({ name, onChange, onNext, seller }: {
+export function NameStep({ name, onChange, onNext, seller, preview }: {
   name: string;
   onChange: (v: string) => void;
   onNext: () => void;
   seller: boolean;
+  preview?: React.ReactNode;
 }) {
   const ok = name.trim().length >= 2;
   return (
@@ -41,12 +42,14 @@ export function NameStep({ name, onChange, onNext, seller }: {
         onSubmitEditing={() => { if (ok) onNext(); }}
         right={<ClearButton visible={name.length > 0} onPress={() => onChange('')} />}
       />
+      {preview}
     </StepScreen>
   );
 }
 
-export function BrandNameStep({ brandName, onChange, onNext }: {
+export function BrandNameStep({ brandName, onChange, onNext, preview }: {
   brandName: string;
+  preview?: React.ReactNode;
   onChange: (v: string) => void;
   onNext: () => void;
 }) {
@@ -69,12 +72,14 @@ export function BrandNameStep({ brandName, onChange, onNext }: {
         onSubmitEditing={() => { if (ok) onNext(); }}
         right={<ClearButton visible={brandName.length > 0} onPress={() => onChange('')} />}
       />
+      {preview}
     </StepScreen>
   );
 }
 
-export function UsernameStep({ username, onChange, onNext, checking, takenError, loading }: {
+export function UsernameStep({ username, onChange, onNext, checking, takenError, loading, preview }: {
   username: string;
+  preview?: React.ReactNode;
   onChange: (v: string) => void;
   onNext: () => void;
   checking: boolean;
@@ -114,6 +119,7 @@ export function UsernameStep({ username, onChange, onNext, checking, takenError,
           </Text>
         </View>
       ) : null}
+      {preview}
     </StepScreen>
   );
 }
@@ -131,13 +137,14 @@ function BigAvatar({ uri, size = 168 }: { uri: string | null; size?: number }) {
   );
 }
 
-export function PhotoStep({ photoUri, onPick, onNext, onSkip, uploading, error }: {
+export function PhotoStep({ photoUri, onPick, onNext, onSkip, uploading, error, preview }: {
   photoUri: string | null;
   onPick: () => void;
   onNext: () => void;
   onSkip: () => void;
   uploading?: boolean;
   error?: string | null;
+  preview?: React.ReactNode;
 }) {
   return (
     <StepScreen
@@ -152,9 +159,9 @@ export function PhotoStep({ photoUri, onPick, onNext, onSkip, uploading, error }
         ? { label: 'Change picture', onPress: onPick, disabled: uploading, testID: 'onboarding-photo-change' }
         : { label: 'Skip', onPress: onSkip, testID: 'onboarding-photo-skip' }}
     >
-      <Pressable onPress={onPick} accessibilityRole="button" accessibilityLabel="Choose a profile picture" style={styles.photoWrap}>
+      {preview ?? <Pressable onPress={onPick} accessibilityRole="button" accessibilityLabel="Choose a profile picture" style={styles.photoWrap}>
         <BigAvatar uri={photoUri} />
-      </Pressable>
+      </Pressable>}
     </StepScreen>
   );
 }
@@ -163,11 +170,12 @@ export function PhotoStep({ photoUri, onPick, onNext, onSkip, uploading, error }
  * Instagram's "Welcome to Instagram, username" moment: shown briefly, then
  * the flow moves on by itself (tap to continue sooner).
  */
-export function WelcomeUserStep({ username, photoUri, onDone, holdMs = 1800 }: {
+export function WelcomeUserStep({ username, photoUri, onDone, holdMs = 1800, preview }: {
   username: string;
   photoUri: string | null;
   onDone: () => void;
   holdMs?: number;
+  preview?: React.ReactNode;
 }) {
   const palette = useColors();
   useEffect(() => {
@@ -182,7 +190,7 @@ export function WelcomeUserStep({ username, photoUri, onDone, holdMs = 1800 }: {
       accessibilityLabel={`Welcome to Brandthread, ${username}. Continue`}
       style={styles.welcome}
     >
-      <BigAvatar uri={photoUri} size={176} />
+      {preview ?? <BigAvatar uri={photoUri} size={176} />}
       <View style={styles.welcomeCopy}>
         <Text style={[styles.welcomeTitle, { color: palette.foreground }]}>Welcome to Brandthread,{'\n'}{username}</Text>
         <Text style={[styles.welcomeSub, { color: palette.mutedForeground }]}>Let's set up your feed.</Text>

@@ -44,6 +44,19 @@ export function shouldAlertLowStock(input: {
 }
 
 /** True exactly when a stock change is a 0 → positive restock. */
+/** Compatibility classifier only; actual delivery uses savedProductAlerts' opt-in and reference-price claims. */
+export function priceDropRecipients(
+  rows: Array<{ userId: string; priceDropAlert: boolean; lastNotifiedPriceCents: number | null }>,
+  newPriceCents: number,
+): Array<{ userId: string; push: boolean }> {
+  const byUser = new Map<string, { userId: string; push: boolean }>();
+  for (const row of rows) {
+    if (row.lastNotifiedPriceCents != null && newPriceCents >= row.lastNotifiedPriceCents) continue;
+    byUser.set(row.userId, { userId: row.userId, push: (byUser.get(row.userId)?.push ?? false) || row.priceDropAlert });
+  }
+  return [...byUser.values()];
+}
+
 export function isRestock(input: { previousStock: number; newStock: number }): boolean {
   return input.previousStock === 0 && input.newStock > 0;
 }

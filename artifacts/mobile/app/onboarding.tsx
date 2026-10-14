@@ -1121,14 +1121,17 @@ export default function OnboardingScreen() {
         return <TermsStep onAgree={() => { void agreeToTerms(); }} loading={busy || !!oauthBusy} error={stepError} />;
 
       case 'NAME':
-        return <NameStep name={fullName} onChange={setFullName} onNext={() => goNext('NAME')} seller={isSeller} />;
+        return <NameStep name={fullName} onChange={setFullName} onNext={() => goNext('NAME')} seller={isSeller}
+          preview={<ProfileBuildCard data={{ name: fullName, handle: username, photoUri }} onPickPhoto={() => { void pickPhoto(); }} />} />;
 
       case 'BRAND_NAME':
-        return <BrandNameStep brandName={brandName} onChange={setBrandName} onNext={() => goNext('BRAND_NAME')} />;
+        return <BrandNameStep brandName={brandName} onChange={setBrandName} onNext={() => goNext('BRAND_NAME')}
+          preview={<ProfileBuildCard data={{ name: brandName || fullName, handle: username, photoUri }} onPickPhoto={() => { void pickPhoto(); }} />} />;
 
       case 'USERNAME':
         return (
           <UsernameStep
+            preview={<ProfileBuildCard data={{ name: isSeller ? brandName || fullName : fullName, handle: username, photoUri }} onPickPhoto={() => { void pickPhoto(); }} />}
             username={username}
             onChange={(v) => { setUsername(v); setUsernameEdited(true); setStepError(null); }}
             onNext={() => { void submitUsername(); }}
@@ -1141,6 +1144,7 @@ export default function OnboardingScreen() {
       case 'PHOTO':
         return (
           <PhotoStep
+            preview={<ProfileBuildCard data={{ name: fullName, handle: username, photoUri }} onPickPhoto={() => { void pickPhoto(); }} />}
             photoUri={photoUri}
             onPick={() => { void pickPhoto(); }}
             onNext={() => goNext('PHOTO')}
@@ -1151,7 +1155,8 @@ export default function OnboardingScreen() {
         );
 
       case 'WELCOME_USER':
-        return <WelcomeUserStep username={username} photoUri={photoUri} onDone={() => goNext('WELCOME_USER')} />;
+        return <WelcomeUserStep username={username} photoUri={photoUri} onDone={() => goNext('WELCOME_USER')}
+          preview={<FlippingProfileCard data={{ name: fullName, handle: username, photoUri }} />} />;
 
       case 'STYLE':
         return (
@@ -1319,12 +1324,6 @@ export default function OnboardingScreen() {
         testID={`onboarding-step-${flow ?? 'choose'}-${stepId}`}
         accessibilityLabel={`Onboarding ${flow ?? 'choose'} ${stepId.toLowerCase()}`}
       >
-        {['NAME', 'BRAND_NAME', 'USERNAME', 'PHOTO'].includes(stepId) && (
-          <ProfileBuildCard data={{ name: flow === 'seller' ? brandName || fullName : fullName, handle: username, photoUri }} onPickPhoto={() => { void pickPhoto(); }} />
-        )}
-        {stepId === 'WELCOME_USER' && (
-          <FlippingProfileCard data={{ name: fullName, handle: username, photoUri }} />
-        )}
         {renderStep()}
       </Animated.View>
     </View>
