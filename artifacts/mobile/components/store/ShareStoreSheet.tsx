@@ -90,12 +90,14 @@ export function ShareStoreContent({ onToast, onLeave, previewWidth = 188, previe
     hapticLight();
     if (Platform.OS === 'web') {
       const nav = typeof navigator !== 'undefined' ? navigator : null;
-      if (nav?.share) { await nav.share({ url: link.url }).catch(() => {}); return; }
+      if (nav?.share) { await nav.share({ url: link.url }).then(() => link.markShared()).catch(() => {}); return; }
       await link.copy();
       onToast('Link copied');
       return;
     }
-    await Share.share(Platform.OS === 'ios' ? { url: link.url } : { message: link.url }).catch(() => {});
+    await Share.share(Platform.OS === 'ios' ? { url: link.url } : { message: link.url })
+      .then((result) => { if (result.action !== Share.dismissedAction) link.markShared(); })
+      .catch(() => {});
   }, [onToast, link]);
 
   const shareTo = useCallback(async (key: ShareTargetKey) => {
@@ -107,8 +109,9 @@ export function ShareStoreContent({ onToast, onLeave, previewWidth = 188, previe
     if (target.copyFirst) { await link.copy(); onToast('Link copied'); }
     for (const url of urls) {
       try {
-        if (Platform.OS === 'web') { window.open(url, '_blank', 'noopener'); return; }
+        if (Platform.OS === 'web') { window.open(url, '_blank', 'noopener'); link.markShared(); return; }
         await Linking.openURL(url);
+        link.markShared();
         return;
       } catch { /* not installed — try the next, then the share sheet */ }
     }

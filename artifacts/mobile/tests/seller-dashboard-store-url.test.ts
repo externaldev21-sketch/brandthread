@@ -6,6 +6,10 @@ import { describe, expect, it } from 'vitest';
 
 const dashboard = readFileSync(resolve(process.cwd(), 'components/SellerHomeCommerceDashboard.tsx'), 'utf8');
 
+it('records first-week sharing only for the authenticated, non-preview seller', () => {
+  expect(dashboard).toContain('if (isSignedIn && !sellerPreview) await api.firstWeek.storeShared()');
+});
+
 /**
  * Dev: on the same row as the "Dashboard" title, show the seller's real
  * public store URL (using the one existing URL builder, not a new one) plus

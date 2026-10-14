@@ -52,6 +52,7 @@ import type {
 import { classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsError';
 import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
+import type { FirstWeekState } from '@/lib/firstWeek';
 import type { WeeklyQuestsClaimResult, WeeklyQuestsStatus } from '@/lib/weeklyQuests';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun, QuickImportItem } from '@/lib/productImportTypes';
 import type { QuizProduct, QuizSwipe } from '@/lib/tasteQuiz';
@@ -2346,6 +2347,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     wallet: {
       status: () => get<{ enabled: boolean }>('/api/wallet/status'),
       passLink: (orderId: string) => post<{ path: string }>(`/api/wallet/orders/${encodeURIComponent(orderId)}/link`, {}),
+    },
+    firstWeek: {
+      get: () => get<FirstWeekState>('/api/first-week'),
+      dismiss: () => post<{ ok: true }>('/api/first-week/dismiss', {}),
+      storeShared: () => post<{ ok: true }>('/api/first-week/store-shared', {}),
     },
     buyer: {
       /** Saved sizes / preferences. GET returns defaults when nothing is saved; update is a partial merge (null clears a size). */

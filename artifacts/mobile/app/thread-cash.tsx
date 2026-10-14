@@ -39,6 +39,7 @@ function historyLabel(entry: ThreadCashEntry): string {
     case 'streak_bonus': return 'Streak bonus';
     case 'referral': return 'Referral';
     case 'weekly_quests': return 'Weekly quests';
+    case 'first_week': return 'First week checklist';
     case 'redemption': return 'Used at checkout';
     case 'checkout_spend': return 'Spent on an order';
     case 'refund_credit': return 'Returned from a refund';
@@ -63,6 +64,7 @@ function historyGlyph(
     case 'streak_bonus': return { icon: 'zap', color: theme.accent };
     case 'referral': return { icon: 'users', color: theme.success };
     case 'weekly_quests': return { icon: 'check-circle', color: theme.success };
+    case 'first_week': return { icon: 'check-circle', color: theme.success };
     case 'redemption':
     case 'checkout_spend': return { icon: 'shopping-bag', color: theme.muted };
     case 'refund_credit':

@@ -3095,3 +3095,4 @@ export const fxRates = pgTable('fx_rates', {
 }));
 export * from './sellerMilestones';
 export * from './closet';
+export * from './firstWeek';

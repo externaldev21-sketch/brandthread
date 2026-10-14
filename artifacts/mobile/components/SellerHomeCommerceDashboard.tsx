@@ -98,6 +98,7 @@ import { SellerDashboardTrafficSources } from '@/components/SellerDashboardTraff
 import { SellerDashboardRecentOrders } from '@/components/SellerDashboardRecentOrders';
 
 import { SellerDashboardSetupCard } from '@/components/SellerDashboardSetupCard';
+import { FirstWeekCard, useFirstWeek } from '@/components/FirstWeekCard';
 
 import { SellerDashboardAISuggestions } from '@/components/SellerDashboardAISuggestions';
 
@@ -258,6 +259,7 @@ export default function SellerHomeCommerceDashboard({
   // safe inset + 16 (shared helper, same rule app-wide).
   const tabBarClearance = useTabBarClearance(2); // seller bar: Studio + AI side circles
   const scrollResetRef = useScrollReset<ScrollView>();
+  const firstWeek = useFirstWeek();
 
   // Opens on Today every launch (Dev) — nothing persisted across launches.
   const [range, setRange] = useState<SellerHomeDashboardRange>('today');
@@ -306,10 +308,11 @@ export default function SellerHomeCommerceDashboard({
         const Clipboard = await import('expo-clipboard');
         await Clipboard.setStringAsync(storeUrl);
       }
+      if (isSignedIn && !sellerPreview) await api.firstWeek.storeShared().catch(() => {});
     })();
     setStoreUrlCopied(true);
     setTimeout(() => setStoreUrlCopied(false), 1200);
-  }, [storeUrl]);
+  }, [storeUrl, api, isSignedIn, sellerPreview]);
 
   useEffect(() => subscribeStoreContext(() => {
     // Drop the previous store's numbers immediately rather than leaving them
@@ -751,7 +754,7 @@ export default function SellerHomeCommerceDashboard({
   // Shopify's "Get ready to sell" until the first sale, then the sales hero.
   // If the checklist can't load, the previous setup card stays as the fallback.
   const readyToSell = useReadyToSell();
-  const showReadyToSell = newSeller && readyToSell.data !== null && !readyToSell.data.hasSale;
+  const showReadyToSell = !firstWeek.visible && newSeller && readyToSell.data !== null && !readyToSell.data.hasSale;
   // ── The one top-card slot (milestones, morning brief, …). While it shows a
   // card, the bottom setup prompts wait, so only one promo is on screen. ──
   const topCard = pickTopCard<DashboardTopCardCandidate>([
@@ -924,6 +927,11 @@ export default function SellerHomeCommerceDashboard({
             </View>
           )}
           <DashboardTopCard card={topCard} />
+          {firstWeek.visible && firstWeek.state && (
+            <View style={styles.section}>
+              <FirstWeekCard state={firstWeek.state} onDismiss={firstWeek.dismiss} />
+            </View>
+          )}
 
           {!data && analyticsError ? (
             <View style={styles.errorBanner} testID="seller-dashboard-error">
@@ -1141,7 +1149,7 @@ export default function SellerHomeCommerceDashboard({
           {/* ── Setup checklist: "Continue setup" banner opens the guided
               walkthrough sheet, which owns the full task list — no separate
               inline checklist duplicated here. ──────────────────────────── */}
-          {!topCard && !showReadyToSell && !setupComplete && setupState.walkthroughShown && (
+          {!topCard && !showReadyToSell && !firstWeek.visible && !setupComplete && setupState.walkthroughShown && (
             <View style={styles.section}>
               <SetupContinueBanner
                 percent={setupPercent}
@@ -1152,7 +1160,7 @@ export default function SellerHomeCommerceDashboard({
           )}
 
           {/* One setup list at a time: Get ready to sell replaces it for a new seller. */}
-          {!topCard && !showReadyToSell && <LaunchChecklistCard />}
+          {!topCard && !showReadyToSell && !firstWeek.visible && <LaunchChecklistCard />}
         </ResponsiveContainer>
         <View testID="seller-dashboard-scroll-end" accessibilityLabel="Seller dashboard scroll end" style={styles.scrollEndMarker} />
       </ScrollView>

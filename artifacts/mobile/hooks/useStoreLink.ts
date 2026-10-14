@@ -69,6 +69,7 @@ export function useStoreLink(): StoreLinkState {
   const markShared = useCallback(() => {
     if (isSellerDevPreview()) return;
     api.seller.launchChecklist.storeShared().catch(() => {});
+    api.firstWeek.storeShared().catch(() => {});
   }, [api]);
   const flash = (set: (v: boolean) => void) => {
     set(true);
@@ -117,6 +118,6 @@ export function useStoreLink(): StoreLinkState {
 
   return {
     loading, url, brandName: profile?.brandName ?? null, username: profile?.username ?? null,
-    copied, saved, copy, share, saveQr,
+    copied, saved, copy, share, saveQr, markShared,
   };
 }
