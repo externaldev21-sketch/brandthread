@@ -15,9 +15,12 @@ export type FeatureFlagKey =
   | 'oauthAppleEnabled'
   | 'hostedCheckoutFallback'
   | 'live_tips'
-  | 'autoCaptions';
+  | 'autoCaptions'
+  | 'monthlyWrapped';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
+  // Monthly Wrapped card on the buyer profile (days 1–7); server-side kill switch.
+  monthlyWrapped: true,
   aiPhotoShoot: true,
   outfitSwap: true,
   boosts: true,
