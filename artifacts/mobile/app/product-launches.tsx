@@ -4,8 +4,11 @@
  * Lists products waiting on a launch time with their Notify me signups, and
  * sets / changes / cancels a launch. `?productId=` (from the product action
  * sheet) opens the editor straight away for that product.
+ *
+ * Release: First come (default) or Draw (SNKRS draw: entries open at the
+ * launch time and close after the chosen window; see routes/product-draws).
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
@@ -22,6 +25,8 @@ import { EmptyState, HapticSwitch, PrimaryButton } from '@/components/Brandthrea
 import { LaunchTimePicker, parseWallClock } from '@/components/products/LaunchTimePicker';
 import { listSupportedTimeZones, zonedTimeToUtc } from '@/lib/dropSchedule';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { SegmentedControl } from '@/components/ui';
 
 type Launch = {
   productId: string; name: string; imageUrl: string | null; status: string;
@@ -36,6 +41,29 @@ function whenLabel(iso: string) {
   const d = new Date(iso);
   return `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
 }
+const DRAW_WINDOWS = [
+  { minutes: 15, label: '15 min' },
+  { minutes: 60, label: '1 hour' },
+  { minutes: 24 * 60, label: '24 hours' },
+];
+
+/** One plain line per audit-log event (the full detail stays on the server). */
+export function drawEventLabel(kind: string, detail: Record<string, unknown>): string {
+  switch (kind) {
+    case 'created': return 'Draw set up';
+    case 'updated': return 'Draw window changed';
+    case 'entry': return 'Entry';
+    case 'withdrawn': return 'Entry withdrawn';
+    case 'closed': return `Entries closed · ${Number(detail.entries ?? 0)} entered`;
+    case 'winner': return `Winner · #${Number(detail.rank ?? 0)}`;
+    case 'charge_failed': return 'Payment declined · next in line';
+    case 'lost': return `${Number(detail.count ?? 0)} not selected · holds released`;
+    case 'drawn': return `Draw complete · ${Number(detail.won ?? 0)} won`;
+    case 'cancelled': return 'Draw cancelled · holds released';
+    default: return kind;
+  }
+}
+
 function deviceZone() {
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; }
 }
@@ -209,6 +237,28 @@ function LaunchEditor({
   const [zoneFilter, setZoneFilter] = useState('');
   const [notifyFollowers, setNotifyFollowers] = useState(existing?.notifyFollowers ?? false);
   const [saving, setSaving] = useState(false);
+  const drawsEnabled = useFeatureFlag('productDraws');
+  const [release, setRelease] = useState<'fcfs' | 'draw'>('fcfs');
+  const [drawWindowMin, setDrawWindowMin] = useState(DRAW_WINDOWS[1].minutes);
+  const [hadDraw, setHadDraw] = useState(false);
+  const [initialWindowMin, setInitialWindowMin] = useState<number | null>(null);
+  const [drawLog, setDrawLog] = useState<Array<{ id: string; kind: string; createdAt: string; detail: Record<string, unknown> }>>([]);
+
+  useEffect(() => {
+    let active = true;
+    api.productDraws.state(target.productId).then((r) => {
+      if (!active || !r.draw) return;
+      setRelease('draw');
+      setHadDraw(true);
+      const mins = Math.round((Date.parse(r.draw.closesAt) - Date.parse(r.draw.opensAt)) / 60_000);
+      const nearest = DRAW_WINDOWS.reduce((best, w) => (Math.abs(w.minutes - mins) < Math.abs(best.minutes - mins) ? w : best)).minutes;
+      setDrawWindowMin(nearest);
+      setInitialWindowMin(nearest);
+    }).catch(() => {});
+    api.productDraws.audit(target.productId).then((events) => { if (active) setDrawLog(events); }).catch(() => {});
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target.productId]);
   const zones = useMemo(() => listSupportedTimeZones(), []);
   const filtered = useMemo(() => {
     const f = zoneFilter.trim().toLowerCase();
@@ -224,6 +274,12 @@ function LaunchEditor({
     setSaving(true);
     try {
       await api.productLaunches.schedule(target.productId, { launchAt: launchAt.toISOString(), notifyFollowers });
+      // Re-sent only when it changed: once people have entered, the window is fixed.
+      if (drawsEnabled && release === 'draw' && !(hadDraw && drawWindowMin === initialWindowMin && existing && Date.parse(existing.launchAt) === launchAt.getTime())) {
+        await api.productDraws.set(target.productId, new Date(launchAt.getTime() + drawWindowMin * 60_000).toISOString());
+      } else if (hadDraw) {
+        await api.productDraws.cancel(target.productId);
+      }
       onSaved();
     } catch (e: any) {
       Alert.alert("Couldn't save", e?.message ?? 'Try again.');
@@ -286,6 +342,39 @@ function LaunchEditor({
           <Icon name="chevron-down" size={14} color={colors.mutedForeground} />
         </TouchableOpacity>
 
+        {drawsEnabled ? (
+          <>
+            <Text style={[s.label, { color: colors.mutedForeground }]}>RELEASE</Text>
+            <SegmentedControl
+              options={[{ id: 'fcfs', label: 'First come' }, { id: 'draw', label: 'Draw' }]}
+              selectedId={release}
+              onChange={(id) => setRelease(id as 'fcfs' | 'draw')}
+              testID="launch-release"
+            />
+            {release === 'draw' ? (
+              <>
+                <Text style={[s.label, { color: colors.mutedForeground }]}>ENTRIES CLOSE AFTER</Text>
+                <View style={s.chips}>
+                  {DRAW_WINDOWS.map((w) => {
+                    const on = w.minutes === drawWindowMin;
+                    return (
+                      <TouchableOpacity
+                        key={w.minutes}
+                        onPress={() => setDrawWindowMin(w.minutes)}
+                        style={[s.chip, { borderColor: on ? colors.foreground : colors.border, backgroundColor: on ? colors.foreground : 'transparent' }]}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: on }}
+                      >
+                        <Text style={[s.name, { color: on ? colors.background : colors.foreground }]}>{w.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            ) : null}
+          </>
+        ) : null}
+
         <View style={[s.switchRow, { borderColor: colors.border }]}>
           <View style={{ flex: 1 }}>
             <Text style={[s.name, { color: colors.foreground }]}>Notify my followers</Text>
@@ -295,6 +384,17 @@ function LaunchEditor({
         </View>
 
         <PrimaryButton label={existing ? 'Save launch' : 'Schedule launch'} onPress={save} loading={saving} disabled={saving} />
+        {drawLog.length > 0 ? (
+          <View style={{ gap: SP.xs }} testID="draw-log">
+            <Text style={[s.label, { color: colors.mutedForeground }]}>DRAW LOG</Text>
+            {drawLog.map((e) => (
+              <View key={e.id} style={[s.logRow, { borderColor: colors.border }]}>
+                <Text style={[s.name, { color: colors.foreground }]}>{drawEventLabel(e.kind, e.detail)}</Text>
+                <Text style={[s.meta, { color: colors.mutedForeground }]}>{whenLabel(e.createdAt)}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
         {existing && (
           <TouchableOpacity style={s.cancelBtn} onPress={cancelLaunch} accessibilityRole="button">
             <Text style={[s.cancelText, { color: colors.destructive }]}>Cancel launch</Text>
@@ -323,6 +423,9 @@ const s = StyleSheet.create({
   zoneBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, minHeight: 44 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, borderTopWidth: 1, borderBottomWidth: 1, paddingVertical: SP.md },
   cancelBtn: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  chips: { flexDirection: 'row', gap: SP.sm },
+  chip: { minHeight: 36, paddingHorizontal: SP.md, borderWidth: 1, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
+  logRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SP.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   cancelText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   filter: { margin: SP.md, borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 10, fontSize: FS.sm, fontFamily: FONT.medium },
   zoneRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: 14, borderBottomWidth: 1 },

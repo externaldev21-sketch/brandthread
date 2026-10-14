@@ -18,6 +18,7 @@ import { isPastBuyer } from "./dropAudience";
 import type { DbExecutor } from "./ledger";
 import { payoutMode } from "../delivery/policy";
 import { unlaunchedProductIds } from "../productLaunch";
+import { drawOnlyProductIds } from "../productDrawGate";
 
 export class CheckoutPlanError extends Error {
   constructor(message: string, readonly status: number, readonly code: string) {
@@ -37,6 +38,8 @@ export async function resolveChargePlan(input: {
   clientDropId?: string | null;
   now?: Date;
   executor?: DbExecutor;
+  /** Pricing a draw entry (lib/productDraws.ts), the one way to buy a product whose draw is open. */
+  viaDraw?: boolean;
 }): Promise<ChargePlan> {
   const executor = input.executor ?? db;
   const now = input.now ?? new Date();
@@ -47,6 +50,9 @@ export async function resolveChargePlan(input: {
   // opened yet can't be bought. Products without a row are unaffected.
   if ((await unlaunchedProductIds(ids, now, executor)).length > 0) {
     throw new CheckoutPlanError("This product hasn't launched yet.", 409, "PRODUCT_NOT_LAUNCHED");
+  }
+  if (!input.viaDraw && (await drawOnlyProductIds(ids, executor)).length > 0) {
+    throw new CheckoutPlanError("This drop is a draw. Enter it from the product page.", 409, "DRAW_ONLY");
   }
 
   const rows = await executor.select({

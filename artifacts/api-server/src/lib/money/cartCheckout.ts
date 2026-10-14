@@ -180,6 +180,8 @@ export async function priceCartGroup(input: {
   /** Live stream the buyer is shopping from (live-only discount codes). */
   liveStreamId?: string | null;
   shipping: CartShipping;
+  /** Pricing a draw entry: the draw is the one way to buy while it's open. */
+  viaDraw?: boolean;
 }): Promise<PricedGroup> {
   const seen = new Set<string>();
   const items: PricedGroup["items"] = [];
@@ -259,7 +261,7 @@ export async function priceCartGroup(input: {
   // never the client); the route stores it on this group's checkout row.
   let chargePlan: ChargePlan;
   try {
-    chargePlan = await resolveChargePlan({ productIds: items.map((i) => i.productId), sellerId, buyerId: input.buyerId, clientDropId: null });
+    chargePlan = await resolveChargePlan({ productIds: items.map((i) => i.productId), sellerId, buyerId: input.buyerId, clientDropId: null, viaDraw: input.viaDraw });
   } catch (error) {
     if (error instanceof CheckoutPlanError) throw new CartCheckoutError(error.status, error.code, error.message);
     throw error;

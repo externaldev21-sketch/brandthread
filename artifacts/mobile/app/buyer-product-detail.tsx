@@ -83,6 +83,8 @@ import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 
 import { LaunchCountdown } from '@/components/products/LaunchCountdown';
 
+import { useProductDraw } from '@/hooks/useProductDraw';
+import { closesLabel, drawFooter } from '@/lib/drawPhase';
 import { PreOrderShipBy } from '@/components/products/PreOrderShipBy';
 
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
@@ -993,6 +995,8 @@ export default function BuyerProductDetailScreen() {
 
   // Waitlist & pre-order reservation state
   const [launching, setLaunching] = useState(false);
+  // Draw mode (SNKRS draw): one "Enter Draw" button replaces Add to cart / Buy now.
+  const productDraw = useProductDraw(productId);
   const [waitlistJoined,  setWaitlistJoined]  = useState(false);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [reserved,        setReserved]        = useState(false);
@@ -1640,7 +1644,12 @@ export default function BuyerProductDetailScreen() {
 
           {!sellerPreview && <LaunchCountdown productId={product.id} onLaunchingChange={setLaunching} />}
 
-          {!sellerPreview && <StockCounter productId={product.id} />}
+          {!sellerPreview && productDraw.draw && productDraw.phase && ['upcoming', 'open', 'entered'].includes(productDraw.phase.kind) ? (
+            <Text style={s.drawLine} testID="product-draw-line">
+              {productDraw.phase.kind === 'entered' ? 'Entered' : 'Draw'} · {closesLabel(productDraw.draw.closesAt)}
+            </Text>
+          ) : null}
+          {!sellerPreview && !productDraw.draw && <StockCounter productId={product.id} />}
           {sellerPreview && (
             <Text style={s.previewNote} testID="product-seller-preview-note">
               {sellerPreview === 'local'
@@ -1752,7 +1761,7 @@ export default function BuyerProductDetailScreen() {
           {/* Demand signals sit under the sizes so photo, name, price, size
               and Add all fit above the fold (item 129). */}
           {/* ── Buyer demand signals (server-supplied values only) ── */}
-          {(demandClaimedUnits > 0 || demandRemainingUnits > 0 || !!demandEndsAt ||
+          {!productDraw.draw && (demandClaimedUnits > 0 || demandRemainingUnits > 0 || !!demandEndsAt ||
             (demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD)) && (
             <View style={{ marginBottom: SP.md, gap: 6 }}>
               {demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD && (
@@ -2118,7 +2127,24 @@ export default function BuyerProductDetailScreen() {
             (Nike PDP CTA, https://mobbin.com/screens/5163c408-ea2f-46d1-b945-ab33395eacd1).
             The bag-icon bump on success is unchanged. */}
         <View style={s.buyNowBtn}>
-        {addedToCart ? (
+        {productDraw.draw && productDraw.phase ? (() => {
+          const footer = drawFooter(productDraw.phase);
+          return (
+            <Button
+              label={footer.label}
+              variant={productDraw.phase.kind === 'entered' ? 'secondary' : 'primary'}
+              disabled={!footer.enabled}
+              onPress={() => {
+                if (footer.target === 'entry') router.push({ pathname: '/draw-entry', params: { productId: product.id, ...(variant ? { variantId: variant.id } : {}) } } as never);
+                if (footer.target === 'result') router.push({ pathname: '/draw-result', params: { productId: product.id } } as never);
+              }}
+              style={s.drawBtn}
+              fullWidth
+              testID="product-draw-button"
+            />
+          );
+        })() : null}
+        {productDraw.draw ? null : addedToCart ? (
           <Button
             label="In bag ✓"
             onPress={() => router.push('/(buyer)/cart' as never)}
@@ -2164,7 +2190,7 @@ export default function BuyerProductDetailScreen() {
       {/* Buy now / Reserve keep their place in the bar, as the secondary
           action under Add to bag. */}
       <View style={s.actionBarSecondRow}>
-        {sellerPreview ? (<Button label="Not for sale yet" onPress={() => {}} disabled fullWidth testID="product-seller-preview-buy" />) : product.isPreOrder ? (
+        {productDraw.draw ? null : sellerPreview ? (<Button label="Not for sale yet" onPress={() => {}} disabled fullWidth testID="product-seller-preview-buy" />) : product.isPreOrder ? (
           <Button
             label={reserved ? 'Reserved ✓' : 'Reserve (No Charge)'}
             onPress={handleReserve}
@@ -2799,6 +2825,7 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   brandLink: { alignSelf: 'flex-start', marginBottom: 4 },
   brandText: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
   productName: { fontSize: 20, lineHeight: 26, fontWeight: '600', color: FG, marginBottom: SP.xs },
+  drawLine: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED, marginBottom: SP.md, fontVariant: ['tabular-nums'] },
   addedSheetContent: { padding: SP.md, paddingTop: SP.xs, alignItems: 'center' },
   addedSheetTitle: { ...TYPE.title, color: FG, marginTop: SP.sm, marginBottom: SP.md },
   addedSheetProductRow: {
@@ -2884,6 +2911,7 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center',
   },
   buyNowBtn: { flex: 1 },
+  drawBtn: { flex: 1, borderRadius: RADIUS.pill },
   reviewsHeader: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.sm },
   reviewRow: { marginBottom: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   reviewStars: { fontSize: FS.sm, fontFamily: FONT.regular, color: GOLD, marginBottom: 2 },

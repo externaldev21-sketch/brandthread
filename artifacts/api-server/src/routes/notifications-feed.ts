@@ -436,6 +436,8 @@ type PublishInput = {
   pushBody?: string;
   /** Extra push data for the device (e.g. the seller widget delta). */
   pushData?: Record<string, unknown>;
+  /** Feed row only, never a push (the recipient hasn't opted in to a push for this). */
+  inAppOnly?: boolean;
 };
 
 /** conversation_participants.muted_until in the future (Chat details > Mute). */
@@ -505,7 +507,7 @@ export async function publishNotification(n: PublishInput): Promise<void> {
   // to dedupe retries on) when its own switch is on.
   const feedEnabled = pushCategory ? await isChannelEnabledForUser(n.userId, pushCategory, "inApp") : true;
   if (!feedEnabled) {
-    if (!isMuted && pushCategory) await sendFeedlessPush(n, pushCategory);
+    if (!isMuted && pushCategory && !n.inAppOnly) await sendFeedlessPush(n, pushCategory);
     return;
   }
 
@@ -545,7 +547,7 @@ export async function publishNotification(n: PublishInput): Promise<void> {
   // The recipient's open app refreshes its Activity + badge now (ws/userHub).
   emitUserEvents([n.userId], { type: "activity.updated" });
 
-  if (pushCategory) {
+  if (pushCategory && !n.inAppOnly) {
     // A muted conversation only suppresses device delivery; the feed row
     // above is kept and unread state is unchanged.
     if (!n.ringThroughMutes && await isConversationMutedFor(n)) return;

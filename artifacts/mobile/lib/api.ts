@@ -4308,6 +4308,31 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ ok: boolean }>(`/api/seller/terminal/payment-intents/${encodeURIComponent(paymentIntentId)}/cancel`, {}),
     },
     /** Scheduled product launches + "Notify me". */
+    /** Draws for limited drops (server: routes/product-draws.ts). */
+    productDraws: {
+      state:    (productId: string) =>
+        get<{ draw: ProductDrawState | null; serverNow: string }>(`/api/product-draws/${encodeURIComponent(productId)}`),
+      entry:    (productId: string) =>
+        get<{ entry: ProductDrawEntry | null }>(`/api/product-draws/${encodeURIComponent(productId)}/entry`),
+      quote:    (productId: string, body: { variantId: string; addressId: string }) =>
+        post<{ subtotalCents: number; shippingCents: number; taxCents: number; totalCents: number; variantLabel: string }>(
+          `/api/product-draws/${encodeURIComponent(productId)}/entry/quote`, body),
+      enter:    (productId: string, body: { variantId: string; addressId: string; notifyResult: boolean }) =>
+        post<{ entryId: string; clientSecret: string | null; amountCents: number; status: string }>(
+          `/api/product-draws/${encodeURIComponent(productId)}/entry`, body),
+      confirm:  (productId: string) =>
+        post<{ status: string }>(`/api/product-draws/${encodeURIComponent(productId)}/entry/confirm`, {}),
+      withdraw: (productId: string) =>
+        del<{ status: string }>(`/api/product-draws/${encodeURIComponent(productId)}/entry`),
+      /** Seller. */
+      set:      (productId: string, entryClosesAt: string) =>
+        put<ProductDrawState>(`/api/product-draws/${encodeURIComponent(productId)}`, { entryClosesAt }),
+      cancel:   (productId: string) =>
+        del<{ cancelled: boolean }>(`/api/product-draws/${encodeURIComponent(productId)}`),
+      audit:    (productId: string) =>
+        get<Array<{ id: string; kind: string; entryId: string | null; actor: string | null; detail: Record<string, unknown>; createdAt: string }>>(
+          `/api/product-draws/${encodeURIComponent(productId)}/audit`),
+    },
     productLaunches: {
       /** Public: is this product waiting on a launch time? */
       state:       (productId: string) =>
@@ -5424,3 +5449,24 @@ export function configureApi(getter: GetToken, getCacheScope: GetCacheScope = ()
   _globalCacheScope = getCacheScope;
 }
 export const api = createApi(() => _globalGetter(), () => _globalCacheScope());
+
+export type ProductDrawState = {
+  productId: string;
+  /** open | drawing | drawn */
+  status: string;
+  opensAt: string;
+  closesAt: string;
+  seedHash: string;
+  drawnAt: string | null;
+};
+
+export type ProductDrawEntry = {
+  id: string;
+  /** pending | entered | won | lost | charge_failed | released */
+  status: string;
+  variantId: string;
+  variantLabel: string;
+  amountCents: number;
+  notifyResult: boolean;
+  decidedAt: string | null;
+};

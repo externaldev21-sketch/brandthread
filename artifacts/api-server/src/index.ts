@@ -11,6 +11,7 @@ import { startTeamInviteReminderJob } from "./jobs/teamInviteReminder";
 import { startScheduledDropBroadcastJob } from "./jobs/scheduledDropBroadcasts";
 import { startDropEarlyAccessPushJob } from "./jobs/dropEarlyAccessPush";
 import { startProductLaunchJob } from "./jobs/productLaunches";
+import { startProductDrawJob } from "./jobs/productDraws";
 import { startSellerTrialReminderJob } from "./jobs/sellerTrialReminder";
 import { startSellerLifecycleJobs } from "./jobs/sellerLifecycle";
 import { startDisputeEvidenceReminderJob } from "./jobs/disputeEvidenceReminder";
@@ -120,6 +121,7 @@ const server = app.listen(port, (err) => {
   startScheduledDropBroadcastJob();
   startDropEarlyAccessPushJob();
   startProductLaunchJob();
+  startProductDrawJob();
   startSellerTrialReminderJob();
   startSellerLifecycleJobs(); // activation nudges + Monday seller summary
   startDisputeEvidenceReminderJob();
