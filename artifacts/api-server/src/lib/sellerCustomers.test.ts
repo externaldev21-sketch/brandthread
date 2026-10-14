@@ -5,6 +5,8 @@ import {
   matchesCustomerSearch,
   mergeSellerCustomers,
   publicCustomer,
+  superfanCount,
+  superfans,
   topCustomers,
   type OrderGroup,
 } from "./sellerCustomers";
@@ -89,5 +91,62 @@ describe("topCustomers / search", () => {
   it("matches name, email and tags case-insensitively", () => {
     expect(list.filter((c) => matchesCustomerSearch(c, "WHOLESALE"))).toHaveLength(1);
     expect(list.filter((c) => matchesCustomerSearch(c, "g1"))).toHaveLength(11); // g1, g10..g19
+  });
+});
+
+describe("superfans (top 1% by spend)", () => {
+  // n signed-in buyers, buyer i spends (n - i) dollars across 1 order.
+  const buyers = (n: number) => mergeSellerCustomers(
+    Array.from({ length: n }, (_, i) => group({ buyerId: `b${i}`, spentCents: (n - i) * 100 })), [], [],
+  );
+
+  it("counts ceil(1%) with a minimum of 1, and none without orders", () => {
+    expect(superfanCount(0)).toBe(0);
+    expect(superfanCount(1)).toBe(1);
+    expect(superfanCount(99)).toBe(1);
+    expect(superfanCount(100)).toBe(1);
+    expect(superfanCount(101)).toBe(2);
+    expect(superfanCount(250)).toBe(3);
+  });
+
+  it.each([[1, 1], [99, 1], [100, 1], [250, 3]])("%i customers -> %i superfans, biggest spenders first", (n, k) => {
+    const list = superfans(buyers(n));
+    expect(list).toHaveLength(k);
+    expect(list.map((c) => c.buyerIds[0])).toEqual(Array.from({ length: k }, (_, i) => `b${i}`));
+  });
+
+  it("is empty when nobody has ordered (hand-entered rows only)", () => {
+    const list = mergeSellerCustomers([], [], [{
+      id: "11111111-1111-1111-1111-111111111111", name: "Manual", email: "m@x.com", phone: null, tags: [], notes: null, createdAt: d("2026-09-01T00:00:00Z"),
+    }]);
+    expect(superfans(list)).toEqual([]);
+  });
+
+  it("breaks spend ties on order count", () => {
+    const list = mergeSellerCustomers([
+      group({ buyerId: "few", spentCents: 5000, orderCount: 1 }),
+      group({ buyerId: "many", spentCents: 5000, orderCount: 4 }),
+    ], [], []);
+    expect(superfans(list)[0]?.buyerIds).toEqual(["many"]);
+  });
+
+  it("excludes guests: the slot goes to the top signed-in buyer", () => {
+    const list = mergeSellerCustomers([
+      group({ guestEmail: "whale@guest.com", spentCents: 99_000 }),
+      group({ buyerId: "acct", spentCents: 2000 }),
+    ], [], []);
+    const top = superfans(list);
+    expect(top.map((c) => c.kind)).toEqual(["account"]);
+    expect(top[0]?.buyerIds).toEqual(["acct"]);
+    // Only guests: nobody qualifies.
+    expect(superfans(mergeSellerCustomers([group({ guestEmail: "g@x.com" })], [], []))).toEqual([]);
+  });
+
+  it("never counts the seller's own account", () => {
+    const list = mergeSellerCustomers([
+      group({ buyerId: "seller", spentCents: 99_000 }),
+      group({ buyerId: "fan", spentCents: 1000 }),
+    ], [], []);
+    expect(superfans(list, "seller").map((c) => c.buyerIds[0])).toEqual(["fan"]);
   });
 });

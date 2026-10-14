@@ -11,10 +11,10 @@
  * into it) by editing a request.
  */
 import { and, eq, inArray } from "drizzle-orm";
-import { db, drops, follows, products } from "@workspace/db";
+import { db, dropEarlyAccessGrants, drops, follows, products } from "@workspace/db";
 import { destinationApplicationFeeCents } from "./fees";
-import { isDropLive } from "./dropLaunch";
 import { isPastBuyer } from "./dropAudience";
+import { grantEarlyAccessMinutes, isDropLive } from "./dropLaunch";
 import type { DbExecutor } from "./ledger";
 import { payoutMode } from "../delivery/policy";
 import { unlaunchedProductIds } from "../productLaunch";
@@ -102,9 +102,17 @@ export async function resolveChargePlan(input: {
         .limit(1);
       hasEarlyAccess = !!isFollower;
     }
-    if (!isDropLive(drop.releaseAt, earlyAccessMinutes, hasEarlyAccess, now)) {
-      throw new CheckoutPlanError("This drop hasn't launched yet.", 409, "DROP_NOT_LIVE");
+    if (isDropLive(drop.releaseAt, earlyAccessMinutes, hasEarlyAccess, now)) continue;
+    // Superfans: a buyer the seller granted early access to this drop
+    // (drop_early_access_grants) may buy during the early window — the drop's
+    // own window, or 60 minutes when it has none — follower or not.
+    if (input.buyerId && isDropLive(drop.releaseAt, grantEarlyAccessMinutes(drop.earlyAccessMinutes), true, now)) {
+      const [grant] = await executor.select({ buyerId: dropEarlyAccessGrants.buyerId }).from(dropEarlyAccessGrants)
+        .where(and(eq(dropEarlyAccessGrants.dropId, drop.dropId!), eq(dropEarlyAccessGrants.buyerId, input.buyerId)))
+        .limit(1);
+      if (grant) continue;
     }
+    throw new CheckoutPlanError("This drop hasn't launched yet.", 409, "DROP_NOT_LIVE");
   }
 
   const preorderDrops = new Set<string>();

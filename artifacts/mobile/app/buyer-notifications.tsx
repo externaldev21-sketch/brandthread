@@ -96,7 +96,8 @@ function notifIcon(type: Notification['type']): string {
     case 'order_refund_warning': return 'clock';
     case 'order_exception': return 'alert-triangle';
     case 'order_returned_to_sender': return 'corner-up-left';
-    case 'drop_live': return 'zap';
+    case 'drop_live':
+    case 'drop_early_access': return 'zap';
     case 'live_reminder':
     case 'live_started': return 'video';
     case 'product_restocked': return 'refresh-cw';
@@ -203,6 +204,10 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
         break;
       }
       router.navigate('/(buyer)/discover' as any);
+      break;
+    case 'drop_early_access':
+      // A seller gave this buyer early access (Customers > Superfans): open the drop.
+      router.push((notif.targetId ? `/buyer-drop-detail?id=${encodeURIComponent(notif.targetId)}` : '/(buyer)/discover') as any);
       break;
     case 'drop_live':
     case 'product_restocked':

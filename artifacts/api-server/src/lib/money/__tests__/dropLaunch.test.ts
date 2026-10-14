@@ -1,5 +1,14 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { effectiveDropLaunchAt, isDropLive } from "../dropLaunch";
+import { effectiveDropLaunchAt, isDropLive, grantEarlyAccessMinutes } from "../dropLaunch";
+
+describe("Superfans grant window", () => {
+  it("preserves a configured window or uses a 60-minute default", () => {
+    expect(grantEarlyAccessMinutes(30)).toBe(30);
+    expect(grantEarlyAccessMinutes(120)).toBe(120);
+    expect(grantEarlyAccessMinutes(0)).toBe(60);
+    expect(grantEarlyAccessMinutes(null)).toBe(60);
+  });
+});
 
 describe("effectiveDropLaunchAt", () => {
   it("returns releaseAt unchanged with no early access window", () => {

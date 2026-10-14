@@ -237,6 +237,42 @@ export function topCustomers(list: readonly SellerCustomer[], limit: number): Se
     .slice(0, limit);
 }
 
+// ─── Superfans ───────────────────────────────────────────────────────────────
+
+/** Share of a seller's buyers that count as superfans. */
+export const SUPERFAN_SHARE = 0.01;
+
+/**
+ * How many superfans a seller with `customersWithOrders` buyers has:
+ * ceil(1%), at least 1, and 0 when nobody has ordered yet.
+ */
+export function superfanCount(customersWithOrders: number): number {
+  if (!Number.isFinite(customersWithOrders) || customersWithOrders < 1) return 0;
+  return Math.max(1, Math.ceil(customersWithOrders * SUPERFAN_SHARE));
+}
+
+/**
+ * The seller's top 1% of buyers by lifetime spend, order count as the
+ * tiebreak (then the most recent order, then id, so the list is stable).
+ *
+ * The count is 1% of everyone with an order (guests are customers too), but
+ * only signed-in buyers fill the slots: early access is attached to an
+ * account, so a guest checkout email can't receive it. The seller's own
+ * account (test orders) never counts.
+ */
+export function superfans(list: readonly SellerCustomer[], ownerId?: string): SellerCustomer[] {
+  const withOrders = list.filter((c) => c.orderCount > 0);
+  const n = superfanCount(withOrders.length);
+  if (n === 0) return [];
+  return withOrders
+    .filter((c) => c.kind === "account" && c.buyerIds.length > 0 && !(ownerId && c.buyerIds.includes(ownerId)))
+    .sort((a, b) => b.totalSpentCents - a.totalSpentCents
+      || b.orderCount - a.orderCount
+      || (b.lastOrderAt ?? "").localeCompare(a.lastOrderAt ?? "")
+      || a.id.localeCompare(b.id))
+    .slice(0, n);
+}
+
 /** What the client sees: identity sets stay server-side. */
 export function publicCustomer(c: SellerCustomer) {
   const { buyerIds: _b, guestEmails: _g, customerIds: _c, ...rest } = c;

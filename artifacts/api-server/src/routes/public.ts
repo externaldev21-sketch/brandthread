@@ -12,6 +12,8 @@ import { resolveDevice } from "../lib/sellerInsights";
 import { db, readDb, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, storeVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
 import { getAuth } from "@clerk/express";
 import { effectiveDropLaunchAt } from "../lib/money/dropLaunch";
+import { grantEarlyAccessMinutes } from "../lib/money/dropLaunch";
+import { dropEarlyAccessGrants } from "@workspace/db";
 import { isPastBuyer } from "../lib/money/dropAudience";
 import { adaptSavedRows } from "../lib/savedItemAdapter";
 import { fetchProductBadgeInfo } from "../lib/savedProductBadges";
@@ -1741,7 +1743,7 @@ router.get("/drops/:id", async (req, res) => {
   // The response carries viewer-specific access (early access, members-only),
   // so a signed-in response must never be shared from a cache.
   setViewerScopedCacheHeaders(res, userId);
-  const [[seller], dropProducts, isFollower, viewerIsMember] = await Promise.all([
+  const [[seller], dropProducts, isFollower, viewerIsMember, hasGrant] = await Promise.all([
     db
       .select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified, verificationStatus: users.verificationStatus, activeStanding: users.activeStanding, policyRestricted: users.policyRestricted })
       .from(users)
@@ -1772,13 +1774,16 @@ router.get("/drops/:id", async (req, res) => {
           .then((rows) => rows.length > 0)
       : Promise.resolve(false),
     drop.membersOnly ? isPastBuyer(userId, drop.ownerId) : Promise.resolve(true),
+    userId ? db.select({ buyerId: dropEarlyAccessGrants.buyerId }).from(dropEarlyAccessGrants)
+      .where(and(eq(dropEarlyAccessGrants.dropId, drop.id), eq(dropEarlyAccessGrants.buyerId, userId)))
+      .limit(1).then(rows => rows.length > 0) : Promise.resolve(false),
   ]);
 
   // The effective moment this viewer may buy/see the drop unlock — releaseAt
   // pulled forward by the seller's early-access window for their followers.
-  const viewerHasEarlyAccess = isFollower && drop.earlyAccessMinutes > 0;
+  const viewerHasEarlyAccess = viewerIsMember && ((isFollower && drop.earlyAccessMinutes > 0) || hasGrant);
   const effectiveReleaseAt = drop.releaseAt
-    ? effectiveDropLaunchAt(drop.releaseAt, drop.earlyAccessMinutes, isFollower)
+    ? effectiveDropLaunchAt(drop.releaseAt, hasGrant ? grantEarlyAccessMinutes(drop.earlyAccessMinutes) : drop.earlyAccessMinutes, viewerHasEarlyAccess)
     : null;
 
   return res.json({

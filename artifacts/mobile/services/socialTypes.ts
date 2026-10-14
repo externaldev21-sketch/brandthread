@@ -551,7 +551,7 @@ export type NotificationType =
   | 'order_preparing' | 'order_auto_refunded' | 'order_refund_warning'
   | 'review_request'
   | 'return_update' | 'refund_update' | 'dispute_update'
-  | 'product_restocked' | 'drop_live' | 'live_reminder' | 'live_started' | 'preorder_closing'
+  | 'product_restocked' | 'drop_live' | 'drop_early_access' | 'live_reminder' | 'live_started' | 'preorder_closing'
   | 'price_drop' | 'saved_product_update'
   | 'bag_restock' | 'size_back'
   | 'new_friend_message' | 'new_seller_reply' | 'new_order_message' | 'message_request'

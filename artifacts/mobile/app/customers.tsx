@@ -19,7 +19,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState, OptionSheet, SkeletonLine } from '@/components/ui';
 import { FILL_ELEVATED, TABULAR, TEXT } from '@/lib/theme';
 import { radius } from '@/constants/radii';
-import { hapticLight } from '@/lib/haptics';
+import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import {
   CUSTOMER_SORT_OPTIONS, customerLocation, customerSpendLine, matchesCustomerSearch, sortCustomers,
   type CustomerSort, type SellerCustomer,
@@ -27,6 +27,11 @@ import {
 import { buildPreviewCustomers } from '@/lib/previewCustomers';
 import { AlphabetScrubber } from '@/components/AlphabetScrubber';
 import { firstRowByLetter, INDEX_MIN_ROWS, rowForLetter, type IndexLetter } from '@/lib/alphabetIndex';
+
+type EarlyAccessStatus = {
+  drop: { id: string; name: string; releaseAt: string; earlyAccessMinutes: number } | null;
+  superfans: number; granted: number; allGranted: boolean;
+};
 
 export default function CustomersScreen() {
   const colors = useColors();
@@ -43,7 +48,34 @@ export default function CustomersScreen() {
   const [error, setError] = useState(false);
   const [sortBy, setSortBy] = useState<CustomerSort>('recent');
   const [sortOpen, setSortOpen] = useState(false);
-  const [segment, setSegment] = useState<'all' | 'top'>('all');
+  const [segment, setSegment] = useState<'all' | 'top' | 'superfans'>('all');
+  const [superfans, setSuperfans] = useState<SellerCustomer[]>([]);
+  const [earlyAccess, setEarlyAccess] = useState<EarlyAccessStatus | null>(null);
+  const [granting, setGranting] = useState(false);
+  const [grantError, setGrantError] = useState(false);
+  const fetchSuperfans = useCallback(async () => {
+    if (isPreviewMode) { setSuperfans([]); setEarlyAccess(null); return; }
+    try {
+      const [list, status] = await Promise.all([
+        serviceRequest<SellerCustomer[]>('/api/customers?segment=superfans'),
+        serviceRequest<EarlyAccessStatus>('/api/customers/superfans/early-access'),
+      ]);
+      setSuperfans(Array.isArray(list) ? list : []);
+      setEarlyAccess(status);
+      setGrantError(false);
+    } catch { setGrantError(true); }
+  }, [isPreviewMode]);
+  useEffect(() => { if (segment === 'superfans') void fetchSuperfans(); }, [segment, fetchSuperfans]);
+  const giveEarlyAccess = useCallback(async () => {
+    if (granting || isPreviewMode) return;
+    setGranting(true);
+    try {
+      await serviceRequest('/api/customers/superfans/early-access', { method: 'POST' });
+      hapticSuccess();
+      await fetchSuperfans();
+    } catch { setGrantError(true); }
+    finally { setGranting(false); }
+  }, [granting, isPreviewMode, fetchSuperfans]);
   const hasDataRef = useRef(false);
 
   const fetchCustomers = useCallback(async (searchText: string) => {
@@ -81,11 +113,12 @@ export default function CustomersScreen() {
   }, [search, fetchCustomers]);
 
   const sortedCustomers = useMemo(() => {
+    if (segment === 'superfans') return sortCustomers(superfans.filter(c => matchesCustomerSearch(c, search)), sortBy);
     const list = segment === 'top'
       ? sortCustomers(customers.filter(c => (c.orderCount ?? 0) > 0), 'spend').slice(0, 20)
       : customers;
     return sortCustomers(list, sortBy);
-  }, [customers, sortBy, segment]);
+  }, [customers, sortBy, segment, superfans, search]);
 
   // A–Z index (S5 #100): only for a long list sorted by name.
   const showIndex = sortBy === 'name' && !loading && !error && sortedCustomers.length >= INDEX_MIN_ROWS;
@@ -151,16 +184,29 @@ export default function CustomersScreen() {
 
         {/* Flat on black — no card behind the empty state or the rows. */}
         <View style={{ flexDirection: 'row', gap: 16, marginBottom: 12 }} accessibilityRole="tablist">
-          {(['all', 'top'] as const).map(key => (
+          {(['all', 'top', 'superfans'] as const).map(key => (
             <TouchableOpacity key={key} style={{ minHeight: 44, justifyContent: 'center' }}
               onPress={() => { hapticLight(); setSegment(key); if (key === 'top') setSortBy('spend'); }}
               accessibilityRole="tab" accessibilityState={{ selected: segment === key }}>
               <Text style={[TEXT.body, { color: segment === key ? colors.foreground : colors.mutedForeground }]}>
-                {key === 'all' ? 'All' : 'Top 20'}
+                {key === 'all' ? 'All' : key === 'top' ? 'Top 20' : 'Superfans'}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
+        {segment === 'superfans' && (
+          <View style={{ gap: 8, marginBottom: 16 }}>
+            <TouchableOpacity accessibilityRole="button" disabled={granting || !!earlyAccess?.allGranted}
+              onPress={() => earlyAccess?.drop ? void giveEarlyAccess() : router.push('/product-launches' as never)}
+              style={{ minHeight: 44, justifyContent: 'center' }} testID="superfans-early-access">
+              <Text style={[TEXT.body, { color: colors.foreground }]}>
+                {granting ? 'Giving early access…' : earlyAccess?.allGranted ? 'Early access given' : earlyAccess?.drop ? 'Give early access' : 'Schedule a drop'}
+              </Text>
+            </TouchableOpacity>
+            {earlyAccess?.drop && <Text style={{ color: colors.mutedForeground }}>{earlyAccess.drop.name}</Text>}
+            {grantError && <TouchableOpacity onPress={() => void fetchSuperfans()} accessibilityRole="button"><Text style={[TEXT.body, { color: colors.foreground }]}>Couldn’t load early access. Tap to retry.</Text></TouchableOpacity>}
+          </View>
+        )}
         {loading ? (
           <View style={{ gap: 22, marginTop: 14 }}>
             {[0, 1, 2].map((i) => (
