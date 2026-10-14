@@ -80,6 +80,7 @@ import { SellerDashboardTopProducts } from '@/components/SellerDashboardTopProdu
 import { SellerDashboardTrafficSources } from '@/components/SellerDashboardTrafficSources';
 import { SellerDashboardRecentOrders } from '@/components/SellerDashboardRecentOrders';
 import { SellerDashboardSetupCard } from '@/components/SellerDashboardSetupCard';
+import { FirstWeekCard, useFirstWeek } from '@/components/FirstWeekCard';
 import {
   BG,
   FG,
@@ -253,6 +254,8 @@ export default function SellerHomeCommerceDashboard({
   const handleCopyStoreUrl = useCallback(() => {
     if (!storeUrl) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    // Counts as "Share your store" on the first-week checklist.
+    api.firstWeek.storeShared().catch(() => {});
     (async () => {
       if (Platform.OS === 'web') {
         await navigator?.clipboard?.writeText?.(storeUrl);
@@ -263,7 +266,7 @@ export default function SellerHomeCommerceDashboard({
     })();
     setStoreUrlCopied(true);
     setTimeout(() => setStoreUrlCopied(false), 1200);
-  }, [storeUrl]);
+  }, [api, storeUrl]);
 
   useEffect(() => subscribeStoreContext(() => {
     // Drop the previous store's numbers immediately rather than leaving them
@@ -508,6 +511,9 @@ export default function SellerHomeCommerceDashboard({
     }, []),
   );
 
+  // One promo card at a time: while the first-week card is up, the setup
+  // banner and launch checklist below wait their turn.
+  const firstWeek = useFirstWeek();
   const nav = useCallback((route: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     router.push(route as never);
@@ -889,6 +895,12 @@ export default function SellerHomeCommerceDashboard({
                 </TouchableOpacity>
               )}
 
+              {firstWeek.visible && firstWeek.state && (
+                <View style={styles.section}>
+                  <FirstWeekCard state={firstWeek.state} onDismiss={firstWeek.dismiss} />
+                </View>
+              )}
+
               {/* ── Action needed / top products / recent orders, or the new-seller setup card ── */}
               <View style={isTablet ? styles.tabletRow : undefined}>
                 {newSeller ? (
@@ -962,7 +974,7 @@ export default function SellerHomeCommerceDashboard({
           {/* ── Setup checklist: "Continue setup" banner opens the guided
               walkthrough sheet, which owns the full task list — no separate
               inline checklist duplicated here. ──────────────────────────── */}
-          {!setupComplete && setupState.walkthroughShown && (
+          {!setupComplete && setupState.walkthroughShown && !firstWeek.visible && (
             <View style={styles.section}>
               <SetupContinueBanner
                 percent={setupPercent}
@@ -972,7 +984,7 @@ export default function SellerHomeCommerceDashboard({
             </View>
           )}
 
-          <LaunchChecklistCard />
+          {!firstWeek.visible && <LaunchChecklistCard />}
         </ResponsiveContainer>
         <View testID="seller-dashboard-scroll-end" accessibilityLabel="Seller dashboard scroll end" style={styles.scrollEndMarker} />
       </ScrollView>
