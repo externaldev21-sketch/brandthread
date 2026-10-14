@@ -6,23 +6,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const projectRoot = path.resolve(__dirname, '..');
 const {
-  ASSET_DIR,
-  ASSET_SOURCES,
-  HERO_SLIDES,
   PENDING_FLOW_KEY,
   ROUTES,
-  SELLER_PLANS,
-  TRENDING_ENDPOINT,
   renderLandingHtml,
   resolveStoreUrl,
   writeLandingPage,
 } = require('./landing-page.js') as {
-  ASSET_DIR: string;
-  ASSET_SOURCES: Record<string, string>;
-  HERO_SLIDES: string[][];
   PENDING_FLOW_KEY: string;
-  SELLER_PLANS: { id: string; name: string; priceLabel: string; tagline: string }[];
-  TRENDING_ENDPOINT: string;
   ROUTES: Record<string, string>;
   renderLandingHtml: (options?: { appStoreUrl?: string | null; playStoreUrl?: string | null }) => string;
   resolveStoreUrl: (value: unknown, kind: 'appStore' | 'playStore') => string | null;
@@ -54,7 +44,6 @@ describe('store badge URLs come from env and are validated', () => {
     expect(html).not.toContain('App Store');
     expect(html).not.toContain('Google Play');
     expect(html).not.toContain('class="badges"');
-    expect(html).not.toContain('Get the app.');
     expect(html).not.toContain('installUrl');
   });
 
@@ -79,9 +68,7 @@ describe('store badge URLs come from env and are validated', () => {
       expect(html).toContain(APP_STORE);
       expect(html).not.toContain('Google Play');
       expect(fs.existsSync(path.join(dir, 'landing.html'))).toBe(true);
-      for (const name of Object.keys(ASSET_SOURCES)) {
-        expect(fs.existsSync(path.join(dir, ASSET_DIR, name)), name).toBe(true);
-      }
+      expect(fs.existsSync(path.join(dir, 'landing-fonts', 'Inter_400Regular.ttf'))).toBe(true);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -91,76 +78,14 @@ describe('store badge URLs come from env and are validated', () => {
 describe('landing page content', () => {
   const html = renderLandingHtml({ appStoreUrl: APP_STORE, playStoreUrl: PLAY_STORE });
 
-  it('makes one same-origin catalogue request and no other calls, external scripts or requests', () => {
-    const fetches = [...html.matchAll(/\bfetch\s*\(([^,)]+)/g)].map((m) => m[1]);
-    expect(fetches).toEqual([JSON.stringify(TRENDING_ENDPOINT)]);
-    expect(TRENDING_ENDPOINT.startsWith('/api/v1/public/trending/products')).toBe(true);
-    expect(html.match(/\/api\//g)).toHaveLength(1);
-    expect(html).not.toMatch(/XMLHttpRequest|WebSocket|sendBeacon/);
+  it('is static: no API calls, no external scripts or requests', () => {
+    expect(html).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|\/api\//);
     expect(html).not.toMatch(/<script[^>]+src=/i);
     const externalResources = [...html.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)]
       .map((m) => new URL(m[1]).hostname)
       .filter((host) => !['brandthread.app', 'apps.apple.com', 'play.google.com'].includes(host));
     expect(externalResources).toEqual([]);
     expect(html).not.toMatch(/<link[^>]+stylesheet/i);
-  });
-
-  it('never renders empty: the trending row ships with demo items and only swaps for 4+ live ones', () => {
-    const rail = html.match(/<ul class="rail" id="trending">([\s\S]*?)<\/ul>/)?.[1] ?? '';
-    expect(rail.match(/<li>/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
-    expect(rail).toContain('Atelier Noire');
-    expect(html).toContain('if(items.length>=4)render(items);');
-    // Live items are built with textContent, never innerHTML.
-    expect(html).not.toMatch(/innerHTML/);
-  });
-
-  it('uses the system font stack and real photos with explicit sizes', () => {
-    expect(html).not.toMatch(/@font-face|landing-fonts|fonts\.googleapis/);
-    expect(html).not.toMatch(/gradient\(/);
-    const imgs = [...html.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
-    expect(imgs.length).toBeGreaterThan(10);
-    for (const img of imgs) {
-      expect(img, img).toMatch(/\bwidth="\d+"/);
-      expect(img, img).toMatch(/\bheight="\d+"/);
-    }
-    // Everything below the hero's first photo is lazy.
-    const eager = imgs.filter((img) => !img.includes('loading="lazy"'));
-    expect(eager.map((img) => img.match(/src="([^"]+)"/)?.[1])).toEqual([
-      `/${ASSET_DIR}/look-${HERO_SLIDES[0][0]}.jpg`,
-      '/brandthread-logo.png',
-    ]);
-    for (const src of [...html.matchAll(/src="\/landing-assets\/([^"]+)"/g)].map((m) => m[1])) {
-      expect(ASSET_SOURCES[src], src).toBeDefined();
-      expect(fs.existsSync(path.join(projectRoot, ASSET_SOURCES[src])), src).toBe(true);
-    }
-  });
-
-  it('runs a three-slide hero that crossfades every 6s, with clickable dots and reduced-motion support', () => {
-    expect(HERO_SLIDES).toHaveLength(3);
-    expect(html.match(/class="slide[ "]/g)).toHaveLength(3);
-    expect(html.match(/class="dot"/g)).toHaveLength(3);
-    expect(html).toContain('6000');
-    expect(html).toContain("matchMedia('(prefers-reduced-motion: reduce)')");
-    expect(html).toContain('@media (prefers-reduced-motion:reduce)');
-    expect(html).toContain('aria-label="Pause slideshow"');
-  });
-
-  it('routes the search pill into the app search', () => {
-    expect(html).toMatch(new RegExp(`<form class="search" role="search" action="${ROUTES.search}" method="get">`));
-    expect(html).toContain('name="q"');
-    expect(html).toContain('placeholder="Search brands, pieces, drops"');
-    const search = fs.readFileSync(path.join(projectRoot, 'app', 'buyer-search.tsx'), 'utf8');
-    expect(search).toContain('useLocalSearchParams<{ q?: string }>');
-    expect(fs.existsSync(path.join(projectRoot, 'app', 'store', 'product', '[productId].tsx'))).toBe(true);
-  });
-
-  it('shows the real seller plan prices from lib/sellerPlans.ts', () => {
-    const plans = fs.readFileSync(path.join(projectRoot, 'lib', 'sellerPlans.ts'), 'utf8');
-    const source = [...plans.matchAll(/id: '(\w+)',\s*name: '([^']+)',\s*tagline: '([^']+)',\s*priceCents: \d+,\s*priceLabel: '([^']+)'/g)]
-      .map(([, id, name, tagline, priceLabel]) => ({ id, name, priceLabel, tagline }));
-    expect(source).toHaveLength(3);
-    expect(SELLER_PLANS).toEqual(source);
-    for (const plan of SELLER_PLANS) expect(html).toContain(`${plan.priceLabel}<small>/mo</small>`);
   });
 
   it('links to real app routes', () => {
@@ -171,12 +96,6 @@ describe('landing page content', () => {
     }
     expect(html).toContain('href="mailto:support@brandthread.app"');
     expect(html).toContain('Start selling');
-    expect(fs.existsSync(path.join(appDir, `${ROUTES.search.slice(1)}.tsx`))).toBe(true);
-    // Every "Start selling" writes the seller flow; "Start shopping" the buyer one.
-    const selling = [...html.matchAll(/<a [^>]*>Start selling/g)].map((m) => m[0]);
-    expect(selling.length).toBeGreaterThanOrEqual(3);
-    for (const a of selling) expect(a).toContain('data-flow="seller"');
-    expect(html).toMatch(/<a [^>]*data-flow="buyer"[^>]*>Start shopping/);
   });
 
   it('uses the same pending-flow key the onboarding screen reads', () => {
@@ -201,8 +120,6 @@ describe('landing page content', () => {
       expect(full.slice(0, 2) === full.slice(2, 4) && full.slice(2, 4) === full.slice(4, 6), `#${hex} is not grey`).toBe(true);
     }
     expect(css).not.toMatch(/rgba\(|backdrop-filter|opacity\s*:\s*0?\.\d/);
-    // No emoji.
-    expect(html).not.toMatch(/\p{Extended_Pictographic}/u);
     expect(html.toLowerCase()).not.toMatch(/coming soon|lorem|testimonial|\d+\s?(k|m)?\+?\s*(downloads|users)|stars?\b/);
   });
 });
@@ -290,12 +207,11 @@ describe('server integration', () => {
   };
 
   it('shows the landing page signed out and the unchanged app shell otherwise', async () => {
-    expect((await get('/')).body).toContain('<span>Shop the drop.</span> <span>Sell your own.</span>');
+    expect((await get('/')).body).toContain('Shop, sell and design streetwear.');
     expect((await get('/welcome')).body).toContain('Start selling');
     expect((await get('/', { cookie: '__session=abc' })).body).toContain('APP SHELL');
     expect((await get('/?bt_preview=buyer')).body).toContain('APP SHELL');
     expect((await get('/sign-in')).body).toContain('APP SHELL');
-    expect((await get('/landing-assets/look-01.jpg')).status).toBe(200);
-    expect((await get('/landing-assets/seller-dashboard.jpg')).status).toBe(200);
+    expect((await get('/landing-fonts/Inter_400Regular.ttf')).status).toBe(200);
   });
 });
