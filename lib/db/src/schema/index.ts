@@ -96,6 +96,10 @@ export const users = pgTable('users', {
   // "Saved by people you follow" on product pages (migration 270): off hides
   // this person's saves from that line. Saves in a private collection never show.
   showSavesToFollowers: boolean('show_saves_to_followers').notNull().default(true),
+  // Profile song (migration 272): { provider, id, title, artist, artworkUrl,
+  // previewUrl, url } from the licensed provider, or null. Only served while
+  // profile music is configured and flagged on (api-server lib/profileMusic.ts).
+  profileSong:    jsonb('profile_song'),
   // Buyer onboarding style picks (cold start for the For You ranking pipeline).
   buyerStyleInterests: jsonb('buyer_style_interests').$type<string[]>().notNull().default([]),
   // Brand onboarding fields (seller side)

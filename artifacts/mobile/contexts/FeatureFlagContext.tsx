@@ -20,7 +20,8 @@ export type FeatureFlagKey =
   | 'live_auctions'
   | 'nativeSurfaces'
   | 'unboxingMoment'
-  | 'monthlyWrapped';
+  | 'monthlyWrapped'
+  | 'profileMusic';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   unboxingMoment: true,
@@ -62,6 +63,10 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   // of them). OFF until a dev-client / TestFlight build with the extensions
   // is out: PUT /api/feature-flags/nativeSurfaces. Seeded by migration 275.
   nativeSurfaces: false,
+  // Profile song. OFF until a licensed preview source is configured server-side
+  // (PROFILE_MUSIC_PROVIDER + APPLE_MUSIC_DEVELOPER_TOKEN) and an operator flips
+  // it (PUT /api/config/features/profileMusic). The server re-checks both.
+  profileMusic: false,
 };
 
 const STORAGE_KEY = 'bt:feature-flags:v1';

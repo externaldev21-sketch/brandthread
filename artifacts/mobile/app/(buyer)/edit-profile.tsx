@@ -55,6 +55,8 @@ import { canSyncAccountServer, fetchAccountSettings, patchAccountSettings, withT
 import { CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia } from '@/components/profile/ProfileCover';
 
 import { COVER_MAX_SECONDS } from '@/components/profile/profileCoverRules';
+import { useProfileMusicEnabled } from '@/hooks/useProfileMusic';
+import { emitProfileSongChanged, onProfileSongChanged, profileSongLabel, type ProfileSong } from '@/lib/profileSong';
 
 import { crispPx } from '@/lib/crispPixel';
 
@@ -131,6 +133,28 @@ export default function BuyerEditProfileScreen() {
   const { theme } = useAppTheme();
   const api = useApi();
   const { getToken, userId } = useAuth();
+  // Profile song (Instagram "Music" row). Hidden entirely unless a licensed
+  // preview source is configured and the profileMusic flag is on.
+  const profileMusicOn = useProfileMusicEnabled();
+  const [song, setSong] = useState<ProfileSong | null>(null);
+  useEffect(() => {
+    if (!profileMusicOn || !userId) return;
+    let active = true;
+    api.profileMusic.forUser(userId).then((res) => { if (active) setSong(res.song); }).catch(() => {});
+    const off = onProfileSongChanged((id, next) => { if (id === userId) setSong(next); });
+    return () => { active = false; off(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileMusicOn, userId]);
+  const removeSong = async () => {
+    const before = song;
+    setSong(null);
+    try {
+      await api.profileMusic.setMine(null);
+      if (userId) emitProfileSongChanged(userId, null);
+    } catch {
+      setSong(before);
+    }
+  };
   // Dev-web preview (?bt_preview=buyer): there is no signed-in Clerk user, so
   // every real network call below 401s. Route those specific calls through a
   // local-only path instead so the whole screen — including username
@@ -687,6 +711,33 @@ export default function BuyerEditProfileScreen() {
               </View>
               {errors.link && <Text style={[styles.inlineError, { color: theme.error }]}>{errors.link}</Text>}
             </View>
+            {profileMusicOn && (
+              <>
+                <Divider theme={theme} />
+                <View style={styles.row}>
+                  <TouchableOpacity
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                    activeOpacity={0.7}
+                    onPress={() => router.push('/profile-music-picker' as never)}
+                    accessibilityRole="button"
+                    accessibilityLabel={song ? `Music, ${profileSongLabel(song)}` : 'Add music to your profile'}
+                    testID="edit-profile-music"
+                  >
+                    <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Music</Text>
+                    <Text style={[styles.chevronLabel, { flex: 1, color: song ? theme.text : theme.muted }]} numberOfLines={1}>
+                      {song ? profileSongLabel(song) : 'Add music to your profile'}
+                    </Text>
+                  </TouchableOpacity>
+                  {song ? (
+                    <TouchableOpacity onPress={() => { void removeSong(); }} hitSlop={10} accessibilityRole="button" accessibilityLabel="Remove music">
+                      <Feather name="x" size={17} color={theme.muted} />
+                    </TouchableOpacity>
+                  ) : (
+                    <Feather name="chevron-right" size={17} color={theme.muted} />
+                  )}
+                </View>
+              </>
+            )}
           </View>
 
           {/* More — kept out of the primary Instagram-style flow, but still reachable */}

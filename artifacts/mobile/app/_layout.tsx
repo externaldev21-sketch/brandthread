@@ -1697,6 +1697,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="seller-activity"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="activity-people"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="profile-music-picker"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="privacy"                 options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="terms"                   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="community-guidelines"    options={{ headerShown: false, animation: 'ios_from_right' }} />

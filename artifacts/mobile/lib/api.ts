@@ -14,6 +14,7 @@ import type { MorningBrief } from '@/lib/morningBrief';
 import type { SellerMilestone } from '@/lib/milestones';
 import type { DropHype } from '@/lib/dropHype';
 import type { LiveMapToday } from '@/lib/liveMap/liveMap';
+import type { ProfileSong } from '@/lib/profileSong';
 import type {
   AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
   ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
@@ -3921,6 +3922,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         remove: (id: string) => del<{ id: string; status: string }>(`/api/seller/affiliate/creators/${encodeURIComponent(id)}`),
         payouts: () => get<{ payouts: Array<{ id: string; creatorName: string; amountCents: number; state: string; paidAt: string | null; createdAt: string }>; payoutsAvailable: boolean }>('/api/seller/affiliate/payouts'),
       },
+    },
+    /** Profile song (Instagram profile music). Off unless a licensed provider is configured server-side. */
+    profileMusic: {
+      config: () => get<{ enabled: boolean }>('/api/profile-music/config'),
+      search: (q: string) => get<{ tracks: ProfileSong[] }>(`/api/profile-music/search?q=${encodeURIComponent(q)}`),
+      /** `null` removes your song. */
+      setMine: (trackId: string | null) => put<{ song: ProfileSong | null }>('/api/profile-music/me', { trackId }),
+      forUser: (userId: string) => get<{ song: ProfileSong | null }>(`/api/profile-music/user/${encodeURIComponent(userId)}`),
     },
     /** Server-side privacy settings */
     privacy: {

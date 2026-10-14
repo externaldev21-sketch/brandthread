@@ -196,6 +196,7 @@ import featureFlagsRouter from "./feature-flags";
 import appConfigRouter from "./app-config";
 import sellerPlanConfigRouter from "./seller-plan-config";
 import configLiveRouter from "./config-live";
+import profileMusicRouter from "./profile-music";
 import accessRouter from "./access";
 import ipCasesRouter from "./ip-cases";
 import shopifyImportRouter from "./shopify-import";
@@ -248,6 +249,7 @@ router.use(killSwitchGate); // Live / Payments / AI kill switches (Admin → Kil
 // Apple Wallet pre-order passes: status + signed download are public, the link route requires auth itself.
 router.use("/wallet",          walletPassesRouter);
 router.use("/fx",             fxRouter); // GET /rates public (display-only currency, intl #107); /display-currency authed per route
+router.use("/profile-music", profileMusicRouter);
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public",          publicWebAnnualPlansRouter); // GET /web-annual-plans (no auth; empty until a yearly web price is set)

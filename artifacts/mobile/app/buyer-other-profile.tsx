@@ -19,6 +19,7 @@ import { haptics, hapticLight, hapticSelection, hapticSuccess } from '@/lib/hapt
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, Text, Alert, StyleSheet, Modal, Pressable, Platform, Share, Linking } from 'react-native';
+import { ProfileSongLine } from '@/components/profile/ProfileSongLine';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -422,6 +423,7 @@ export default function BuyerOtherProfileScreen() {
           onPress={() => { hapticSelection(); router.push(connectionsHref('followers', canonicalUserId) as never); }}
         />
       ) : null}
+      {canonicalReady && !iBlockedThem ? <ProfileSongLine userId={canonicalUserId} /> : null}
       {isFollowedBy && !isMutual ? <ProfileChip label="Follows you" icon="user-check" /> : null}
       {isMutual ? <ProfileChip label="Friends" icon="users" tone="accent" /> : null}
       {isMutual && threadCashSendEnabled ? (
