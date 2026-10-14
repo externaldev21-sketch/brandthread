@@ -46,3 +46,22 @@ describe('closetService', () => {
     expect(state.request).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('unboxing', () => {
+  it('asks the server and marks it seen', async () => {
+    const { getUnboxing, markUnboxingSeen } = await import('@/services/closetService');
+    state.request.mockResolvedValueOnce({ unboxing: { orderId: 'o', pieces: [] } });
+    expect(await getUnboxing()).toEqual({ orderId: 'o', pieces: [] });
+    state.request.mockResolvedValueOnce({ marked: 1 });
+    await markUnboxingSeen();
+    expect(state.request.mock.calls.map((c) => c[0])).toEqual(['/api/buyer/closet/unboxing', '/api/buyer/closet/unboxing/seen']);
+  });
+
+  it('never shows in the fresh preview', async () => {
+    const { getUnboxing, markUnboxingSeen } = await import('@/services/closetService');
+    state.preview = true;
+    expect(await getUnboxing()).toBeNull();
+    await markUnboxingSeen();
+    expect(state.request).not.toHaveBeenCalled();
+  });
+});

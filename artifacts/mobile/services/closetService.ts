@@ -106,6 +106,20 @@ export async function saveClosetOutfit(pieceIds: string[]): Promise<ClosetOutfit
   return postOutfit(pieceIds);
 }
 
+export interface Unboxing { orderId: string; pieces: ClosetPiece[] }
+
+/** The delivery waiting for its unboxing moment, if any (never in the fresh preview). */
+export async function getUnboxing(): Promise<Unboxing | null> {
+  const fetchIt = async () => (await serviceRequest<{ unboxing: Unboxing | null }>('/api/buyer/closet/unboxing', {}, false)).unboxing ?? null;
+  if (isBuyerDevPreview()) return previewOr(fetchIt, () => null);
+  return fetchIt();
+}
+
+export async function markUnboxingSeen(): Promise<void> {
+  if (isBuyerDevPreview() && !NAVIGATION_ISOLATION_TEST && !isPreviewDemoMode()) return;
+  await serviceRequest('/api/buyer/closet/unboxing/seen', { method: 'POST', body: '{}' }, false);
+}
+
 export async function deleteClosetOutfit(id: string): Promise<void> {
   if (isBuyerDevPreview()) {
     previewOutfits = previewOutfits.filter((o) => o.id !== id);
