@@ -54,6 +54,7 @@ import { DiscoverFeaturedRail } from '@/components/discover/DiscoverFeaturedRail
 import { DiscoverPersonCard } from '@/components/discover/DiscoverPersonCard';
 import { DiscoverDropCalendarItem } from '@/components/discover/DiscoverDropCalendarItem';
 import { buildDropCalendarItems } from '@/lib/dropCalendar';
+import { RisingBrandsSection } from '@/components/discover/RisingBrands';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { useDiscoveryShelves } from '@/hooks/useDiscoveryShelves';
 import { getFriendSuggestions, muteUser } from '@/services/socialService';
@@ -352,6 +353,14 @@ export default function DiscoverScreen() {
       {filter === 'forYou' && <BrandsYouMightLikeRow />}
     </>
   );
+  // Brands: "Rising this week" sits at the top, above the existing grid
+  // (renders nothing when fewer than 3 brands qualify).
+  const brandsHeader = (
+    <>
+      {header}
+      <RisingBrandsSection />
+    </>
+  );
 
   return (
     <View ref={rootRef} style={{ flex: 1, backgroundColor: theme.background }}>
@@ -425,7 +434,7 @@ export default function DiscoverScreen() {
           numColumns={2}
           columnWrapperStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}
           contentContainerStyle={{ gap: SP.sm, paddingBottom: tabBarClearance }}
-          ListHeaderComponent={header}
+          ListHeaderComponent={brandsHeader}
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           renderItem={({ item }) => <DiscoverBrandCard brand={item} variant="tile" />}
           ListEmptyComponent={brandsLoading ? (

@@ -271,6 +271,7 @@ router.use("/public/store-trust", storeTrustRouter); // "Ships in N days" + deta
 // them. See docs/scale/CACHE.md for keys, TTLs and invalidation.
 router.get("/public/search", responseCache({ name: "search", ttlSeconds: 30, scope: "viewer-blocks", generational: true }));
 router.get("/public/profiles/:username", responseCache({ name: "profile", ttlSeconds: 20, scope: "viewer-blocks" }));
+router.get("/public/brands/rising", responseCache({ name: "rising-brands", ttlSeconds: 600, scope: "anon" }));
 router.get("/public/products/:id", responseCache({ name: "product", ttlSeconds: 15, scope: "anon", idKey: (req) => String(req.params.id) }));
 // A seller edit or delete drops the cached product page immediately, and any
 // product write (publish, edit, delete) starts a fresh search generation so

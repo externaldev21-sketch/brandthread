@@ -41,6 +41,7 @@ import {
   setPaginationHeaders,
 } from "../lib/pagination";
 import { setPublicCacheHeaders, setViewerScopedCacheHeaders } from "../lib/httpCache";
+import { computeRisingBrands } from "../lib/risingBrands";
 import { applySalesToVariants } from "../lib/pricing/salesRuntime";
 import { suggestedPostsSnoozed } from "../lib/interactionSettings";
 import { remixCredits } from "../lib/remix";
@@ -1412,6 +1413,16 @@ router.get("/brands/discover", async (req, res) => {
 // (lib/onboardingFeaturedBrands.ts), each with its newest real product
 // photos, for the Brands-to-follow step's featured rail (less-AI pass, item
 // 54). Unset → { brands: [] } and the step is unchanged.
+router.get("/brands/rising", async (req, res) => {
+  try {
+    setPublicCacheHeaders(res, { maxAgeSeconds: 600, staleWhileRevalidateSeconds: 600 });
+    res.json(await computeRisingBrands());
+  } catch (err) {
+    req.log.error({ err }, "Failed to compute rising brands");
+    res.status(500).json({ error: "Failed to load rising brands" });
+  }
+});
+
 router.get("/brands/featured", async (req, res) => {
   try {
     const handles = parseFeaturedHandles(process.env.ONBOARDING_FEATURED_SELLER_HANDLES);

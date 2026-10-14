@@ -3,6 +3,7 @@
  * Base URL is resolved from EXPO_PUBLIC_API_BASE_URL (set in the dev script).
  * Every request attaches the Clerk Bearer token supplied by getToken().
  */
+import type { RisingBrandsResponse } from '@/lib/risingBrands';
 import type { SizeChartData, SizeChartPreset, SizeChartTemplateSummary, SizeChartTemplateDetail } from '@/lib/sizeChartTypes';
 import { prepareImageForUpload, presetForUploadPath } from '@/lib/imageUploadPrep';
 import { sessionProgress, uploadResumeKey, uploadStrategy, withUploadRetry } from '@/lib/resumableUpload';
@@ -3083,6 +3084,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           logoUrl:     string | null;
           bannerUrl:   string | null;
           storeAccentColor: string | null;
+          /** Store Settings > "Show in Rising brands" (off by default). */
+          risingBrandsOptIn?: boolean;
           category:    string | null;
           tags:        string[];
           location:    string | null;
@@ -3126,6 +3129,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Set (or clear with null) the storefront accent, from the monochrome allowlist. */
       setStoreAccent: (color: string | null) =>
         put<{ storeAccentColor: string | null }>('/api/seller/profile/accent', { color }),
+      /** Opt in to (or out of) Discover > Brands "Rising this week". */
+      setRisingBrandsOptIn: (optIn: boolean) =>
+        put<{ risingBrandsOptIn: boolean }>('/api/seller/profile/rising-brands', { optIn }),
       /** Save Instagram / TikTok handles or links; the server returns canonical URLs. */
       saveSocialLinks: (body: { instagram?: string; tiktok?: string }) =>
         put<{ socialLinks: Record<string, string> }>('/api/seller/social-links', body),
@@ -4083,6 +4089,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Buyer discovery: normalized categories and real-signal trending (public). */
     publicDiscovery: {
+      /** Discover > Brands "Rising this week": top 10 opted-in brands by order growth (percent only). */
+      risingBrands: () =>
+        get<RisingBrandsResponse>('/api/public/brands/rising'),
       categories: () =>
         get<{ categories: Array<{ slug: string; label: string; productCount: number; coverImageUrl: string | null }> }>(
           '/api/public/categories',

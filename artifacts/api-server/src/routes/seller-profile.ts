@@ -134,6 +134,7 @@ router.get("/profile", async (req, res): Promise<void> => {
         logoUrl:             users.logoUrl,
         bannerUrl:           users.bannerUrl,
         storeAccentColor:    users.storeAccentColor,
+        risingBrandsOptIn:   users.risingBrandsOptIn,
         category:            users.category,
         tags:                users.tags,
         location:            users.location,
@@ -492,6 +493,28 @@ router.put("/profile/accent", validateInput({ body: accentBody }), async (req, r
     .set({ storeAccentColor: color, updatedAt: new Date() })
     .where(eq(users.clerkId, clerkId))
     .returning({ storeAccentColor: users.storeAccentColor });
+  if (!updated) {
+    res.status(404).json({ error: "Seller profile not found" });
+    return;
+  }
+  res.json(updated);
+});
+
+// ─── PUT /api/seller/profile/rising-brands ────────────────────────────────────
+// Store Settings > "Show in Rising brands": opt in to (or out of) the Discover
+// > Brands "Rising this week" leaderboard. Off by default (migration 294).
+router.put("/profile/rising-brands", async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const optIn = req.body?.optIn;
+  if (typeof optIn !== "boolean") {
+    res.status(400).json({ error: "optIn must be true or false" });
+    return;
+  }
+  const [updated] = await db
+    .update(users)
+    .set({ risingBrandsOptIn: optIn, updatedAt: new Date() })
+    .where(eq(users.clerkId, clerkId))
+    .returning({ risingBrandsOptIn: users.risingBrandsOptIn });
   if (!updated) {
     res.status(404).json({ error: "Seller profile not found" });
     return;

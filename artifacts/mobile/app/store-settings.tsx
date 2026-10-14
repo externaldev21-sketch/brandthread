@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
 
 import { View, Text, ScrollView, TextInput, StyleSheet, Alert } from 'react-native';
@@ -23,6 +23,7 @@ import { getStorefront, updateSettings } from '@/services/storeService';
 import { Storefront, StoreSettings, StorePublishStatus } from '@/services/storeTypes';
 
 import { radius } from '@/constants/radii';
+import { useApi } from '@/lib/api';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -88,6 +89,27 @@ export default function StoreSettingsScreen() {
   });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Discover > Brands "Rising this week" opt-in. Lives on the seller's
+  // account (users.rising_brands_opt_in), not the local storefront blob, so
+  // it saves on its own the moment it is flipped. Off by default.
+  const api = useApi();
+  const [risingOptIn, setRisingOptIn] = useState(false);
+  useEffect(() => {
+    let active = true;
+    api.seller.getProfile()
+      .then((p) => { if (active) setRisingOptIn(!!p?.risingBrandsOptIn); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [api]);
+  const toggleRising = useCallback(async (next: boolean) => {
+    setRisingOptIn(next);
+    try {
+      const res = await api.seller.setRisingBrandsOptIn(next);
+      setRisingOptIn(!!res?.risingBrandsOptIn);
+    } catch {
+      setRisingOptIn(!next);
+    }
+  }, [api]);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -319,6 +341,17 @@ export default function StoreSettingsScreen() {
             style={{ minHeight: 48 }}
           />
         </BrandthreadCard>
+
+        {/* DISCOVER */}
+        <SectionHeader title="DISCOVER" style={ss.sectionHeader} />
+        <BrandthreadCard style={ss.card}>
+          <SwitchRow
+            label="Show in Rising brands"
+            value={risingOptIn}
+            onValueChange={toggleRising}
+          />
+        </BrandthreadCard>
+
       </ScrollView>
       )}
     </View>

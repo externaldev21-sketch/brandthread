@@ -241,6 +241,8 @@ export const users = pgTable('users', {
   // Seller-set buyer cancellation window in hours (migration 272). NULL =
   // the platform default in api-server lib/buyerCancellationPolicy.ts.
   buyerCancelWindowHours: integer('buyer_cancel_window_hours'),
+  // Seller chose to appear in Discover > Brands "Rising this week" (migration 294). Off by default.
+  risingBrandsOptIn: boolean('rising_brands_opt_in').notNull().default(false),
   // Quiet hours: local wall-clock "HH:MM" strings evaluated in quietHoursTimezone.
   // A push falling inside the window is suppressed (feed row still written);
   // null start/end means quiet hours are off.
