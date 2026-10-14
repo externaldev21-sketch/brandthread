@@ -13,7 +13,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { ListSkeleton } from '@/components/layout';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { SectionError } from '@/components/InlineFeedback';
-import { ThemedRefreshControl } from '@/components/ui';
+import { useThreadRefresh } from '@/components/ui/ThreadRefresh';
 import { DiscoveryProductGrid } from '@/components/discover/DiscoveryProductGrid';
 import { DiscoverBrandCard } from '@/components/discover/DiscoverBrandCard';
 import { mapTrendingBrand, type TrendingBrandRow } from '@/lib/discoveryShelves';
@@ -51,8 +51,9 @@ export default function BuyerTrendingScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  const refreshControl = (
-    <ThemedRefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />
+  const { refreshControl, indicator: refreshIndicator } = useThreadRefresh(
+    refreshing,
+    async () => { setRefreshing(true); await load(); setRefreshing(false); },
   );
   const bottom = insets.bottom + SPACING.xl;
 
@@ -84,6 +85,7 @@ export default function BuyerTrendingScreen() {
           empty={<EmptyState icon="trending-up" title="No trending products yet" description="Products appear here as shoppers view, save and buy." />}
         />
       )}
+      {refreshIndicator}
     </View>
   );
 }

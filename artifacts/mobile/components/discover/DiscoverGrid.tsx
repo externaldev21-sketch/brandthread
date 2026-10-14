@@ -62,6 +62,7 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   ListHeaderComponent?: React.ComponentType<any> | React.ReactElement;
   /** Rendered after the last row (and the load-more skeleton). */
   ListFooterExtra?: React.ReactElement | null;
+  refreshControl?: React.ReactElement<any>;
 }>(function DiscoverGrid({
   posts,
   loading,
@@ -83,6 +84,7 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   contentContainerStyle,
   ListHeaderComponent,
   ListFooterExtra,
+  refreshControl,
 }, ref) {
   const { theme } = useAppTheme();
   const { width } = useWindowDimensions();
@@ -136,6 +138,7 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
       onEndReachedThreshold={0.6}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={contentContainerStyle}
+      refreshControl={refreshControl}
       ListHeaderComponent={ListHeaderComponent}
       ListEmptyComponent={!loading ? (
         <EmptyState
