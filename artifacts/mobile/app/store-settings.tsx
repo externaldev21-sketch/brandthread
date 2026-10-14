@@ -94,12 +94,23 @@ export default function StoreSettingsScreen() {
   // it saves on its own the moment it is flipped. Off by default.
   const api = useApi();
   const [risingOptIn, setRisingOptIn] = useState(false);
+  const [lookbook, setLookbook] = useState(false);
   useEffect(() => {
     let active = true;
     api.seller.getProfile()
-      .then((p) => { if (active) setRisingOptIn(!!p?.risingBrandsOptIn); })
+      .then((p) => { if (active) { setRisingOptIn(!!p?.risingBrandsOptIn); setLookbook(p?.storeLayout === 'lookbook'); } })
       .catch(() => {});
     return () => { active = false; };
+  }, [api]);
+  const toggleLookbook = useCallback(async (next: boolean) => {
+    setLookbook(next);
+    try {
+      const res = await api.seller.setStoreLayout(next ? 'lookbook' : 'grid');
+      setLookbook(res?.storeLayout === 'lookbook');
+    } catch {
+      setLookbook(!next);
+      Alert.alert('Could not save', 'Try again.');
+    }
   }, [api]);
   const toggleRising = useCallback(async (next: boolean) => {
     setRisingOptIn(next);
@@ -343,6 +354,10 @@ export default function StoreSettingsScreen() {
         </BrandthreadCard>
 
         {/* DISCOVER */}
+        <SectionHeader title="STORE PAGE" style={ss.sectionHeader} />
+        <BrandthreadCard style={ss.card}>
+          <SwitchRow label="Lookbook" value={lookbook} onValueChange={toggleLookbook} />
+        </BrandthreadCard>
         <SectionHeader title="DISCOVER" style={ss.sectionHeader} />
         <BrandthreadCard style={ss.card}>
           <SwitchRow

@@ -135,6 +135,7 @@ router.get("/profile", async (req, res): Promise<void> => {
         bannerUrl:           users.bannerUrl,
         storeAccentColor:    users.storeAccentColor,
         risingBrandsOptIn:   users.risingBrandsOptIn,
+        storeLayout: users.storeLayout,
         category:            users.category,
         tags:                users.tags,
         location:            users.location,
@@ -503,6 +504,25 @@ router.put("/profile/accent", validateInput({ body: accentBody }), async (req, r
 // ─── PUT /api/seller/profile/rising-brands ────────────────────────────────────
 // Store Settings > "Show in Rising brands": opt in to (or out of) the Discover
 // > Brands "Rising this week" leaderboard. Off by default (migration 294).
+export const STORE_LAYOUTS = ["grid", "lookbook"] as const;
+export type StoreLayout = (typeof STORE_LAYOUTS)[number];
+export function parseStoreLayout(value: unknown): StoreLayout | null {
+  return typeof value === "string" && (STORE_LAYOUTS as readonly string[]).includes(value) ? value as StoreLayout : null;
+}
+router.put("/profile/store-layout", async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const layout = parseStoreLayout(req.body?.layout);
+  if (!layout) {
+    res.status(400).json({ error: "layout must be 'grid' or 'lookbook'" });
+    return;
+  }
+  const [profile] = await db.update(users)
+    .set({ storeLayout: layout, updatedAt: new Date() })
+    .where(eq(users.clerkId, clerkId))
+    .returning({ storeLayout: users.storeLayout });
+  res.json(profile);
+});
+
 router.put("/profile/rising-brands", async (req, res): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
   const optIn = req.body?.optIn;

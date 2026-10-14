@@ -52,6 +52,8 @@ export function toPublicSellerProfile(seller: Row): Row {
     username: seller.username ?? null,
     /** "Founding Seller #N" (1..100), or null. */
     foundingSellerNumber: publicFoundingSellerNumber(seller.foundingSellerNumber),
+    // Store page layout the buyer app renders: 'grid' or 'lookbook' (migration 295).
+    storeLayout: seller.storeLayout === "lookbook" ? "lookbook" : "grid",
   };
 }
 

@@ -1516,6 +1516,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
       vacationMode:    users.vacationMode,
       vacationMessage: users.vacationMessage,
       username:        users.username,
+      storeLayout:     users.storeLayout,
       coverVideoUrl:   users.coverVideoUrl,
       coverPosterUrl:  users.coverPosterUrl,
       coverVideoModerationStatus: users.coverVideoModerationStatus,
