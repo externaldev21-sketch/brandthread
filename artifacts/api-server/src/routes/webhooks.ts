@@ -49,6 +49,7 @@ import { stampDeliveryDeadlines } from "../lib/delivery/deliveryState";
 import { applyDisputePauseByDisputeId } from "../lib/delivery/disputePause";
 import { commitStockReservation, releaseStockReservation } from "../lib/money/stockReservation";
 import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
+import { awardDayOne } from "../lib/dayOne";
 import {
   isOrderConfirmationEligibleStatus,
   sendOrderConfirmationEmail,
@@ -981,6 +982,9 @@ export async function handleCheckoutPaid(
       })
       .returning();
     createdOrderId = order.id;
+
+    // "Day 1": the brand's first 100 distinct buyers (lib/dayOne.ts).
+    if (buyerId && oversoldItems.length === 0) await awardDayOne(tx, ownerId, buyerId, order.id);
 
     // Money: fee split, charge ids, funds state and ledger, in this same
     // transaction as the order row (lib/money/escrow.ts).

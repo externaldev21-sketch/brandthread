@@ -13,7 +13,9 @@ describe('highlights wiring', () => {
   it("the visitor profile shows a highlights row only when there are visible highlights, and opens the viewer with highlightId", () => {
     const src = read('app/buyer-other-profile.tsx');
     expect(src).toContain('api.social.userHighlights(resolvedId)');
-    expect(src).toMatch(/extras=\{highlights\.length > 0 && !iBlockedThem/);
+    // The extras slot also holds the brands row now; highlights still render only when there are some, never across a block.
+    expect(src).toMatch(/extras=\{\(highlights\.length > 0 \|\| profileBrands\.length > 0\) && !iBlockedThem/);
+    expect(src).toMatch(/highlights\.length > 0 \? \(\s*<View testID="other-profile-highlights">/);
     expect(src).toMatch(/pathname: '\/buyer-story-viewer'[\s\S]{0,80}params: \{ highlightId: item\.id \}/);
     // a failed highlights read must never fail the profile load
     expect(src).toMatch(/catch \{\s*setHighlights\(\[\]\)/);

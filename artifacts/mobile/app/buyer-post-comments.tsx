@@ -305,6 +305,9 @@ function CommentRow({
           <View style={s.commentHeader}>
             <Text style={s.authorName} numberOfLines={1}>{comment.author.name}</Text>
             {isCreator && <Text style={[s.creatorBadge, { color: theme.text }]}>· Creator</Text>}
+            {!isCreator && comment.dayOne ? (
+              <Text style={[s.creatorBadge, { color: MUTED }]} accessibilityLabel="Day 1 buyer" testID="comment-day-one">· Day 1</Text>
+            ) : null}
             {isPending && <View style={s.pendingDot} />}
           </View>
 
