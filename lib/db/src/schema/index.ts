@@ -711,6 +711,8 @@ export const orders = pgTable('orders', {
   giftTo: text('gift_to'),
   giftFrom: text('gift_from'),
   giftMessage: text('gift_message'),
+  // Unboxing moment (migration 264): set when the buyer was shown it.
+  unboxingSeenAt: timestamp('unboxing_seen_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

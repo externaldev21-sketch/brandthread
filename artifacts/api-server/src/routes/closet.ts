@@ -4,12 +4,15 @@
  * GET    /api/buyer/closet/outfits       — saved outfits with their pieces
  * POST   /api/buyer/closet/outfits       — save { pieceIds } (closet pieces only)
  * DELETE /api/buyer/closet/outfits/:id   — delete one of my outfits
+ * GET    /api/buyer/closet/unboxing      — the delivery waiting for its unboxing moment, or null
+ * POST   /api/buyer/closet/unboxing/seen — never show the moment again for what's waiting
  */
 import { Router } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { closetOutfits, db } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { loadClosetPieces, type ClosetPiece } from "../lib/closet/pieces";
+import { markUnboxingSeen, nextUnboxing } from "../lib/closet/unboxing";
 
 export const MAX_OUTFIT_PIECES = 8;
 
@@ -87,6 +90,24 @@ router.delete("/outfits/:id", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to delete closet outfit");
     return res.status(500).json({ error: "Couldn’t delete this outfit" });
+  }
+});
+
+router.get("/unboxing", async (req, res) => {
+  try {
+    return res.json({ unboxing: await nextUnboxing(me(req)) });
+  } catch (err) {
+    req.log.error({ err }, "Failed to load unboxing");
+    return res.status(500).json({ error: "Couldn’t load this" });
+  }
+});
+
+router.post("/unboxing/seen", async (req, res) => {
+  try {
+    return res.json({ marked: await markUnboxingSeen(me(req)) });
+  } catch (err) {
+    req.log.error({ err }, "Failed to mark unboxing seen");
+    return res.status(500).json({ error: "Couldn’t save this" });
   }
 });
 

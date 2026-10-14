@@ -18,9 +18,12 @@ export type FeatureFlagKey =
   | 'live_tips'
   | 'autoCaptions'
   | 'live_auctions'
-  | 'nativeSurfaces';
+  | 'nativeSurfaces'
+  | 'unboxingMoment';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
+  // Unboxing moment after a delivery; server-side kill switch.
+  unboxingMoment: true,
   aiPhotoShoot: true,
   outfitSwap: true,
   boosts: true,
