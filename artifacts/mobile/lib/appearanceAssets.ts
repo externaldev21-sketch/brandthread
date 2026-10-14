@@ -1,6 +1,7 @@
 import { Asset } from 'expo-asset';
 import type { ImageSourcePropType } from 'react-native';
 import type { AppThemeId } from '@/contexts/AppThemeContext';
+import type { AppIconId } from '@/contexts/AppIconContext';
 
 /**
  * Every icon/theme-preview image the Appearance screen can show, bundled as
@@ -9,7 +10,7 @@ import type { AppThemeId } from '@/contexts/AppThemeContext';
  * call, and the Appearance screen never has to show a loading/fade state for
  * a bitmap that was already resolved before the screen ever mounts.
  */
-export const APPEARANCE_ICON_IMAGES: Record<AppThemeId, ImageSourcePropType> = {
+export const APPEARANCE_ICON_IMAGES: Record<AppIconId, ImageSourcePropType> = {
   monochrome: require('../assets/images/app-icons/monochrome.png'),
   purple: require('../assets/images/app-icons/purple.png'),
   olive: require('../assets/images/app-icons/olive.png'),
@@ -22,6 +23,9 @@ export const APPEARANCE_ICON_IMAGES: Record<AppThemeId, ImageSourcePropType> = {
   'leopard-red': require('../assets/images/app-icons/leopard-red.png'),
   maroon: require('../assets/images/app-icons/maroon.png'),
   gold: require('../assets/images/app-icons/gold.png'),
+  // Unlockable (lib/unlockableIcons.ts)
+  'brushed-silver': require('../assets/images/app-icons/brushed-silver.png'),
+  chrome: require('../assets/images/app-icons/chrome.png'),
 };
 
 export const APPEARANCE_THEME_IMAGES: Record<AppThemeId, ImageSourcePropType> = {
