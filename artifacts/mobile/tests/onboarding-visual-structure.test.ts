@@ -20,6 +20,9 @@ const ONBOARDING_SCREENS = [
   'components/onboarding/NotificationsStep.tsx',
   'components/onboarding/CurateFeedStep.tsx',
   'components/onboarding/SizesStep.tsx',
+  'components/onboarding/CategoriesStep.tsx',
+  'components/onboarding/FirstProductStep.tsx',
+  'components/onboarding/PayoutsStep.tsx',
 ];
 
 describe('onboarding visual rules', () => {
@@ -127,6 +130,36 @@ describe('buyer: sizes', () => {
     expect(src).toContain("export const ASKED_SIZE_CATEGORIES: SizeCategory[] = ['tops', 'bottoms', 'shoes'];");
     expect(src).toContain('<SquareChip');
     expect(src).toContain("label={picked ? 'Next' : 'Skip'}");
+  });
+});
+
+describe('seller', () => {
+  it('store name + @handle reuse the Profile screen', () => {
+    const src = read('app/onboarding.tsx');
+    expect(src).toContain('title="Your store"');
+    expect(src).toContain('nameLabel="Store name"');
+  });
+
+  it('first product uses the real upload + create endpoints, camera or library, and can wait', () => {
+    const src = read('components/onboarding/FirstProductStep.tsx');
+    expect(src).toContain('api.products.uploadImage({ uri: localUri })');
+    expect(src).toContain("completeSetupTaskAfter('first_product', () => api.products.create({");
+    expect(src).toContain('ImagePicker.launchCameraAsync');
+    expect(src).toContain('ImagePicker.launchImageLibraryAsync');
+    expect(src).toContain('label="Do it later"');
+  });
+
+  it('payouts is the existing Stripe Connect hosted link, skippable', () => {
+    const src = read('components/onboarding/PayoutsStep.tsx');
+    expect(src).toContain('api.seller.connect.link()');
+    expect(src).toContain('WebBrowser.openBrowserAsync(link.url)');
+    expect(src).toContain('label="Do it later"');
+  });
+
+  it('ends on "Your store is live" after a first product, else the dashboard', () => {
+    const src = read('app/onboarding.tsx');
+    expect(src).toContain("router.replace({ pathname: '/store-live', params: { productId: publishedProductId } } as never);");
+    expect(src).toContain("router.replace('/(tabs)/' as never);");
   });
 });
 

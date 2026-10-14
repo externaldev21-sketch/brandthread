@@ -62,6 +62,13 @@ const {
     },
     seller: {
       saveOnboardingData: vi.fn(record('seller.saveOnboardingData')),
+      connect: {
+        link: vi.fn(async () => { apiCalls.push({ name: 'seller.connect.link', args: [] }); return { url: 'https://connect.stripe.com/setup/e/acct_test', kind: 'account_onboarding', expiresAt: null }; }),
+      },
+    },
+    products: {
+      uploadImage: vi.fn(async () => { apiCalls.push({ name: 'products.uploadImage', args: [] }); return { objectPath: '/objects/uploads/hoodie' }; }),
+      create: vi.fn(async (body: unknown) => { apiCalls.push({ name: 'products.create', args: [body] }); return { id: 'prod_first', status: 'active' }; }),
     },
     ai: {
       brandMemoryRebuild: vi.fn(async () => ({ fields: {} })),
@@ -178,7 +185,18 @@ vi.mock('expo-haptics', () => ({
 }));
 
 vi.mock('expo-auth-session', () => ({ makeRedirectUri: vi.fn(() => 'brandthread://redirect') }));
-vi.mock('expo-web-browser', () => ({ maybeCompleteAuthSession: vi.fn(), openAuthSessionAsync: vi.fn() }));
+vi.mock('expo-web-browser', () => ({ maybeCompleteAuthSession: vi.fn(), openAuthSessionAsync: vi.fn(), openBrowserAsync: vi.fn(async () => ({ type: 'dismiss' })) }));
+
+vi.mock('expo-image-picker', () => ({
+  MediaTypeOptions: { Images: 'Images' },
+  requestMediaLibraryPermissionsAsync: vi.fn(async () => ({ granted: true })),
+  requestCameraPermissionsAsync: vi.fn(async () => ({ granted: true })),
+  launchImageLibraryAsync: vi.fn(async () => ({ canceled: false, assets: [{ uri: 'file:///tmp/hoodie.jpg' }] })),
+  launchCameraAsync: vi.fn(async () => ({ canceled: true, assets: [] })),
+}));
+
+vi.mock('@/components/ui/ActionSheet', () => ({ showActionSheet: vi.fn() }));
+vi.mock('@/lib/setupStore', () => ({ completeTask: vi.fn(async () => {}) }));
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -535,24 +553,62 @@ describe('onboarding flow (seller)', () => {
     renderer = undefined;
   });
 
-  it('signs up, names the store, and lands on the tabs dashboard with the right API calls', async () => {
+  async function throughCategories(r: ReactTestRenderer) {
+    await driveThroughSignUp(r, 'seller', 'seller-flow@onboarding-e2e.test');
+    expect(allText(r)).toContain('01 / 04');
+    await fill(findByTestId(r, 'onboarding-first-name-input'), 'Noir Field Studio');
+    await fill(findByTestId(r, 'onboarding-username-input'), 'noirfield');
+    await press(findButton(r, 'Next'));
+    await press(findButton(r, 'Tops'));
+    await press(findButton(r, 'Outerwear'));
+    await press(findButton(r, 'Next'));
+    await settle();
+  }
+
+  it('creates the store on leaving categories, lists a first piece, skips payouts and lands on "Your store is live"', async () => {
     renderer = await renderScreen();
-    await driveThroughSignUp(renderer, 'seller', 'seller-flow@onboarding-e2e.test');
+    await throughCategories(renderer);
 
-    await fillProfile(renderer, 'Sasha Rivera', 'noirfield');
-    await fill(findByTestId(renderer, 'onboarding-brand-name-input'), 'Noir Field Studio');
-    await press(findButton(renderer, 'Next'));
-
-    await press(findButton(renderer, 'Continue'));
-    await settle();
-    await settle();
-
-    const names = apiCalls.map((c) => c.name);
-    expect(names).toContain('auth.sync');
-    expect(names).toContain('auth.updateProfile');
-    expect(apiCalls.find((c) => c.name === 'auth.onboarding')!.args[0]).toMatchObject({ brandName: 'Noir Field Studio', username: 'noirfield' });
+    // The account exists before the product step.
+    expect(apiCalls.find((c) => c.name === 'auth.onboarding')!.args[0]).toMatchObject({
+      brandName: 'Noir Field Studio', brandType: 'Tops, Outerwear', username: 'noirfield',
+    });
     expect((apiCalls.find((c) => c.name === 'auth.updateProfile')!.args[0] as { accountType?: string }).accountType).toBe('seller');
     expect(apiCalls.find((c) => c.name === 'auth.completeOnboarding')!.args[0]).toBe('seller');
+    expect(memoryStorage.get('onboarding_complete')).not.toBe('true');
+
+    // First product: photo, name, price.
+    expect(allText(renderer)).toContain('03 / 04');
+    await press(findButton(renderer, 'Add photo'));
+    await settle();
+    await fill(findInput(renderer, 'Name'), 'Heavyweight Hoodie');
+    await fill(findInput(renderer, 'Price'), '88');
+    await press(findButton(renderer, 'Publish'));
+    await settle();
+    expect(apiCalls.find((c) => c.name === 'products.create')!.args[0]).toMatchObject({
+      name: 'Heavyweight Hoodie', status: 'active', images: ['/objects/uploads/hoodie'],
+      variants: [{ sku: 'HEAVYWEIGHT-HOODIE-1', priceCents: 8800, stock: 1, lowStockThreshold: 0 }],
+    });
+    expect(memoryStorage.get('bt:store-live-seen:v1:user_test_clerk_id')).toBe('1');
+
+    // Payouts: do it later.
+    expect(allText(renderer)).toContain('04 / 04');
+    await press(findByTestId(renderer, 'onboarding-payouts-later'));
+    await settle();
+
+    expect(memoryStorage.get('onboarding_complete')).toBe('true');
+    expect(memoryStorage.get('user_role')).toBe('seller');
+    expect(routerReplaceMock).toHaveBeenCalledWith({ pathname: '/store-live', params: { productId: 'prod_first' } });
+  }, 20_000);
+
+  it('"Do it later" on both optional steps lands on the dashboard; payouts opens Stripe when asked', async () => {
+    renderer = await renderScreen();
+    await throughCategories(renderer);
+    await press(findByTestId(renderer, 'onboarding-product-later'));
+    await press(findButton(renderer, 'Set up payouts'));
+    await settle();
+    expect(apiCalls.map((c) => c.name)).toContain('seller.connect.link');
+    expect(apiCalls.map((c) => c.name)).not.toContain('products.create');
     expect(routerReplaceMock).toHaveBeenCalledWith('/(tabs)/');
   }, 20_000);
 
@@ -627,13 +683,14 @@ describe('onboarding flow — already-signed-in routing', () => {
     await settle();
 
     expect(() => findByTestId(renderer!, 'onboarding-first-name-input')).not.toThrow();
-    expect(allText(renderer)).toContain('01 / 03');
+    expect(allText(renderer)).toContain('01 / 04');
   });
 });
 
 describe('onboarding step machine sanity', () => {
   it('BUYER_STEP_INDEX / SELLER_STEP_INDEX match what this test drives through', () => {
     expect(BUYER_STEP_INDEX.PROFILE).toBe(1);
-    expect(SELLER_STEP_INDEX.BRAND_NAME).toBeGreaterThan(SELLER_STEP_INDEX.PROFILE);
+    expect(SELLER_STEP_INDEX.STORE).toBe(1);
+    expect(SELLER_STEP_INDEX.PAYOUTS).toBe(4);
   });
 });

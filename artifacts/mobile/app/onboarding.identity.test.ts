@@ -6,16 +6,16 @@ const source = readFileSync(path.resolve(__dirname, "./onboarding.tsx"), "utf8")
 
 describe("seller onboarding identity handoff", () => {
   it("syncs the local seller user before writing the brand name", () => {
-    const finishSeller = source.indexOf("async function finishSeller()");
-    expect(finishSeller).toBeGreaterThan(-1);
+    const commitSeller = source.indexOf("async function commitSeller()");
+    expect(commitSeller).toBeGreaterThan(-1);
 
     const sync = source.indexOf(
       "const profile = await api.auth.sync({ name });",
-      finishSeller,
+      commitSeller,
     );
-    const brandWrite = source.indexOf("await api.auth.onboarding({", finishSeller);
+    const brandWrite = source.indexOf("await api.auth.onboarding({", commitSeller);
 
-    expect(sync).toBeGreaterThan(finishSeller);
+    expect(sync).toBeGreaterThan(commitSeller);
     expect(brandWrite).toBeGreaterThan(sync);
     expect(source.slice(brandWrite, brandWrite + 260)).toContain(
       "brandName: brandName.trim()",
@@ -47,7 +47,7 @@ describe("buyer onboarding completion recovery", () => {
     const finishBuyer = source.indexOf("async function finishBuyer(retryAttempt = false)");
     expect(finishBuyer).toBeGreaterThan(-1);
 
-    const buyerSlice = source.slice(finishBuyer, source.indexOf("async function finishSeller()", finishBuyer));
+    const buyerSlice = source.slice(finishBuyer, source.indexOf("async function commitSeller()", finishBuyer));
     expect(buyerSlice).toContain("await queueBuyerOnboardingSync(profile.clerkId, styleInterests)");
     expect(buyerSlice).toContain("await syncBuyerOnboarding(profile.clerkId, styleInterests, api)");
     expect(buyerSlice).toContain("expectedClerkId: profile.clerkId");

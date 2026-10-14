@@ -22,9 +22,10 @@ export type BuyerStepId =
 
 export type SellerStepId =
   | 'SIGN_UP'
-  | 'PROFILE'
-  | 'BRAND_NAME'
-  | 'NOTIFICATIONS';
+  | 'STORE'
+  | 'CATEGORIES'
+  | 'PRODUCT'
+  | 'PAYOUTS';
 
 export interface StepDef<Id extends string> {
   id: Id;
@@ -32,14 +33,14 @@ export interface StepDef<Id extends string> {
   skippable: boolean;
 }
 
-// ─── Step order (v9) ──────────────────────────────────────────────────────
+// ─── Step order (v10) ─────────────────────────────────────────────────────
 // The Welcome opener and the two-card account-type screen are gone: the
 // buyer/seller choice, Apple / Google / email and the age check all live on
 // one Sign up screen (step 0), like Grailed's.
-// BOTH:   0=SignUp  1=Profile (name + @username)
-// BUYER:  2=Brands  3=Sizes  4=Notifications
-// SELLER: 2=BrandName  3=Notifications
-// Buyer steps after Profile can all be skipped.
+// BUYER:  0=SignUp  1=Profile (name + @username)  2=Brands  3=Sizes  4=Notifications
+// SELLER: 0=SignUp  1=Store (store name + @handle)  2=Categories  3=First product  4=Payouts
+// Every step after the account and its name can be skipped. The seller's
+// account is created when they leave Categories, so a product can be listed.
 export const BUYER_FLOW_STEPS: StepDef<BuyerStepId>[] = [
   { id: 'SIGN_UP', skippable: false },
   { id: 'PROFILE', skippable: false },
@@ -50,9 +51,10 @@ export const BUYER_FLOW_STEPS: StepDef<BuyerStepId>[] = [
 
 export const SELLER_FLOW_STEPS: StepDef<SellerStepId>[] = [
   { id: 'SIGN_UP', skippable: false },
-  { id: 'PROFILE', skippable: false },
-  { id: 'BRAND_NAME', skippable: false },
-  { id: 'NOTIFICATIONS', skippable: true },
+  { id: 'STORE', skippable: false },
+  { id: 'CATEGORIES', skippable: true },
+  { id: 'PRODUCT', skippable: true },
+  { id: 'PAYOUTS', skippable: true },
 ];
 
 function stepIndexMap<Id extends string>(steps: StepDef<Id>[]): Record<Id, number> {
@@ -110,7 +112,7 @@ export function canGoBack(stepIndex: number): boolean {
  * in-flight user resuming mid-onboarding lands back on an equivalent step
  * instead of restarting from scratch.
  */
-export const DRAFT_VERSION = 9;
+export const DRAFT_VERSION = 10;
 
 // v8 order: the *source* indices for the v8 -> v9 migration. Frozen.
 const V8_BUYER_STEP_INDEX = {
@@ -144,6 +146,18 @@ function v8ToV9(flow: Flow, v8Step: number): number {
   if (v8Step === sl.NAME) return V9_SELLER.PROFILE;
   if (v8Step === sl.BRAND_NAME) return V9_SELLER.BRAND_NAME;
   return V9_SELLER.NOTIFICATIONS;
+}
+
+/**
+ * v9 -> v10: the seller's Profile and store-name steps merge into Store,
+ * and the old Notifications step resumes on Categories (the account is
+ * created after it). Buyer indices are unchanged.
+ */
+function v9ToV10(flow: Flow, v9Step: number): number {
+  if (flow === 'buyer') return v9Step;
+  if (v9Step <= V9_SELLER.SIGN_UP) return 0;
+  if (v9Step === V9_SELLER.PROFILE || v9Step === V9_SELLER.BRAND_NAME) return 1;
+  return 2;
 }
 
 // v7 order (Welcome + Brands, no Sizes step): the *source* indices for the
@@ -297,14 +311,15 @@ function v7ToV8(flow: Flow, v7Step: number): number {
 }
 
 /**
- * Translate a persisted (flow, step, version) draft into the current (v9)
+ * Translate a persisted (flow, step, version) draft into the current (v10)
  * step index for that flow. Unknown/undefined versions are treated as the
  * oldest legacy shape, matching the historical behaviour of this function.
  */
 export function restoreDraftStep(flow: Flow, step: number, version?: number): number {
   if (version === DRAFT_VERSION) return clampStep(flow, step);
-  if (version === 8) return clampStep(flow, v8ToV9(flow, step));
-  if (version === 7) return clampStep(flow, v8ToV9(flow, v7ToV8(flow, step)));
+  if (version === 9) return clampStep(flow, v9ToV10(flow, step));
+  if (version === 8) return clampStep(flow, v9ToV10(flow, v8ToV9(flow, step)));
+  if (version === 7) return clampStep(flow, v9ToV10(flow, v8ToV9(flow, v7ToV8(flow, step))));
   const v6Step = restoreLegacyStepToV6(flow, step, version);
-  return clampStep(flow, v8ToV9(flow, v7ToV8(flow, v6ToV7(flow, v6Step))));
+  return clampStep(flow, v9ToV10(flow, v8ToV9(flow, v7ToV8(flow, v6ToV7(flow, v6Step)))));
 }

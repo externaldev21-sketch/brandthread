@@ -6,9 +6,10 @@
  * and spacing, Grailed's fields and buttons): a "01 / 04" counter, one caps
  * headline, one sentence, one square button.
  *
- * BOTH:   0=SignUp (Shop/Sell, birthday, Apple / Google / email)  1=Profile
- * BUYER:  2=Curate your feed  3=Sizes  4=Notifications → the Threads feed
- * SELLER: 2=BrandName  3=Notifications
+ * BOTH:   0=SignUp (Shop/Sell, birthday, Apple / Google / email)
+ * BUYER:  1=Profile  2=Curate your feed  3=Sizes  4=Notifications → the Threads feed
+ * SELLER: 1=Store (name + @handle)  2=What do you sell  3=First product  4=Payouts
+ *         → "Your store is live" (after a first product) → the dashboard
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Easing, Platform, StatusBar, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
@@ -45,7 +46,10 @@ import { SizesStep } from '@/components/onboarding/SizesStep';
 import { SignUpStep } from '@/components/onboarding/SignUpStep';
 import { ProfileStep } from '@/components/onboarding/ProfileStep';
 import { NotificationsStep } from '@/components/onboarding/NotificationsStep';
-import { Body, Field, Headline, SquareButton, StepScreen } from '@/components/onboarding/kit';
+import { CategoriesStep, brandTypeFor } from '@/components/onboarding/CategoriesStep';
+import { FirstProductStep } from '@/components/onboarding/FirstProductStep';
+import { PayoutsStep } from '@/components/onboarding/PayoutsStep';
+import { storeLiveSeenKey } from '@/lib/storeLive';
 
 // Required on Android so the in-app browser tab closes after OAuth redirect
 WebBrowser.maybeCompleteAuthSession();
@@ -133,12 +137,16 @@ export default function OnboardingScreen() {
   )), []);
 
   const [brandName, setBrandName] = useState('');
+  const [categories, setCategories] = useState<string[]>([]);
+  // Set once the seller account exists (on leaving Categories), so a resume
+  // after that point never tries to create it twice.
+  const [sellerCommitted, setSellerCommitted] = useState(false);
+  const [publishedProductId, setPublishedProductId] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
 
   const transitionProgress = useRef(new Animated.Value(1)).current;
   const transitionDirection = useRef<1 | -1>(1);
   const firstNameInputRef = useRef<TextInput>(null);
-  const brandNameInputRef = useRef<TextInput>(null);
   const restoredDraft = useRef(false);
   const transitionSequence = useRef(0);
   const transitionInitiatedAt = useRef(0);
@@ -211,6 +219,9 @@ export default function OnboardingScreen() {
               setUsername(draft.username ?? '');
               setSurvey(sanitizeDraftSurvey(draft.survey));
               setBrandName(draft.brandName ?? '');
+              setCategories(Array.isArray(draft.categories) ? draft.categories.filter((c: unknown) => typeof c === 'string') : []);
+              setSellerCommitted(draft.sellerCommitted === true);
+              setPublishedProductId(typeof draft.publishedProductId === 'string' ? draft.publishedProductId : null);
             }
           } catch { /* bad json, ignore */ }
         } else if (!isAddAccount && (pendingFlow === 'buyer' || pendingFlow === 'seller')) {
@@ -251,10 +262,10 @@ export default function OnboardingScreen() {
     const data = {
       version: DRAFT_VERSION,
       ownerId: userId,
-      flow, step, firstName, lastName, username, survey, brandName,
+      flow, step, firstName, lastName, username, survey, brandName, categories, sellerCommitted, publishedProductId,
     };
     await AsyncStorage.setItem(draftKey, JSON.stringify(data));
-  }, [flow, step, firstName, lastName, username, survey, brandName, user?.id]);
+  }, [flow, step, firstName, lastName, username, survey, brandName, categories, sellerCommitted, publishedProductId, user?.id]);
 
   useEffect(() => {
     if (!user?.id || !ready || !flow) return;
@@ -267,12 +278,9 @@ export default function OnboardingScreen() {
 
   // Let the screen transition finish before opening the keyboard.
   useEffect(() => {
-    const isProfile = step === BUYER_STEP_INDEX.PROFILE;
-    const isBrandName = flow === 'seller' && step === SELLER_STEP_INDEX.BRAND_NAME;
-    if (!isProfile && !isBrandName) return;
+    if (step !== BUYER_STEP_INDEX.PROFILE) return;
     const timer = setTimeout(() => {
-      if (isBrandName) brandNameInputRef.current?.focus();
-      else if (!firstName) firstNameInputRef.current?.focus();
+      if (!(flow === 'seller' ? brandName : firstName)) firstNameInputRef.current?.focus();
     }, 260);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -475,20 +483,30 @@ export default function OnboardingScreen() {
     }
   }
 
-  async function finishSeller() {
+  /**
+   * Creates the seller account when they leave "What do you sell?", so the
+   * first-product step can list a real product. Local completion flags are
+   * only written when they land (landSeller); if the app closes in between,
+   * the auth gate finds the server-side completion and opens the dashboard.
+   */
+  async function commitSeller() {
     if (finishing) return;
+    if (sellerCommitted) { goNext(); return; }
     setFinishing(true);
     if (isDevWebPreviewUser && typeof window !== 'undefined') {
       window.location.assign('/?bt_preview=seller');
       return;
     }
     try {
-      const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || firstName.trim();
+      // The store name is the seller's public name; a name from Apple /
+      // Google, when there is one, stays on the account.
+      const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || brandName.trim();
       const uname = username.trim().toLowerCase();
       const profile = await api.auth.sync({ name });
       await submitPendingAge(api);
       await api.auth.onboarding({
         brandName: brandName.trim(),
+        ...(categories.length > 0 ? { brandType: brandTypeFor(categories) } : {}),
         ...(uname ? { username: uname } : {}),
       });
       await api.auth.updateProfile({
@@ -506,18 +524,10 @@ export default function OnboardingScreen() {
         });
       }
       await api.auth.completeOnboarding('seller');
-      await AsyncStorage.multiSet([
-        [ONBOARDING_KEY, 'true'],
-        [ONBOARDING_OWNER_KEY, profile.clerkId],
-        ['user_role', 'seller'],
-        ['onboarding_first_name', firstName],
-        ['onboarding_brand_name', brandName],
-      ]);
-      await AsyncStorage.multiRemove([draftKeyForUser(profile.clerkId)!, LEGACY_DRAFT_KEY]);
-      await AsyncStorage.multiRemove([PENDING_FLOW_KEY, PENDING_USERNAME_KEY]);
-      void registerGrantedPushToken(profile.clerkId, api);
       api.ai.brandMemoryRebuild().catch(() => {});
-      router.replace('/(tabs)/' as never);
+      setSellerCommitted(true);
+      setFinishing(false);
+      goNext();
     } catch (error) {
       setFinishing(false);
       console.error('[seller-onboarding] save failed', {
@@ -531,8 +541,33 @@ export default function OnboardingScreen() {
       Alert.alert(
         'Setup incomplete',
         'We couldn’t save your store. Check your connection and try again.',
-        [{ text: 'Retry', onPress: () => { void finishSeller(); } }],
+        [{ text: 'Retry', onPress: () => { void commitSeller(); } }],
       );
+    }
+  }
+
+  /** After payouts: "Your store is live" if they listed something, else the dashboard. */
+  async function landSeller() {
+    if (finishing) return;
+    setFinishing(true);
+    const userId = user?.id ?? null;
+    try {
+      await AsyncStorage.multiSet([
+        [ONBOARDING_KEY, 'true'],
+        ...(userId ? [[ONBOARDING_OWNER_KEY, userId] as [string, string]] : []),
+        ['user_role', 'seller'],
+        ['onboarding_first_name', firstName],
+        ['onboarding_brand_name', brandName],
+      ]);
+      await AsyncStorage.multiRemove([...(userId ? [draftKeyForUser(userId)!] : []), LEGACY_DRAFT_KEY, PENDING_FLOW_KEY, PENDING_USERNAME_KEY]);
+    } catch {
+      // Local flags are a cache; the server already has the completed account.
+    }
+    void registerGrantedPushToken(userId, api);
+    if (publishedProductId) {
+      router.replace({ pathname: '/store-live', params: { productId: publishedProductId } } as never);
+    } else {
+      router.replace('/(tabs)/' as never);
     }
   }
 
@@ -579,12 +614,29 @@ export default function OnboardingScreen() {
 
     const counter = stepCounterFor(flow, step);
 
+    if (flow === 'seller' && step === SELLER_STEP_INDEX.STORE) return (
+      <ProfileStep
+        ref={firstNameInputRef}
+        counter={counter}
+        title="Your store"
+        body="Its name and the handle buyers find it by."
+        nameLabel="Store name"
+        namePlaceholder="e.g. Northline Studio"
+        name={brandName}
+        onNameChange={setBrandName}
+        username={username}
+        onUsernameChange={updateUsername}
+        onNameFocus={recordDeviceFocus}
+        onNext={goNext}
+      />
+    );
+
     if (step === BUYER_STEP_INDEX.PROFILE) return (
       <ProfileStep
         ref={firstNameInputRef}
         counter={counter}
-        title={flow === 'buyer' ? 'Your profile' : 'About you'}
-        body={flow === 'buyer' ? 'Your name and the handle people find you by.' : 'Your name and your handle on Brandthread.'}
+        title="Your profile"
+        body="Your name and the handle people find you by."
         nameLabel="Name"
         namePlaceholder="First and last name"
         name={firstName}
@@ -614,32 +666,24 @@ export default function OnboardingScreen() {
     }
 
     if (flow === 'seller') {
-      if (step === SELLER_STEP_INDEX.BRAND_NAME) return (
-        <StepScreen
-          counter={counter}
-          footer={<SquareButton testID="onboarding-next" label="Next" onPress={goNext} disabled={brandName.trim().length < 1} />}
-        >
-          <Headline>Your store</Headline>
-          <Body>Use your brand's name. You can change it later.</Body>
-          <Field
-            ref={brandNameInputRef}
-            testID="onboarding-brand-name-input"
-            label="Store name"
-            value={brandName}
-            onChangeText={setBrandName}
-            onFocus={recordDeviceFocus}
-            autoCapitalize="words"
-            maxLength={60}
-          />
-        </StepScreen>
+      if (step === SELLER_STEP_INDEX.CATEGORIES) return (
+        <CategoriesStep counter={counter} categories={categories} onChange={setCategories} busy={finishing} onNext={() => { void commitSeller(); }} />
       );
-      if (step === SELLER_STEP_INDEX.NOTIFICATIONS) return (
-        <NotificationsStep
+      if (step === SELLER_STEP_INDEX.PRODUCT) return (
+        <FirstProductStep
           counter={counter}
-          body="Know the moment an order comes in, a payout lands or a customer writes."
-          busy={finishing}
-          onDone={() => { void finishSeller(); }}
+          onSkip={goNext}
+          onPublished={(productId) => {
+            setPublishedProductId(productId);
+            // Onboarding hands off to "Your store is live" itself, so Add
+            // product never shows it a second time for this seller.
+            if (user?.id) void AsyncStorage.setItem(storeLiveSeenKey(user.id), '1').catch(() => {});
+            goNext();
+          }}
         />
+      );
+      if (step === SELLER_STEP_INDEX.PAYOUTS) return (
+        <PayoutsStep counter={counter} busy={finishing} onDone={() => { void landSeller(); }} />
       );
     }
     return null;

@@ -233,6 +233,7 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir }) {
       if (user.accountType !== 'seller') throw new Error(`Expected accountType "seller", got ${JSON.stringify(user.accountType)}`);
       if (user.onboardingComplete !== true) throw new Error('Expected onboardingComplete to be true after finishing onboarding.');
       if (user.brandName !== id.brandName) throw new Error(`Expected brandName to have been saved, got ${JSON.stringify(user.brandName)}`);
+      if (user.brandType !== 'Tops, Outerwear, Headwear') throw new Error(`Expected brandType from What do you sell, got ${JSON.stringify(user.brandType)}`);
     });
   } finally {
     await context.close();
@@ -240,25 +241,62 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir }) {
   return report.rows;
 }
 
-/** Everything after the account exists, through landing on the dashboard. */
-async function runSellerSteps(page, { id, shot, report }) {
-  await report.step('profile: name + @username', () => fillProfile(page, id, shot, 'profile'));
-
-  await report.step('store name', async () => {
-    await page.getByTestId('onboarding-brand-name-input').waitFor({ timeout: 10_000 });
-    await page.getByTestId('onboarding-brand-name-input').fill(id.brandName);
-    await shot('store-name');
+/** Everything after the account exists, through "Your store is live". */
+async function runSellerSteps(page, { id, shot, report, api }) {
+  await report.step('store: name + @handle', async () => {
+    await page.getByTestId('onboarding-first-name-input').waitFor({ timeout: 15_000 });
+    await shot('store-empty');
+    await page.getByTestId('onboarding-first-name-input').fill(id.brandName);
+    await page.getByTestId('onboarding-username-input').fill(id.username);
+    await page.getByText('is available', { exact: false }).waitFor({ timeout: 10_000 });
+    await shot('store');
     await page.getByTestId('onboarding-next').click();
   });
 
-  await report.step('notifications', async () => {
-    await page.getByTestId('onboarding-notifications').waitFor({ timeout: 10_000 });
-    await shot('notifications');
-    await page.getByTestId('onboarding-notifications-continue').click();
+  await report.step('what do you sell', async () => {
+    await page.getByTestId('onboarding-categories').waitFor({ timeout: 10_000 });
+    await shot('categories-empty');
+    await page.getByTestId('onboarding-category-Tops').click();
+    await page.getByTestId('onboarding-category-Outerwear').click();
+    await page.getByTestId('onboarding-category-Headwear').click();
+    await shot('categories');
+    await page.getByTestId('onboarding-next').click();
   });
 
-  await report.step('lands on seller dashboard', async () => {
-    await page.waitForURL((url) => !url.pathname.startsWith('/onboarding'), { timeout: 20_000 });
+  await report.step('first product', async () => {
+    await page.getByTestId('onboarding-first-product').waitFor({ timeout: 15_000 });
+    await shot('first-product-empty');
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByTestId('onboarding-product-photo').click();
+    await (await chooser).setFiles(demoImages['hoodie-ember']);
+    await page.getByLabel('Name', { exact: true }).fill('Heavyweight Hoodie');
+    await page.getByLabel('Price', { exact: true }).fill('98');
+    await page.waitForTimeout(800);
+    await shot('first-product');
+    await page.getByTestId('onboarding-publish').click();
+  });
+
+  await report.step('payouts', async () => {
+    await page.getByTestId('onboarding-payouts').waitFor({ timeout: 15_000 });
+    await shot('payouts');
+    await page.getByTestId('onboarding-payouts-later').click();
+  });
+
+  await report.step('lands on "Your store is live" for the new product', async () => {
+    await page.getByTestId('store-live-screen').waitFor({ timeout: 20_000 });
+    if (!page.url().includes('productId=prod_onboarding_1')) throw new Error(`Expected /store-live?productId=prod_onboarding_1, got ${page.url()}`);
+    if (api.getProducts().length !== 1) throw new Error(`Expected one product created, got ${api.getProducts().length}`);
+    // Not screenshotted here: this export build (EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST)
+    // treats a cached user_role of 'seller' as the signed-out seller preview and
+    // blocks the screen's own API reads, so its preview would render empty. A
+    // release build never does. scripts/store-screenshots/store-live-capture.mjs
+    // captures this screen with seller data.
+  });
+
+  await report.step('done lands on the seller dashboard', async () => {
+    await dismissCookieBanner(page);
+    await page.getByTestId('store-live-done').click();
+    await page.waitForURL((url) => !url.pathname.startsWith('/store-live'), { timeout: 20_000 });
     await page.waitForTimeout(2500);
     await dismissCookieBanner(page);
     await shot('seller-dashboard');

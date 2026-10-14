@@ -50,6 +50,8 @@ export function createFakeOnboardingApi({ apiOrigin = 'https://api.brandthread.t
   /** @type {any} */
   let dbUser = null;
   const calls = [];
+  /** Products the seller lists during onboarding. */
+  const products = [];
 
   function ensureUser(name, clerkId) {
     if (!dbUser) {
@@ -104,6 +106,7 @@ export function createFakeOnboardingApi({ apiOrigin = 'https://api.brandthread.t
       const user = ensureUser();
       if (body?.brandName != null) user.brandName = body.brandName;
       if (body?.brandStage != null) user.brandStage = body.brandStage;
+      if (body?.brandType != null) user.brandType = body.brandType;
       if (body?.username != null) user.username = body.username;
       return { status: 200, body: { ok: true } };
     }
@@ -189,7 +192,22 @@ export function createFakeOnboardingApi({ apiOrigin = 'https://api.brandthread.t
     }
     if (get && p === '/team/context') return { status: 200, body: { role: 'owner', storeOwnerId: dbUser?.clerkId ?? null, teamMembershipId: null } };
     if (get && p === '/team/my-memberships') return { status: 200, body: { memberships: [] } };
-    if (get && p === '/products') return { status: 200, body: [] };
+    if (p === '/products/images' && method === 'POST') {
+      return { status: 200, body: { objectPath: `${apiOrigin}/demo-images/hoodie-ember.jpg` } };
+    }
+    if (p === '/products' && method === 'POST') {
+      const product = { id: `prod_onboarding_${products.length + 1}`, ...body, images: body?.images ?? [] };
+      products.push(product);
+      return { status: 201, body: product };
+    }
+    if (get && p === '/products') return { status: 200, body: products };
+    if (get && p === '/seller/profile') {
+      const user = ensureUser();
+      return { status: 200, body: { id: user.clerkId, clerkId: user.clerkId, displayName: user.displayName, brandName: user.brandName, username: user.username, profileImageUrl: null, logoUrl: null, verified: false } };
+    }
+    if (get && p === '/seller/connect/link') {
+      return { status: 200, body: { url: 'https://connect.stripe.com/setup/e/acct_walkthrough', kind: 'account_onboarding', expiresAt: null } };
+    }
     if (get && p === '/manufacturers/public') return { status: 200, body: [] };
 
     return undefined;
@@ -199,6 +217,8 @@ export function createFakeOnboardingApi({ apiOrigin = 'https://api.brandthread.t
     respond,
     /** The in-memory row this run has written, or null before /auth/sync. */
     getUser: () => dbUser,
+    /** Products created through POST /api/products. */
+    getProducts: () => products,
     /** Every request this instance has handled, for debugging a failed run. */
     getCalls: () => calls,
   };
