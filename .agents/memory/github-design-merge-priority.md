@@ -3,6 +3,12 @@ name: GitHub design merge priority
 description: How to resolve reviewed GitHub design changes against local Repl fixes during requested syncs.
 ---
 
+The approved public landing concept is “Shop, sell and design streetwear.” with a phone illustration on the right at desktop widths, stacked below the copy on phones.
+
+**Why:** The owner explicitly rejected the fashion-photo carousel redesign and requested restoration of the previous landing page and tests.
+
+**How to apply:** Preserve this landing concept unless a subsequent request explicitly approves replacing it; do not reintroduce the rejected redesign during bulk upstream merges.
+
 When syncing reviewed design PRs from GitHub dev, treat origin/dev as the source of truth for conflicting UI screen and component files. Preserve nonconflicting local build or runtime fixes, and report local-only commits so they can be brought into GitHub deliberately. Preserve the local development preview selector when the user explicitly asks. For requested dev syncs, use a merge; do not rebase, force-update, or push without a separate instruction.
 
 **Why:** The user reviewed the GitHub design changes and explicitly chose them over divergent local UI when a merge conflict occurred. They later explicitly required merge-only syncing with the local preview selector intact; a concurrent rebase previously disrupted the shared checkout.
