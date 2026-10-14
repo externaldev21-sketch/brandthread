@@ -5,12 +5,14 @@
  *   node scripts/landing-fit-check.mjs [--shots <dir>]
  *
  * Builds the page into a temp folder, serves it with server/serve.js, opens it
- * at 393x852 and 1440x900 in Chromium and fails if any of these is violated:
+ * at 390x844, 393x852 and 1440x900 in Chromium and fails if any of these is violated:
  *  - a text element has scrollWidth > clientWidth, or uses text-overflow
  *  - an element's box leaves its parent's box
- *  - buttons/chips have < 12px inner horizontal padding, cards < 16px
- *  - buttons or badges in one group differ in width or height
- *  - a step title or description wraps to a second line, or any text is under 12px
+ *  - buttons/badges have < 12px inner horizontal padding, the panel < 16px
+ *  - store badges differ in width or height, or the Get started button and
+ *    the email field differ in height
+ *  - any text is under 12px
+ * The stats row is filled from a mocked response with wide numbers.
  *  - a wrapped paragraph or heading ends with a single word (orphan)
  *  - anything overflows the viewport horizontally
  * With --shots it also writes a zoomed screenshot of every card and button group.
@@ -57,7 +59,7 @@ function inPage() {
   if (document.documentElement.scrollWidth > vw) problems.push(`page scrolls horizontally (${document.documentElement.scrollWidth} > ${vw})`);
 
   for (const el of document.body.querySelectorAll('*')) {
-    if (!visible(el) || el.closest('.skip')) continue;
+    if (!visible(el) || el.closest('.skip, .vh')) continue;
     const cs = getComputedStyle(el);
     if (hasOwnText(el)) {
       if (el.scrollWidth > el.clientWidth + 0.5 && cs.display !== 'inline') problems.push(`text overflows its box: ${label(el)}`);
@@ -72,7 +74,7 @@ function inPage() {
     }
   }
 
-  for (const el of document.querySelectorAll('.btn, .badge, .screen li')) {
+  for (const el of document.querySelectorAll('.btn, .badge')) {
     const cs = getComputedStyle(el);
     const min = 12;
     if (px(cs.paddingLeft) < min || px(cs.paddingRight) < min) problems.push(`inner padding < ${min}px: ${label(el)}`);
@@ -83,27 +85,22 @@ function inPage() {
     if (Math.abs((r.left + r.right) / 2 - (text.left + text.right) / 2) > 1.5) problems.push(`text not centred horizontally: ${label(el)}`);
     if (Math.abs((r.top + r.bottom) / 2 - (text.top + text.bottom) / 2) > 1.5) problems.push(`text not centred vertically: ${label(el)}`);
   }
-  for (const el of document.querySelectorAll('.card')) {
+  for (const el of document.querySelectorAll('.panel')) {
     const cs = getComputedStyle(el);
-    if (px(cs.paddingLeft) < 16 || px(cs.paddingRight) < 16) problems.push(`card padding < 16px: ${label(el)}`);
+    if (px(cs.paddingLeft) < 16 || px(cs.paddingRight) < 16) problems.push(`panel padding < 16px: ${label(el)}`);
   }
 
-  for (const group of document.querySelectorAll('.ctas, .badges')) {
+  for (const group of document.querySelectorAll('.badges')) {
     const items = [...group.children].map((c) => c.querySelector('a') || c).map((c) => c.getBoundingClientRect());
     const w = new Set(items.map((r) => Math.round(r.width)));
     const h = new Set(items.map((r) => Math.round(r.height)));
     if (w.size > 1) problems.push(`unequal widths in ${group.className}: ${[...w]}`);
     if (h.size > 1) problems.push(`unequal heights in ${group.className}: ${[...h]}`);
   }
-  // Same row: CTA buttons and badges share one height.
-  const heights = new Set([...document.querySelectorAll('.hero .btn, .hero .badge')].map((e) => Math.round(e.getBoundingClientRect().height)));
-  if (heights.size > 1) problems.push(`hero buttons and badges differ in height: ${[...heights]}`);
-
-  for (const h of document.querySelectorAll('.steps h3, .steps p')) {
-    const cs = getComputedStyle(h);
-    const lh = px(cs.lineHeight) || px(cs.fontSize) * 1.5;
-    if (h.getBoundingClientRect().height > lh * 1.3) problems.push(`step text wraps: ${label(h)}`);
-  }
+  // The email field and Get started share one height.
+  const heights = new Set([...document.querySelectorAll('.signup input, .signup .btn')].map((e) => Math.round(e.getBoundingClientRect().height)));
+  if (heights.size > 1) problems.push(`email field and button differ in height: ${[...heights]}`);
+  if (document.querySelector('[data-stats]').hidden) problems.push('stats row stayed hidden with a valid response');
 
   // Orphans: last line holds a single word.
   for (const el of document.querySelectorAll('h1, h2, h3, p, .foot a')) {
@@ -135,9 +132,13 @@ try {
     try { await fetch(`http://127.0.0.1:${port}/status`); break; } catch { await new Promise((r) => setTimeout(r, 100)); }
   }
   const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
-  for (const [name, viewport, mobile] of [['393x852', { width: 393, height: 852 }, true], ['1440x900', { width: 1440, height: 900 }, false]]) {
+  for (const [name, viewport, mobile] of [['390x844', { width: 390, height: 844 }, true], ['393x852', { width: 393, height: 852 }, true], ['1440x900', { width: 1440, height: 900 }, false]]) {
     const ctx = await browser.newContext({ viewport, deviceScaleFactor: mobile ? 2 : 1, isMobile: mobile, hasTouch: mobile });
     const page = await ctx.newPage();
+    await page.route('**/api/v1/public/stats', (route) => route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ brands: 12345, piecesListed: 1234567, ordersShipped: 1234567 }),
+    }));
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle' });
     await page.evaluate(() => document.fonts.ready);
     const problems = await page.evaluate(inPage);
@@ -147,12 +148,10 @@ try {
     if (shotsDir) {
       fs.mkdirSync(shotsDir, { recursive: true });
       const targets = [
-        ['cards', '.cards'],
-        ['hero-buttons', '.hero .ctas'],
-        ['hero-badges', '.hero .badges'],
-        ['sell-steps', '.steps'],
-        ['final-buttons', '.final .ctas'],
-        ['final-badges', '.final .badges'],
+        ['nav', 'header .bar'],
+        ['signup', '.signup'],
+        ['phone', '.stage'],
+        ['panel', '.panel'],
         ['footer', 'footer .foot'],
       ];
       for (const [id, selector] of targets) {

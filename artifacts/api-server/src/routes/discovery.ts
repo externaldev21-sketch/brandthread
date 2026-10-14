@@ -4,6 +4,7 @@
  *   GET /categories/:slug/products   products in one category (taxonomy-classified)
  *   GET /trending/products           products ranked by real recent signals
  *   GET /trending/brands             brands ranked by real recent signals
+ *   GET /stats                       live marketplace totals for the landing page
  *
  * Categories come from lib/categoryTaxonomy (free-text products.category,
  * name and tags mapped to a stable slug set). Trending uses lib/trendingScoring
@@ -337,6 +338,44 @@ router.get("/trending/brands", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to fetch trending brands");
     res.status(500).json({ error: "Failed to fetch trending brands" });
+  }
+});
+
+// GET /api/public/stats
+// Real counts only, for the marketing page's numbers row (it hides the row when
+// this fails): sellers with at least one live product, live products from
+// sellers in good standing, and orders that have actually shipped.
+router.get("/stats", async (req, res) => {
+  try {
+    setPublicCacheHeaders(res, { maxAgeSeconds: 300, staleWhileRevalidateSeconds: 3600 });
+    const visibleSeller = and(
+      isNull(users.suspendedAt),
+      isNull(users.deletedAt),
+      isNull(users.deletionRequestedAt),
+      eq(users.policyRestricted, false),
+    );
+    const [[listed], [shipped]] = await Promise.all([
+      db
+        .select({
+          brands: sql<number>`count(distinct ${products.ownerId})::int`,
+          piecesListed: sql<number>`count(*)::int`,
+        })
+        .from(products)
+        .innerJoin(users, eq(users.clerkId, products.ownerId))
+        .where(and(eq(products.status, "active"), isNull(products.deletedAt), visibleSeller)),
+      db
+        .select({ ordersShipped: sql<number>`count(*)::int` })
+        .from(orders)
+        .where(isNotNull(orders.shippedAt)),
+    ]);
+    res.json({
+      brands: Number(listed?.brands ?? 0),
+      piecesListed: Number(listed?.piecesListed ?? 0),
+      ordersShipped: Number(shipped?.ordersShipped ?? 0),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch marketplace stats");
+    res.status(500).json({ error: "Failed to fetch stats" });
   }
 });
 

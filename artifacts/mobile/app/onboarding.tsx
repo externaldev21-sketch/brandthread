@@ -169,6 +169,9 @@ const LEGACY_DRAFT_KEY = 'onboarding_draft';
 const DRAFT_KEY_PREFIX = 'onboarding_draft:';
 const PENDING_FLOW_KEY = 'onboarding_pending_flow';
 const PENDING_USERNAME_KEY = 'onboarding_pending_username';
+// Written by the marketing page's email field (scripts/landing-page.js) and
+// read once here to prefill the sign-up email; never sent anywhere.
+const PREFILL_EMAIL_KEY = 'onboarding_prefill_email';
 // Draft version, step index objects and cross-version migration now live in
 // lib/onboardingFlow.ts (imported above) — this file only renders steps.
 
@@ -1129,6 +1132,8 @@ interface SharedAuthStepProps {
   /** Prefill last name (stored for profile write) */
   onLastNamePrefill: (lastName: string) => void;
   allowSignedInAccountCreation?: boolean;
+  /** Email typed on the marketing page, if any */
+  initialEmail?: string;
 }
 
 function SharedAuthStep({
@@ -1136,6 +1141,7 @@ function SharedAuthStep({
   username, onUsernameChange, referralCode, onReferralCodeChange,
   onFirstNamePrefill, onLastNamePrefill,
   allowSignedInAccountCreation = false,
+  initialEmail = '',
 }: SharedAuthStepProps) {
   const { theme } = useAppTheme();
   const ssa = createSsa(theme);
@@ -1150,7 +1156,11 @@ function SharedAuthStep({
   const usernameLiveCheck = useUsernameLiveCheck(username);
 
   const [phase, setPhase]             = useState<SharedAuthPhase>('form');
-  const [email, setEmail]             = useState('');
+  const [email, setEmail]             = useState(initialEmail);
+  // The prefill is read from storage after first render; never overwrite typing.
+  useEffect(() => {
+    if (initialEmail) setEmail((current) => current || initialEmail);
+  }, [initialEmail]);
   const [formFirstName, setFormFirstName] = useState('');
   const [formLastName, setFormLastName]   = useState('');
   const [password, setPassword]       = useState('');
@@ -1933,6 +1943,7 @@ export default function OnboardingScreen() {
 
   const [flow, setFlow]           = useState<Flow | null>(deviceProbeFlow);
   const [selectedFlow, setSelectedFlow] = useState<AccountType | null>(deviceProbeFlow);
+  const [prefillEmail, setPrefillEmail] = useState('');
   // Step 0 = AccountType for both paths (v6 ordering)
   const [step, setStep]           = useState(deviceProbeStep);
   const [ready, setReady]         = useState(deviceProbeEnabled);
@@ -2042,10 +2053,18 @@ export default function OnboardingScreen() {
           ...(draftKey ? [draftKey] : []),
           PENDING_FLOW_KEY,
           PENDING_USERNAME_KEY,
+          PREFILL_EMAIL_KEY,
         ]);
         const draftVal = draftKey ? values.find(([key]) => key === draftKey)?.[1] : null;
         const pendingFlow = values.find(([key]) => key === PENDING_FLOW_KEY)?.[1];
         const pendingUsername = values.find(([key]) => key === PENDING_USERNAME_KEY)?.[1];
+        const pendingEmail = values.find(([key]) => key === PREFILL_EMAIL_KEY)?.[1];
+        if (pendingEmail) {
+          // One-shot: consumed on this visit whether or not it is used.
+          await AsyncStorage.removeItem(PREFILL_EMAIL_KEY);
+          const trimmed = pendingEmail.trim();
+          if (!isAddAccount && trimmed.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) setPrefillEmail(trimmed);
+        }
 
         if (draftVal) {
           try {
@@ -2558,6 +2577,7 @@ export default function OnboardingScreen() {
             onFirstNamePrefill={setFirstName}
             onLastNamePrefill={setLastName}
             allowSignedInAccountCreation={isAddAccount}
+            initialEmail={prefillEmail}
           />
           {deviceProbeEnabled && (
             <TouchableOpacity
@@ -2661,6 +2681,7 @@ export default function OnboardingScreen() {
             onFirstNamePrefill={setFirstName}
             onLastNamePrefill={setLastName}
             allowSignedInAccountCreation={isAddAccount}
+            initialEmail={prefillEmail}
           />
           {deviceProbeEnabled && (
             <TouchableOpacity

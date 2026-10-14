@@ -6,13 +6,25 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const projectRoot = path.resolve(__dirname, '..');
 const {
+  ASSET_DIR,
+  LANDING_ASSETS,
   PENDING_FLOW_KEY,
+  PREFILL_EMAIL_KEY,
+  QR_FALLBACK_URL,
   ROUTES,
+  STATS_ENDPOINT,
+  qrSvg,
   renderLandingHtml,
   resolveStoreUrl,
   writeLandingPage,
 } = require('./landing-page.js') as {
+  ASSET_DIR: string;
+  LANDING_ASSETS: Record<string, string>;
   PENDING_FLOW_KEY: string;
+  PREFILL_EMAIL_KEY: string;
+  QR_FALLBACK_URL: string;
+  STATS_ENDPOINT: string;
+  qrSvg: (text: string) => string;
   ROUTES: Record<string, string>;
   renderLandingHtml: (options?: { appStoreUrl?: string | null; playStoreUrl?: string | null }) => string;
   resolveStoreUrl: (value: unknown, kind: 'appStore' | 'playStore') => string | null;
@@ -68,7 +80,15 @@ describe('store badge URLs come from env and are validated', () => {
       expect(html).toContain(APP_STORE);
       expect(html).not.toContain('Google Play');
       expect(fs.existsSync(path.join(dir, 'landing.html'))).toBe(true);
-      expect(fs.existsSync(path.join(dir, 'landing-fonts', 'Inter_400Regular.ttf'))).toBe(true);
+      // Media is published under content-hashed names (static files are immutable).
+      const published = fs.readdirSync(path.join(dir, ASSET_DIR));
+      for (const name of Object.keys(LANDING_ASSETS)) {
+        const ext = path.extname(name);
+        const hashed = published.find((file) => new RegExp(`^${name.slice(0, -ext.length)}\\.[0-9a-f]{10}\\${ext}$`).test(file));
+        expect(hashed, name).toBeDefined();
+        expect(html).toContain(`/${ASSET_DIR}/${hashed}`);
+      }
+      expect(html).not.toContain(`/${ASSET_DIR}/app-capture.mp4"`);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -78,8 +98,12 @@ describe('store badge URLs come from env and are validated', () => {
 describe('landing page content', () => {
   const html = renderLandingHtml({ appStoreUrl: APP_STORE, playStoreUrl: PLAY_STORE });
 
-  it('is static: no API calls, no external scripts or requests', () => {
-    expect(html).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|\/api\//);
+  it('makes one same-origin stats request and no other calls, external scripts or requests', () => {
+    const fetches = [...html.matchAll(/\bfetch\s*\(([^,)]+)/g)].map((m) => m[1]);
+    expect(fetches).toEqual([JSON.stringify(STATS_ENDPOINT)]);
+    expect(STATS_ENDPOINT).toBe('/api/v1/public/stats');
+    expect(html.match(/\/api\//g)).toHaveLength(1);
+    expect(html).not.toMatch(/XMLHttpRequest|WebSocket|sendBeacon/);
     expect(html).not.toMatch(/<script[^>]+src=/i);
     const externalResources = [...html.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)]
       .map((m) => new URL(m[1]).hostname)
@@ -90,10 +114,19 @@ describe('landing page content', () => {
 
   it('links to real app routes', () => {
     const appDir = path.join(projectRoot, 'app');
-    for (const route of [ROUTES.signUp, ROUTES.signIn, ROUTES.privacy, ROUTES.terms, ROUTES.guidelines]) {
+    for (const route of [ROUTES.signUp, ROUTES.signIn, ROUTES.pricing, ROUTES.privacy, ROUTES.terms, ROUTES.guidelines]) {
       expect(html).toContain(`href="${route}"`);
       expect(fs.existsSync(path.join(appDir, `${route.slice(1)}.tsx`)), route).toBe(true);
     }
+    expect(html).toContain(`href="${ROUTES.shop}"`);
+    expect(fs.existsSync(path.join(appDir, '(buyer)', 'discover.tsx'))).toBe(true);
+    expect(html).toMatch(new RegExp(`<form class="search" role="search" action="${ROUTES.search}" method="get">`));
+    expect(fs.existsSync(path.join(appDir, `${ROUTES.search.slice(1)}.tsx`))).toBe(true);
+    // Shop and the search pill must work signed out.
+    const guest = fs.readFileSync(path.join(projectRoot, 'lib', 'guestRoutes.ts'), 'utf8');
+    expect(guest).toContain("'discover'");
+    expect(guest).toContain("'buyer-search'");
+    for (const label of ['Shop', 'Sell', 'Pricing', 'Log in', 'Sign up', 'Get started']) expect(html).toContain(`>${label}<`);
     expect(html).toContain('href="mailto:support@brandthread.app"');
     expect(html).toContain('Start selling');
   });
@@ -101,7 +134,58 @@ describe('landing page content', () => {
   it('uses the same pending-flow key the onboarding screen reads', () => {
     const onboarding = fs.readFileSync(path.join(projectRoot, 'app', 'onboarding.tsx'), 'utf8');
     expect(onboarding).toContain(`const PENDING_FLOW_KEY = '${PENDING_FLOW_KEY}'`);
-    expect(html).toContain(`localStorage.setItem("${PENDING_FLOW_KEY}"`);
+    expect(html).toContain(`remember(${JSON.stringify(PENDING_FLOW_KEY)}`);
+    // Every "Start selling"/"Sell" link writes the seller flow; Get started the buyer one.
+    for (const a of [...html.matchAll(/<a [^>]*>(?:Sell|Start selling)\b/g)].map((m) => m[0])) expect(a).toContain('data-flow="seller"');
+    expect(html).toMatch(/<form class="signup"[^>]*data-flow="buyer"/);
+  });
+
+  it('hands the typed email to onboarding in storage, never in the URL', () => {
+    const onboarding = fs.readFileSync(path.join(projectRoot, 'app', 'onboarding.tsx'), 'utf8');
+    expect(onboarding).toContain(`const PREFILL_EMAIL_KEY = '${PREFILL_EMAIL_KEY}'`);
+    expect(onboarding).toContain('initialEmail={prefillEmail}');
+    expect(html).toContain(`remember(${JSON.stringify(PREFILL_EMAIL_KEY)},email)`);
+    const input = html.match(/<input id="signup-email"[^>]*>/)?.[0] ?? '';
+    expect(input).toContain('type="email"');
+    expect(input).not.toMatch(/\bname=/);
+    expect(html).toMatch(/<form class="signup" action="\/onboarding" method="get"/);
+  });
+
+  it('points the QR code at the App Store when configured, else at /welcome', () => {
+    expect(html).toContain(qrSvg(APP_STORE));
+    const fallback = renderLandingHtml();
+    expect(QR_FALLBACK_URL).toBe('https://brandthread.app/welcome');
+    expect(fallback).toContain(qrSvg(QR_FALLBACK_URL));
+    expect(fallback).toContain('Download the Brandthread app');
+    expect(qrSvg(APP_STORE)).not.toBe(qrSvg(QR_FALLBACK_URL));
+  });
+
+  it('shows the real app capture: muted, looping, inline, poster first, never on reduced motion', () => {
+    const video = html.match(/<video[^>]*>/)?.[0] ?? '';
+    for (const attr of ['muted', 'loop', 'playsinline', 'preload="none"', 'poster="/landing-assets/app-capture-poster.jpg"', 'width="540"', 'height="1168"']) {
+      expect(video, attr).toContain(attr);
+    }
+    // Started from script so reduced-motion visitors (and no-JS) keep the still.
+    expect(video).not.toMatch(/\bautoplay\b/);
+    expect(html).toContain("matchMedia('(prefers-reduced-motion: reduce)')");
+    expect(html).toContain('<source src="/landing-assets/app-capture.mp4" type="video/mp4" />');
+    expect(html).toContain('<source src="/landing-assets/app-capture.webm" type="video/webm" />');
+    for (const [name, source] of Object.entries(LANDING_ASSETS)) {
+      const size = fs.statSync(path.join(projectRoot, source)).size;
+      expect(size, name).toBeLessThan(1.5 * 1024 * 1024);
+    }
+  });
+
+  it('shows only real marketplace numbers, hidden until the stats endpoint answers', () => {
+    expect(html).toMatch(/<div class="numbers" data-stats hidden>/);
+    for (const key of ['brands', 'piecesListed', 'ordersShipped']) expect(html).toContain(`<dd data-stat="${key}"></dd>`);
+    // No digits are baked into the numbers row.
+    const row = html.match(/<div class="numbers"[\s\S]*?<\/dl>/)?.[0] ?? '';
+    expect(row).not.toMatch(/\d/);
+    const discovery = fs.readFileSync(path.join(projectRoot, '..', 'api-server', 'src', 'routes', 'discovery.ts'), 'utf8');
+    expect(discovery).toContain('router.get("/stats"');
+    for (const key of ['brands', 'piecesListed', 'ordersShipped']) expect(discovery).toContain(`${key}:`);
+    for (const label of ['Apple Pay', 'Klarna &amp; Afterpay where offered', 'Free returns where offered', 'Ships from the brand']) expect(html).toContain(label);
   });
 
   it('carries SEO, social and structured data consistent with the existing web export', () => {
@@ -212,6 +296,17 @@ describe('server integration', () => {
     expect((await get('/', { cookie: '__session=abc' })).body).toContain('APP SHELL');
     expect((await get('/?bt_preview=buyer')).body).toContain('APP SHELL');
     expect((await get('/sign-in')).body).toContain('APP SHELL');
-    expect((await get('/landing-fonts/Inter_400Regular.ttf')).status).toBe(200);
+    const mp4 = fs.readdirSync(path.join(root, ASSET_DIR)).find((f) => f.endsWith('.mp4'))!;
+    const full = await fetch(`http://127.0.0.1:${port}/${ASSET_DIR}/${mp4}`);
+    expect(full.status).toBe(200);
+    expect(full.headers.get('content-type')).toBe('video/mp4');
+    expect(full.headers.get('accept-ranges')).toBe('bytes');
+    // Safari probes video with a byte range and needs a 206.
+    const probe = await fetch(`http://127.0.0.1:${port}/${ASSET_DIR}/${mp4}`, { headers: { range: 'bytes=0-1' } });
+    expect(probe.status).toBe(206);
+    expect(probe.headers.get('content-range')).toMatch(/^bytes 0-1\/\d+$/);
+    expect((await probe.arrayBuffer()).byteLength).toBe(2);
+    const bad = await fetch(`http://127.0.0.1:${port}/${ASSET_DIR}/${mp4}`, { headers: { range: 'bytes=999999999-' } });
+    expect(bad.status).toBe(416);
   });
 });
