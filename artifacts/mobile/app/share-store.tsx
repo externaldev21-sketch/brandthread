@@ -47,9 +47,13 @@ export default function ShareStoreScreen() {
   const storeUrl  = `${BASE_URL}/${storeSlug}`;
   const handleStr = `@${handle ?? storeSlug}`;
 
+  // First-week checklist: "Share your store" (best-effort, no UI of its own).
+  const markShared = () => { api.firstWeek.storeShared().catch(() => {}); };
+
   async function copyLink() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await Clipboard.setStringAsync(storeUrl);
+    markShared();
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   }
@@ -57,10 +61,11 @@ export default function ShareStoreScreen() {
   async function shareLink() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      await Share.share({
+      const result = await Share.share({
         message: `Shop ${brandName} on Brandthread: ${storeUrl}`,
         url:     storeUrl,
       });
+      if (result.action !== Share.dismissedAction) markShared();
     } catch {
       // dismissed
     }

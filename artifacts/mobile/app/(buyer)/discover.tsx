@@ -57,6 +57,7 @@ import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProd
 import { useDiscoveryShelves } from '@/hooks/useDiscoveryShelves';
 import { getFriendSuggestions, muteUser } from '@/services/socialService';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { FirstWeekCard, useFirstWeek } from '@/components/FirstWeekCard';
 import { BUYER_DISCOVER_GESTURE } from '@/lib/firstRunTips/content';
 import {
   composeDiscoverPosts, composeDiscoverBrands, composeDiscoverPeople, composeDiscoverDrops,
@@ -292,6 +293,7 @@ export default function DiscoverScreen() {
     setFitsPosts((prev) => prev.filter(filterFn));
   }
 
+  const firstWeek = useFirstWeek();
   const header = (
     <>
       <DiscoverSearchHeader
@@ -300,6 +302,11 @@ export default function DiscoverScreen() {
         onBellPress={isSignedIn ? () => router.push('/(buyer)/inbox' as never) : undefined}
       />
       <DiscoverFilterRow active={filter} onChange={setFilter} />
+      {filter === 'forYou' && firstWeek.visible && firstWeek.state && (
+        <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+          <FirstWeekCard state={firstWeek.state} onDismiss={firstWeek.dismiss} />
+        </View>
+      )}
       {filter === 'forYou' && <DiscoverFeaturedRail />}
       {filter === 'forYou' && <BrandsYouMightLikeRow />}
     </>

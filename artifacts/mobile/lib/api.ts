@@ -35,6 +35,7 @@ import { classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsEr
 import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
+import type { FirstWeekState } from '@/lib/firstWeek';
 import type { GiftCard, GiftCardHistoryEntry, GiftCardSettings, GiftCardStoreInfo } from '@/lib/giftCards';
 import type { MentionPerson, Story, StoryMentionItem, StoryStickerState } from '@/services/socialTypes';
 import type { LiveModerationState, LiveCohostCandidate, LiveCohostInvite, LiveCohostPerson } from '@/lib/live/moderationTypes';
@@ -1717,6 +1718,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ imported: number; updated: number; skipped: Array<{ shopifyProductId: string; reason: string }> }>(
           '/api/shopify/products/import', { shopifyProductIds, publishStatus },
         ),
+    },
+    /** First-week checklist card: steps computed server-side from real data; reward credited once when all done. */
+    firstWeek: {
+      get: () => get<FirstWeekState>('/api/first-week'),
+      dismiss: () => post<{ ok: true }>('/api/first-week/dismiss', {}),
+      storeShared: () => post<{ ok: true }>('/api/first-week/store-shared', {}),
     },
     buyer: {
       /** Saved sizes / preferences. GET returns defaults when nothing is saved; update is a partial merge (null clears a size). */
