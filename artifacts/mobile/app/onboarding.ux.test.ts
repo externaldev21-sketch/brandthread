@@ -64,8 +64,10 @@ describe("profile", () => {
 });
 
 describe("finish", () => {
-  it("buyer success routes to thread-explainer, seller to tabs", () => {
-    expect(source).toContain("router.replace('/thread-explainer'");
+  it("buyers land straight on the Threads feed (explainer marked seen), sellers on tabs", () => {
+    expect(source).toContain("await AsyncStorage.setItem(`thread_explainer_seen:${userId}`, 'true')");
+    expect(source).toContain("router.replace('/(buyer)/' as never)");
+    expect(source).not.toContain("router.replace('/thread-explainer'");
     expect(source).toContain("router.replace('/(tabs)/'");
   });
 

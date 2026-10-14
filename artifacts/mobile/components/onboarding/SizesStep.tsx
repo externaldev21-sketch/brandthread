@@ -1,77 +1,68 @@
 /**
- * Buyer onboarding — optional "Your sizes" step (between Style and Brands).
- * Tap a size to pick it, tap again to clear. Choices are held in onboarding
- * state and saved into buyer_preferences after auth (lib/onboardingSurvey.ts),
- * so My sizes and size recommendations start pre-filled. Layout follows
- * Depop's "Interests and sizes": a section heading per category with chips.
+ * Buyer onboarding — "Your sizes": tops, bottoms and shoes as square chips.
+ * Tap a size to pick it, tap again to clear. Saved into buyer_preferences
+ * after the account exists (lib/onboardingSurvey.ts), so My sizes and size
+ * recommendations start filled in. Optional: NEXT reads SKIP until a size is
+ * picked. (Outerwear stays in the saved shape but isn't asked here — it
+ * repeats the tops scale.)
  */
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { useAppTheme } from '@/contexts/AppThemeContext';
-import { SURVEY_SIZE_CATEGORIES, toggleSize, type OnboardingSurvey } from '@/lib/onboardingSurvey';
+import { SURVEY_SIZE_CATEGORIES, hasSurveyAnswers, toggleSize, type OnboardingSurvey } from '@/lib/onboardingSurvey';
 import type { SizeCategory } from '@/lib/sizeRecommendation';
-import { PressableScale, Reveal, StepHeadline, StepSub } from './OnboardingUI';
-import { RADIUS, SPACE, TYPE } from './onboardingTokens';
+import { Body, Headline, ONB_TYPE, SquareButton, SquareChip, StepScreen, useKitTheme } from './kit';
+
+export const ASKED_SIZE_CATEGORIES: SizeCategory[] = ['tops', 'bottoms', 'shoes'];
 
 interface Props {
+  counter: { current: number; total: number } | null;
   sizes: OnboardingSurvey['sizes'];
   onChange: (next: OnboardingSurvey['sizes']) => void;
+  onNext: () => void;
 }
 
-export function SizesStep({ sizes, onChange }: Props) {
-  const { theme } = useAppTheme();
-  const styles = createStyles(theme);
+export function SizesStep({ counter, sizes, onChange, onNext }: Props) {
+  const theme = useKitTheme();
+  const picked = hasSurveyAnswers({ sizes, likedBrandIds: [] });
 
   function pick(key: SizeCategory, value: string) {
-    Haptics.selectionAsync();
+    void Haptics.selectionAsync().catch(() => {});
     onChange(toggleSize(sizes, key, value));
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-      <StepHeadline>What sizes{'\n'}do you wear?</StepHeadline>
-      <StepSub>We will show the size that fits when you shop. Skip it and add sizes later.</StepSub>
-      {SURVEY_SIZE_CATEGORIES.map(({ key, label, options }, i) => (
-        <Reveal key={key} index={i + 2} style={styles.section}>
-          <Text style={styles.sectionTitle}>{label}</Text>
+    <StepScreen
+      counter={counter}
+      testID="onboarding-sizes"
+      footer={<SquareButton testID="onboarding-next" label={picked ? 'Next' : 'Skip'} onPress={onNext} />}
+    >
+      <Headline>Your sizes</Headline>
+      <Body>We'll show what fits first.</Body>
+      {SURVEY_SIZE_CATEGORIES.filter((c) => ASKED_SIZE_CATEGORIES.includes(c.key)).map(({ key, label, options }) => (
+        <View key={key} style={styles.section}>
+          <Text style={[ONB_TYPE.caps, { color: theme.muted, marginBottom: 12 }]}>{label.toUpperCase()}</Text>
           <View style={styles.grid}>
-            {options.map((option) => {
-              const selected = sizes[key] === option;
-              return (
-                <View key={option} style={styles.cell}>
-                <PressableScale
-                  testID={`onboarding-size-${key}-${option}`}
-                  style={[styles.chip, selected && { backgroundColor: theme.accentDim, borderColor: theme.text, borderWidth: 1 }]}
-                  accessibilityRole="radio"
-                  accessibilityLabel={`${label} size ${option}`}
-                  accessibilityState={{ selected }}
-                  onPress={() => pick(key, option)}
-                >
-                  <Text style={[styles.chipText, selected && { color: theme.text }]}>{option}</Text>
-                  {selected && <Feather name="check" size={13} color={theme.text} />}
-                </PressableScale>
-                </View>
-              );
-            })}
+            {options.map((option) => (
+              <SquareChip
+                key={option}
+                testID={`onboarding-size-${key}-${option}`}
+                accessibilityLabel={`${label} size ${option}`}
+                label={option}
+                selected={sizes[key] === option}
+                onPress={() => pick(key, option)}
+                style={styles.cell}
+              />
+            ))}
           </View>
-        </Reveal>
+        </View>
       ))}
-    </ScrollView>
+    </StepScreen>
   );
 }
 
-const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  scroll: { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xxl },
-  section: { marginTop: SPACE.lg },
-  sectionTitle: { ...TYPE.label, color: theme.text, fontFamily: 'Inter_600SemiBold', marginBottom: SPACE.sm },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.xs },
-  cell: { width: '31.5%' },
-  chip: {
-    width: '100%', minHeight: 44, borderRadius: RADIUS.pill, paddingHorizontal: 12,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
-  },
-  chipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
+const styles = StyleSheet.create({
+  section: { marginTop: 28 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  cell: { width: '31.6%' },
 });

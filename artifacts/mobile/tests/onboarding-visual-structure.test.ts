@@ -18,6 +18,8 @@ const ONBOARDING_SCREENS = [
   'components/onboarding/SignUpStep.tsx',
   'components/onboarding/ProfileStep.tsx',
   'components/onboarding/NotificationsStep.tsx',
+  'components/onboarding/CurateFeedStep.tsx',
+  'components/onboarding/SizesStep.tsx',
 ];
 
 describe('onboarding visual rules', () => {
@@ -91,8 +93,40 @@ describe('onboarding visual rules', () => {
   it('removed screens stay removed', () => {
     const dir = readdirSync(resolve(process.cwd(), 'components/onboarding'));
     expect(dir).not.toContain('WelcomeStep.tsx');
+    expect(dir).not.toContain('BrandsToFollowStep.tsx');
     const src = read('app/onboarding.tsx');
     expect(src).not.toMatch(/SuccessScreen|SellerPreviewStep|STYLE_INTERESTS|BRAND_STAGES|SELLER_GOALS/);
+  });
+});
+
+describe('buyer: Curate your feed (Grailed 1:1)', () => {
+  const src = read('components/onboarding/CurateFeedStep.tsx');
+
+  it('has the search field, brand rows and three-photo brand cards with a listing count', () => {
+    expect(src).toContain('placeholder="Find a brand"');
+    expect(src).toContain('<Headline>Curate your feed</Headline>');
+    expect(src).toContain('{[0, 1, 2].map((i) => {');
+    expect(src).toContain("`${n.toLocaleString('en-US')} ${n === 1 ? 'listing' : 'listings'}`");
+    expect(src).toContain('<FollowButton');
+  });
+
+  it('uses only real brands from the API and the app\'s one follow path', () => {
+    expect(src).toContain('discoverBrands(30)');
+    expect(src).toContain('await setSellerFollowing(brand.sellerId, next);');
+    expect(src).not.toMatch(/demo|placeholder\.com|unsplash|picsum/i);
+  });
+
+  it('is skippable: the one button reads SKIP until a brand is followed', () => {
+    expect(src).toContain("label={followedCount > 0 ? 'Next' : 'Skip'}");
+  });
+});
+
+describe('buyer: sizes', () => {
+  it('asks tops, bottoms and shoes with square chips', () => {
+    const src = read('components/onboarding/SizesStep.tsx');
+    expect(src).toContain("export const ASKED_SIZE_CATEGORIES: SizeCategory[] = ['tops', 'bottoms', 'shoes'];");
+    expect(src).toContain('<SquareChip');
+    expect(src).toContain("label={picked ? 'Next' : 'Skip'}");
   });
 });
 

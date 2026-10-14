@@ -277,9 +277,11 @@ vi.mock('@clerk/expo', () => {
 
 vi.mock('@/lib/api', () => ({ useApi: () => api }));
 
+const followCalls = vi.hoisted(() => [] as Array<[string, boolean]>);
 vi.mock('@/services/socialService', () => ({
   hydrateMyProfileFromAccount: vi.fn(async () => {}),
   socialKeysForUser: vi.fn(() => ({})),
+  setSellerFollowing: vi.fn(async (id: string, on: boolean) => { followCalls.push([id, on]); }),
 }));
 
 vi.mock('@/lib/buyerProfile', () => ({
@@ -318,9 +320,16 @@ vi.mock('@/lib/onboarding/useUsernameLiveCheck', () => ({
   useUsernameLiveCheck: () => ({ error: '', checking: false }),
 }));
 
-vi.mock('@/components/onboarding/SizesStep', () => {
+vi.mock('@/services/discoverService', () => ({
+  discoverBrands: vi.fn(async () => [
+    { id: 'seller_a', sellerId: 'seller_a', handle: 'northline', name: 'Northline Studio', brandType: null, logoUrl: null, verified: true, productCount: 12, productImages: ['/objects/a1', '/objects/a2', '/objects/a3'] },
+    { id: 'seller_b', sellerId: 'seller_b', handle: 'quiet', name: 'Quiet Hours', brandType: null, logoUrl: null, verified: false, productCount: 0, productImages: [] },
+  ]),
+}));
+
+vi.mock('@/components/CachedImage', () => {
   const React = require('react') as typeof import('react');
-  return { SizesStep: () => React.createElement('View', { testID: 'onboarding-sizes-step' }) };
+  return { CachedImage: (props: Record<string, unknown>) => React.createElement('Image', props) };
 });
 
 // app/onboarding.tsx imports ONBOARDING_KEY/ONBOARDING_OWNER_KEY from
@@ -339,11 +348,6 @@ vi.mock('@/components/legal/LegalConsent', () => {
     // Sign-up shows one linked line; continuing is the agreement (no checkbox).
     LegalContinueNotice: () => React.createElement('Text', { testID: 'legal-consent-line' }),
   };
-});
-
-vi.mock('@/components/onboarding/BrandsToFollowStep', () => {
-  const React = require('react') as typeof import('react');
-  return { BrandsToFollowStep: () => React.createElement('View', { testID: 'onboarding-brands-step' }) };
 });
 
 vi.mock('@/components/onboarding/ThreadLine', () => ({
@@ -463,6 +467,7 @@ function resetWorld() {
   routerPushMock.mockClear();
   delete searchParams.addAccount;
   delete searchParams.postAuth;
+  followCalls.length = 0;
 }
 
 describe('onboarding flow (buyer)', () => {
@@ -473,18 +478,27 @@ describe('onboarding flow (buyer)', () => {
     renderer = undefined;
   });
 
-  it('signs up, skips the optional steps, and lands on the thread explainer with the right API calls', async () => {
+  it('signs up, follows a brand, picks sizes, and lands on the Threads feed with the right API calls', async () => {
     renderer = await renderScreen();
     await driveThroughSignUp(renderer, 'buyer', 'buyer-flow@onboarding-e2e.test');
 
     expect(allText(renderer)).toContain('01 / 04');
     await fillProfile(renderer, 'Bailey Rivera', 'wt_buyer_flow');
 
-    // Brands (mocked list) and Sizes (mocked) are skippable: the one button reads Skip.
-    expect(() => findByTestId(renderer!, 'onboarding-brands-step')).not.toThrow();
-    await press(findButton(renderer, 'Skip'));
-    expect(() => findByTestId(renderer!, 'onboarding-sizes-step')).not.toThrow();
-    await press(findButton(renderer, 'Skip'));
+    // Curate your feed: real brands from the API (mocked), photos in the card.
+    await settle();
+    expect(allText(renderer)).toContain('Northline Studio');
+    expect(allText(renderer)).toContain('12 listings');
+    expect(() => findButton(renderer!, 'Skip')).not.toThrow();
+    await press(findButton(renderer, 'Follow Northline Studio'));
+    await settle();
+    expect(followCalls).toContainEqual(['seller_a', true]);
+    await press(findButton(renderer, 'Next'));
+
+    // Sizes: tops / bottoms / shoes.
+    await press(findButton(renderer, 'Tops size M'));
+    await press(findButton(renderer, 'Shoes size 10'));
+    await press(findButton(renderer, 'Next'));
 
     // Notifications: CONTINUE asks (web: no prompt) and finishes onboarding.
     expect(allText(renderer)).toContain('04 / 04');
@@ -500,7 +514,8 @@ describe('onboarding flow (buyer)', () => {
     const updateProfileCall = apiCalls.find((c) => c.name === 'auth.updateProfile');
     expect(updateProfileCall!.args[0]).toMatchObject({ accountType: 'buyer', username: 'wt_buyer_flow', name: 'Bailey Rivera' });
     expect(apiCalls.find((c) => c.name === 'auth.completeOnboarding')!.args[0]).toBe('buyer');
-    expect(routerReplaceMock).toHaveBeenCalledWith('/thread-explainer');
+    expect(memoryStorage.get('thread_explainer_seen:user_test_clerk_id')).toBe('true');
+    expect(routerReplaceMock).toHaveBeenCalledWith('/(buyer)/');
   }, 20_000);
 
   it('blocks account creation without a valid birthday', async () => {

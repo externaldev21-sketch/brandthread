@@ -7,7 +7,7 @@
  * headline, one sentence, one square button.
  *
  * BOTH:   0=SignUp (Shop/Sell, birthday, Apple / Google / email)  1=Profile
- * BUYER:  2=Brands  3=Sizes  4=Notifications
+ * BUYER:  2=Curate your feed  3=Sizes  4=Notifications → the Threads feed
  * SELLER: 2=BrandName  3=Notifications
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -39,8 +39,8 @@ import {
   stepCounterFor,
   type Flow,
 } from '@/lib/onboardingFlow';
-import { EMPTY_SURVEY, hasSurveyAnswers, sanitizeDraftSurvey, saveBuyerSurvey, type OnboardingSurvey } from '@/lib/onboardingSurvey';
-import { BrandsToFollowStep } from '@/components/onboarding/BrandsToFollowStep';
+import { EMPTY_SURVEY, sanitizeDraftSurvey, saveBuyerSurvey, type OnboardingSurvey } from '@/lib/onboardingSurvey';
+import { CurateFeedStep } from '@/components/onboarding/CurateFeedStep';
 import { SizesStep } from '@/components/onboarding/SizesStep';
 import { SignUpStep } from '@/components/onboarding/SignUpStep';
 import { ProfileStep } from '@/components/onboarding/ProfileStep';
@@ -365,6 +365,17 @@ export default function OnboardingScreen() {
     });
   }
 
+  /**
+   * Buyers land straight on the Threads feed, already shaped by the brands
+   * they followed. The old Thread explainer (four icon cards) is marked seen
+   * so the auth gate doesn't detour through it; the feed's own gesture coach
+   * still shows on first visit.
+   */
+  async function landOnFeed(userId: string) {
+    await AsyncStorage.setItem(`thread_explainer_seen:${userId}`, 'true').catch(() => {});
+    router.replace('/(buyer)/' as never);
+  }
+
   async function finishBuyer(retryAttempt = false) {
     if (finishing) return;
     setFinishing(true);
@@ -421,7 +432,7 @@ export default function OnboardingScreen() {
       await AsyncStorage.multiRemove([draftKeyForUser(profile.clerkId)!, LEGACY_DRAFT_KEY]);
       await AsyncStorage.multiRemove([PENDING_FLOW_KEY, PENDING_USERNAME_KEY]);
       void registerGrantedPushToken(profile.clerkId, api);
-      router.replace('/thread-explainer' as never);
+      await landOnFeed(profile.clerkId);
     } catch (error) {
       setFinishing(false);
       logBuyerOnboardingFailure(failureStage, error, retryAttempt);
@@ -451,7 +462,7 @@ export default function OnboardingScreen() {
         void syncBuyerOnboarding(profileId, styleInterests, api).catch((backgroundError) => {
           logBuyerOnboardingFailure('background-retry', backgroundError, true);
         });
-        router.replace('/thread-explainer' as never);
+        await landOnFeed(profileId);
         return;
       }
       Alert.alert(
@@ -587,30 +598,10 @@ export default function OnboardingScreen() {
 
     if (flow === 'buyer') {
       if (step === BUYER_STEP_INDEX.BRANDS) return (
-        <StepScreen
-          counter={counter}
-          scroll={false}
-          testID="onboarding-brands"
-          footer={<SquareButton testID="onboarding-next" label={survey.likedBrandIds.length > 0 ? 'Next' : 'Skip'} onPress={goNext} />}
-        >
-          <BrandsToFollowStep onLikedChange={setSurveyBrands} />
-        </StepScreen>
+        <CurateFeedStep counter={counter} onLikedChange={setSurveyBrands} onNext={goNext} />
       );
       if (step === BUYER_STEP_INDEX.SIZES) return (
-        <StepScreen
-          counter={counter}
-          scroll={false}
-          testID="onboarding-sizes"
-          footer={(
-            <SquareButton
-              testID="onboarding-next"
-              label={hasSurveyAnswers({ sizes: survey.sizes, likedBrandIds: [] }) ? 'Next' : 'Skip'}
-              onPress={goNext}
-            />
-          )}
-        >
-          <SizesStep sizes={survey.sizes} onChange={setSurveySizes} />
-        </StepScreen>
+        <SizesStep counter={counter} sizes={survey.sizes} onChange={setSurveySizes} onNext={goNext} />
       );
       if (step === BUYER_STEP_INDEX.NOTIFICATIONS) return (
         <NotificationsStep
