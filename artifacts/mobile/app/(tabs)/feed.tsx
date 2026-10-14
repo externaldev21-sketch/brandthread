@@ -3,14 +3,13 @@ import { haptics, hapticLight, hapticMedium, hapticSelection, haptic } from '@/l
 import { spotlightPagePropsEqual } from '@/lib/feedPageMemo';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useThreadRefresh } from '@/components/ui/ThreadRefresh';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
 import { DEMO_RUNWAY_VIDEO_SOURCES, DEMO_RUNWAY_VIDEO_URIS } from '@/lib/demoMedia';
 
 import { UploadProgressPill } from '@/components/feed/UploadProgressPill';
-
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback, Animated, TextInput, Modal, Pressable, PanResponder, AccessibilityInfo, ScrollView, RefreshControl, ActivityIndicator, Easing, useWindowDimensions, type LayoutChangeEvent, type ViewToken, Platform, type ImageSourcePropType } from 'react-native';
-
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -2792,6 +2791,7 @@ export default function FeedScreen({
     if (feedRefreshing) return;
     void loadFeed();
   }, [feedRefreshing, loadFeed]);
+  const { refreshControl: threadRefresh, indicator: threadRefreshIndicator } = useThreadRefresh(feedRefreshing, handleRefresh);
 
 
   // "Just dropped from brands you follow" — real drops only: fetch the
@@ -3526,14 +3526,7 @@ export default function FeedScreen({
         viewabilityConfig={viewabilityConfig}
         onEndReached={loadMoreFeed}
         onEndReachedThreshold={0.5}
-        refreshControl={
-          <RefreshControl
-            refreshing={feedRefreshing}
-            onRefresh={handleRefresh}
-            tintColor={PURPLE}
-            colors={[PURPLE]}
-          />
-        }
+        refreshControl={threadRefresh}
         ListEmptyComponent={
           isCreatorFeed && !feedLoading ? (
             <View style={{ width: pageWidth, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
@@ -3678,6 +3671,7 @@ export default function FeedScreen({
         }}
       />}
       </Animated.View>
+      {threadRefreshIndicator}
 
       {/* ─ Legibility scrims: fixed overlay above the list (not per-cell), so
           they stay put while the video underneath swipes past. Standard

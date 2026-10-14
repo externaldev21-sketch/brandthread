@@ -13,7 +13,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { ListSkeleton } from '@/components/layout';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { SectionError } from '@/components/InlineFeedback';
-import { ThemedRefreshControl } from '@/components/ui';
+import { useThreadRefresh } from '@/components/ui/ThreadRefresh';
 import { DiscoveryProductGrid } from '@/components/discover/DiscoveryProductGrid';
 import { SPACING } from '@/constants/spacing';
 
@@ -60,6 +60,7 @@ export default function BuyerCategoryScreen() {
     await load(false);
     setRefreshing(false);
   }, [load]);
+  const { refreshControl, indicator: refreshIndicator } = useThreadRefresh(refreshing, onRefresh);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -75,10 +76,11 @@ export default function BuyerCategoryScreen() {
           products={products}
           contentBottom={insets.bottom + SPACING.xl}
           onEndReached={() => { if (!loadingMore.current && products.length < total) load(true); }}
-          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={refreshControl}
           empty={<EmptyState icon="shopping-bag" title={`No ${label.toLowerCase()} yet`} description="New pieces show up here as sellers list them." />}
         />
       )}
+      {refreshIndicator}
     </View>
   );
 }

@@ -41,7 +41,7 @@ import { DiscoverSearchHeader } from '@/components/discover/DiscoverSearchHeader
 import { DiscoverSearchOverlay, type BarRect } from '@/components/discover/search/DiscoverSearchOverlay';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { useScrollReset } from '@/hooks/useScrollReset';
-import { ThemedRefreshControl } from '@/components/ui';
+import { useThreadRefresh } from '@/components/ui/ThreadRefresh';
 import { isPreviewCatalogEnabled, getPreviewCatalog, getPreviewCatalogByDemand } from '@/lib/previewCatalog';
 import type { EditorialTileItem } from '@/components/discover/EditorialTile';
 import { DiscoverFilterRow, type DiscoverFilterKey } from '@/components/discover/DiscoverFilterRow';
@@ -306,6 +306,8 @@ export default function DiscoverScreen() {
     ]).finally(() => setRefreshing(false));
   }, [filter, shelves.reload, fetchJustDropped, fetchHighDemand, fetchPeople, fetchForYou, fetchFits, fetchBrands, fetchDrops]);
 
+  const { refreshControl: threadRefresh, indicator: threadRefreshIndicator } = useThreadRefresh(refreshing, handleRefresh);
+
   function openViewer(post: DiscoverPost, flatIndex: number, allPosts: DiscoverPost[]) {
     setViewer({ posts: allPosts, startIndex: flatIndex });
   }
@@ -369,7 +371,7 @@ export default function DiscoverScreen() {
           ref={listRef as never}
           layout="masonry"
           posts={forYouPosts}
-          loading={forYouLoading}
+          loading={forYouLoading && forYouPosts.length === 0}
           loadingMore={forYouLoadingMore}
           justDroppedItems={justDroppedItems}
           trendingBrands={trendingBrands}
@@ -397,7 +399,7 @@ export default function DiscoverScreen() {
           contentContainerStyle={{ paddingBottom: tabBarClearance }}
           ListHeaderComponent={header as never}
           ListFooterExtra={<RecentlyViewedRow style={{ paddingHorizontal: SP.md, marginTop: SP.lg }} />}
-          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={threadRefresh}
         />
       )}
 
@@ -405,7 +407,7 @@ export default function DiscoverScreen() {
         <DiscoverGrid
           ref={listRef as never}
           posts={fitsPosts}
-          loading={fitsLoading}
+          loading={fitsLoading && fitsPosts.length === 0}
           loadingMore={fitsLoadingMore}
           showRails={false}
           people={people}
@@ -422,7 +424,7 @@ export default function DiscoverScreen() {
           }}
           contentContainerStyle={{ paddingBottom: tabBarClearance }}
           ListHeaderComponent={header as never}
-          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={threadRefresh}
         />
       )}
 
@@ -435,7 +437,7 @@ export default function DiscoverScreen() {
           columnWrapperStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}
           contentContainerStyle={{ gap: SP.sm, paddingBottom: tabBarClearance }}
           ListHeaderComponent={brandsHeader}
-          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={threadRefresh}
           renderItem={({ item }) => <DiscoverBrandCard brand={item} variant="tile" />}
           ListEmptyComponent={brandsLoading ? (
             <ResponsiveContainer style={{ paddingHorizontal: SP.md, marginTop: SP.md }}>
@@ -456,7 +458,7 @@ export default function DiscoverScreen() {
           keyExtractor={(p) => p.userId}
           contentContainerStyle={{ paddingBottom: tabBarClearance }}
           ListHeaderComponent={header}
-          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={threadRefresh}
           renderItem={({ item }) => <DiscoverPersonCard person={item} />}
           ListEmptyComponent={peopleLoading ? (
             <ResponsiveContainer style={{ paddingHorizontal: SP.md, marginTop: SP.md }}>
@@ -477,7 +479,7 @@ export default function DiscoverScreen() {
           keyExtractor={(d) => d.key}
           contentContainerStyle={{ paddingTop: SP.md, paddingBottom: tabBarClearance }}
           ListHeaderComponent={header}
-          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={threadRefresh}
           renderItem={({ item }) => <DiscoverDropCalendarItem item={item} />}
           ListEmptyComponent={dropsLoading ? (
             <ResponsiveContainer style={{ paddingHorizontal: SP.md }}>
@@ -491,6 +493,7 @@ export default function DiscoverScreen() {
         />
       )}
 
+      {threadRefreshIndicator}
       {viewer && (
         <DiscoverPostViewer
           posts={viewer.posts}
