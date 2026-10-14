@@ -3,7 +3,6 @@ import { ActivityIndicator, Alert, Platform, RefreshControl, ScrollView, StyleSh
 
 import { useRouter, useFocusEffect } from 'expo-router';
 
-import { useIsFocused } from '@react-navigation/native';
 import { useAuth } from '@clerk/expo';
 
 import { haptics, haptic } from '@/lib/haptics';
@@ -338,7 +337,11 @@ export default function SellerHomeCommerceDashboard({
   }, [analyticsUserId, range, sellerPreview, snapshot]);
 
   // Live map: realtime only while this screen is focused (socket closes on blur).
-  const screenFocused = useIsFocused();
+  const [screenFocused, setScreenFocused] = useState(false);
+  useFocusEffect(useCallback(() => {
+    setScreenFocused(true);
+    return () => setScreenFocused(false);
+  }, []));
   const liveMap = useSellerLiveMap({
     enabled: screenFocused && !!userId,
     preview: sellerPreview ? (isPreviewDemoMode() ? 'demo' : 'fresh') : null,
@@ -855,12 +858,14 @@ export default function SellerHomeCommerceDashboard({
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background ?? SCREEN_BG }]}>
+      {/* Clip above the floating bar even mid-scroll; viewport reserve plus
+          end padding together equal the shared tab-bar clearance. */}
       <ScrollView
         ref={scrollResetRef}
         testID="seller-dashboard-scroll"
         accessibilityLabel="Seller dashboard scroll"
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12, paddingBottom: tabBarClearance }]}
+        style={[styles.scrollView, { marginBottom: Math.max(0, tabBarClearance - SP.md) }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12, paddingBottom: SP.md }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />

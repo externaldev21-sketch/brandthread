@@ -1658,10 +1658,9 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="draw-entry" options={{ headerShown: false, presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="draw-result" options={{ headerShown: false, presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        {/* A pushed product page (from Search, Saved, related products): a
-            standard push with the interactive edge back-swipe, like every
-            other pushed screen. */}
-        <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'ios_from_right', gestureEnabled: true }} />
+        {/* The shared photo owns this route's entrance motion. Keep the
+            interactive edge back-swipe without a second slide-in animation. */}
+        <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'none', gestureEnabled: true }} />
         <Stack.Screen name="ip-report"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-checkout"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="checkout-return"       options={{ headerShown: false, animation: 'none' }} />

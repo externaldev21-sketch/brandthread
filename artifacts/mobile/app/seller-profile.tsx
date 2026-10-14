@@ -66,7 +66,7 @@ import { shipsInLabel } from '@/lib/storeTrust';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { ListRow } from '@/components/ui/ListRow';
-import { haptics, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
+import { haptics, hapticLight, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import { FoundingSellerBadge, foundingSellerNumberOf } from '@/components/profile/FoundingSellerBadge';
 import {

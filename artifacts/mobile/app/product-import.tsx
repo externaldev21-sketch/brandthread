@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput 
 
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { Icon, type IconName } from '@/components/ui/Icon';
+import { Icon, Icon as Feather, type IconName } from '@/components/ui/Icon';
 
 import { useRouter, useFocusEffect } from 'expo-router';
 
@@ -301,7 +301,7 @@ export default function ProductImportScreen() {
         {/* ── One tap: Shopify store link / Instagram → drafts (app/quick-import.tsx) ── */}
         <GradientCard
           style={s.methodCard}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/quick-import' as never); }}
+          onPress={() => { haptics.light(); router.push('/quick-import' as never); }}
         >
           <View style={s.methodRow} testID="product-import-quick">
             <View style={s.methodInfo}>

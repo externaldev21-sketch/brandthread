@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 
-import { Icon } from '@/components/ui/Icon';
+import { Icon, Icon as Feather } from '@/components/ui/Icon';
 
 import { useNavigation, useRouter } from 'expo-router';
 
