@@ -18,6 +18,8 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { plural } from '@/lib/plural';
+import type { MembershipLevel } from '@/lib/api';
+import { LEVEL_LABEL } from '@/lib/membershipLevels';
 import { Alert, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -228,6 +230,17 @@ export default function SellerProfileScreen() {
   const canonicalSellerId = seller?.sellerId ?? null;
   const mode = resolveProfileMode({ viewerId: userId, ownerId: canonicalSellerId, previewAsVisitor });
   const isOwner = mode === 'owner';
+  // The viewing buyer's own level with this brand, shown quietly in the header (never to anyone else).
+  const [myLevel, setMyLevel] = useState<MembershipLevel | null>(null);
+  useEffect(() => {
+    if (!canonicalSellerId || isOwner || !userId) { setMyLevel(null); return; }
+    let active = true;
+    Promise.resolve().then(() => api.brandMembership.brand(canonicalSellerId))
+      .then((m) => { if (active) setMyLevel(m.level); })
+      .catch(() => { if (active) setMyLevel(null); });
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canonicalSellerId, isOwner, userId]);
   const caps = profileCapabilities('seller', mode);
   // A visited store opens on its Products ("Shop") tab — what a shopper came
   // for. The owner still lands on Posts. Only until the viewer picks a tab.
@@ -784,6 +797,7 @@ export default function SellerProfileScreen() {
       onOpenWebsite={(url) => { void Linking.openURL(url); }}
     >
       <FoundingSellerBadge number={seller.foundingSellerNumber} />
+      {myLevel ? <ProfileChip label={`Your level: ${LEVEL_LABEL[myLevel]}`} /> : null}
       {seller.category ? <ProfileChip label={seller.category} icon="tag" /> : null}
       {rating && rating.totalCount > 0 ? (
         <Pressable

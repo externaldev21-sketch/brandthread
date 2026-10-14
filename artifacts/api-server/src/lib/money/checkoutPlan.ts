@@ -48,7 +48,7 @@ export async function resolveChargePlan(input: {
 
   // Scheduled product launches: products with a launch row that hasn't
   // opened yet can't be bought. Products without a row are unaffected.
-  if ((await unlaunchedProductIds(ids, now, executor)).length > 0) {
+  if ((await unlaunchedProductIds(ids, now, executor, input.buyerId)).length > 0) {
     throw new CheckoutPlanError("This product hasn't launched yet.", 409, "PRODUCT_NOT_LAUNCHED");
   }
   if (!input.viaDraw && (await drawOnlyProductIds(ids, executor)).length > 0) {

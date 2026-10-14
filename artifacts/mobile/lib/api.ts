@@ -4353,6 +4353,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<Array<{ id: string; kind: string; entryId: string | null; actor: string | null; detail: Record<string, unknown>; createdAt: string }>>(
           `/api/product-draws/${encodeURIComponent(productId)}/audit`),
     },
+    /** Brand membership levels (server: routes/brand-membership.ts). Levels are private to the buyer. */
+    brandMembership: {
+      mine:     () => get<{ brands: Array<BrandMembership & { name: string; handle: string; initials: string; avatarUrl: string | null }> }>('/api/brand-membership/mine'),
+      brand:    (sellerId: string) => get<BrandMembership>(`/api/brand-membership/brand/${encodeURIComponent(sellerId)}`),
+      settings: () => get<BrandMembershipSettings>('/api/brand-membership/settings'),
+      saveSettings: (body: BrandMembershipSettings) => put<BrandMembershipSettings>('/api/brand-membership/settings', body),
+    },
     /** "Day 1" badges: the brands a person was one of the first 100 buyers of (public). */
     dayOne: {
       brands: (userId: string) =>
@@ -5495,4 +5502,18 @@ export type ProductDrawEntry = {
   amountCents: number;
   notifyResult: boolean;
   decidedAt: string | null;
+};
+export type MembershipLevel = 'member' | 'insider' | 'inner_circle';
+
+export type BrandMembership = {
+  sellerId: string;
+  level: MembershipLevel | null;
+  spendCents: number;
+  next: { level: MembershipLevel; remainingCents: number } | null;
+};
+
+export type BrandMembershipSettings = {
+  insiderCents: number;
+  innerCircleCents: number;
+  innerCircleEarlyAccessMinutes: number;
 };

@@ -97,7 +97,6 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
   ListHeaderComponent?: React.ComponentType<any> | React.ReactElement;
   /** Rendered after the last row (and the load-more skeleton). */
   ListFooterExtra?: React.ReactElement | null;
-<<<<<<< HEAD
   /** Sponsored ads (hooks/useFeedAds), each placed after the row holding `afterId`. */
   sponsored?: ReadonlyArray<{ afterId: string; item: SponsoredFeedItem }>;
   renderSponsored?: (item: SponsoredFeedItem) => React.ReactElement;
@@ -109,9 +108,6 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
    * (trending products) leading it.
    */
   layout?: 'explore' | 'masonry';
-=======
-  refreshControl?: React.ReactElement<any>;
->>>>>>> origin/pr1039
 }>(function DiscoverGrid({
   posts,
   loading,

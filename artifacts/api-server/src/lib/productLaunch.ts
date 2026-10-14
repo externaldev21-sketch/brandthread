@@ -11,6 +11,7 @@ import type { DbExecutor } from "./money/ledger";
 import { publishNotification } from "../routes/notifications-feed";
 import { logger } from "./logger";
 import { bumpResponseCacheGeneration } from "../middlewares/responseCache";
+import { earlyAccessMinutesFor } from "./brandMembership";
 
 export function isProductLive(
   launch: { launchAt: Date; launchedAt: Date | null } | null | undefined,
@@ -27,22 +28,41 @@ export function validateLaunchAt(launchAt: Date, now: Date = new Date()): string
   return null;
 }
 
-/** IDs among `productIds` that are scheduled and not yet live. Empty for products without a launch row. */
+/**
+ * IDs among `productIds` that are scheduled and not yet live. Empty for
+ * products without a launch row. With `buyerId`, a launch already counts as
+ * open for that buyer if the seller gives Inner Circle early access and the
+ * buyer is Inner Circle with them (lib/brandMembership.ts).
+ */
 export async function unlaunchedProductIds(
   productIds: string[],
   now: Date = new Date(),
   executor: DbExecutor = db,
+  buyerId?: string | null,
 ): Promise<string[]> {
   if (productIds.length === 0) return [];
   const rows = await executor
-    .select({ productId: productLaunches.productId })
+    .select({ productId: productLaunches.productId, launchAt: productLaunches.launchAt, ownerId: products.ownerId })
     .from(productLaunches)
+    .innerJoin(products, eq(products.id, productLaunches.productId))
     .where(and(
       inArray(productLaunches.productId, productIds),
       isNull(productLaunches.launchedAt),
       sql`${productLaunches.launchAt} > ${now}`,
     ));
-  return rows.map((r) => r.productId);
+  if (!buyerId || rows.length === 0) return rows.map((r) => r.productId);
+  const early = new Map<string, number>();
+  for (const ownerId of new Set(rows.map((r) => r.ownerId))) {
+    early.set(ownerId, await earlyAccessMinutesFor(ownerId, buyerId, executor));
+  }
+  return rows
+    .filter((r) => effectiveLaunchAt(r.launchAt, early.get(r.ownerId) ?? 0).getTime() > now.getTime())
+    .map((r) => r.productId);
+}
+
+/** When a launch opens for someone with `earlyAccessMinutes` of early access. */
+export function effectiveLaunchAt(launchAt: Date, earlyAccessMinutes: number): Date {
+  return earlyAccessMinutes > 0 ? new Date(launchAt.getTime() - earlyAccessMinutes * 60_000) : launchAt;
 }
 
 const FANOUT_CHUNK = 50;

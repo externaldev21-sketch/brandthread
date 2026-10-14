@@ -18,6 +18,7 @@ export * from './sellerPayouts';
 export * from './productLaunches';
 export * from './productDraws';
 export * from './brandDayOne';
+export * from './brandMembership';
 export * from './threadCash';
 export * from './threadCashExpiry';
 export * from './sellerShipping';

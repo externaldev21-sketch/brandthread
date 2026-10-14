@@ -18,7 +18,9 @@ import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db, productLaunchAlerts, productLaunches, products } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
-import { isProductLive, validateLaunchAt } from "../lib/productLaunch";
+import { effectiveLaunchAt, isProductLive, validateLaunchAt } from "../lib/productLaunch";
+import { earlyAccessMinutesFor } from "../lib/brandMembership";
+import { optionalViewerId } from "../lib/safety";
 
 const router = Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -61,12 +63,16 @@ router.get("/", requireAuth, teamContext(), async (req, res) => {
 
 router.get("/:productId", async (req, res) => {
   if (!isUuid(req.params.productId)) { badId(res); return; }
-  const [row] = await db
-    .select({ launchAt: productLaunches.launchAt, launchedAt: productLaunches.launchedAt })
+  const [found] = await db
+    .select({ launchAt: productLaunches.launchAt, launchedAt: productLaunches.launchedAt, ownerId: products.ownerId })
     .from(productLaunches)
     .innerJoin(products, eq(products.id, productLaunches.productId))
     .where(and(eq(productLaunches.productId, req.params.productId), eq(products.status, "active"), isNull(products.deletedAt)))
     .limit(1);
+  // Signed-in Inner Circle buyers see (and get) the seller's early opening.
+  const viewerId = optionalViewerId(req);
+  const earlyMinutes = found && !found.launchedAt ? await earlyAccessMinutesFor(found.ownerId, viewerId) : 0;
+  const row = found ? { launchAt: effectiveLaunchAt(found.launchAt, earlyMinutes), launchedAt: found.launchedAt } : undefined;
   const now = new Date();
   const launching = !!row && !isProductLive(row, now);
   // The drop lobby shows this live. It is the real row count, nothing added.
@@ -82,6 +88,7 @@ router.get("/:productId", async (req, res) => {
     launching,
     launchAt: launching ? row!.launchAt.toISOString() : null,
     notifyCount,
+    earlyAccess: launching && earlyMinutes > 0,
     serverNow: now.toISOString(),
   });
 });

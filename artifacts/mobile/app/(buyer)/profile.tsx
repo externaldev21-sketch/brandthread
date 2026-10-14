@@ -336,7 +336,7 @@ export default function ProfileScreen() {
   const { height: windowHeight } = useWindowDimensions();
   const bannerH = bannerHeight(windowHeight);
   useEffect(() => { setHeroHeight(bannerH); }, [bannerH]);
-  const profileBrands = useProfileBrands(user?.id);
+  const profileBrands = useProfileBrands(user?.id, true);
 
   // Sheets
   const [shareSheetOpen, setShareSheetOpen] = useState(false);

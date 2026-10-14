@@ -1826,6 +1826,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="mystery-box-edit" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-video" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-launches" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="membership-levels" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="waitlist-demand" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="products-bulk-edit" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-seo" options={{ headerShown: false, animation: 'ios_from_right' }} />

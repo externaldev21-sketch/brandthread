@@ -147,6 +147,7 @@ import sellerVerificationRouter from "./seller-verification";
 import productLaunchesRouter from "./product-launches";
 import productDrawsRouter from "./product-draws";
 import dayOneRouter from "./day-one";
+import brandMembershipRouter from "./brand-membership";
 import preorderTermsRouter from "./preorder-terms";
 import waitlistRouter from "./waitlist";
 import bundlesRouter from "./bundles";
@@ -400,6 +401,8 @@ router.use("/product-launches",          tc, productLaunchesRouter);
 // Buyer entry routes must see the buyer, so no tc here; seller routes apply teamContext() themselves.
 router.use("/product-draws",             productDrawsRouter);
 router.use("/day-one",                   dayOneRouter);
+// Buyer routes must see the buyer, so no tc here; the seller settings routes apply teamContext() themselves.
+router.use("/brand-membership",          brandMembershipRouter);
 router.use("/preorder-terms",            tc, preorderTermsRouter);
 router.use("/waitlist",                  tc, waitlistRouter);
 router.use("/bundles",                   tc, bundlesRouter);
