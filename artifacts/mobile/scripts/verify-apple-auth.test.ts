@@ -31,8 +31,8 @@ describe("Apple sign-in native configuration", () => {
     expect(appConfig.plugins).toContain("expo-apple-authentication");
   });
 
-  it("pins every iOS build profile to a named Xcode 26 image", () => {
-    expect(REQUIRED_IMAGE).toBe("macos-sequoia-15.6-xcode-26.0");
+  it("uses Expo's current supported iOS image alias", () => {
+    expect(REQUIRED_IMAGE).toBe("latest");
     expect(getIosBuildConfigErrors(easConfig)).toEqual([]);
     // Additive profiles (testflight, preview-ios-simulator, ...) may exist; scripts/eas-profiles.test.ts pins their resolved image.
     expect(Object.keys(easConfig.build)).toEqual(expect.arrayContaining(REQUIRED_PROFILES));
@@ -49,7 +49,7 @@ describe("Apple sign-in native configuration", () => {
     ]);
     expect(getIosBuildConfigErrors({
       build: {
-        development: { ios: { image: "latest" } },
+        development: { ios: { image: "not-a-real-image" } },
         preview: { ios: { image: REQUIRED_IMAGE } },
         production: { ios: { image: REQUIRED_IMAGE } },
       },

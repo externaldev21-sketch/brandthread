@@ -174,18 +174,18 @@ describe("Live Activity widget extension signing (EAS credentials)", () => {
     | Array<{ targetName: string; bundleIdentifier: string; entitlements: Record<string, string[]> }>
     | undefined;
 
-  it("declares the plugin's extension target for EAS so it gets its own provisioning profile", () => {
-    expect(appConfig.plugins).toContain("./plugins/with-upload-live-activity");
-    expect(extensions).toHaveLength(1);
-    const [extension] = extensions!;
-    expect(extension.targetName).toBe(plugin.EXTENSION_NAME);
-    // The plugin derives the extension bundle id as `<main bundle id>.<EXTENSION_NAME>`.
-    expect(extension.bundleIdentifier).toBe(`${appConfig.ios.bundleIdentifier}.${plugin.EXTENSION_NAME}`);
+  it("does not generate or request signing for the disabled first-build extension", () => {
+    expect(appConfig.plugins).not.toContain("./plugins/with-upload-live-activity");
+    expect(extensions).toBeUndefined();
+    const gate = require("../plugins/with-native-surfaces.js");
+    const out = gate(structuredClone(appConfig), { enabled: false });
+    expect(out.extra.nativeSurfacesBuildEnabled).toBe(false);
+    expect(out.extra.eas?.build?.experimental?.ios?.appExtensions).toBeUndefined();
   });
 
-  it("registers the same App Group the plugin and the extension entitlements use", () => {
-    const [extension] = extensions!;
-    expect(extension.entitlements["com.apple.security.application-groups"]).toEqual([plugin.APP_GROUP]);
+  it("preserves the canonical App Group for a later opt-in build", () => {
+    const gateSource = readFileSync(path.join(mobileRoot, "plugins/with-native-surfaces.js"), "utf8");
+    expect(gateSource).toContain("'com.apple.security.application-groups': [APP_GROUP]");
     expect(entitlementsPlist).toContain(`<string>${plugin.APP_GROUP}</string>`);
   });
 });

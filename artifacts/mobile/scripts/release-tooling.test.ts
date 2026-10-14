@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import {
   resolveDsn,
@@ -13,7 +13,6 @@ const mobileRoot = path.resolve(__dirname, "..");
 const appJson = JSON.parse(readFileSync(path.join(mobileRoot, "app.json"), "utf8"));
 const easConfig = JSON.parse(readFileSync(path.join(mobileRoot, "eas.json"), "utf8"));
 const packageJson = JSON.parse(readFileSync(path.join(mobileRoot, "package.json"), "utf8"));
-const dynamicConfig = require("../app.config.js") as (ctx: { config: Record<string, any> }) => Record<string, any>;
 const { parseArgs } = require("./eas-update.js") as {
   parseArgs: (argv: string[]) => { options: Record<string, unknown>; errors: string[] };
 };
@@ -33,8 +32,8 @@ describe("over-the-air updates", () => {
     expect(appJson.expo.runtimeVersion).toEqual({ policy: "fingerprint" });
   });
 
-  it("downloads in the background and applies on the next launch", () => {
-    expect(appJson.expo.updates).toMatchObject({ enabled: true, checkAutomatically: "ON_LOAD", fallbackToCacheTimeout: 0 });
+  it("explicitly disables OTA until Launch has linked the project, retaining its future policy", () => {
+    expect(appJson.expo.updates).toMatchObject({ enabled: false, checkAutomatically: "ON_LOAD", fallbackToCacheTimeout: 0 });
   });
 
   it("maps every build profile to its own update channel", () => {
@@ -43,41 +42,23 @@ describe("over-the-air updates", () => {
     expect(easConfig.build.development.channel).toBe("development");
   });
 
-  it("derives the EAS Update URL from the project ID once `eas init` has run", () => {
-    const base = appJson.expo;
-    const savedProjectId = process.env.EAS_PROJECT_ID;
-    delete process.env.EAS_PROJECT_ID;
-    expect(dynamicConfig({ config: base }).updates.url).toBeUndefined();
-    if (savedProjectId !== undefined) process.env.EAS_PROJECT_ID = savedProjectId;
-    const linked = { ...base, extra: { eas: { projectId: "abc-123" } } };
-    expect(dynamicConfig({ config: linked }).updates).toMatchObject({
-      url: "https://u.expo.dev/abc-123",
-      checkAutomatically: "ON_LOAD",
-    });
+  it("leaves project ownership and linking to Launch instead of fabricating IDs", () => {
+    expect(appJson.expo.owner).toBeUndefined();
+    expect(appJson.expo.extra.eas?.projectId).toBeUndefined();
+    expect(appJson.expo.updates.url).toBeUndefined();
   });
 
-  it("reads only EAS_PROJECT_ID from the environment in app.config.js", () => {
-    const source = readFileSync(path.join(mobileRoot, "app.config.js"), "utf8");
-    const reads = source.match(/process\.env\.\w+/g) ?? [];
-    expect(new Set(reads)).toEqual(new Set(["process.env.EAS_PROJECT_ID"]));
+  it("uses only a static config that resolves outside the development workspace", () => {
+    expect(existsSync(path.join(mobileRoot, "app.config.js"))).toBe(false);
+    expect(existsSync(path.join(mobileRoot, "app.config.ts"))).toBe(false);
+    expect(appJson.expo.extra.router.asyncRoutes).toEqual({ web: true, default: false });
   });
 
-  it("falls back to EAS_PROJECT_ID for the update URL and project ID when app.json has none", () => {
-    const saved = process.env.EAS_PROJECT_ID;
-    try {
-      process.env.EAS_PROJECT_ID = " env-project ";
-      const out = dynamicConfig({ config: appJson.expo });
-      expect(out.updates.url).toBe("https://u.expo.dev/env-project");
-      expect(out.extra.eas.projectId).toBe("env-project");
-      // Other extra.eas settings (the Live Activity appExtensions) are kept.
-      expect(out.extra.eas.build).toEqual(appJson.expo.extra.eas.build);
-      // A project ID committed by `eas init` always wins over the env.
-      const linked = { ...appJson.expo, extra: { eas: { projectId: "abc-123" } } };
-      expect(dynamicConfig({ config: linked }).updates.url).toBe("https://u.expo.dev/abc-123");
-    } finally {
-      if (saved === undefined) delete process.env.EAS_PROJECT_ID;
-      else process.env.EAS_PROJECT_ID = saved;
-    }
+  it("does not request signing profiles for disabled native extension targets", () => {
+    expect(appJson.expo.extra.eas?.build?.experimental?.ios?.appExtensions).toBeUndefined();
+    const gate = appJson.expo.plugins.find((p: any) => Array.isArray(p) && p[0] === "./plugins/with-native-surfaces");
+    expect(gate[1].enabled).toBe(false);
+    expect(packageJson.expo.autolinking.exclude).toEqual(expect.arrayContaining(["upload-live-activity", "expo-runtime-app-icon"]));
   });
 
   it("keeps the EAS project fields (updates.url, extra.eas) out of the runtime fingerprint", () => {

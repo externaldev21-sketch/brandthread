@@ -69,7 +69,7 @@ function withRichPushServiceTarget(config) {
         entry.buildSettings &&
         entry.buildSettings.PRODUCT_NAME === `"${EXTENSION_NAME}"`
       ) {
-        entry.buildSettings.SWIFT_VERSION = '5.9';
+        entry.buildSettings.SWIFT_VERSION = '5.0';
         entry.buildSettings.IPHONEOS_DEPLOYMENT_TARGET = '15.1';
         entry.buildSettings.TARGETED_DEVICE_FAMILY = '"1,2"';
         entry.buildSettings.PRODUCT_BUNDLE_IDENTIFIER = `"${extensionBundleId}"`;

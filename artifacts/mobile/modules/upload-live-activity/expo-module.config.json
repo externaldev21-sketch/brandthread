@@ -1,6 +1,7 @@
 {
   "platforms": ["ios"],
   "ios": {
+    "podspecPath": "UploadLiveActivity.podspec",
     "modules": ["UploadLiveActivityModule", "BrandthreadSystemModule"],
     "appDelegateSubscribers": ["QuickActionsAppDelegateSubscriber"]
   }

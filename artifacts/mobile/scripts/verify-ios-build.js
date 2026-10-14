@@ -6,7 +6,7 @@ const path = require("node:path");
 const projectRoot = path.resolve(__dirname, "..");
 const configPath = path.join(projectRoot, "eas.json");
 const REQUIRED_PROFILES = ["development", "preview", "production"];
-const REQUIRED_IMAGE = "macos-sequoia-15.6-xcode-26.0";
+const REQUIRED_IMAGE = "latest";
 
 function readConfig() {
   try {
@@ -24,7 +24,7 @@ function getIosBuildConfigErrors(config) {
     const image = profiles[profile]?.ios?.image;
     if (image !== REQUIRED_IMAGE) {
       errors.push(
-        `${profile}.ios.image must be "${REQUIRED_IMAGE}" so the build uses Xcode 26.0 and the iOS 26 SDK`,
+        `${profile}.ios.image must be "${REQUIRED_IMAGE}" so Launch uses Expo's current supported iOS build image`,
       );
     }
   }
@@ -42,7 +42,7 @@ function verifyIosBuild() {
     return false;
   }
   console.log(
-    `Verified development, preview, and production iOS profiles use ${REQUIRED_IMAGE}.`,
+    `Verified development, preview, and production iOS profiles use Expo's ${REQUIRED_IMAGE} image.`,
   );
   return true;
 }

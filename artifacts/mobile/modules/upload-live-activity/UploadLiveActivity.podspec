@@ -11,7 +11,7 @@ Pod::Spec.new do |s|
   s.author         = package['author']
   s.homepage       = package['homepage']
   s.platforms      = { ios: '16.1' }
-  s.swift_version  = '5.9'
+  s.swift_version  = '5.0'
   s.source         = { git: '' }
   s.static_framework = true
 

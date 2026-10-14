@@ -71,8 +71,8 @@ function requireEasCli() {
 }
 
 /**
- * The EAS project ID written by `eas init`, else the EAS_PROJECT_ID fallback
- * app.config.js also reads, or null before the project is linked.
+ * Project ID from the static config linked by Launch, else the legacy tooling
+ * environment fallback. This helper never changes Expo's static app config.
  */
 function easProjectId(appJson = readJson('app.json'), env = process.env) {
   return appJson?.expo?.extra?.eas?.projectId || env.EAS_PROJECT_ID?.trim() || null;

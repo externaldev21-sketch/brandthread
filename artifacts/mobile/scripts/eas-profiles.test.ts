@@ -11,7 +11,7 @@ describe("additive EAS build profiles", () => {
       distribution: "store",
       environment: "production",
       channel: "production",
-      ios: { image: "macos-sequoia-15.6-xcode-26.0", autoIncrement: "buildNumber" },
+      ios: { image: "latest", autoIncrement: "buildNumber" },
       android: { buildType: "app-bundle", autoIncrement: "versionCode" },
     });
     expect(build.preview.distribution).toBe("internal");
@@ -25,7 +25,7 @@ describe("additive EAS build profiles", () => {
   });
 
   it("preview-ios-simulator builds for the simulator from the preview profile", () => {
-    expect(build["preview-ios-simulator"]).toEqual({ extends: "preview", ios: { image: "macos-sequoia-15.6-xcode-26.0", simulator: true } });
+    expect(build["preview-ios-simulator"]).toEqual({ extends: "preview", ios: { image: "latest", simulator: true } });
   });
 
   it("production-apk is sideloadable and never burns a Play versionCode", () => {

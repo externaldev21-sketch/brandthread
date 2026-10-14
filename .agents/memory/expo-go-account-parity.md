@@ -3,8 +3,8 @@ name: Expo Go iOS account parity
 description: Account matching required for physical-device Expo Go development preview
 ---
 
-**Rule:** For a physical iOS Expo Go development preview on Expo SDK 57, Expo CLI and Expo Go must authenticate as the same Expo account. Prefer a personal Expo access token supplied only through Replit Secrets over the workspace's managed private Expo CLI session; if a token is present but invalid, fail visibly rather than switching to the managed session.
+**Rule:** For physical iOS Expo Go on SDK 57, follow the current Expo skill's managed **Preview on your phone** sign-in flow. Preserve its nonfatal `create-launch login` bootstrap. Do not prescribe manual CLI/EAS login or substitute the managed session secret for `EXPO_TOKEN`.
 
-**Why:** Expo's September 2026 account check rejects the managed private CLI identity on a user's phone, even when the manifest and native bundle both serve successfully. Browser-based CLI login from a remote Replit container redirects to its own localhost, which the user's phone cannot reach.
+**Why:** CLI/phone account mismatch can block a valid bundle, but Replit now provisions the managed session through its phone-preview flow. Earlier token-first advice predates that flow and must not override current platform instructions.
 
-**How to apply:** Have the user sign into Expo Go with the same personal Expo account that owns the token. Never request or paste the token in chat; use a secure secret form. After changing the secret, restart the managed Expo workflow and verify CLI account, iOS manifest, and native bundle. A successful HTTP manifest alone cannot prove the phone-side Expo Go account matches.
+**How to apply:** Read the current Expo skill before authentication changes. A stale managed session needs a workspace refresh and workflow restart, not hand-written credentials. Never expose existing tokens. A successful manifest alone does not prove the phone's account matches.

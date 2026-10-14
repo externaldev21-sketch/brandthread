@@ -38,12 +38,13 @@ describe('theme-matched app icons', () => {
     }
   });
 
-  it('registers every theme with the native config plugin', () => {
+  it('keeps every theme available behind the default-off native build gate', () => {
     const config = JSON.parse(readFileSync(resolve(root, 'app.json'), 'utf8'));
     const plugin = config.expo.plugins.find(
-      (entry: unknown) => Array.isArray(entry) && entry[0] === 'expo-runtime-app-icon',
+      (entry: unknown) => Array.isArray(entry) && entry[0] === './plugins/with-native-surfaces',
     );
     expect(plugin).toBeTruthy();
+    expect(plugin[1].enabled).toBe(false);
     // Every theme icon, then the unlockable ones (lib/unlockableIcons.ts).
     expect(Object.keys(plugin[1].icons)).toEqual([...themeIds, 'brushed-silver', 'chrome'].map((id) => id.replaceAll('-', '_')));
     for (const entry of Object.values(plugin[1].icons) as Array<{ image: string; androidForegroundImage: string }>) {
@@ -59,6 +60,7 @@ describe('theme-matched app icons', () => {
     const context = readFileSync(resolve(root, 'contexts/AppIconContext.tsx'), 'utf8');
     expect(context).toContain("@brandthread/app-icon:${ICON_STORAGE_VERSION}:${userId ?? 'guest'}");
     expect(context).toContain("Constants.appOwnership !== 'expo'");
+    expect(context).toContain("Constants.expoConfig?.extra?.nativeSurfacesBuildEnabled === false");
     expect(context).toContain("await import('expo-runtime-app-icon')");
     expect(context).not.toContain("import { setAppIcon } from 'expo-runtime-app-icon'");
     expect(context).toContain('const resolvedIconId = preference ?? theme.id');

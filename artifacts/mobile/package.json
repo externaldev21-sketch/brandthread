@@ -193,6 +193,10 @@
   },
   "expo": {
     "autolinking": {
+      "exclude": [
+        "upload-live-activity",
+        "expo-runtime-app-icon"
+      ],
       "searchPaths": [
         "./modules"
       ]

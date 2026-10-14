@@ -49,24 +49,37 @@ describe("store build gate (verify-launch-config)", () => {
     }
   });
 
-  it("resolves the update URL from app.json or EAS_PROJECT_ID, like EAS does", () => {
+  it("uses static app.json and does not invent project linking from the workspace environment", () => {
     expect(launch.resolveExpoConfig({}).updates.url).toBeUndefined();
-    expect(launch.resolveExpoConfig({ EAS_PROJECT_ID: "p-1" }).updates.url).toBe("https://u.expo.dev/p-1");
+    expect(launch.resolveExpoConfig({ EAS_PROJECT_ID: "p-1" })).toEqual(launch.resolveExpoConfig({}));
+    expect(launch.resolveExpoConfig({}).updates.enabled).toBe(false);
   });
 
-  it("fails production and testflight builds without a DSN or update URL", () => {
+  it("allows the first wizard build with explicit warnings and no guessed credentials", () => {
     for (const profile of ["production", "testflight"]) {
       const result = launch.getLaunchConfigProblems({ profile, env: {} });
       expect(result.store).toBe(true);
-      expect(result.errors).toHaveLength(2);
-      expect(result.errors[0]).toMatch(/EXPO_PUBLIC_SENTRY_DSN/);
-      expect(result.errors[0]).toMatch(/Client Keys \(DSN\)/);
-      expect(result.errors[1]).toMatch(/eas init/);
+      expect(result.errors).toEqual([]);
+      expect(result.warnings).toHaveLength(2);
+      expect(result.warnings[0]).toMatch(/EXPO_PUBLIC_SENTRY_DSN/);
+      expect(result.warnings[1]).toMatch(/explicitly disabled/);
     }
-    expect(launch.getLaunchConfigProblems({ profile: "production", env: { EXPO_PUBLIC_SENTRY_DSN: DSN } }).errors).toHaveLength(1);
+    expect(launch.getLaunchConfigProblems({ profile: "production", env: { EXPO_PUBLIC_SENTRY_DSN: DSN } }).warnings).toHaveLength(1);
+  });
+
+  it("still rejects enabled OTA without a real matching project ID and URL", () => {
+    const projectId = "11111111-2222-4333-8444-555555555555";
+    for (const extra of [{}, { eas: { projectId: "placeholder" } }, { eas: { projectId } }]) {
+      expect(launch.getLaunchConfigProblems({
+        profile: "production",
+        env: {},
+        expoConfig: { updates: { enabled: true, url: "https://u.expo.dev/wrong" }, extra },
+      }).errors).toHaveLength(1);
+    }
     expect(launch.getLaunchConfigProblems({
       profile: "production",
-      env: { EXPO_PUBLIC_SENTRY_DSN: DSN, EAS_PROJECT_ID: "p-1" },
+      env: { EXPO_PUBLIC_SENTRY_DSN: DSN },
+      expoConfig: { updates: { enabled: true, url: `https://u.expo.dev/${projectId}` }, extra: { eas: { projectId } } },
     }).errors).toEqual([]);
   });
 

@@ -39,6 +39,7 @@ function encodeStoredPreference(value: AppIconPreference): string {
 
 function canUseNativeAppIcons(): boolean {
   if (Platform.OS === 'web') return false;
+  if (Constants.expoConfig?.extra?.nativeSurfacesBuildEnabled === false) return false;
   // appOwnership is deprecated in favor of executionEnvironment, but it is the
   // only value that distinguishes Expo Go from a custom development client.
   return Constants.appOwnership !== 'expo';

@@ -10,7 +10,7 @@
       "environment": "development",
       "channel": "development",
       "ios": {
-        "image": "macos-sequoia-15.6-xcode-26.0"
+        "image": "latest"
       }
     },
     "preview": {
@@ -18,7 +18,7 @@
       "environment": "preview",
       "channel": "preview",
       "ios": {
-        "image": "macos-sequoia-15.6-xcode-26.0"
+        "image": "latest"
       },
       "android": {
         "buildType": "apk"
@@ -37,7 +37,7 @@
       "environment": "production",
       "channel": "production",
       "ios": {
-        "image": "macos-sequoia-15.6-xcode-26.0",
+        "image": "latest",
         "autoIncrement": "buildNumber"
       },
       "android": {
@@ -50,14 +50,14 @@
       "distribution": "store",
       "channel": "testflight",
       "ios": {
-        "image": "macos-sequoia-15.6-xcode-26.0",
+        "image": "latest",
         "autoIncrement": "buildNumber"
       }
     },
     "preview-ios-simulator": {
       "extends": "preview",
       "ios": {
-        "image": "macos-sequoia-15.6-xcode-26.0",
+        "image": "latest",
         "simulator": true
       }
     },
