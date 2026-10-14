@@ -6,12 +6,34 @@ import { BUYER_STEP_INDEX, DRAFT_VERSION } from '../lib/onboardingFlow';
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
 describe('onboarding visual structure', () => {
-  it('uses compact progress dots with the original progress colors', () => {
+  it('shows progress as a thin straight segmented bar, not the drawn thread', () => {
     const onboarding = read('app/onboarding.tsx');
+    const bar = read('components/onboarding/SegmentedProgress.tsx');
     expect(onboarding).toContain('function StepDots');
-    expect(onboarding).not.toContain('function GradientBar');
-    expect(onboarding).toContain("backgroundColor: 'rgba(255,255,255,0.08)'");
-    expect(onboarding).toContain('colors={theme.heroGradient}');
+    expect(onboarding).toContain('<SegmentedProgress');
+    expect(onboarding).not.toMatch(/ThreadProgress|ThreadWeave|ThreadDraw|ThreadLogoStitch/);
+    expect(bar).toContain("segment: { flex: 1, height: 2, borderRadius: 1 }");
+    expect(bar).toContain('theme.muted');
+  });
+
+  it('has no icon-in-a-circle decorations, no feature checklists and no fake loader', () => {
+    const onboarding = read('app/onboarding.tsx');
+    expect(onboarding).not.toContain('bellBg');
+    expect(onboarding).not.toContain('<Feather name="bell"');
+    expect(onboarding).not.toContain('function LoadingAnimation');
+    expect(onboarding).not.toMatch(/Curating your Thread|Mapping your brand workspace/);
+    expect(onboarding).not.toMatch(/Thread — your personal brand feed|Analytics dashboard activated/);
+    const accountType = read('app/account-type.tsx');
+    expect(accountType).not.toContain('iconWrap');
+    expect(accountType).not.toContain('bullets');
+    expect(read('app/thread-explainer.tsx')).not.toContain('<View style={[styles.featureIconWrap');
+  });
+
+  it('never says "AI" in onboarding copy', () => {
+    for (const file of ['app/onboarding.tsx', 'app/account-type.tsx', 'components/onboarding/BrandsToFollowStep.tsx']) {
+      const copy = read(file).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+      expect(copy).not.toMatch(/['">][^'"<>\n]*\bAI\b[^'"<>\n]*['"<]/);
+    }
   });
 
   it('uses hairline default borders for onboarding inputs and choices', () => {
@@ -43,15 +65,11 @@ describe('onboarding visual structure', () => {
     expect(splash).not.toContain('ctaWrap');
   });
 
-  it('buyer style interests use emoji and solid-fill selected state with checkmark', () => {
+  it('buyer style interests are plain text chips with a solid-fill selected state', () => {
     const onboarding = read('app/onboarding.tsx');
-    // Emoji data present
-    expect(onboarding).toContain('STYLE_INTERESTS_WITH_EMOJI');
-    // StyleChip with emoji prop
+    expect(onboarding).not.toContain('STYLE_INTERESTS_WITH_EMOJI');
     expect(onboarding).toContain('function StyleChip');
-    // Feather check icon rendered when selected
-    expect(onboarding).toContain('name="check"');
-    // Solid fill selected state (backgroundColor on selected chip)
+    expect(onboarding).not.toMatch(/\p{Extended_Pictographic}/u);
     expect(onboarding).toContain('backgroundColor: theme.accentDim');
   });
 
@@ -106,8 +124,9 @@ describe('onboarding visual structure', () => {
     expect(onboarding).toContain('useNativeDriver: true');
     expect(onboarding).not.toContain('duration: 220');
     expect(onboarding).not.toContain('isAuthStep ? sm.interactiveStepWrap');
-    expect(onboarding).toContain('onDone={() => transitionTo(BUYER_STEP_INDEX.NOTIFICATIONS, 1)}');
-    expect(onboarding).toContain('onDone={() => transitionTo(SELLER_STEP_INDEX.NOTIFICATIONS, 1)}');
+    // The old loader step is stepped over straight to Notifications.
+    expect(onboarding).toContain('if (flow === \'buyer\' && next === BUYER_STEP_INDEX.LOADING) return BUYER_STEP_INDEX.NOTIFICATIONS;');
+    expect(onboarding).toContain('if (flow === \'seller\' && next === SELLER_STEP_INDEX.LOADING) return SELLER_STEP_INDEX.NOTIFICATIONS;');
   });
 
   it('keeps account-type storage and draft persistence off the transition path', () => {

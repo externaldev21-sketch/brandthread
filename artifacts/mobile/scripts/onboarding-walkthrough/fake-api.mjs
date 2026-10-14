@@ -24,7 +24,29 @@ function clerkIdFromAuthHeader(authorization) {
   return match ? match[1] : null;
 }
 
-export function createFakeOnboardingApi() {
+/**
+ * Brands for the buyer "Follow a few brands" step — the same demo brands and
+ * demo catalogue photos (scripts/store-screenshots/demo-images.mjs) the store
+ * screenshots use. Harness data only; the app never invents brands.
+ */
+function demoBrands(apiOrigin) {
+  const img = (name) => `${apiOrigin}/demo-images/${name}.jpg`;
+  const brand = (id, name, handle, logo, count, photos) => ({
+    id, sellerId: id, handle, name, brandType: null, logoUrl: logo ? img(logo) : null, verified: true,
+    productCount: count, productImages: photos.map(img),
+  });
+  return [
+    brand('user_northline', 'Northline Studio', 'northlinestudio', 'portrait-rust', 48, ['hoodie-ember', 'jacket-rust', 'cargo-rust']),
+    brand('user_ember', 'Ember & Ash', 'emberandash', 'texture-ember', 31, ['hoodie-graphite', 'jacket-onyx', 'hoodie-bone']),
+    brand('user_field', 'Field Office', 'fieldoffice', 'look-mono', 19, ['runner-rust', 'runner-stone', 'look-rust']),
+    brand('user_moss', 'Moss Supply', 'mosssupply', null, 12, ['hoodie-moss', 'hoodie-midnight', 'look-mono']),
+    brand('user_quiet', 'Quiet Hours', 'quiethours', 'texture-mono', 0, []),
+    brand('user_dusk', 'Dusk Club', 'duskclub', null, 0, []),
+    brand('user_index', 'Index Studio', 'indexstudio', null, 0, []),
+  ];
+}
+
+export function createFakeOnboardingApi({ apiOrigin = 'https://api.brandthread.test' } = {}) {
   /** @type {any} */
   let dbUser = null;
   const calls = [];
@@ -111,6 +133,9 @@ export function createFakeOnboardingApi() {
       if (body?.brandStage != null) user.brandStage = body.brandStage;
       return { status: 200, body: { ok: true } };
     }
+    if (p === '/public/username-check' && get) {
+      return { status: 200, body: { available: true } };
+    }
     if (p === '/auth/username/check' && get) {
       return { status: 200, body: { available: true } };
     }
@@ -124,8 +149,10 @@ export function createFakeOnboardingApi() {
       return { status: 200, body: { ok: true, inviterId: 'seller_stub' } };
     }
     if (p === '/public/brands/discover' && get) {
-      // Empty is a valid, gracefully-handled state for BrandsToFollowStep.
-      return { status: 200, body: [] };
+      return { status: 200, body: { brands: demoBrands(apiOrigin) } };
+    }
+    if (p.startsWith('/social/follow') || p.startsWith('/social/unfollow')) {
+      return { status: 200, body: { ok: true } };
     }
     if (p === '/config/features' && get) {
       return { status: 200, body: { flags: { aiPhotoShoot: true, outfitSwap: true, boosts: true, manufacturerHub: true }, updatedAt: null } };
@@ -182,7 +209,7 @@ export function createFakeOnboardingApi() {
  * BrowserContext, mirroring scripts/store-screenshots/harness.mjs's
  * `openContext` routing but for a signed-OUT onboarding run.
  */
-export async function installFakeBackend(context, { origin, apiOrigin, api }) {
+export async function installFakeBackend(context, { origin, apiOrigin, api, images = {} }) {
   await context.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -195,6 +222,10 @@ export async function installFakeBackend(context, { origin, apiOrigin, api }) {
         'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
       };
       if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+      const demoImage = /^\/demo-images\/([\w-]+)\.jpg$/.exec(url.pathname);
+      if (demoImage && images[demoImage[1]]) {
+        return route.fulfill({ status: 200, headers: cors, contentType: 'image/jpeg', path: images[demoImage[1]] });
+      }
       let body;
       const raw = request.postData();
       if (raw) {

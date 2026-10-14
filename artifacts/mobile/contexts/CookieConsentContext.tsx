@@ -12,7 +12,7 @@ import { WEB_SHELL_MAX_WIDTH } from '@/components/web/WebAppShell';
 export { COOKIE_CONSENT_VERSION, CookieConsent, canUseAnalytics, canUseMarketing } from '@/lib/cookieConsent';
 const KEY = 'bt:cookie-consent';
 // Keep the banner off pre-auth screens with bottom-pinned actions.
-const SUPPRESS_ON_PATHNAMES = new Set(['/splash', '/sign-in', '/onboarding', '/forgot-password']);
+const SUPPRESS_ON_PATHNAMES = new Set(['/splash', '/sign-in', '/onboarding', '/forgot-password', '/account-type', '/thread-explainer']);
 type Value = { consent: CookieConsent | null; saveConsent: (choices: Pick<CookieConsent, 'analytics' | 'marketing'>) => Promise<void>; openPreferences: () => void; noticeClearance: number };
 const Context = createContext<Value>({ consent: null, saveConsent: async () => {}, openPreferences: () => {}, noticeClearance: 0 });
 export function useCookieConsent() { return useContext(Context); }

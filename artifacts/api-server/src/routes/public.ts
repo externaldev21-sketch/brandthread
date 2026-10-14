@@ -21,6 +21,7 @@ import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { buildFacets, parseSearchFilters, type FacetRow } from "../lib/searchFilters";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
+import { brandProductsBySeller, photoBrandsFirst } from "../lib/discoverBrandProducts";
 import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant } from "../lib/publicProfile";
 import { matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
@@ -1194,6 +1195,11 @@ router.get("/search/categories", async (req, res) => {
 // exists on `users` today, so this intentionally returns a flat list; any
 // future style/category filter should extend this query, not add a second
 // endpoint.
+//
+// Each brand also carries its handle, its active listing count and up to
+// three of its newest product photos (lib/discoverBrandProducts.ts), so the
+// onboarding "Curate your feed" step can show real listings per brand;
+// brands with photos come first.
 export function rankDiscoverBrands<T extends { createdAt: Date; clerkId: string }>(sellers: T[]): T[] {
   return [...sellers].sort((a, b) =>
     b.createdAt.getTime() - a.createdAt.getTime() || a.clerkId.localeCompare(b.clerkId));
@@ -1214,6 +1220,7 @@ router.get("/brands/discover", async (req, res) => {
     const sellers = await db
       .select({
         clerkId:         users.clerkId,
+        username:        users.username,
         displayName:     users.displayName,
         brandName:       users.brandName,
         brandType:       users.brandType,
@@ -1237,16 +1244,41 @@ router.get("/brands/discover", async (req, res) => {
       .limit(lim * 2); // small buffer before app-side ranking/limit
 
     const ranked = rankDiscoverBrands(sellers).slice(0, lim);
+    const sellerIds = ranked.map((s) => s.clerkId);
+    const activeProduct = sellerIds.length > 0
+      ? and(inArray(products.ownerId, sellerIds), eq(products.status, "active"), isNull(products.deletedAt))
+      : undefined;
+    const [recent, counts] = activeProduct
+      ? await Promise.all([
+          db.select({ ownerId: products.ownerId, images: products.images })
+            .from(products)
+            .where(activeProduct)
+            .orderBy(desc(products.createdAt), asc(products.id))
+            .limit(sellerIds.length * 8),
+          db.select({ ownerId: products.ownerId, total: count() })
+            .from(products)
+            .where(activeProduct)
+            .groupBy(products.ownerId),
+        ])
+      : [[], []];
+    const productsBySeller = brandProductsBySeller(
+      sellerIds,
+      recent,
+      new Map(counts.map((c) => [c.ownerId, Number(c.total)])),
+    );
 
     res.json({
-      brands: ranked.map((s) => ({
+      brands: photoBrandsFirst(ranked.map((s) => ({
         id:          s.clerkId,
         sellerId:    s.clerkId,
+        handle:      s.username ?? null,
         name:        s.brandName || s.displayName || "Brand",
         brandType:   s.brandType ?? null,
         logoUrl:     s.profileImageUrl ?? s.avatarUrl ?? null,
         verified:    deriveSellerVerified(s),
-      })),
+        productCount:  productsBySeller.get(s.clerkId)?.productCount ?? 0,
+        productImages: productsBySeller.get(s.clerkId)?.productImages ?? [],
+      }))),
     });
   } catch (err) {
     req.log.error({ err }, "Failed to fetch discover brands");

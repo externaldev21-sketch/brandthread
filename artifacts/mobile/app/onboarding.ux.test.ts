@@ -20,14 +20,12 @@ describe("onboarding questionnaire defaults", () => {
 });
 
 describe("seller pre-plan experience", () => {
-  it("uses all theme presets and a server-backed one-sample request", () => {
+  it("keeps the storefront accent picker and drops the AI logo sample", () => {
     expect(source).toContain("APP_THEME_PRESETS.map");
     expect(source).toContain("Saved when your seller workspace is created.");
-    expect(source).toContain("api.logo.onboardingSample");
-    expect(source).toContain("onboarding-generate-sample");
-    expect(source).toContain("Your real AI sample is ready.");
-    expect(source).toContain("Retry");
-    expect(source).toContain("Skip sample · Continue to plans");
+    expect(source).not.toContain("api.logo.onboardingSample");
+    expect(source).not.toContain("onboarding-generate-sample");
+    expect(source).toContain('label="Continue to plans"');
     expect(source).toContain('accessibilityRole="radio"');
     expect(source).toContain("accessibilityState={{ selected }}");
     expect(source).toContain("await selectTheme(selectedThemeId)");
@@ -94,19 +92,23 @@ describe("v7 step order: Welcome opener, then AccountType, then path-specific au
     expect(source).toContain("chooseHeadline");
   });
 
-  it("buyer success routes to thread-explainer, seller to tabs", () => {
-    expect(source).toContain("router.replace('/thread-explainer'");
+  it("buyer success goes straight to the feed (explainer marked seen), seller to tabs", () => {
+    expect(source).toContain("await AsyncStorage.setItem(`thread_explainer_seen:${userId}`, 'true')");
+    expect(source).toContain("router.replace('/(buyer)/' as never)");
+    expect(source).not.toContain("router.replace('/thread-explainer'");
     expect(source).toContain("router.replace('/(tabs)/'");
   });
 
-  it("style interests carry emoji and solid-fill selected chip with checkmark", () => {
-    expect(source).toContain("STYLE_INTERESTS_WITH_EMOJI");
-    expect(source).toContain("emoji: '🏙️'");
+  it("style interests are plain text chips, solid fill when selected", () => {
+    expect(source).toContain("const STYLE_INTERESTS = [");
     expect(source).toContain("function StyleChip");
-    // Solid fill: accentDim background on selected state
     expect(source).toContain("backgroundColor: theme.accentDim");
-    // Checkmark icon when selected
-    expect(source).toContain('name="check"');
+  });
+
+  it("suggests the username from the name until the person edits it", () => {
+    expect(source).toContain("export function suggestUsername(first: string, last: string, attempt = 0): string");
+    expect(source).toContain("const suggestion = suggestUsername(formFirstName, formLastName, suggestionAttempt);");
+    expect(source).toContain("setUsernameEdited(true);");
   });
 
   it("seller name step is pre-filled from auth form first/last name", () => {

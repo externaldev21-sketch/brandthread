@@ -164,9 +164,6 @@ export default function ThreadExplainerScreen() {
           <View style={styles.features}>
             {THREAD_FEATURES.map((feature, i) => (
               <View key={feature.title} style={[styles.featureCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                <View style={[styles.featureIconWrap, { backgroundColor: theme.accentDim, borderColor: theme.accentDim }]}>
-                  <Feather name={feature.icon} size={22} color={theme.accentLight} />
-                </View>
                 <View style={styles.featureContent}>
                   <Text style={[styles.featureTitle, { color: theme.text }]}>{feature.title}</Text>
                   <Text style={[styles.featureBody, { color: theme.muted }]}>{feature.body}</Text>

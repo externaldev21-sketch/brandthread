@@ -84,7 +84,9 @@ import {
   mapOAuthError,
 } from '@/lib/oauthFlow';
 import {
+  BUYER_FLOW_STEPS,
   BUYER_STEP_INDEX,
+  SELLER_FLOW_STEPS,
   SELLER_STEP_INDEX,
   DRAFT_VERSION,
   restoreDraftStep,
@@ -97,7 +99,7 @@ import { BrandsToFollowStep } from '@/components/onboarding/BrandsToFollowStep';
 import { SizesStep } from '@/components/onboarding/SizesStep';
 import { EMPTY_SURVEY, hasSurveyAnswers, sanitizeDraftSurvey, saveBuyerSurvey, type OnboardingSurvey } from '@/lib/onboardingSurvey';
 import { WelcomeStep } from '@/components/onboarding/WelcomeStep';
-import { Glow, ThreadDraw, ThreadLogoStitch, ThreadProgress, ThreadWeave } from '@/components/onboarding/ThreadLine';
+import { SegmentedProgress } from '@/components/onboarding/SegmentedProgress';
 import {
   CodeCells,
   FloatingInput,
@@ -107,7 +109,6 @@ import {
   RevealToggle,
   StepHeadline,
   StepSub,
-  StitchAccent,
 } from '@/components/onboarding/OnboardingUI';
 import { MOTION, RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
 import { radius } from '@/constants/radii';
@@ -127,24 +128,10 @@ let ERR = DEFAULT_THEME.error;
 let GREEN = DEFAULT_THEME.success;
 
 // ─── Data ───────────────────────────────────────────────────────────────────
-const STYLE_INTERESTS_WITH_EMOJI: { label: string; emoji: string }[] = [
-  { label: 'Streetwear',        emoji: '🏙️' },
-  { label: 'Luxury',            emoji: '💎' },
-  { label: 'Vintage',           emoji: '🕰️' },
-  { label: 'Athleisure',        emoji: '🏃' },
-  { label: 'Basics',            emoji: '👕' },
-  { label: 'Accessories',       emoji: '👜' },
-  { label: 'Sneakers',          emoji: '👟' },
-  { label: 'Denim',             emoji: '🧥' },
-  { label: 'Graphic tees',      emoji: '🎨' },
-  { label: 'Minimal',           emoji: '◻️' },
-  { label: 'Avant-garde',       emoji: '🌀' },
-  { label: 'Sustainable fashion', emoji: '🌿' },
+const STYLE_INTERESTS = [
+  'Streetwear', 'Luxury', 'Vintage', 'Athleisure', 'Basics', 'Accessories',
+  'Sneakers', 'Denim', 'Graphic tees', 'Minimal', 'Avant-garde', 'Sustainable fashion',
 ];
-
-// Keep the plain string list for compatibility with existing code that checks
-// membership / draft serialization / API calls.
-const STYLE_INTERESTS = STYLE_INTERESTS_WITH_EMOJI.map((i) => i.label);
 
 const BRAND_STAGES = [
   { value: 'idea',    label: 'Just an idea',    sub: "I'm starting from zero." },
@@ -162,8 +149,6 @@ const DEFAULT_BUYER_INTERESTS = ['Basics', 'Minimal', 'Sustainable fashion'];
 const DEFAULT_SELLER_GOALS = ['Create designs', 'Launch my store', 'Build content'];
 const LOGO_SAMPLE_STYLES = ['Minimalist', 'Bold', 'Vintage', 'Luxury', 'Streetwear', 'Playful'];
 
-const BUYER_LOADING_STEPS  = ['Learning your style', 'Curating your Thread', 'Finding brands you\'ll love', 'Finishing your profile'];
-const SELLER_LOADING_STEPS = ['Mapping your brand workspace', 'Preparing your product pipeline', 'Connecting your growth tools', 'Finishing your dashboard'];
 
 const LEGACY_DRAFT_KEY = 'onboarding_draft';
 const DRAFT_KEY_PREFIX = 'onboarding_draft:';
@@ -229,31 +214,38 @@ function mapClerkError(err: any): string {
   return inner?.message || err?.message || 'Something went wrong. Please try again.';
 }
 
+/**
+ * A username suggestion from the person's name: "Bailey Rivera" → "bailey_rivera"
+ * (letters, numbers and underscores, 3–30 — the server's rule), with a number
+ * appended when the plain one is taken.
+ */
+export function suggestUsername(first: string, last: string, attempt = 0): string {
+  const part = (v: string) => v.normalize('NFKD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const base = [part(first), part(last)].filter(Boolean).join('_').slice(0, 26);
+  if (base.length < 3) return '';
+  return attempt > 0 ? `${base}${attempt + 1}` : base;
+}
+
 // ─── Shared UI ───────────────────────────────────────────────────────────────
 
 /**
- * Progress indicator: the signature thread, sewn node-to-node as the user
- * advances (one stitch node per step). Replaces the old dot row.
+ * Progress indicator: thin straight segments (iOS style), one per visible
+ * step. Welcome and the removed loading screen aren't counted.
  */
-function StepDots({ current, total }: { current: number; total: number }) {
-  const { theme } = useAppTheme();
-  return (
-    <ThreadProgress
-      current={current}
-      total={total}
-      color={theme.text}
-      trackColor={theme.border}
-      accessibilityLabel={`Step ${current + 1} of ${total}`}
-      style={{ flex: 1 }}
-    />
-  );
+function visibleStepIds(flow: Flow): string[] {
+  const steps = flow === 'buyer' ? BUYER_FLOW_STEPS : SELLER_FLOW_STEPS;
+  return steps.map((st) => st.id as string).filter((id) => id !== 'WELCOME' && id !== 'LOADING');
 }
 
-/**
- * Style-interest chip with solid-fill selected state and checkmark.
- * Selected: solid accent-dim background, bright border, checkmark + label.
- */
-function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: string; selected: boolean; onPress: () => void }) {
+function StepDots({ flow, step }: { flow: Flow; step: number }) {
+  const steps = flow === 'buyer' ? BUYER_FLOW_STEPS : SELLER_FLOW_STEPS;
+  const ids = visibleStepIds(flow);
+  const current = Math.max(0, ids.indexOf((steps[step]?.id as string) ?? ''));
+  return <SegmentedProgress current={current} total={ids.length} style={{ flex: 1 }} />;
+}
+
+/** Style-interest chip: plain text; selected = solid fill and bright border. */
+function StyleChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   const { theme } = useAppTheme();
   const ssc = createSsc(theme);
   return (
@@ -264,17 +256,15 @@ function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: 
       ]}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
+      accessibilityLabel={label}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
     >
-      <Text style={ssc.emoji}>{emoji}</Text>
       <Text style={[ssc.chipText, selected && { color: theme.text }]}>{label}</Text>
-      {selected && <Feather name="check" size={13} color={theme.text} />}
     </PressableScale>
   );
 }
 const createSsc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   chip:     { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: radius.md, minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  emoji:    { fontSize: 16 },
   chipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
 });
 
@@ -289,7 +279,6 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
     >
       <Text style={[sc.chipText, selected && { color: theme.text }]}>{label}</Text>
-      {selected && <Feather name="check" size={13} color={theme.text} />}
     </PressableScale>
   );
 }
@@ -309,7 +298,6 @@ function RadioRow({ label, sub, selected, onPress }: { label: string; sub: strin
       accessibilityState={{ selected }}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
     >
-      <StitchAccent active={selected} color={theme.text} style={sr.stitch} />
       <View style={{ flex: 1 }}>
         <Text style={[sr.label, selected && sr.labelOn]}>{label}</Text>
         <Text style={sr.sub}>{sub}</Text>
@@ -322,7 +310,6 @@ function RadioRow({ label, sub, selected, onPress }: { label: string; sub: strin
 }
 const createSr = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   row:     { backgroundColor: theme.card, borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, paddingHorizontal: 18, paddingVertical: 20, flexDirection: 'row', alignItems: 'center', gap: SPACE.md, overflow: 'hidden' },
-  stitch:  { position: 'absolute', top: 10, left: 18 },
   label:   { fontSize: 17, lineHeight: 22, fontFamily: 'Inter_600SemiBold', color: theme.text, marginBottom: 2 },
   labelOn: { color: theme.text },
   sub:     { ...TYPE.body, color: theme.muted },
@@ -345,120 +332,6 @@ function InlineError({ message }: { message: string }) {
     </Reveal>
   );
 }
-
-// ─── Loading animation ────────────────────────────────────────────────────────
-// Timing is unchanged: each task completes on the same schedule and onDone
-// fires at the same moment. Visually, the thread sews one stitch per task.
-function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => void }) {
-  const { theme } = useAppTheme();
-  const sl = createSl(theme);
-  const insets  = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
-  const [done, setDone]   = useState<boolean[]>(steps.map(() => false));
-  const [active, setActive] = useState(0);
-  const logoScale = useRef(new Animated.Value(0.7)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const total = steps.length * 700 + 400;
-
-    Animated.parallel([
-      Animated.spring(logoScale, { toValue: 1, damping: 14, stiffness: 100, useNativeDriver: true }),
-      Animated.timing(logoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-    ]).start();
-
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    steps.forEach((_, i) => {
-      timers.push(
-        setTimeout(() => {
-          setActive(i);
-          setTimeout(() => {
-            setDone((prev) => { const n = [...prev]; n[i] = true; return n; });
-          }, 500);
-        }, i * 700),
-      );
-    });
-
-    const endTimer = setTimeout(onDone, total);
-    timers.push(endTimer);
-    return () => timers.forEach(clearTimeout);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const doneCount = done.filter(Boolean).length;
-
-  return (
-    <View style={[sl.root, { paddingTop: headerTopInset + SPACE.xxl, paddingBottom: insets.bottom + SPACE.xxl }]}>
-
-      {/* Logo */}
-      <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }], marginBottom: SPACE.xl, alignItems: 'center' }}>
-        <Glow size={200} color={theme.text} intensity={0.12} style={sl.logoHalo} />
-        <BrandthreadLogo size={72} />
-      </Animated.View>
-
-      {/* Steps, joined by a running stitch */}
-      <View style={sl.stepsList}>
-        {steps.map((label, i) => {
-          const isDone = done[i];
-          const isActive = active === i && !isDone;
-          return (
-            <Reveal key={label} index={i + 1}>
-              <View style={sl.stepRow}>
-                <View style={sl.stepRail}>
-                  <View style={[sl.stepIcon, isDone && sl.stepIconDone, isActive && { borderColor: theme.text }]}>
-                    {isDone ? (
-                      <Feather name="check" size={13} color={theme.background} />
-                    ) : isActive ? (
-                      <ActivityIndicator size="small" color={theme.text} />
-                    ) : (
-                      <View style={sl.stepDot} />
-                    )}
-                  </View>
-                  {i < steps.length - 1 ? (
-                    <View style={[sl.stepJoin, { backgroundColor: isDone ? theme.text : theme.border }]} />
-                  ) : null}
-                </View>
-                <Text style={[sl.stepLabel, (isDone || isActive) && sl.stepLabelActive]}>
-                  {label}
-                </Text>
-              </View>
-            </Reveal>
-          );
-        })}
-      </View>
-
-      {/* The thread sews one stitch per finished task */}
-      <ThreadProgress
-        fraction={doneCount / Math.max(1, steps.length)}
-        color={theme.text}
-        trackColor={theme.border}
-        accessibilityLabel={`${doneCount} of ${steps.length} setup steps done`}
-        style={{ width: '100%' }}
-      />
-    </View>
-  );
-}
-const createSl = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const BORDER = theme.border, FG = theme.text, MUTED = theme.muted;
-  return StyleSheet.create({
-  root: { flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACE.xl },
-  logoHalo: { position: 'absolute', top: -64 },
-  stepsList: { width: '100%', marginBottom: SPACE.xl },
-  stepRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md },
-  stepRail:  { alignItems: 'center' },
-  stepIcon:  {
-    width: 28, height: 28, borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  stepJoin:       { width: 1, height: 20, marginVertical: 2 },
-  stepIconDone:   { backgroundColor: FG, borderColor: FG },
-  stepDot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)' },
-  stepLabel:      { ...TYPE.body, lineHeight: 28, color: MUTED },
-  stepLabelActive:{ color: FG, fontFamily: 'Inter_600SemiBold' },
-  });
-};
-
 
 // ─── Notifications step ────────────────────────────────────────────────────────
 function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: () => void; onSkip: () => void }) {
@@ -483,16 +356,6 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
     <View style={[sn.root, { paddingTop: headerTopInset + SPACE.xxl, paddingBottom: insets.bottom + SPACE.lg }]}>
 
       <View style={sn.body}>
-        {/* Hero: the thread passes through the bell */}
-        <View style={sn.hero}>
-          <ThreadDraw height={120} color={theme.text} delay={120} duration={1100} style={sn.heroThread} />
-          <Reveal>
-            <View style={[sn.bellBg, { backgroundColor: theme.background, borderColor: theme.border, shadowColor: theme.text }]}>
-              <Feather name="bell" size={30} color={theme.text} />
-            </View>
-          </Reveal>
-        </View>
-
         <StepHeadline size="display" delay={180}>Never miss{'\n'}what matters.</StepHeadline>
         <StepSub index={3}>{desc}</StepSub>
 
@@ -527,9 +390,6 @@ const createSn = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background, paddingHorizontal: SPACE.lg },
   body: { flex: 1, justifyContent: 'center', paddingBottom: SPACE.lg },
-  hero: { height: 120, justifyContent: 'center', marginBottom: SPACE.lg },
-  heroThread: { position: 'absolute', left: -SPACE.lg, right: -SPACE.lg, top: 0 },
-  bellBg:   { width: 72, height: 72, borderRadius: 36, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center', shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: 0 }, elevation: 8, marginLeft: SPACE.xl },
   examples: { gap: SPACE.sm, width: '100%', marginTop: SPACE.lg },
   exampleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
   exampleDot: { width: 5, height: 5, borderRadius: 3 },
@@ -539,92 +399,37 @@ const createSn = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 };
 
 // ─── Success screen ────────────────────────────────────────────────────────────
-// Finale: the thread that ran through every step sews the Brandthread mark,
-// then the real logo resolves over the stitching.
+// The mark, one headline, one line, one button.
 function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { flow: Flow; firstName: string; brandName: string; onFinish: () => void; finishing?: boolean }) {
   const { theme } = useAppTheme();
   const ss = createSs(theme);
   const insets  = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
-  const copyDelay = Math.round(MOTION.finaleDrawMs * 0.7);
 
   const ctaLabel = flow === 'buyer' ? 'Start exploring' : 'Go to Dashboard';
   const desc = flow === 'buyer'
-    ? 'Your next favorite brand is one swipe away.'
-    : 'Your brand now has one home for design, production, selling and growth.';
+    ? 'Your Thread is ready, shaped by the brands you follow.'
+    : `${brandName.trim() || 'Your store'} is set up. Add your first product next.`;
 
   return (
-    <View style={[ss.root, { paddingTop: headerTopInset + SPACE.xxl, paddingBottom: insets.bottom + SPACE.lg }]}>
-      <LinearGradient
-        pointerEvents="none"
-        colors={theme.heroGradient}
-        // heroGradient[0] is the theme background, so running it bottom-up
-        // lights the top and dissolves seamlessly into the canvas.
-        start={{ x: 0.5, y: 1 }}
-        end={{ x: 0.5, y: 0 }}
-        style={ss.wash}
-      />
-
+    <View style={[ss.root, { paddingTop: headerTopInset + SPACE.xxl, paddingBottom: insets.bottom + SPACE.md }]}>
       <View style={ss.body}>
         <View style={ss.hero}>
-          <ThreadLogoStitch
-            size={124}
-            color={theme.text}
-            onStitched={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }}
-          />
+          <BrandthreadLogo size={96} />
         </View>
-
-        <StepHeadline size="display" delay={copyDelay}>Welcome to{'\n'}Brandthread.</StepHeadline>
-
-        {flow === 'seller' && brandName ? (
-          <Reveal delay={copyDelay} index={2}>
-            <View style={[ss.brandBadge, { borderColor: theme.border }]}>
-              <Text style={[ss.brandBadgeText, { color: theme.text }]}>{brandName}</Text>
-            </View>
-          </Reveal>
-        ) : null}
-
-        <Reveal delay={copyDelay} index={2}>
-          <Text style={ss.desc}>{desc}</Text>
-        </Reveal>
-
-        {/* Feature rows */}
-        <View style={ss.features}>
-          {(flow === 'buyer'
-            ? ['Thread — your personal brand feed', 'Discover drops before they sell out', 'Chat directly with brands', 'Track every order in one place']
-            : ['Design Studio & AI tools ready', 'Manufacturer network unlocked', 'Your store is ready to launch', 'Analytics dashboard activated']
-          ).map((f, i) => (
-            <Reveal key={f} delay={copyDelay} index={i + 3}>
-              <View style={ss.featureRow}>
-                <Feather name="check" size={15} color={theme.text} />
-                <Text style={ss.featureText}>{f}</Text>
-              </View>
-            </Reveal>
-          ))}
-        </View>
+        <StepHeadline size="display">Welcome to{'\n'}Brandthread.</StepHeadline>
+        <Text style={ss.desc}>{desc}</Text>
       </View>
-
-      <Reveal delay={copyDelay} index={7}>
-        <PrimaryButton label={finishing ? 'Saving…' : ctaLabel} onPress={onFinish} loading={finishing} />
-      </Reveal>
+      <PrimaryButton label={finishing ? 'Saving…' : ctaLabel} onPress={onFinish} loading={finishing} />
     </View>
   );
 }
-const createSs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const FG = theme.text, MUTED = theme.muted;
-  return StyleSheet.create({
-  root:       { flex: 1, backgroundColor: theme.background, paddingHorizontal: SPACE.lg },
-  wash:       { position: 'absolute', top: 0, left: 0, right: 0, height: '55%', opacity: 0.8 },
-  body:       { flex: 1, justifyContent: 'center' },
-  hero:       { alignItems: 'center', marginBottom: SPACE.xl },
-  brandBadge: { alignSelf: 'flex-start', borderRadius: RADIUS.pill, paddingHorizontal: 14, paddingVertical: 6, marginTop: SPACE.sm, borderWidth: 1 },
-  brandBadgeText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  desc:       { ...TYPE.body, color: MUTED, marginTop: SPACE.sm, marginBottom: SPACE.lg },
-  features:   { gap: SPACE.sm },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
-  featureText:{ ...TYPE.bodyStrong, color: FG },
-  });
-};
+const createSs = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  root:  { flex: 1, backgroundColor: theme.background, paddingHorizontal: SPACE.lg },
+  body:  { flex: 1, justifyContent: 'center' },
+  hero:  { alignItems: 'flex-start', marginBottom: SPACE.xl },
+  desc:  { ...TYPE.body, color: theme.muted, marginTop: SPACE.sm },
+});
 
 // ─── Buyer Auth Step — bold "Sign up" screen with stacked OAuth rows ──────────
 type BuyerAuthPhase = 'choose' | 'email-form' | 'verify' | 'existing-account';
@@ -1129,6 +934,8 @@ interface SharedAuthStepProps {
   /** Prefill last name (stored for profile write) */
   onLastNamePrefill: (lastName: string) => void;
   allowSignedInAccountCreation?: boolean;
+  /** Which path was chosen on the account-type step; only changes the subtitle. */
+  flow?: Flow;
 }
 
 function SharedAuthStep({
@@ -1136,6 +943,7 @@ function SharedAuthStep({
   username, onUsernameChange, referralCode, onReferralCodeChange,
   onFirstNamePrefill, onLastNamePrefill,
   allowSignedInAccountCreation = false,
+  flow: authFlow = 'seller',
 }: SharedAuthStepProps) {
   const { theme } = useAppTheme();
   const ssa = createSsa(theme);
@@ -1163,6 +971,15 @@ function SharedAuthStep({
   const [error, setError]             = useState('');
   const [clearingSession, setClearSession] = useState(false);
   const [usernameError, setUsernameError] = useState('');
+  // The username is suggested from the name until the person types their own.
+  const [usernameEdited, setUsernameEdited] = useState(username.length > 0);
+  const [suggestionAttempt, setSuggestionAttempt] = useState(0);
+  useEffect(() => {
+    if (usernameEdited) return;
+    const suggestion = suggestUsername(formFirstName, formLastName, suggestionAttempt);
+    if (suggestion !== username) onUsernameChange(suggestion);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formFirstName, formLastName, suggestionAttempt, usernameEdited]);
   // Explicit agreement to the Terms, Community Guidelines and Privacy Policy
   // is required before any account is created (email, Google or Apple).
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -1194,6 +1011,11 @@ function SharedAuthStep({
     setConsentError(false);
     setError((current) => current.startsWith('Please agree') ? '' : current);
   }
+
+  // A suggested name that's taken moves on to the next numbered suggestion.
+  useEffect(() => {
+    if (!usernameEdited && usernameLiveCheck.error && suggestionAttempt < 20) setSuggestionAttempt((n) => n + 1);
+  }, [usernameEdited, usernameLiveCheck.error, suggestionAttempt]);
 
   const USERNAME_REGEX_AUTH = /^[a-zA-Z0-9_]{3,30}$/;
   const isUsernameValid = USERNAME_REGEX_AUTH.test(username.trim());
@@ -1422,7 +1244,7 @@ function SharedAuthStep({
         showsVerticalScrollIndicator={false}
       >
         <StepHeadline>Create your{'\n'}account</StepHeadline>
-        <StepSub>Build your brand on Brandthread.</StepSub>
+        <StepSub>{authFlow === 'buyer' ? 'Shop independent brands on Brandthread.' : 'Build your brand on Brandthread.'}</StepSub>
         <View style={ssa.formTop} />
 
         {/* Email */}
@@ -1506,6 +1328,7 @@ function SharedAuthStep({
             editable
             onChangeText={v => {
               const cleaned = v.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
+              setUsernameEdited(true);
               onUsernameChange(cleaned);
               if (cleaned.length > 0 && cleaned.length < 3) {
                 setUsernameError('At least 3 characters');
@@ -1719,49 +1542,23 @@ const createSsa = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   });
 };
 
-// ─── Seller preview / theme selection step ────────────────────────────────────
+// ─── Seller storefront accent step ────────────────────────────────────────────
 function SellerPreviewStep({
-  brandName,
   selectedThemeId,
   onSelectTheme,
   onContinue,
-  generateSample,
 }: {
-  brandName: string;
   selectedThemeId: AppThemeId;
   onSelectTheme: (id: AppThemeId) => void;
   onContinue: () => void;
-  generateSample: (style: string) => Promise<{ b64_json: string }>;
 }) {
   const { theme } = useAppTheme();
   const spreview = createSpreview(theme);
-  const [sampleStyle, setSampleStyle] = useState('Minimalist');
-  const [sampleUri, setSampleUri] = useState<string | null>(null);
-  const [sampleError, setSampleError] = useState('');
-  const [generating, setGenerating] = useState(false);
-
-  const handleGenerate = async () => {
-    if (generating || sampleUri) return;
-    setGenerating(true);
-    setSampleError('');
-    try {
-      const result = await generateSample(sampleStyle);
-      if (!result?.b64_json) throw new Error('The AI service returned no image.');
-      setSampleUri(`data:image/png;base64,${result.b64_json}`);
-    } catch (error: any) {
-      setSampleError(error?.message || 'The sample could not be generated. Try again.');
-    } finally {
-      setGenerating(false);
-    }
-  };
 
   return (
     <ScrollView contentContainerStyle={spreview.scroll} showsVerticalScrollIndicator={false}>
       <StepHeadline>Make it feel{'\n'}like yours.</StepHeadline>
-      <StepSub>
-        Pick a storefront accent, then try one free AI logo sample before choosing a plan.
-        Your choices stay editable later.
-      </StepSub>
+      <StepSub>Pick a storefront accent. You can change it any time.</StepSub>
 
       <Reveal index={2}>
         <Text style={spreview.sectionLabel}>Storefront accent</Text>
@@ -1795,58 +1592,11 @@ function SellerPreviewStep({
       </Reveal>
       <Text style={spreview.hint}>Saved when your seller workspace is created.</Text>
 
-      <Reveal index={4}>
-        <View style={spreview.sampleHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={spreview.sectionLabel}>One free AI sample</Text>
-            <Text style={spreview.sampleSub}>See your brand name as a logo. This calls the real generator.</Text>
-          </View>
-          <Feather name="zap" size={18} color={theme.text} />
-        </View>
-        <View style={spreview.styleRow}>
-          {LOGO_SAMPLE_STYLES.map((style) => (
-            <Chip key={style} label={style} selected={sampleStyle === style} onPress={() => setSampleStyle(style)} />
-          ))}
-        </View>
-      </Reveal>
-
-      {sampleUri ? (
-        <Reveal>
-          <View style={[spreview.resultCard, { borderColor: theme.border }]}>
-            <Image source={{ uri: sampleUri }} style={spreview.resultImage} resizeMode="contain" accessibilityLabel={`${brandName} AI logo sample`} />
-            <AiGeneratedBadge position="topLeft" />
-            <View style={spreview.resultCaption}>
-              <Feather name="check" size={15} color={theme.text} />
-              <Text style={spreview.resultText}>Your real AI sample is ready.</Text>
-            </View>
-          </View>
-        </Reveal>
-      ) : (
-        <Reveal index={5}>
-          <PillButton
-            testID="onboarding-generate-sample"
-            label="Generate free sample"
-            icon={<Feather name="image" size={18} color={theme.onAccent} />}
-            onPress={() => { void handleGenerate(); }}
-            loading={generating}
-          />
-        </Reveal>
-      )}
-      {sampleError ? (
-        <View style={spreview.errorBox}>
-          <Feather name="alert-circle" size={14} color={theme.error} />
-          <Text style={spreview.errorText}>{sampleError}</Text>
-          <TouchableOpacity onPress={() => { void handleGenerate(); }} disabled={generating || !!sampleUri}>
-            <Text style={[spreview.retryText, { color: theme.text }]}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-      <Reveal index={6} style={spreview.continueWrap}>
+      <Reveal index={4} style={spreview.continueWrap}>
         <PillButton
           testID="onboarding-preview-continue"
-          accessibilityLabel={sampleUri ? 'Continue to plans' : 'Skip sample and continue to plans'}
-          label={sampleUri ? 'Continue to plans' : 'Skip sample · Continue to plans'}
-          variant={sampleUri ? 'primary' : 'secondary'}
+          accessibilityLabel="Continue to plans"
+          label="Continue to plans"
           onPress={onContinue}
         />
       </Reveal>
@@ -1854,7 +1604,7 @@ function SellerPreviewStep({
   );
 }
 const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted, MUTED2 = theme.subtle, ERR = theme.error;
+  const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED2 = theme.subtle;
   return StyleSheet.create({
   scroll: { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xl },
   sectionLabel: { ...TYPE.eyebrow, color: FG, textTransform: 'uppercase', marginTop: SPACE.xl, marginBottom: SPACE.sm },
@@ -1866,17 +1616,7 @@ const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   themeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 8 },
   themeName: { flex: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG },
   hint: { ...TYPE.caption, color: MUTED2, marginTop: SPACE.xs },
-  sampleHeader: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: SPACE.sm },
-  sampleSub: { ...TYPE.caption, color: MUTED, paddingRight: 18, marginTop: -4 },
-  styleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.xs, marginBottom: SPACE.md },
-  resultCard: { borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth, backgroundColor: '#F7F7F7', overflow: 'hidden', marginBottom: SPACE.sm },
-  resultImage: { width: '100%', height: 180 },
-  resultCaption: { flexDirection: 'row', gap: 7, alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, backgroundColor: 'rgba(0,0,0,0.86)' },
-  resultText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-  errorBox: { flexDirection: 'row', alignItems: 'center', gap: SPACE.xs, marginTop: SPACE.xs, padding: SPACE.sm, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: ERR },
-  errorText: { flex: 1, fontSize: 12, lineHeight: 17, color: ERR },
-  retryText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  continueWrap: { marginTop: SPACE.md },
+  continueWrap: { marginTop: SPACE.xl },
   });
 };
 
@@ -2211,9 +1951,16 @@ export default function OnboardingScreen() {
     });
   }
 
+  /** The fake setup loader is gone: stepping onto it goes on to Notifications. */
+  function skipLoading(next: number): number {
+    if (flow === 'buyer' && next === BUYER_STEP_INDEX.LOADING) return BUYER_STEP_INDEX.NOTIFICATIONS;
+    if (flow === 'seller' && next === SELLER_STEP_INDEX.LOADING) return SELLER_STEP_INDEX.NOTIFICATIONS;
+    return next;
+  }
+
   function goNext(overrideStep?: number) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const next = overrideStep ?? step + 1;
+    const next = skipLoading(overrideStep ?? step + 1);
     transitionTo(next, 1);
   }
 
@@ -2222,6 +1969,14 @@ export default function OnboardingScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     transitionTo(step - 1, -1);
   }
+
+  // A draft saved on the old loading screen resumes on the next real step.
+  useEffect(() => {
+    if (!flow) return;
+    const target = skipLoading(step);
+    if (target !== step) setStep(target);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flow, step]);
 
   function continueFromAccountType() {
     if (!selectedFlow) return;
@@ -2277,6 +2032,16 @@ export default function OnboardingScreen() {
       code: apiError?.code,
       requestId: apiError?.requestId,
     });
+  }
+
+  /**
+   * Buyers go straight to the Threads feed. The separate "Welcome to the
+   * Thread" explainer is marked seen so the auth gate doesn't detour through
+   * it; the feed's own gesture coach covers the same ground in place.
+   */
+  async function landOnFeed(userId: string) {
+    await AsyncStorage.setItem(`thread_explainer_seen:${userId}`, 'true').catch(() => {});
+    router.replace('/(buyer)/' as never);
   }
 
   async function finishBuyer(retryAttempt = false) {
@@ -2337,8 +2102,7 @@ export default function OnboardingScreen() {
       await AsyncStorage.multiRemove([draftKeyForUser(profile.clerkId)!, LEGACY_DRAFT_KEY]);
       await AsyncStorage.multiRemove([PENDING_FLOW_KEY, PENDING_USERNAME_KEY]);
       void registerGrantedPushToken(profile.clerkId, api);
-      // Route to the feed explainer for first-time buyers
-      router.replace('/thread-explainer' as never);
+      await landOnFeed(profile.clerkId);
     } catch (error) {
       setFinishing(false);
       logBuyerOnboardingFailure(
@@ -2372,7 +2136,7 @@ export default function OnboardingScreen() {
         void syncBuyerOnboarding(profileId, styleInterests, api).catch((backgroundError) => {
           logBuyerOnboardingFailure('background-retry', backgroundError, true);
         });
-        router.replace('/thread-explainer' as never);
+        await landOnFeed(profileId);
         return;
       }
       Alert.alert(
@@ -2499,12 +2263,6 @@ export default function OnboardingScreen() {
     return step !== BUYER_STEP_INDEX.WELCOME;
   }
 
-  function progressSteps(): { current: number; total: number } {
-    const progressFlow = flow ?? selectedFlow;
-    const total = progressFlow ? totalStepsFor(progressFlow) : totalStepsFor('buyer');
-    return { current: Math.min(step, total - 1), total };
-  }
-
   // ── Step rendering ──────────────────────────────────────────────────────────
   function renderStep() {
     // Step 0: Welcome — cinematic opener shown before any account-type choice.
@@ -2546,6 +2304,7 @@ export default function OnboardingScreen() {
       if (step === BUYER_STEP_INDEX.AUTH) return (
         <>
           <SharedAuthStep
+            flow={flow}
             signUp={signUp}
             startGoogleOAuth={startGoogleOAuth}
             startAppleOAuth={startAppleOAuth}
@@ -2600,11 +2359,10 @@ export default function OnboardingScreen() {
           <StepHeadline>What do you{'\n'}want to see?</StepHeadline>
           <StepSub>Pick a few for better recommendations. You can skip this for now.</StepSub>
           <Reveal index={2} style={sm.chipGrid}>
-            {STYLE_INTERESTS_WITH_EMOJI.map(({ label: item, emoji }) => (
+            {STYLE_INTERESTS.map((item) => (
               <StyleChip
                 key={item}
                 label={item}
-                emoji={emoji}
                 selected={styleInterests.includes(item)}
                 onPress={() => setStyleArr((prev) => prev.includes(item) ? prev.filter((v) => v !== item) : [...prev, item])}
               />
@@ -2620,12 +2378,10 @@ export default function OnboardingScreen() {
 
       // Step 6: Brands to follow — personalizes the Thread before the buyer ever sees it
       if (step === BUYER_STEP_INDEX.BRANDS) return (
-        <BrandsToFollowStep onLikedChange={setSurveyBrands} />
-      );
-
-      // Step 6: Loading
-      if (step === BUYER_STEP_INDEX.LOADING) return (
-        <LoadingAnimation steps={BUYER_LOADING_STEPS} onDone={() => transitionTo(BUYER_STEP_INDEX.NOTIFICATIONS, 1)} />
+        <BrandsToFollowStep
+          onLikedChange={setSurveyBrands}
+          onNoBrands={() => transitionTo(skipLoading(transitionDirection.current === -1 ? BUYER_STEP_INDEX.SIZES : BUYER_STEP_INDEX.BRANDS + 1), transitionDirection.current)}
+        />
       );
 
       // Step 5: Notifications
@@ -2649,6 +2405,7 @@ export default function OnboardingScreen() {
       if (step === SELLER_STEP_INDEX.AUTH) return (
         <>
           <SharedAuthStep
+            flow={flow}
             signUp={signUp}
             startGoogleOAuth={startGoogleOAuth}
             startAppleOAuth={startAppleOAuth}
@@ -2715,7 +2472,7 @@ export default function OnboardingScreen() {
                 autoCapitalize="words"
                 maxLength={60}
                 valid={brandName.trim().length >= 1}
-                hint="Brandthread AI will use this to shape your workspace."
+                hint="This is how buyers will see your store."
               />
             </Reveal>
           </ScrollView>
@@ -2780,25 +2537,11 @@ export default function OnboardingScreen() {
           />
         ) : (
           <SellerPreviewStep
-            brandName={brandName.trim()}
             selectedThemeId={selectedThemeId}
             onSelectTheme={setSelectedThemeId}
-            generateSample={async (style) => {
-              const account = await api.auth.sync({ name: firstName.trim() });
-              if (account.accountType === 'buyer') {
-                throw new Error('This account is already set up as a buyer.');
-              }
-              await api.auth.updateProfile({ accountType: 'seller' });
-              return api.logo.onboardingSample(brandName.trim(), style);
-            }}
             onContinue={() => setPlanPrepDone(true)}
           />
         )
-      );
-
-      // Step 7: Loading
-      if (step === SELLER_STEP_INDEX.LOADING) return (
-        <LoadingAnimation steps={SELLER_LOADING_STEPS} onDone={() => transitionTo(SELLER_STEP_INDEX.NOTIFICATIONS, 1)} />
       );
 
       // Step 8: Notifications
@@ -2857,7 +2600,6 @@ export default function OnboardingScreen() {
         {/* Brief on-brand hold while the session resolves: the mark and a thread beginning to sew. */}
         <View accessible accessibilityLabel="Loading" style={sm.bootWrap}>
           <BrandthreadLogo size={44} />
-          <ThreadDraw height={36} color={theme.text} duration={1100} style={sm.bootThread} />
         </View>
       </View>
     );
@@ -2866,16 +2608,6 @@ export default function OnboardingScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <StatusBar barStyle="light-content" />
-
-      {/* The thread weaves behind each headline as screens hand off. */}
-      {!isFullScreen && (
-        <ThreadWeave
-          stepKey={`${flow ?? 'choose'}-${step}`}
-          direction={transitionDirection.current}
-          color={theme.text}
-          style={[sm.weave, { top: insets.top + 44 }]}
-        />
-      )}
 
       {/* Standard header for form steps */}
       {!isFullScreen && (
@@ -2894,7 +2626,7 @@ export default function OnboardingScreen() {
 
           {showsProgressBar() && (
             <View style={{ flex: 1 }}>
-              <StepDots current={progressSteps().current} total={progressSteps().total} />
+              <StepDots flow={(flow ?? selectedFlow ?? 'buyer') as Flow} step={step} />
             </View>
           )}
         </View>
@@ -2906,7 +2638,7 @@ export default function OnboardingScreen() {
           pointerEvents="none"
           style={[sm.progressOverlay, { paddingTop: headerTopInset + 8 }]}
         >
-          <StepDots current={progressSteps().current} total={progressSteps().total} />
+          <StepDots flow={(flow ?? selectedFlow ?? 'buyer') as Flow} step={step} />
         </View>
       )}
 
