@@ -48,7 +48,7 @@ export function ProfileBrandsRow({ items, testID = 'profile-brands' }: { items: 
 
 const s = StyleSheet.create({
   row: { paddingHorizontal: SP.md, gap: SP.sm },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 34, paddingLeft: 5, paddingRight: 12, borderWidth: 1, borderRadius: RADIUS.pill, maxWidth: 260 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 34, paddingLeft: 5, paddingRight: 12, borderWidth: 1, borderRadius: RADIUS.pill, maxWidth: 340 },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm, flexShrink: 1 },
   tagWrap: { flexShrink: 0 },
   tag: { fontFamily: FONT.medium, fontSize: FS.sm },

@@ -148,7 +148,7 @@ describe("product launches", () => {
     await api(`/api/product-launches/${id}`, seller, "PUT", { launchAt: future(3).toISOString() });
     await api(`/api/product-launches/${id}/alert`, buyerA, "POST");
     const pub = await api(`/api/product-launches/${id}`);
-    expect(Object.keys(pub.body).sort()).toEqual(["launchAt", "launching", "serverNow"]);
+    expect(Object.keys(pub.body).sort()).toEqual(["earlyAccess", "launchAt", "launching", "serverNow"]);
     expect(pub.body.launching).toBe(true);
 
     await db.update(products).set({ status: "draft" }).where(eq(products.id, id));

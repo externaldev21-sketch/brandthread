@@ -376,7 +376,7 @@ export default function ProfileScreen() {
   const [heroHeight, setHeroHeight] = useState(0);
   const [heroOnScreen, setHeroOnScreen] = useState(true);
   const coverFlow = useProfileCover({ own: true, cover: serverCover, userId: user?.id });
-  const profileBrands = useProfileBrands(user?.id);
+  const profileBrands = useProfileBrands(user?.id, true);
 
   // Sheets
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
