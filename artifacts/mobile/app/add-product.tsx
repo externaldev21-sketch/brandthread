@@ -36,6 +36,9 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterCh
 
 import { getProduct, saveDraft, loadDraft, deleteDraft, getCollections } from '@/services/productService';
 import { useApi } from '@/hooks/useApi';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@clerk/expo';
+import { isFirstStoreLive, storeLiveSeenKey, type OwnProductRow } from '@/lib/storeLive';
 
 import { Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES, SIZE_PRESETS, COLOR_PRESETS, SalesModel, OptionType, ProductOption, OptionValue, ProductVariant, ProductMedia, ProductCollection } from '@/services/productTypes';
 
@@ -185,6 +188,7 @@ export default function AddProductScreen() {
   const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const { userId } = useAuth();
 
   const [draftData, setDraftData] = useState<Partial<Product>>({
     name: '',
@@ -601,6 +605,26 @@ export default function AddProductScreen() {
     if (Platform.OS !== 'web') Alert.alert(title, message);
   }
 
+  /**
+   * The seller's first product just went live: show "Your store is live"
+   * once instead of the success sheet. Any failure falls back to the sheet.
+   */
+  async function openStoreLiveIfFirst(productId: string): Promise<boolean> {
+    if (!userId) return false;
+    try {
+      const key = storeLiveSeenKey(userId);
+      const seen = (await AsyncStorage.getItem(key)) === '1';
+      if (seen) return false;
+      const rows = (await api.products.list()) as OwnProductRow[];
+      if (!isFirstStoreLive(rows ?? [], productId, false)) return false;
+      await AsyncStorage.setItem(key, '1');
+      router.replace({ pathname: '/store-live', params: { productId } } as never);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async function handlePublish() {
     setPublishError(null);
     if (photosUploading) {
@@ -779,8 +803,13 @@ export default function AddProductScreen() {
     try {
       const name = draftData.name ?? 'Product';
       if (isEditMode && editProductId) {
+        // Only a draft → active edit can be the store's first time going live.
+        const wasActive = finalStatus === 'active'
+          ? await api.products.get(editProductId).then((p: any) => p?.status === 'active').catch(() => true)
+          : true;
         await api.products.update(editProductId, serverUpdatePayload);
         await deleteDraft(draftId.current);
+        if (!wasActive && await openStoreLiveIfFirst(editProductId)) return;
         setPublishSuccess({ name, kind: 'updated', productId: editProductId });
       } else {
         const newProduct = await completeSetupTaskAfter(
@@ -788,6 +817,7 @@ export default function AddProductScreen() {
           () => api.products.create(serverCreatePayload),
         ) as any;
         await deleteDraft(draftId.current);
+        if (finalStatus === 'active' && newProduct?.id && await openStoreLiveIfFirst(newProduct.id)) return;
         setPublishSuccess({ name, kind: 'created', productId: newProduct.id });
       }
     } catch (err: any) {
