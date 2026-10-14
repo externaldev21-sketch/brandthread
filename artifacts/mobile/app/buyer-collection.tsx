@@ -58,6 +58,8 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ProductPhoto } from '@/components/media/ProductPhoto';
+import { SharedPhotoFrame } from '@/components/sharedPhoto/SharedPhotoFrame';
+import { openWithSharedPhoto } from '@/lib/sharedPhoto';
 import { PRODUCT_PHOTO_ASPECT } from '@/constants/media';
 
 import { openPullDownMenu } from '@/lib/contextMenu';
@@ -195,7 +197,7 @@ export default function BuyerCollection() {
 
   function openItem(item: SavedItem) {
     if (item.type === 'product') {
-      router.push(`/thread-product-detail?productId=${encodeURIComponent(item.targetId)}&productName=${encodeURIComponent(item.title)}` as never);
+      openWithSharedPhoto(item.targetId, () => router.push(`/thread-product-detail?productId=${encodeURIComponent(item.targetId)}&productName=${encodeURIComponent(item.title)}` as never));
     } else if (item.type === 'post') {
       router.push(`/buyer-post-viewer?postId=${encodeURIComponent(item.targetId)}` as never);
     }
@@ -209,14 +211,14 @@ export default function BuyerCollection() {
         onLongPress={() => { haptic('longPress'); removeItem(item); }}
         activeOpacity={0.85}
       >
-        <View style={styles.tileImageWrap}>
+        <SharedPhotoFrame productId={item.targetId} uri={item.type === 'product' ? item.image : null} radius={RADIUS.lg} style={styles.tileImageWrap}>
           <ProductPhoto uri={item.image} brand={item.brand} name={item.title} style={styles.tileImage} />
           {item.priceDropped ? (
             <View style={styles.dropTag} testID="collection-price-drop-tag">
               <Text style={styles.dropTagText}>Price drop</Text>
             </View>
           ) : null}
-        </View>
+        </SharedPhotoFrame>
         <View style={styles.tileInfo}>
           {item.brand ? <BrandLink sellerId={item.sellerId} name={item.brand} style={styles.tileBrand} /> : null}
           {!item.brand && item.type === 'post' && item.subtitle ? <Text style={styles.tileBrand} numberOfLines={1}>{item.subtitle}</Text> : null}

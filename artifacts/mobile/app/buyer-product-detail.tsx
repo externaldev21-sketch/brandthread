@@ -168,6 +168,7 @@ import { Snackbar } from '@/components/ui/Snackbar';
 import { useAutoSelectSize } from '@/hooks/useAutoSelectSize';
 import { FriendsSavedLine } from '@/components/products/FriendsSavedLine';
 import { PriceHistoryChart } from '@/components/products/PriceHistoryChart';
+import { sharedPhoto, startClose as startSharedPhotoClose } from '@/lib/sharedPhoto';
 import { ApiError } from '@/lib/networkNotice';
 
 type ThemeAliases = {
@@ -511,7 +512,8 @@ const galleryStyles = StyleSheet.create({
 
 type GallerySlide = { kind: 'video'; uri: string; poster: string | null } | { kind: 'image'; uri: string };
 
-export function ProductGallery({ imageUris, accentColor, video, focusUri, brand, name }: {
+export function ProductGallery({ imageUris, accentColor, video, focusUri, brand, name, onIndexChange }: {
+  onIndexChange?: (index: number) => void;
   brand?: string; name?: string;
   imageUris: string[];
   accentColor: string;
@@ -565,7 +567,9 @@ export function ProductGallery({ imageUris, accentColor, video, focusUri, brand,
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
           onMomentumScrollEnd={(e) => {
             const next = Math.round(e.nativeEvent.contentOffset.x / GALLERY_WIDTH);
-            setActiveIndex(Math.max(0, Math.min(slides.length - 1, next)));
+            const clamped = Math.max(0, Math.min(slides.length - 1, next));
+            setActiveIndex(clamped);
+            onIndexChange?.(clamped);
           }}
           scrollEventThrottle={16}
         />
@@ -937,7 +941,15 @@ export default function BuyerProductDetailScreen() {
   const pathname = usePathname();
   const { push, back } = useThreadPull();
   const usesThreadPull = pathname === '/thread-product-detail';
-  const leaveProduct = () => usesThreadPull ? back() : goBackOr(router, '/(buyer)/discover');
+  const galleryIndexRef = useRef(0);
+  const scrollYRef = useRef(0);
+  const leaveProduct = () => {
+    if (usesThreadPull && productId) startSharedPhotoClose(productId, {
+      onFirstPhoto: galleryIndexRef.current === 0 && !galleryVideo,
+      atTop: scrollYRef.current < 8,
+    });
+    return usesThreadPull ? back() : goBackOr(router, '/(buyer)/discover');
+  };
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const api    = useApi();
@@ -1048,6 +1060,11 @@ export default function BuyerProductDetailScreen() {
   const [bagPlusOne, setBagPlusOne] = useState({ trigger: 0, quantity: 1 });
   // Polish 83: the product video leads the gallery when the seller added one.
   const galleryVideo = useGalleryVideo(productId);
+  useEffect(() => {
+    if (loading || !product) return;
+    const frame = requestAnimationFrame(() => sharedPhoto.heroReady(product.id));
+    return () => cancelAnimationFrame(frame);
+  }, [loading, product?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1564,6 +1581,7 @@ export default function BuyerProductDetailScreen() {
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={(e) => {
+          scrollYRef.current = e.nativeEvent.contentOffset.y;
           const next = e.nativeEvent.contentOffset.y > GALLERY_HEIGHT - topBarHeight;
           if (next !== pastPhotoRef.current) { pastPhotoRef.current = next; setPastPhoto(next); }
         }}
@@ -1578,7 +1596,7 @@ export default function BuyerProductDetailScreen() {
       >
         {/* Immersive product gallery */}
         <View style={s.imageArea} ref={galleryRef} collapsable={false}>
-          <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} video={galleryVideo} focusUri={product.options.find(o => o.id === "opt_color")?.values.find(v => v.id === selections.opt_color)?.imageUri} brand={product.sellerName} name={product.name} />
+          <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} video={galleryVideo} focusUri={product.options.find(o => o.id === "opt_color")?.values.find(v => v.id === selections.opt_color)?.imageUri} brand={product.sellerName} name={product.name} onIndexChange={(i) => { galleryIndexRef.current = i; }} />
           {sellerPreview && (
             <View
               style={[s.previewMarkerWrap, { top: headerTopInset + SP.sm + 8 }]}

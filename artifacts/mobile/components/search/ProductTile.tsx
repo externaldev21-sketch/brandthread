@@ -17,6 +17,8 @@ import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { productTransitionKey, setPendingTileTransition } from '@/lib/tileTransition';
 import { prefetchProductOnPressIn } from '@/lib/detailPrefetch';
 import { formatMoney } from '@/lib/format';
+import { SharedPhotoFrame } from '@/components/sharedPhoto/SharedPhotoFrame';
+import { openWithSharedPhoto } from '@/lib/sharedPhoto';
 
 // Fixed 4:5 aspect ratio for every card so the grid never has uneven row
 // heights — no per-image aspect-ratio measurement.
@@ -35,12 +37,17 @@ export type SearchProductTileItem = {
   priceCents?: number;
 };
 
-/** Product grid card — a 4:5 image, price chip overlay, name and brand row. */
-export function ProductTile({ item, accent: _accent, onPress, width }: {
+/**
+ * Product grid card — a 4:5 image, price chip overlay, name and brand row.
+ * `sharedPhoto`: the caller opens `/thread-product-detail`, so the photo grows
+ * into the product page (lib/sharedPhoto.ts).
+ */
+export function ProductTile({ item, accent: _accent, onPress, width, sharedPhoto = false }: {
   item: SearchProductTileItem;
   accent: string;
   onPress: () => void;
   width: number;
+  sharedPhoto?: boolean;
 }) {
   const { theme } = useAppTheme();
   const styles = makeStyles(theme);
@@ -51,6 +58,7 @@ export function ProductTile({ item, accent: _accent, onPress, width }: {
   // it first, then navigate either way.
   const handlePress = () => {
     hapticPrimaryAction();
+    if (sharedPhoto) { openWithSharedPhoto(item.productId ?? item.id, onPress); return; }
     const media = mediaRef.current;
     if (!item.imageUri || !media?.measureInWindow) { onPress(); return; }
     media.measureInWindow((x, y, w, h) => {
@@ -108,14 +116,16 @@ export function ProductTile({ item, accent: _accent, onPress, width }: {
       accessibilityLabel={`Open ${item.name}, ${item.brand}`}
     >
       <Animated.View style={[styles.card, { width, transform: [{ scale }] }]}>
+        <SharedPhotoFrame productId={item.productId ?? item.id} uri={item.imageUri} radius={RADII.card}>
         <View ref={mediaRef} collapsable={false} style={[styles.media, { width, height: width / GRID_CARD_ASPECT }]}>
           <ProductPhoto uri={item.imageUri} brand={item.brand} name={item.name} style={StyleSheet.absoluteFill} />
+        </View>
           {typeof item.priceCents === 'number' && (
             <View style={styles.priceChip}>
               <Text style={styles.priceText}>{formatMoney(item.priceCents)}</Text>
             </View>
           )}
-        </View>
+        </SharedPhotoFrame>
         <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
         <View style={styles.brandRow}>
           <View style={[styles.brandDot, { backgroundColor: item.color }]} />

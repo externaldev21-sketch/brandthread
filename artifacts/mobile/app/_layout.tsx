@@ -78,6 +78,7 @@ import { dismissNetworkNotice } from '@/lib/networkNotice';
 import { RevenueCatProvider } from '@/lib/revenueCat';
 import { registerGrantedPushToken, setSignedInAccountIds } from '@/lib/contextualPushPermission';
 import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts/FeatureFlagContext';
+import { SharedPhotoOverlay } from '@/components/sharedPhoto/SharedPhotoOverlay';
 import { UndoToastProvider } from '@/components/BrandthreadUI';
 import { CallSessionProvider } from '@/lib/calls/CallSessionContext';
 import { FirstRunTipsProvider } from '@/contexts/FirstRunTipsContext';
@@ -1917,6 +1918,7 @@ function RootLayout() {
                                     <PerfOverlay />
                                     <SaveHeartHost />
                                     <ShareStoreSheetHost />
+                                    <SharedPhotoOverlay />
                                   </FirstRunTipsProvider>
                                 </CallSessionProvider>
                               </ThreadPullProvider>

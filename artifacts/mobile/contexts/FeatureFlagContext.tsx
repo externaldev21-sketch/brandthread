@@ -22,7 +22,8 @@ export type FeatureFlagKey =
   | 'unboxingMoment'
   | 'monthlyWrapped'
   | 'profileMusic'
-  | 'productDraws';
+  | 'productDraws'
+  | 'sharedPhotoTransition';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   unboxingMoment: true,
@@ -70,6 +71,10 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   // (PROFILE_MUSIC_PROVIDER + APPLE_MUSIC_DEVELOPER_TOKEN) and an operator flips
   // it (PUT /api/config/features/profileMusic). The server re-checks both.
   profileMusic: false,
+  // Shared-element product photo (grid photo grows into the product page).
+  // ON; a server-side kill switch in case a device class misbehaves
+  // (PUT /api/config/features/sharedPhotoTransition { enabled: false }).
+  sharedPhotoTransition: true,
 };
 
 const STORAGE_KEY = 'bt:feature-flags:v1';

@@ -14,6 +14,9 @@ import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ProductPhoto } from '@/components/media/ProductPhoto';
 import { productPhotoHeight } from '@/constants/media';
+import { SharedPhotoFrame } from '@/components/sharedPhoto/SharedPhotoFrame';
+import { openWithSharedPhoto } from '@/lib/sharedPhoto';
+import { CachedImage } from '@/components/CachedImage';
 import { formatCents } from '@/lib/money';
 import { prefetchProductOnPressIn } from '@/lib/detailPrefetch';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -72,10 +75,12 @@ export function RecentlyViewedRow({ style, excludeProductId }: { style?: object;
             accessibilityLabel={`${item.name}, ${item.brand}${item.priceCents != null ? `, ${formatCents(item.priceCents)}` : ''}`}
             onPressIn={() => prefetchProductOnPressIn(item.productId, item.image)}
             onPress={() => {
-              router.push(`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}` as never);
+              openWithSharedPhoto(item.productId, () => router.push(`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}` as never));
             }}
           >
+            <SharedPhotoFrame productId={item.productId} uri={item.image} radius={RADIUS.md}>
             <ProductPhoto uri={item.image} brand={item.brand} name={item.name} style={s.image} />
+            </SharedPhotoFrame>
             <Text style={[s.name, { color: theme.text }]} numberOfLines={2}>{item.name}</Text>
             {item.priceCents != null && (
               <Text style={[s.price, { color: theme.muted }]}>{formatCents(item.priceCents)}</Text>

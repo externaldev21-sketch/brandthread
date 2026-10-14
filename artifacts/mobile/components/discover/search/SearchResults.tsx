@@ -97,7 +97,7 @@ export function SearchResults({
   const grid = (items: GridItem[]) => {
     const [left, right] = splitColumns(items, colWidth);
     const renderTile = (g: GridItem) => (g.kind === 'product'
-      ? <ProductTile key={`p-${g.item.id}`} item={g.item} accent={theme.accent} width={colWidth} onPress={() => onProductPress(g.item)} />
+      ? <ProductTile key={`p-${g.item.id}`} item={g.item} accent={theme.accent} width={colWidth} sharedPhoto onPress={() => onProductPress(g.item)} />
       : <VideoTile key={`v-${g.item.id}`} item={g.item} width={colWidth} onPress={() => onVideoPress(g.item)} />);
     return (
       <View style={styles.grid}>

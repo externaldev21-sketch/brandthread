@@ -7,6 +7,9 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
+import { formatCents } from '@/lib/money';
+import { SharedPhotoFrame } from '@/components/sharedPhoto/SharedPhotoFrame';
+import { openWithSharedPhoto } from '@/lib/sharedPhoto';
 import { CachedImage } from '@/components/CachedImage';
 import { productPhotoHeight } from '@/constants/media';
 import { SaveHeart } from '@/components/SaveHeart';
@@ -48,13 +51,14 @@ export const EditorialTile = React.memo(function EditorialTile({ item, theme }: 
     <View style={{ width: TILE_WIDTH }}>
     <Pressable
       onPress={() => {
-        push((`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}&src=feed`) as never);
+        openWithSharedPhoto(item.productId, () => push((`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}&src=feed`) as never));
       }}
       onPressIn={() => prefetchProductOnPressIn(item.productId, item.imageUri)}
       accessibilityRole="button"
       accessibilityLabel={`${item.name} by ${item.brand}${item.priceCents != null ? `, ${formatMoney(item.priceCents)}` : ''}`}
       style={{ width: TILE_WIDTH }}
     >
+      <SharedPhotoFrame productId={item.productId} uri={item.imageUri} radius={12}>
       <LinearGradient
         colors={theme.heroGradient}
         start={{ x: 0.1, y: 0 }}
@@ -77,6 +81,7 @@ export const EditorialTile = React.memo(function EditorialTile({ item, theme }: 
           </View>
         )}
       </LinearGradient>
+      </SharedPhotoFrame>
       {/* Image, then name / brand / price below it with a tight 4-6pt rhythm
           — never an overlay pill sitting on the image's bottom edge, which
           clipped against the image and crowded the name below it. */}

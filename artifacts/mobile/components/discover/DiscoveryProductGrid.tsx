@@ -57,6 +57,7 @@ export function DiscoveryProductGrid({ products, header, footer, empty, contentB
           item={toProductTileItem(item, theme.muted)}
           accent={theme.text}
           width={cardWidth}
+          sharedPhoto
           onPress={() => push({ pathname: '/thread-product-detail' as any, params: { productId: item.id, src: 'search' } } as never)}
         />
       )}
