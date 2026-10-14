@@ -3326,6 +3326,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ notified: number }>(`/api/waitlist/seller/notify/${encodeURIComponent(variantId)}`, {}),
     },
     /** Scheduled product launches + "Notify me". */
+    /** Brand membership levels (server: routes/brand-membership.ts). Levels are private to the buyer. */
+    brandMembership: {
+      mine:     () => get<{ brands: Array<BrandMembership & { name: string; handle: string; initials: string; avatarUrl: string | null }> }>('/api/brand-membership/mine'),
+      brand:    (sellerId: string) => get<BrandMembership>(`/api/brand-membership/brand/${encodeURIComponent(sellerId)}`),
+      settings: () => get<BrandMembershipSettings>('/api/brand-membership/settings'),
+      saveSettings: (body: BrandMembershipSettings) => put<BrandMembershipSettings>('/api/brand-membership/settings', body),
+    },
     /** "Day 1" badges: the brands a person was one of the first 100 buyers of (public). */
     dayOne: {
       brands: (userId: string) =>
@@ -4286,3 +4293,18 @@ export function configureApi(getter: GetToken, getCacheScope: GetCacheScope = ()
   _globalCacheScope = getCacheScope;
 }
 export const api = createApi(() => _globalGetter(), () => _globalCacheScope());
+
+export type MembershipLevel = 'member' | 'insider' | 'inner_circle';
+
+export type BrandMembership = {
+  sellerId: string;
+  level: MembershipLevel | null;
+  spendCents: number;
+  next: { level: MembershipLevel; remainingCents: number } | null;
+};
+
+export type BrandMembershipSettings = {
+  insiderCents: number;
+  innerCircleCents: number;
+  innerCircleEarlyAccessMinutes: number;
+};

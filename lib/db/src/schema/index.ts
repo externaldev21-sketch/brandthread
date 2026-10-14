@@ -9,6 +9,7 @@ export * from './security';
 export * from './money';
 export * from './productLaunches';
 export * from './brandDayOne';
+export * from './brandMembership';
 export * from './threadCash';
 export * from './threadCashExpiry';
 export * from './shopifyFulfillment';

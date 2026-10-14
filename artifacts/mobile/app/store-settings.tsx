@@ -306,6 +306,15 @@ export default function StoreSettingsScreen() {
             onPress={() => router.push('/discounts')}
             style={{ minHeight: 48 }}
           />
+          <View style={ss.divider} />
+          <ListRow
+            title="Membership levels"
+            subtitle="Insider and Inner Circle by lifetime spend"
+            chevron
+            onPress={() => router.push('/membership-levels' as never)}
+            style={{ minHeight: 48 }}
+            testID="store-settings-membership-levels"
+          />
         </BrandthreadCard>
 
         <PrimaryButton label="Save Settings" onPress={handleSave} loading={saving} style={ss.saveBtn} />
