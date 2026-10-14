@@ -53,12 +53,26 @@ const CUSTOMERS = [
   C('guest_d', 'Zoe Harper', 'zoe@harperstudio.co', 4, 47_300, 21),
   C('c-manual-1', 'Riley Adams', 'riley@adams.com', 0, 0, 0, { tags: ['Pop-up'], createdAt: ago(30) }),
 ];
-// A seller with ~250 buyers has 3 superfans (ceil 1%); signed-in only.
-const SUPERFANS = [
-  CUSTOMERS[4],
-  CUSTOMERS[0],
-  C('buyer_u9', 'Elena Park', '', 7, 68_900, 3, { handle: '@elenapark' }),
-];
+/**
+ * JS copy of the server rule (api-server lib/sellerCustomers.ts
+ * `superfanCount` / `superfans`): ceil(1% of customers with an order),
+ * minimum 1; only signed-in buyers fill the slots; spend, then orders.
+ */
+export function superfanCount(customersWithOrders) {
+  if (!Number.isFinite(customersWithOrders) || customersWithOrders < 1) return 0;
+  return Math.max(1, Math.ceil(customersWithOrders * 0.01));
+}
+export function deriveSuperfans(list) {
+  const withOrders = list.filter((c) => c.orderCount > 0);
+  const n = superfanCount(withOrders.length);
+  return withOrders
+    .filter((c) => c.kind === 'account')
+    .sort((a, b) => b.totalSpentCents - a.totalSpentCents || b.orderCount - a.orderCount
+      || (b.lastOrderAt ?? '').localeCompare(a.lastOrderAt ?? '') || a.id.localeCompare(b.id))
+    .slice(0, n);
+}
+// 9 customers, 8 with an order -> 1 superfan: Leo Martins, the top spender.
+const SUPERFANS = deriveSuperfans(CUSTOMERS);
 const DROP = { id: '7d2a0c1e-0000-4000-8000-000000000001', name: 'Winter Capsule', releaseAt: new Date(DEMO_NOW + 4 * 86_400_000 + 3 * 3_600_000).toISOString(), earlyAccessMinutes: 60 };
 
 function json(route, body, status = 200) {
@@ -77,7 +91,8 @@ async function shot(page, name) {
   console.log(`${name}: text-fit ${issues.length ? 'PROBLEMS ' + JSON.stringify(issues) : 'OK'}`);
 }
 
-async function seller(browser, images, origin, { drop = DROP, customers = CUSTOMERS, superfans = SUPERFANS } = {}) {
+async function seller(browser, images, origin, { drop = DROP, customers = CUSTOMERS } = {}) {
+  const superfans = deriveSuperfans(customers);
   const { context, page, activity } = await openContext(browser, { device: DEVICE, role: 'seller', origin, images });
   const state = { granted: false, posts: 0 };
   await context.route(`${API}/**`, async (route) => {
@@ -129,7 +144,7 @@ async function openCustomers(page, activity, origin, expectText) {
 
 async function superfansTab(page, activity) {
   await page.getByRole('tab', { name: 'Superfans' }).click();
-  await page.getByText('Elena Park', { exact: true }).first().or(page.getByText('No superfans yet', { exact: true }).first()).waitFor({ timeout: 10_000 });
+  await page.getByText(/^(Give early access|Schedule a drop|No superfans yet)$/).first().waitFor({ timeout: 10_000 });
   await waitForQuietNetwork(activity, 700, 10_000);
   await page.waitForTimeout(600);
 }
@@ -138,6 +153,8 @@ async function run() {
   const server = await serveBuild(BUILD);
   const browser = await launchBrowser();
   const images = await ensureDemoImages(browser, path.join(WORK_DIR, 'demo-images'));
+  console.log(`fixture: ${CUSTOMERS.length} customers, ${CUSTOMERS.filter((c) => c.orderCount > 0).length} with an order -> superfans: ${SUPERFANS.map((c) => c.name).join(', ')}`);
+  if (SUPERFANS.length !== 1 || SUPERFANS[0].name !== 'Leo Martins') problems++;
   try {
     {
       const { context, page, activity, state } = await seller(browser, images, server.origin);
@@ -162,7 +179,7 @@ async function run() {
       await context.close();
     }
     {
-      const { context, page, activity } = await seller(browser, images, server.origin, { customers: [], superfans: [] });
+      const { context, page, activity } = await seller(browser, images, server.origin, { customers: [] });
       await openCustomers(page, activity, server.origin, 'No customers yet');
       await superfansTab(page, activity);
       await shot(page, 'after-393x852-05-superfans-empty');
