@@ -31,6 +31,8 @@ import { Card, IconButton, Button, ListRow, SegmentedControl, BottomSheet, Theme
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
+import { SharedPhotoFrame } from '@/components/sharedPhoto/SharedPhotoFrame';
+import { openWithSharedPhoto } from '@/lib/sharedPhoto';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 
@@ -124,7 +126,7 @@ export default function BuyerSaved() {
         router.push(`/buyer-post-viewer?postId=${encodeURIComponent(item.targetId)}&postAuthorColor=${encodeURIComponent(item.accentColor ?? '')}` as never);
         return;
       case 'product':
-        router.push(`/thread-product-detail?productId=${encodeURIComponent(item.targetId)}&productName=${encodeURIComponent(item.title)}` as never);
+        openWithSharedPhoto(item.targetId, () => router.push(`/thread-product-detail?productId=${encodeURIComponent(item.targetId)}&productName=${encodeURIComponent(item.title)}` as never));
         return;
       case 'store':
         router.push(`/seller-profile?sellerId=${encodeURIComponent(item.targetId)}` as never);
@@ -236,7 +238,7 @@ export default function BuyerSaved() {
         onPress={() => openItem(item)}
         onLongPress={() => (isProduct ? setActionsFor(item) : removeSaved(item))}
       >
-        <View style={styles.tileImageWrap}>
+        <SharedPhotoFrame productId={item.targetId} uri={isProduct ? item.image : null} radius={RADII.sheet} style={styles.tileImageWrap}>
           {item.image ? (
             <CachedImage source={{ uri: item.image }} style={styles.tileImage} />
           ) : (
@@ -255,7 +257,7 @@ export default function BuyerSaved() {
             />
           )}
           {renderBadges(item)}
-        </View>
+        </SharedPhotoFrame>
         <View style={styles.tileInfo}>
           {item.brand ? <Text style={styles.tileBrand} numberOfLines={1}>{item.brand}</Text> : null}
           <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>

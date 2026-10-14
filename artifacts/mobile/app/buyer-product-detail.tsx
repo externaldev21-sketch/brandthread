@@ -67,6 +67,7 @@ import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { StockCounter } from '@/components/products/StockCounter';
+import { sharedPhoto, startClose as startSharedPhotoClose } from '@/lib/sharedPhoto';
 import { ApiError } from '@/lib/networkNotice';
 import {
   CART_FLIGHT_ITEM_SIZE, flightSourceFromRect, getCartFlightVector, measureCartTarget, measureWindowRect,
@@ -301,7 +302,7 @@ const galleryStyles = StyleSheet.create({
   thumbImage: { width: '100%', height: '100%' },
 });
 
-function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accentColor: string }) {
+function ProductGallery({ imageUris, accentColor, onIndexChange }: { imageUris: string[]; accentColor: string; onIndexChange?: (index: number) => void }) {
   const images = imageUris.filter(Boolean);
   const scrollX = useRef(new Animated.Value(0)).current;
   const listRef = useRef<Animated.FlatList<string>>(null);
@@ -330,8 +331,9 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
           getItemLayout={(_, index) => ({ length: GALLERY_WIDTH, offset: GALLERY_WIDTH * index, index })}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
           onMomentumScrollEnd={(e) => {
-            const next = Math.round(e.nativeEvent.contentOffset.x / GALLERY_WIDTH);
-            setActiveIndex(Math.max(0, Math.min(images.length - 1, next)));
+            const next = Math.max(0, Math.min(images.length - 1, Math.round(e.nativeEvent.contentOffset.x / GALLERY_WIDTH)));
+            setActiveIndex(next);
+            onIndexChange?.(next);
           }}
           scrollEventThrottle={16}
         />
@@ -516,7 +518,17 @@ export default function BuyerProductDetailScreen() {
   const pathname = usePathname();
   const { push, back } = useThreadPull();
   const usesThreadPull = pathname === '/thread-product-detail';
-  const leaveProduct = () => usesThreadPull ? back() : goBackOr(router, '/(buyer)/discover');
+  // Shared-element photo (lib/sharedPhoto.ts): Back shrinks the hero into the
+  // grid tile it came from, but only while that's still the same picture —
+  // first photo showing, page at the top. Otherwise it just closes.
+  const galleryIndexRef = useRef(0);
+  const scrollYRef = useRef(0);
+  const leaveProduct = () => {
+    if (usesThreadPull && productId) {
+      startSharedPhotoClose(productId, { onFirstPhoto: galleryIndexRef.current === 0, atTop: scrollYRef.current < 8 });
+    }
+    return usesThreadPull ? back() : goBackOr(router, '/(buyer)/discover');
+  };
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const api    = useApi();
@@ -661,6 +673,13 @@ export default function BuyerProductDetailScreen() {
 
     return () => { cancelled = true; };
   }, [productId, reloadTick]);
+
+  // Hand the shared-element morph off to the real gallery once it's on screen.
+  useEffect(() => {
+    if (loading || !product?.id) return;
+    const frame = requestAnimationFrame(() => sharedPhoto.heroReady(product.id));
+    return () => cancelAnimationFrame(frame);
+  }, [loading, product?.id]);
 
   // Real per-source traffic tracking for the seller's own Dashboard — a
   // signed-out shopper's visit still counts, so this never gates on
@@ -967,6 +986,8 @@ export default function BuyerProductDetailScreen() {
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
+        onScroll={(e) => { scrollYRef.current = e.nativeEvent.contentOffset.y; }}
+        scrollEventThrottle={32}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -978,7 +999,7 @@ export default function BuyerProductDetailScreen() {
       >
         {/* Immersive product gallery */}
         <View style={s.imageArea} ref={galleryRef} collapsable={false}>
-          <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} />
+          <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} onIndexChange={(i) => { galleryIndexRef.current = i; }} />
           {/* Back button — solid dark chrome over the full-bleed gallery. A
               BlurView-based "glass" variant re-samples whatever sits behind
               it every frame; on a swipeable gallery that reads as the same

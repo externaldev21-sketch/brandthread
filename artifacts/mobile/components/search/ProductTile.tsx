@@ -10,6 +10,8 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+import { SharedPhotoFrame } from '@/components/sharedPhoto/SharedPhotoFrame';
+import { openWithSharedPhoto } from '@/lib/sharedPhoto';
 
 // Fixed 4:5 aspect ratio for every card so the grid never has uneven row
 // heights — no per-image aspect-ratio measurement.
@@ -28,12 +30,17 @@ export type SearchProductTileItem = {
   priceCents?: number;
 };
 
-/** Product grid card — a 4:5 image, price chip overlay, name and brand row. */
-export function ProductTile({ item, accent: _accent, onPress, width }: {
+/**
+ * Product grid card — a 4:5 image, price chip overlay, name and brand row.
+ * `sharedPhoto`: the caller opens `/thread-product-detail`, so the photo grows
+ * into the product page (lib/sharedPhoto.ts).
+ */
+export function ProductTile({ item, accent: _accent, onPress, width, sharedPhoto = false }: {
   item: SearchProductTileItem;
   accent: string;
   onPress: () => void;
   width: number;
+  sharedPhoto?: boolean;
 }) {
   const { theme } = useAppTheme();
   const styles = makeStyles(theme);
@@ -42,14 +49,18 @@ export function ProductTile({ item, accent: _accent, onPress, width }: {
   return (
     <View style={{ width }}>
     <Pressable
-      onPress={() => { hapticPrimaryAction(); onPress(); }}
+      onPress={() => {
+        hapticPrimaryAction();
+        if (sharedPhoto) openWithSharedPhoto(item.productId ?? item.id, onPress);
+        else onPress();
+      }}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       accessibilityRole="button"
       accessibilityLabel={`Open ${item.name}, ${item.brand}`}
     >
       <Animated.View style={[styles.card, { width, transform: [{ scale }] }]}>
-        <View style={[styles.media, { width, height: width / GRID_CARD_ASPECT, backgroundColor: item.color }]}>
+        <SharedPhotoFrame productId={item.productId ?? item.id} uri={item.imageUri} radius={RADII.card} style={[styles.media, { width, height: width / GRID_CARD_ASPECT, backgroundColor: item.color }]}>
           {item.imageUri ? (
             <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
@@ -63,7 +74,7 @@ export function ProductTile({ item, accent: _accent, onPress, width }: {
               <Text style={styles.priceText}>{formatCents(item.priceCents)}</Text>
             </View>
           )}
-        </View>
+        </SharedPhotoFrame>
         <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
         <View style={styles.brandRow}>
           <View style={[styles.brandDot, { backgroundColor: item.color }]} />
