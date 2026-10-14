@@ -347,6 +347,8 @@ type PublishInput = {
   pushKind?: "transactional" | "promotional";
   /** The recipient asked for this exact alert (e.g. per-drop "notify me"). */
   pushExplicitRequest?: boolean;
+  /** Feed row only, never a push (the recipient hasn't opted in to a push for this). */
+  inAppOnly?: boolean;
 };
 
 /** conversation_participants.muted_until in the future (Chat details > Mute). */
@@ -398,7 +400,7 @@ export async function publishNotification(n: PublishInput): Promise<void> {
   // to dedupe retries on) when its own switch is on.
   const feedEnabled = pushCategory ? await isChannelEnabledForUser(n.userId, pushCategory, "inApp") : true;
   if (!feedEnabled) {
-    if (!isMuted && pushCategory) await sendFeedlessPush(n, pushCategory);
+    if (!isMuted && pushCategory && !n.inAppOnly) await sendFeedlessPush(n, pushCategory);
     return;
   }
 
@@ -433,7 +435,7 @@ export async function publishNotification(n: PublishInput): Promise<void> {
   // the recipient goes looking, just not worth interrupting them for.
   if (!notification || isMuted) return;
 
-  if (pushCategory) {
+  if (pushCategory && !n.inAppOnly) {
     // A muted conversation only suppresses device delivery; the feed row
     // above is kept and unread state is unchanged.
     if (await isConversationMutedFor(n)) return;

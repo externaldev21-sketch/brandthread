@@ -15,7 +15,8 @@ export type FeatureFlagKey =
   | 'oauthAppleEnabled'
   | 'hostedCheckoutFallback'
   | 'live_tips'
-  | 'autoCaptions';
+  | 'autoCaptions'
+  | 'productDraws';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   aiPhotoShoot: true,
@@ -34,6 +35,8 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   // server-side (see docs/payments/thread-cash-checkout-todo.md) — the
   // money flow itself is implemented and tested.
   threadCashCheckoutDiscount: false,
+  // Draw mode for drops: OFF until turned on server-side (money flow).
+  productDraws: false,
   // ON by default server-side (mutual-follow required, still a server-side
   // kill switch) — this fallback only covers the brief window before the
   // real flags load.

@@ -51,6 +51,8 @@ import { RADII, radius } from '@/constants/radii';
 import { hapticToggle, hapticPrimaryAction, hapticWarning } from '@/lib/haptics';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { LaunchCountdown } from '@/components/products/LaunchCountdown';
+import { useProductDraw } from '@/hooks/useProductDraw';
+import { closesLabel, drawFooter } from '@/lib/drawPhase';
 import { PreOrderShipBy } from '@/components/products/PreOrderShipBy';
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
 import { CompleteTheFit } from '@/components/products/CompleteTheFit';
@@ -549,6 +551,8 @@ export default function BuyerProductDetailScreen() {
 
   // Waitlist & pre-order reservation state
   const [launching, setLaunching] = useState(false);
+  // Draw mode (SNKRS draw): one "Enter Draw" button replaces Add to cart / Buy now.
+  const productDraw = useProductDraw(productId);
   const [waitlistJoined,  setWaitlistJoined]  = useState(false);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [reserved,        setReserved]        = useState(false);
@@ -1061,10 +1065,16 @@ export default function BuyerProductDetailScreen() {
           </View>
 
           <LaunchCountdown productId={product.id} onLaunchingChange={setLaunching} />
+          {productDraw.draw && productDraw.phase && ['upcoming', 'open', 'entered'].includes(productDraw.phase.kind) ? (
+            <Text style={s.drawLine} testID="product-draw-line">
+              {productDraw.phase.kind === 'entered' ? 'Entered' : 'Draw'} · {closesLabel(productDraw.draw.closesAt)}
+            </Text>
+          ) : null}
 
-          <StockCounter productId={product.id} />
+          {/* A draw has no "left" / countdown pressure: everyone who enters has the same chance. */}
+          {productDraw.draw ? null : <StockCounter productId={product.id} />}
           {/* ── Buyer demand signals (server-supplied values only) ── */}
-          {(demandClaimedUnits > 0 || demandRemainingUnits > 0 || !!demandEndsAt ||
+          {!productDraw.draw && (demandClaimedUnits > 0 || demandRemainingUnits > 0 || !!demandEndsAt ||
             (demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD)) && (
             <View style={{ marginBottom: SP.md, gap: 6 }}>
               {demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD && (
@@ -1428,8 +1438,25 @@ export default function BuyerProductDetailScreen() {
         accessibilityRole="toolbar"
         accessibilityLabel="Product purchase actions"
       >
+        {productDraw.draw && productDraw.phase ? (() => {
+          const footer = drawFooter(productDraw.phase);
+          return (
+            <Button
+              label={footer.label}
+              variant={productDraw.phase.kind === 'entered' ? 'secondary' : 'primary'}
+              disabled={!footer.enabled}
+              onPress={() => {
+                if (footer.target === 'entry') router.push({ pathname: '/draw-entry', params: { productId: product.id, ...(variant ? { variantId: variant.id } : {}) } } as never);
+                if (footer.target === 'result') router.push({ pathname: '/draw-result', params: { productId: product.id } } as never);
+              }}
+              style={s.drawBtn}
+              fullWidth
+              testID="product-draw-button"
+            />
+          );
+        })() : null}
         {/* Real "Add to cart" + "Buy now" pair (it was an unlabeled bag icon). */}
-        {addedToCart ? (
+        {productDraw.draw ? null : addedToCart ? (
           <Button
             label="In your bag"
             icon="check"
@@ -1452,7 +1479,7 @@ export default function BuyerProductDetailScreen() {
           />
         )}
 
-        {product.isPreOrder ? (
+        {productDraw.draw ? null : product.isPreOrder ? (
           <Button
             label={reserved ? 'Reserved ✓' : 'Reserve (No Charge)'}
             onPress={handleReserve}
@@ -1888,6 +1915,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   saleBadge: { backgroundColor: RED_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
   saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: RED, letterSpacing: 0.4 },
   productName: { ...TYPE.title, color: FG, marginBottom: SP.sm },
+  drawLine: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED, marginBottom: SP.md, fontVariant: ['tabular-nums'] },
   addedSheetContent: { padding: SP.md, paddingTop: SP.xs, alignItems: 'center' },
   addedSheetTitle: { ...TYPE.title, color: FG, marginTop: SP.sm, marginBottom: SP.md },
   addedSheetProductRow: {
@@ -1959,6 +1987,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center',
   },
   buyNowBtn: { flex: 1 },
+  drawBtn: { flex: 1, borderRadius: RADIUS.pill },
   reviewsHeader: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   reviewRow: { marginBottom: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   reviewStars: { fontSize: FS.sm, fontFamily: FONT.regular, color: GOLD, marginBottom: 2 },

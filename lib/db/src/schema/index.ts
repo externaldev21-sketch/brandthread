@@ -8,6 +8,7 @@ export * from './productVariantsStock';
 export * from './security';
 export * from './money';
 export * from './productLaunches';
+export * from './productDraws';
 export * from './threadCash';
 export * from './threadCashExpiry';
 export * from './shopifyFulfillment';

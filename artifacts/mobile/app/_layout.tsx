@@ -1500,6 +1500,8 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="analytics-cohorts"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Buyer commerce screens */}
         <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="draw-entry" options={{ headerShown: false, presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="draw-result" options={{ headerShown: false, presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
         <Stack.Screen name="ip-report"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-checkout"        options={{ headerShown: false, animation: 'ios_from_right' }} />

@@ -148,6 +148,8 @@ export async function priceCartGroup(input: {
   /** Live stream the buyer is shopping from (live-only discount codes). */
   liveStreamId?: string | null;
   shipping: CartShipping;
+  /** Pricing a draw entry: the draw is the one way to buy while it's open. */
+  viaDraw?: boolean;
 }): Promise<PricedGroup> {
   const seen = new Set<string>();
   const items: PricedGroup["items"] = [];
@@ -212,7 +214,7 @@ export async function priceCartGroup(input: {
 
   // Preorder drops stay on hosted Checkout (held escrow is its own model).
   try {
-    const plan = await resolveChargePlan({ productIds: items.map((i) => i.productId), sellerId, buyerId: input.buyerId, clientDropId: null });
+    const plan = await resolveChargePlan({ productIds: items.map((i) => i.productId), sellerId, buyerId: input.buyerId, clientDropId: null, viaDraw: input.viaDraw });
     if (plan.chargeModel !== "destination") {
       throw new CartCheckoutError(409, "USE_HOSTED_CHECKOUT", "Preorders use the secure Stripe checkout page.", { reason: "preorder" });
     }
