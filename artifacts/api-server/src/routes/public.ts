@@ -7,9 +7,9 @@ import { Router } from "express";
 import { locationsByPlaceId } from "../lib/places";
 import { publicCoverFields } from "../lib/profileCover";
 import { resolveDevice } from "../lib/sellerInsights";
-import { db, readDb, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, storeVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
+import { db, readDb, products, productVariants, users, drops, dropAlertSubscriptions, dropEarlyAccessGrants, posts, postTaggedProducts, interactions, storefrontVisits, storeVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
 import { getAuth } from "@clerk/express";
-import { effectiveDropLaunchAt } from "../lib/money/dropLaunch";
+import { effectiveDropLaunchAt, grantEarlyAccessMinutes } from "../lib/money/dropLaunch";
 import { adaptSavedRows } from "../lib/savedItemAdapter";
 import { fetchProductBadgeInfo } from "../lib/savedProductBadges";
 import { eq, and, asc, desc, ne, inArray, notInArray, or, ilike, sql, count, gt, gte, lte, isNull, isNotNull, type SQL } from "drizzle-orm";
@@ -1491,7 +1491,7 @@ router.get("/drops/:id", async (req, res) => {
   if (!drop) return res.status(404).json({ error: "Drop not found" });
 
   const { userId } = getAuth(req);
-  const [[seller], dropProducts, isFollower] = await Promise.all([
+  const [[seller], dropProducts, isFollower, hasGrant] = await Promise.all([
     db
       .select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified, verificationStatus: users.verificationStatus, activeStanding: users.activeStanding, policyRestricted: users.policyRestricted })
       .from(users)
@@ -1521,13 +1521,25 @@ router.get("/drops/:id", async (req, res) => {
           .limit(1)
           .then((rows) => rows.length > 0)
       : Promise.resolve(false),
+    // Superfans early access granted by the seller (migration 293).
+    userId
+      ? db.select({ buyerId: dropEarlyAccessGrants.buyerId }).from(dropEarlyAccessGrants)
+          .where(and(eq(dropEarlyAccessGrants.dropId, drop.id), eq(dropEarlyAccessGrants.buyerId, userId)))
+          .limit(1)
+          .then((rows) => rows.length > 0)
+      : Promise.resolve(false),
   ]);
 
   // The effective moment this viewer may buy/see the drop unlock — releaseAt
-  // pulled forward by the seller's early-access window for their followers.
-  const viewerHasEarlyAccess = isFollower && drop.earlyAccessMinutes > 0;
+  // pulled forward by the seller's early-access window for their followers,
+  // or by the grant window for a buyer the seller gave early access
+  // (whichever is earlier; checkoutPlan.ts enforces the same rule).
+  const followerWindow = isFollower ? drop.earlyAccessMinutes : 0;
+  const grantWindow = hasGrant ? grantEarlyAccessMinutes(drop.earlyAccessMinutes) : 0;
+  const viewerWindow = Math.max(followerWindow, grantWindow);
+  const viewerHasEarlyAccess = viewerWindow > 0;
   const effectiveReleaseAt = drop.releaseAt
-    ? effectiveDropLaunchAt(drop.releaseAt, drop.earlyAccessMinutes, isFollower)
+    ? effectiveDropLaunchAt(drop.releaseAt, viewerWindow, viewerHasEarlyAccess)
     : null;
 
   return res.json({

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { effectiveDropLaunchAt, isDropLive } from "../dropLaunch";
+import { effectiveDropLaunchAt, grantEarlyAccessMinutes, isDropLive } from "../dropLaunch";
 
 describe("effectiveDropLaunchAt", () => {
   it("returns releaseAt unchanged with no early access window", () => {
@@ -62,5 +62,14 @@ describe("isDropLive — server-clock launch gating", () => {
         expect(isDropLive(releaseAt, 0, false, justAfter)).toBe(true);
       });
     }
+  });
+});
+
+describe("grantEarlyAccessMinutes (Superfans grant window)", () => {
+  it("uses the drop's own window, or 60 minutes when it has none", () => {
+    expect(grantEarlyAccessMinutes(30)).toBe(30);
+    expect(grantEarlyAccessMinutes(120)).toBe(120);
+    expect(grantEarlyAccessMinutes(0)).toBe(60);
+    expect(grantEarlyAccessMinutes(null)).toBe(60);
   });
 });

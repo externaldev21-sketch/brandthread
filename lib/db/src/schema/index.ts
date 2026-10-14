@@ -443,6 +443,20 @@ export const dropAlertSubscriptions = pgTable('drop_alert_subscriptions', {
   userIdx: index('drop_alert_subscriptions_user_idx').on(t.userId),
 }));
 
+// Superfans early access (migration 293): a seller grants a specific buyer
+// early access to one drop. Checkout honours the grant during the drop's
+// early window (drops.earlyAccessMinutes, or 60 minutes when that is 0),
+// whether or not the buyer follows the seller. One row per (drop, buyer).
+export const dropEarlyAccessGrants = pgTable('drop_early_access_grants', {
+  dropId:    uuid('drop_id').notNull().references(() => drops.id, { onDelete: 'cascade' }),
+  buyerId:   text('buyer_id').notNull(),
+  grantedAt: timestamp('granted_at', { withTimezone: true }).defaultNow().notNull(),
+  grantedBy: text('granted_by').notNull(),
+}, (t) => ({
+  pk:       primaryKey({ columns: [t.dropId, t.buyerId] }),
+  buyerIdx: index('drop_early_access_grants_buyer_idx').on(t.buyerId),
+}));
+
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
 export const orders = pgTable('orders', {

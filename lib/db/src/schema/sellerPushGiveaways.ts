@@ -11,7 +11,9 @@ export const sellerPushBroadcasts = pgTable('seller_push_broadcasts', {
   body:           text('body').notNull(),
   deeplinkType:   text('deeplink_type'),
   deeplinkId:     text('deeplink_id'),
-  status:         text('status').notNull().default('sending'),
+  // 'followers' | 'past_buyers' (migration 271).
+  audience:       text('audience').notNull().default('followers'),
+  status:        text('status').notNull().default('sending'),
   recipientCount: integer('recipient_count').notNull().default(0),
   sentCount:      integer('sent_count').notNull().default(0),
   skippedCount:   integer('skipped_count').notNull().default(0),

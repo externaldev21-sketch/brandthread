@@ -15,6 +15,8 @@ import { EmptyState } from '@/components/layout';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { radius } from '@/constants/radii';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { hapticSelection, hapticSuccess } from '@/lib/haptics';
 
 type ApiCustomer = {
   id: string;
@@ -27,8 +29,51 @@ type ApiCustomer = {
   notes?: string;
   orderCount?: number;
   totalSpentCents?: number;
+  /** Derived from orders (GET /api/customers). Null for hand-entered people with no orders. */
+  lastOrderAt?: string | null;
+  /** @username for signed-in buyers (their account email is never shared). */
+  handle?: string | null;
   createdAt: string;
 };
+
+// Shopify-style segment tabs: everyone, the biggest lifetime spenders, or
+// Superfans — the server's top 1% of signed-in buyers by spend
+// (GET /api/customers?segment=superfans).
+type Segment = 'all' | 'top' | 'superfans';
+const TOP_N = 20;
+const SEGMENTS: { key: Segment; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'top', label: `Top ${TOP_N}` },
+  { key: 'superfans', label: 'Superfans' },
+];
+
+/** GET/POST /api/customers/superfans/early-access */
+type EarlyAccessStatus = {
+  drop: { id: string; name: string; releaseAt: string; earlyAccessMinutes: number } | null;
+  superfans: number;
+  granted: number;
+  allGranted: boolean;
+};
+type EarlyAccessGrant = { dropId: string; dropName: string; granted: number; alreadyHad: number };
+
+function dropWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+/** "$174.93 • 2 orders • Oct 3" — the Shopify customer row's spend line. */
+function spendLine(c: ApiCustomer): string {
+  const n = c.orderCount ?? 0;
+  const parts = [formatCents(c.totalSpentCents ?? 0), `${n} ${n === 1 ? 'order' : 'orders'}`];
+  if (c.lastOrderAt) {
+    const d = new Date(c.lastOrderAt);
+    if (!Number.isNaN(d.getTime())) parts.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+  }
+  return parts.join(' • ');
+}
+
+const lastActivity = (c: ApiCustomer) => new Date(c.lastOrderAt ?? c.createdAt).getTime();
 
 
 type SortOption = 'recent' | 'spend' | 'name';
@@ -57,7 +102,12 @@ export default function CustomersScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('recent');
+  const [segment, setSegment] = useState<Segment>('all');
   const hasDataRef = useRef(false);
+  const [superfanList, setSuperfanList] = useState<ApiCustomer[] | null>(null);
+  const [earlyAccess, setEarlyAccess] = useState<EarlyAccessStatus | null>(null);
+  const [granting, setGranting] = useState(false);
+  const [grantError, setGrantError] = useState(false);
 
   const fetchCustomers = useCallback(async (searchText: string) => {
     if (isPreviewMode && !userId) {
@@ -99,13 +149,66 @@ export default function CustomersScreen() {
     return () => clearTimeout(timer);
   }, [search, fetchCustomers]);
 
+  // Superfans tab: the ranked list and the next drop's early-access state
+  // both come from the server; fetched when the tab opens.
+  const fetchSuperfans = useCallback(async () => {
+    if (isPreviewMode && !userId) { setSuperfanList([]); setEarlyAccess(null); return; }
+    try {
+      const [list, status] = await Promise.all([
+        serviceRequest<ApiCustomer[]>('/api/customers?segment=superfans'),
+        serviceRequest<EarlyAccessStatus>('/api/customers/superfans/early-access'),
+      ]);
+      setSuperfanList(Array.isArray(list) ? list : []);
+      setEarlyAccess(status ?? null);
+    } catch {
+      setSuperfanList((prev) => prev ?? []);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (segment === 'superfans') fetchSuperfans();
+  }, [segment, fetchSuperfans]);
+
+  const giveEarlyAccess = useCallback(async () => {
+    if (granting) return;
+    setGranting(true);
+    setGrantError(false);
+    try {
+      const res = await serviceRequest<EarlyAccessGrant>('/api/customers/superfans/early-access', { method: 'POST' });
+      hapticSuccess();
+      setEarlyAccess((prev) => prev && prev.drop
+        ? { ...prev, drop: { ...prev.drop, id: res.dropId, name: res.dropName }, granted: prev.superfans, allGranted: true }
+        : prev);
+    } catch {
+      // e.g. the drop was moved or released meanwhile: refresh what the button shows.
+      setGrantError(true);
+      fetchSuperfans();
+    } finally {
+      setGranting(false);
+    }
+  }, [granting, fetchSuperfans]);
+
   const totalCustomers = customers.length;
   const avgSpendCents = totalCustomers > 0
     ? Math.round(customers.reduce((sum, c) => sum + (c.totalSpentCents ?? 0), 0) / totalCustomers)
     : 0;
 
   const sortedCustomers = useMemo(() => {
-    const list = [...customers];
+    if (segment === 'superfans') {
+      const term = search.trim().toLowerCase();
+      const list = (superfanList ?? []).filter((c) => !term
+        || [c.name, c.email, c.handle ?? '', ...(c.tags ?? [])].some((v) => v.toLowerCase().includes(term)));
+      // Server rank order (spend, then orders) unless a sort chip says otherwise.
+      if (sortBy === 'name') return [...list].sort((a, b) => a.name.localeCompare(b.name));
+      if (sortBy === 'recent') return [...list].sort((a, b) => lastActivity(b) - lastActivity(a));
+      return list;
+    }
+    const list = segment === 'top'
+      ? customers
+        .filter((c) => (c.orderCount ?? 0) > 0)
+        .sort((a, b) => (b.totalSpentCents ?? 0) - (a.totalSpentCents ?? 0) || lastActivity(b) - lastActivity(a))
+        .slice(0, TOP_N)
+      : [...customers];
     switch (sortBy) {
       case 'spend':
         return list.sort((a, b) => (b.totalSpentCents ?? 0) - (a.totalSpentCents ?? 0));
@@ -113,9 +216,11 @@ export default function CustomersScreen() {
         return list.sort((a, b) => a.name.localeCompare(b.name));
       case 'recent':
       default:
-        return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        return list.sort((a, b) => lastActivity(b) - lastActivity(a));
     }
-  }, [customers, sortBy]);
+  }, [customers, sortBy, segment, superfanList, search]);
+
+  const listLoading = loading || (segment === 'superfans' && superfanList === null);
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
@@ -166,6 +271,32 @@ export default function CustomersScreen() {
         />
       </View>
 
+      {/* Segments (Shopify Customers / Orders tab row) */}
+      <View style={styles.segmentTabs} accessibilityRole="tablist">
+        {SEGMENTS.map((s) => {
+          const active = segment === s.key;
+          return (
+            <PressableScale
+              key={s.key}
+              onPress={() => {
+                if (active) return;
+                hapticSelection();
+                setSegment(s.key);
+                // Top 20 and Superfans open ranked by lifetime spend; the sort chips still re-order them.
+                if (s.key === 'top' || s.key === 'superfans') setSortBy('spend');
+              }}
+              noMinHeight
+              style={[styles.segmentTab, active && { backgroundColor: colors.border }]}
+              accessibilityRole="tab"
+              accessibilityLabel={s.label}
+              accessibilityState={{ selected: active }}
+            >
+              <Text style={[styles.segmentTabText, { color: active ? colors.foreground : colors.mutedForeground }]}>{s.label}</Text>
+            </PressableScale>
+          );
+        })}
+      </View>
+
       {/* Sort */}
       <View style={styles.sortRow}>
         {SORT_OPTIONS.map((opt) => {
@@ -191,14 +322,61 @@ export default function CustomersScreen() {
         })}
       </View>
 
+      {/* Superfans: one tap gives every superfan early access to the next drop. */}
+      {segment === 'superfans' && !listLoading && (superfanList?.length ?? 0) > 0 ? (
+        <View style={styles.earlyAccessWrap}>
+          {earlyAccess?.drop ? (
+            earlyAccess.allGranted ? (
+              <View
+                style={[styles.earlyAccessBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: true }}
+                aria-disabled
+                accessibilityLabel={`Early access given, ${earlyAccess.drop.name}`}
+              >
+                <Feather name="check" size={16} color={colors.foreground} />
+                <Text style={[styles.earlyAccessText, { color: colors.foreground }]} numberOfLines={1}>
+                  Early access given · {earlyAccess.drop.name}
+                </Text>
+              </View>
+            ) : (
+              <PressableScale
+                onPress={giveEarlyAccess}
+                disabled={granting}
+                style={[styles.earlyAccessBtn, { backgroundColor: colors.primary, opacity: granting ? 0.6 : 1 }]}
+                accessibilityRole="button"
+                accessibilityLabel={`Give early access to ${earlyAccess.drop.name}`}
+              >
+                {granting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
+                <Text style={[styles.earlyAccessText, { color: colors.primaryForeground }]} numberOfLines={1}>Give early access</Text>
+              </PressableScale>
+            )
+          ) : (
+            <PressableScale
+              onPress={() => router.push('/seller-drop-create' as never)}
+              style={[styles.earlyAccessBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Schedule a drop"
+            >
+              <Text style={[styles.earlyAccessText, { color: colors.foreground }]} numberOfLines={1}>Schedule a drop</Text>
+            </PressableScale>
+          )}
+          {earlyAccess?.drop && (!earlyAccess.allGranted || grantError) ? (
+            <Text style={[styles.earlyAccessMeta, { color: grantError ? colors.destructive : colors.mutedForeground }]} numberOfLines={1}>
+              {grantError ? "Couldn't give early access. Try again." : `${earlyAccess.drop.name} · ${dropWhen(earlyAccess.drop.releaseAt)}`}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       {/* Customer List — the bordered/shaded card wrapper is for populated
           rows and the loading/error states only. The empty state renders
           flat, directly on the screen background, with no grey box behind
           it (Dev's explicit "no grey boxes" call). */}
-      {!loading && !error && sortedCustomers.length === 0 ? (
+      {!listLoading && !error && sortedCustomers.length === 0 ? (
         <EmptyState
           icon="users"
-          title={search.trim() ? 'No matching customers' : 'No customers yet'}
+          title={search.trim() ? 'No matching customers' : segment === 'superfans' ? 'No superfans yet' : segment === 'top' && customers.length > 0 ? 'No orders yet' : 'No customers yet'}
           message={
             search.trim()
               ? 'Try a different name, email or tag.'
@@ -212,7 +390,7 @@ export default function CustomersScreen() {
         />
       ) : (
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {loading ? (
+        {listLoading ? (
           <View style={styles.custRow}>
             <ActivityIndicator size="small" color={colors.primary} />
             <Text style={[styles.custEmail, { color: colors.mutedForeground, marginLeft: 10 }]}>Loading customers...</Text>
@@ -239,8 +417,11 @@ export default function CustomersScreen() {
                   <Text style={[styles.avatarText, { color }]}>{initials}</Text>
                 </View>
                 <View style={styles.custInfo}>
-                  <Text style={[styles.custName, { color: colors.foreground }]}>{c.name}</Text>
-                  <Text style={[styles.custEmail, { color: colors.mutedForeground }]}>{c.email}</Text>
+                  <Text style={[styles.custName, { color: colors.foreground }]} numberOfLines={1}>{c.name}</Text>
+                  {c.email || c.handle ? (
+                    <Text style={[styles.custEmail, { color: colors.mutedForeground }]} numberOfLines={1}>{c.email || c.handle}</Text>
+                  ) : null}
+                  <Text style={[styles.custSpend, { color: colors.foreground }]} numberOfLines={1}>{spendLine(c)}</Text>
                   {c.phone ? (
                     <Text style={[styles.custOrders, { color: colors.mutedForeground }]}>{c.phone}</Text>
                   ) : null}
@@ -303,7 +484,15 @@ const styles = StyleSheet.create({
   custName: { fontSize: FS.sm, fontFamily: 'Inter_600SemiBold' },
   custEmail: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   custOrders: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  custSpend: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  segmentTabs: { flexDirection: 'row', gap: 4, marginBottom: 12 },
+  segmentTab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.sm },
+  segmentTabText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   custRight: { alignItems: 'flex-end', justifyContent: 'center' },
+  earlyAccessWrap: { marginBottom: 12, gap: 6 },
+  earlyAccessBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: radius.sm, paddingHorizontal: 16 },
+  earlyAccessText: { fontSize: FS.sm, fontFamily: 'Inter_600SemiBold', flexShrink: 1 },
+  earlyAccessMeta: { fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center' },
   tagsRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
   tagChip:   { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, borderWidth: 1 },
   tagText:   { fontSize: FS.xs, fontFamily: 'Inter_600SemiBold' },

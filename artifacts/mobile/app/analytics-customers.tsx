@@ -66,7 +66,7 @@ export default function AnalyticsCustomersScreen() {
     requestUser.current = requestedUser;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     let planRejected = false;
-    const customerCall = api.analytics.customers(10).catch((e) => {
+    const customerCall = api.analytics.customers(20).catch((e) => {
       if (getEntitlementRejection(e)) planRejected = true;
       return null;
     });
