@@ -61,6 +61,8 @@ export function createFakeStripe() {
     paymentIntents: new Map<string, any>(),
     paymentIntentKeys: new Map<string, any>(),
     paymentIntentCreates: [] as Array<{ params: any; options: any }>,
+    /** Manual-capture intents whose capture should be declined (draw tests). */
+    captureFails: new Set<string>(),
     /** Tax per Stripe Tax calculation (default 8% of the taxable amount). */
     taxRate: 0.08,
     taxFails: false,
@@ -139,6 +141,16 @@ export function createFakeStripe() {
         if (intent.status === "succeeded") throw stripeError("definitive", "PaymentIntent already succeeded");
         intent.status = "canceled";
         intent.cancellation_reason = params.cancellation_reason ?? null;
+        return intent;
+      },
+      capture: async (id: string) => {
+        const intent = state.paymentIntents.get(id);
+        if (!intent) throw stripeError("definitive", "No such payment_intent");
+        if (intent.status !== "requires_capture") throw stripeError("definitive", `PaymentIntent is ${intent.status}`);
+        if (state.captureFails.has(id)) throw stripeError("definitive", "Your card was declined.");
+        intent.status = "succeeded";
+        intent.amount_received = intent.amount;
+        intent.latest_charge = `ch_${id}`;
         return intent;
       },
       retrieve: async (id: string) => {
@@ -270,6 +282,7 @@ export function createFakeStripe() {
     state.paymentIntents.clear();
     state.paymentIntentKeys.clear();
     state.paymentIntentCreates.length = 0;
+    state.captureFails.clear();
     state.taxRate = 0.08;
     state.taxFails = false;
     state.taxCalculations.length = 0;

@@ -85,8 +85,10 @@ export function offeredPaymentTypes(types?: string[]): string[] {
   return known.includes('card') ? known : ['card'];
 }
 
-export function StripePaymentProvider({ amountCents, children, onUnavailable, paymentMethodTypes }: {
+export function StripePaymentProvider({ amountCents, children, onUnavailable, paymentMethodTypes, manualCapture }: {
   amountCents: number;
+  /** The intent authorises now and is captured later (draw entries): card only, nothing saved. */
+  manualCapture?: boolean;
   /** From the server's quote; must match the PaymentIntent's payment_method_types. */
   paymentMethodTypes?: string[];
   children: React.ReactNode;
@@ -113,13 +115,15 @@ export function StripePaymentProvider({ amountCents, children, onUnavailable, pa
     // Matches the server (cards are kept on the buyer's Stripe customer for
     // next time, as the hosted flow always did). Klarna / Afterpay can't be
     // combined with a top-level setupFutureUsage, so then it is card-only.
-    ...(offered.length === 1
-      ? { setupFutureUsage: 'off_session' as const }
-      : { paymentMethodOptions: { card: { setup_future_usage: 'off_session' as const } } }),
+    ...(manualCapture
+      ? { captureMethod: 'manual' as const }
+      : offered.length === 1
+        ? { setupFutureUsage: 'off_session' as const }
+        : { paymentMethodOptions: { card: { setup_future_usage: 'off_session' as const } } }),
     appearance: makeAppearance(ck),
     fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap' }],
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [amountCents, ck, offeredKey]);
+  }), [amountCents, ck, offeredKey, manualCapture]);
   if (!loader) return <>{children}</>;
   // Elements can't change its payment methods after mount, so a change remounts it.
   return <Elements key={offeredKey} stripe={loader} options={options}>{children}</Elements>;
