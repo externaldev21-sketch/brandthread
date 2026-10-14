@@ -7,19 +7,26 @@ import { Platform } from 'react-native';
 import { type AppThemeId, APP_THEME_PRESETS, useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 
-export type AppIconPreference = AppThemeId | null;
+/** Icons earned by reaching a brand membership level (lib/unlockableIcons.ts); not tied to a theme. */
+export const UNLOCKABLE_ICON_IDS = ['brushed-silver', 'chrome'] as const;
+export type UnlockableIconId = typeof UNLOCKABLE_ICON_IDS[number];
+export type AppIconId = AppThemeId | UnlockableIconId;
+export type AppIconPreference = AppIconId | null;
 
 const FOLLOW_THEME_STORAGE_VALUE = 'follow-theme';
 const ICON_STORAGE_VERSION = 'v1';
-const APP_ICON_IDS = new Set<AppThemeId>(APP_THEME_PRESETS.map((preset) => preset.id));
+const APP_ICON_IDS = new Set<AppIconId>([...APP_THEME_PRESETS.map((preset) => preset.id), ...UNLOCKABLE_ICON_IDS]);
 
-export const isAppIconId = (value: unknown): value is AppThemeId =>
-  typeof value === 'string' && APP_ICON_IDS.has(value as AppThemeId);
+export const isAppIconId = (value: unknown): value is AppIconId =>
+  typeof value === 'string' && APP_ICON_IDS.has(value as AppIconId);
+
+export const isUnlockableIconId = (value: unknown): value is UnlockableIconId =>
+  typeof value === 'string' && (UNLOCKABLE_ICON_IDS as readonly string[]).includes(value);
 
 export const appIconStorageKeyFor = (userId?: string | null) =>
   `@brandthread/app-icon:${ICON_STORAGE_VERSION}:${userId ?? 'guest'}`;
 
-export const nativeIconNameFor = (iconId: AppThemeId) => iconId.replaceAll('-', '_');
+export const nativeIconNameFor = (iconId: AppIconId) => iconId.replaceAll('-', '_');
 
 function decodeStoredPreference(value: string | null): AppIconPreference | undefined {
   if (value === FOLLOW_THEME_STORAGE_VALUE) return null;
@@ -37,7 +44,7 @@ function canUseNativeAppIcons(): boolean {
   return Constants.appOwnership !== 'expo';
 }
 
-export async function applyDeviceAppIcon(iconId: AppThemeId): Promise<boolean> {
+export async function applyDeviceAppIcon(iconId: AppIconId): Promise<boolean> {
   if (!canUseNativeAppIcons()) return false;
   try {
     // Do not statically import this native module. Expo Go does not include it.
@@ -56,7 +63,7 @@ export async function applyDeviceAppIcon(iconId: AppThemeId): Promise<boolean> {
 
 type AppIconContextValue = {
   preference: AppIconPreference;
-  resolvedIconId: AppThemeId;
+  resolvedIconId: AppIconId;
   followsTheme: boolean;
   isHydrated: boolean;
   selectIcon: (preference: AppIconPreference) => Promise<void>;

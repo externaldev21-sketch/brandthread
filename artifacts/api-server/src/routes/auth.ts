@@ -41,6 +41,7 @@ import { LEGAL_ACCEPTANCE_SOURCES, recordLegalAcceptance, type LegalAcceptanceSo
 import { buildAccountDataExport } from "../lib/dataExport";
 import { decideUsernameChange, usernameNextChangeAt } from "../lib/usernameCooldown";
 import { hasRedeemedAccessCode, isInviteOnlyEnabled } from "../lib/access/inviteOnly";
+import { UNLOCKABLE_ICON_IDS, canUseAppIcon } from "../lib/unlockableIcons";
 
 const router = Router();
 const usernameSchema = z.string().trim().regex(/^[a-zA-Z0-9_]{3,30}$/);
@@ -72,7 +73,7 @@ const profileBodySchema = z.object({
   username: usernameSchema.optional(),
   accountType: z.enum(["buyer", "seller"]).optional(),
   appThemeId: z.enum(["monochrome", "purple", "olive", "navy", "champagne", "black", "silver", "black-gold", "emerald-gold", "leopard-red", "maroon", "gold"]).optional(),
-  appIconId: z.enum(["monochrome", "purple", "olive", "navy", "champagne", "black", "silver", "black-gold", "emerald-gold", "leopard-red", "maroon", "gold"]).nullable().optional(),
+  appIconId: z.enum(["monochrome", "purple", "olive", "navy", "champagne", "black", "silver", "black-gold", "emerald-gold", "leopard-red", "maroon", "gold", ...UNLOCKABLE_ICON_IDS]).nullable().optional(),
   expectedClerkId: z.string().min(1).optional(),
   // Seller storefront metadata (Edit Profile — Store Details section)
   category: optionalProfileText,
@@ -834,7 +835,14 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
     updates.accountType = accountType;
   }
   if (appThemeId !== undefined) updates.appThemeId = appThemeId;
-  if (appIconId !== undefined) updates.appIconId = appIconId;
+  if (appIconId !== undefined) {
+    // Brushed silver / Chrome are earned with brand membership levels (lib/unlockableIcons.ts).
+    if (appIconId && !(await canUseAppIcon(clerkId, appIconId))) {
+      res.status(403).json({ error: "This icon unlocks with a higher membership level.", code: "ICON_LOCKED" });
+      return;
+    }
+    updates.appIconId = appIconId;
+  }
   if (category     !== undefined) updates.category     = category;
   if (location     !== undefined) updates.location     = location;
   if (contactEmail !== undefined) updates.contactEmail = contactEmail;
