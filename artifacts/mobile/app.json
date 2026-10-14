@@ -353,6 +353,16 @@
               "image": "./assets/images/app-icons/gold.png",
               "backgroundColor": "#241A0D",
               "androidForegroundImage": "./assets/images/app-icons/gold-android-foreground.png"
+            },
+            "brushed_silver": {
+              "image": "./assets/images/app-icons/brushed-silver.png",
+              "backgroundColor": "#26272A",
+              "androidForegroundImage": "./assets/images/app-icons/brushed-silver-android-foreground.png"
+            },
+            "chrome": {
+              "image": "./assets/images/app-icons/chrome.png",
+              "backgroundColor": "#080809",
+              "androidForegroundImage": "./assets/images/app-icons/chrome-android-foreground.png"
             }
           }
         }

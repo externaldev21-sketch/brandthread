@@ -19,9 +19,9 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 import { HapticSwitch } from '@/components/BrandthreadUI';
-
-import { useAppIconPreference, type AppIconPreference } from '@/contexts/AppIconContext';
-
+import { isUnlockableIconId, useAppIconPreference, type AppIconPreference } from '@/contexts/AppIconContext';
+import { useBestMembershipLevel } from '@/hooks/useBestMembershipLevel';
+import { UNLOCKABLE_ICONS, isIconUnlocked, lockedCaption, unlockableIconName } from '@/lib/unlockableIcons';
 import { APP_THEME_PRESETS, type AppThemeId, type AppThemePreset, useAppTheme } from '@/contexts/AppThemeContext';
 
 import { APPEARANCE_ICON_IMAGES, APPEARANCE_THEME_IMAGES, preloadAppearanceAssets } from '@/lib/appearanceAssets';
@@ -39,7 +39,10 @@ export default function AppearanceScreen() {
 
   useEffect(() => { void preloadAppearanceAssets(); }, []);
 
-  const heroPreset = presetById(resolvedIconId);
+  const bestLevel = useBestMembershipLevel();
+  // Unlockable icons aren't themes: the hero shows their name over the monochrome glow.
+  const heroPreset = presetById(isUnlockableIconId(resolvedIconId) ? 'monochrome' : resolvedIconId);
+  const heroName = isUnlockableIconId(resolvedIconId) ? unlockableIconName(resolvedIconId) : heroPreset.name;
 
   async function chooseTheme(id: AppThemeId) {
     if (id === theme.id) return;
@@ -80,7 +83,7 @@ export default function AppearanceScreen() {
             cachePolicy="memory-disk"
             transition={0}
           />
-          <Text style={[styles.heroName, { color: theme.text }]}>{heroPreset.name}</Text>
+          <Text style={[styles.heroName, { color: theme.text }]}>{heroName}</Text>
           <Text style={[styles.heroSubtitle, { color: theme.muted }]}>
             {followsTheme ? 'Following app theme' : 'Custom app icon'}
           </Text>
@@ -164,6 +167,53 @@ export default function AppearanceScreen() {
             );
           })}
         </View>
+
+        {/* Unlockable — earned with brand membership levels; locked ones show the level that opens them */}
+        <Text style={[styles.sectionLabel, { color: theme.muted }]}>Unlockable</Text>
+        <View style={styles.grid} testID="appearance-unlockable-icons">
+          {UNLOCKABLE_ICONS.map((option) => {
+            const unlocked = isIconUnlocked(option.id, bestLevel);
+            const selected = preference === option.id;
+            return (
+              <TouchableOpacity
+                key={option.id}
+                style={styles.item}
+                onPress={() => { if (unlocked) chooseIcon(option.id); }}
+                disabled={!unlocked}
+                activeOpacity={0.82}
+                accessibilityRole="radio"
+                accessibilityState={{ selected, disabled: !unlocked }}
+                accessibilityLabel={unlocked
+                  ? `${option.name} app icon${selected ? ', selected' : ''}`
+                  : `${option.name} app icon, unlocks at ${lockedCaption(option.id)}`}
+                testID={`unlockable-icon-${option.id}`}
+              >
+                <View style={[styles.iconRing, selected && { borderColor: '#FFFFFF' }]}>
+                  <Image
+                    source={APPEARANCE_ICON_IMAGES[option.id]}
+                    style={[styles.icon, !unlocked && styles.iconLocked]}
+                    cachePolicy="memory-disk"
+                    transition={0}
+                  />
+                  {!unlocked ? (
+                    <View style={styles.lockBadge}>
+                      <Feather name="lock" size={11} color="#FFFFFF" />
+                    </View>
+                  ) : selected ? (
+                    <View style={[styles.selectedBadge, { backgroundColor: theme.text, borderColor: theme.background }]}>
+                      <Feather name="check" size={11} color={theme.background} />
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={[styles.label, { color: selected ? theme.text : theme.muted }]} numberOfLines={1}>
+                  {unlocked ? option.name : lockedCaption(option.id)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+          {/* Keep the 4-column rhythm of the grid above (it spaces items between). */}
+          {Array.from({ length: (4 - (UNLOCKABLE_ICONS.length % 4)) % 4 }, (_, i) => <View key={`pad-${i}`} style={styles.item} />)}
+        </View>
       </ScrollView>
     </View>
   );
@@ -193,6 +243,8 @@ const styles = StyleSheet.create({
   item: { width: '23%', alignItems: 'center' },
   iconRing: { width: '100%', aspectRatio: 1, borderRadius: 16, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   icon: { width: '100%', height: '100%', borderRadius: 16 },
+  iconLocked: { opacity: 0.35 },
+  lockBadge: { position: 'absolute', right: -2, top: -2, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2A2A2C', borderWidth: 2, borderColor: '#000' },
   selectedBadge: { position: 'absolute', right: -2, top: -2, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000' },
   label: { fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 6, textAlign: 'center' },
 });

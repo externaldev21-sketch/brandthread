@@ -44,7 +44,12 @@ describe('theme-matched app icons', () => {
       (entry: unknown) => Array.isArray(entry) && entry[0] === 'expo-runtime-app-icon',
     );
     expect(plugin).toBeTruthy();
-    expect(Object.keys(plugin[1].icons)).toEqual(themeIds.map((id) => id.replaceAll('-', '_')));
+    // Every theme icon, then the unlockable ones (lib/unlockableIcons.ts).
+    expect(Object.keys(plugin[1].icons)).toEqual([...themeIds, 'brushed-silver', 'chrome'].map((id) => id.replaceAll('-', '_')));
+    for (const entry of Object.values(plugin[1].icons) as Array<{ image: string; androidForegroundImage: string }>) {
+      expect(existsSync(resolve(root, entry.image))).toBe(true);
+      expect(existsSync(resolve(root, entry.androidForegroundImage))).toBe(true);
+    }
     expect(config.expo.icon).toBe('./assets/images/app-icons/monochrome.png');
     expect(config.expo.android.adaptiveIcon.foregroundImage)
       .toBe('./assets/images/app-icons/monochrome-android-foreground.png');
