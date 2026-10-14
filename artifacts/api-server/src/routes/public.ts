@@ -16,6 +16,7 @@ import { eq, and, asc, desc, ne, inArray, notInArray, or, ilike, sql, count, gt,
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 import { computeSellerRankingForToday, isSellerRankingCacheFresh } from "../jobs/computeSellerRanking";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { computeRisingBrands } from "../lib/risingBrands";
 import { requireAuth } from "../middlewares/requireAuth";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { buildFacets, parseSearchFilters, type FacetRow } from "../lib/searchFilters";
@@ -1251,6 +1252,21 @@ router.get("/brands/discover", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to fetch discover brands");
     res.status(500).json({ error: "Failed to fetch brands" });
+  }
+});
+
+// ─── GET /api/public/brands/rising — "Rising this week" leaderboard ──────────
+// Top 10 opted-in sellers by week-over-week paid order growth (see
+// lib/risingBrands.ts). Same answer for everyone, no auth; the shared
+// response cache (routes/index.ts) holds it for 10 minutes. Percent only —
+// never absolute order counts.
+router.get("/brands/rising", async (req, res) => {
+  try {
+    setPublicCacheHeaders(res, { maxAgeSeconds: 600, staleWhileRevalidateSeconds: 600 });
+    res.json(await computeRisingBrands());
+  } catch (err) {
+    req.log.error({ err }, "Failed to compute rising brands");
+    res.status(500).json({ error: "Failed to load rising brands" });
   }
 });
 

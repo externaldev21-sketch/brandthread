@@ -176,6 +176,8 @@ export const users = pgTable('users', {
   // transactional category toggles in notificationPreferences and OFF by
   // default; enforced server-side in lib/pushPolicy.ts / sendPushToUser.
   promoPushOptIn: boolean('promo_push_opt_in').notNull().default(false),
+  // Seller chose to appear in Discover > Brands "Rising this week" (migration 294). Off by default.
+  risingBrandsOptIn: boolean('rising_brands_opt_in').notNull().default(false),
   // Quiet hours: local wall-clock "HH:MM" strings evaluated in quietHoursTimezone.
   // A push falling inside the window is suppressed (feed row still written);
   // null start/end means quiet hours are off.
