@@ -38,6 +38,8 @@ const MIME_TYPES = {
   '.ttf': 'font/ttf',
   '.otf': 'font/otf',
   '.map': 'application/json',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
 };
 
 function send(res, status, body, contentType = 'text/plain; charset=utf-8') {
@@ -69,7 +71,7 @@ function safeFilePath(urlPath) {
 
 const COMPRESSIBLE_EXTS = new Set(['.html', '.js', '.css', '.json', '.svg', '.map']);
 
-function serveFile(filePath, res, acceptEncoding = '') {
+function serveFile(filePath, res, acceptEncoding = '', rangeHeader = '') {
   if (!filePath || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     return false;
   }
@@ -79,6 +81,27 @@ function serveFile(filePath, res, acceptEncoding = '') {
     'cache-control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
   };
   const body = fs.readFileSync(filePath);
+  // Video needs byte ranges: Safari will not play an <video> source without
+  // a 206 answer to its "bytes=0-1" probe. Only a single range is supported.
+  if (ext === '.mp4' || ext === '.webm') {
+    headers['accept-ranges'] = 'bytes';
+    const range = /^bytes=(\d*)-(\d*)$/.exec(String(rangeHeader || '').trim());
+    if (range && (range[1] || range[2])) {
+      const size = body.length;
+      let start = range[1] ? Number(range[1]) : size - Number(range[2]);
+      let end = range[1] && range[2] ? Number(range[2]) : size - 1;
+      start = Math.max(0, start);
+      end = Math.min(end, size - 1);
+      if (start > end || start >= size) {
+        res.writeHead(416, { 'content-range': `bytes */${size}` });
+        res.end();
+        return true;
+      }
+      res.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': end - start + 1 });
+      res.end(body.subarray(start, end + 1));
+      return true;
+    }
+  }
   // Text assets compress well and dominate initial page weight (JS bundles,
   // the HTML shell); images/fonts are already compressed formats.
   if (COMPRESSIBLE_EXTS.has(ext) && /\bgzip\b/.test(acceptEncoding)) {
@@ -174,7 +197,7 @@ const server = http.createServer(async (req, res) => {
     res.end(gzip ? zlib.gzipSync(landingHtml) : landingHtml);
     return;
   }
-  if (serveFile(safeFilePath(requestedPath), res, acceptEncoding)) return;
+  if (serveFile(safeFilePath(requestedPath), res, acceptEncoding, req.headers.range)) return;
 
   // This server only ever serves the exported browser app — real /api/*
   // traffic is handled by api-server, a separate process/origin (see this
