@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Platform, RefreshControl, ScrollView, StyleSh
 
 import { useRouter, useFocusEffect } from 'expo-router';
 
+import { useIsFocused } from '@react-navigation/native';
 import { useAuth } from '@clerk/expo';
 
 import { haptics, haptic } from '@/lib/haptics';
@@ -116,6 +117,8 @@ import { SellerDashboardQuickActions } from '@/components/SellerDashboardQuickAc
 import { SellerDashboardPayoutCard } from '@/components/SellerDashboardPayoutCard';
 import { SellerDashboardActivityFeed } from '@/components/SellerDashboardActivityFeed';
 import { SellerDashboardSectionTitle } from '@/components/SellerDashboardSectionTitle';
+import { SellerLiveMap } from '@/components/SellerLiveMap';
+import { useSellerLiveMap } from '@/hooks/useSellerLiveMap';
 import {
   HOME_RANGE_COMPARISON,
   HOME_RANGE_EMPTY_MESSAGE,
@@ -333,6 +336,13 @@ export default function SellerHomeCommerceDashboard({
       toShipCount: snapshot.data.toFulfill,
     });
   }, [analyticsUserId, range, sellerPreview, snapshot]);
+
+  // Live map: realtime only while this screen is focused (socket closes on blur).
+  const screenFocused = useIsFocused();
+  const liveMap = useSellerLiveMap({
+    enabled: screenFocused && !!userId,
+    preview: sellerPreview ? (isPreviewDemoMode() ? 'demo' : 'fresh') : null,
+  });
 
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
   const [celebrationVisible, setCelebrationVisible] = useState(false);
@@ -996,6 +1006,9 @@ export default function SellerHomeCommerceDashboard({
                 </View>
               )}
 
+              <View style={styles.section}>
+                <SellerLiveMap data={liveMap.data} ping={liveMap.ping} theme={theme} />
+              </View>
               {/* ── Payouts: next payout, then balance / withdraw ───────── */}
               {showOwnerMoney && (
                 <View style={styles.section} testID="seller-dashboard-payouts">

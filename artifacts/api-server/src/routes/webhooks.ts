@@ -124,6 +124,7 @@ import { refreshManufacturerVerification } from "../lib/manufacturerTrust";
 import { emailManufacturerOrderPaid, inBackground } from "../lib/manufacturerNotifications";
 import { applyMysteryBoxPicks } from "../lib/mysteryBox";
 import { newOrderPushDelivery } from "../lib/saleAlerts";
+import { broadcastOrderCity } from "../lib/liveMap/broadcastOrderCity";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -1500,6 +1501,10 @@ export async function handleCheckoutPaid(
     }
 
     if (createdOrderId) {
+      // Seller dashboard Live map: ping the order's city on any open
+      // dashboard. City level only; never throws (see broadcastOrderCity).
+      broadcastOrderCity(ownerId, shippingAddress);
+
       const [createdOrder] = await db
         .select({
           id: orders.id,

@@ -50,6 +50,7 @@ import { attachCommunityWebSocket } from "./ws/communityHub";
 import { attachCallWebSocket } from "./ws/callHub";
 import { attachMessagesWebSocket } from "./ws/messagesHub";
 import { startOrderChangeListener, stopOrderChangeListener } from "./lib/orderChangeListener";
+import { attachSellerWebSocket } from "./ws/sellerHub";
 import { startCommunityPushJob } from "./lib/communityPush";
 import { startScheduledPostPublisherJob } from "./jobs/scheduledPostPublisher";
 import { startFreelancerAutoReleaseJob } from "./jobs/freelancerAutoRelease";
@@ -97,6 +98,8 @@ const server = app.listen(port, (err) => {
   attachMessagesWebSocket(server);
   // Order inserts / status changes (migration 280 trigger) → the hub above.
   startOrderChangeListener();
+  // Seller dashboard channel (/ws/seller): Live map order_city pings.
+  attachSellerWebSocket(server);
 
   // Ensure Stripe webhook endpoint includes all required event types
   // (especially customer.subscription.* for live seller subscription updates)

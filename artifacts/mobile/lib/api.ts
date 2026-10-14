@@ -13,6 +13,7 @@ import type { PriceHistory } from '@/lib/priceHistory';
 import type { MorningBrief } from '@/lib/morningBrief';
 import type { SellerMilestone } from '@/lib/milestones';
 import type { DropHype } from '@/lib/dropHype';
+import type { LiveMapToday } from '@/lib/liveMap/liveMap';
 import type {
   AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
   ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
@@ -3144,6 +3145,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         next: () => get<SellerMilestone | null>('/api/seller/milestones/next'),
         seen: (key: string) => post<void>(`/api/seller/milestones/${encodeURIComponent(key)}/seen`, {}),
       },
+      /** Dashboard Live map: today's paid orders by city (city level only), seller-local day. */
+      liveMapToday: () =>
+        get<LiveMapToday>(`/api/seller/live-map/today?tz=${-new Date().getTimezoneOffset()}`),
       launchChecklist: {
         get: () => get<LaunchChecklistResponse>('/api/seller/launch-checklist'),
         previewSeen: () => post<void>('/api/seller/launch-checklist/preview-seen', {}),
