@@ -358,6 +358,9 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // WebView filling the screen below its own close+device-toggle bar); the
   // persistent tab bar has no business floating on top of that.
   'store-preview',
+  // "Your store is live" — one-time full-screen moment after the first
+  // product is published; its own Share / Done buttons sit at the bottom.
+  'store-live',
   // Multi-step quote wizard with its own step header/footer.
   'quote-request',
   // Seller livestream — real full-screen camera/broadcast controls.
@@ -1804,6 +1807,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="my-store"           options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="store-product"      options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="store-profile"      options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="store-live"         options={{ headerShown: false, animation: 'fade', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="launch-checklist"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="launch-publish"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="store-preview-as-buyer" options={{ headerShown: false, animation: 'fade', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />

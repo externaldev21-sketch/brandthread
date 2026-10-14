@@ -83,6 +83,8 @@ import { VariantTable } from '@/components/products/VariantTable';
 import { confirmPublishWithoutPayouts } from '@/lib/payoutReadinessPrompt';
 
 import { getEntitlementRejection } from '@/lib/entitlementError';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isFirstStoreLive, storeLiveSeenKey, type OwnProductRow } from '@/lib/storeLive';
 
 import { Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES, SIZE_PRESETS, COLOR_PRESETS, SalesModel, OptionType, ProductOption, OptionValue, ProductVariant, ProductMedia, ProductCollection } from '@/services/productTypes';
 
@@ -753,10 +755,26 @@ export default function AddProductScreen() {
       await completeSetupTaskWhen('first_product', true);
       setDraftData(prev => ({ ...prev, storeSettings: { ...(prev.storeSettings as any), status: 'active' } }));
       haptics.success();
+      if (await openStoreLiveIfFirst(created.productId)) return;
     } catch {
       showPublishError('Could not publish', 'Your draft is saved. Try again.');
     } finally {
       setPublishingNow(false);
+    }
+  }
+
+  async function openStoreLiveIfFirst(productId: string): Promise<boolean> {
+    if (!authUserId || localOnlyPreview || isPreviewSellerProductId(productId)) return false;
+    try {
+      const key = storeLiveSeenKey(authUserId);
+      if ((await AsyncStorage.getItem(key)) === '1') return false;
+      const rows = (await api.products.list()) as OwnProductRow[];
+      if (!isFirstStoreLive(rows ?? [], productId, false)) return false;
+      await AsyncStorage.setItem(key, '1');
+      router.replace({ pathname: '/store-live', params: { productId } } as never);
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -987,11 +1005,15 @@ export default function AddProductScreen() {
     try {
       const name = draftData.name ?? 'Product';
       if (isEditMode && editProductId) {
+        const wasActive = finalStatus === 'active' && !localOnlyPreview && !isPreviewSellerProductId(editProductId)
+          ? await api.products.get(editProductId).then((p: any) => p?.status === 'active').catch(() => true)
+          : true;
         // A seeded demo product (?demo=1) has no server row to update.
         if (!localOnlyPreview && !isPreviewSellerProductId(editProductId)) await api.products.update(editProductId, serverUpdatePayload);
         // Product detail and the Products tab read the local product store.
         await updateProduct(editProductId, productPayload);
         await deleteDraft(draftId.current);
+        if (!wasActive && await openStoreLiveIfFirst(editProductId)) return;
         setPublishSuccess({ name, kind: 'updated', productId: editProductId });
       } else if (localOnlyPreview) {
         const saved = await createProduct(productPayload);
@@ -1012,6 +1034,7 @@ export default function AddProductScreen() {
           { id: String(newProduct.id) },
         ).catch(() => undefined);
         await deleteDraft(draftId.current);
+        if (finalStatus === 'active' && newProduct?.id && await openStoreLiveIfFirst(newProduct.id)) return;
         setPublishSuccess({ name, kind: 'created', productId: newProduct.id, soldOut: publishesSoldOut({ status: 'active', ...soldOut }) });
       }
     } catch (err: any) {
