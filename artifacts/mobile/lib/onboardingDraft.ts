@@ -58,11 +58,10 @@ export interface OnboardingDraft {
 
 const SECRET_KEYS = ['password', 'confirmPassword', 'code', 'verificationCode'];
 
-/** What actually goes to storage: no secrets, and no birthday once the account exists. */
+/** No credentials. The birthday survives Clerk's redirect only until /auth/age succeeds. */
 export function sanitizeDraftForStorage(draft: OnboardingDraft): OnboardingDraft {
   const clean: Record<string, unknown> = { ...draft, version: DRAFT_VERSION };
   for (const key of SECRET_KEYS) delete clean[key];
-  if (draft.accountCreated) clean.dob = null;
   return clean as unknown as OnboardingDraft;
 }
 

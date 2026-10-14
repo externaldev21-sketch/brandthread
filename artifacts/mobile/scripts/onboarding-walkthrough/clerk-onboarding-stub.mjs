@@ -195,7 +195,7 @@ export function clerkOnboardingStubScript() {
     async create(params) {
       const emailAddress = (params?.emailAddress || '').trim().toLowerCase();
       if (usedEmails.has(emailAddress)) {
-        return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.', { paramName: 'email_address' }) };
+        return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.', 'email_address') };
       }
       signUpState = { ...freshSignUpState(), id: genId('su'), emailAddress };
       notifySignUp();

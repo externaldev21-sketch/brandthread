@@ -76,11 +76,12 @@ export function checkDobInput(text: string, opts: { seller?: boolean } = {}, now
   return { ok: true, dob, band };
 }
 
-/** Sends the birthday entered at sign-up once the account exists; the server keeps only the band. Best effort. */
+/** Send after /auth/sync. Retain failed submissions so onboarding can retry. */
 export async function submitPendingAge(api: { ageGate: { submit: (dob: string) => Promise<unknown> } }): Promise<void> {
-  const dob = takePendingDob();
+  const dob = peekPendingDob();
   if (!dob) return;
-  try { await api.ageGate.submit(dob); } catch { /* the inline ask at the first sell action covers a miss */ }
+  await api.ageGate.submit(dob);
+  if (pendingDob === dob) pendingDob = null;
 }
 
 // ── seller restriction status ─────────────────────────────────────────────────

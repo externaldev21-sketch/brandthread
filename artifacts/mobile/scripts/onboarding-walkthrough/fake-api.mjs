@@ -86,6 +86,20 @@ export function createFakeOnboardingApi({ demo = false } = {}) {
       const user = ensureUser(body?.name, clerkId);
       return { status: 200, body: user };
     }
+    if (p === '/auth/age' && method === 'POST') {
+      if (!dbUser) return { status: 404, body: { error: 'Call /auth/sync first' } };
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(body?.dateOfBirth ?? '')) {
+        return { status: 400, body: { error: 'Enter a valid date of birth.' } };
+      }
+      const birth = new Date(`${body.dateOfBirth}T00:00:00Z`);
+      const now = new Date();
+      let age = now.getUTCFullYear() - birth.getUTCFullYear();
+      if (now.getUTCMonth() < birth.getUTCMonth()
+        || (now.getUTCMonth() === birth.getUTCMonth() && now.getUTCDate() < birth.getUTCDate())) age--;
+      if (age < 13) return { status: 403, body: { error: 'You must be at least 13.' } };
+      dbUser.ageBand = age < 18 ? '13_17' : '18_plus';
+      return { status: 200, body: { ageBand: dbUser.ageBand } };
+    }
     if (p === '/auth/me' && get) {
       if (!dbUser) return { status: 404, body: { error: { code: 'NOT_FOUND', message: 'No account yet' } } };
       return { status: 200, body: dbUser };

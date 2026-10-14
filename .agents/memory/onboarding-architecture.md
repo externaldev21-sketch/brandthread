@@ -21,6 +21,12 @@ Onboarding completion is a final server-authoritative transition shared by buyer
 
 **How to apply:** Keep generic identity sync idempotent but incomplete. Commit completion through the dedicated final operation, restore completed roles from the server on new devices, and use same-user local completion only to upgrade older installs.
 
+An account becoming authenticated is not acknowledgement of its age submission. Retain a pending birthday through authentication returns only until the backend accepts the age band, then erase it from the draft.
+
+**Why:** Clerk authentication may reload the page, and the age endpoint requires an existing application profile. Erasing at account creation or silently treating a failed request as success loses the answer.
+
+**How to apply:** Sync the profile before submitting age, keep failed submissions retryable, and never retain an acknowledged birthday or add it to the server's stored profile.
+
 Onboarding welcome footage needs separate native and browser-compatible delivery. Keep a poster until an actual decoded frame appears, and let the poster stand when playback is unavailable.
 
 **Why:** Expo's web preview returned 200 and `video/mp4` for an H.264 clip but its browser reported no supported streams; the native fallback host did not serve that clip. A web-compatible encoding played, while native needed the clip available as an app asset.

@@ -58,6 +58,7 @@ function makeReport(role, viewportId) {
         const message = String(error?.message ?? error).split('\n')[0];
         console.log(`  ✗ ${label} — ${message}`);
         rows.push({ name, ok: false, message });
+        error.walkthroughRows = rows;
         throw error;
       }
     },
@@ -268,6 +269,11 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir, demo }) 
       if (user.onboardingComplete !== true) throw new Error('Expected onboardingComplete to be true after finishing onboarding.');
       if (user.username !== id.username.toLowerCase()) throw new Error(`Expected username ${id.username}, got ${JSON.stringify(user.username)}`);
       if (!api.getCalls().some((c) => c.pathname.endsWith('/auth/age'))) throw new Error('Expected the birthday to be sent to /api/auth/age.');
+      if (user.ageBand !== '18_plus') throw new Error('Expected the backend to acknowledge the adult age band.');
+      const storedDraft = await page.evaluate(() => Object.entries(localStorage)
+        .filter(([key]) => key.includes('onboarding_draft:') || key.includes('onboarding_pending_draft'))
+        .map(([, value]) => JSON.parse(value)));
+      if (storedDraft.some((draft) => draft.dob)) throw new Error('Birthday must be removed from drafts after successful submission.');
     });
 
     // Dev P0: "Create an account" while a session is still on the device, then
@@ -412,6 +418,7 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir, demo })
       const user = api.getUser();
       if (!user) throw new Error('No /api/auth/sync call was ever recorded — no account was created.');
       if (user.accountType !== 'seller') throw new Error(`Expected accountType "seller", got ${JSON.stringify(user.accountType)}`);
+      if (user.ageBand !== '18_plus') throw new Error('Expected the seller birthday to be acknowledged by the backend.');
       if (user.onboardingComplete !== true) throw new Error('Expected onboardingComplete to be true after finishing onboarding.');
       if (user.brandName !== id.brandName) throw new Error(`Expected brandName to have been saved, got ${JSON.stringify(user.brandName)}`);
       if (!user.goals || !user.goals.includes('Find manufacturers')) throw new Error('Expected the chosen goals to have been saved via /api/seller/onboarding/data.');
@@ -449,7 +456,8 @@ async function main() {
       try {
         const rows = await runBuyerWalkthrough(browser, { viewport, origin: server.origin, outDir: buyerDir, demo: options.demo });
         allRows.push(...rows.map((r) => ({ ...r, viewport: viewport.id, role: 'buyer' })));
-      } catch {
+      } catch (error) {
+        allRows.push(...(error.walkthroughRows ?? []).map((r) => ({ ...r, viewport: viewport.id, role: 'buyer' })));
         hadFailure = true;
       }
 
@@ -458,7 +466,8 @@ async function main() {
       try {
         const rows = await runSellerWalkthrough(browser, { viewport, origin: server.origin, outDir: sellerDir, demo: options.demo });
         allRows.push(...rows.map((r) => ({ ...r, viewport: viewport.id, role: 'seller' })));
-      } catch {
+      } catch (error) {
+        allRows.push(...(error.walkthroughRows ?? []).map((r) => ({ ...r, viewport: viewport.id, role: 'seller' })));
         hadFailure = true;
       }
     }

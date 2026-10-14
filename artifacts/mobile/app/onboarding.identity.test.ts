@@ -22,6 +22,21 @@ describe("seller onboarding identity handoff", () => {
 });
 
 describe("signup identity inputs", () => {
+  it("mounts the web CAPTCHA target required by Clerk custom signup", () => {
+    expect(source).toContain('nativeID="clerk-captcha"');
+  });
+
+  it("submits DOB only after syncing the profile and clears it after acknowledgement", () => {
+    const basics = source.slice(source.indexOf("async function saveProfileBasics()"));
+    const sync = basics.indexOf("await api.auth.sync({ name })");
+    const age = basics.indexOf("await submitPendingAge(api)");
+    const erase = basics.indexOf("await persistDraft({ dob: null })");
+    expect(sync).toBeGreaterThan(-1);
+    expect(age).toBeGreaterThan(sync);
+    expect(erase).toBeGreaterThan(age);
+    expect(basics.indexOf("setDob(null)")).toBeGreaterThan(erase);
+  });
+
   it("username is its own controlled step; the invite code is a controlled field behind 'Have a code?'", () => {
     expect(profileSteps).toContain('testID="onboarding-username-input"');
     expect(profileSteps).toContain("value={username}");

@@ -14,9 +14,10 @@ describe('sanitizeDraftForStorage', () => {
     expect(json).not.toContain('hunter22');
     expect(json).not.toContain('123456');
   });
-  it('keeps the birthday only until the account exists', () => {
+  it('keeps the birthday through account activation until the age request succeeds', () => {
     expect(sanitizeDraftForStorage({ ...base, dob: '1995-01-01' }).dob).toBe('1995-01-01');
-    expect(sanitizeDraftForStorage({ ...base, dob: '1995-01-01', accountCreated: true }).dob).toBeNull();
+    expect(sanitizeDraftForStorage({ ...base, dob: '1995-01-01', accountCreated: true }).dob).toBe('1995-01-01');
+    expect(sanitizeDraftForStorage({ ...base, dob: null, accountCreated: true }).dob).toBeNull();
   });
 });
 

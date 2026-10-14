@@ -538,12 +538,8 @@ export default function OnboardingScreen() {
     }
   }, [accountReady, flow, goTo, ready, stepId]);
 
-  // The birthday is sent once the account exists; the server keeps only the band.
-  useEffect(() => {
-    if (!accountReady || !dob || isDevWebPreviewUser) return;
-    setPendingDob(dob);
-    void submitPendingAge(api).then(() => setDob(null));
-  }, [accountReady, api, dob, isDevWebPreviewUser]);
+  // Submit the birthday in saveProfileBasics, AFTER /auth/sync creates the
+  // profile. A request here could race sync, receive 404, and lose the answer.
 
   // Suggest a username the first time the step opens (Instagram pre-fills one).
   useEffect(() => {
@@ -623,7 +619,8 @@ export default function OnboardingScreen() {
         } else setStepError(mapClerkError(error));
         return;
       }
-      await signUp.verifications.sendEmailCode();
+      const { error: verificationError } = await signUp.verifications.sendEmailCode();
+      if (verificationError) { setStepError(mapClerkError(verificationError)); return; }
       track('signup_started', { method: 'email' });
       setCode('');
       goTo('CODE', 1);
@@ -639,7 +636,8 @@ export default function OnboardingScreen() {
     setResending(true);
     setStepError(null);
     try {
-      await signUp.verifications.sendEmailCode();
+      const { error } = await signUp.verifications.sendEmailCode();
+      if (error) setStepError(mapClerkError(error));
     } catch (e) {
       setStepError(mapClerkError(e));
     } finally {
@@ -765,7 +763,14 @@ export default function OnboardingScreen() {
     const uname = username.trim().toLowerCase();
     try {
       const profile = await api.auth.sync({ name });
-      await submitPendingAge(api);
+      if (dob) {
+        setPendingDob(dob);
+        await submitPendingAge(api);
+        // Clerk can reload the whole page on finalize/OAuth. Retain the draft
+        // birthday until the server acknowledges it, then erase it promptly.
+        await persistDraft({ dob: null });
+        setDob(null);
+      }
       if (flow === 'seller') {
         await api.auth.onboarding({ brandName: brandName.trim(), ...(brandStage ? { brandStage } : {}), username: uname });
         await api.auth.updateProfile({ name, displayName: name, accountType: 'seller', expectedClerkId: profile.clerkId });
@@ -1299,6 +1304,7 @@ export default function OnboardingScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <StatusBar barStyle="light-content" />
+      {Platform.OS === 'web' ? <View nativeID="clerk-captcha" /> : null}
 
       {!fullBleed && (
         <View style={[styles.header, { paddingTop: headerTopInset }]}>

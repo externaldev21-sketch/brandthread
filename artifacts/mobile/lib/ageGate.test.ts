@@ -58,6 +58,9 @@ describe('mobile age helpers', () => {
     await submitPendingAge({ ageGate: { submit } });
     expect(submit).toHaveBeenCalledTimes(1);
     setPendingDob('2000-01-01');
-    await expect(submitPendingAge({ ageGate: { submit: async () => { throw new Error('x'); } } })).resolves.toBeUndefined();
+    await expect(submitPendingAge({ ageGate: { submit: async () => { throw new Error('x'); } } })).rejects.toThrow('x');
+    expect(peekPendingDob()).toBe('2000-01-01');
+    await submitPendingAge({ ageGate: { submit } });
+    expect(peekPendingDob()).toBeNull();
   });
 });
