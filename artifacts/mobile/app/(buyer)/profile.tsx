@@ -68,6 +68,8 @@ import { useProfileNote } from '@/components/profile/useProfileNote';
 import { useProfileBanner } from '@/components/profile/ProfileBannerEditor';
 import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
 import { ProfileStoriesRow, type ProfileStoryItem } from '@/components/profile/ProfileStoriesRow';
+import { ProfileBrandsRow } from '@/components/profile/ProfileBrandsRow';
+import { useProfileBrands } from '@/hooks/useProfileBrands';
 import { loadHighlights, type Highlight } from '@/lib/highlightsService';
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
@@ -334,6 +336,7 @@ export default function ProfileScreen() {
   const { height: windowHeight } = useWindowDimensions();
   const bannerH = bannerHeight(windowHeight);
   useEffect(() => { setHeroHeight(bannerH); }, [bannerH]);
+  const profileBrands = useProfileBrands(user?.id);
 
   // Sheets
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
@@ -996,6 +999,11 @@ export default function ProfileScreen() {
 
       {/* Monthly Wrapped: the one card, days 1–7 only, dismissible for good. */}
       <WrappedProfileCard userId={user?.id} />
+      {profileBrands.length > 0 ? (
+        <View style={styles.brandsWrap}>
+          <ProfileBrandsRow items={profileBrands} />
+        </View>
+      ) : null}
 
       {threadCashEnabled ? (
         <View style={styles.streakWrap}>
@@ -1144,6 +1152,7 @@ function makeStyles(theme: AppThemePreset) {
 
     // Bio → highlights: 16pt.
     highlightsWrap: { paddingTop: 16 },
+    brandsWrap: { paddingTop: 12 },
     // Highlights → streak card (or tabs, when Thread Cash is off): 16pt.
     streakWrap: { marginTop: 16 },
     // Streak card (or highlights) → tabs: 16pt above; tabs → grid: 1pt

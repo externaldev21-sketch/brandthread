@@ -41,6 +41,7 @@ import {
   findAttachableMedia, isHeldUpload, mediaForComments, parseCommentMediaInput, toMediaView, type CommentMediaView,
 } from "../lib/commentMedia";
 import { recordHeldMedia } from "../lib/mediaModerationStore";
+import { dayOneAmong } from "../lib/dayOne";
 import {
   authorInGoodStanding,
   blockRelation,
@@ -93,6 +94,8 @@ export interface CommentView {
   mentions: CommentMention[];
   /** Photo reply attached to this comment, if any. */
   media: CommentMediaView | null;
+  /** The author is one of the post owner's first 100 buyers ("Day 1", lib/dayOne.ts). */
+  dayOne: boolean;
   replies: CommentView[];
   /** Roots only: true when more replies exist beyond the inline page. */
   hasMoreReplies?: boolean;
@@ -275,6 +278,7 @@ router.get("/:postId/comments", async (req, res) => {
       mentionsForComments(ids),
       mediaForComments(ids),
     ]);
+    const dayOne = await dayOneAmong(post.userId, shown.map((c) => c.authorId));
     const creatorLiked = new Set(creatorLikeRows.map((row) => row.commentId));
     const likes = new Map(likeRows.map((row) => [row.commentId, Number(row.n)]));
     const mine = new Set(myLikeRows.map((row) => row.commentId));
@@ -298,6 +302,7 @@ router.get("/:postId/comments", async (req, res) => {
       creatorLiked: creatorLiked.has(comment.id),
       mentions: (mentionsByComment.get(comment.id) ?? []).filter((m) => !blocked.has(m.userId)),
       media: mediaByComment.get(comment.id) ?? null,
+      dayOne: dayOne.has(comment.authorId),
       replies: [],
     });
 
@@ -400,6 +405,7 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
       .from(postCommentLikes)
       .where(and(inArray(postCommentLikes.commentId, ids), eq(postCommentLikes.userId, post.userId))) : [];
     const creatorLikedIds = new Set(creatorLikedRows.map((row) => row.commentId));
+    const dayOne = await dayOneAmong(post.userId, shown.map((c) => c.authorId));
 
     const replies: CommentView[] = shown.map((comment) => ({
       id: comment.id,
@@ -420,6 +426,7 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
       creatorLiked: creatorLikedIds.has(comment.id),
       mentions: (mentionsByComment.get(comment.id) ?? []).filter((m) => !blocked.has(m.userId)),
       media: mediaByComment.get(comment.id) ?? null,
+      dayOne: dayOne.has(comment.authorId),
       replies: [],
     }));
     return res.json({
@@ -580,7 +587,7 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), validateBody
       void recordPostSignal(authorId, postId, "comment");
     }
 
-    const profiles = await profilesById([authorId]);
+    const [profiles, dayOne] = await Promise.all([profilesById([authorId]), dayOneAmong(post.userId, [authorId])]);
     const view: CommentView = {
       id: created.id,
       postId,
@@ -597,6 +604,7 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), validateBody
       creatorLiked: false,
       mentions,
       media: media ? toMediaView(media) : null,
+      dayOne: dayOne.has(authorId),
       replies: [],
     };
     return res.status(201).json({

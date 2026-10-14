@@ -4353,6 +4353,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<Array<{ id: string; kind: string; entryId: string | null; actor: string | null; detail: Record<string, unknown>; createdAt: string }>>(
           `/api/product-draws/${encodeURIComponent(productId)}/audit`),
     },
+    /** "Day 1" badges: the brands a person was one of the first 100 buyers of (public). */
+    dayOne: {
+      brands: (userId: string) =>
+        get<{ brands: Array<{ sellerId: string; name: string; handle: string; initials: string; avatarUrl: string | null; rank: number; since: string }> }>(
+          `/api/day-one/${encodeURIComponent(userId)}`),
+    },
     productLaunches: {
       /** Public: is this product waiting on a launch time? */
       state:       (productId: string) =>

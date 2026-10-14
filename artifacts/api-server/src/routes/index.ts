@@ -146,6 +146,7 @@ import returnLabelsRouter from "./return-labels";
 import sellerVerificationRouter from "./seller-verification";
 import productLaunchesRouter from "./product-launches";
 import productDrawsRouter from "./product-draws";
+import dayOneRouter from "./day-one";
 import preorderTermsRouter from "./preorder-terms";
 import waitlistRouter from "./waitlist";
 import bundlesRouter from "./bundles";
@@ -398,6 +399,7 @@ router.use("/ai",              tc, aiSafetyGuard("ai-chat", { mode: "chat" }), a
 router.use("/product-launches",          tc, productLaunchesRouter);
 // Buyer entry routes must see the buyer, so no tc here; seller routes apply teamContext() themselves.
 router.use("/product-draws",             productDrawsRouter);
+router.use("/day-one",                   dayOneRouter);
 router.use("/preorder-terms",            tc, preorderTermsRouter);
 router.use("/waitlist",                  tc, waitlistRouter);
 router.use("/bundles",                   tc, bundlesRouter);
