@@ -298,6 +298,20 @@ export default function ProductImportScreen() {
           )}
         </GradientCard>
 
+        {/* ── One tap: Shopify store link / Instagram → drafts (app/quick-import.tsx) ── */}
+        <GradientCard
+          style={s.methodCard}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/quick-import' as never); }}
+        >
+          <View style={s.methodRow} testID="product-import-quick">
+            <View style={s.methodInfo}>
+              <Text style={s.methodTitle}>Paste your Shopify link</Text>
+              <Text style={s.methodDesc}>Products come in as drafts to review</Text>
+            </View>
+            <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+          </View>
+        </GradientCard>
+
         {/* ── METHOD B: Shopify transfer (routes to the working transfer flow in Store Builder) ── */}
         <GradientCard
           style={s.methodCard}

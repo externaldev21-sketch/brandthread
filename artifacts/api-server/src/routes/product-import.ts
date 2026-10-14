@@ -7,7 +7,7 @@
 import express, { Router } from "express";
 import crypto from "node:crypto";
 import { desc, eq } from "drizzle-orm";
-import { db, etsyConnections, etsyOauthStates, productImportRuns, shopifyConnections } from "@workspace/db";
+import { db, etsyConnections, etsyOauthStates, metaAdAccounts, productImportRuns, shopifyConnections } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole } from "../middlewares/requireRole";
 import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
@@ -26,6 +26,11 @@ import {
 import { EtsyApiError, fetchAllActiveListings, getEtsyApi } from "../lib/etsy/client";
 import { mapEtsyListings } from "../lib/etsy/mapper";
 import { logger } from "../lib/logger";
+import { mapInstagramMedia, mapShopifyCatalog } from "../lib/productImport/oneTap";
+import { ShopifyImportError, discoverShopifyCatalog, normalizeShopifyUrl } from "../lib/shopifyImport";
+import { decryptToken } from "../lib/metaCrypto";
+import { MetaGraphError, listInstagramMedia } from "../lib/metaGraph";
+import { isFeatureEnabled } from "../lib/threadCash/wallet";
 
 const router = Router();
 /** Unauthenticated: Etsy redirects the seller's browser here. Identity comes from the stored state row. */
@@ -184,6 +189,8 @@ router.get("/providers", async (req, res) => {
     etsy: etsyEnabled
       ? { enabled: true, connected: Boolean(etsy && etsy.status === "connected"), shopName: etsy?.shopName ?? null }
       : { enabled: false, connected: false, reason: ETSY_DISABLED_REASON },
+    // Off unless the flag is on AND the seller already connected Instagram through Meta.
+    instagram: await instagramProvider(ownerId),
   });
 });
 
@@ -328,6 +335,109 @@ router.post("/etsy/commit", requireRole("manager"), async (req, res) => {
   const loaded = await loadEtsyProducts(ownerOf(req));
   if (isFail(loaded)) { res.status(loaded.status).json({ error: loaded.error, message: loaded.message }); return; }
   await runCommit(req, res, "etsy_api", loaded.mapped, "Etsy shop");
+});
+
+// ─── Shopify store link (public products.json, no app keys) ─────────────────
+
+/** Every product in a one-tap preview, so the seller can untick what they don't want. */
+function itemsOf(mapped: MapResult) {
+  return mapped.products.map((p) => ({
+    key: p.externalKey, name: p.name, image: p.images[0] ?? null, variantCount: p.variants.length,
+    priceFromCents: Math.min(...p.variants.map((v) => v.priceCents)),
+  }));
+}
+
+/** Narrows a commit to the keys the seller kept ticked (all when none are sent). */
+function onlySelected(req: express.Request, mapped: MapResult): MapResult {
+  const keys = (req.body as { keys?: unknown } | undefined)?.keys;
+  if (!Array.isArray(keys)) return mapped;
+  const wanted = new Set(keys.filter((k): k is string => typeof k === "string").slice(0, 2000));
+  return { ...mapped, products: mapped.products.filter((p) => wanted.has(p.externalKey)) };
+}
+
+async function loadShopifyUrl(req: express.Request): Promise<{ mapped: MapResult; storeName: string; more: boolean } | Fail> {
+  let url: string;
+  try {
+    url = normalizeShopifyUrl((req.body as { url?: unknown } | undefined)?.url);
+  } catch (err) {
+    return { status: 400, error: "INVALID_URL", message: err instanceof ShopifyImportError ? err.message : "Enter your store link, like yourbrand.com." };
+  }
+  try {
+    const catalog = await discoverShopifyCatalog(url);
+    const mapped = mapShopifyCatalog(url, catalog.products);
+    return { mapped: { ...mapped, ignoredColumns: [] }, storeName: catalog.storeName, more: Boolean(catalog.nextCursor) };
+  } catch (err) {
+    if (err instanceof ShopifyImportError) return { status: 422, error: err.code, message: err.message };
+    logger.error({ err }, "Shopify store link import failed");
+    return { status: 502, error: "SHOPIFY_UNREACHABLE", message: "We couldn't reach that store. Check the link and try again." };
+  }
+}
+
+router.post("/shopify-url/preview", requireRole("manager"), async (req, res) => {
+  const loaded = await loadShopifyUrl(req);
+  if (isFail(loaded)) { res.status(loaded.status).json({ error: loaded.error, message: loaded.message }); return; }
+  const access = await planAccess(req, res);
+  if (!access) return;
+  const preview = await buildPreview(ownerOf(req), "shopify_url", loaded.mapped, access.limits.products);
+  if (loaded.more) preview.notes.unshift("Your store has more products than one import takes; the newest are included. Run it again later for the rest.");
+  res.json({ layout: "shopify", layoutLabel: loaded.storeName || "Shopify store", source: "shopify_url", rowCount: loaded.mapped.products.length, ...preview, items: itemsOf(loaded.mapped) });
+});
+
+router.post("/shopify-url/commit", requireRole("manager"), async (req, res) => {
+  const loaded = await loadShopifyUrl(req);
+  if (isFail(loaded)) { res.status(loaded.status).json({ error: loaded.error, message: loaded.message }); return; }
+  await runCommit(req, res, "shopify_url", onlySelected(req, loaded.mapped), loaded.storeName || "Shopify store");
+});
+
+// ─── Instagram posts (existing Meta connection, behind instagramProductImport) ─
+
+const INSTAGRAM_FLAG = "instagramProductImport";
+
+async function instagramConnection(ownerId: string) {
+  const [row] = await db.select({
+    token: metaAdAccounts.accessTokenEncrypted, igId: metaAdAccounts.instagramActorId,
+    username: metaAdAccounts.instagramUsername, status: metaAdAccounts.status,
+  }).from(metaAdAccounts).where(eq(metaAdAccounts.sellerId, ownerId)).limit(1);
+  return row && row.status === "connected" && row.igId ? row : null;
+}
+
+async function instagramProvider(ownerId: string) {
+  try {
+    if (!await isFeatureEnabled(INSTAGRAM_FLAG, false)) return { enabled: false, connected: false, username: null };
+    const conn = await instagramConnection(ownerId);
+    return { enabled: Boolean(conn), connected: Boolean(conn), username: conn?.username ?? null };
+  } catch {
+    return { enabled: false, connected: false, username: null };
+  }
+}
+
+async function loadInstagram(ownerId: string): Promise<{ mapped: MapResult } | Fail> {
+  if (!await isFeatureEnabled(INSTAGRAM_FLAG, false)) return { status: 404, error: "INSTAGRAM_IMPORT_OFF", message: "Instagram import isn't available yet." };
+  const conn = await instagramConnection(ownerId);
+  if (!conn) return { status: 409, error: "INSTAGRAM_NOT_CONNECTED", message: "Connect Instagram first." };
+  try {
+    const media = await listInstagramMedia(decryptToken(conn.token), conn.igId!, 50);
+    return { mapped: { ...mapInstagramMedia(media), ignoredColumns: [] } };
+  } catch (err) {
+    if (err instanceof MetaGraphError) return { status: 502, error: "INSTAGRAM_ERROR", message: err.userMessage ?? "Instagram didn't answer. Try again." };
+    logger.error({ err }, "Instagram import failed");
+    return { status: 502, error: "INSTAGRAM_ERROR", message: "Instagram didn't answer. Try again." };
+  }
+}
+
+router.post("/instagram/preview", requireRole("manager"), async (req, res) => {
+  const loaded = await loadInstagram(ownerOf(req));
+  if (isFail(loaded)) { res.status(loaded.status).json({ error: loaded.error, message: loaded.message }); return; }
+  const access = await planAccess(req, res);
+  if (!access) return;
+  const preview = await buildPreview(ownerOf(req), "instagram_api", loaded.mapped, access.limits.products);
+  res.json({ layout: "generic", layoutLabel: "Instagram posts", source: "instagram_api", rowCount: loaded.mapped.products.length, ...preview, items: itemsOf(loaded.mapped) });
+});
+
+router.post("/instagram/commit", requireRole("manager"), async (req, res) => {
+  const loaded = await loadInstagram(ownerOf(req));
+  if (isFail(loaded)) { res.status(loaded.status).json({ error: loaded.error, message: loaded.message }); return; }
+  await runCommit(req, res, "instagram_api", onlySelected(req, loaded.mapped), "Instagram posts");
 });
 
 // ─── Etsy OAuth callback (unauthenticated) ──────────────────────────────────

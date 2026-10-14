@@ -1074,6 +1074,7 @@ export default function SellerHomeCommerceDashboard({
                       hasSetupChecklist={Boolean(addProductTask)}
                       onAddProduct={() => nav(withOrigin('/add-product', 'dashboard'))}
                       onOpenSetup={() => (addProductTask ? openTask(addProductTask) : nav(withOrigin('/add-product', 'dashboard')))}
+                      onImport={() => nav('/quick-import')}
                     />
                   </View>
                 ) : null}

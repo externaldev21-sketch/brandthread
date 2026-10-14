@@ -10,6 +10,17 @@ export type ImportProviders = {
   csv: boolean;
   shopify: { publicUrl: boolean; oauth: boolean; connected: boolean; shopDomain: string | null };
   etsy: { enabled: boolean; connected: boolean; shopName?: string | null; reason?: string };
+  /** Off unless the server flag is on and the seller already connected Instagram (Meta). */
+  instagram?: { enabled: boolean; connected: boolean; username: string | null };
+};
+
+/** One product offered by a one-tap import (Shopify store link / Instagram). */
+export type QuickImportItem = {
+  key: string;
+  name: string;
+  image: string | null;
+  variantCount: number;
+  priceFromCents: number;
 };
 
 export type ImportPreview = {

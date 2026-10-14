@@ -52,7 +52,7 @@ import { classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsEr
 import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { WeeklyQuestsClaimResult, WeeklyQuestsStatus } from '@/lib/weeklyQuests';
-import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
+import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun, QuickImportItem } from '@/lib/productImportTypes';
 import type { QuizProduct, QuizSwipe } from '@/lib/tasteQuiz';
 import type { GiftCard, GiftCardHistoryEntry, GiftCardSettings, GiftCardStoreInfo } from '@/lib/giftCards';
 import type { MentionPerson, Story, StoryMentionItem, StoryStickerState } from '@/services/socialTypes';
@@ -4549,6 +4549,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       etsyPreview: () => request<ImportPreview>('/api/product-import/etsy/preview', { method: 'POST', body: '{}' },
         getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
       etsyCommit: () => request<ImportCommitResult>('/api/product-import/etsy/commit', { method: 'POST', body: '{}' },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+      /** One-tap: a Shopify store link (public catalog, no app) or the connected Instagram. Commit creates drafts. */
+      quickPreview: (source: 'shopify-url' | 'instagram', url?: string) => request<ImportPreview & { items: QuickImportItem[] }>(
+        `/api/product-import/${source}/preview`, { method: 'POST', body: JSON.stringify(url ? { url } : {}) },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+      quickCommit: (source: 'shopify-url' | 'instagram', keys: string[], url?: string) => request<ImportCommitResult>(
+        `/api/product-import/${source}/commit`, { method: 'POST', body: JSON.stringify({ keys, ...(url ? { url } : {}) }) },
         getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
     },
     /** Disputes / chargebacks — Stripe dispute data and evidence submission */

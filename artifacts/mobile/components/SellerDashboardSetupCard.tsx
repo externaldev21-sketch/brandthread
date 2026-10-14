@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
 
@@ -24,11 +24,14 @@ export function SellerDashboardSetupCard({
   onAddProduct,
   onOpenSetup,
   hasSetupChecklist,
+  onImport,
 }: {
   theme: AppThemePreset;
   onAddProduct: () => void;
   onOpenSetup: () => void;
   hasSetupChecklist: boolean;
+  /** One-tap import from a Shopify store link (app/quick-import.tsx). */
+  onImport?: () => void;
 }) {
   const router = useRouter();
   // Products are live but nothing has sold yet: the next step is sharing the
@@ -71,7 +74,14 @@ export function SellerDashboardSetupCard({
       </Text>
       </View>
       </PressableScale>
-      <PrimaryButton label="Add a product" icon="plus" small onPress={onAddProduct} style={styles.button} testID="seller-dashboard-setup-add-product" />
+      <View style={styles.actions}>
+        <PrimaryButton label="Add a product" icon="plus" small onPress={onAddProduct} style={styles.button} testID="seller-dashboard-setup-add-product" />
+        {onImport ? (
+          <Pressable onPress={onImport} hitSlop={8} accessibilityRole="button" testID="seller-dashboard-setup-import">
+            <Text style={[styles.link, { color: theme.text }]}>Import from Shopify</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -85,6 +95,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: SP.xs,
   },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
+  link: { fontFamily: FONT.semibold, fontSize: FS.sm, textDecorationLine: 'underline' },
   cardContent: {
     gap: SP.xs,
   },
