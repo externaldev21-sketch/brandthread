@@ -91,6 +91,8 @@ import { radius } from '@/constants/radii';
 import { subscribeThreadCashChanged } from '@/lib/threadCashEvents';
 import { useScreenInteractive } from '@/lib/perf';
 import { updateBuyerCashWidget } from '@/lib/nativeSystem';
+import { getClosetOutfits, getClosetPieces, type ClosetOutfit, type ClosetPiece } from '@/services/closetService';
+import { ClosetEmpty, ClosetOutfitTile, ClosetPieceTile, ClosetSubBar, type ClosetView } from '@/components/closet/ClosetViews';
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -100,11 +102,13 @@ import { updateBuyerCashWidget } from '@/lib/nativeSystem';
 const PREVIEW_NAME = 'Ava Buyer';
 const PREVIEW_HANDLE = '@ava';
 
-const TABS = ['Posts', 'Tagged', 'Saved', 'Liked', 'Orders'] as const;
+const TABS = ['Posts', 'Closet', 'Tagged', 'Saved', 'Liked', 'Orders'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_ITEMS: ProfileTab[] = [
   { key: 'Posts', label: 'Posts', icon: 'grid' },
+  // Digital Closet: every delivered piece, plus outfits built from them.
+  { key: 'Closet', label: 'Closet', icon: 'layers' },
   { key: 'Tagged', label: 'Tagged', icon: 'tag' },
   { key: 'Saved', label: 'Saved', icon: 'bookmark' },
   { key: 'Liked', label: 'Liked', icon: 'heart' },
@@ -225,6 +229,8 @@ type ListRow =
   | { kind: 'tagged'; item: ProfileGridItem; authorId: string; authorName: string | null; source: 'post' | 'story' }
   | { kind: 'saved'; saved: SavedItem }
   | { kind: 'order'; order: BuyerOrderView }
+  | { kind: 'closetPiece'; piece: ClosetPiece }
+  | { kind: 'closetOutfit'; outfit: ClosetOutfit }
   // Instagram-style folder tile — first cell of the Posts grid, only when
   // there's at least one draft. Opens the drafts list; does not filter the
   // grid in place (there is no second tab/pill row on this screen anymore).
@@ -287,6 +293,9 @@ export default function ProfileScreen() {
   // exists; only the profile header plays it.
   const [avatarVideoUri, setAvatarVideoUri] = useState<string | null>(null);
   const [myOrders, setMyOrders] = useState<BuyerOrderView[]>([]);
+  const [closetPieces, setClosetPieces] = useState<ClosetPiece[]>([]);
+  const [closetOutfits, setClosetOutfits] = useState<ClosetOutfit[]>([]);
+  const [closetView, setClosetView] = useState<ClosetView>('pieces');
   const [loading, setLoading] = useState(true);
   useScreenInteractive('profile', !loading);
   const [loadError, setLoadError] = useState(false);
@@ -353,6 +362,18 @@ export default function ProfileScreen() {
     } catch { /* keep the last known counts */ }
   }, [api, user?.id]);
 
+  // The closet is its own request so a slow closet never holds up the profile.
+  const loadCloset = useCallback(async () => {
+    const id = user?.id;
+    const [pieces, outfits] = await Promise.all([
+      getClosetPieces().catch(() => null),
+      getClosetOutfits().catch(() => null),
+    ]);
+    if (accountRef.current !== id) return;
+    if (pieces) setClosetPieces(pieces);
+    if (outfits) setClosetOutfits(outfits);
+  }, [user?.id]);
+
   const loadData = useCallback(async () => {
     if (!user?.id) {
       setProfile(null);
@@ -390,6 +411,7 @@ export default function ProfileScreen() {
       setAvatarUri(bp.avatarUri || null);
       setAvatarVideoUri(bp.avatarVideoUri || null);
       setMyOrders(ordersResult.orders);
+      void loadCloset();
     } catch (error) {
       setLoadError(true);
       setProfile(null);
@@ -398,7 +420,7 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, [api, loadCounts, user?.id]);
+  }, [api, loadCloset, loadCounts, user?.id]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -541,6 +563,17 @@ export default function ProfileScreen() {
   const handleTabPress = useCallback((tab: string) => {
     setActiveTab(tab as Tab);
   }, []);
+
+  const handleClosetPiecePress = useCallback((piece: ClosetPiece) => {
+    if (!piece.productId) return;
+    hapticSelection();
+    router.push(`/buyer-product-detail?productId=${encodeURIComponent(piece.productId)}` as never);
+  }, [router]);
+
+  const handleNewOutfit = useCallback(() => {
+    hapticSelection();
+    router.push('/closet-outfit' as never);
+  }, [router]);
 
   const handleOrdersPress = useCallback((order: BuyerOrderView) => {
     router.push(`/buyer-order-detail?id=${order.id}` as never);
@@ -688,12 +721,21 @@ export default function ProfileScreen() {
     }
     if (activeTab === 'Saved') return savedItems.map((saved) => ({ kind: 'saved' as const, saved }));
     if (activeTab === 'Orders') return myOrders.map((order) => ({ kind: 'order' as const, order }));
+    if (activeTab === 'Closet') {
+      return closetView === 'outfits'
+        ? closetOutfits.map((outfit) => ({ kind: 'closetOutfit' as const, outfit }))
+        : closetPieces.map((piece) => ({ kind: 'closetPiece' as const, piece }));
+    }
     // Liked has no backing data yet — a clean empty slot rather than
     // inventing engagement history.
     return [];
-  }, [activeTab, posts, savedItems, myOrders, tagged.items]);
+  }, [activeTab, posts, savedItems, myOrders, tagged.items, closetView, closetPieces, closetOutfits]);
 
-  const numColumns = activeTab === 'Posts' || activeTab === 'Tagged' ? layout.gridColumns : activeTab === 'Saved' ? savedColumns : 1;
+  const closetOutfitColumns = 2;
+  const closetOutfitWidth = Math.floor((layout.columnWidth - (closetOutfitColumns - 1)) / closetOutfitColumns);
+  const numColumns = activeTab === 'Posts' || activeTab === 'Tagged' ? layout.gridColumns
+    : activeTab === 'Closet' ? (closetView === 'outfits' ? closetOutfitColumns : layout.gridColumns)
+    : activeTab === 'Saved' ? savedColumns : 1;
 
   // Posts/Saved force the FlatList above to remount (new `key`, since a
   // live FlatList can't change numColumns) — restore the offset it had
@@ -748,15 +790,38 @@ export default function ProfileScreen() {
       );
     }
     if (item.kind === 'order') return <OrderRow order={item.order} theme={theme} onPress={handleOrdersPress} />;
+    if (item.kind === 'closetPiece') {
+      return (
+        <ClosetPieceTile
+          piece={item.piece}
+          width={layout.tileWidth}
+          onPress={handleClosetPiecePress}
+          testID={`closet-piece-${item.piece.id}`}
+        />
+      );
+    }
+    if (item.kind === 'closetOutfit') {
+      return (
+        <ClosetOutfitTile
+          pieces={item.outfit.pieces}
+          width={closetOutfitWidth}
+          onPress={() => { hapticSelection(); router.push(`/closet-outfit?id=${encodeURIComponent(item.outfit.id)}` as never); }}
+          testID={`closet-outfit-${item.outfit.id}`}
+        />
+      );
+    }
     return <SavedCell item={item.saved} size={savedCellSize} theme={theme} onPress={handleSavedTap} />;
-  }, [handleDraftsTilePress, handleOrdersPress, handlePostLongPress, handlePostTap, handleSavedTap, layout.tileHeight, layout.tileWidth, savedCellSize, theme]);
+  }, [closetOutfitWidth, handleClosetPiecePress, handleDraftsTilePress, handleOrdersPress, handlePostLongPress, handlePostTap, handleSavedTap, layout.tileHeight, layout.tileWidth, router, savedCellSize, theme]);
 
   const keyForRow = useCallback((row: ListRow) => (
-    row.kind === 'draftsTile' ? 'drafts-tile' : row.kind === 'post' ? row.post.id : row.kind === 'tagged' ? `t-${row.item.id}` : row.kind === 'order' ? row.order.id : row.saved.id
+    row.kind === 'draftsTile' ? 'drafts-tile' : row.kind === 'post' ? row.post.id : row.kind === 'tagged' ? `t-${row.item.id}` : row.kind === 'order' ? row.order.id
+      : row.kind === 'closetPiece' ? `cp-${row.piece.id}` : row.kind === 'closetOutfit' ? `co-${row.outfit.id}` : row.saved.id
   ), []);
 
   // One table decides every tab's empty copy + CTA (own profile → CTA).
-  const emptyTabKey = activeTab === 'Posts' ? 'buyer:posts' : `buyer:${activeTab.toLowerCase()}`;
+  const emptyTabKey = activeTab === 'Posts' ? 'buyer:posts'
+    : activeTab === 'Closet' && closetView === 'outfits' ? 'buyer:closet-outfits'
+    : `buyer:${activeTab.toLowerCase()}`;
   const empty = profileEmptyState(emptyTabKey as ProfileEmptyTab, true);
   const emptyIcon = empty.icon as IconName;
   const emptyIllustration = empty.illustration;
@@ -927,6 +992,15 @@ export default function ProfileScreen() {
       <View style={styles.tabsBlock}>
         <ProfileTabs tabs={TAB_ITEMS} active={activeTab} onChange={handleTabPress} variant="iconOnly" />
       </View>
+      {activeTab === 'Closet' && closetPieces.length > 0 ? (
+        <ClosetSubBar
+          view={closetView}
+          pieceCount={closetPieces.length}
+          outfitCount={closetOutfits.length}
+          onView={(view) => { hapticSelection(); setClosetView(view); }}
+          onNewOutfit={handleNewOutfit}
+        />
+      ) : null}
     </View>
   );
 
@@ -942,7 +1016,9 @@ export default function ProfileScreen() {
         numColumns={numColumns}
         columnWrapperStyle={numColumns > 1 ? styles.gridRow : undefined}
         ListHeaderComponent={header}
-        ListEmptyComponent={(
+        ListEmptyComponent={activeTab === 'Closet' && !loading ? (
+          <ClosetEmpty title={emptyTitle} action={emptyAction} minHeight={emptyArea.minHeight} />
+        ) : (
           // `emptyArea` (computeEmptyArea, shared with ProfileShell) sizes
           // this to fill the rest of the viewport below the (measured, video
           // hero included) header, and `emptyArea.paddingBottom` below

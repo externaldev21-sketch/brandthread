@@ -51,6 +51,10 @@ import { mergeHashtags, syncPostHashtags } from "../lib/hashtags";
 import { attachQuoteData, postCardImage } from "../lib/quotedPosts";
 import { attachPostExtras } from "../lib/postExtras";
 import { brandRepostBlocked, isFitCheckPost, REPOST_PERMISSION_REQUIRED } from "../lib/fits";
+import { productsMissingFromCloset } from "../lib/closet/pieces";
+
+/** A buyer fit tags at most this many closet pieces (an outfit board holds 8). */
+const MAX_BUYER_TAGS = 8;
 import {
   authorInGoodStanding,
   enqueueAutoFilterReport,
@@ -733,11 +737,16 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
         code:  "BUYER_MEDIA_TYPE",
       });
     }
+    // Buyers can tag only pieces in their own closet (delivered to them and
+    // not refunded) — posting a fit from the Closet pre-tags its pieces.
     if (taggedProductIds && taggedProductIds.length > 0) {
-      return res.status(403).json({
-        error: "Buyer accounts cannot tag products.",
-        code:  "BUYER_NO_PRODUCT_TAGS",
-      });
+      if (!Array.isArray(taggedProductIds) || taggedProductIds.length > MAX_BUYER_TAGS
+        || (await productsMissingFromCloset(clerkId, taggedProductIds)).length > 0) {
+        return res.status(403).json({
+          error: "You can tag pieces from your closet only.",
+          code:  "BUYER_NO_PRODUCT_TAGS",
+        });
+      }
     }
     if (scheduledAt) {
       return res.status(403).json({
@@ -1105,7 +1114,7 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
       const sellerProds = await db
         .select({ id: products.id, name: products.name, images: products.images })
         .from(products)
-        .where(and(inArray(products.id, validIds), eq(products.ownerId, clerkId), isNull(products.deletedAt)));
+        .where(and(inArray(products.id, validIds), isNull(products.deletedAt), isBuyer ? undefined : eq(products.ownerId, clerkId)));
 
       if (sellerProds.length > 0) {
         await db.insert(postTaggedProducts).values(
@@ -1222,7 +1231,11 @@ router.patch("/:id", requireAuth, validateBody(updatePostBody), async (req, res)
       return res.status(403).json({ error: "Buyer accounts cannot post to Threads.", code: "BUYER_NO_THREADS" });
     }
     if (Array.isArray(body.taggedProductIds) && body.taggedProductIds.length > 0) {
-      return res.status(403).json({ error: "Buyer accounts cannot tag products.", code: "BUYER_NO_PRODUCT_TAGS" });
+      const ids = body.taggedProductIds.filter((id: unknown): id is string => typeof id === "string");
+      if (ids.length !== body.taggedProductIds.length || ids.length > MAX_BUYER_TAGS
+        || (await productsMissingFromCloset(clerkId, ids)).length > 0) {
+        return res.status(403).json({ error: "You can tag pieces from your closet only.", code: "BUYER_NO_PRODUCT_TAGS" });
+      }
     }
     if (body.scheduledAt) {
       return res.status(403).json({ error: "Buyer posts cannot be scheduled.", code: "BUYER_NO_SCHEDULING" });
@@ -1440,7 +1453,7 @@ router.patch("/:id", requireAuth, validateBody(updatePostBody), async (req, res)
         const validIds = (taggedProductIds as string[]).filter((productId) => UUID_RE.test(productId));
         const ownedProducts = validIds.length > 0
           ? await tx.select({ id: products.id }).from(products)
-            .where(and(inArray(products.id, validIds), eq(products.ownerId, clerkId), isNull(products.deletedAt)))
+            .where(and(inArray(products.id, validIds), isNull(products.deletedAt), isBuyerPoster ? undefined : eq(products.ownerId, clerkId)))
           : [];
         await tx.delete(postTaggedProducts).where(eq(postTaggedProducts.postId, id));
         if (ownedProducts.length > 0) {

@@ -3062,3 +3062,4 @@ export const fxRates = pgTable('fx_rates', {
   pk: primaryKey({ columns: [t.baseCurrency, t.currency] }),
 }));
 export * from './sellerMilestones';
+export * from './closet';
