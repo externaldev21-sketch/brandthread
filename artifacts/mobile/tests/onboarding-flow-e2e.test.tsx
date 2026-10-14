@@ -128,6 +128,7 @@ vi.mock('react-native', () => {
     Keyboard: { dismiss: vi.fn() },
     Linking: { openURL: vi.fn() },
     Platform: { OS: 'web', select: (obj: Record<string, unknown>) => obj.web ?? obj.default },
+    Pressable: host('Pressable'),
     ScrollView: host('ScrollView'),
     StatusBar: host('StatusBar'),
     StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1, absoluteFill: {} },
@@ -297,6 +298,31 @@ vi.mock('@/lib/legalConsent', () => ({
 vi.mock('@/components/branding/BrandthreadLogo', () => ({ default: () => null }));
 vi.mock('@/components/branding/GoogleGlyph', () => ({ default: () => null }));
 
+vi.mock('expo-notifications', () => ({
+  getPermissionsAsync: vi.fn(async () => ({ status: 'undetermined', canAskAgain: true })),
+  requestPermissionsAsync: vi.fn(async () => ({ status: 'denied' })),
+}));
+
+vi.mock('@/components/KeyboardProviderCompat', () => {
+  const React = require('react') as typeof import('react');
+  return { KeyboardAvoidingView: (props: Record<string, unknown>) => React.createElement('KeyboardAvoidingView', props, props.children as React.ReactNode) };
+});
+
+vi.mock('@/hooks/useHeaderTopInset', () => ({ useHeaderTopInset: () => 0 }));
+
+vi.mock('@/contexts/FeatureFlagContext', () => ({ useFeatureFlag: () => true }));
+
+vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
+
+vi.mock('@/lib/onboarding/useUsernameLiveCheck', () => ({
+  useUsernameLiveCheck: () => ({ error: '', checking: false }),
+}));
+
+vi.mock('@/components/onboarding/SizesStep', () => {
+  const React = require('react') as typeof import('react');
+  return { SizesStep: () => React.createElement('View', { testID: 'onboarding-sizes-step' }) };
+});
+
 // app/onboarding.tsx imports ONBOARDING_KEY/ONBOARDING_OWNER_KEY from
 // './_layout' — real app/_layout.tsx pulls in the entire app shell (query
 // client, notifications, RevenueCat, every context provider, …), which is
@@ -315,40 +341,9 @@ vi.mock('@/components/legal/LegalConsent', () => {
   };
 });
 
-vi.mock('@/components/onboarding/WelcomeStep', () => {
-  const React = require('react') as typeof import('react');
-  return {
-    WelcomeStep: ({ onGetStarted, onSignIn }: { onGetStarted: () => void; onSignIn: () => void }) =>
-      React.createElement('View', null,
-        React.createElement('TouchableOpacity', { testID: 'onboarding-welcome-get-started', onPress: onGetStarted }),
-        React.createElement('TouchableOpacity', { testID: 'onboarding-welcome-sign-in', onPress: onSignIn }),
-      ),
-  };
-});
-
-vi.mock('@/app/account-type', () => {
-  const React = require('react') as typeof import('react');
-  return {
-    AccountTypeStep: ({ onSelect, onContinue }: { onSelect: (t: 'buyer' | 'seller') => void; onContinue: () => void }) =>
-      React.createElement('View', null,
-        React.createElement('TouchableOpacity', { testID: 'onboarding-account-type-buyer', onPress: () => onSelect('buyer') }),
-        React.createElement('TouchableOpacity', { testID: 'onboarding-account-type-seller', onPress: () => onSelect('seller') }),
-        React.createElement('TouchableOpacity', { testID: 'onboarding-account-type-continue', onPress: onContinue }),
-      ),
-  };
-});
-
 vi.mock('@/components/onboarding/BrandsToFollowStep', () => {
   const React = require('react') as typeof import('react');
   return { BrandsToFollowStep: () => React.createElement('View', { testID: 'onboarding-brands-step' }) };
-});
-
-vi.mock('@/components/onboarding/SellerPlanRecommendationStep', () => {
-  const React = require('react') as typeof import('react');
-  return {
-    SellerPlanRecommendationStep: ({ onContinue }: { onContinue: () => void }) =>
-      React.createElement('TouchableOpacity', { testID: 'onboarding-plan-recommendation-continue', onPress: onContinue }),
-  };
 });
 
 vi.mock('@/components/onboarding/ThreadLine', () => ({
@@ -390,14 +385,24 @@ vi.mock('@/contexts/AppThemeContext', async (importOriginal) => {
 import OnboardingScreen from '@/app/onboarding';
 import { BUYER_STEP_INDEX, SELLER_STEP_INDEX } from '@/lib/onboardingFlow';
 
-function findByTestId(renderer: ReactTestRenderer, testID: string) {
+type Node = ReturnType<ReactTestRenderer['root']['findByProps']>;
+
+function findByTestId(renderer: ReactTestRenderer, testID: string): Node {
   return renderer.root.findByProps({ testID });
 }
-function findByLabel(renderer: ReactTestRenderer, label: string) {
-  return renderer.root.findByProps({ label });
+/** A kit Field renders its TextInput with accessibilityLabel = the field label. */
+function findInput(renderer: ReactTestRenderer, label: string): Node {
+  return renderer.root.findAllByType('TextInput' as never).find((n) => n.props.accessibilityLabel === label)!;
 }
-function findButtonByLabel(renderer: ReactTestRenderer, label: string) {
-  return renderer.root.findAllByType('PillButton' as never).find((n) => n.props.label === label)!;
+/** A kit SquareButton is a Pressable labelled with its (title-case) label. */
+function findButton(renderer: ReactTestRenderer, label: string): Node {
+  const node = renderer.root.findAllByType('Pressable' as never).find((n) => n.props.accessibilityLabel === label);
+  if (!node) throw new Error(`No button labelled "${label}"`);
+  return node;
+}
+function allText(renderer: ReactTestRenderer): string {
+  const flatten = (v: unknown): string => Array.isArray(v) ? v.map(flatten).join('') : (typeof v === 'string' || typeof v === 'number') ? String(v) : '';
+  return renderer.root.findAllByType('Text' as never).map((n) => flatten(n.props.children)).join(' | ');
 }
 
 async function renderScreen(): Promise<ReactTestRenderer> {
@@ -409,289 +414,211 @@ async function renderScreen(): Promise<ReactTestRenderer> {
   return renderer;
 }
 
-async function press(renderer: ReactTestRenderer, node: ReturnType<typeof findByTestId>) {
+async function press(node: Node) {
   await act(async () => {
     node.props.onPress();
+    await Promise.resolve();
     await Promise.resolve();
   });
 }
 
-async function fill(node: ReturnType<typeof findByLabel>, value: string) {
+async function fill(node: Node, value: string) {
   await act(async () => {
     node.props.onChangeText(value);
     await Promise.resolve();
   });
 }
 
-/** Drives the screen from Welcome through the end of the shared sign-up form. */
+async function settle() {
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); await Promise.resolve(); });
+}
+
+/** Sign up screen → email sheet → code, for the given role. */
 async function driveThroughSignUp(renderer: ReactTestRenderer, role: 'buyer' | 'seller', email: string) {
-  await press(renderer, findByTestId(renderer, 'onboarding-welcome-get-started'));
-  await press(renderer, findByTestId(renderer, `onboarding-account-type-${role}`));
-  await press(renderer, findByTestId(renderer, 'onboarding-account-type-continue'));
+  await press(findByTestId(renderer, `onboarding-account-type-${role}`));
+  await fill(findByTestId(renderer, 'onboarding-dob-input'), '01151995');
+  await press(findByTestId(renderer, 'onboarding-sign-up-email'));
 
-  await fill(findByLabel(renderer, 'Email address'), email);
-  await fill(findByLabel(renderer, 'First name'), role === 'seller' ? 'Sasha' : 'Bailey');
-  await fill(findByLabel(renderer, 'Last name'), 'Rivera');
-  await fill(findByLabel(renderer, 'Password'), 'Walkthrough!Pass1');
-  await fill(findByLabel(renderer, 'Confirm password'), 'Walkthrough!Pass1');
-  await fill(findByTestId(renderer, 'onboarding-username-input'), `wt_${role}_flow`);
+  await fill(findInput(renderer, 'Email'), email);
+  await fill(findInput(renderer, 'Password'), 'Walkthrough!Pass1');
+  await press(findButton(renderer, 'Next'));
+  await fill(findInput(renderer, 'Verification code'), '000000');
+  await press(findButton(renderer, 'Verify'));
+  await settle();
+}
 
-  await press(renderer, findButtonByLabel(renderer, 'Create account'));
-  await fill(findByTestId(renderer, 'onboarding-code-cells'), '000000');
-  await press(renderer, findButtonByLabel(renderer, 'Verify email'));
+async function fillProfile(renderer: ReactTestRenderer, name: string, username: string) {
+  await fill(findByTestId(renderer, 'onboarding-first-name-input'), name);
+  await fill(findByTestId(renderer, 'onboarding-username-input'), username);
+  await press(findButton(renderer, 'Next'));
+}
 
-  // handleVerify's finalize() flips clerkStore.isSignedIn, and the
-  // "watch for OAuth isSignedIn change" effect (plus onAuthComplete() called
-  // right after finalize resolves) moves the real component to the Name step.
-  await act(async () => { await Promise.resolve(); });
+function resetWorld() {
+  memoryStorage.clear();
+  apiCalls.length = 0;
+  clerkStore.isSignedIn = false;
+  clerkStore.userId = null;
+  clerkStore.signUp = { status: 'missing_requirements', emailAddress: null, pendingCode: null, finalized: false };
+  routerReplaceMock.mockClear();
+  routerPushMock.mockClear();
+  delete searchParams.addAccount;
+  delete searchParams.postAuth;
 }
 
 describe('onboarding flow (buyer)', () => {
   let renderer: ReactTestRenderer | undefined;
-
-  beforeEach(() => {
-    memoryStorage.clear();
-    apiCalls.length = 0;
-    clerkStore.isSignedIn = false;
-    clerkStore.userId = null;
-    clerkStore.signUp = { status: 'missing_requirements', emailAddress: null, pendingCode: null, finalized: false };
-    routerReplaceMock.mockClear();
-    routerPushMock.mockClear();
-  });
-
+  beforeEach(resetWorld);
   afterEach(async () => {
     await act(async () => { renderer?.unmount(); });
     renderer = undefined;
   });
 
-  it('signs up, completes the buyer questionnaire, and lands on the thread explainer with the right API calls', async () => {
+  it('signs up, skips the optional steps, and lands on the thread explainer with the right API calls', async () => {
     renderer = await renderScreen();
     await driveThroughSignUp(renderer, 'buyer', 'buyer-flow@onboarding-e2e.test');
 
-    // Name step
-    await fill(findByTestId(renderer, 'onboarding-first-name-input'), 'Bailey');
-    await press(renderer, findButtonByLabel(renderer, 'Continue'));
+    expect(allText(renderer)).toContain('01 / 04');
+    await fillProfile(renderer, 'Bailey Rivera', 'wt_buyer_flow');
 
-    // Style interests step — skippable, just continue with the defaults.
-    await press(renderer, findButtonByLabel(renderer, 'Continue'));
+    // Brands (mocked list) and Sizes (mocked) are skippable: the one button reads Skip.
+    expect(() => findByTestId(renderer!, 'onboarding-brands-step')).not.toThrow();
+    await press(findButton(renderer, 'Skip'));
+    expect(() => findByTestId(renderer!, 'onboarding-sizes-step')).not.toThrow();
+    await press(findButton(renderer, 'Skip'));
 
-    // Brands-to-follow step (mocked) — skippable, continue.
-    await press(renderer, findButtonByLabel(renderer, 'Continue'));
-
-    // Loading step fires its onDone callback after a real setTimeout; run it
-    // for real rather than faking timers, to keep this in step with the
-    // production timing constants in app/onboarding.tsx.
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 3300)); });
-
-    // Notifications step — skip.
-    await press(renderer, findByTestId(renderer, 'onboarding-notifications-skip'));
-
-    // Success step — this triggers finishBuyer().
-    await act(async () => {
-      findButtonByLabel(renderer!, 'Start exploring').props.onPress();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    // Notifications: CONTINUE asks (web: no prompt) and finishes onboarding.
+    expect(allText(renderer)).toContain('04 / 04');
+    await press(findButton(renderer, 'Continue'));
+    await settle();
+    await settle();
 
     const names = apiCalls.map((c) => c.name);
-    expect(names).toContain('auth.sync');
-    expect(names).toContain('auth.updateProfile');
-    expect(names).toContain('auth.saveBuyerPreferences');
-    expect(names).toContain('auth.completeOnboarding');
+    expect(names.indexOf('auth.sync')).toBeGreaterThan(-1);
     expect(names.indexOf('auth.sync')).toBeLessThan(names.indexOf('auth.updateProfile'));
     expect(names.indexOf('auth.saveBuyerPreferences')).toBeLessThan(names.indexOf('auth.completeOnboarding'));
 
     const updateProfileCall = apiCalls.find((c) => c.name === 'auth.updateProfile');
-    expect((updateProfileCall!.args[0] as { accountType?: string }).accountType).toBe('buyer');
-
-    const completeCall = apiCalls.find((c) => c.name === 'auth.completeOnboarding');
-    expect(completeCall!.args[0]).toBe('buyer');
-
+    expect(updateProfileCall!.args[0]).toMatchObject({ accountType: 'buyer', username: 'wt_buyer_flow', name: 'Bailey Rivera' });
+    expect(apiCalls.find((c) => c.name === 'auth.completeOnboarding')!.args[0]).toBe('buyer');
     expect(routerReplaceMock).toHaveBeenCalledWith('/thread-explainer');
   }, 20_000);
+
+  it('blocks account creation without a valid birthday', async () => {
+    renderer = await renderScreen();
+    await fill(findByTestId(renderer, 'onboarding-dob-input'), '01152020');
+    await press(findByTestId(renderer, 'onboarding-sign-up-email'));
+    expect(allText(renderer)).toContain('You must be at least 13 to create an account.');
+    expect(findInput(renderer, 'Password')).toBeUndefined();
+  });
 });
 
 describe('onboarding flow (seller)', () => {
   let renderer: ReactTestRenderer | undefined;
-
-  beforeEach(() => {
-    memoryStorage.clear();
-    apiCalls.length = 0;
-    clerkStore.isSignedIn = false;
-    clerkStore.userId = null;
-    clerkStore.signUp = { status: 'missing_requirements', emailAddress: null, pendingCode: null, finalized: false };
-    routerReplaceMock.mockClear();
-    routerPushMock.mockClear();
-  });
-
+  beforeEach(resetWorld);
   afterEach(async () => {
     await act(async () => { renderer?.unmount(); });
     renderer = undefined;
   });
 
-  it('signs up, completes the seller questionnaire (with goals), and lands on the tabs dashboard with the right API calls', async () => {
+  it('signs up, names the store, and lands on the tabs dashboard with the right API calls', async () => {
     renderer = await renderScreen();
     await driveThroughSignUp(renderer, 'seller', 'seller-flow@onboarding-e2e.test');
 
-    // Name step
-    await fill(findByTestId(renderer, 'onboarding-first-name-input'), 'Sasha');
-    await press(renderer, findButtonByLabel(renderer, 'Continue'));
-
-    // Brand name step
+    await fillProfile(renderer, 'Sasha Rivera', 'noirfield');
     await fill(findByTestId(renderer, 'onboarding-brand-name-input'), 'Noir Field Studio');
-    await press(renderer, findButtonByLabel(renderer, 'Continue'));
+    await press(findButton(renderer, 'Next'));
 
-    // Brand stage step — default ('idea') already satisfies canContinue().
-    await press(renderer, findButtonByLabel(renderer, 'Continue'));
-
-    // Goals step has no footer; its own inline button reads "Build my
-    // workspace" once any goal is selected (DEFAULT_SELLER_GOALS is
-    // non-empty already).
-    await press(renderer, findButtonByLabel(renderer, 'Build my workspace'));
-
-    // Plan step, part 1: SellerPreviewStep (theme + optional AI sample).
-    // Skip the sample, same as the Playwright walkthrough's "skip" path.
-    await press(renderer, findByTestId(renderer, 'onboarding-preview-continue'));
-
-    // Plan step, part 2: SellerPlanRecommendationStep (mocked).
-    await press(renderer, findByTestId(renderer, 'onboarding-plan-recommendation-continue'));
-
-    // Loading step — real timers, matching app/onboarding.tsx's own timing.
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 3300)); });
-
-    // Notifications step — skip.
-    await press(renderer, findByTestId(renderer, 'onboarding-notifications-skip'));
-
-    // Success step — this triggers finishSeller().
-    await act(async () => {
-      findButtonByLabel(renderer!, 'Go to Dashboard').props.onPress();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    await press(findButton(renderer, 'Continue'));
+    await settle();
+    await settle();
 
     const names = apiCalls.map((c) => c.name);
     expect(names).toContain('auth.sync');
-    expect(names).toContain('auth.onboarding');
     expect(names).toContain('auth.updateProfile');
-    expect(names).toContain('seller.saveOnboardingData');
-    expect(names).toContain('auth.completeOnboarding');
-
-    const onboardingCall = apiCalls.find((c) => c.name === 'auth.onboarding');
-    expect((onboardingCall!.args[0] as { brandName?: string }).brandName).toBe('Noir Field Studio');
-
-    const updateProfileCall = apiCalls.find((c) => c.name === 'auth.updateProfile');
-    expect((updateProfileCall!.args[0] as { accountType?: string }).accountType).toBe('seller');
-
-    const saveOnboardingDataCall = apiCalls.find((c) => c.name === 'seller.saveOnboardingData');
-    expect((saveOnboardingDataCall!.args[0] as { goals?: string[] }).goals).toEqual(expect.arrayContaining(['Create designs', 'Launch my store', 'Build content']));
-
-    const completeCall = apiCalls.find((c) => c.name === 'auth.completeOnboarding');
-    expect(completeCall!.args[0]).toBe('seller');
-
+    expect(apiCalls.find((c) => c.name === 'auth.onboarding')!.args[0]).toMatchObject({ brandName: 'Noir Field Studio', username: 'noirfield' });
+    expect((apiCalls.find((c) => c.name === 'auth.updateProfile')!.args[0] as { accountType?: string }).accountType).toBe('seller');
+    expect(apiCalls.find((c) => c.name === 'auth.completeOnboarding')!.args[0]).toBe('seller');
     expect(routerReplaceMock).toHaveBeenCalledWith('/(tabs)/');
   }, 20_000);
+
+  it('a 16-year-old can shop but not sell', async () => {
+    const year = new Date().getUTCFullYear() - 16;
+    renderer = await renderScreen();
+    await press(findByTestId(renderer, 'onboarding-account-type-seller'));
+    await fill(findByTestId(renderer, 'onboarding-dob-input'), `0101${year}`);
+    await press(findByTestId(renderer, 'onboarding-sign-up-email'));
+    expect(allText(renderer)).toContain('You must be 18 or older to sell.');
+    await press(findByTestId(renderer, 'onboarding-account-type-buyer'));
+    await press(findByTestId(renderer, 'onboarding-sign-up-email'));
+    expect(findInput(renderer, 'Password')).toBeDefined();
+  });
 });
 
-// ── Regression coverage for the "Already signed in" trap ───────────────────
-// Reported bug: a brand-new sign-up (any email) landed back on the Auth
-// step's "Already signed in as <email> / Sign out and create another
-// account" guard instead of continuing into the questionnaire. Root cause:
-// app/onboarding.tsx's continueFromAccountType() always routed AccountType
-// -> Auth, even when a session was already active (e.g. this very sign-up's
-// own Clerk session, once verified) and the user was not deliberately adding
-// a second account. These tests drive continueFromAccountType() directly
-// through the real screen with isSignedIn pre-set, the same shape the bug
-// took after a remount lost `flow` and sent the user back through
-// AccountType while already signed in.
+// ── The "Already signed in" trap ───────────────────────────────────────────
+// A session that is already active (this flow's own, after a remount) must
+// continue into the questionnaire, never back into account creation; only a
+// deliberate add-account flow shows the sign-up methods again.
 describe('onboarding flow — already-signed-in routing', () => {
   let renderer: ReactTestRenderer | undefined;
-
-  beforeEach(() => {
-    memoryStorage.clear();
-    apiCalls.length = 0;
-    clerkStore.isSignedIn = false;
-    clerkStore.userId = null;
-    clerkStore.signUp = { status: 'missing_requirements', emailAddress: null, pendingCode: null, finalized: false };
-    routerReplaceMock.mockClear();
-    routerPushMock.mockClear();
-    delete searchParams.addAccount;
-    delete searchParams.postAuth;
-  });
-
+  beforeEach(resetWorld);
   afterEach(async () => {
     await act(async () => { renderer?.unmount(); });
     renderer = undefined;
-    delete searchParams.addAccount;
-    delete searchParams.postAuth;
+    resetWorld();
   });
 
-  it('a session already active from this sign-up flow continues straight to the next step — never the sign-up form again', async () => {
-    // Simulates the reported bug's shape: a Clerk session is already active
-    // (this flow's own, just verified) and the query string carries no
-    // addAccount=1, so this is not a deliberate second-account creation.
+  it('a session already active continues straight to Profile — never the sign-up methods again', async () => {
     clerkStore.isSignedIn = true;
     clerkStore.userId = 'user_already_signed_in';
 
     renderer = await renderScreen();
-    await press(renderer, findByTestId(renderer, 'onboarding-welcome-get-started'));
-    await press(renderer, findByTestId(renderer, 'onboarding-account-type-buyer'));
-    await press(renderer, findByTestId(renderer, 'onboarding-account-type-continue'));
+    expect(() => findByTestId(renderer!, 'onboarding-sign-up-email')).toThrow();
+    await press(findByTestId(renderer, 'onboarding-account-type-buyer'));
+    await press(findByTestId(renderer, 'onboarding-account-type-continue'));
 
-    // Lands directly on the Name step...
     expect(() => findByTestId(renderer!, 'onboarding-first-name-input')).not.toThrow();
-    // ...and the sign-up form / "Already signed in" guard were never shown.
-    expect(() => findByLabel(renderer!, 'Email address')).toThrow();
-    const allText = renderer.root.findAllByType('Text' as never).map((n) => n.props.children);
-    expect(allText.flat().join(' ')).not.toContain('Already signed in');
+    expect(memoryStorage.get('onboarding_pending_flow')).toBe('buyer');
   });
 
-  it('creating a second account (add-account flow) while signed in still shows the sign-up form', async () => {
-    // The deliberate "add another account" path: a different, already-signed
-    // -in account is choosing to create a second, separate identity.
+  it('creating a second account (add-account flow) while signed in still shows the sign-up methods', async () => {
     clerkStore.isSignedIn = true;
     clerkStore.userId = 'user_source_account';
     searchParams.addAccount = '1';
 
     renderer = await renderScreen();
-    await press(renderer, findByTestId(renderer, 'onboarding-welcome-get-started'));
-    await press(renderer, findByTestId(renderer, 'onboarding-account-type-seller'));
-    await press(renderer, findByTestId(renderer, 'onboarding-account-type-continue'));
-
-    // The sign-up form is shown so a second, distinct account can be created
-    // — it must not skip straight to the questionnaire using the source
-    // account's identity, and must not show the blocking "already signed
-    // in" guard either.
-    expect(() => findByLabel(renderer!, 'Email address')).not.toThrow();
-    const allText = renderer.root.findAllByType('Text' as never).map((n) => n.props.children);
-    expect(allText.flat().join(' ')).not.toContain('Already signed in');
+    await settle();
+    expect(() => findByTestId(renderer!, 'onboarding-sign-up-email')).not.toThrow();
+    expect(allText(renderer)).not.toContain('Finish setting up');
   });
 
-  it('a stale pending-flow flag from an abandoned attempt resumes straight into its Auth step — which is exactly why sign-out clears it', async () => {
-    // A device-scoped `onboarding_pending_flow` left over from an earlier,
-    // different, abandoned attempt (e.g. a friend who picked seller, then
-    // signed out or closed the app) is honored on the next mount as "resume
-    // where this device last left off" and jumps straight past
-    // Welcome/AccountType into that flow's own Auth step. That's the
-    // intended behavior for the SAME still-anonymous attempt resuming after
-    // an app restart — but it's also precisely why
-    // sign-out-clears-onboarding-state.test.ts requires app/_layout.tsx to
-    // wipe this key on sign-out: without that cleanup, a NEW person signing
-    // up right after someone else signed out on the same phone would land
-    // on the previous person's half-filled Auth step instead of a clean one.
+  it('a pending flow from an abandoned attempt comes back preselected on Sign up — which is why sign-out clears it', async () => {
     memoryStorage.set('onboarding_pending_flow', 'seller');
 
     renderer = await renderScreen();
-    await act(async () => { await Promise.resolve(); });
+    await settle();
 
-    expect(() => findByLabel(renderer!, 'Email address')).not.toThrow();
+    const sellRow = renderer.root.findAllByType('Pressable' as never).find((n) => n.props.testID === 'onboarding-account-type-seller');
+    expect(sellRow!.props.accessibilityState).toEqual({ selected: true });
+    expect(() => findByTestId(renderer!, 'onboarding-sign-up-email')).not.toThrow();
+  });
+
+  it('after the email-verification remount (postAuth=1) the pending flow resumes on Profile', async () => {
+    memoryStorage.set('onboarding_pending_flow', 'seller');
+    clerkStore.isSignedIn = true;
+    clerkStore.userId = 'user_just_verified';
+    searchParams.postAuth = '1';
+
+    renderer = await renderScreen();
+    await settle();
+
+    expect(() => findByTestId(renderer!, 'onboarding-first-name-input')).not.toThrow();
+    expect(allText(renderer)).toContain('01 / 03');
   });
 });
 
 describe('onboarding step machine sanity', () => {
   it('BUYER_STEP_INDEX / SELLER_STEP_INDEX match what this test drives through', () => {
-    expect(BUYER_STEP_INDEX.NAME).toBeGreaterThan(BUYER_STEP_INDEX.AUTH);
-    expect(SELLER_STEP_INDEX.BRAND_NAME).toBeGreaterThan(SELLER_STEP_INDEX.NAME);
+    expect(BUYER_STEP_INDEX.PROFILE).toBe(1);
+    expect(SELLER_STEP_INDEX.BRAND_NAME).toBeGreaterThan(SELLER_STEP_INDEX.PROFILE);
   });
 });

@@ -2,7 +2,7 @@
  * Explicit, typed onboarding step machine for buyer and seller flows.
  *
  * This is the single source of truth for:
- *  - step ordering per flow (including the v7 Welcome + Brands-to-follow steps)
+ *  - step ordering per flow
  *  - which steps may be skipped
  *  - draft-version migration (old in-flight AsyncStorage drafts -> current step)
  *
@@ -14,29 +14,17 @@
 export type Flow = 'buyer' | 'seller';
 
 export type BuyerStepId =
-  | 'WELCOME'
-  | 'ACCOUNT_TYPE'
-  | 'AUTH'
-  | 'NAME'
-  | 'STYLE'
-  | 'SIZES'
+  | 'SIGN_UP'
+  | 'PROFILE'
   | 'BRANDS'
-  | 'LOADING'
-  | 'NOTIFICATIONS'
-  | 'SUCCESS';
+  | 'SIZES'
+  | 'NOTIFICATIONS';
 
 export type SellerStepId =
-  | 'WELCOME'
-  | 'ACCOUNT_TYPE'
-  | 'AUTH'
-  | 'NAME'
+  | 'SIGN_UP'
+  | 'PROFILE'
   | 'BRAND_NAME'
-  | 'BRAND_STAGE'
-  | 'GOALS'
-  | 'PLAN'
-  | 'LOADING'
-  | 'NOTIFICATIONS'
-  | 'SUCCESS';
+  | 'NOTIFICATIONS';
 
 export interface StepDef<Id extends string> {
   id: Id;
@@ -44,35 +32,27 @@ export interface StepDef<Id extends string> {
   skippable: boolean;
 }
 
-// ─── Step order (v8) ──────────────────────────────────────────────────────
-// BOTH:   0=Welcome  1=AccountType  2=Auth  3=Name
-// BUYER:  4=Style  5=Sizes  6=Brands  7=Loading  8=Notifications  9=Success
-// SELLER: 4=BrandName  5=BrandStage  6=Goals  7=Plan  8=Loading  9=Notifications  10=Success
+// ─── Step order (v9) ──────────────────────────────────────────────────────
+// The Welcome opener and the two-card account-type screen are gone: the
+// buyer/seller choice, Apple / Google / email and the age check all live on
+// one Sign up screen (step 0), like Grailed's.
+// BOTH:   0=SignUp  1=Profile (name + @username)
+// BUYER:  2=Brands  3=Sizes  4=Notifications
+// SELLER: 2=BrandName  3=Notifications
+// Buyer steps after Profile can all be skipped.
 export const BUYER_FLOW_STEPS: StepDef<BuyerStepId>[] = [
-  { id: 'WELCOME', skippable: false },
-  { id: 'ACCOUNT_TYPE', skippable: false },
-  { id: 'AUTH', skippable: false },
-  { id: 'NAME', skippable: false },
-  { id: 'STYLE', skippable: true },
-  { id: 'SIZES', skippable: true },
+  { id: 'SIGN_UP', skippable: false },
+  { id: 'PROFILE', skippable: false },
   { id: 'BRANDS', skippable: true },
-  { id: 'LOADING', skippable: false },
+  { id: 'SIZES', skippable: true },
   { id: 'NOTIFICATIONS', skippable: true },
-  { id: 'SUCCESS', skippable: false },
 ];
 
 export const SELLER_FLOW_STEPS: StepDef<SellerStepId>[] = [
-  { id: 'WELCOME', skippable: false },
-  { id: 'ACCOUNT_TYPE', skippable: false },
-  { id: 'AUTH', skippable: false },
-  { id: 'NAME', skippable: false },
+  { id: 'SIGN_UP', skippable: false },
+  { id: 'PROFILE', skippable: false },
   { id: 'BRAND_NAME', skippable: false },
-  { id: 'BRAND_STAGE', skippable: true },
-  { id: 'GOALS', skippable: true },
-  { id: 'PLAN', skippable: true },
-  { id: 'LOADING', skippable: false },
   { id: 'NOTIFICATIONS', skippable: true },
-  { id: 'SUCCESS', skippable: false },
 ];
 
 function stepIndexMap<Id extends string>(steps: StepDef<Id>[]): Record<Id, number> {
@@ -90,6 +70,15 @@ export function totalStepsFor(flow: Flow): number {
   return stepsFor(flow).length;
 }
 
+/**
+ * The "02 / 04" counter: Sign up is step zero and isn't counted, so the
+ * first step after the account exists reads 01.
+ */
+export function stepCounterFor(flow: Flow, stepIndex: number): { current: number; total: number } | null {
+  if (stepIndex <= 0) return null;
+  return { current: stepIndex, total: totalStepsFor(flow) - 1 };
+}
+
 export function clampStep(flow: Flow, stepIndex: number): number {
   return Math.max(0, Math.min(stepIndex, totalStepsFor(flow) - 1));
 }
@@ -103,7 +92,7 @@ export function nextStepIndex(flow: Flow, stepIndex: number): number {
   return clampStep(flow, stepIndex + 1);
 }
 
-/** One step back, clamped to the first step of the flow (Welcome). */
+/** One step back, clamped to the first step of the flow (Sign up). */
 export function prevStepIndex(flow: Flow, stepIndex: number): number {
   return clampStep(flow, stepIndex - 1);
 }
@@ -121,7 +110,41 @@ export function canGoBack(stepIndex: number): boolean {
  * in-flight user resuming mid-onboarding lands back on an equivalent step
  * instead of restarting from scratch.
  */
-export const DRAFT_VERSION = 8;
+export const DRAFT_VERSION = 9;
+
+// v8 order: the *source* indices for the v8 -> v9 migration. Frozen.
+const V8_BUYER_STEP_INDEX = {
+  WELCOME: 0, ACCOUNT_TYPE: 1, AUTH: 2, NAME: 3, STYLE: 4, SIZES: 5, BRANDS: 6, LOADING: 7, NOTIFICATIONS: 8, SUCCESS: 9,
+} as const;
+const V8_SELLER_STEP_INDEX = {
+  WELCOME: 0, ACCOUNT_TYPE: 1, AUTH: 2, NAME: 3, BRAND_NAME: 4, BRAND_STAGE: 5, GOALS: 6, PLAN: 7,
+  LOADING: 8, NOTIFICATIONS: 9, SUCCESS: 10,
+} as const;
+
+// v9 targets, frozen for the same reason (later versions migrate from here).
+const V9_BUYER = { SIGN_UP: 0, PROFILE: 1, BRANDS: 2, SIZES: 3, NOTIFICATIONS: 4 } as const;
+const V9_SELLER = { SIGN_UP: 0, PROFILE: 1, BRAND_NAME: 2, NOTIFICATIONS: 3 } as const;
+
+/**
+ * v8 -> v9: Welcome / AccountType / Auth collapse into Sign up; Name becomes
+ * Profile; the removed Style, Loading, Success, BrandStage, Goals and Plan
+ * steps resume on the nearest step that still exists.
+ */
+function v8ToV9(flow: Flow, v8Step: number): number {
+  if (flow === 'buyer') {
+    const b = V8_BUYER_STEP_INDEX;
+    if (v8Step <= b.AUTH) return V9_BUYER.SIGN_UP;
+    if (v8Step === b.NAME) return V9_BUYER.PROFILE;
+    if (v8Step === b.STYLE || v8Step === b.BRANDS) return V9_BUYER.BRANDS;
+    if (v8Step === b.SIZES) return V9_BUYER.SIZES;
+    return V9_BUYER.NOTIFICATIONS;
+  }
+  const sl = V8_SELLER_STEP_INDEX;
+  if (v8Step <= sl.AUTH) return V9_SELLER.SIGN_UP;
+  if (v8Step === sl.NAME) return V9_SELLER.PROFILE;
+  if (v8Step === sl.BRAND_NAME) return V9_SELLER.BRAND_NAME;
+  return V9_SELLER.NOTIFICATIONS;
+}
 
 // v7 order (Welcome + Brands, no Sizes step): the *source* indices for the
 // v7 -> v8 migration. Frozen — never reference the live index maps here.
@@ -274,13 +297,14 @@ function v7ToV8(flow: Flow, v7Step: number): number {
 }
 
 /**
- * Translate a persisted (flow, step, version) draft into the current (v8)
+ * Translate a persisted (flow, step, version) draft into the current (v9)
  * step index for that flow. Unknown/undefined versions are treated as the
  * oldest legacy shape, matching the historical behaviour of this function.
  */
 export function restoreDraftStep(flow: Flow, step: number, version?: number): number {
   if (version === DRAFT_VERSION) return clampStep(flow, step);
-  if (version === 7) return clampStep(flow, v7ToV8(flow, step));
+  if (version === 8) return clampStep(flow, v8ToV9(flow, step));
+  if (version === 7) return clampStep(flow, v8ToV9(flow, v7ToV8(flow, step)));
   const v6Step = restoreLegacyStepToV6(flow, step, version);
-  return clampStep(flow, v7ToV8(flow, v6ToV7(flow, v6Step)));
+  return clampStep(flow, v8ToV9(flow, v7ToV8(flow, v6ToV7(flow, v6Step))));
 }

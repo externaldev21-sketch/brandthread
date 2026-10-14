@@ -6,6 +6,10 @@ const onboardingSource = readFileSync(
   path.resolve(__dirname, "../app/onboarding.tsx"),
   "utf8",
 );
+const signUpStepSource = readFileSync(
+  path.resolve(__dirname, "../components/onboarding/SignUpStep.tsx"),
+  "utf8",
+);
 const signInSource = readFileSync(
   path.resolve(__dirname, "../app/sign-in.tsx"),
   "utf8",
@@ -20,13 +24,17 @@ const authRouteSource = readFileSync(
 );
 
 describe("Apple auth end-to-end code contract", () => {
-  it("starts onboarding with Apple, activates only a completed session, then asks for role", () => {
+  it("starts onboarding with Apple after the role is chosen, activates only a completed session", () => {
     expect(onboardingSource).toContain("strategy: APPLE_OAUTH_STRATEGY");
-    expect(onboardingSource).toContain("if (result?.createdSessionId && result?.setActive)");
-    expect(onboardingSource).toContain("if (isOAuthFlowComplete(result))");
-    // After v6 restructure: AccountType is step 0, so after OAuth the user
-    // goes to NAME step (no longer ACCOUNT_TYPE). AccountType still exists.
-    expect(onboardingSource).toContain("BUYER_STEP_INDEX.ACCOUNT_TYPE");
+    expect(signUpStepSource).toContain("if (result?.createdSessionId && result?.setActive)");
+    expect(signUpStepSource).toContain("if (isOAuthFlowComplete(result))");
+    // v9: Shop / Sell sits on the Sign up screen itself, so the role is
+    // already chosen (and persisted) before Apple opens; afterwards → Profile.
+    expect(signUpStepSource).toContain("if (!flow) { setError('Choose Shop or Sell.'); return false; }");
+    expect(signUpStepSource).toContain("onBeforeAuth(flow);");
+    expect(onboardingSource).toContain("transitionTo(BUYER_STEP_INDEX.PROFILE, 1)");
+    // Apple leads on iOS (App Store 4.8 prominence).
+    expect(signUpStepSource.indexOf("key: 'apple' as const")).toBeLessThan(signUpStepSource.indexOf("key: 'google' as const"));
   });
 
   it("syncs buyer and seller profiles before binding completion to the Clerk user", () => {
@@ -46,7 +54,7 @@ describe("Apple auth end-to-end code contract", () => {
     const sellerBrandWrite = onboardingSource.indexOf("await api.auth.onboarding({");
     expect(sellerCompletion).toBeGreaterThan(sellerBrandWrite);
     expect(onboardingSource).toContain("[ONBOARDING_OWNER_KEY, profile.clerkId]");
-    // v6: buyers go to thread-explainer first, sellers still go to /(tabs)/
+    // Buyers go to thread-explainer first, sellers to /(tabs)/
     expect(onboardingSource).toContain("router.replace('/thread-explainer'");
     expect(onboardingSource).toContain("router.replace('/(tabs)/'");
   });

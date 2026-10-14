@@ -111,6 +111,9 @@ export function createFakeOnboardingApi() {
       if (body?.brandStage != null) user.brandStage = body.brandStage;
       return { status: 200, body: { ok: true } };
     }
+    if (p === '/public/username-check' && get) {
+      return { status: 200, body: { available: true } };
+    }
     if (p === '/auth/username/check' && get) {
       return { status: 200, body: { available: true } };
     }

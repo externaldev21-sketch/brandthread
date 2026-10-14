@@ -69,9 +69,13 @@ describe('legal documents (single source)', () => {
 describe('agreement at sign-up', () => {
   it('shows one linked line under the sign-up buttons and records agreement on continue', () => {
     const onboarding = read('app/onboarding.tsx');
-    expect((onboarding.match(/<LegalContinueNotice /g) ?? []).length).toBe(3);
-    // email, Google and Apple sign-up each remember the agreement when continuing
-    expect((onboarding.match(/recordConsent\(\);/g) ?? []).length).toBe(4);
+    const signUp = read('components/onboarding/SignUpStep.tsx');
+    expect((signUp.match(/<LegalContinueNotice /g) ?? []).length).toBe(1);
+    // Apple, Google and email all pass through beforeAccount(), which
+    // remembers the agreement before any account is created.
+    expect(signUp).toContain('void rememberPendingConsent();');
+    expect((signUp.match(/beforeAccount\(\)/g) ?? []).length).toBe(3);
+    expect(signUp).not.toContain('agreedToTerms');
     expect(onboarding).not.toContain('agreedToTerms');
     const consent = read('components/legal/LegalConsent.tsx');
     const notice = consent.slice(consent.indexOf('export function LegalContinueNotice'));

@@ -29,26 +29,16 @@ describe("seller onboarding identity handoff", () => {
 });
 
 describe("signup identity inputs", () => {
-  it("keeps username and referral fields editable, controlled, and above the animated layer", () => {
-    const usernameInput = source.indexOf('testID="onboarding-username-input"');
-    const referralInput = source.indexOf('testID="onboarding-referral-input"');
-
+  it("keeps the username field editable and controlled", () => {
+    const profile = readFileSync(path.resolve(__dirname, "../components/onboarding/ProfileStep.tsx"), "utf8");
+    const usernameInput = profile.indexOf('testID="onboarding-username-input"');
     expect(usernameInput).toBeGreaterThan(-1);
-    expect(referralInput).toBeGreaterThan(usernameInput);
-    expect(source.slice(usernameInput, referralInput)).toContain("value={username}");
-    expect(source.slice(usernameInput, referralInput)).toContain("onUsernameChange(cleaned)");
-    expect(source.slice(usernameInput, referralInput)).toContain("editable");
-
-    const referralSection = source.slice(referralInput, referralInput + 600);
-    expect(referralSection).toContain("value={referralCode}");
-    expect(referralSection).toContain("onReferralCodeChange(");
-    expect(referralSection).toContain("editable");
-
-    expect(source).toContain("isAuthStep && sm.interactiveStepWrap");
-    expect(source).toContain("translateX: transitionProgress.interpolate");
-    expect(source).toContain(
-      "interactiveStepWrap: { position: 'relative', zIndex: 2 }",
-    );
+    const field = profile.slice(usernameInput, usernameInput + 600);
+    expect(field).toContain("value={username}");
+    expect(field).toContain("onUsernameChange(cleanUsername(v))");
+    expect(field).toContain("editable");
+    // Mirrored to device storage so the postAuth remount can't drop it.
+    expect(source).toContain("void AsyncStorage.setItem(PENDING_USERNAME_KEY, value)");
   });
 });
 
