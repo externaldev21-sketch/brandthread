@@ -546,6 +546,8 @@ export const orders = pgTable('orders', {
   // 0 none, 1 = 5 days, 2 = 2 days, 3 = 12 hours warning already sent.
   deadlineWarningLevel: integer('deadline_warning_level').notNull().default(0),
   trackingPolledAt: timestamp('tracking_polled_at', { withTimezone: true }),
+  // Unboxing moment (migration 264): set when the buyer was shown it.
+  unboxingSeenAt: timestamp('unboxing_seen_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -2629,3 +2631,4 @@ export * from './comments';
 export * from './hashtags';
 export * from './captions';
 export * from './places';
+export * from './closet';

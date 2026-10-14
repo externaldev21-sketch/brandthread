@@ -15,9 +15,12 @@ export type FeatureFlagKey =
   | 'oauthAppleEnabled'
   | 'hostedCheckoutFallback'
   | 'live_tips'
-  | 'autoCaptions';
+  | 'autoCaptions'
+  | 'unboxingMoment';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
+  // Unboxing moment after a delivery; server-side kill switch.
+  unboxingMoment: true,
   aiPhotoShoot: true,
   outfitSwap: true,
   boosts: true,

@@ -10,6 +10,8 @@ import { BuyerTabBar } from '@/components/buyer-nav/BuyerTabBar';
 import { TabScreenErrorFallback } from '@/components/ErrorBoundary';
 import { getConversations, getNotifications, subscribeSocial } from '@/services/socialService';
 import { ThreadCashActiveTimeTracker } from '@/components/thread-cash/ThreadCashActiveTimeTracker';
+import { UnboxingHost } from '@/components/closet/UnboxingMoment';
+import { useAuth } from '@clerk/expo';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { getPreviewConversations, getPreviewNotifications } from '@/lib/previewInbox';
 import { useCommunityBadgeCount } from '@/lib/communities/useCommunityInbox';
@@ -152,6 +154,7 @@ function BuyerTabLayout() {
 // ─── Root export ──────────────────────────────────────────────────────────────
 
 export default function BuyerLayout() {
+  const { isSignedIn } = useAuth();
   useEffect(() => {
     getDeactivationStatus().then(status => {
       if (status?.active) reactivate();
@@ -165,6 +168,8 @@ export default function BuyerLayout() {
           own — see ThreadCashActiveTimeTracker for the 7-minute trigger and
           CelebrationHost for the money-burst it plays on a successful claim. */}
       <ThreadCashActiveTimeTracker />
+      {/* First open after a delivery: the one-time unboxing moment. */}
+      <UnboxingHost enabled={!!isSignedIn} />
     </>
   );
 }
