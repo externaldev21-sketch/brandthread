@@ -41,6 +41,8 @@ export interface ThreadComment {
   pinned?: boolean;
   /** The post owner liked this comment. */
   creatorLiked?: boolean;
+  /** The author is one of the post owner's first 100 buyers ("Day 1"). */
+  dayOne?: boolean;
   /** Server-verified @mentions in `body`. */
   mentions?: { userId: string; handle: string }[];
   replies: ThreadComment[];

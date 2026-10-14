@@ -3326,6 +3326,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ notified: number }>(`/api/waitlist/seller/notify/${encodeURIComponent(variantId)}`, {}),
     },
     /** Scheduled product launches + "Notify me". */
+    /** "Day 1" badges: the brands a person was one of the first 100 buyers of (public). */
+    dayOne: {
+      brands: (userId: string) =>
+        get<{ brands: Array<{ sellerId: string; name: string; handle: string; initials: string; avatarUrl: string | null; rank: number; since: string }> }>(
+          `/api/day-one/${encodeURIComponent(userId)}`),
+    },
     productLaunches: {
       /** Public: is this product waiting on a launch time? */
       state:       (productId: string) =>

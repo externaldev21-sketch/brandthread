@@ -31,6 +31,7 @@ import { publicPostCondition } from "../lib/postVisibility";
 import { notifyCommentActivity, notifyCommentLike, notifyCommentPinned } from "../lib/activityEvents";
 import { mentionsForComments, recordCommentMentions, resolveCommentMentions, type CommentMention } from "../lib/commentMentions";
 import { recordPostSignal } from "../lib/ranking/signals";
+import { dayOneAmong } from "../lib/dayOne";
 import {
   authorInGoodStanding,
   blockRelation,
@@ -71,6 +72,8 @@ export interface CommentView {
   creatorLiked: boolean;
   /** Verified @mentions, resolved server-side. */
   mentions: CommentMention[];
+  /** The author is one of the post owner's first 100 buyers ("Day 1", lib/dayOne.ts). */
+  dayOne: boolean;
   replies: CommentView[];
   /** Roots only: true when more replies exist beyond the inline page. */
   hasMoreReplies?: boolean;
@@ -221,6 +224,7 @@ router.get("/:postId/comments", async (req, res) => {
         : Promise.resolve([]),
       mentionsForComments(ids),
     ]);
+    const dayOne = await dayOneAmong(post.userId, shown.map((c) => c.authorId));
     const creatorLiked = new Set(creatorLikeRows.map((row) => row.commentId));
     const likes = new Map(likeRows.map((row) => [row.commentId, Number(row.n)]));
     const mine = new Set(myLikeRows.map((row) => row.commentId));
@@ -243,6 +247,7 @@ router.get("/:postId/comments", async (req, res) => {
       pinned: comment.pinnedAt != null,
       creatorLiked: creatorLiked.has(comment.id),
       mentions: (mentionsByComment.get(comment.id) ?? []).filter((m) => !blocked.has(m.userId)),
+      dayOne: dayOne.has(comment.authorId),
       replies: [],
     });
 
@@ -341,6 +346,7 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
       .from(postCommentLikes)
       .where(and(inArray(postCommentLikes.commentId, ids), eq(postCommentLikes.userId, post.userId))) : [];
     const creatorLikedIds = new Set(creatorLikedRows.map((row) => row.commentId));
+    const dayOne = await dayOneAmong(post.userId, shown.map((c) => c.authorId));
 
     const replies: CommentView[] = shown.map((comment) => ({
       id: comment.id,
@@ -360,6 +366,7 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
       pinned: false,
       creatorLiked: creatorLikedIds.has(comment.id),
       mentions: (mentionsByComment.get(comment.id) ?? []).filter((m) => !blocked.has(m.userId)),
+      dayOne: dayOne.has(comment.authorId),
       replies: [],
     }));
     return res.json({
@@ -463,7 +470,7 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
       void recordPostSignal(authorId, postId, "comment");
     }
 
-    const profiles = await profilesById([authorId]);
+    const [profiles, dayOne] = await Promise.all([profilesById([authorId]), dayOneAmong(post.userId, [authorId])]);
     const view: CommentView = {
       id: created.id,
       postId,
@@ -479,6 +486,7 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
       pinned: false,
       creatorLiked: false,
       mentions,
+      dayOne: dayOne.has(authorId),
       replies: [],
     };
     return res.status(201).json({

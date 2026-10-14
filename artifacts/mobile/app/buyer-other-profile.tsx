@@ -37,6 +37,8 @@ import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import { ProfileStoriesRow } from '@/components/profile/ProfileStoriesRow';
+import { ProfileBrandsRow } from '@/components/profile/ProfileBrandsRow';
+import { useProfileBrands } from '@/hooks/useProfileBrands';
 import { highlightFromServer, type Highlight } from '@/lib/highlightsService';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
@@ -92,6 +94,7 @@ export default function BuyerOtherProfileScreen() {
     userId: string; name: string; handle: string; initials: string; color: string; asVisitor?: string;
   }>();
   const previewAsVisitor = isVisitorPreviewParam(params.asVisitor);
+  const profileBrands = useProfileBrands(params.userId);
 
   // In dev-preview (including a Clerk-stubbed audit/e2e session) these
   // params can be the audit's own generic synthetic fallback (its
@@ -502,15 +505,20 @@ export default function BuyerOtherProfileScreen() {
           />
         )}
         meta={meta}
-        extras={highlights.length > 0 && !iBlockedThem ? (
-          <View testID="other-profile-highlights">
-            <ProfileStoriesRow
-              items={highlights.map((h) => ({ id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor, imageUri: h.coverUrl ?? null }))}
-              onPressItem={(item) => {
-                hapticLight();
-                router.push({ pathname: '/buyer-story-viewer' as any, params: { highlightId: item.id } });
-              }}
-            />
+        extras={(highlights.length > 0 || profileBrands.length > 0) && !iBlockedThem ? (
+          <View style={{ gap: 12 }}>
+            {highlights.length > 0 ? (
+              <View testID="other-profile-highlights">
+                <ProfileStoriesRow
+                  items={highlights.map((h) => ({ id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor, imageUri: h.coverUrl ?? null }))}
+                  onPressItem={(item) => {
+                    hapticLight();
+                    router.push({ pathname: '/buyer-story-viewer' as any, params: { highlightId: item.id } });
+                  }}
+                />
+              </View>
+            ) : null}
+            <ProfileBrandsRow items={profileBrands} />
           </View>
         ) : undefined}
         stats={stats}

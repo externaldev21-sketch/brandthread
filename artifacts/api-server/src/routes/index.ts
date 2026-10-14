@@ -107,6 +107,7 @@ import returnsRouter from "./returns";
 import returnLabelsRouter from "./return-labels";
 import sellerVerificationRouter from "./seller-verification";
 import productLaunchesRouter from "./product-launches";
+import dayOneRouter from "./day-one";
 import preorderTermsRouter from "./preorder-terms";
 import waitlistRouter from "./waitlist";
 import bundlesRouter from "./bundles";
@@ -263,6 +264,7 @@ router.use("/ai",              tc, aiSafetyGuard("ai-chat", { mode: "chat" }), a
 // Buyer routes are intentionally NOT wrapped with tc — buyer context must stay
 // scoped to the actual buyer, not the team store owner.
 router.use("/product-launches",          tc, productLaunchesRouter);
+router.use("/day-one",                   dayOneRouter);
 router.use("/preorder-terms",            tc, preorderTermsRouter);
 router.use("/waitlist",                  tc, waitlistRouter);
 router.use("/bundles",                   tc, bundlesRouter);

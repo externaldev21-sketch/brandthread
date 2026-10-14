@@ -58,6 +58,8 @@ import { ProfileVideoHeader, useHeroPosterOnly } from '@/components/profile/Prof
 import { ProfileStoryAvatar } from '@/components/profile/ProfileStoryAvatar';
 import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
 import { ProfileStoriesRow, type ProfileStoryItem } from '@/components/profile/ProfileStoriesRow';
+import { ProfileBrandsRow } from '@/components/profile/ProfileBrandsRow';
+import { useProfileBrands } from '@/hooks/useProfileBrands';
 import { loadHighlights, type Highlight } from '@/lib/highlightsService';
 import { Button } from '@/components/ui/Button';
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
@@ -374,6 +376,7 @@ export default function ProfileScreen() {
   const [heroHeight, setHeroHeight] = useState(0);
   const [heroOnScreen, setHeroOnScreen] = useState(true);
   const coverFlow = useProfileCover({ own: true, cover: serverCover, userId: user?.id });
+  const profileBrands = useProfileBrands(user?.id);
 
   // Sheets
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
@@ -936,6 +939,12 @@ export default function ProfileScreen() {
         />
       </View>
 
+      {profileBrands.length > 0 ? (
+        <View style={styles.brandsWrap}>
+          <ProfileBrandsRow items={profileBrands} />
+        </View>
+      ) : null}
+
       {threadCashEnabled ? (
         <View style={styles.streakWrap}>
           <ThreadCashStreakRow streak={threadCashStreak} onPress={() => router.push('/thread-cash' as never)} />
@@ -1052,6 +1061,7 @@ function makeStyles(theme: AppThemePreset) {
     actionSquare: { width: 36, paddingHorizontal: 0 },
     // Buttons → highlights: 16pt.
     highlightsWrap: { paddingTop: 16 },
+    brandsWrap: { paddingTop: 12 },
     // Highlights → streak card (or tabs, when Thread Cash is off): 16pt.
     streakWrap: { marginTop: 16 },
     // Streak card (or highlights) → tabs: 16pt above; tabs → grid: 1pt
