@@ -94,6 +94,7 @@ import { updateBuyerCashWidget } from '@/lib/nativeSystem';
 import { getClosetOutfits, getClosetPieces, type ClosetOutfit, type ClosetPiece } from '@/services/closetService';
 import { ClosetEmpty, ClosetOutfitTile, ClosetPieceTile, ClosetSubBar, PieceEditionLine, type ClosetView } from '@/components/closet/ClosetViews';
 import { ClosetProofCard } from '@/components/closet/ClosetProofCard';
+import { WrappedProfileCard } from '@/components/closet/WrappedProfileCard';
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -987,6 +988,9 @@ export default function ProfileScreen() {
           }}
         />
       </View>
+
+      {/* Monthly Wrapped: the one card, days 1–7 only, dismissible for good. */}
+      <WrappedProfileCard userId={user?.id} />
 
       {threadCashEnabled ? (
         <View style={styles.streakWrap}>

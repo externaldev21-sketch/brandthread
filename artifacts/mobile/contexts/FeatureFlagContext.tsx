@@ -19,11 +19,13 @@ export type FeatureFlagKey =
   | 'autoCaptions'
   | 'live_auctions'
   | 'nativeSurfaces'
-  | 'unboxingMoment';
+  | 'unboxingMoment'
+  | 'monthlyWrapped';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
-  // Unboxing moment after a delivery; server-side kill switch.
   unboxingMoment: true,
+  // Monthly Wrapped card on the buyer profile (days 1–7); server-side kill switch.
+  monthlyWrapped: true,
   aiPhotoShoot: true,
   outfitSwap: true,
   boosts: true,
