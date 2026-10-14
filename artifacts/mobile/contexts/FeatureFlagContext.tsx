@@ -15,7 +15,8 @@ export type FeatureFlagKey =
   | 'oauthAppleEnabled'
   | 'hostedCheckoutFallback'
   | 'live_tips'
-  | 'autoCaptions';
+  | 'autoCaptions'
+  | 'sharedPhotoTransition';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   aiPhotoShoot: true,
@@ -47,6 +48,10 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   // Auto captions (Whisper) on video posts. OFF until the server has the AI keys
   // and an operator flips it (PUT /api/feature-flags/autoCaptions).
   autoCaptions: false,
+  // Shared-element product photo (grid photo grows into the product page).
+  // ON; a server-side kill switch in case a device class misbehaves
+  // (PUT /api/config/features/sharedPhotoTransition { enabled: false }).
+  sharedPhotoTransition: true,
 };
 
 const STORAGE_KEY = 'bt:feature-flags:v1';

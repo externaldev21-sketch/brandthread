@@ -32,6 +32,8 @@ import { formatCents } from '@/lib/money';
 import { buildCanonicalCollectionUrl } from '@/lib/shareCollection';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { SharedPhotoFrame } from '@/components/sharedPhoto/SharedPhotoFrame';
+import { openWithSharedPhoto } from '@/lib/sharedPhoto';
 
 const { width: W } = Dimensions.get('window');
 const GAP = SP.sm;
@@ -163,7 +165,7 @@ export default function BuyerCollection() {
 
   function openItem(item: SavedItem) {
     if (item.type === 'product') {
-      router.push(`/thread-product-detail?productId=${encodeURIComponent(item.targetId)}&productName=${encodeURIComponent(item.title)}` as never);
+      openWithSharedPhoto(item.targetId, () => router.push(`/thread-product-detail?productId=${encodeURIComponent(item.targetId)}&productName=${encodeURIComponent(item.title)}` as never));
     } else if (item.type === 'post') {
       router.push(`/buyer-post-viewer?postId=${encodeURIComponent(item.targetId)}` as never);
     }
@@ -177,7 +179,7 @@ export default function BuyerCollection() {
         onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); removeItem(item); }}
         activeOpacity={0.85}
       >
-        <View style={styles.tileImageWrap}>
+        <SharedPhotoFrame productId={item.targetId} uri={item.type === 'product' ? item.image : null} radius={RADIUS.lg} style={styles.tileImageWrap}>
           {item.image ? (
             <CachedImage source={{ uri: item.image }} style={styles.tileImage} />
           ) : (
@@ -185,7 +187,7 @@ export default function BuyerCollection() {
               <Feather name="shopping-bag" size={22} color={theme.accent} />
             </View>
           )}
-        </View>
+        </SharedPhotoFrame>
         <View style={styles.tileInfo}>
           {item.brand ? <Text style={styles.tileBrand} numberOfLines={1}>{item.brand}</Text> : null}
           <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>

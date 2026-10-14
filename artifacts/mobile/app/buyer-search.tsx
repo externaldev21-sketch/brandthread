@@ -423,7 +423,7 @@ export default function BuyerSearchScreen() {
       <View style={styles.grid} onLayout={onGridLayout}>
         {items.map((item, index) => (
           <AnimatedEntrance key={item.id} delay={Math.min(index, 6) * 30}>
-            <ProductTile item={item} accent={primary} width={gridCardWidth} onPress={() => handleResultPress(item)} />
+            <ProductTile item={item} accent={primary} width={gridCardWidth} sharedPhoto onPress={() => handleResultPress(item)} />
           </AnimatedEntrance>
         ))}
       </View>

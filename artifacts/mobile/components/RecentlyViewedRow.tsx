@@ -10,6 +10,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { SharedPhotoFrame } from '@/components/sharedPhoto/SharedPhotoFrame';
+import { openWithSharedPhoto } from '@/lib/sharedPhoto';
 import { CachedImage } from '@/components/CachedImage';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -62,16 +64,18 @@ export function RecentlyViewedRow({ style }: { style?: object }) {
             accessibilityRole="button"
             accessibilityLabel={`${item.name}, ${item.brand}${item.priceCents != null ? `, ${formatCents(item.priceCents)}` : ''}`}
             onPress={() => {
-              router.push(`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}` as never);
+              openWithSharedPhoto(item.productId, () => router.push(`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}` as never));
             }}
           >
-            {item.image ? (
-              <CachedImage source={{ uri: item.image }} style={[s.image, { backgroundColor: theme.cardElevated }]} contentFit="cover" />
-            ) : (
-              <View style={[s.image, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
-                <Feather name="image" size={18} color={theme.muted} />
-              </View>
-            )}
+            <SharedPhotoFrame productId={item.productId} uri={item.image} radius={RADIUS.md}>
+              {item.image ? (
+                <CachedImage source={{ uri: item.image }} style={[s.image, { backgroundColor: theme.cardElevated }]} contentFit="cover" />
+              ) : (
+                <View style={[s.image, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Feather name="image" size={18} color={theme.muted} />
+                </View>
+              )}
+            </SharedPhotoFrame>
             <Text style={[s.name, { color: theme.text }]} numberOfLines={2}>{item.name}</Text>
             {item.priceCents != null && (
               <Text style={[s.price, { color: theme.muted }]}>{formatCents(item.priceCents)}</Text>
