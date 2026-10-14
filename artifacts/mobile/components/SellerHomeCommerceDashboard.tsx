@@ -1080,7 +1080,7 @@ export default function SellerHomeCommerceDashboard({
 
               {/* ── Action needed / top products / recent orders, or the new-seller setup card ── */}
               <View style={isTablet ? styles.tabletRow : undefined}>
-                {showReadyToSell ? null : newSeller ? (
+                {firstWeek.visible || showReadyToSell ? null : newSeller ? (
                   <View style={[isTablet && styles.tabletRowItem, styles.section]}>
                     <SellerDashboardSetupCard
                       theme={theme}

@@ -13,6 +13,7 @@ import { LEVEL_LABEL } from '@/lib/membershipLevels';
 export function useProfileBrands(userId?: string | null, own = false): ProfileBrandItem[] {
   const api = useApi();
   const [items, setItems] = useState<ProfileBrandItem[]>([]);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   useEffect(() => {
     if (!userId) { setItems([]); return; }
     let active = true;
@@ -35,9 +36,10 @@ export function useProfileBrands(userId?: string | null, own = false): ProfileBr
         if (!listed.has(b.sellerId)) out.push({ sellerId: b.sellerId, name: b.name, avatarUrl: b.avatarUrl, tags: ['Day 1'] });
       }
       setItems(out);
+      setLoadedFor(userId);
     });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, own]);
-  return items;
+  return userId && userId === loadedFor ? items : [];
 }

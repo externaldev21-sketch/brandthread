@@ -9,14 +9,20 @@ export function useBestMembershipLevel(): MembershipLevel | null {
   const api = useApi();
   const { userId } = useAuth();
   const [best, setBest] = useState<MembershipLevel | null>(null);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   useEffect(() => {
     if (!userId) { setBest(null); return; }
     let active = true;
     Promise.resolve().then(() => api.brandMembership.mine())
-      .then((r) => { if (active) setBest(bestLevel(r.brands.map((b) => b.level))); })
+      .then((r) => {
+        if (active) {
+          setBest(bestLevel(r.brands.map((b) => b.level)));
+          setLoadedFor(userId);
+        }
+      })
       .catch(() => { if (active) setBest(null); });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
-  return best;
+  return userId && userId === loadedFor ? best : null;
 }

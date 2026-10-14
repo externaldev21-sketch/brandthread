@@ -22,6 +22,8 @@ export interface StoreLinkState {
   copy: () => Promise<void>;
   share: () => Promise<void>;
   saveQr: () => Promise<void>;
+  /** Records successful sharing from the canonical sheet and standalone page. */
+  markShared: () => void;
 }
 
 async function writeClipboard(text: string): Promise<void> {

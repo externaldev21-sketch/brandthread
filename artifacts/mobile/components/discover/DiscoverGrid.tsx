@@ -13,6 +13,7 @@
  */
 import React, { forwardRef, useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import type { RefreshControlProps } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -101,7 +102,7 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
   sponsored?: ReadonlyArray<{ afterId: string; item: SponsoredFeedItem }>;
   renderSponsored?: (item: SponsoredFeedItem) => React.ReactElement;
   /** Pull-to-refresh control for the grid. */
-  refreshControl?: React.ReactElement;
+  refreshControl?: React.ReactElement<RefreshControlProps>;
   /**
    * 'explore' (default) is the 3-column Instagram Explore grid; 'masonry' is
    * the Pinterest-style staggered 2-column For You grid with "Trending now"
@@ -319,7 +320,6 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
       maintainVisibleContentPosition={MVCP_OFF}
       onEndReached={loading ? undefined : onEndReached}
       onEndReachedThreshold={0.6}
-      refreshControl={refreshControl as React.ComponentProps<typeof FlashList>['refreshControl']}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={contentContainerStyle}
       refreshControl={refreshControl}

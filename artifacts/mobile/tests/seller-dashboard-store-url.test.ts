@@ -39,7 +39,8 @@ describe('Dashboard: store URL + copy icon row next to the title', () => {
   });
 
   it('copying writes to the clipboard and flips a checkmark for ~1.2s — no toast, no haptic (copy is not in the haptics map)', () => {
-    const fnBody = dashboard.slice(dashboard.indexOf('const handleCopyStoreUrl = useCallback'), dashboard.indexOf('}, [storeUrl]);'));
+    const fnBody = dashboard.match(/const handleCopyStoreUrl = useCallback\([\s\S]*?\n\s*\}, \[[^\]]*\]\);/)?.[0] ?? '';
+    expect(fnBody).not.toBe('');
     expect(fnBody).not.toContain('haptics.');
     expect(fnBody).toContain('Clipboard.setStringAsync(storeUrl)');
     expect(fnBody).toContain('navigator?.clipboard?.writeText?.(storeUrl)');
