@@ -24,6 +24,9 @@ export interface ClosetPieceRow {
   orderedAt: Date;
   itemDeliveredAt: Date | null;
   orderDeliveredAt: Date | null;
+  quantity: number;
+  editionNumber: number | null;
+  editionSize: number | null;
 }
 
 export interface ClosetPiece {
@@ -38,6 +41,8 @@ export interface ClosetPiece {
   imageUrl: string | null;
   orderedAt: string;
   deliveredAt: string;
+  /** Numbered run: shown on the piece in the Closet only. */
+  edition: { number: number; quantity: number; size: number } | null;
 }
 
 function firstImage(images: unknown): string | null {
@@ -65,6 +70,9 @@ export function toClosetPieces(rows: ClosetPieceRow[]): ClosetPiece[] {
       imageUrl: firstImage(row.images),
       orderedAt: row.orderedAt.toISOString(),
       deliveredAt: delivered.toISOString(),
+      edition: row.editionNumber !== null && row.editionSize !== null
+        ? { number: row.editionNumber, quantity: row.quantity, size: row.editionSize }
+        : null,
     });
   }
   return pieces.sort((a, b) => b.deliveredAt.localeCompare(a.deliveredAt) || a.id.localeCompare(b.id));
@@ -88,6 +96,9 @@ export async function loadClosetPieceRows(buyerId: string, orderItemIds?: string
       orderedAt: orders.createdAt,
       itemDeliveredAt: orderItems.deliveredAt,
       orderDeliveredAt: orders.deliveredAt,
+      quantity: orderItems.quantity,
+      editionNumber: orderItems.editionNumber,
+      editionSize: products.editionSize,
     })
     .from(orderItems)
     .innerJoin(orders, eq(orders.id, orderItems.orderId))

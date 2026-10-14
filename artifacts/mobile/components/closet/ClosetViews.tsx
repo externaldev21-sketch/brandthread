@@ -12,6 +12,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { boardLayout, pieceCaption } from '@/lib/closet';
 import { FONT, FS, SP } from '@/lib/theme';
 import type { ClosetPiece } from '@/services/closetService';
+import { editionLabel, type PieceEdition } from '@/lib/editions';
 
 /** Every product photo in the app is 4:5. */
 export const PIECE_PHOTO_ASPECT = 5 / 4;
@@ -71,6 +72,12 @@ export function ClosetPieceTile({
       </View>
     </Pressable>
   );
+}
+
+/** "No. 014 of 200" under a numbered piece (Closet only). */
+export function PieceEditionLine({ edition }: { edition: PieceEdition }) {
+  const { theme } = useAppTheme();
+  return <Text style={[styles.edition, { color: theme.text }]} numberOfLines={1} testID="closet-piece-edition">{editionLabel(edition)}</Text>;
 }
 
 /** The pieces of one outfit, tiled edge to edge on a 4:5 board. */
@@ -179,6 +186,7 @@ const styles = StyleSheet.create({
   caption: { paddingHorizontal: SP.xs + 2, paddingTop: 6, paddingBottom: SP.sm + 2, gap: 1 },
   captionText: { fontFamily: FONT.medium, fontSize: FS.sm },
   captionMeta: { fontFamily: FONT.regular, fontSize: FS.meta },
+  edition: { fontFamily: FONT.semibold, fontSize: FS.meta, fontVariant: ['tabular-nums'], marginTop: 2 },
   subBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SP.md, paddingVertical: SP.sm + 2,

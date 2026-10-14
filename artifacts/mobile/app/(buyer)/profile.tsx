@@ -92,7 +92,8 @@ import { subscribeThreadCashChanged } from '@/lib/threadCashEvents';
 import { useScreenInteractive } from '@/lib/perf';
 import { updateBuyerCashWidget } from '@/lib/nativeSystem';
 import { getClosetOutfits, getClosetPieces, type ClosetOutfit, type ClosetPiece } from '@/services/closetService';
-import { ClosetEmpty, ClosetOutfitTile, ClosetPieceTile, ClosetSubBar, type ClosetView } from '@/components/closet/ClosetViews';
+import { ClosetEmpty, ClosetOutfitTile, ClosetPieceTile, ClosetSubBar, PieceEditionLine, type ClosetView } from '@/components/closet/ClosetViews';
+import { ClosetProofCard } from '@/components/closet/ClosetProofCard';
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -296,6 +297,7 @@ export default function ProfileScreen() {
   const [closetPieces, setClosetPieces] = useState<ClosetPiece[]>([]);
   const [closetOutfits, setClosetOutfits] = useState<ClosetOutfit[]>([]);
   const [closetView, setClosetView] = useState<ClosetView>('pieces');
+  const [proofPiece, setProofPiece] = useState<ClosetPiece | null>(null);
   const [loading, setLoading] = useState(true);
   useScreenInteractive('profile', !loading);
   const [loadError, setLoadError] = useState(false);
@@ -565,6 +567,8 @@ export default function ProfileScreen() {
   }, []);
 
   const handleClosetPiecePress = useCallback((piece: ClosetPiece) => {
+    // A numbered piece opens its proof card; everything else its product page.
+    if (piece.edition) { hapticSelection(); setProofPiece(piece); return; }
     if (!piece.productId) return;
     hapticSelection();
     router.push(`/buyer-product-detail?productId=${encodeURIComponent(piece.productId)}` as never);
@@ -796,6 +800,7 @@ export default function ProfileScreen() {
           piece={item.piece}
           width={layout.tileWidth}
           onPress={handleClosetPiecePress}
+          footer={item.piece.edition ? <PieceEditionLine edition={item.piece.edition} /> : undefined}
           testID={`closet-piece-${item.piece.id}`}
         />
       );
@@ -1048,6 +1053,14 @@ export default function ProfileScreen() {
       />
       </ProfileEmptyAreaContext.Provider>
 
+      <ClosetProofCard
+        piece={proofPiece}
+        onClose={() => setProofPiece(null)}
+        onViewProduct={(piece) => {
+          setProofPiece(null);
+          router.push(`/buyer-product-detail?productId=${encodeURIComponent(piece.productId ?? '')}` as never);
+        }}
+      />
       <CoverCoachmarkSheet
         visible={coverFlow.coachmarkVisible}
         onAdd={() => { coverFlow.dismissCoachmark(); coverFlow.startAdd(); }}
