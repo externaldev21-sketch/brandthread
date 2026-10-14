@@ -243,6 +243,28 @@ export async function listPages(
   }));
 }
 
+/**
+ * The connected Instagram professional account's recent posts (needs the
+ * `instagram_basic` scope the Meta connection already requests). Used by the
+ * one-tap product import; read-only.
+ */
+export async function listInstagramMedia(
+  accessToken: string,
+  igUserId: string,
+  limit = 50,
+): Promise<Array<{
+  id: string; caption?: string | null; media_type?: string; media_url?: string | null; timestamp?: string | null;
+  children?: { data?: Array<{ media_type?: string; media_url?: string | null }> } | null;
+}>> {
+  const url = `${graphBase()}/${encodeURIComponent(igUserId)}/media?${qs({
+    fields: "id,caption,media_type,media_url,timestamp,children{media_type,media_url}",
+    limit: Math.min(Math.max(limit, 1), 100),
+    access_token: accessToken,
+  })}`;
+  const body = await metaGet(url, "metaGraph.listInstagramMedia");
+  return Array.isArray(body?.data) ? body.data : [];
+}
+
 // ─── Pixel ──────────────────────────────────────────────────────────────────
 
 export async function getOrCreatePixel(accessToken: string, adAccountId: string): Promise<{ id: string }> {

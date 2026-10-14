@@ -1,4 +1,4 @@
-export type ImportSource = "shopify_csv" | "etsy_csv" | "generic_csv" | "etsy_api";
+export type ImportSource = "shopify_csv" | "etsy_csv" | "generic_csv" | "etsy_api" | "shopify_url" | "instagram_api";
 export type CsvLayout = "shopify" | "etsy" | "generic";
 
 export const LAYOUT_SOURCE: Record<CsvLayout, ImportSource> = {
