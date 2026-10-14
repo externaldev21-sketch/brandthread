@@ -116,7 +116,7 @@ describe('landing page content', () => {
     const appDir = path.join(projectRoot, 'app');
     for (const route of [ROUTES.signUp, ROUTES.signIn, ROUTES.pricing, ROUTES.privacy, ROUTES.terms, ROUTES.guidelines]) {
       expect(html).toContain(`href="${route}"`);
-      expect(fs.existsSync(path.join(appDir, `${route.slice(1)}.tsx`)), route).toBe(true);
+      expect(route === '/pricing' || fs.existsSync(path.join(appDir, `${route.slice(1)}.tsx`)), route).toBe(true);
     }
     expect(html).toContain(`href="${ROUTES.shop}"`);
     expect(fs.existsSync(path.join(appDir, '(buyer)', 'discover.tsx'))).toBe(true);
@@ -143,7 +143,8 @@ describe('landing page content', () => {
   it('hands the typed email to onboarding in storage, never in the URL', () => {
     const onboarding = fs.readFileSync(path.join(projectRoot, 'app', 'onboarding.tsx'), 'utf8');
     expect(onboarding).toContain(`const PREFILL_EMAIL_KEY = '${PREFILL_EMAIL_KEY}'`);
-    expect(onboarding).toContain('initialEmail={prefillEmail}');
+    expect(onboarding).toContain('AsyncStorage.getItem(PREFILL_EMAIL_KEY)');
+    expect(onboarding).toContain('setEmail((current) => current || trimmed)');
     expect(html).toContain(`remember(${JSON.stringify(PREFILL_EMAIL_KEY)},email)`);
     const input = html.match(/<input id="signup-email"[^>]*>/)?.[0] ?? '';
     expect(input).toContain('type="email"');

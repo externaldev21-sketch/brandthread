@@ -135,14 +135,15 @@ describe('landing pricing section', () => {
     expect(runTrialScript(html, new Date(2026, 9, 13, 9))).toEqual(['Oct 20', 'Oct 20']);
   });
 
-  it('stays static: no requests, so the signed-out page never calls an API', () => {
-    expect(html).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|\/api\//);
+  it('keeps pricing static while the hero may fetch public marketplace statistics', () => {
+    expect(pricing.renderLandingPricingSection(catalogue)).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|\/api\//);
+    expect(html).toContain('/api/v1/public/stats');
   });
 
-  it('renders exactly as before without a catalogue', () => {
+  it('omits plan cards without a catalogue while retaining the public pricing link', () => {
     const bare = landing.renderLandingHtml({});
     expect(bare).not.toContain('id="pricing"');
-    expect(bare).not.toContain('/pricing');
+    expect(bare).toContain('href="/pricing"');
   });
 });
 

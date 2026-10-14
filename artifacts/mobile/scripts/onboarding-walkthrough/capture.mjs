@@ -355,9 +355,7 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir, demo })
       await page.getByTestId('onboarding-store-preview').waitFor({ timeout: 15_000 });
       await page.getByTestId('onboarding-building-done').waitFor({ timeout: 15_000 });
       await shot('store-ready');
-      await page.getByTestId('onboarding-generate-sample').click();
-      await page.getByTestId('onboarding-generate-sample').waitFor({ state: 'detached', timeout: 15_000 });
-      await shot('store-ready-with-logo');
+      if (await page.getByTestId('onboarding-generate-sample').count()) throw new Error('Removed logo prompt is still present');
       await page.getByTestId('onboarding-building-done').click();
     });
 

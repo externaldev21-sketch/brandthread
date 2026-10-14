@@ -19,7 +19,7 @@ import { SPACING } from '@/constants/spacing';
 import { radius } from '@/constants/radii';
 import { COUNTRIES } from '@/lib/addressRegions';
 
-export interface ChoiceOption { value: string; label: string; description?: string; icon: IconName }
+export interface ChoiceOption { value: string; label: string; description?: string; icon?: IconName }
 
 export const BRAND_STAGE_OPTIONS: ChoiceOption[] = [
   { value: 'idea', label: 'Just an idea', description: "I'm starting from zero.", icon: 'edit-3' },
@@ -62,7 +62,7 @@ export function ChoiceCard({ option, selected, multi, onPress, testID }: { optio
         {selected && multi ? <Icon name="check" size={14} color={palette.background} /> : null}
         {selected && !multi ? <View style={[styles.radioDot, { backgroundColor: palette.foreground }]} /> : null}
       </View>
-      <Icon name={option.icon} size={20} color={palette.foreground} />
+      {option.icon ? <Icon name={option.icon} size={20} color={palette.foreground} /> : null}
       <View style={styles.cardText}>
         <Text style={[styles.cardTitle, { color: palette.foreground }]}>{option.label}</Text>
         {option.description ? (
@@ -219,7 +219,7 @@ function StorePreview({ brandName, username, logoUri }: { brandName: string; use
 
 export function BuildingStoreStep({
   brandName, username, building, buildError, onRetryBuild, logoUri, sampleStyle, onSampleStyle,
-  onGenerate, generating, sampleError, sampleUnavailable, onDone, finishing,
+  onGenerate, generating, sampleError, sampleUnavailable, onDone, finishing, showLogoSample = true,
 }: {
   brandName: string;
   username: string;
@@ -234,12 +234,13 @@ export function BuildingStoreStep({
   sampleError?: string | null;
   /** The free sample was already used on this device/email; don't offer it again. */
   sampleUnavailable?: boolean;
+  showLogoSample?: boolean;
   onDone: () => void;
   finishing?: boolean;
 }) {
   const palette = useColors();
   const insets = useSafeAreaInsets();
-  const canOfferSample = !logoUri && !sampleUnavailable;
+  const canOfferSample = showLogoSample && !logoUri && !sampleUnavailable;
   return (
     <View style={styles.root} testID="onboarding-building-step">
       <ScrollView contentContainerStyle={[styles.scroll, styles.buildingScroll]} showsVerticalScrollIndicator={false}>

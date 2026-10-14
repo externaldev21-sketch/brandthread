@@ -89,8 +89,9 @@ describe("account creation order and safety", () => {
     expect(source).toContain("if (authMethod !== 'email') { await runOAuth(authMethod); return; }");
   });
 
-  it("buyer lands on the thread explainer, seller on the dashboard", () => {
-    expect(source).toContain("router.replace('/thread-explainer'");
+  it("buyer lands directly on the feed, seller on the dashboard", () => {
+    expect(source).toContain("router.replace('/(buyer)/'");
+    expect(source).toContain("thread_explainer_seen:${userId}");
     expect(source).toContain("router.replace('/(tabs)/'");
   });
 });

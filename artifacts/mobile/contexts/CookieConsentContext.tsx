@@ -44,7 +44,7 @@ export { COOKIE_CONSENT_VERSION, CookieConsent, canUseAnalytics, canUseMarketing
 
 const KEY = 'bt:cookie-consent';
 // Keep the card off pre-auth screens with bottom-pinned actions.
-const SUPPRESS_ON_PATHNAMES = new Set(['/splash', '/sign-in', '/onboarding', '/forgot-password']);
+const SUPPRESS_ON_PATHNAMES = new Set(['/splash', '/sign-in', '/onboarding', '/forgot-password', '/account-type', '/thread-explainer']);
 /** The raised surface on the monochrome theme (its card colour is pure black). */
 const RAISED_SURFACE = '#1C1C1E';
 /** A short beat after launch, so the first-run coach (which checks the server

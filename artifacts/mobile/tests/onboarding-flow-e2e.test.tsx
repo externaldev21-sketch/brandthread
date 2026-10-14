@@ -136,7 +136,7 @@ vi.mock('react-native', () => {
     stopAnimation() {}
     interpolate() { return this.value; }
   }
-  const timing = () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }) });
+  const timing = () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }), stop: () => {} });
   return {
     ActivityIndicator: host('ActivityIndicator'),
     Alert: { alert: vi.fn() },
@@ -654,7 +654,8 @@ describe('onboarding flow (buyer, Instagram order)', () => {
 
     const updateProfileCall = apiCalls.find((c) => c.name === 'auth.updateProfile');
     expect(updateProfileCall!.args[0]).toMatchObject({ accountType: 'buyer', username: 'bailey_rivera', name: 'Bailey Rivera' });
-    expect(routerReplaceMock).toHaveBeenCalledWith('/thread-explainer');
+    expect(routerReplaceMock).toHaveBeenCalledWith('/(buyer)/');
+    expect(memoryStorage.get('thread_explainer_seen:user_buyer_e2e')).toBe('true');
 
     // The draft is cleared once onboarding finishes.
     expect([...memoryStorage.keys()].some((k) => k.startsWith('onboarding_draft:') || k === 'onboarding_pending_draft')).toBe(false);
@@ -713,8 +714,8 @@ describe('onboarding flow (seller, Shopify order)', () => {
     // "Building your store": the seller's own preview, before anything paid.
     expect(has(renderer, 'onboarding-store-preview')).toBe(true);
     await settle();
-    await tap(renderer, 'onboarding-generate-sample');
-    expect(api.logo.onboardingSample).toHaveBeenCalledWith('Noir Field Studio', 'Minimalist', 'install-test-0000-0000');
+    expect(has(renderer, 'onboarding-generate-sample')).toBe(false);
+    expect(api.logo.onboardingSample).not.toHaveBeenCalled();
     await tap(renderer, 'onboarding-building-done');
 
     // Plan + free trial right after the preview, Dev's exact copy, no skip.
@@ -976,6 +977,10 @@ async function press(renderer: ReactTestRenderer, node: ReactTestRenderer['root'
 }
 
 async function fillAndCreate(renderer: ReactTestRenderer, _role: 'buyer' | 'seller', email: string) {
+  // Current seller questions precede account creation; don't assume the legacy
+  // single sign-up form immediately follows the role selection.
+  if (has(renderer, 'onboarding-question-skip-all')) await tap(renderer, 'onboarding-question-skip-all');
+  if (has(renderer, 'onboarding-location-step')) await tap(renderer, 'onboarding-question-next');
   if (renderer.root.findAll((n) => n.props.testID === 'onboarding-first-name-input').length) {
     await type(renderer, 'onboarding-first-name-input', 'New Seller');
     await tap(renderer, 'onboarding-name-next');
@@ -996,7 +1001,7 @@ function onCodeStep(renderer: ReactTestRenderer): boolean {
 
 function findButtonByLabel(renderer: ReactTestRenderer, label: string): ReactTestRenderer['root'] {
   const node = renderer.root.findAll((n) => typeof n.props.onPress === 'function'
-    && (n.props.accessibilityLabel === label || JSON.stringify(n.props.children).includes(label)))[0];
+    && (n.props.accessibilityLabel === label || n.props.label === label || n.props.children === label))[0];
   if (!node) throw new Error(`Missing button: ${label}`);
   return node;
 }
@@ -1068,9 +1073,7 @@ describe('onboarding sign-up — new email always reaches the code step', () => 
   it('(b) device already signed into another account: no "Already signed in" screen, straight to the code', async () => {
     clerkStore.isSignedIn = true;
     clerkStore.userId = 'user_other_account';
-    memoryStorage.set('onboarding_pending_flow', 'seller'); // lands on the Auth step while signed in
-    renderer = await renderScreen();
-    await act(async () => { await Promise.resolve(); });
+    renderer = await startCreate('seller');
     expect(screenText(renderer)).not.toContain('Already signed in');
     await fillAndCreate(renderer, 'seller', 'fresh-b@onboarding-e2e.test');
     expectCodeStepFor(renderer, 'fresh-b@onboarding-e2e.test');
@@ -1080,9 +1083,7 @@ describe('onboarding sign-up — new email always reaches the code step', () => 
     clerkStore.isSignedIn = true;
     clerkStore.userId = 'user_other_account';
     clerkStore.singleSession = true;
-    memoryStorage.set('onboarding_pending_flow', 'buyer');
-    renderer = await renderScreen();
-    await act(async () => { await Promise.resolve(); });
+    renderer = await startCreate('buyer');
     await fillAndCreate(renderer, 'buyer', 'fresh-b2@onboarding-e2e.test');
     expect(clerkStore.isSignedIn).toBe(false);
     expectCodeStepFor(renderer, 'fresh-b2@onboarding-e2e.test');

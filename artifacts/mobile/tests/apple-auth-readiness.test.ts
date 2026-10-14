@@ -46,7 +46,7 @@ describe("Apple auth end-to-end code contract", () => {
     expect(sellerCompletion).toBeGreaterThan(sellerBrandWrite);
     expect(onboardingSource).toContain("[ONBOARDING_OWNER_KEY, profile.clerkId]");
     // v6: buyers go to thread-explainer first, sellers still go to /(tabs)/
-    expect(onboardingSource).toContain("router.replace('/thread-explainer'");
+    expect(onboardingSource).toContain("router.replace('/(buyer)/' as never)");
     expect(onboardingSource).toContain("router.replace('/(tabs)/'");
   });
 

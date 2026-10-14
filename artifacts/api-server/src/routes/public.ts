@@ -29,6 +29,7 @@ import { buildFacets, parseSearchFilters, type FacetRow } from "../lib/searchFil
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
 import { parseFeaturedHandles, shapeFeaturedBrands } from "../lib/onboardingFeaturedBrands";
+import { brandProductsBySeller, photoBrandsFirst } from "../lib/discoverBrandProducts";
 import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant } from "../lib/publicProfile";
 import { matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
@@ -1393,16 +1394,34 @@ router.get("/brands/discover", async (req, res) => {
       .limit(lim * 2); // small buffer before app-side ranking/limit
 
     const ranked = rankDiscoverBrands(sellers).slice(0, lim);
+    const sellerIds = ranked.map((s) => s.clerkId);
+    const activeProduct = sellerIds.length > 0
+      ? and(inArray(products.ownerId, sellerIds), eq(products.status, "active"), isNull(products.deletedAt))
+      : undefined;
+    const [recent, counts] = activeProduct
+      ? await Promise.all([
+          db.select({ ownerId: products.ownerId, images: products.images })
+            .from(products).where(activeProduct)
+            .orderBy(desc(products.createdAt), asc(products.id)).limit(sellerIds.length * 8),
+          db.select({ ownerId: products.ownerId, total: count() })
+            .from(products).where(activeProduct).groupBy(products.ownerId),
+        ])
+      : [[], []];
+    const productsBySeller = brandProductsBySeller(
+      sellerIds, recent, new Map(counts.map((c) => [c.ownerId, Number(c.total)])),
+    );
 
     res.json({
-      brands: ranked.map((s) => ({
+      brands: photoBrandsFirst(ranked.map((s) => ({
         id:          s.clerkId,
         sellerId:    s.clerkId,
         name:        s.brandName || s.displayName || "Brand",
         brandType:   s.brandType ?? null,
         logoUrl:     s.profileImageUrl ?? s.avatarUrl ?? null,
         verified:    deriveSellerVerified(s),
-      })),
+        productCount: productsBySeller.get(s.clerkId)?.productCount ?? 0,
+        productImages: productsBySeller.get(s.clerkId)?.productImages ?? [],
+      }))),
     });
   } catch (err) {
     req.log.error({ err }, "Failed to fetch discover brands");

@@ -483,11 +483,15 @@ function writeLandingPage(outputDir, projectRoot, env = process.env) {
     pricing: require('./plan-catalogue').loadPlanCatalogue(projectRoot),
   });
   fs.writeFileSync(path.join(outputDir, 'landing.html'), html);
-  fs.writeFileSync(path.join(outputDir, PRICING_FILE), renderPricingHtml(require('./plan-catalogue').loadPlanCatalogue(projectRoot)));
+  fs.writeFileSync(path.join(outputDir, PRICING_FILE), renderPricingHtml(require('./plan-catalogue').loadPlanCatalogue(), {
+    CANONICAL_ORIGIN, LOGO_URL, BASE_CSS: CSS, ROUTES, PENDING_FLOW_KEY,
+  }));
   return html;
 }
 
 module.exports = {
+  BASE_CSS: CSS,
+  LOGO_URL,
   PRICING_FILE,
   writeLandingPage,
   ASSET_DIR,

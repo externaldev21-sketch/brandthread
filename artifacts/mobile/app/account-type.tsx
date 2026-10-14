@@ -36,15 +36,13 @@ import { RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
 const OPTIONS: (ChoiceOption & { value: AccountType })[] = [
   {
     value: 'buyer',
-    icon: 'shopping-bag',
     label: "I'm here to shop",
-    description: 'Discover brands, watch content and buy from the Thread.',
+    description: 'Discover independent brands and shop their drops.',
   },
   {
     value: 'seller',
-    icon: 'scissors',
     label: "I'm building a brand",
-    description: 'Design, make, sell and run your brand in one workspace.',
+    description: 'Design, make and sell your brand in one place.',
   },
 ];
 

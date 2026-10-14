@@ -49,7 +49,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 
 
-import { suggestUsername } from '@/lib/onboarding/usernameSuggestion';
+import { suggestUsername, withSuffix } from '@/lib/onboarding/usernameSuggestion';
 
 import { classifySignUpCreateError, identifierTakenMessage } from '@/lib/onboarding/signUpErrors';
 
@@ -93,6 +93,7 @@ import type { QuizSwipe } from '@/lib/tasteQuiz';
 import { Icon, Input } from '@/components/ui';
 
 import { WelcomeStep } from '@/components/onboarding/WelcomeStep';
+import { SegmentedProgress } from '@/components/onboarding/SegmentedProgress';
 
 import { BrandsToFollowStep } from '@/components/onboarding/BrandsToFollowStep';
 import { InterestTileGrid } from '@/components/onboarding/InterestTileGrid';
@@ -144,6 +145,7 @@ const DEFAULT_BUYER_INTERESTS = ['Basics', 'Minimal', 'Sustainable fashion'];
  * buyer/seller question, then cleared.
  */
 const PENDING_FLOW_KEY = 'onboarding_pending_flow';
+const PREFILL_EMAIL_KEY = 'onboarding_prefill_email';
 /** Device-scoped keys from the previous (v8) flow; cleared so they can't leak into this one. */
 const LEGACY_PENDING_KEYS = ['onboarding_draft', PENDING_FLOW_KEY, 'onboarding_pending_username'];
 
@@ -324,6 +326,7 @@ export default function OnboardingScreen() {
   const [planId, setPlanId] = useState<SellerPlanId | null>(null);
 
   const usernameLiveCheck = useUsernameLiveCheck(stepId === 'USERNAME' ? username : '');
+  const suggestionAttempt = useRef(0);
   const ctx = useMemo(() => ({ accountReady, authMethod }), [accountReady, authMethod]);
 
   // ── Transition ────────────────────────────────────────────────────────────
@@ -412,8 +415,8 @@ export default function OnboardingScreen() {
     void (async () => {
       try {
         const storedFlow = await AsyncStorage.getItem(PENDING_FLOW_KEY).catch(() => null);
-        const landingEmail = await AsyncStorage.getItem('onboarding_prefill_email').catch(() => null);
-        await AsyncStorage.removeItem('onboarding_prefill_email').catch(() => {});
+        const landingEmail = await AsyncStorage.getItem(PREFILL_EMAIL_KEY).catch(() => null);
+        await AsyncStorage.removeItem(PREFILL_EMAIL_KEY).catch(() => {});
         if (!isAddAccount && landingEmail) {
           const trimmed = landingEmail.trim();
           if (trimmed.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
@@ -548,6 +551,12 @@ export default function OnboardingScreen() {
     const suggestion = suggestUsername({ brandName: flow === 'seller' ? brandName : '', name: fullName, email });
     if (suggestion) setUsername(suggestion);
   }, [brandName, email, flow, fullName, stepId, username, usernameEdited]);
+
+  useEffect(() => {
+    if (stepId !== 'USERNAME' || usernameEdited || !usernameLiveCheck.error || suggestionAttempt.current >= 20) return;
+    const base = suggestUsername({ brandName: flow === 'seller' ? brandName : '', name: fullName, email });
+    if (base) setUsername(withSuffix(base, ++suggestionAttempt.current));
+  }, [brandName, email, flow, fullName, stepId, usernameEdited, usernameLiveCheck.error]);
 
   // ── Account type ──────────────────────────────────────────────────────────
   function continueFromAccountType() {
@@ -825,6 +834,11 @@ export default function OnboardingScreen() {
     });
   }
 
+  async function landOnFeed(userId: string) {
+    await AsyncStorage.setItem(`thread_explainer_seen:${userId}`, 'true');
+    router.replace('/(buyer)/' as never);
+  }
+
   async function finishBuyer(retryAttempt = false) {
     if (finishing) return;
     setFinishing(true);
@@ -861,7 +875,7 @@ export default function OnboardingScreen() {
       ]);
       await AsyncStorage.multiRemove([userDraftKey(profile.clerkId)!, PENDING_DRAFT_KEY]);
       void registerGrantedPushToken(profile.clerkId, api);
-      router.replace('/thread-explainer' as never);
+      await landOnFeed(profile.clerkId);
     } catch (error) {
       setFinishing(false);
       logBuyerFailure(failureStage, error, retryAttempt);
@@ -879,7 +893,7 @@ export default function OnboardingScreen() {
         }
         void saveBuyerSurvey(profileId, survey, styleInterests, api);
         void syncBuyerOnboarding(profileId, styleInterests, api).catch((e) => logBuyerFailure('background-retry', e, true));
-        router.replace('/thread-explainer' as never);
+        await landOnFeed(profileId);
         return;
       }
       Alert.alert(
@@ -1213,7 +1227,7 @@ export default function OnboardingScreen() {
             primary={{ label: 'Next', onPress: () => goNext('BRANDS'), disabled: survey.likedBrandIds.length === 0, testID: 'onboarding-brands-next' }}
             secondary={{ label: 'Skip', onPress: () => goNext('BRANDS'), testID: 'onboarding-brands-skip' }}
           >
-            <BrandsToFollowStep onLikedChange={setSurveyBrands} />
+            <BrandsToFollowStep onLikedChange={setSurveyBrands} onNoBrands={() => goNext('BRANDS')} />
           </StepScreen>
         );
 
@@ -1223,6 +1237,7 @@ export default function OnboardingScreen() {
       case 'BUILDING':
         return (
           <BuildingStoreStep
+            showLogoSample={false}
             brandName={brandName.trim()}
             username={username}
             building={building || (!built && !buildError)}
@@ -1271,8 +1286,8 @@ export default function OnboardingScreen() {
   }
 
   const fullBleed = stepId === 'WELCOME' || stepId === 'FEED_PREVIEW';
-  const buyerProgressSteps: StepId[] = flow === 'buyer'
-    ? stepsFor('buyer', ctx).filter((id) => id !== 'WELCOME' && id !== 'FEED_PREVIEW')
+  const buyerProgressSteps: StepId[] = flow
+    ? stepsFor(flow, ctx).filter((id) => id !== 'WELCOME' && id !== 'FEED_PREVIEW')
     : [];
   const buyerProgressIndex = buyerProgressSteps.indexOf(stepId);
   const showBack = !fullBleed
@@ -1309,9 +1324,7 @@ export default function OnboardingScreen() {
           accessibilityValue={{ min: 0, max: buyerProgressSteps.length, now: buyerProgressIndex + 1 }}
           style={{ flexDirection: 'row', gap: 3, paddingHorizontal: SPACING.md, paddingTop: SPACING.xs }}
         >
-          {buyerProgressSteps.map((id, index) => (
-            <View key={id} style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: index <= buyerProgressIndex ? theme.text : theme.border }} />
-          ))}
+          <SegmentedProgress current={buyerProgressIndex} total={buyerProgressSteps.length} style={{ flex: 1 }} />
         </View>
       ) : null}
 

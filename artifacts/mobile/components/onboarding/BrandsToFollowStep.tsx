@@ -8,7 +8,7 @@ import { haptics } from '@/lib/haptics';
  * app, using the same follow mechanism as the rest of the app
  * (socialService.setSellerFollowing) — no parallel follow system.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CachedImage as Image } from '@/components/CachedImage';
 import { Icon } from '@/components/ui';
@@ -21,8 +21,13 @@ import { SPACE } from './onboardingTokens';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { FILL_ELEVATED, FONT, TEXT } from '@/lib/theme';
 import { FeaturedBrandsRail } from './FeaturedBrandsRail';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import { demoOnboardingBrands } from '@/lib/onboarding/demoBrands';
 
-export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerIds: string[]) => void } = {}) {
+export function BrandsToFollowStep({ onLikedChange, onNoBrands }: {
+  onLikedChange?: (sellerIds: string[]) => void;
+  onNoBrands?: () => void;
+} = {}) {
   const { theme } = useAppTheme();
   const styles = createStyles(theme);
 
@@ -34,18 +39,24 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
   const [loadError, setLoadError] = useState(false);
   const [following, setFollowing] = useState<Record<string, boolean>>({});
   const [pending, setPending] = useState<Record<string, boolean>>({});
+  const skipped = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    if (isPreviewDemoMode()) {
+      setBrands(demoOnboardingBrands());
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadError(false);
-    featuredBrands()
+    const featuredRequest = featuredBrands()
       .then((list) => { if (!cancelled) setFeatured(list); })
       .catch(() => { /* optional rail — the rest of the step still works */ });
     discoverBrands(24)
       .then((list) => { if (!cancelled) setBrands(list); })
       .catch(() => { if (!cancelled) setLoadError(true); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .finally(async () => { await featuredRequest; if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
 
@@ -53,8 +64,14 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
   // liked_brand_ids (follows above are unchanged).
   useEffect(() => {
     if (!onLikedChange) return;
-    onLikedChange(Object.keys(following).filter((id) => following[id]));
+    onLikedChange(Object.keys(following).filter((id) => following[id] && !id.startsWith('preview-brand-')));
   }, [following, onLikedChange]);
+
+  useEffect(() => {
+    if (loading || loadError || brands.length || featured.length || skipped.current || !onNoBrands) return;
+    skipped.current = true;
+    onNoBrands();
+  }, [loading, loadError, brands.length, featured.length, onNoBrands]);
 
   async function toggleFollow(brand: { sellerId: string }) {
     const next = !following[brand.sellerId];
@@ -62,6 +79,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
     // Optimistic — the follow API itself is the source of truth; on failure
     // we revert the toggle rather than losing the app to an inconsistent state.
     setFollowing((prev) => ({ ...prev, [brand.sellerId]: next }));
+    if (brand.sellerId.startsWith('preview-brand-')) return;
     setPending((prev) => ({ ...prev, [brand.sellerId]: true }));
     try {
       await setSellerFollowing(brand.sellerId, next);
@@ -80,7 +98,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
       toFollow.forEach((b) => { next[b.sellerId] = true; });
       return next;
     });
-    await Promise.all(toFollow.map((b) =>
+    await Promise.all(toFollow.filter((b) => !b.sellerId.startsWith('preview-brand-')).map((b) =>
       setSellerFollowing(b.sellerId, true).catch(() => {
         setFollowing((prev) => ({ ...prev, [b.sellerId]: false }));
       }),
@@ -112,10 +130,6 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
       />
 
       {!loading && !loadError && totalBrands === 0 && (
-        <Text style={styles.emptyText}>No brands to show yet — check back soon.</Text>
-      )}
-
-      {!loading && !loadError && totalBrands === 0 && (
         <Text style={styles.emptyText}>No brands to follow yet. Brands you follow from Discover show up in your feed.</Text>
       )}
 
@@ -137,8 +151,8 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
         const isFollowing = !!following[brand.sellerId];
         const isPending = !!pending[brand.sellerId];
         return (
+          <View key={brand.id}>
           <Pressable
-            key={brand.id}
             testID={`onboarding-brand-card-${brand.sellerId}`}
             style={styles.row}
             accessibilityRole="checkbox"
@@ -161,7 +175,9 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
                 <Text numberOfLines={1} style={styles.name}>{brand.name}</Text>
                 {brand.verified && <VerifiedBadge />}
               </View>
-              {brand.brandType ? <Text numberOfLines={1} style={styles.handle}>{brand.brandType}</Text> : null}
+              <Text numberOfLines={1} style={styles.handle}>
+                {brand.handle ? `@${brand.handle} · ` : ''}{brand.productCount ?? 0} listings
+              </Text>
             </View>
             <View style={[styles.select, isFollowing && { backgroundColor: theme.text, borderColor: theme.text }]}>
               {isPending ? (
@@ -171,6 +187,14 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
               ) : null}
             </View>
           </Pressable>
+          {(brand.productImages?.length ?? 0) > 0 ? (
+            <View style={styles.photos}>
+              {brand.productImages?.slice(0, 3).map((uri) => (
+                <Image key={uri} source={{ uri }} style={styles.photo} accessibilityLabel={`${brand.name} product`} />
+              ))}
+            </View>
+          ) : null}
+          </View>
         );
       })}
     </View>
@@ -178,6 +202,8 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
 }
 
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  photos: { flexDirection: 'row', gap: 6, marginBottom: SPACE.sm },
+  photo: { flex: 1, aspectRatio: 4 / 5, borderRadius: 10 },
   loadingWrap: { paddingVertical: SPACE.xxl, alignItems: 'center' },
   emptyText: { ...TEXT.subhead, color: theme.muted, paddingVertical: SPACE.lg },
   followAll: { alignSelf: 'flex-end', paddingVertical: SPACE.xs },
