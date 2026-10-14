@@ -68,7 +68,7 @@ describe("buyer onboarding completion recovery", () => {
     expect(buyerSlice).toContain("&& profileId");
     expect(buyerSlice).toContain("pendingSyncQueued");
     expect(buyerSlice).toContain("isRecoverableBuyerOnboardingSyncError(error)");
-    expect(buyerSlice).toContain("router.replace('/thread-explainer'");
+    expect(buyerSlice.match(/await landOnFeed\(/g)).toHaveLength(2);
     expect(source).toContain("console.error('[buyer-onboarding] save failed'");
     expect(buyerSlice).not.toContain("api.seller.saveOnboardingData({ styleInterests })");
   });

@@ -4,46 +4,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { PillButton, PressableScale, Reveal, StepHeadline, StepSub, StitchAccent } from '@/components/onboarding/OnboardingUI';
+import { PillButton, PressableScale, Reveal, StepHeadline, StepSub } from '@/components/onboarding/OnboardingUI';
 import { RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
 
-const getCards = (theme: AppThemePreset): {
-  type: AccountType;
-  icon: 'shopping-bag' | 'star';
-  title: string;
-  description: string;
-  bullets: string[];
-  accent: string;
-}[] => [
+const CARDS: { type: AccountType; title: string; description: string }[] = [
   {
     type: 'buyer',
-    icon: 'shopping-bag',
     title: "I'm here to shop",
-    description: 'Discover brands, watch content and buy products directly from the Thread.',
-    bullets: [
-      'Discover emerging brands',
-      'Shop exclusive drops',
-      'Save & follow collections',
-      'Track your orders',
-    ],
-    accent: theme.accent,
+    description: 'Discover independent brands and shop their drops.',
   },
   {
     type: 'seller',
-    icon: 'star',
     title: "I'm building a brand",
-    description:
-      'Design, manufacture, launch, sell and manage everything in one workspace.',
-    bullets: [
-      'AI-powered design studio',
-      'Global manufacturer network',
-      'Launch your storefront',
-      'Analytics & growth tools',
-    ],
-    accent: theme.secondary,
+    description: 'Design, make and sell your brand in one place.',
   },
 ];
 
@@ -64,7 +39,7 @@ export function AccountTypeStep({
 }) {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
-  const cards = React.useMemo(() => getCards(theme), [theme]);
+  const cards = CARDS;
   const insets  = useSafeAreaInsets();
   const topInset = useHeaderTopInset();
 
@@ -101,13 +76,9 @@ export function AccountTypeStep({
                   isSelected && { borderColor: theme.text, borderWidth: 1 },
                 ]}
               >
-                <StitchAccent active={isSelected} color={theme.text} style={styles.cardStitch} />
 
-                {/* Icon + title + radio */}
+                {/* Title + radio */}
                 <View style={styles.cardTop}>
-                  <View style={[styles.iconWrap, isSelected && { borderColor: theme.text }]}>
-                    <Feather name={c.icon} size={20} color={isSelected ? theme.text : theme.muted} />
-                  </View>
                   <View style={styles.cardTitleWrap}>
                     <Text style={[styles.cardKicker, { color: isSelected ? theme.text : theme.subtle }]}>
                       {c.type === 'buyer' ? 'Explore' : 'Create'}
@@ -119,16 +90,6 @@ export function AccountTypeStep({
                   </View>
                 </View>
                 <Text style={styles.cardDesc}>{c.description}</Text>
-
-                {/* Benefits */}
-                <View style={styles.bullets}>
-                  {c.bullets.map((b) => (
-                    <View key={b} style={styles.bulletRow}>
-                      <Feather name="check" size={12} color={isSelected ? theme.text : theme.subtle} />
-                      <Text style={[styles.bulletText, isSelected && { color: theme.text }]}>{b}</Text>
-                    </View>
-                  ))}
-                </View>
               </PressableScale>
             </Reveal>
           );
@@ -176,13 +137,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     padding: SPACE.md + 2,
     overflow: 'hidden',
   },
-  cardStitch: { position: 'absolute', top: 10, left: SPACE.md + 2 },
   cardTop: { flexDirection: 'row', gap: SPACE.sm, alignItems: 'center', marginBottom: SPACE.xs },
-  iconWrap: {
-    width: 44, height: 44, borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
   cardTitleWrap: { flex: 1 },
   cardKicker: { ...TYPE.eyebrow, marginBottom: 2 },
   cardTitle: { fontSize: 20, lineHeight: 24, fontFamily: 'Inter_700Bold', color: theme.text, letterSpacing: -0.4 },
@@ -191,11 +146,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   radioDot: { width: 10, height: 10, borderRadius: 5 },
-  cardDesc:  { ...TYPE.body, color: theme.muted, marginBottom: SPACE.sm },
-
-  bullets:   { flexDirection: 'row', flexWrap: 'wrap', rowGap: SPACE.xs, columnGap: SPACE.md },
-  bulletRow: { flexDirection: 'row', alignItems: 'center', gap: 6, width: '46%' },
-  bulletText:{ flex: 1, ...TYPE.label, color: theme.muted },
+  cardDesc:  { ...TYPE.body, color: theme.muted },
 
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,

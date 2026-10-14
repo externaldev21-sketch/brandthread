@@ -128,6 +128,7 @@ vi.mock('react-native', () => {
     Keyboard: { dismiss: vi.fn() },
     Linking: { openURL: vi.fn() },
     Platform: { OS: 'web', select: (obj: Record<string, unknown>) => obj.web ?? obj.default },
+    Pressable: host('Pressable'),
     ScrollView: host('ScrollView'),
     StatusBar: host('StatusBar'),
     StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1, absoluteFill: {} },
@@ -297,6 +298,25 @@ vi.mock('@/lib/legalConsent', () => ({
 vi.mock('@/components/branding/BrandthreadLogo', () => ({ default: () => null }));
 vi.mock('@/components/branding/GoogleGlyph', () => ({ default: () => null }));
 
+vi.mock('@/components/KeyboardProviderCompat', () => {
+  const React = require('react') as typeof import('react');
+  return { KeyboardAvoidingView: (props: Record<string, unknown>) => React.createElement('KeyboardAvoidingView', props, props.children as React.ReactNode) };
+});
+vi.mock('@/hooks/useHeaderTopInset', () => ({ useHeaderTopInset: () => 0 }));
+vi.mock('@/contexts/FeatureFlagContext', () => ({ useFeatureFlag: () => true }));
+vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
+vi.mock('@/lib/onboarding/useUsernameLiveCheck', () => ({
+  useUsernameLiveCheck: () => ({ error: '', checking: false }),
+}));
+vi.mock('@/components/onboarding/SizesStep', () => {
+  const React = require('react') as typeof import('react');
+  return { SizesStep: () => React.createElement('View', { testID: 'onboarding-sizes-step' }) };
+});
+vi.mock('@/components/age/AgeNotices', () => {
+  const React = require('react') as typeof import('react');
+  return { AgeDobField: () => React.createElement('View', null) };
+});
+
 // app/onboarding.tsx imports ONBOARDING_KEY/ONBOARDING_OWNER_KEY from
 // './_layout' — real app/_layout.tsx pulls in the entire app shell (query
 // client, notifications, RevenueCat, every context provider, …), which is
@@ -312,6 +332,8 @@ vi.mock('@/components/legal/LegalConsent', () => {
   return {
     // Sign-up shows one linked line; continuing is the agreement (no checkbox).
     LegalContinueNotice: () => React.createElement('Text', { testID: 'legal-consent-line' }),
+    LegalConsent: ({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) =>
+      React.createElement('TouchableOpacity', { testID: 'legal-consent-checkbox', onPress: () => onChange(!checked) }),
   };
 });
 
@@ -434,7 +456,10 @@ async function driveThroughSignUp(renderer: ReactTestRenderer, role: 'buyer' | '
   await fill(findByLabel(renderer, 'Last name'), 'Rivera');
   await fill(findByLabel(renderer, 'Password'), 'Walkthrough!Pass1');
   await fill(findByLabel(renderer, 'Confirm password'), 'Walkthrough!Pass1');
-  await fill(findByTestId(renderer, 'onboarding-username-input'), `wt_${role}_flow`);
+  // No username typed: it's suggested from the name.
+  expect(findByTestId(renderer, 'onboarding-username-input').props.value).toBe(role === 'seller' ? 'sasha_rivera' : 'bailey_rivera');
+  await fill(findByTestId(renderer, 'onboarding-dob-input'), '01/15/1995');
+  await press(renderer, findByTestId(renderer, 'legal-consent-checkbox'));
 
   await press(renderer, findButtonByLabel(renderer, 'Create account'));
   await fill(findByTestId(renderer, 'onboarding-code-cells'), '000000');
@@ -464,7 +489,7 @@ describe('onboarding flow (buyer)', () => {
     renderer = undefined;
   });
 
-  it('signs up, completes the buyer questionnaire, and lands on the thread explainer with the right API calls', async () => {
+  it('signs up, completes the buyer questionnaire, and lands on the feed with the right API calls', async () => {
     renderer = await renderScreen();
     await driveThroughSignUp(renderer, 'buyer', 'buyer-flow@onboarding-e2e.test');
 
@@ -475,13 +500,11 @@ describe('onboarding flow (buyer)', () => {
     // Style interests step — skippable, just continue with the defaults.
     await press(renderer, findButtonByLabel(renderer, 'Continue'));
 
-    // Brands-to-follow step (mocked) — skippable, continue.
-    await press(renderer, findButtonByLabel(renderer, 'Continue'));
+    // Sizes step (mocked) — skippable.
+    await press(renderer, findButtonByLabel(renderer, 'Skip for now'));
 
-    // Loading step fires its onDone callback after a real setTimeout; run it
-    // for real rather than faking timers, to keep this in step with the
-    // production timing constants in app/onboarding.tsx.
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 3300)); });
+    // Brands-to-follow step (mocked) — skippable, continue. No loader after it.
+    await press(renderer, findButtonByLabel(renderer, 'Continue'));
 
     // Notifications step — skip.
     await press(renderer, findByTestId(renderer, 'onboarding-notifications-skip'));
@@ -508,7 +531,9 @@ describe('onboarding flow (buyer)', () => {
     const completeCall = apiCalls.find((c) => c.name === 'auth.completeOnboarding');
     expect(completeCall!.args[0]).toBe('buyer');
 
-    expect(routerReplaceMock).toHaveBeenCalledWith('/thread-explainer');
+    expect(updateProfileCall!.args[0]).toMatchObject({ username: 'bailey_rivera' });
+    expect(memoryStorage.get('thread_explainer_seen:user_test_clerk_id')).toBe('true');
+    expect(routerReplaceMock).toHaveBeenCalledWith('/(buyer)/');
   }, 20_000);
 });
 
@@ -550,15 +575,11 @@ describe('onboarding flow (seller)', () => {
     // non-empty already).
     await press(renderer, findButtonByLabel(renderer, 'Build my workspace'));
 
-    // Plan step, part 1: SellerPreviewStep (theme + optional AI sample).
-    // Skip the sample, same as the Playwright walkthrough's "skip" path.
+    // Plan step, part 1: SellerPreviewStep (storefront accent).
     await press(renderer, findByTestId(renderer, 'onboarding-preview-continue'));
 
-    // Plan step, part 2: SellerPlanRecommendationStep (mocked).
+    // Plan step, part 2: SellerPlanRecommendationStep (mocked). No loader after it.
     await press(renderer, findByTestId(renderer, 'onboarding-plan-recommendation-continue'));
-
-    // Loading step — real timers, matching app/onboarding.tsx's own timing.
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 3300)); });
 
     // Notifications step — skip.
     await press(renderer, findByTestId(renderer, 'onboarding-notifications-skip'));
