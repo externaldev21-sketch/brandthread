@@ -1374,6 +1374,7 @@ router.get("/brands/discover", async (req, res) => {
         displayName:     users.displayName,
         brandName:       users.brandName,
         brandType:       users.brandType,
+        username:        users.username,
         profileImageUrl: users.profileImageUrl,
         avatarUrl:       users.avatarUrl,
         verified:        users.verified,
@@ -1415,6 +1416,7 @@ router.get("/brands/discover", async (req, res) => {
       brands: photoBrandsFirst(ranked.map((s) => ({
         id:          s.clerkId,
         sellerId:    s.clerkId,
+        handle:      s.username ?? null,
         name:        s.brandName || s.displayName || "Brand",
         brandType:   s.brandType ?? null,
         logoUrl:     s.profileImageUrl ?? s.avatarUrl ?? null,

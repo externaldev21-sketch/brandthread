@@ -490,6 +490,11 @@ vi.mock('@/components/onboarding/InterestTileGrid', () => {
   };
 });
 
+vi.mock('@/components/onboarding/TasteQuizStep', () => ({
+  TasteQuizStep: ({ onDone }: { onDone: (result: { swipes: unknown[] }) => void }) =>
+    React.createElement('Pressable', { testID: 'taste-quiz-skip', onPress: () => onDone({ swipes: [] }) }),
+}));
+
 vi.mock('@/components/onboarding/FeedPreviewStep', () => {
   const React = require('react') as typeof import('react');
   return {
@@ -638,6 +643,7 @@ describe('onboarding flow (buyer, Instagram order)', () => {
     expect(has(renderer, 'onboarding-welcome-user')).toBe(true);
     await tap(renderer, 'onboarding-welcome-user');
     await tap(renderer, 'onboarding-style-next');
+    await tap(renderer, 'taste-quiz-skip');
     await tap(renderer, 'onboarding-sizes-skip');
     await tap(renderer, 'onboarding-brands-skip');
     expect(has(renderer, 'onboarding-feed-preview')).toBe(true);
@@ -655,7 +661,7 @@ describe('onboarding flow (buyer, Instagram order)', () => {
     const updateProfileCall = apiCalls.find((c) => c.name === 'auth.updateProfile');
     expect(updateProfileCall!.args[0]).toMatchObject({ accountType: 'buyer', username: 'bailey_rivera', name: 'Bailey Rivera' });
     expect(routerReplaceMock).toHaveBeenCalledWith('/(buyer)/');
-    expect(memoryStorage.get('thread_explainer_seen:user_buyer_e2e')).toBe('true');
+    expect(memoryStorage.get(`thread_explainer_seen:${clerkStore.userId}`)).toBe('true');
 
     // The draft is cleared once onboarding finishes.
     expect([...memoryStorage.keys()].some((k) => k.startsWith('onboarding_draft:') || k === 'onboarding_pending_draft')).toBe(false);

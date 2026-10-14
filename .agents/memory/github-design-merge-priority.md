@@ -3,11 +3,11 @@ name: GitHub design merge priority
 description: How to resolve reviewed GitHub design changes against local Repl fixes during requested syncs.
 ---
 
-The approved public landing concept is “Shop, sell and design streetwear.” with a phone illustration on the right at desktop widths, stacked below the copy on phones.
+The approved public landing keeps “Shop, sell and design streetwear.” and uses a tilted phone playing a recording of the real app, an email/Get started form, and a download QR code.
 
-**Why:** The owner explicitly rejected the fashion-photo carousel redesign and requested restoration of the previous landing page and tests.
+**Why:** The owner rejected the fashion-photo carousel redesign, then explicitly approved the Kraken-style hero that retains the original headline and uses the real app capture.
 
-**How to apply:** Preserve this landing concept unless a subsequent request explicitly approves replacing it; do not reintroduce the rejected redesign during bulk upstream merges.
+**How to apply:** Preserve this landing concept unless a subsequent request explicitly approves replacing it; retain the real pricing catalogue and do not reintroduce the rejected carousel during bulk merges.
 
 When syncing reviewed design PRs from GitHub dev, treat origin/dev as the source of truth for conflicting UI screen and component files. Preserve nonconflicting local build or runtime fixes, and report local-only commits so they can be brought into GitHub deliberately. Preserve the local development preview selector when the user explicitly asks. For requested dev syncs, use a merge; do not rebase, force-update, or push without a separate instruction.
 

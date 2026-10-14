@@ -220,9 +220,12 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir, demo }) 
 
     await report.step('pick styles', async () => {
       await page.getByTestId('onboarding-style-step').waitFor({ timeout: 10_000 });
-      await page.getByTestId('onboarding-style-streetwear').click();
+      await page.getByTestId('onboarding-interest-streetwear').click();
       await shot('styles');
       await page.getByTestId('onboarding-style-next').click();
+      // No quiz catalogue is a legitimate automatic skip, not a missing CTA.
+      await page.locator('[data-testid="onboarding-sizes-step"], [data-testid="taste-quiz-skip"]').first().waitFor({ timeout: 15_000 });
+      if (await page.getByTestId('taste-quiz-skip').count()) await page.getByTestId('taste-quiz-skip').click();
     });
 
     await report.step('sizes', async () => {
@@ -232,6 +235,11 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir, demo }) 
     });
 
     await report.step('brands to follow', async () => {
+      if (!demo) {
+        // A successful empty API now skips this step automatically.
+        await page.getByTestId('onboarding-feed-preview').waitFor({ timeout: 10_000 });
+        return;
+      }
       await page.getByTestId('onboarding-brands-step').waitFor({ timeout: 10_000 });
       await page.waitForTimeout(800);
       if (demo) {
@@ -248,9 +256,9 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir, demo }) 
       await page.getByTestId('onboarding-see-feed').click();
     });
 
-    await report.step('lands on thread explainer', async () => {
-      await page.getByText('Enter the Thread', { exact: false }).waitFor({ timeout: 20_000 });
-      await shot('thread-explainer');
+    await report.step('lands directly on buyer feed', async () => {
+      await page.waitForFunction(() => !/\/onboarding|\/thread-explainer/.test(window.location.pathname), { timeout: 20_000 });
+      await shot('buyer-feed');
     });
 
     await report.step('server-side data was actually saved', async () => {
