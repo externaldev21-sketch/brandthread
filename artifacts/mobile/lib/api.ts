@@ -2286,6 +2286,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           logoUrl:     string | null;
           bannerUrl:   string | null;
           storeAccentColor: string | null;
+          /** Buyer store page layout (Store Settings > Lookbook). */
+          storeLayout?: 'grid' | 'lookbook';
           category:    string | null;
           tags:        string[];
           location:    string | null;
@@ -2329,6 +2331,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Set (or clear with null) the storefront accent, from the monochrome allowlist. */
       setStoreAccent: (color: string | null) =>
         put<{ storeAccentColor: string | null }>('/api/seller/profile/accent', { color }),
+      /** Store page layout: 'grid' (default) or 'lookbook' (full-screen editorial swipe). */
+      setStoreLayout: (layout: 'grid' | 'lookbook') =>
+        put<{ storeLayout: 'grid' | 'lookbook' }>('/api/seller/profile/store-layout', { layout }),
       /** Save Instagram / TikTok handles or links; the server returns canonical URLs. */
       saveSocialLinks: (body: { instagram?: string; tiktok?: string }) =>
         put<{ socialLinks: Record<string, string> }>('/api/seller/social-links', body),

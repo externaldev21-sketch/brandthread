@@ -45,6 +45,8 @@ import {
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { getSellerShopPage, taggedItemHref, type ShopProduct } from '@/services/profileService';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
+import { LookbookView } from '@/components/profile/LookbookView';
+import { lookbookPreviewHref, parseStoreLayout, resolveStoreLayout, type StoreLayout } from '@/lib/storeLayout';
 import { ProfileProductTile } from '@/components/profile/ProfileProductTile';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { BrandDropsCard } from '@/components/BrandDropsCard';
@@ -102,6 +104,8 @@ interface SellerView {
   likesCount: number | null;
   followersCount: number | null;
   followingCount: number | null;
+  /** Store page layout the seller chose (Store Settings > Lookbook). */
+  storeLayout: StoreLayout;
 }
 
 function initialsOf(name: string): string {
@@ -136,6 +140,7 @@ function toSellerView(profile: any, fallbackId: string): SellerView {
     likesCount: typeof profile?.likesCount === 'number' ? profile.likesCount : null,
     followersCount: typeof profile?.followersCount === 'number' ? profile.followersCount : null,
     followingCount: typeof profile?.followingCount === 'number' ? profile.followingCount : null,
+    storeLayout: parseStoreLayout(profile?.storeLayout),
   };
 }
 
@@ -145,7 +150,7 @@ export default function SellerProfileScreen() {
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string; sellerId?: string; isOwner?: string; src?: string; asVisitor?: string }>();
+  const params = useLocalSearchParams<{ id?: string; sellerId?: string; isOwner?: string; src?: string; asVisitor?: string; lookbook?: string }>();
   const routeSellerId = params.id ?? params.sellerId;
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
@@ -188,6 +193,17 @@ export default function SellerProfileScreen() {
   const mode = resolveProfileMode({ viewerId: userId, ownerId: canonicalSellerId, previewAsVisitor });
   const isOwner = mode === 'owner';
   const caps = profileCapabilities('seller', mode);
+  // Lookbook (Store Settings): visitors get the full-screen editorial swipe
+  // when the seller turned it on; the owner's "Preview lookbook" forces it.
+  // A visitor can still open the full store page from inside it.
+  const [visitorChoseGrid, setVisitorChoseGrid] = useState(false);
+  const storeLayout = resolveStoreLayout({
+    saved: seller?.storeLayout,
+    isOwner,
+    previewLookbook: previewAsVisitor && isVisitorPreviewParam(params.lookbook),
+    visitorChoseGrid,
+  });
+  const showLookbook = !!seller && storeLayout === 'lookbook';
   // The signed-out web preview (?bt_preview=…) must never reach protected APIs.
   const devPreview = isSellerDevPreview() || isBuyerDevPreview();
 
@@ -310,8 +326,8 @@ export default function SellerProfileScreen() {
     }
   }, [canonicalSellerId]);
   useEffect(() => {
-    if (activeTab === 'Shop') void loadShop();
-  }, [activeTab, loadShop, reloadTick]);
+    if (activeTab === 'Shop' || showLookbook) void loadShop();
+  }, [activeTab, loadShop, reloadTick, showLookbook]);
 
   const tagged = useTaggedPosts(canonicalSellerId, activeTab === 'Tagged' && !!userId && !devPreview);
 
@@ -438,6 +454,12 @@ export default function SellerProfileScreen() {
       items.push({
         key: 'view-as-visitor', icon: 'eye', label: 'View as visitor',
         onPress: () => router.push(viewAsVisitorHref('seller', sellerId) as never),
+      });
+      // Owner-only: see the store page as buyers will in Lookbook mode,
+      // whether or not it is switched on yet.
+      items.push({
+        key: 'preview-lookbook', icon: 'image', label: 'Preview lookbook',
+        onPress: () => router.push(lookbookPreviewHref(sellerId) as never),
       });
     }
     if (caps.showVisitorMenu && sellsGiftCards) {
@@ -677,6 +699,28 @@ export default function SellerProfileScreen() {
     : activeTab === 'Tagged' ? tagged.loading
     : profileLoading || videos.loading;
   const gridErrorNow = activeTab === 'Shop' ? shopError : activeTab === 'Tagged' ? tagged.error : videos.error;
+
+  if (showLookbook && seller) {
+    return (
+      <>
+        <LookbookView
+          brandName={brandName}
+          products={shopProducts}
+          loading={shopLoading}
+          following={isFollowing}
+          followDisabled={previewAsVisitor || followPending || !canonicalSellerId}
+          onFollow={handleFollow}
+          onBack={goBack}
+          onOpenProduct={openProduct}
+          onShowStore={() => setVisitorChoseGrid(true)}
+          onMore={() => { hapticLight(); setMenuOpen(true); }}
+          bottomInset={barInset}
+        />
+        <ProfileMenuSheet visible={menuOpen} title={brandName} items={menuItems} onClose={() => setMenuOpen(false)} />
+        <Snackbar visible={!!snackbar} message={snackbar} onDismiss={() => setSnackbar('')} />
+      </>
+    );
+  }
 
   return (
     <>

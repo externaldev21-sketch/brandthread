@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TextInput,
@@ -17,6 +17,7 @@ import { hapticToggle } from '@/lib/haptics';
 import { getStorefront, updateSettings } from '@/services/storeService';
 import { Storefront, StoreSettings, StorePublishStatus } from '@/services/storeTypes';
 import { radius } from '@/constants/radii';
+import { useApi } from '@/lib/api';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -81,6 +82,27 @@ export default function StoreSettingsScreen() {
   });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Store page layout (users.store_layout): read by the buyer store page from
+  // the public profile, so it saves on its own the moment it is flipped
+  // rather than with the local storefront settings below. Off (grid) by default.
+  const api = useApi();
+  const [lookbook, setLookbook] = useState(false);
+  useEffect(() => {
+    let active = true;
+    api.seller.getProfile()
+      .then((p) => { if (active) setLookbook(p?.storeLayout === 'lookbook'); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [api]);
+  const toggleLookbook = useCallback(async (next: boolean) => {
+    setLookbook(next);
+    try {
+      const res = await api.seller.setStoreLayout(next ? 'lookbook' : 'grid');
+      setLookbook(res?.storeLayout === 'lookbook');
+    } catch {
+      setLookbook(!next);
+    }
+  }, [api]);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -308,6 +330,16 @@ export default function StoreSettingsScreen() {
           />
         </BrandthreadCard>
 
+        {/* STORE PAGE */}
+        <SectionHeader title="STORE PAGE" style={ss.sectionHeader} />
+        <BrandthreadCard style={ss.card}>
+          <SwitchRow
+            label="Lookbook"
+            value={lookbook}
+            onValueChange={toggleLookbook}
+          />
+        </BrandthreadCard>
+
         <PrimaryButton label="Save Settings" onPress={handleSave} loading={saving} style={ss.saveBtn} />
       </ScrollView>
       )}
@@ -325,7 +357,7 @@ function FieldRow({ ss, label, children }: { ss: ReturnType<typeof makeStyles>; 
 }
 
 function SwitchRow({ label, description, value, onValueChange }: {
-  label: string; description: string; value: boolean; onValueChange: (v: boolean) => void;
+  label: string; description?: string; value: boolean; onValueChange: (v: boolean) => void;
 }) {
   return (
     <ListRow
