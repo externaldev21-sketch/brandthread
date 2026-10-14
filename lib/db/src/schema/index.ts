@@ -1086,7 +1086,9 @@ export const pushTokens = pgTable('push_tokens', {
 // ─── Seller Quote Requests (seller → manufacturer quote/sample requests) ───────
 
 export const sellerQuoteRequests = pgTable('seller_quote_requests', {
-  id:               uuid('id').primaryKey().defaultRandom(),
+  // Keep the original text-backed UUID contract so Publish never needs an
+  // unsupported implicit text-to-uuid conversion of existing quote IDs.
+  id:               text('id').primaryKey().default(sql`gen_random_uuid()::text`),
   sellerId:         text('seller_id').notNull(),
   manufacturerId:   uuid('manufacturer_id').notNull().references(() => manufacturers.id, { onDelete: 'cascade' }),
   // Set when this quote request was fanned out from a broadcast RFQ
