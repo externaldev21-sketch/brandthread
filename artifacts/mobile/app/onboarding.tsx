@@ -412,6 +412,14 @@ export default function OnboardingScreen() {
     void (async () => {
       try {
         const storedFlow = await AsyncStorage.getItem(PENDING_FLOW_KEY).catch(() => null);
+        const landingEmail = await AsyncStorage.getItem('onboarding_prefill_email').catch(() => null);
+        await AsyncStorage.removeItem('onboarding_prefill_email').catch(() => {});
+        if (!isAddAccount && landingEmail) {
+          const trimmed = landingEmail.trim();
+          if (trimmed.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+            setEmail((current) => current || trimmed);
+          }
+        }
         const landingFlow = flowParam === 'buyer' || flowParam === 'seller' ? flowParam : storedFlow;
         await AsyncStorage.multiRemove(LEGACY_PENDING_KEYS).catch(() => {});
         // "Create new account" always starts clean at the buyer/seller question.

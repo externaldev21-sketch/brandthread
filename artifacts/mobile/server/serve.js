@@ -48,6 +48,7 @@ const MIME_TYPES = {
   '.otf': 'font/otf',
   '.map': 'application/json',
   '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
 };
 
 function send(res, status, body, contentType = 'text/plain; charset=utf-8') {
@@ -82,7 +83,7 @@ const COMPRESSIBLE_EXTS = new Set(['.html', '.js', '.css', '.json', '.svg', '.ma
 // Video needs byte ranges: Safari won't play an <video> source without 206
 // responses, and every browser uses them to seek. (Demo feed clips are served
 // from public/demo-media instead of being bundled into the app.)
-const RANGE_EXTS = new Set(['.mp4']);
+const RANGE_EXTS = new Set(['.mp4', '.webm']);
 
 function parseRange(rangeHeader, size) {
   const match = /^bytes=(\d*)-(\d*)$/.exec(String(rangeHeader || '').trim());
