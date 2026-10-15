@@ -382,10 +382,19 @@ export function TabBarCircle({
  * The `useEffect` below is the correctness fallback for a focus change that
  * never went through `press()` — back button, deep link, programmatic
  * navigation, or a press that got cancelled before `onPress` fired.
+ *
+ * `parkedAt` (optional) is where the pill rests, faded out, while no capsule
+ * slot is active — in the same slot-index units as `x`, measured from the
+ * capsule's own origin, so it may sit past the last slot (the buyer bar
+ * parks it on its Profile circle, see BuyerTabBar's `profileParkIndex`).
+ * With it, leaving that state glides out *from* the park on the same spring
+ * as a tab -> tab move, and entering it glides *to* the park while fading.
+ * Without it (seller bar, buyer search), hiding/showing fades in place
+ * exactly as before.
  */
-export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean) {
-  const restingX = Math.max(activeIndex, 0);
+export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean, parkedAt?: number) {
   const shown = activeIndex >= 0;
+  const restingX = shown ? activeIndex : (parkedAt ?? 0);
   // Tracked in slot-index "units" rather than raw pixels so the resting/glide
   // position stays correct while `itemWidth` itself is also animating
   // between its regular and compact values (see TabBarIndicator's style
@@ -400,34 +409,43 @@ export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean)
   useEffect(() => {
     opacity.set(withTiming(shown ? 1 : 0, { duration: 180 }));
     if (committedShown.current !== shown) {
-      // Appearing (e.g. back from Profile or search) or hiding fades in
-      // place — only a move between tabs glides.
       committedShown.current = shown;
       committedIndex.current = restingX;
       target.set(restingX);
-      x.set(restingX);
+      // With a park (buyer Profile circle), appearing/hiding glides between
+      // the park and the tab from wherever the pill currently is. Without
+      // one (e.g. back from buyer search) it fades in place — only a move
+      // between tabs glides.
+      x.set(parkedAt === undefined || reduceMotion ? restingX : withSpring(restingX, INDICATOR_SPRING));
       return;
     }
     if (committedIndex.current === restingX) return;
     committedIndex.current = restingX;
     target.set(restingX);
     x.set(reduceMotion ? restingX : withSpring(restingX, INDICATOR_SPRING));
-  }, [shown, restingX, reduceMotion, x, target, opacity]);
+  }, [shown, restingX, parkedAt, reduceMotion, x, target, opacity]);
 
   const press = useCallback((index: number) => {
     committedShown.current = true;
     committedIndex.current = index;
     opacity.set(withTiming(1, { duration: 180 }));
     target.set(index);
+    // withSpring starts from x's current (possibly mid-flight or parked)
+    // value, so a press always travels from where the pill visibly is.
     x.set(reduceMotion ? index : withSpring(index, INDICATOR_SPRING));
   }, [reduceMotion, x, target, opacity]);
 
   /** For a side circle (e.g. buyer Profile) that isn't one of the pill's own
-   *  slots — hides the pill the instant that circle is pressed. */
+   *  slots — hides the pill the instant that circle is pressed, gliding it
+   *  onto `parkedAt` (when given) as it fades. */
   const hide = useCallback(() => {
     committedShown.current = false;
     opacity.set(withTiming(0, { duration: 180 }));
-  }, [opacity]);
+    if (parkedAt === undefined) return;
+    committedIndex.current = parkedAt;
+    target.set(parkedAt);
+    x.set(reduceMotion ? parkedAt : withSpring(parkedAt, INDICATOR_SPRING));
+  }, [parkedAt, reduceMotion, x, target, opacity]);
 
   return { x, target, opacity, press, hide };
 }
