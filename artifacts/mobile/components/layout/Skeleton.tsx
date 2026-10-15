@@ -4,6 +4,14 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { RADIUS, SP } from '@/lib/theme';
 
 /** A single shimmering placeholder block. Compose these to match a screen's real layout. */
+/** On the black/white/silver theme `cardElevated` is the same pure black as
+ *  the background, so a skeleton drawn in it is invisible — the screen just
+ *  reads as blank until content pops in. Fall back to a faint solid grey
+ *  there; every other theme keeps its own card tint. */
+export function skeletonFill(theme: { cardElevated: string; background: string }): string {
+  return theme.cardElevated.toLowerCase() === theme.background.toLowerCase() ? '#1A1A1A' : theme.cardElevated;
+}
+
 export function SkeletonBlock({ width, height, radius = RADIUS.sm, style }: {
   width: number | `${number}%`;
   height: number;
@@ -27,7 +35,7 @@ export function SkeletonBlock({ width, height, radius = RADIUS.sm, style }: {
   return (
     <Animated.View
       style={[
-        { width, height, borderRadius: radius, backgroundColor: theme.cardElevated, opacity: pulse },
+        { width, height, borderRadius: radius, backgroundColor: skeletonFill(theme), opacity: pulse },
         style,
       ]}
     />

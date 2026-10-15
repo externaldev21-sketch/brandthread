@@ -58,6 +58,41 @@ export async function hydrateTabData<T>(key: string): Promise<T | undefined> {
   return undefined;
 }
 
+/** Memory-only write — instant on the next mount this session, never persisted. */
+export function setMemoryTabData<T>(key: string, data: T): void {
+  if (data === undefined) return;
+  memoryCache.set(scopedKey(key), data);
+}
+
+/**
+ * Keys written with `persist: true` (lib/stickyState.ts) or by the app-start
+ * warmers that a cold start should paint from. Hydrated into memory once per
+ * account by `hydratePersistedTabData()` so the screens' synchronous
+ * `getCachedTabData` reads see them on their very first frame.
+ */
+export const PERSISTED_TAB_KEYS = [
+  'inbox',
+  'inbox:storyTray',
+  'inbox:myStoryId',
+  'inbox:myNote',
+  'inbox:notesByAuthor',
+  'inbox:suggested',
+  'discover:forYou',
+  'discover:justDropped',
+  'discover:highDemand',
+  'discover:people',
+  'discover:brands',
+  'discover:featured',
+  'discover:recommendedBrands',
+  'discovery:categories',
+  'discovery:trendingProducts',
+  'discovery:trendingBrands',
+] as const;
+
+export async function hydratePersistedTabData(): Promise<void> {
+  await Promise.all(PERSISTED_TAB_KEYS.map((key) => hydrateTabData(key)));
+}
+
 /** Called after every successful tab load so the next cold start/tab switch is instant. */
 export function setCachedTabData<T>(key: string, data: T): void {
   if (data === undefined) return;

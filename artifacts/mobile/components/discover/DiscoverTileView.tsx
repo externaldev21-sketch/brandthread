@@ -8,7 +8,6 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { CachedImage } from '@/components/CachedImage';
-import { SkeletonBlock } from '@/components/layout';
 import { FONT, FS } from '@/lib/theme';
 import type { DiscoverPost } from '@/lib/discoverFeed';
 
@@ -67,12 +66,18 @@ export function DiscoverTileView({
   );
 }
 
+// Same solid fill a real tile shows before its image decodes (styles.image
+// below), so skeleton → content is a seamless swap. Not the theme-tinted
+// SkeletonBlock: on the black/white/silver theme `cardElevated` is pure
+// black, which made the loading grid an invisible "blank screen".
+export const TILE_PLACEHOLDER_COLOR = '#111';
+
 export function DiscoverTileSkeleton({ width, height }: { width: number; height: number }) {
-  return <SkeletonBlock width={width} height={height} radius={0} />;
+  return <View style={{ width, height, backgroundColor: TILE_PLACEHOLDER_COLOR }} />;
 }
 
 const styles = StyleSheet.create({
-  image: { width: '100%', height: '100%', backgroundColor: '#111' },
+  image: { width: '100%', height: '100%', backgroundColor: TILE_PLACEHOLDER_COLOR },
   fallback: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, gap: 4 },
   fallbackInitials: { color: '#FFFFFF99', fontFamily: FONT.bold, fontSize: FS.md },
   fallbackCaption: { color: '#FFFFFF66', fontFamily: FONT.regular, fontSize: 11, textAlign: 'center' },

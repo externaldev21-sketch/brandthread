@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useApi } from '@/hooks/useApi';
+import { useStickyState } from '@/lib/stickyState';
 import { mapTrendingBrand, type DiscoveryCategory, type TrendingBrandRow } from '@/lib/discoveryShelves';
 
 /**
@@ -9,9 +10,15 @@ import { mapTrendingBrand, type DiscoveryCategory, type TrendingBrandRow } from 
  */
 export function useDiscoveryShelves({ categories: wantCategories = true, trending: wantTrending = true }: { categories?: boolean; trending?: boolean } = {}) {
   const api = useApi();
-  const [categories, setCategories] = useState<DiscoveryCategory[]>([]);
-  const [trendingProducts, setTrendingProducts] = useState<any[]>([]);
-  const [trendingBrands, setTrendingBrands] = useState<TrendingBrandRow[]>([]);
+  // Sticky across remounts (lib/stickyState.ts): the shelves are already in
+  // place on a revisit instead of being inserted into the grid late.
+  const [categories, setCategories, hadCategories] = useStickyState<DiscoveryCategory[]>('discovery:categories', [], { persist: true });
+  const [trendingProducts, setTrendingProducts, hadProducts] = useStickyState<any[]>('discovery:trendingProducts', [], { persist: true });
+  const [trendingBrands, setTrendingBrands, hadBrands] = useStickyState<TrendingBrandRow[]>('discovery:trendingBrands', [], { persist: true });
+  // True once the first load has answered (or everything was already cached).
+  const [settled, setSettled] = useState(
+    (!wantCategories || hadCategories) && (!wantTrending || (hadProducts && hadBrands)),
+  );
 
   const reload = useCallback(async () => {
     await Promise.all([
@@ -31,9 +38,10 @@ export function useDiscoveryShelves({ categories: wantCategories = true, trendin
             .catch(() => {})
         : Promise.resolve(),
     ]);
-  }, [api, wantCategories, wantTrending]);
+    setSettled(true);
+  }, [api, wantCategories, wantTrending, setCategories, setTrendingProducts, setTrendingBrands]);
 
   useEffect(() => { reload(); }, [reload]);
 
-  return { categories, trendingProducts, trendingBrands, reload };
+  return { categories, trendingProducts, trendingBrands, reload, settled };
 }

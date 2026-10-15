@@ -26,6 +26,7 @@
  * the classic notifications list.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useStickyState } from '@/lib/stickyState';
 import {
   ActivityIndicator,
   Alert,
@@ -588,7 +589,9 @@ export default function ActivityCenterScreen() {
   }, [router]);
   const openAllStoryMentions = useCallback(() => router.push('/story-mentions' as never), [router]);
 
-  const [items, setItems] = useState<ActivityItem[]>([]);
+  // Sticky (memory-only, account-scoped — lib/stickyState.ts): a remount
+  // paints the last-known rows on frame one instead of the skeleton.
+  const [items, setItems, hadItems] = useStickyState<ActivityItem[]>('activity:items', []);
   // Ids that were unread when the page loaded. They stay in "New" for this
   // visit even after being marked read, so rows don't jump while you look at
   // them; the next refresh moves them to their dated section.
@@ -613,7 +616,7 @@ export default function ActivityCenterScreen() {
       return next;
     });
   }, []);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(hadItems ? 'ready' : 'loading');
   const [errorKind, setErrorKind] = useState<'auth' | 'offline' | 'server'>('offline');
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -777,7 +780,8 @@ export default function ActivityCenterScreen() {
 
   const loadFirstPage = useCallback(async (mode: 'initial' | 'refresh' | 'focus') => {
     const id = ++requestId.current;
-    if (mode === 'initial') setStatus('loading');
+    // Cached rows stay up while the first page refreshes underneath them.
+    if (mode === 'initial' && itemsRef.current.length === 0) setStatus('loading');
     if (mode === 'refresh') setRefreshing(true);
     // Skip the real call entirely in dev-web preview — that mode has no
     // live backend to seed a real feed from, so go straight to the same

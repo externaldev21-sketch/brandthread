@@ -28,6 +28,7 @@ import { getConversations, getNotifications, getThreadPostsPage, createThreadFee
 import { getProducts, getProductStats } from '@/services/productService';
 import { getSellerShopPage } from '@/services/profileService';
 import type { BrandthreadApi } from '@/lib/api';
+import { warmDiscoverTab } from '@/lib/discoverTabData';
 
 const NEXT_POSTER_PREFETCH_COUNT = 3;
 
@@ -47,18 +48,13 @@ async function warmFeed(queryClient: QueryClient): Promise<void> {
 }
 
 async function warmDiscover(queryClient: QueryClient, api: BrandthreadApi): Promise<void> {
-  const [highDemand, forYou, trending] = await queryClient.fetchQuery({
+  // Fills the exact cache keys app/(buyer)/discover.tsx seeds its state from
+  // (lib/discoverTabData.ts), so a first Discover visit after this resolves
+  // paints the grid on frame one with no skeleton.
+  await queryClient.fetchQuery({
     queryKey: queryKeys.tabData('discover'),
-    queryFn: () => Promise.all([
-      api.publicProducts.highDemand(6),
-      api.publicProducts.list({ limit: 8 }),
-      api.publicTrending.get(20),
-    ]),
+    queryFn: async () => { await warmDiscoverTab(api, true); return true; },
   });
-  setCachedTabData('discover', { highDemand, forYou, trending });
-  ([...(highDemand ?? []), ...(forYou ?? [])] as Array<{ imageUri?: string; cutoutUri?: string }>)
-    .slice(0, 8)
-    .forEach((item) => prefetchImage(item.cutoutUri ?? item.imageUri));
 }
 
 async function warmInbox(queryClient: QueryClient): Promise<void> {

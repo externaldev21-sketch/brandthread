@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useStickyState } from '@/lib/stickyState';
 import { useApi } from '@/lib/api';
 import { getPreviewStoryMentions, isPreviewStoryMentionsEnabled } from '@/lib/previewStoryMentions';
 import { isPreviewActivityEnabled } from '@/lib/previewActivity';
@@ -13,8 +14,10 @@ import type { StoryMentionItem } from '@/services/socialTypes';
  */
 export function useStoryMentions() {
   const api = useApi();
-  const [items, setItems] = useState<StoryMentionItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Sticky so the mentions rail above Activity's rows is already in place
+  // on a remount instead of pushing every row down when it lands.
+  const [items, setItems, hadItems] = useStickyState<StoryMentionItem[]>('activity:storyMentions', []);
+  const [loading, setLoading] = useState(!hadItems);
   const requestId = useRef(0);
 
   const reload = useCallback(async () => {
