@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { usePersistedChoice } from '@/hooks/usePersistedChoice';
-
+import { getCachedTabData, setCachedTabData } from '@/lib/tabDataCache';
 import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Platform, Share } from 'react-native';
 
 import { showActionSheet } from '@/components/ui/ActionSheet';
@@ -756,7 +756,16 @@ export default function OrdersScreen() {
     return valid.includes(requested as OrderListFilter) ? (requested as OrderListFilter) : 'all';
   })();
 
-  const [orders, setOrders] = useState<OrderListOrder[]>([]);
+  // Seed from the last list this account loaded (this session, or the
+  // app-start warmer's 'seller-orders' entry) so the tab paints its rows on
+  // frame one; the focus poll below still refreshes them in the background
+  // and the skeleton only ever shows while `orders` is empty.
+  const seedRows = (() => {
+    if (!userId) return null;
+    const cached = getCachedTabData<unknown[]>('seller-orders');
+    return Array.isArray(cached) && cached.length > 0 ? cached : null;
+  })();
+  const [orders, setOrders] = useState<OrderListOrder[]>(() => (seedRows ? (seedRows as any[]).map(apiRowToOrder) : []));
   // Split only once there are orders; with none, the list's empty state keeps the full width.
   const splitView = splitCapable && orders.length > 0;
   // In the split the list owns a fixed column, so no tablet centring inside it.
@@ -773,8 +782,8 @@ export default function OrdersScreen() {
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [stats, setStats] = useState<OrderStats | null>(null);
-  const [ordersOwnerId, setOrdersOwnerId] = useState<string | null>(null);
+  const [stats, setStats] = useState<OrderStats | null>(() => (orders.length > 0 ? computeStats(orders) : null));
+  const [ordersOwnerId, setOrdersOwnerId] = useState<string | null>(() => (orders.length > 0 ? userId ?? null : null));
 
   const consecutiveFailuresRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -837,6 +846,7 @@ export default function OrdersScreen() {
       const all = Array.isArray(rows) ? (rows as SellerOrderListRow[]).map(apiRowToOrder) : [];
       saveSellerOrdersCache(rows);
       setOrders(all);
+      if (Array.isArray(rows)) setCachedTabData('seller-orders', rows);
       // Keep the raw snapshot outside the shared cache. Seed only the tapped
       // order; hundreds of cache updates synchronously dehydrate the cache
       // hundreds of times, despite throttled AsyncStorage writes.

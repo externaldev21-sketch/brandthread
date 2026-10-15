@@ -11,7 +11,7 @@ import { openPullDownMenu } from '@/lib/contextMenu';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePersistedChoice } from '@/hooks/usePersistedChoice';
-
+import { getCachedTabData, setCachedTabData, setMemoryTabData } from '@/lib/tabDataCache';
 import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, LayoutAnimation, UIManager, Platform } from 'react-native';
 
 import { showActionSheet } from '@/components/ui/ActionSheet';
@@ -508,12 +508,19 @@ export default function ProductsScreen() {
 
   const params = useLocalSearchParams<{ filter?: ProductFilter; pickForMockup?: string; projectId?: string }>();
   const api = useApi();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
   const [filter, setFilter] = usePersistedChoice<ProductFilter>(
     'seller-products.filter', params.filter ?? 'all', PRODUCT_FILTER_KEYS, { restore: !params.filter },
   );
   const [sort, setSort] = useState<SortKey>(DEFAULT_PRODUCT_SORT);
+  // Seed the first frame from the last 'all' list this account loaded (this
+  // session, or the app-start warmer's 'seller-products' entry) instead of
+  // a one-frame "No products yet" → skeleton → grid sequence.
+  const [products, setProducts] = useState<Product[]>(() => {
+    if (filter !== 'all') return [];
+    const cached = getCachedTabData<Product[]>('seller-products');
+    return Array.isArray(cached) ? cached : [];
+  });
+  const [stats, setStats] = useState<Stats | null>(() => getCachedTabData<Stats>('seller-products:stats') ?? null);
   const [searchQuery, setSearchQuery] = useState('');
   const [actionProduct, setActionProduct] = useState<Product | null>(null);
   const [actionSheetVisible, setActionSheetVisible] = useState(false);
@@ -523,7 +530,8 @@ export default function ProductsScreen() {
   const [stockEditVisible, setStockEditVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [sortModalVisible, setSortModalVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // true until the first load answers, unless the seed above already has rows.
+  const [loading, setLoading] = useState(() => products.length === 0);
   const [refreshing, setRefreshing] = useState(false);
   // List (Shopify-style rows) or grid, remembered on this device.
   const [viewMode, setViewMode] = useState<ProductsViewMode>(DEFAULT_PRODUCTS_VIEW_MODE);
@@ -568,7 +576,7 @@ export default function ProductsScreen() {
         setStats(EMPTY_STATS);
         return;
       }
-      setStats({
+      const next: Stats = {
         active: s.active,
         draft: s.draft,
         archived: s.archived,
@@ -576,7 +584,9 @@ export default function ProductsScreen() {
         outOfStock: s.outOfStock,
         preOrder: s.preOrder,
         totalInventoryValueCents: s.totalInventoryValueCents,
-      });
+      };
+      setStats(next);
+      setMemoryTabData('seller-products:stats', next);
     } catch { /* use defaults */ }
   }, [previewDemo, previewOnly]);
 
@@ -631,6 +641,7 @@ export default function ProductsScreen() {
       setProducts(previewOnlyRef.current ? localPreviewSaves(list) : list);
       loadedKeyRef.current = key;
       getProductSalesFlags().then(setSalesFlags, () => {});
+      if (filter === 'all' && !debouncedQuery && !previewOnlyRef.current) setCachedTabData('seller-products', list);
       await loadStats();
     } catch {
       if (!silent) setProducts([]);

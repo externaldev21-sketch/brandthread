@@ -670,7 +670,10 @@ describe('Discover — rail fetches stay on their real endpoints', () => {
   it('Just Dropped still comes from publicProducts.list, High Demand from publicProducts.highDemand — never cross-mixed', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
+    // The rail fetchers/mappers moved to lib/discoverTabData.ts so the app-start
+    // warmer fills the same cache the screen paints from — check both.
+    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8')
+      + readFileSync(resolve(__dirname, '../lib/discoverTabData.ts'), 'utf8');
     expect(source).toMatch(/publicProducts\.list\s*\(\s*\{\s*limit:\s*8\s*\}\s*\)/);
     expect(source).toMatch(/publicProducts\.highDemand\s*\(\s*6\s*\)/);
     // Neither rail is ever derived from the other, or from post/trending data.
@@ -681,7 +684,10 @@ describe('Discover — rail fetches stay on their real endpoints', () => {
   it('discover does not fake demandCount from finalScore or organicScore', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
+    // The rail fetchers/mappers moved to lib/discoverTabData.ts so the app-start
+    // warmer fills the same cache the screen paints from — check both.
+    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8')
+      + readFileSync(resolve(__dirname, '../lib/discoverTabData.ts'), 'utf8');
     expect(source).not.toMatch(/demandCount\s*:\s*(t|p|item|row)\s*\.\s*finalScore/);
     expect(source).not.toMatch(/demandCount\s*=\s*(t|p|item|row)\s*\.\s*finalScore/);
     expect(source).not.toMatch(/demandCount\s*:\s*(t|p|item|row)\s*\.\s*organicScore/);
@@ -716,7 +722,10 @@ describe('highDemand API — correct endpoint, no ordinary-product fallback', ()
   it('Discover fetchHighDemand calls publicProducts.highDemand(6) not list()', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
+    // The rail fetchers/mappers moved to lib/discoverTabData.ts so the app-start
+    // warmer fills the same cache the screen paints from — check both.
+    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8')
+      + readFileSync(resolve(__dirname, '../lib/discoverTabData.ts'), 'utf8');
     // Correct endpoint
     expect(source).toMatch(/publicProducts\.highDemand\s*\(\s*6\s*\)/);
     // Not ordinary list
@@ -735,7 +744,10 @@ describe('highDemand API — correct endpoint, no ordinary-product fallback', ()
   it('Discover no longer has a separate Trending rail — trending posts are grid tiles now', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
+    // The rail fetchers/mappers moved to lib/discoverTabData.ts so the app-start
+    // warmer fills the same cache the screen paints from — check both.
+    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8')
+      + readFileSync(resolve(__dirname, '../lib/discoverTabData.ts'), 'utf8');
     // The old dedicated "Trending" list section / TrendingRow component is
     // gone: trending posts are mapped into DiscoverPost tiles (mapTrendingToPost
     // in lib/discoverFeed.ts) and rendered inside the unified Explore grid.
@@ -746,9 +758,13 @@ describe('highDemand API — correct endpoint, no ordinary-product fallback', ()
   it('High Demand rail items are only ever mapToEditorialTile(\'hd\', ...) — never derived from trending/post data', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
+    // The rail fetchers/mappers moved to lib/discoverTabData.ts so the app-start
+    // warmer fills the same cache the screen paints from — check both.
+    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8')
+      + readFileSync(resolve(__dirname, '../lib/discoverTabData.ts'), 'utf8');
     expect(source).not.toMatch(/highDemandItems\s*=\s*(forYouPosts|fitsPosts|trendingItems)/);
-    expect(source).toMatch(/setHighDemandItems\(safe\.map\(\(row, i\) => mapToEditorialTile\('hd', row, i\)\)\)/);
+    expect(source).toMatch(/safe\.map\(\(row, i\) => mapToEditorialTile\('hd', row, i\)\)/);
+    expect(source).toMatch(/setHighDemandItems\(await loadHighDemand\(api\)\)/);
   });
 });
 
@@ -758,7 +774,10 @@ describe('Discover screen — no hardcoded mock data, accent-based urgency', () 
   it('has no HERO_DROP or FOR_YOU mock data', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
+    // The rail fetchers/mappers moved to lib/discoverTabData.ts so the app-start
+    // warmer fills the same cache the screen paints from — check both.
+    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8')
+      + readFileSync(resolve(__dirname, '../lib/discoverTabData.ts'), 'utf8');
     expect(source).not.toContain('HERO_DROP');
     expect(source).not.toContain('FOR_YOU =');
     expect(source).not.toContain('DROPPING_SOON');
@@ -769,7 +788,10 @@ describe('Discover screen — no hardcoded mock data, accent-based urgency', () 
   it('uses real API demand fields', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
+    // The rail fetchers/mappers moved to lib/discoverTabData.ts so the app-start
+    // warmer fills the same cache the screen paints from — check both.
+    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8')
+      + readFileSync(resolve(__dirname, '../lib/discoverTabData.ts'), 'utf8');
     expect(source).toContain('currentPriceCents');
     expect(source).toContain('claimedUnits');
     expect(source).toContain('remainingUnits');

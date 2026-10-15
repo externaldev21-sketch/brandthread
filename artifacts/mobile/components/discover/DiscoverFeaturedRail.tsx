@@ -10,9 +10,12 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useApi } from '@/hooks/useApi';
 import { SP } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { DiscoverSectionHeader } from './DiscoverSectionHeader';
 import { isPreviewDemoMode } from '@/lib/devPreview';
 import { DiscoverBrandCard } from './DiscoverBrandCard';
+import { useStickyState } from '@/lib/stickyState';
+import { DISCOVER_KEYS } from '@/lib/discoverTabData';
 import type { DiscoverBrandCard as BrandCardData } from '@/lib/discoverFeed';
 
 const CARD_WIDTH = 130;
@@ -23,9 +26,13 @@ const DEMO_BRANDS: BrandCardData[] = [
   { id: 'demo-featured-3', name: 'Studio Sable', verified: true, followersLabel: 'Featured' },
 ];
 
-export function DiscoverFeaturedRail() {
+/** Featured brands, sticky across remounts (lib/stickyState.ts) so the rail
+ *  is already in place on a revisit instead of popping in above the grid.
+ *  `settled` flips once the first fetch has answered either way. */
+export function useFeaturedBrands(): { brands: BrandCardData[]; settled: boolean } {
   const api = useApi();
-  const [brands, setBrands] = useState<BrandCardData[]>([]);
+  const [brands, setBrands, hadCache] = useStickyState<BrandCardData[]>(DISCOVER_KEYS.featured, [], { persist: !isPreviewDemoMode() });
+  const [settled, setSettled] = useState(hadCache);
 
   useEffect(() => {
     let alive = true;
@@ -39,11 +46,18 @@ export function DiscoverFeaturedRail() {
         if (alive) setBrands(rows.length > 0 ? rows : isPreviewDemoMode() ? DEMO_BRANDS : []);
       } catch {
         if (alive && isPreviewDemoMode()) setBrands(DEMO_BRANDS);
+      } finally {
+        if (alive) setSettled(true);
       }
     })();
     return () => { alive = false; };
-  }, [api]);
+  }, [api, setBrands]);
 
+  return { brands, settled };
+}
+
+export function DiscoverFeaturedRail({ brands }: { brands: BrandCardData[] }) {
+  const { theme } = useAppTheme();
   if (brands.length === 0) return null;
   return (
     <View style={{ marginTop: SP.sm, marginBottom: SP.md, paddingHorizontal: SP.md }} testID="discover-featured-rail">

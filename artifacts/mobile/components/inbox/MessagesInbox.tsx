@@ -60,6 +60,7 @@ import type { Conversation, ProfileSearchResult, AccountType, Story, Note } from
 import { NOTE_MAX_CHARS } from '@/services/socialTypes';
 import { getSuggestedPeople, dismissSuggestedPerson, type SuggestedPerson } from '@/services/activityService';
 import { getCachedTabData, setCachedTabData } from '@/lib/tabDataCache';
+import { useStickyState } from '@/lib/stickyState';
 import { useApi } from '@/lib/api';
 import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
 import { openContextMenu } from '@/lib/contextMenu';
@@ -360,10 +361,21 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   // this tab. A cold start with nothing cached yet falls back to the
   // skeleton exactly as before.
   const cachedInbox = isSeller ? null : getCachedTabData<{ conversations: Conversation[] }>('inbox');
-  const [conversations, setConversations] = useState<Conversation[]>(cachedInbox?.conversations ?? []);
+  const previewInboxAtMount = !cachedInbox && (!userId || isPreviewSession()) && isPreviewInboxEnabled() && !sellerFreshPreview;
+  const [conversations, setConversations] = useState<Conversation[]>(() =>
+    cachedInbox?.conversations ?? (previewInboxAtMount
+      ? (isSeller ? getSellerPreviewConversations() : getPreviewConversations()) : []));
   const localReadClaims = useRef(new Map<string, { signature: string }>());
   useEffect(() => { localReadClaims.current.clear(); }, [userId]);
-  const [loading, setLoading] = useState(!cachedInbox);
+  const [loading, setLoading] = useState(!cachedInbox && !previewInboxAtMount);
+  const rowFirstSeenRef = useRef<Map<string, number> | null>(null);
+  const shouldAnimateRow = (id: string): boolean => {
+    const seen = rowFirstSeenRef.current;
+    if (!seen) return false;
+    const now = Date.now();
+    if (!seen.has(id)) seen.set(id, now);
+    return now - (seen.get(id) ?? 0) < 600;
+  };
   useScreenInteractive('inbox', !loading);
   // Requests deleted (or "Delete all"-ed) in this session sit in a ~4s undo
   // window (lib/pendingRequestDeletes.ts) before the real delete actually
@@ -417,15 +429,23 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   // getFriendSuggestions() used only for the compose sheet's default
   // directory. Loaded once per mount/account, independent of the compose
   // sheet so it can show up under the Inbox pill without opening compose.
-  const [suggestedPeople, setSuggestedPeople] = useState<SuggestedPerson[]>([]);
-  const [suggestedLoading, setSuggestedLoading] = useState(true);
+  const inboxCachePrefix = `${isPreviewDemoMode() ? 'demo:' : ''}${isSeller ? 'seller-inbox' : 'inbox'}`;
+  const [suggestedPeople, setSuggestedPeople, hadSuggested] = useStickyState<SuggestedPerson[]>(`${inboxCachePrefix}:suggested`, [], { persist: !isPreviewDemoMode() });
+  const [suggestedLoading, setSuggestedLoading] = useState(!hadSuggested);
   const [messagingSuggestedId, setMessagingSuggestedId] = useState<string | null>(null);
 
   // Stories tray — see loadStoryTray() below. `myStoryId` is null when the
   // buyer has no active story ("Your story" then shows the add/"+" badge).
   const { user: clerkUser } = useUser();
-  const [storyTrayRows, setStoryTrayRows] = useState<StoryTrayRow[]>([]);
-  const [myStoryId, setMyStoryId] = useState<string | null>(null);
+  const previewTrayAtMount = (!userId || isPreviewSession()) && isPreviewStoriesEnabled() && !sellerFreshPreview;
+  const [storyTrayRows, setStoryTrayRows] = useStickyState<StoryTrayRow[]>(`${inboxCachePrefix}:storyTray`, () =>
+    previewTrayAtMount ? getPreviewStoryTrayRows().map(r => ({
+      authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
+      color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
+      seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
+    })) : [], { persist: !previewTrayAtMount });
+  const [myStoryId, setMyStoryId] = useStickyState<string | null>(`${inboxCachePrefix}:myStoryId`,
+    () => previewTrayAtMount ? PREVIEW_MY_STORY.id : null, { persist: !previewTrayAtMount });
   const myAvatarUri = clerkUser?.hasImage ? clerkUser.imageUrl : undefined;
   const myDisplayName = clerkUser?.fullName || clerkUser?.firstName || clerkUser?.username || 'You';
   const myInitials = myDisplayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'Y';
@@ -434,8 +454,12 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   // null when the buyer has no active (<24h) note ("Your note" then shows
   // the empty tap-to-post prompt bubble); notesByAuthor covers everyone
   // else's bubble, keyed by authorId, same key space as storyTrayRows.
-  const [myNote, setMyNote] = useState<Note | null>(null);
-  const [notesByAuthor, setNotesByAuthor] = useState<Record<string, Note>>({});
+  const previewNotesAtMount = (!userId || isPreviewSession()) && isPreviewNotesEnabled() && !sellerFreshPreview;
+  const [myNote, setMyNote] = useStickyState<Note | null>(`${inboxCachePrefix}:myNote`,
+    () => previewNotesAtMount ? getPreviewMyNote() : null, { persist: !previewNotesAtMount });
+  const [notesByAuthor, setNotesByAuthor] = useStickyState<Record<string, Note>>(`${inboxCachePrefix}:notesByAuthor`,
+    () => Object.fromEntries(previewNotesAtMount ? getPreviewNotesForTray().map(n => [n.authorId, n]) : []),
+    { persist: !previewNotesAtMount });
   const [noteComposeVisible, setNoteComposeVisible] = useState(false);
   const { height: windowHeight } = useWindowDimensions();
 
@@ -731,6 +755,12 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   );
 
   // ── Handlers ────────────────────────────────────────────────────────────────
+  if (!loading && rowFirstSeenRef.current === null) {
+    const seen = new Map<string, number>();
+    for (const c of conversations) seen.set(c.id, 0);
+    for (const c of joinedCommunities) seen.set(`community:${c.id}`, 0);
+    rowFirstSeenRef.current = seen;
+  }
 
   function openConversation(conv: Conversation) {
     // Don't open request conversations inline — user must accept first
@@ -1281,7 +1311,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     ];
 
     return (
-      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10}>
+      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10} disabled={!shouldAnimateRow(conv.id)}>
         <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
           <PressableScale
             style={[s.convRow, { backgroundColor: theme.background }]}
@@ -1394,7 +1424,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   function renderInboxRow({ item, index }: { item: InboxMergedRow<Conversation>; index: number }) {
     if (item.kind === 'dm') return renderConvRow({ item: item.dm, index });
     return (
-      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10}>
+      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10} disabled={!shouldAnimateRow(`community:${item.community.id}`)}>
         <CommunityInboxRow
           community={item.community}
           onPress={() => { hapticPrimaryAction(); router.push(`/community-chat?id=${encodeURIComponent(item.community.id)}` as never); }}
@@ -1439,7 +1469,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     ];
 
     return (
-      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10}>
+      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10} disabled={!shouldAnimateRow(conv.id)}>
         <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
           <PressableScale
             style={[s.convRow, { backgroundColor: theme.background }]}
@@ -1716,8 +1746,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
           Always renders (even with nobody but "Your story") — see the
           storyTrayRows.length check below, which only ever hides the *rest*
           of the row, never the whole thing. */}
-      {!loading && !messagesSearchLower && (
-        <AnimatedEntrance distance={12}>
+      {!messagesSearchLower && (
           <View style={s.storyTrayWrap}>
             <ScrollView
               horizontal
@@ -1870,7 +1899,6 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
               style={s.storyTrayFade}
             />
           </View>
-        </AnimatedEntrance>
       )}
 
       {/* Inbox / Requests pill row */}

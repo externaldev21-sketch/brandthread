@@ -59,7 +59,7 @@ import { initProductService } from '@/services/productService';
 import { adoptGuestCart, flushDirtyCart } from '@/services/cartService';
 import { initOrderService } from '@/services/orderService';
 import { initAnalyticsService } from '@/services/analyticsService';
-import { initTabDataCache } from '@/lib/tabDataCache';
+import { hydratePersistedTabData, initTabDataCache } from '@/lib/tabDataCache';
 import { clearSiriSalesSnapshot } from '@/lib/siriSalesSnapshot';
 import { initFeedPostsCache } from '@/lib/feedPostsCache';
 import { initEngagementRetryQueue } from '@/lib/engagementRetryQueue';
@@ -1153,6 +1153,9 @@ function ServiceConfigurer() {
     // full clear()+refetch flicker every time.
     setQueryKeyScope(newUserId);
     initTabDataCache(newUserId);
+    // Paint last-known Discover/Inbox content on a cold start's first visit
+    // instead of a skeleton (lib/stickyState.ts reads this synchronously).
+    void hydratePersistedTabData();
     initFeedPostsCache(newUserId);
     // Per-account local caches (settings, highlights, store draft, AI
     // settings, ...) — see lib/accountStorage.ts.
