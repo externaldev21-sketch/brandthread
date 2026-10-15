@@ -275,7 +275,7 @@ export interface AnalyticsPoint {
 // ─── Seller profile & content extended types ─────────────────────────────────
 
 export type PostStatus       = 'draft' | 'processing' | 'scheduled' | 'published' | 'failed' | 'archived';
-export type AspectRatio      = '9:16' | '3:4' | '1:1';
+export type AspectRatio      = '9:16' | '4:5' | '3:4' | '1:1';
 export type MaxVideoDuration = 10 | 15 | 30 | 60;
 export type OverlayType      = 'text' | 'sticker' | 'product' | 'price' | 'countdown' | 'logo' | 'image';
 export type TransitionStyle  = 'cut' | 'fade' | 'slide' | 'zoom' | 'flash' | 'blur';

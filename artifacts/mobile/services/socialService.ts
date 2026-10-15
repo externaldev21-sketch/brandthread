@@ -7,6 +7,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { fetchSponsoredSlots } from '@/services/sponsoredService';
+import { createOfficialSeedCursor, fetchOfficialSeedPage, type OfficialSeedCursor } from '@/services/officialSeedService';
 import { emitProfileEvent } from '@/lib/profileEvents';
 import { canUsePreviewFollow, setPreviewFollowing } from '@/lib/previewFollowStore';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
@@ -549,7 +550,7 @@ export interface SellerThreadPost {
   styleTags?:        string[];
   mediaUris:         string[];
   thumbnailUri?:     string;
-  aspectRatio:       '9:16' | '3:4' | '1:1';
+  aspectRatio:       '9:16' | '4:5' | '3:4' | '1:1';
   contentType:       string;
   postStatus:        'draft' | 'scheduled' | 'published' | 'archived' | 'deleted';
   isDraft:           boolean;
@@ -588,6 +589,10 @@ export interface SellerThreadPost {
   slides?:           PostSlide[];
   /** Where it lives: Threads feed or the author's profile grid. */
   surface?:          'thread' | 'profile';
+  /** Authored by the official @brandthread account (silver B avatar + official badge). */
+  isOfficial?:       boolean;
+  /** "Video: @handle" creator credit on official reposts; userId set when the creator is on Brandthread. */
+  credit?:           PostCredit | null;
   /** Per-slide overlay metadata — used to restore draft editors */
   slideOverlays?:    Array<{
     slideIndex: number;
@@ -597,6 +602,28 @@ export interface SellerThreadPost {
       bgStyle: string; fontSize: number;
     }>;
   }>;
+}
+
+export interface PostCredit {
+  handle: string | null;
+  name: string | null;
+  userId: string | null;
+  accountType: 'buyer' | 'seller' | null;
+}
+
+/** API `credit` → client credit (null when absent or malformed). */
+export function mapPostCredit(raw: unknown): PostCredit | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const c = raw as Record<string, unknown>;
+  const handle = typeof c.handle === 'string' && c.handle.trim() ? c.handle.trim().replace(/^@+/, '') : null;
+  const name = typeof c.name === 'string' && c.name.trim() ? c.name.trim() : null;
+  if (!handle && !name) return null;
+  return {
+    handle,
+    name,
+    userId: typeof c.userId === 'string' && c.userId ? c.userId : null,
+    accountType: c.accountType === 'seller' ? 'seller' : c.accountType === 'buyer' ? 'buyer' : null,
+  };
 }
 
 async function ensureSellerPostsSeed(k: SocialKeys = K()): Promise<void> {
@@ -683,7 +710,7 @@ export async function createSellerPost(params: {
   mediaPath?: string;
   thumbnailPath?: string;
   thumbnailUri?: string;
-  aspectRatio?: '9:16' | '3:4' | '1:1';
+  aspectRatio?: '9:16' | '4:5' | '3:4' | '1:1';
   productTags?: SellerPostProductTag[];
   /** @deprecated use productTags instead */
   productTagIds?: string[];
@@ -699,6 +726,11 @@ export async function createSellerPost(params: {
   slides?: Array<{ kind: 'photo' | 'video'; path: string; thumbnailPath: string; duration?: number }>;
   /** Per-slide overlay metadata */
   slideOverlays?: Array<{ slideIndex: number; overlays: any[] }>;
+  /** Admins only: publish as the official @brandthread account. */
+  postAs?: 'brandthread';
+  /** Creator credit for official reposts ("Video: @handle"). */
+  creditHandle?: string;
+  creditName?: string;
 }): Promise<SellerThreadPost> {
   const k = K();
   const created = await serviceRequest<any>('/api/posts', {
@@ -726,8 +758,20 @@ export async function createSellerPost(params: {
         .filter(id => /^[0-9a-f-]{36}$/i.test(id)),
       isDraft: params.isDraft === true,
       scheduledAt: params.isDraft ? null : (params.scheduledAt ?? null),
+      ...(params.postAs ? {
+        postAs: params.postAs,
+        creditHandle: params.creditHandle?.trim() || undefined,
+        creditName: params.creditName?.trim() || undefined,
+      } : {}),
     }),
   });
+
+  // An official post belongs to @brandthread, not to the admin who posted it:
+  // never cache it among the admin's own posts.
+  if (params.postAs) {
+    notify();
+    return { ...mapApiPostToSellerThreadPost(created, 0), postStatus: created.postStatus ?? 'published', isOfficial: true };
+  }
 
   const existing = await load<SellerThreadPost[]>(k.sellerPosts, []);
   const post = {
@@ -915,6 +959,8 @@ export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadP
     sound:             p.sound ?? undefined,
     sponsored:         p.sponsored === true ? true : undefined,
     sponsoredBoostId:  p.sponsored === true && typeof p.boostId === 'string' ? p.boostId : undefined,
+    isOfficial:        p.seller?.isOfficial === true ? true : undefined,
+    credit:            mapPostCredit(p.credit),
     productTags:       (p.taggedProducts ?? []).map((t: any) => ({
       productId:   t.productId,
       productName: t.name ?? '',
@@ -963,6 +1009,8 @@ export interface ThreadFeedCursor {
   seenPostIds: string[];
   /** Organic posts served so far in this For You session — drives the Sponsored frequency cap. */
   organicServed?: number;
+  /** New-user @brandthread seeding state for this For You session. */
+  officialSeed?: OfficialSeedCursor;
 }
 export type ThreadFeedMode = 'following' | 'for-you' | 'mixed';
 
@@ -1867,6 +1915,7 @@ export async function getThreadPostsPage(
     followedDone: Boolean(cursor.followedDone),
     generalDone: Boolean(cursor.generalDone),
     seenPostIds: Array.isArray(cursor.seenPostIds) ? [...cursor.seenPostIds] : [],
+    officialSeed: cursor.officialSeed,
   };
   const seen = new Set(next.seenPostIds);
   const rows: any[] = [];
@@ -1947,12 +1996,35 @@ export async function getThreadPostsPage(
     } : row;
   });
 
+  // New-user seeding (For You only): the server decides whether this viewer
+  // gets @brandthread official Threads woven in (slot 1, then spaced by the
+  // size of the real-post pool) and returns the merged order. Everyone else
+  // gets their organic page back untouched.
+  let seededRows: any[] = rowsWithRepostContext;
+  if (mode === 'for-you') {
+    const seedCursor = next.officialSeed ?? createOfficialSeedCursor();
+    const seed = await fetchOfficialSeedPage(
+      rowsWithRepostContext.map((row) => row.id as string),
+      seedCursor,
+      next.generalDone,
+    );
+    next.officialSeed = seed.cursor;
+    if (seed.seeding) {
+      const byId = new Map(rowsWithRepostContext.map((row) => [row.id as string, row]));
+      seededRows = seed.items.flatMap((item) => {
+        if (item.type === 'organic') return byId.has(item.id) ? [byId.get(item.id)] : [];
+        seen.add(item.post.id);
+        return [item.post];
+      });
+    }
+  }
+
   // Sponsored placement (For You only): the server plans where labelled,
   // admin-approved promotions go under a frequency cap. Optional — any failure
   // leaves the organic page untouched.
-  let pageRows: any[] = rowsWithRepostContext;
+  let pageRows: any[] = seededRows;
   const organicBefore = next.organicServed ?? 0;
-  if (mode === 'for-you' && rowsWithRepostContext.length > 0) {
+  if (mode === 'for-you' && seededRows.length > 0) {
     const slots = await fetchSponsoredSlots(organicBefore, rowsWithRepostContext.length);
     if (slots.length > 0) {
       const byIndex = new Map<number, any[]>();
@@ -1961,7 +2033,7 @@ export async function getThreadPostsPage(
         seen.add(slot.post.id);
         byIndex.set(slot.afterIndex, [...(byIndex.get(slot.afterIndex) ?? []), slot.post]);
       }
-      pageRows = rowsWithRepostContext.flatMap((row, i) => [row, ...(byIndex.get(i) ?? [])]);
+      pageRows = seededRows.flatMap((row, i) => [row, ...(byIndex.get(i) ?? [])]);
     }
   }
   next.organicServed = organicBefore + rowsWithRepostContext.length;

@@ -27,6 +27,8 @@ import { hidePostFromForYou, unhidePostFromForYou } from "../lib/ranking/signals
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { serveSponsoredSlots } from "../lib/promotions/sponsoredService";
 import { injectSponsored } from "../lib/promotions/sponsored";
+import { planOfficialSeed, recordOfficialSeedProgress } from "../lib/officialSeed/service";
+import { isPlatformAdmin } from "../lib/platformAdmin";
 
 const router = Router();
 
@@ -267,6 +269,88 @@ router.get("/for-you", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Failed to load feed" });
   }
 });
+
+// ─── GET /api/feed/official-seed ──────────────────────────────────────────────
+// New-user seeding of @brandthread official Threads into one page of the
+// Threads (For You) feed. The client sends the organic page it fetched and
+// gets back the merged order. Users outside the seeding window get
+// `{ seeding: false }` and keep their organic page untouched.
+//   ?organicIds=a,b,c       organic post ids on this page, in order (≤50)
+//   &position=&lastOfficialPosition=   session cursor from the previous page
+//   &exclude=x,y            official ids already served this session (≤50)
+//   &last=1                 no further organic page exists
+//   &preview=1              admins only: preview the new-user experience
+const UUID_LIST_RE = /^[0-9a-f-]{36}(,[0-9a-f-]{36}){0,49}$/i;
+
+function uuidList(value: unknown): string[] | null {
+  if (value === undefined || value === "") return [];
+  if (typeof value !== "string" || !UUID_LIST_RE.test(value)) return null;
+  const ids = value.split(",");
+  return ids.every((id) => z.string().uuid().safeParse(id).success) ? [...new Set(ids)] : null;
+}
+
+function nonNegativeInt(value: unknown, max: number): number | null {
+  if (value === undefined) return 0;
+  if (typeof value !== "string" || !/^\d{1,6}$/.test(value)) return null;
+  const n = Number(value);
+  return n <= max ? n : null;
+}
+
+router.get("/official-seed", requireAuth, rateLimit("feed-event"), async (req, res) => {
+  const viewerId = (req as any).clerkUserId as string;
+  const organicIds = uuidList(req.query.organicIds);
+  const exclude = uuidList(req.query.exclude);
+  const position = nonNegativeInt(req.query.position, 100_000);
+  const lastOfficialPosition = nonNegativeInt(req.query.lastOfficialPosition, 100_000);
+  if (!organicIds || !exclude || position === null || lastOfficialPosition === null) {
+    return res.status(400).json({ error: "Invalid official seed query", code: "VALIDATION_ERROR" });
+  }
+  try {
+    const preview = req.query.preview === "1" && await isPlatformAdmin(viewerId);
+    const result = await planOfficialSeed({
+      viewerId,
+      organicIds,
+      cursor: { position, lastOfficialPosition },
+      exclude,
+      isLastPage: req.query.last === "1",
+      preview,
+    });
+    return res.json({ ...result, preview });
+  } catch (err) {
+    req.log.error({ err, viewerId }, "Failed to plan official seed page");
+    // Seeding is optional: a failure must never break the organic feed.
+    return res.json({ seeding: false, reason: "error" });
+  }
+});
+
+// ─── POST /api/feed/official-seed/progress ────────────────────────────────────
+// Sent only while the client is in the seeding window. `seenPostIds` are
+// official Threads that were actually on screen (never seeded again);
+// `viewedCount` is how many Threads were viewed since the last report.
+const seedProgressSchema = z.object({
+  seenPostIds: z.array(z.string().uuid()).max(20).default([]),
+  viewedCount: z.number().int().min(0).max(100).default(0),
+}).passthrough();
+
+router.post(
+  "/official-seed/progress",
+  requireAuth,
+  rateLimit("feed-event"),
+  validateRequest({ body: seedProgressSchema }),
+  async (req, res) => {
+    const viewerId = (req as any).clerkUserId as string;
+    const body = req.body as z.infer<typeof seedProgressSchema>;
+    try {
+      const result = await recordOfficialSeedProgress({
+        viewerId, seenPostIds: [...new Set(body.seenPostIds)], viewedCount: body.viewedCount,
+      });
+      return res.status(202).json(result);
+    } catch (err) {
+      req.log.error({ err, viewerId }, "Failed to record official seed progress");
+      return res.status(500).json({ error: "Failed to record progress" });
+    }
+  },
+);
 
 // ─── DELETE /api/feed/not-interested/:postId ──────────────────────────────────
 router.delete("/not-interested/:postId", requireAuth, async (req, res) => {

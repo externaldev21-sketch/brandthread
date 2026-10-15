@@ -33,6 +33,9 @@ describe('buyer Thread chrome', () => {
       .toContain('length: pageHeight, offset: pageHeight * index');
     expect(feed).not.toContain('snapToInterval={pageHeight}');
     expect(feed).not.toContain("Dimensions.get('window')");
-    expect(feed).toContain('contentFit="contain"');
+    // Photo slides render through the shared carousel, letterboxed, never cropped.
+    expect(feed).toContain('<PhotoCarousel');
+    expect(readFileSync(resolve(process.cwd(), 'components/buyer-feed/PhotoCarousel.tsx'), 'utf8'))
+      .toContain('contentFit="contain"');
   });
 });

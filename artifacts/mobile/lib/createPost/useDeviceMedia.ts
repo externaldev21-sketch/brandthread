@@ -77,7 +77,10 @@ export function useDeviceMedia({ pageSize = PAGE_SIZE }: { pageSize?: number } =
   }, [isWeb, pageSize]);
 
   const requestAccess = useCallback(async () => {
-    const MediaLibrary = isWeb ? null : getMediaLibrary();
+    // Web has no media library to ask: files come from the file input, so
+    // there is nothing to deny (previously this flipped web to "denied").
+    if (isWeb) { setPermission('granted'); return; }
+    const MediaLibrary = getMediaLibrary();
     if (!MediaLibrary) {
       setPermission('denied');
       return;

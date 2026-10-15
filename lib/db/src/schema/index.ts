@@ -1,4 +1,5 @@
 export * from './productImports';
+export * from './officialSeed';
 import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, primaryKey, index, numeric, real, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
 export * from './manufacturers';
 export * from './sizeCharts';
@@ -211,6 +212,11 @@ export const users = pgTable('users', {
   // verification for sellers. A system account is excluded from seller
   // search/ranking and cannot be reported (see reports.ts).
   isSystemAccount: boolean('is_system_account').notNull().default(false),
+  // The official @brandthread creator account (migration 270). At most one
+  // row — partial unique index. Unlike the system agent it is a normal,
+  // followable, searchable profile; admins publish to it from the composer
+  // ("Post as @brandthread"). It has no Clerk identity, so nobody signs in as it.
+  isOfficialAccount: boolean('is_official_account').notNull().default(false),
   // Internal App Review demo account (migration 240). Never purged by the
   // test-data tooling; seeded by scripts/seedReviewAccounts.ts.
   isReviewAccount: boolean('is_review_account').notNull().default(false),
@@ -673,6 +679,10 @@ export const posts = pgTable('posts', {
   // stays 'quote' so readers can tell "original gone" from "not a quote".
   quotedPostId: uuid('quoted_post_id'),
   repostKind: text('repost_kind'), // null | 'quote'
+  // Creator credit (migration 270): "Video: @creditHandle" under the caption
+  // on official reposts of other creators' content. Handle stored without @.
+  creditHandle: text('credit_handle'),
+  creditName: text('credit_name'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
