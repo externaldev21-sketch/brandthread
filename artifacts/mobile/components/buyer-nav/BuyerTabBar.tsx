@@ -152,12 +152,25 @@ export function BuyerTabBar({
   const hiddenByScreen = useTabBarHiddenByScreen();
   const isFullScreenRoute = BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(firstSegment) || hiddenByScreen;
 
+  // Where the pill parks (faded out) while Profile is active: the Profile
+  // circle's center, in the pill's own slot-index units measured from the
+  // capsule's origin. The capsule and the circle are siblings in one flex
+  // row (`styles.bar`), both at fixed regular-mode sizes with `gap` between
+  // them, so this is the circle's exact position in the same coordinate
+  // space the pill's `translateX` already uses — no separate measurement
+  // pass that could be stale or missing on the first frame. Without it the
+  // pill used to glide (invisibly) back to Home while hidden on Profile,
+  // so Profile -> any tab swept in from the far left instead of from the
+  // circle.
+  const profileCircleCenterX = regularMetrics.capsuleWidth + regularMetrics.gap + regularMetrics.circleSize * 0.5;
+  const profileParkIndex = (profileCircleCenterX - regularMetrics.capsulePadding) / regularMetrics.itemWidth - 0.5;
+
   // Owns the pill's position so a tab press can kick the glide immediately,
   // before the tabPress event and the screen swap — see the hook's doc.
   const {
     x: indicatorX, target: indicatorTarget, origin: indicatorOrigin, peakStretch: indicatorStretch,
     opacity: indicatorOpacity, press: pressIndicator, hide: hideIndicator, afterGlide,
-  } = useTabBarActiveIndex(activeIndex, reducedMotion);
+  } = useTabBarActiveIndex(activeIndex, reducedMotion, profileParkIndex);
 
   // 0 = regular, 1 = compact. Every animated style below reads this one
   // value so the capsule/circle/pill/icons all move as one coordinated
@@ -428,6 +441,7 @@ export function BuyerTabBar({
       <Animated.View
         style={[
           styles.shadow,
+          styles.capsuleAbove,
           { width: regularMetrics.capsuleWidth, height: regularMetrics.capsuleHeight, borderRadius: radius.bar },
           capsuleAnimatedStyle,
         ]}
@@ -533,6 +547,11 @@ const styles = StyleSheet.create({
   // Shadow lives on an unclipped wrapper; the glass inside clips to the radius.
   shadow: TAB_BAR_SHADOW,
   pillLayer: { pointerEvents: 'none' },
+  // Stacks the capsule (and so the pill inside it) over the Profile circle
+  // only where they overlap — which is nowhere at rest, so nothing visible
+  // changes; it just keeps the pill readable while it glides to/from its
+  // park on the circle instead of sliding underneath the circle's glass.
+  capsuleAbove: { zIndex: 1 },
   slotRow: {
     flexDirection: 'row',
     alignSelf: 'flex-start',
