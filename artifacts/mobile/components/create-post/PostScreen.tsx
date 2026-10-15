@@ -27,6 +27,7 @@ import { activeToken, CAPTION_MAX, replaceToken, tokenizeCaption } from '@/lib/c
 import type { MediaDraft, PostDetails, PublishInput } from '@/lib/createPost/types';
 import { CP, CreateHeader, PillButton, SubPage, tap } from '@/components/create-post/ui';
 import { formatCents } from '@/lib/money';
+import { OFFICIAL_AVATAR_SOURCE, OFFICIAL_HANDLE } from '@/lib/officialAccount';
 
 const MAX_PRODUCT_TAGS = 5;
 const isPreview = () => isSellerDevPreview() || isBuyerDevPreview();
@@ -55,6 +56,66 @@ function OptionRow({ icon, label, value, onPress, testID }: {
       </View>
       <Feather name="chevron-right" size={20} color={CP.silverDim} />
     </Pressable>
+  );
+}
+
+/**
+ * Admin-only: "Post as @brandthread" switch, plus the optional creator credit
+ * shown under the caption ("Video: @handle"). `locked` = an admin on a buyer
+ * account, whose Threads can only go out as @brandthread.
+ */
+export function PostAsOfficialSection({ details, onDetails, locked }: {
+  details: PostDetails; onDetails: (d: PostDetails) => void; locked: boolean;
+}) {
+  const on = locked || details.postAsOfficial === true;
+  return (
+    <View testID="post-as-official">
+      <View style={s.row}>
+        <View style={s.officialAvatar}>
+          <Image source={OFFICIAL_AVATAR_SOURCE} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.rowLabel}>{`Post as ${OFFICIAL_HANDLE}`}</Text>
+          <Text style={s.rowValue}>{on ? 'Publishes on the official Brandthread account' : 'Publishes on your own account'}</Text>
+        </View>
+        <HapticSwitch
+          value={on}
+          disabled={locked}
+          onValueChange={(v: boolean) => onDetails({ ...details, postAsOfficial: v })}
+          testID="switch-post-as-official"
+          accessibilityLabel={`Post as ${OFFICIAL_HANDLE}`}
+        />
+      </View>
+      {on ? (
+        <View style={s.creditBox}>
+          <Text style={s.creditTitle}>Creator credit</Text>
+          <View style={s.creditRow}>
+            <Text style={s.creditAt}>@</Text>
+            <TextInput
+              value={details.creditHandle ?? ''}
+              onChangeText={(t) => onDetails({ ...details, creditHandle: t.replace(/^@+/, '').replace(/\s/g, '').slice(0, 30) })}
+              placeholder="creatorhandle (optional)"
+              placeholderTextColor={CP.silverDim}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={s.creditInput}
+              testID="input-credit-handle"
+              accessibilityLabel="Creator handle"
+            />
+          </View>
+          <TextInput
+            value={details.creditName ?? ''}
+            onChangeText={(t) => onDetails({ ...details, creditName: t.slice(0, 60) })}
+            placeholder="Name or brand (optional)"
+            placeholderTextColor={CP.silverDim}
+            style={[s.creditInput, s.creditName]}
+            testID="input-credit-name"
+            accessibilityLabel="Creator name"
+          />
+          <Text style={s.creditHint}>Shows under the caption. Tappable when that handle is on Brandthread.</Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -363,10 +424,12 @@ function ProgressPage({ state, onRetry, onCancel }: { state: PublishState; onRet
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function PostScreen({
-  mode, isSeller, media, onMedia, details, onDetails, editing, existingThumb, publishState, onSubmit, onRetry, onCancelPublish, onBack, onDiscard,
+  mode, isSeller, postAs, media, onMedia, details, onDetails, editing, existingThumb, publishState, onSubmit, onRetry, onCancelPublish, onBack, onDiscard,
 }: {
   mode: PostMode;
   isSeller: boolean;
+  /** Present only for platform admins composing a Thread. */
+  postAs?: { locked: boolean };
   media: MediaDraft | null;
   onMedia: (m: MediaDraft) => void;
   details: PostDetails;
@@ -481,8 +544,9 @@ export function PostScreen({
           ) : null}
 
           <View style={{ height: 8 }} />
+          {postAs ? <PostAsOfficialSection details={details} onDetails={onDetails} locked={postAs.locked} /> : null}
           {isPost ? <OptionRow icon="user" label="Tag people" value={mentionCount ? `${mentionCount} tagged` : undefined} onPress={() => setPage('people')} testID="row-people" /> : null}
-          {isSeller ? (
+          {isSeller && !(postAs && (postAs.locked || details.postAsOfficial)) ? (
             <OptionRow icon="tag" label="Tag products" value={details.productTags.length ? `${details.productTags.length} tagged` : undefined} onPress={() => setPage('products')} testID="row-products" />
           ) : null}
           <OptionRow
@@ -493,7 +557,7 @@ export function PostScreen({
             testID="row-visibility"
           />
           <OptionRow icon="more-horizontal" label="More options" value="Comments, reposts, like count" onPress={() => setPage('options')} testID="row-options" />
-          {isSeller ? (
+          {isSeller || postAs ? (
             <OptionRow icon="calendar" label="Schedule" value={scheduled ? scheduled.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Post now'} onPress={() => setPage('schedule')} testID="row-schedule" />
           ) : null}
         </ScrollView>
@@ -547,6 +611,14 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, minHeight: 60, paddingVertical: 10 },
   rowLabel: { color: CP.white, fontFamily: FONT.semibold, fontSize: 16 },
   rowValue: { color: CP.silver, fontFamily: FONT.regular, fontSize: 13, marginTop: 2 },
+  officialAvatar: { width: 28, height: 28, borderRadius: 14, overflow: 'hidden', backgroundColor: CP.black, borderWidth: 1, borderColor: CP.surface2 },
+  creditBox: { marginHorizontal: 16, marginBottom: 8, padding: 12, borderRadius: 10, backgroundColor: CP.surface },
+  creditTitle: { color: CP.white, fontFamily: FONT.semibold, fontSize: 14, marginBottom: 8 },
+  creditRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: CP.surface2, borderRadius: 8, paddingLeft: 10 },
+  creditAt: { color: CP.silver, fontFamily: FONT.semibold, fontSize: 15 },
+  creditInput: { flex: 1, height: 40, paddingHorizontal: 6, color: CP.white, fontFamily: FONT.regular, fontSize: 15, outlineStyle: 'none' as any },
+  creditName: { flex: 0, height: 40, minHeight: 40, marginTop: 8, backgroundColor: CP.surface2, borderRadius: 8, paddingHorizontal: 10 },
+  creditHint: { color: CP.silverDim, fontFamily: FONT.regular, fontSize: 12, marginTop: 8 },
   bottom: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 10, backgroundColor: CP.black },
   search: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, paddingHorizontal: 12, height: 44, borderRadius: 10, backgroundColor: CP.surface2 },
   searchInput: { flex: 1, color: CP.white, fontFamily: FONT.regular, fontSize: 15, outlineStyle: 'none' as any },

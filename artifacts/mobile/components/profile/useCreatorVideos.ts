@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCreatorVideosPage } from '@/services/profileService';
 import type { SellerThreadPost } from '@/services/socialService';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import { isOfficialAccountId } from '@/lib/officialAccount';
+import { previewOfficialGrid } from '@/lib/previewOfficialAccount';
 
 export interface CreatorVideosState {
   posts: SellerThreadPost[];
@@ -37,6 +40,11 @@ export function useCreatorVideos(userId: string | null | undefined, opts: { fres
     if (!userId) return;
     const generation = ++generationRef.current;
     setError(false);
+    if (isPreviewDemoMode() && isOfficialAccountId(userId)) {
+      const demo = previewOfficialGrid();
+      setPosts(demo); setTotal(demo.length); setHasMore(false); setLoading(false);
+      return;
+    }
     try {
       const page = await getCreatorVideosPage(userId, 0, undefined, { fresh: fresh || reloadOpts.fresh, asVisitor });
       if (generation !== generationRef.current) return;

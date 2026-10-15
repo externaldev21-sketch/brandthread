@@ -55,6 +55,11 @@ export interface PostDetails {
   productTags: PostProductTag[];
   visibility: PostVisibility;
   scheduledAt: string | null;
+  /** Admins only (THREAD): publish as the official @brandthread account. */
+  postAsOfficial?: boolean;
+  /** Creator credit for @brandthread reposts ("Video: @handle"); optional. */
+  creditHandle?: string;
+  creditName?: string;
 }
 
 export interface PublishInput {

@@ -39,6 +39,7 @@ import {
 } from "../lib/safety";
 import { matchesMutedWords } from "../lib/contentModerator";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
+import { attachCredits } from "../lib/officialSeed/credit";
 import { parsePagination } from "../lib/pagination";
 
 const router = Router();
@@ -62,6 +63,9 @@ const videoRowSelection = {
   sound:        posts.sound,
   visibility:   posts.visibility,
   createdAt:    posts.createdAt,
+  creditHandle: posts.creditHandle,
+  creditName:   posts.creditName,
+  isOfficialAccount: users.isOfficialAccount,
   accountType:  users.accountType,
   displayName:  users.displayName,
   brandName:    users.brandName,
@@ -89,6 +93,9 @@ type VideoRow = {
   sound: unknown;
   visibility: { isPublic?: boolean; allowComments: boolean; allowReposts: boolean; showLikeCount: boolean } | null;
   createdAt: Date;
+  creditHandle?: string | null;
+  creditName?: string | null;
+  isOfficialAccount?: boolean | null;
   accountType: string | null;
   displayName: string | null;
   brandName: string | null;
@@ -188,7 +195,10 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
       brandName:   row.accountType === "seller" ? row.brandName : null,
       username:    row.username,
       verified:    row.accountType === "seller" ? deriveSellerVerified(row as any) : false,
+      isOfficial:  row.isOfficialAccount === true,
     },
+    creditHandle:  row.creditHandle ?? null,
+    creditName:    row.creditName ?? null,
     taggedProducts: (tagsByPost.get(row.id) ?? []).map((tag) => ({
       productId:  tag.productId,
       position:   tag.position,
@@ -202,7 +212,7 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
     viewsCount:    views.get(row.id) ?? 0,
     repostedByMe:  repostedByMe.has(row.id),
   }));
-  return attachQuoteData(mapped, viewerId);
+  return attachQuoteData(await attachCredits(mapped), viewerId);
 }
 
 async function isMutualFollow(a: string, b: string): Promise<boolean> {
@@ -294,7 +304,7 @@ router.get("/users/:userId/videos", async (req, res) => {
 
     const where = and(
       eq(posts.userId, clerkId),
-      isSelf ? ownPostsCondition() : isSeller ? publicPostCondition() : buyerFriendPostsCondition(),
+      isSelf ? ownPostsCondition() : isSeller ? publicPostCondition(undefined, undefined, { officialViewerId: viewerId }) : buyerFriendPostsCondition(),
     );
 
     const [[{ total }], pageRows] = await Promise.all([

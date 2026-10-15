@@ -44,6 +44,7 @@ const SLIDE_PREVIEW_TTL_SECONDS = 60 * 60; // 1 hour signed URL
 const SLIDE_CANVAS: Record<string, { w: number; h: number }> = {
   "9:16": { w: 720, h: 1280 },
   "3:4": { w: 810, h: 1080 },
+  "4:5": { w: 864, h: 1080 },
   "1:1": { w: 1080, h: 1080 },
 };
 
@@ -197,7 +198,7 @@ router.post("/compose-slideshow", requireAuth, async (req, res) => {
   const body = req.body as { slides?: unknown; aspectRatio?: unknown; surface?: unknown; coverIndex?: unknown };
   const rawSlides = body.slides;
   const canvas = SLIDE_CANVAS[String(body.aspectRatio ?? "9:16")];
-  if (!canvas) return res.status(400).json({ error: "aspectRatio must be 9:16, 3:4, or 1:1" });
+  if (!canvas) return res.status(400).json({ error: "aspectRatio must be 9:16, 4:5, 3:4, or 1:1" });
   const SLIDE_W = canvas.w;
   const SLIDE_H = canvas.h;
   const [acct] = await db.select({ accountType: users.accountType })
