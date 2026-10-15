@@ -15,6 +15,8 @@
  *    3-column, 1pt-gutter, 4:5 grid.
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useStickyState } from '@/lib/stickyState';
+import { getCachedTabData } from '@/lib/tabDataCache';
 import {
   View, Text, StyleSheet, Modal, Animated, Share, Linking, Alert, ScrollView, Pressable,
   useWindowDimensions, type LayoutChangeEvent, type FlatList,
@@ -344,30 +346,48 @@ export default function ProfileScreen() {
 
   const accountRef = useRef(user?.id);
   accountRef.current = user?.id;
+  const profileLoadedRef = useRef(false);
 
-  const [profile, setProfile] = useState<BuyerSocialProfile | null>(null);
-  const [posts, setPosts] = useState<BuyerPost[]>([]);
-  const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
+  // Sticky (memory-only, account-scoped — lib/stickyState.ts): a remount
+  // or revisit paints the last-known profile on frame one instead of a
+  // skeleton, and late-arriving rows (streak, cover, counts) are already in
+  // place rather than pushing the grid down when they land.
+  const [profile, setProfile, hadProfile] = useStickyState<BuyerSocialProfile | null>('buyerProfile:profile', null);
+  const [posts, setPosts] = useStickyState<BuyerPost[]>('buyerProfile:posts', []);
+  const [savedItems, setSavedItems] = useStickyState<SavedItem[]>('buyerProfile:saved', []);
   const [, setPrivacySettings] = useState<PrivacySettings | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('Posts');
   const [refreshing, setRefreshing] = useState(false);
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [avatarUri, setAvatarUri] = useStickyState<string | null>('buyerProfile:avatarUri', null);
   // Set only when the buyer has a moving profile picture — the poster frame
   // above (`avatarUri`) always stays in sync too, so every OTHER screen that
   // just shows a static avatar (feed, chat, calls) never needs to know this
   // exists; only the profile header plays it.
-  const [avatarVideoUri, setAvatarVideoUri] = useState<string | null>(null);
-  const [myOrders, setMyOrders] = useState<BuyerOrderView[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [avatarVideoUri, setAvatarVideoUri] = useStickyState<string | null>('buyerProfile:avatarVideoUri', null);
+  const [myOrders, setMyOrders] = useStickyState<BuyerOrderView[]>('buyerProfile:orders', []);
+  const [loading, setLoading] = useState(!hadProfile);
+  if (hadProfile && profile) profileLoadedRef.current = true;
   const [loadError, setLoadError] = useState(false);
-  const [threadCashBalanceCents, setThreadCashBalanceCents] = useState(0);
-  const [threadCashStreak, setThreadCashStreak] = useState<ThreadCashStreakState | null>(null);
+  // First visit seeds from the app-start warmer (lib/appStartPrefetch.ts's
+  // 'threadCash' entry) so the streak row is in place on frame one rather
+  // than popping in above the tabs and grid.
+  const [threadCashBalanceCents, setThreadCashBalanceCents] = useStickyState(
+    'buyerProfile:threadCashBalance',
+    () => Math.max(0, getCachedTabData<{ balanceCents?: number }>('threadCash')?.balanceCents ?? 0),
+  );
+  const [threadCashStreak, setThreadCashStreak] = useStickyState<ThreadCashStreakState | null>(
+    'buyerProfile:threadCashStreak',
+    () => {
+      const streak = getCachedTabData<{ streak?: ThreadCashStreakState }>('threadCash')?.streak;
+      return streak && streak.currentStreak > 0 ? streak : null;
+    },
+  );
   // Live follower/following counts from the server (the locally cached
   // profile counts went stale after every follow).
-  const [socialCounts, setSocialCounts] = useState<{ followers: number; following: number } | null>(null);
-  const [serverCover, setServerCover] = useState<CoverMedia>({ videoUrl: null, posterUrl: null });
-  const [myStoryIds, setMyStoryIds] = useState<string[]>([]);
-  const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [socialCounts, setSocialCounts] = useStickyState<{ followers: number; following: number } | null>('buyerProfile:socialCounts', null);
+  const [serverCover, setServerCover] = useStickyState<CoverMedia>('buyerProfile:cover', { videoUrl: null, posterUrl: null });
+  const [myStoryIds, setMyStoryIds] = useStickyState<string[]>('buyerProfile:storyIds', []);
+  const [highlights, setHighlights] = useStickyState<Highlight[]>('buyerProfile:highlights', []);
   // The profile video only decodes while this tab is focused AND the video
   // layer is still on screen (paused once it scrolls away).
   const [focused, setFocused] = useState(true);
@@ -437,11 +457,16 @@ export default function ProfileScreen() {
       setAvatarUri(bp.avatarUri || null);
       setAvatarVideoUri(bp.avatarVideoUri || null);
       setMyOrders(ordersResult.orders);
+      profileLoadedRef.current = true;
     } catch (error) {
-      setLoadError(true);
-      setProfile(null);
-      setPosts([]);
-      setSavedItems([]);
+      // A failed background refresh keeps what's already on screen; only a
+      // first load with nothing to show falls back to the error state.
+      if (!profileLoadedRef.current) {
+        setLoadError(true);
+        setProfile(null);
+        setPosts([]);
+        setSavedItems([]);
+      }
     } finally {
       setLoading(false);
     }

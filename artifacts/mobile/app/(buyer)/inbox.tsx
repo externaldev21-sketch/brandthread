@@ -30,6 +30,7 @@ import type { Conversation, ProfileSearchResult, AccountType, Story, Note } from
 import { NOTE_MAX_CHARS } from '@/services/socialTypes';
 import { getSuggestedPeople, dismissSuggestedPerson, type SuggestedPerson } from '@/services/activityService';
 import { getCachedTabData, setCachedTabData } from '@/lib/tabDataCache';
+import { useStickyState } from '@/lib/stickyState';
 import { useApi } from '@/lib/api';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
@@ -254,6 +255,14 @@ type StoryTrayRow = {
   latestCreatedAt: number;
 };
 
+function previewStoryTrayRows(): StoryTrayRow[] {
+  return getPreviewStoryTrayRows().map(r => ({
+    authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
+    color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
+    seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
+  }));
+}
+
 function sortStoryTray(rows: StoryTrayRow[], isLive: (authorId: string) => boolean): StoryTrayRow[] {
   return [...rows].sort((a, b) => {
     const aLive = isLive(a.authorId), bLive = isLive(b.authorId);
@@ -293,8 +302,27 @@ export default function InboxScreen() {
   // this tab. A cold start with nothing cached yet falls back to the
   // skeleton exactly as before.
   const cachedInbox = getCachedTabData<{ conversations: Conversation[] }>('inbox');
-  const [conversations, setConversations] = useState<Conversation[]>(cachedInbox?.conversations ?? []);
-  const [loading, setLoading] = useState(!cachedInbox);
+  // The seeded dev/preview inbox is synchronous, so it paints on frame one
+  // too (same gate loadData() uses below) instead of skeleton → rows.
+  const previewInboxAtMount = !cachedInbox && (!userId || isBuyerDevPreview()) && isPreviewInboxEnabled();
+  const [conversations, setConversations] = useState<Conversation[]>(
+    () => cachedInbox?.conversations ?? (previewInboxAtMount ? getPreviewConversations() : []),
+  );
+  const [loading, setLoading] = useState(!cachedInbox && !previewInboxAtMount);
+
+  // Entrance animation only for rows that genuinely arrive after the list
+  // first painted (a new DM, an accepted request) — never for rows that
+  // were already there, so refocusing or remounting the tab never replays
+  // the staggered glide-in. Holds each new id's first-seen time so a row
+  // scrolled away and back later doesn't replay it either.
+  const rowFirstSeenRef = useRef<Map<string, number> | null>(null);
+  const shouldAnimateRow = (id: string): boolean => {
+    const seen = rowFirstSeenRef.current;
+    if (!seen) return false;
+    const now = Date.now();
+    if (!seen.has(id)) seen.set(id, now);
+    return now - (seen.get(id) ?? 0) < 600;
+  };
   // Requests deleted (or "Delete all"-ed) in this session sit in a ~4s undo
   // window (lib/pendingRequestDeletes.ts) before the real delete actually
   // fires. Tracked here purely to force a re-render + filter them out of
@@ -347,15 +375,23 @@ export default function InboxScreen() {
   // getFriendSuggestions() used only for the compose sheet's default
   // directory. Loaded once per mount/account, independent of the compose
   // sheet so it can show up under the Inbox pill without opening compose.
-  const [suggestedPeople, setSuggestedPeople] = useState<SuggestedPerson[]>([]);
-  const [suggestedLoading, setSuggestedLoading] = useState(true);
+  const [suggestedPeople, setSuggestedPeople, hadSuggested] = useStickyState<SuggestedPerson[]>('inbox:suggested', [], { persist: true });
+  const [suggestedLoading, setSuggestedLoading] = useState(!hadSuggested);
   const [messagingSuggestedId, setMessagingSuggestedId] = useState<string | null>(null);
 
   // Stories tray — see loadStoryTray() below. `myStoryId` is null when the
   // buyer has no active story ("Your story" then shows the add/"+" badge).
   const { user: clerkUser } = useUser();
-  const [storyTrayRows, setStoryTrayRows] = useState<StoryTrayRow[]>([]);
-  const [myStoryId, setMyStoryId] = useState<string | null>(null);
+  // Sticky (lib/stickyState.ts) so the tray is already in place on a
+  // revisit/remount instead of popping in; the preview tray is synchronous
+  // so it's seeded straight away too.
+  const previewTrayAtMount = (!userId || isBuyerDevPreview()) && isPreviewStoriesEnabled();
+  const [storyTrayRows, setStoryTrayRows] = useStickyState<StoryTrayRow[]>(
+    'inbox:storyTray', () => (previewTrayAtMount ? previewStoryTrayRows() : []), { persist: !previewTrayAtMount },
+  );
+  const [myStoryId, setMyStoryId] = useStickyState<string | null>(
+    'inbox:myStoryId', () => (previewTrayAtMount ? PREVIEW_MY_STORY.id : null), { persist: !previewTrayAtMount },
+  );
   const myAvatarUri = clerkUser?.hasImage ? clerkUser.imageUrl : undefined;
   const myDisplayName = clerkUser?.fullName || clerkUser?.firstName || clerkUser?.username || 'You';
   const myInitials = myDisplayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'Y';
@@ -364,8 +400,19 @@ export default function InboxScreen() {
   // null when the buyer has no active (<24h) note ("Your note" then shows
   // the empty tap-to-post prompt bubble); notesByAuthor covers everyone
   // else's bubble, keyed by authorId, same key space as storyTrayRows.
-  const [myNote, setMyNote] = useState<Note | null>(null);
-  const [notesByAuthor, setNotesByAuthor] = useState<Record<string, Note>>({});
+  const previewNotesAtMount = !userId && isPreviewNotesEnabled();
+  const [myNote, setMyNote] = useStickyState<Note | null>(
+    'inbox:myNote', () => (previewNotesAtMount ? getPreviewMyNote() : null), { persist: !previewNotesAtMount },
+  );
+  const [notesByAuthor, setNotesByAuthor] = useStickyState<Record<string, Note>>(
+    'inbox:notesByAuthor',
+    () => {
+      const byAuthor: Record<string, Note> = {};
+      if (previewNotesAtMount) for (const n of getPreviewNotesForTray()) byAuthor[n.authorId] = n;
+      return byAuthor;
+    },
+    { persist: !previewNotesAtMount },
+  );
   const [noteComposeVisible, setNoteComposeVisible] = useState(false);
   const [noteComposeText, setNoteComposeText] = useState('');
   const [noteComposeSaving, setNoteComposeSaving] = useState(false);
@@ -384,11 +431,7 @@ export default function InboxScreen() {
     // stories endpoints below.
     if (!userId || isBuyerDevPreview()) {
       if (isPreviewStoriesEnabled()) {
-        setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
-          authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
-          color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
-          seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
-        })));
+        setStoryTrayRows(previewStoryTrayRows());
         setMyStoryId(PREVIEW_MY_STORY.id);
         cacheStoriesForViewer([
           PREVIEW_MY_STORY,
@@ -420,11 +463,7 @@ export default function InboxScreen() {
       if (fetched.length) cacheStoriesForViewer(fetched).catch(() => {});
     } catch {
       if (isPreviewStoriesEnabled()) {
-        setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
-          authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
-          color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
-          seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
-        })));
+        setStoryTrayRows(previewStoryTrayRows());
         setMyStoryId(PREVIEW_MY_STORY.id);
         cacheStoriesForViewer([
           PREVIEW_MY_STORY,
@@ -617,6 +656,15 @@ export default function InboxScreen() {
   const requestConvs = conversations.filter(conv =>
     conv.isRequest === true && !conv.isArchived && !pendingDeleteIds.has(conv.id)
   );
+
+  // Everything present when the list first paints counts as "already
+  // there" (see shouldAnimateRow above) — only later arrivals animate.
+  if (!loading && rowFirstSeenRef.current === null) {
+    const seen = new Map<string, number>();
+    for (const c of conversations) seen.set(c.id, 0);
+    for (const c of joinedCommunities) seen.set(`community:${c.id}`, 0);
+    rowFirstSeenRef.current = seen;
+  }
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -1138,7 +1186,7 @@ export default function InboxScreen() {
     ];
 
     return (
-      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10}>
+      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10} disabled={!shouldAnimateRow(conv.id)}>
         <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
           <PressableScale
             style={[s.convRow, { backgroundColor: theme.background }]}
@@ -1244,7 +1292,7 @@ export default function InboxScreen() {
   function renderInboxRow({ item, index }: { item: InboxMergedRow<Conversation>; index: number }) {
     if (item.kind === 'dm') return renderConvRow({ item: item.dm, index });
     return (
-      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10}>
+      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10} disabled={!shouldAnimateRow(`community:${item.community.id}`)}>
         <CommunityInboxRow
           community={item.community}
           onPress={() => { hapticPrimaryAction(); router.push(`/community-chat?id=${encodeURIComponent(item.community.id)}` as never); }}
@@ -1289,7 +1337,7 @@ export default function InboxScreen() {
     ];
 
     return (
-      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10}>
+      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10} disabled={!shouldAnimateRow(conv.id)}>
         <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
           <PressableScale
             style={[s.convRow, { backgroundColor: theme.background }]}
@@ -1548,8 +1596,11 @@ export default function InboxScreen() {
           Always renders (even with nobody but "Your story") — see the
           storyTrayRows.length check below, which only ever hides the *rest*
           of the row, never the whole thing. */}
-      {!loading && !messagesSearchLower && (
-        <AnimatedEntrance distance={12}>
+      {/* Rendered from the very first frame (never gated on the inbox
+          fetch, never animated in) — "Your story" and its note bubble are
+          static, and the rest of the row is sticky across visits, so the
+          row's height is reserved up front and nothing below it moves. */}
+      {!messagesSearchLower && (
           <View style={s.storyTrayWrap}>
             <ScrollView
               horizontal
@@ -1702,11 +1753,10 @@ export default function InboxScreen() {
               style={s.storyTrayFade}
             />
           </View>
-        </AnimatedEntrance>
       )}
 
-      {/* Inbox / Requests pill row */}
-      {!loading && (
+      {/* Inbox / Requests pill row — static chrome, in place from frame one. */}
+      {(
         <InboxPillRow
           value={activeTab}
           onChange={setActiveTab}
