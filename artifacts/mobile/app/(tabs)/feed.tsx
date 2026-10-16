@@ -50,7 +50,7 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
-import { FeedSkeleton, PressableScale } from '@/components/BrandthreadUI';
+import { LoadingSkeleton, PressableScale, SkeletonText } from '@/components/BrandthreadUI';
 import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
@@ -320,6 +320,23 @@ const hdStyles = StyleSheet.create({
   skelAvatar: { width: 44, height: 44, borderRadius: RADIUS.xs, backgroundColor: SURFACE },
   skelLine: { height: 10, borderRadius: 4, backgroundColor: SURFACE },
 });
+
+// ─── Loading state ─────────────────────────────────────────────────────────────
+// Full-bleed like a real Thread: one shimmer that covers the whole page
+// (behind the header and the floating tab bar) with caption placeholders
+// where the caption sits — never a card with bands around it.
+function ThreadPageSkeleton({ bottomClearance }: { bottomClearance: number }) {
+  return (
+    <View style={[StyleSheet.absoluteFill, { zIndex: 5 }]} pointerEvents="none" testID="thread-page-skeleton">
+      <LoadingSkeleton height={0} style={[StyleSheet.absoluteFill, { borderRadius: 0, height: '100%' }]} />
+      <View style={{ position: 'absolute', left: 16, right: 84, bottom: bottomClearance + CAPTION_BOTTOM_GAP + 8, gap: 8 }}>
+        <SkeletonText width="38%" height={14} />
+        <SkeletonText width="82%" height={11} />
+        <SkeletonText width="56%" height={11} />
+      </View>
+    </View>
+  );
+}
 
 // ─── Feed item display type ───────────────────────────────────────────────────
 
@@ -1893,8 +1910,8 @@ function isLiveStreamItem(item: SpotlightItem | LiveStreamFeedItem | JustDropped
 // server seeds a brand-new user (official in slot 1, then every 3rd slot).
 function withPreviewOfficialPosts(posts: SpotlightItem[]): SpotlightItem[] {
   if (!isPreviewDemoMode()) return posts;
-  const [video, slideshow] = previewOfficialPosts().map(mapSellerPost).filter((p): p is SpotlightItem => p !== null);
-  return [video, ...posts.slice(0, 2), slideshow, ...posts.slice(2)];
+  const [video, slideshow, photo] = previewOfficialPosts().map(mapSellerPost).filter((p): p is SpotlightItem => p !== null);
+  return [video, ...posts.slice(0, 2), slideshow, ...posts.slice(2, 4), photo, ...posts.slice(4)];
 }
 
 // ─── Map a service SellerThreadPost to the feed display format ────────────────
@@ -2596,7 +2613,7 @@ export default function FeedScreen({
     // poster under the exact same condition `allItems` above includes those
     // preview posts. Outside of that (a real production feed with no
     // preview content), showing that bundled poster would be actively
-    // wrong, so render nothing and let the existing `FeedSkeleton` cover
+    // wrong, so render nothing and let the full-bleed `ThreadPageSkeleton` cover
     // this brief window instead.
     const previewEligible = __DEV__ && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you';
     if (!previewEligible) return null;
@@ -3040,9 +3057,7 @@ export default function FeedScreen({
        * visible for as long as that hang lasted, even though real content
        * was already mounted underneath it the whole time. */}
       {feedLoading && displayItems.length === 0 && (
-        <FeedSkeleton
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }}
-        />
+        <ThreadPageSkeleton bottomClearance={bottomClearance} />
       )}
       {/*
        * SCROLL-RESET EXCEPTION (see hooks/useScrollReset.ts): this vertical

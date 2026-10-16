@@ -80,6 +80,18 @@ export function previewOfficialPosts(): SellerThreadPost[] {
       viewsCount: 30100,
       credit: null,
     },
+    {
+      ...base,
+      id: 'preview-official-photo',
+      caption: 'One look, one frame.',
+      mediaUris: [uri(POSTERS[3])],
+      thumbnailUri: uri(POSTERS[3]),
+      aspectRatio: '4:5',
+      contentType: 'photo',
+      likesCount: 5100,
+      viewsCount: 14800,
+      credit: { handle: 'movrrs', name: null, userId: null, accountType: null },
+    },
   ];
 }
 

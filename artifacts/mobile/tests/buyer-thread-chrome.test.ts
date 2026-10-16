@@ -22,7 +22,7 @@ describe('buyer Thread chrome', () => {
     expect(parts).toContain('width: size, height: size, borderRadius: radius.bar');
   });
 
-  it('fits every Thread page to the measured tab scene and never crops photos', () => {
+  it('fits every Thread page to the measured tab scene, full-bleed with no bands', () => {
     expect(feed).toContain('const [viewportSize, setViewportSize]');
     expect(feed).toContain('const viewportReady = viewportSize.width > 0 && viewportSize.height > 0');
     expect(feed).toContain('{viewportReady && <FlatList');
@@ -33,9 +33,15 @@ describe('buyer Thread chrome', () => {
       .toContain('length: pageHeight, offset: pageHeight * index');
     expect(feed).not.toContain('snapToInterval={pageHeight}');
     expect(feed).not.toContain("Dimensions.get('window')");
-    // Photo slides render through the shared carousel, letterboxed, never cropped.
+    // Photo slides (carousel and single photo) are full-bleed like video
+    // Threads: cover-cropped behind the header and tab bar, never letterboxed
+    // into black bands at the top/bottom.
     expect(feed).toContain('<PhotoCarousel');
-    expect(readFileSync(resolve(process.cwd(), 'components/buyer-feed/PhotoCarousel.tsx'), 'utf8'))
-      .toContain('contentFit="contain"');
+    const carousel = readFileSync(resolve(process.cwd(), 'components/buyer-feed/PhotoCarousel.tsx'), 'utf8');
+    expect(carousel).toContain('contentFit="cover"');
+    expect(carousel).not.toContain('contentFit="contain"');
+    // Loading is a full-page shimmer, not a card with screen-colored bands.
+    expect(feed).toContain('<ThreadPageSkeleton');
+    expect(feed).not.toContain('<FeedSkeleton');
   });
 });
