@@ -14,7 +14,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { useRole } from '@/contexts/RoleContext';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
-import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { getSellerPosts, updateSellerPost, type SellerThreadPost } from '@/services/socialService';
 import {
@@ -71,7 +71,19 @@ export default function CreatePostScreen() {
   const params = useLocalSearchParams<{ accountType?: string; editId?: string; from?: string; mode?: string; capture?: string }>();
   const isSeller = role === 'seller' && params.accountType !== 'buyer';
   const roleKey = isSeller ? 'seller' : 'buyer';
-  const modes = CREATE_MODES_BY_ROLE[roleKey];
+  // Platform admins (users.role = admin) can publish Threads as @brandthread.
+  // An admin on a buyer account gets THREAD too — those Threads can only go
+  // out as @brandthread, so the switch is locked on for them.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    // demo=1 preview shows the admin composer so it can be reviewed; posting stays off.
+    if (isSellerDevPreview() || isBuyerDevPreview()) { setIsAdmin(isPreviewDemoMode()); return; }
+    let live = true;
+    api.moderation.me().then((r: { isModerator: boolean }) => { if (live) setIsAdmin(r.isModerator === true); }).catch(() => {});
+    return () => { live = false; };
+  }, [api]);
+  const canThread = isSeller || isAdmin;
+  const modes = isSeller || !isAdmin ? CREATE_MODES_BY_ROLE[roleKey] : (['story', 'thread', 'post'] as CreateMode[]);
   const editId = typeof params.editId === 'string' ? params.editId : undefined;
   const isWeb = Platform.OS === 'web';
   // Camera-first on native and web; a browser without a camera still has
@@ -108,10 +120,15 @@ export default function CreatePostScreen() {
     leaveSetupFlow(router, params.from);
   }, [params.from, router]);
 
-  // A buyer can never be in a Threads flow, however the route was reached.
+  // A buyer can never be in a Threads flow, however the route was reached
+  // (admins excepted — theirs go out as @brandthread).
   useEffect(() => {
-    if (!isSeller && mode === 'thread') setMode('post');
-  }, [isSeller, mode]);
+    if (!canThread && mode === 'thread' && roleLoaded) setMode('post');
+  }, [canThread, mode, roleLoaded]);
+  const postAsLocked = !isSeller && isAdmin && postMode === 'thread';
+  useEffect(() => {
+    if (postAsLocked && !details.postAsOfficial) setDetails((d) => ({ ...d, postAsOfficial: true }));
+  }, [postAsLocked, details.postAsOfficial]);
 
   // Editing an existing post: straight to the post screen with its saved details.
   useEffect(() => {
@@ -246,7 +263,7 @@ export default function CreatePostScreen() {
       <StatusBar barStyle="light-content" />
       {step === 'capture' && !noCameraStep ? (
         <CreateCamera
-          isBuyer={!isSeller}
+          isBuyer={!canThread}
           mode={postMode}
           onModeChange={changeMode}
           onClose={leave}
@@ -310,6 +327,7 @@ export default function CreatePostScreen() {
         <PostScreen
           mode={postMode}
           isSeller={isSeller}
+          postAs={isAdmin && postMode === 'thread' && !editId ? { locked: postAsLocked } : undefined}
           media={media}
           onMedia={setMedia}
           details={details}

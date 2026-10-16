@@ -1,7 +1,20 @@
-import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
+import { and, count, eq, inArray, lte, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import { db, interactions, postComments, posts } from "@workspace/db";
 import { authorInGoodStanding } from "./safety";
 import { privateAuthorVisibleTo } from "./privateAccount";
+import { OFFICIAL_ACCOUNT_CLERK_ID, officialSeedPublicSql } from "./officialSeed/config";
+
+/**
+ * Official @brandthread posts are visible to everyone only while
+ * OFFICIAL_SEED_CONTENT_PUBLIC is on (see officialSeed/config.ts); platform
+ * admins always see them. Every other author passes straight through.
+ */
+export function officialPostVisibleTo(viewerId: string | null | undefined, authorColumn: AnyColumn | SQL) {
+  const viewerIsAdmin = viewerId
+    ? sql<boolean>`exists (select 1 from users ou where ou.clerk_id = ${viewerId} and ou.role = 'admin' and ou.suspended_at is null)`
+    : sql<boolean>`false`;
+  return sql<boolean>`(${authorColumn} <> ${OFFICIAL_ACCOUNT_CLERK_ID} or ${officialSeedPublicSql()} or ${viewerIsAdmin})`;
+}
 
 /**
  * A post is publicly visible when it is published (or its schedule is due),
@@ -9,8 +22,15 @@ import { privateAuthorVisibleTo } from "./privateAccount";
  * suspended nor deleted. Every public feed and single-post read uses this.
  * Private accounts' posts are hidden unless `viewerId` is the author or
  * follows them (signed-out / omitted viewer: private authors excluded).
+ * Official @brandthread posts follow officialPostVisibleTo, checked against
+ * `opts.officialViewerId` (defaults to `viewerId`) so a surface can unlock
+ * them for admins without also changing its private-account behaviour.
  */
-export function publicPostCondition(now = new Date(), viewerId?: string | null) {
+export function publicPostCondition(
+  now = new Date(),
+  viewerId?: string | null,
+  opts: { officialViewerId?: string | null } = {},
+) {
   return and(
     sql<boolean>`coalesce((${posts.visibility}->>'isPublic')::boolean, true) = true`,
     or(
@@ -20,6 +40,7 @@ export function publicPostCondition(now = new Date(), viewerId?: string | null) 
     eq(posts.moderationStatus, "visible"),
     authorInGoodStanding(posts.userId),
     privateAuthorVisibleTo(viewerId, posts.userId),
+    officialPostVisibleTo(opts.officialViewerId ?? viewerId, posts.userId),
   );
 }
 

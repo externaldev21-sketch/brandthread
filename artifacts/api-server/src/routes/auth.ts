@@ -40,6 +40,7 @@ import { AGE_RESTRICTED_MESSAGE, bandMaySellOrEarn, denyIfAgeRestricted } from "
 import { LEGAL_ACCEPTANCE_SOURCES, recordLegalAcceptance, type LegalAcceptanceSource } from "../lib/legalAcceptance";
 import { buildAccountDataExport } from "../lib/dataExport";
 import { decideUsernameChange, usernameNextChangeAt } from "../lib/usernameCooldown";
+import { isPlatformImpersonationHandle } from "../lib/storeIdentity";
 import { hasRedeemedAccessCode, isInviteOnlyEnabled } from "../lib/access/inviteOnly";
 
 const router = Router();
@@ -117,6 +118,13 @@ function validateUsername(u: string): string | null {
   if (!USERNAME_REGEX.test(u))
     return "Username may only contain letters, numbers, and underscores (3–30 characters).";
   return null; // valid
+}
+
+const USERNAME_RESERVED = { error: "That username is reserved.", code: "USERNAME_RESERVED" } as const;
+
+/** @brandthread and its look-alikes are reserved — unless the caller already holds that handle. */
+function isReservedForCaller(uname: string, holderClerkId: string | null | undefined, callerClerkId: string): boolean {
+  return holderClerkId !== callerClerkId && isPlatformImpersonationHandle(uname);
 }
 
 // ─── POST /api/auth/sync ──────────────────────────────────────────────────────
@@ -560,6 +568,10 @@ router.patch("/onboarding", requireAuth, validateRequest({ body: onboardingBodyS
       res.status(409).json({ error: "Username is already taken.", code: "USERNAME_TAKEN" });
       return;
     }
+    if (isReservedForCaller(uname, taken?.clerkId, clerkUserId)) {
+      res.status(400).json(USERNAME_RESERVED);
+      return;
+    }
     updates.username = uname;
   }
 
@@ -886,6 +898,10 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
           res.status(409).json({ error: "Username is already taken.", code: "USERNAME_TAKEN" });
           return;
         }
+        if (isReservedForCaller(uname, taken?.clerkId, clerkId)) {
+          res.status(400).json(USERNAME_RESERVED);
+          return;
+        }
         updates.username = uname;
       }
       if (decision.stamp) updates.usernameChangedAt = new Date();
@@ -959,6 +975,8 @@ router.get("/username/check", requireAuth, async (req, res) => {
 
   if (existing && existing.clerkId !== clerkUserId) {
     res.json({ available: false, error: "Username is already taken." });
+  } else if (isReservedForCaller(raw, existing?.clerkId, clerkUserId)) {
+    res.json({ available: false, code: USERNAME_RESERVED.code, error: USERNAME_RESERVED.error });
   } else {
     res.json({ available: true });
   }

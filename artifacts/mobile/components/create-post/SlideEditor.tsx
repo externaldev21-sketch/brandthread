@@ -2,7 +2,7 @@
  * Step 3 (photos) — slideshow editor, laid out like TikTok's crop screen:
  * the post frame in the middle with corner marks and a rule-of-thirds grid,
  * a filmstrip of the slides below (tap to jump, hold-drag to reorder), the
- * aspect-ratio row (1:1 · 3:4 · 9:16 — one ratio for the whole post) and the
+ * aspect-ratio row (1:1 · 4:5 · 3:4 · 9:16 — one ratio for the whole post) and the
  * bottom pills. Every slide is cropped on its own: drag to pan, pinch (or
  * mouse wheel on web) to zoom inside the frame; dragging past the image edge
  * swipes to the previous/next slide.
@@ -19,7 +19,7 @@ import { ReorderStrip } from '@/components/create-post/ReorderStrip';
 import { CropFrame } from '@/components/create-post/CropFrame';
 
 const ASPECT_ICON: Record<PostAspect, { w: number; h: number }> = {
-  '1:1': { w: 20, h: 20 }, '3:4': { w: 17, h: 22 }, '9:16': { w: 13, h: 23 },
+  '1:1': { w: 20, h: 20 }, '4:5': { w: 18, h: 22 }, '3:4': { w: 17, h: 22 }, '9:16': { w: 13, h: 23 },
 };
 
 export function SlideEditor({ slides, aspect, activeIndex, onActiveIndex, onAspect, onSlides, onBack, onNext }: {
@@ -136,7 +136,7 @@ const s = StyleSheet.create({
   thumbWrap: { flex: 1, borderRadius: 4, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent', backgroundColor: CP.surface },
   thumbOn: { borderColor: CP.white },
   hint: { color: CP.silverDim, fontFamily: FONT.regular, fontSize: 12, textAlign: 'center', marginTop: 2 },
-  aspects: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 40, paddingVertical: 14 },
+  aspects: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 24, paddingVertical: 14 },
   aspect: { alignItems: 'center', gap: 6, minWidth: 60 },
   aspectLabel: { fontFamily: FONT.semibold, fontSize: 13 },
   buttons: { flexDirection: 'row', gap: 10, paddingHorizontal: 16 },

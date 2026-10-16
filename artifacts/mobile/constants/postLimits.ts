@@ -54,12 +54,12 @@ export const CAPTURE_DURATIONS = [
   { id: '10m', label: '10m', seconds: MAX_VIDEO_SECONDS },
 ] as const;
 
-export const POST_ASPECTS = ['1:1', '3:4', '9:16'] as const;
+export const POST_ASPECTS = ['1:1', '4:5', '3:4', '9:16'] as const;
 export type PostAspect = (typeof POST_ASPECTS)[number];
 /** Ratios offered per destination. POST is always 3:4 (no picker). */
 export const ASPECTS_BY_MODE: Record<PostMode, readonly PostAspect[]> = {
   thread: POST_ASPECTS,
   post: ['3:4'],
 };
-export const ASPECT_RATIO_VALUE: Record<PostAspect, number> = { '1:1': 1, '3:4': 3 / 4, '9:16': 9 / 16 };
+export const ASPECT_RATIO_VALUE: Record<PostAspect, number> = { '1:1': 1, '4:5': 4 / 5, '3:4': 3 / 4, '9:16': 9 / 16 };
 export const DEFAULT_SLIDE_ASPECT: PostAspect = '3:4';

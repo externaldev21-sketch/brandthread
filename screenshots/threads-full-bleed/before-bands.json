@@ -1,0 +1,26 @@
+{
+  "video": {
+    "top": 0,
+    "bottom": 0
+  },
+  "carousel-slide1": {
+    "top": 69,
+    "bottom": 29
+  },
+  "carousel-slide3": {
+    "top": 69,
+    "bottom": 29
+  },
+  "single-photo": {
+    "top": 69,
+    "bottom": 29
+  },
+  "following-loading": {
+    "top": 16,
+    "bottom": 29
+  },
+  "product-tagged": {
+    "top": 0,
+    "bottom": 0
+  }
+}

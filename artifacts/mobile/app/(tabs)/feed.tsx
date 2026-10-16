@@ -50,7 +50,7 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
-import { FeedSkeleton, PressableScale } from '@/components/BrandthreadUI';
+import { LoadingSkeleton, PressableScale, SkeletonText } from '@/components/BrandthreadUI';
 import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
@@ -97,6 +97,12 @@ import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
 import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
+import { PhotoCarousel } from '@/components/buyer-feed/PhotoCarousel';
+import { creditLabel, OFFICIAL_AVATAR_SOURCE } from '@/lib/officialAccount';
+import { noteThreadOnScreen } from '@/services/officialSeedService';
+import { previewOfficialPosts } from '@/lib/previewOfficialAccount';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import type { PostCredit } from '@/services/socialService';
 import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 import { a11yHidden } from '@/lib/a11yHidden';
@@ -315,6 +321,23 @@ const hdStyles = StyleSheet.create({
   skelLine: { height: 10, borderRadius: 4, backgroundColor: SURFACE },
 });
 
+// ─── Loading state ─────────────────────────────────────────────────────────────
+// Full-bleed like a real Thread: one shimmer that covers the whole page
+// (behind the header and the floating tab bar) with caption placeholders
+// where the caption sits — never a card with bands around it.
+function ThreadPageSkeleton({ bottomClearance }: { bottomClearance: number }) {
+  return (
+    <View style={[StyleSheet.absoluteFill, { zIndex: 5 }]} pointerEvents="none" testID="thread-page-skeleton">
+      <LoadingSkeleton height={0} style={[StyleSheet.absoluteFill, { borderRadius: 0, height: '100%' }]} />
+      <View style={{ position: 'absolute', left: 16, right: 84, bottom: bottomClearance + CAPTION_BOTTOM_GAP + 8, gap: 8 }}>
+        <SkeletonText width="38%" height={14} />
+        <SkeletonText width="82%" height={11} />
+        <SkeletonText width="56%" height={11} />
+      </View>
+    </View>
+  );
+}
+
 // ─── Feed item display type ───────────────────────────────────────────────────
 
 interface SpotlightItem {
@@ -357,6 +380,10 @@ interface SpotlightItem {
   /** Admin-approved paid promotion served in For You; rendered with a "Sponsored" label. */
   sponsored?: boolean;
   sponsoredBoostId?: string;
+  /** Official @brandthread post: silver B avatar + "Official" badge. */
+  official?: boolean;
+  /** "Video: @handle" creator credit under the caption (official reposts). */
+  credit?: PostCredit | null;
 }
 type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
 
@@ -1360,44 +1387,6 @@ function LiveVideoVisual({
   );
 }
 
-function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange, onFirstImagePainted }: { uris: string[]; pageWidth: number; pageHeight: number; onPageChange?: (index: number) => void; onFirstImagePainted?: () => void }) {
-  const pages = uris.length > 0 ? uris : [''];
-  return (
-    <FlatList
-      data={pages}
-      style={StyleSheet.absoluteFill}
-      keyExtractor={(uri, index) => `${uri}-${index}`}
-      horizontal
-      pagingEnabled
-      showsHorizontalScrollIndicator={false}
-      directionalLockEnabled
-      nestedScrollEnabled
-      onMomentumScrollEnd={(e) => {
-        if (!onPageChange || pageWidth <= 0) return;
-        const index = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
-        onPageChange(Math.max(0, Math.min(pages.length - 1, index)));
-      }}
-      renderItem={({ item: uri, index }) => (
-        <View style={{ width: pageWidth, height: pageHeight }}>
-          {uri ? (
-            <CachedImage
-              source={{ uri }}
-              style={StyleSheet.absoluteFill}
-              contentFit="contain"
-              onLoad={index === 0 ? onFirstImagePainted : undefined}
-            />
-          ) : (
-            <View style={[StyleSheet.absoluteFill, styles.mediaPlaceholder]}>
-              <Feather name="image" size={42} color="#FFFFFF99" />
-            </View>
-          )}
-        </View>
-      )}
-      getItemLayout={(_, index) => ({ length: pageWidth, offset: pageWidth * index, index })}
-    />
-  );
-}
-
 // The old inline ShopPill/right-rail/caption-block/top-bar JSX previously
 // defined in this file has been rebuilt as its own component tree under
 // components/buyer-feed/ (ShopSideTab, RightActionRail, CaptionBlock,
@@ -1471,7 +1460,6 @@ function SpotlightPageImpl({
   const immersive = immersiveProp || !hasTabBar;
   const [paused, setPaused] = useState(false);
   /** Which page of a multi-photo post is currently visible, for the pager dots. */
-  const [photoPageIndex, setPhotoPageIndex] = useState(0);
   /** Pause while the buyer is holding down on the left/center of the video — distinct from the tap-to-toggle `paused` above, so releasing always resumes rather than fighting a manual pause. */
   const [holdPaused, setHoldPaused] = useState(false);
   /** 2x while holding the right side of the video. */
@@ -1691,12 +1679,20 @@ function SpotlightPageImpl({
                 onFirstFramePainted={isFirstItem ? onFirstFramePainted : undefined}
               />
             )
-            : <PhotoVisual uris={item.mediaUris} pageWidth={pageWidth} pageHeight={pageHeight} onPageChange={setPhotoPageIndex} onFirstImagePainted={isFirstItem ? onFirstFramePainted : undefined} />}
-          {item.contentType !== 'video' && item.mediaUris.length > 1 && (
-            <View style={styles.mediaDots} pointerEvents="none">
-              {item.mediaUris.slice(0, 5).map((_, index) => <View key={index} style={[styles.mediaDot, index === photoPageIndex && styles.mediaDotActive]} />)}
-            </View>
-          )}
+            : (
+              <PhotoCarousel
+                postId={item.id}
+                uris={item.mediaUris}
+                pageWidth={pageWidth}
+                pageHeight={pageHeight}
+                isActive={isActive || preload}
+                // Below the floating Following | Threads bar; the segment
+                // indicator sits where a video's progress bar would.
+                counterTop={insets.top + (hasTabBar ? 60 : 16)}
+                indicatorBottom={bottomClearance + 2}
+                onFirstImagePainted={isFirstItem ? onFirstFramePainted : undefined}
+              />
+            )}
           <Animated.View
             pointerEvents="none"
             style={[styles.heartBurst, {
@@ -1750,6 +1746,7 @@ function SpotlightPageImpl({
         creator={item.creator}
         hostId={item.sellerId}
         avatarColor={item.avatarColor}
+        avatarSource={item.official ? OFFICIAL_AVATAR_SOURCE : undefined}
         initials={item.initials}
         accentColor={item.accentColor}
         engagement={engagement}
@@ -1817,6 +1814,17 @@ function SpotlightPageImpl({
         creator={item.creator}
         verified={!!item.verified}
         sponsored={item.sponsored}
+        official={item.official}
+        credit={item.credit ? {
+          label: creditLabel(item.credit, item.contentType === 'video' ? 'video' : 'photos'),
+          onPress: item.credit.userId
+            ? () => router.push(profileHref({
+                userId: item.credit!.userId!,
+                accountType: item.credit!.accountType ?? 'buyer',
+                handle: item.credit!.handle ? `@${item.credit!.handle}` : undefined,
+              }) as never)
+            : undefined,
+        } : undefined}
         caption={item.caption}
         sound={item.sound}
         soundOn={soundOn}
@@ -1898,6 +1906,14 @@ function isLiveStreamItem(item: SpotlightItem | LiveStreamFeedItem | JustDropped
   return (item as LiveStreamFeedItem)._isLive === true;
 }
 
+// demo=1 preview only: lay the official @brandthread samples out the way the
+// server seeds a brand-new user (official in slot 1, then every 3rd slot).
+function withPreviewOfficialPosts(posts: SpotlightItem[]): SpotlightItem[] {
+  if (!isPreviewDemoMode()) return posts;
+  const [video, slideshow, photo] = previewOfficialPosts().map(mapSellerPost).filter((p): p is SpotlightItem => p !== null);
+  return [video, ...posts.slice(0, 2), slideshow, ...posts.slice(2, 4), photo, ...posts.slice(4)];
+}
+
 // ─── Map a service SellerThreadPost to the feed display format ────────────────
 // Returns null only when a post has no displayable media. Photo, slideshow, and
 // video posts all share the same full-screen Thread surface.
@@ -1911,7 +1927,6 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     handle: post.authorHandle,
     avatarColor: post.authorColor,
     initials: post.authorInitials,
-    verified: false,
     mediaUris: post.mediaUris,
     videoSource: post.contentType === 'video' ? post.mediaUris[0] : undefined,
     videoPosterUri: post.thumbnailUri,
@@ -1942,6 +1957,9 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     commentsCount: post.commentsCount,
     sponsored: post.sponsored === true ? true : undefined,
     sponsoredBoostId: post.sponsoredBoostId,
+    official: post.isOfficial === true ? true : undefined,
+    verified: post.isOfficial === true,
+    credit: post.credit ?? null,
   };
 }
 
@@ -2454,7 +2472,7 @@ export default function FeedScreen({
   const allItems = useMemo(() => {
     if (!userId && guestMutedPhrases === null) return [];
     const previewPosts = __DEV__ && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you'
-      ? FASHION_PREVIEW_POSTS
+      ? withPreviewOfficialPosts(FASHION_PREVIEW_POSTS)
       : [];
     const regular: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...previewPosts, ...sellerFeedPosts]
       .filter((post) => userId || !matchesGuestMutedWords(
@@ -2595,7 +2613,7 @@ export default function FeedScreen({
     // poster under the exact same condition `allItems` above includes those
     // preview posts. Outside of that (a real production feed with no
     // preview content), showing that bundled poster would be actively
-    // wrong, so render nothing and let the existing `FeedSkeleton` cover
+    // wrong, so render nothing and let the full-bleed `ThreadPageSkeleton` cover
     // this brief window instead.
     const previewEligible = __DEV__ && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you';
     if (!previewEligible) return null;
@@ -2607,7 +2625,7 @@ export default function FeedScreen({
   // player — see the plain <Image> in the return below), removed once the
   // real first cell reports it has actually painted a frame
   // (`onFirstFramePainted`, threaded through SpotlightPage/VideoVisual/
-  // PhotoVisual above). `overlayFading` drives a short crossfade rather than
+  // PhotoCarousel above). `overlayFading` drives a short crossfade rather than
   // an instant pop so the handoff to the real content is never a visible
   // flash either way.
   const [overlayDismissed, setOverlayDismissed] = useState(false);
@@ -2649,6 +2667,15 @@ export default function FeedScreen({
       initials: item.initials,
     }) as never);
   }, [creatorSource, creatorId, router, openLive]);
+
+  // New-user seeding: tell the server which Threads were actually on screen
+  // (no-op unless the server put this viewer in the seeding window).
+  useEffect(() => {
+    if (!userId || feedTab !== 'for-you' || isCreatorFeed) return;
+    const item = displayItems[activeIndex];
+    if (!item || isDemandPageItem(item) || !('contentType' in item)) return;
+    noteThreadOnScreen(item.id, (item as SpotlightItem).official === true);
+  }, [activeIndex, displayItems, feedTab, isCreatorFeed, userId]);
 
   // Record one view per post per session when it becomes the active page —
   // the view counts profile video tiles show.
@@ -2998,7 +3025,7 @@ export default function FeedScreen({
        * today and the buyer still sees this within one frame of mount.
        * Removed (120ms crossfade) once the real first cell reports it has
        * actually painted a frame — see `onFirstFramePainted` threaded
-       * through SpotlightPage/VideoVisual/PhotoVisual above — so it never
+       * through SpotlightPage/VideoVisual/PhotoCarousel above — so it never
        * lingers over, or pops against, live content.
        */}
       {overlayPosterSource && !overlayDismissed && (
@@ -3030,9 +3057,7 @@ export default function FeedScreen({
        * visible for as long as that hang lasted, even though real content
        * was already mounted underneath it the whole time. */}
       {feedLoading && displayItems.length === 0 && (
-        <FeedSkeleton
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }}
-        />
+        <ThreadPageSkeleton bottomClearance={bottomClearance} />
       )}
       {/*
        * SCROLL-RESET EXCEPTION (see hooks/useScrollReset.ts): this vertical
@@ -3618,9 +3643,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: SCREEN_BG },
 
   pauseOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-  mediaPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#17131D' },
   heartBurst: { position: 'absolute', top: '38%', left: '50%', marginLeft: -55, marginTop: -55 },
-  mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
   videoFill: { width: '100%', height: '100%' },
   letterboxBackdrop: { opacity: 0.55 },
   feedContentFade: { flex: 1 },
@@ -3660,8 +3683,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
   },
   speedPillText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 13 },
-  mediaDot: { width: 5, height: 5, borderRadius: RADII.pill, backgroundColor: `${ON_DARK}80` },
-  mediaDotActive: { width: 18, backgroundColor: ON_DARK },
   // The bottom-left stack's vertical rhythm is one consistent system, set
   // as explicit per-step margins (not a single uniform `gap`, since each
   // step needs its own value): creator name row -> 6pt -> caption -> 8pt ->

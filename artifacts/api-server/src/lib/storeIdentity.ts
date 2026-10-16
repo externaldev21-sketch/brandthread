@@ -77,10 +77,19 @@ const RESERVED_HANDLES = new Set([
   "anonymous", "everyone", "you", "me", "stripe", "threadcash", "brandthread",
 ]);
 
+/**
+ * True for any handle that reads as the platform itself: brandthread,
+ * brand_thread, brandthreadofficial, official.brandthread, br4ndthr3ad…
+ * Only the official account (seeded by migration 270) may hold @brandthread.
+ */
+export function isPlatformImpersonationHandle(handle: string): boolean {
+  return squashForScreening(handle).includes("brandthread");
+}
+
 /** True for reserved handles and anything impersonating the platform. */
 export function isReservedHandle(handle: string): boolean {
   const key = handle.toLowerCase().replace(/_/g, "");
-  return RESERVED_HANDLES.has(key) || key.includes("brandthread");
+  return RESERVED_HANDLES.has(key) || key.includes("brandthread") || isPlatformImpersonationHandle(handle);
 }
 
 const HANDLE_RE = /^[a-z0-9_]{3,30}$/;
