@@ -16,7 +16,8 @@ import { useApi, type RecommendedBrand } from '@/lib/api';
 import { isPreviewDemoMode } from '@/lib/devPreview';
 import { readDismissed, shouldShowBrandsRow, writeDismissed } from '@/lib/brandsYouMightLike';
 import { SP } from '@/lib/theme';
-import { TYPE_SCALE } from '@/constants/typography';
+import { SectionHeader } from '@/components/reframe';
+import { X_GUTTER, X_SPACE, xColors } from '@/constants/reframe';
 import { DiscoverEntityCard } from './DiscoverEntityCard';
 import { useStickyState } from '@/lib/stickyState';
 import { DISCOVER_KEYS } from '@/lib/discoverTabData';
@@ -93,18 +94,21 @@ export function BrandsYouMightLikeRow({ state }: { state: BrandsYouMightLikeStat
 
   return (
     <View style={styles.wrap} testID="brands-you-might-like">
-      <View style={styles.headRow}>
-        <Text style={[TYPE_SCALE.headline, { color: theme.text }]}>Brands you might like</Text>
-        <PressableScale
-          onPress={state.dismiss}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss brands you might like"
-          style={styles.dismiss}
-          testID="brands-you-might-like-dismiss"
-        >
-          <Feather name="x" size={18} color={theme.muted} />
-        </PressableScale>
-      </View>
+      <SectionHeader
+        title="Brands you might like"
+        style={styles.headRow}
+        trailing={(
+          <PressableScale
+            onPress={state.dismiss}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss brands you might like"
+            style={styles.dismiss}
+            testID="brands-you-might-like-dismiss"
+          >
+            <Feather name="x" size={18} color={xColors(theme).secondary} />
+          </PressableScale>
+        )}
+      />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.track}>
         {brands.map((b) => (
           <View key={b.id} style={{ width: CARD_WIDTH }}>
@@ -125,8 +129,10 @@ export function BrandsYouMightLikeRow({ state }: { state: BrandsYouMightLikeStat
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingTop: SP.sm, paddingBottom: SP.sm },
-  headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: SP.md, paddingRight: SP.xs },
+  wrap: { paddingTop: X_SPACE[4], paddingBottom: X_SPACE[8] },
+  // The dismiss X's 44pt box is pulled 12pt into the right gutter so the
+  // glyph itself sits on the 16pt edge; the box re-centres the title row.
+  headRow: { paddingRight: X_GUTTER - 12, paddingTop: X_SPACE[4], paddingBottom: 0 },
   dismiss: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  track: { flexDirection: 'row', gap: 12, paddingHorizontal: SP.md, paddingTop: 2 },
+  track: { flexDirection: 'row', gap: X_SPACE[12], paddingHorizontal: X_GUTTER, paddingTop: 2 },
 });

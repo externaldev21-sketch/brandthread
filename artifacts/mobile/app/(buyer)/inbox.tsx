@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
-import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
+import { SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -61,7 +61,9 @@ import {
   isPreviewNotesEnabled, getPreviewNotesForTray, getPreviewMyNote, postPreviewNote,
 } from '@/lib/previewNotes';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import { TabPageHeader } from '@/components/layout/TabPageHeader';
+import { EmptyState as QuietEmptyState, ScreenHeader, SectionHeader, SegmentTabs } from '@/components/reframe';
+import { IconButton } from '@/components/ui/IconButton';
+import { X_AVATAR, X_AVATAR_GAP, X_GUTTER, X_HAIRLINE, X_SPACE, X_TYPE, xColors } from '@/constants/reframe';
 import { Glass } from '@/components/ui/Glass';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
@@ -73,85 +75,44 @@ import { radius } from '@/constants/radii';
 // and pill controls. Scale/opacity press feedback is unaffected.
 const NO_RIPPLE = false;
 
-// ─── Inbox / Requests pill row (Threads-style chips, replaces the old
-// underline-tab segmented control) ──────────────────────────────────────────
+// ─── Inbox / Requests tabs (X-style text tabs with a white underline on the
+// active one — the shared reframe SegmentTabs, replacing the old boxed pill
+// chips). The filter control stays, as a plain icon at the row's right edge.
 
 type InboxTab = 'inbox' | 'requests';
 
 function InboxPillRow({
-  value, onChange, requestsCount, theme, gutter, onFilterPress,
+  value, onChange, requestsCount, theme, onFilterPress,
 }: {
   value: InboxTab;
   onChange: (tab: InboxTab) => void;
   requestsCount: number;
   theme: ReturnType<typeof useAppTheme>['theme'];
-  gutter: number;
   onFilterPress: () => void;
 }) {
-  const pills: { key: InboxTab; label: string; count?: number }[] = [
-    { key: 'inbox', label: 'Inbox' },
-    { key: 'requests', label: 'Requests', count: requestsCount },
-  ];
   return (
-    <View style={[pillS.row, { paddingHorizontal: gutter }]}>
-      <PressableScale
-        style={[pillS.iconPill, { borderColor: theme.border }]}
-        onPress={onFilterPress}
-        rippleEnabled={NO_RIPPLE}
-        accessibilityRole="button"
-        accessibilityLabel="Filter messages"
-        testID="inbox-filter-pill"
-      >
-        <Feather name="sliders" size={15} color={theme.text} />
-      </PressableScale>
-      {pills.map(pill => {
-        const active = value === pill.key;
-        return (
-          <PressableScale
-            key={pill.key}
-            style={[
-              pillS.pill,
-              active
-                ? { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }
-                : { backgroundColor: 'transparent', borderColor: theme.border },
-            ]}
-            onPress={() => onChange(pill.key)}
-            rippleEnabled={NO_RIPPLE}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
-            testID={`inbox-tab-${pill.key}`}
-          >
-            <Text style={[pillS.pillLabel, { color: active ? theme.text : theme.muted }]}>
-              {pill.label}
-            </Text>
-            {!!pill.count && pill.count > 0 && (
-              <View style={[pillS.pillCount, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
-                <Text style={[pillS.pillCountText, { color: active ? theme.onAccent : theme.muted }]}>
-                  {pill.count > 99 ? '99+' : pill.count}
-                </Text>
-              </View>
-            )}
-          </PressableScale>
-        );
-      })}
-    </View>
+    <SegmentTabs
+      tabs={[
+        { key: 'inbox', label: 'Inbox', testID: 'inbox-tab-inbox' },
+        { key: 'requests', label: 'Requests', count: requestsCount, testID: 'inbox-tab-requests' },
+      ]}
+      value={value}
+      onChange={onChange}
+      trailing={(
+        <IconButton
+          name="sliders"
+          variant="plain"
+          size={18}
+          color={xColors(theme).text}
+          onPress={onFilterPress}
+          rippleEnabled={NO_RIPPLE}
+          accessibilityLabel="Filter messages"
+          testID="inbox-filter-pill"
+        />
+      )}
+    />
   );
 }
-
-const pillS = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
-  iconPill: {
-    width: 36, height: 36, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  pill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    height: 36, paddingHorizontal: SP.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth,
-  },
-  pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
-  pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  pillCountText: { fontSize: 11, fontFamily: FONT.bold },
-});
 
 // ─── Compose sheet: unified "person" shape ────────────────────────────────────
 // Friends/followers/following come from the follow-graph endpoints in
@@ -279,7 +240,7 @@ export default function InboxScreen() {
   // ScrollViews, one FlashList) mounts at a time, so sharing this ref is safe.
   const scrollResetRef = useScrollReset<any>(true, false);
   const insets = useSafeAreaInsets();
-  // Matches TabPageHeader's own topPad exactly (shared useHeaderTopInset),
+  // Matches the reframe ScreenHeader's own top offset (shared useHeaderTopInset),
   // so the search-mode header row sits at the identical vertical position
   // as the title/icon row it swaps with.
   const headerTopPad = useHeaderTopInset();
@@ -293,6 +254,7 @@ export default function InboxScreen() {
   // shell and over-constrain the header at very wide viewports.
   const gutter = SP.md;
   const s = React.useMemo(() => createStyles(theme, gutter), [theme, gutter]);
+  const x = xColors(theme);
   const { userId } = useAuth();
   const accountRef = useRef(userId);
   accountRef.current = userId;
@@ -1214,13 +1176,13 @@ export default function InboxScreen() {
                 Line) while non-live rows (no ring at all) rendered fine. */}
             <View style={s.avatarContainer}>
               {conv.isOfficial ? (
-                <View style={[s.avatar56, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                  <BrandthreadLogo size={28} />
+                <View style={[s.avatar48, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                  <BrandthreadLogo size={24} />
                 </View>
               ) : (
                 // LIVE ring while this person is streaming; tapping the
                 // ringed avatar opens their live instead of the thread.
-                <LiveHostRing hostId={participant.userId} hostName={participant.name} size={48} ringGap={2} pressToWatch>
+                <LiveHostRing hostId={participant.userId} hostName={participant.name} size={48} ringGap={-2} pressToWatch>
                   {participant.avatarUri ? (
                     <Image source={{ uri: participant.avatarUri }} style={s.avatar48} testID={`inbox-avatar-image-${conv.id}`} />
                   ) : (
@@ -1242,7 +1204,7 @@ export default function InboxScreen() {
             <View style={s.convCenter}>
               <View style={s.convNameRow}>
                 <Text
-                  style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.regular }]}
+                  style={[s.convName, { color: theme.text }]}
                   numberOfLines={1}
                 >
                   {participant.name}
@@ -1266,7 +1228,7 @@ export default function InboxScreen() {
                   attachmentType={conv.lastMessageType}
                   isFromMe={!!conv.lastMessageSenderId && conv.lastMessageSenderId === MY_USER_ID}
                   bold={isUnread}
-                  color={isUnread ? theme.text : theme.muted}
+                  color={isUnread ? theme.text : x.secondary}
                   orderNumber={conv.contextOrderNumber}
                 />
               )}
@@ -1277,7 +1239,7 @@ export default function InboxScreen() {
                 badge, no chevron. */}
             <View style={s.convTrailing}>
               {conv.lastMessageTs ? (
-                <Text style={[s.convTime, { color: theme.muted, marginLeft: 0 }]} numberOfLines={1}>{timeAgo(conv.lastMessageTs)}</Text>
+                <Text style={[s.convTime, { color: x.secondary, marginLeft: 0 }]} numberOfLines={1}>{timeAgo(conv.lastMessageTs)}</Text>
               ) : null}
               {isUnread ? (
                 <View style={[s.unreadDotTrailing, { backgroundColor: theme.accent }]} testID={`inbox-unread-badge-${conv.id}`} />
@@ -1359,7 +1321,7 @@ export default function InboxScreen() {
             <View style={s.convCenter}>
               <View style={s.convNameRow}>
                 <Text
-                  style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.regular }]}
+                  style={[s.convName, { color: theme.text }]}
                   numberOfLines={1}
                 >
                   {participant.name}
@@ -1370,13 +1332,13 @@ export default function InboxScreen() {
                 attachmentType={conv.lastMessageType}
                 isFromMe={false}
                 bold={isUnread}
-                color={isUnread ? theme.text : theme.muted}
+                color={isUnread ? theme.text : x.secondary}
               />
             </View>
 
             <View style={s.convTrailing}>
               {conv.lastMessageTs ? (
-                <Text style={[s.convTime, { color: theme.muted, marginLeft: 0 }]} numberOfLines={1}>{timeAgo(conv.lastMessageTs)}</Text>
+                <Text style={[s.convTime, { color: x.secondary, marginLeft: 0 }]} numberOfLines={1}>{timeAgo(conv.lastMessageTs)}</Text>
               ) : null}
               {isUnread ? (
                 <View style={[s.unreadDotTrailing, { backgroundColor: theme.accent }]} testID={`inbox-request-unread-${conv.id}`} />
@@ -1390,45 +1352,35 @@ export default function InboxScreen() {
 
   function renderEmptyState() {
     // Only reached for the search-no-matches and load-error cases — the
-    // true zero-conversations empty state is the hand-rolled Threads-style
-    // treatment below (renderInboxEmptyState).
+    // true zero-conversations empty state is renderInboxEmptyState below.
     if (messagesSearchLower && !loadError) {
       return (
-        <EmptyState
-          icon="search"
+        <QuietEmptyState
           title="No matches"
-          description={`No conversations match "${messagesSearchQuery.trim()}"`}
+          message={`No conversations match "${messagesSearchQuery.trim()}"`}
         />
       );
     }
     return (
-      <EmptyState
-        icon="alert-circle"
+      <QuietEmptyState
+        tone="error"
         title="Could not load your inbox"
-        description="Pull to refresh and try again."
+        message="Pull to refresh and try again."
       />
     );
   }
 
-  // Threads-style empty inbox: centered circular dark badge + envelope icon,
-  // bold headline, gray subtitle, full-width filled "Send a message" button.
+  // X-style quiet empty inbox: one bold line, one gray line and a text
+  // button — no icon circle, no big headline, no filled button.
   function renderInboxEmptyState() {
     return (
-      <View style={s.inboxEmptyWrap}>
-        <View style={[s.inboxEmptyBadge, { backgroundColor: theme.cardElevated }]}>
-          <Feather name="mail" size={30} color={theme.text} />
-        </View>
-        <Text style={[s.inboxEmptyTitle, { color: theme.text }]}>Keep it real in DMs</Text>
-        <Text style={[s.inboxEmptySubtitle, { color: theme.muted }]}>
-          Send a message to someone in your network
-        </Text>
-        <PrimaryButton
-          label="Send a message"
-          onPress={openCompose}
-          style={s.inboxEmptyButton}
-          small
-        />
-      </View>
+      <QuietEmptyState
+        title="Keep it real in DMs"
+        message="Send a message to someone in your network."
+        actionLabel="Send a message"
+        onAction={openCompose}
+        testID="inbox-empty"
+      />
     );
   }
 
@@ -1442,7 +1394,7 @@ export default function InboxScreen() {
     if (suggestedLoading || suggestedPeople.length === 0) return null;
     return (
       <View style={s.suggestedSection} testID="inbox-suggested-section">
-        <Text style={[s.composeSectionTitleLoose, { color: theme.muted }]}>Suggested</Text>
+        <SectionHeader title="Suggested" />
         {suggestedPeople.map(person => (
           <View key={person.userId} style={s.suggestedRow} testID={`inbox-suggested-${person.userId}`}>
             {person.avatarUrl ? (
@@ -1453,10 +1405,10 @@ export default function InboxScreen() {
               </View>
             )}
             <View style={s.convCenter}>
-              <Text style={[s.convName, { color: theme.text, fontFamily: FONT.semibold }]} numberOfLines={1}>
+              <Text style={[s.convName, { color: theme.text }]} numberOfLines={1}>
                 {person.name}
               </Text>
-              <Text style={[s.suggestedReason, { color: theme.muted }]} numberOfLines={1}>
+              <Text style={[s.suggestedReason, { color: x.secondary }]} numberOfLines={1}>
                 {person.reason}
               </Text>
             </View>
@@ -1476,7 +1428,7 @@ export default function InboxScreen() {
                 accessibilityLabel={`Dismiss suggestion for ${person.name}`}
                 testID={`inbox-suggested-dismiss-${person.userId}`}
               >
-                <Feather name="x" size={16} color={theme.subtle} />
+                <Feather name="x" size={16} color={x.secondary} />
               </PressableScale>
             </View>
           </View>
@@ -1489,16 +1441,16 @@ export default function InboxScreen() {
 
   const requestsTabContent = (
     <ScrollView
-      contentContainerStyle={[{ paddingBottom: barInset + SP.md, paddingHorizontal: gutter }]}
+      contentContainerStyle={[{ paddingBottom: barInset + SP.md }]}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
     >
       {requestConvs.length === 0 ? (
-        <EmptyState icon="mail" illustration="envelope" title="No message requests" description="Requests from people you don't follow appear here" />
+        <QuietEmptyState title="No message requests" message="Requests from people you don't follow appear here." />
       ) : (
         <>
           <View style={s.requestsHeaderRow}>
-            <Text style={[s.requestsHeaderText, { color: theme.muted }]}>
+            <Text style={[s.requestsHeaderText, { color: x.secondary }]}>
               Open a chat to get info about who's messaging you. They won't know you've seen it until you accept.
             </Text>
             <PressableScale
@@ -1510,7 +1462,7 @@ export default function InboxScreen() {
               testID="inbox-requests-delete-all"
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Text style={[s.requestsDeleteAll, { color: theme.muted }]}>Delete all</Text>
+              <Text style={[s.requestsDeleteAll, { color: theme.text }]}>Delete all</Text>
             </PressableScale>
           </View>
           {requestConvs.map((conv, index) => (
@@ -1525,7 +1477,7 @@ export default function InboxScreen() {
     <View style={[s.root, { backgroundColor: SCREEN_BG }]}>
       {isSearchBarOpen ? (
         <Animated.View style={{ opacity: searchHeaderFade }}>
-          <View style={[s.searchHeaderRow, { paddingTop: headerTopPad + 12, paddingHorizontal: gutter }]}>
+          <View style={[s.searchHeaderRow, { paddingTop: headerTopPad + X_SPACE[4], paddingHorizontal: gutter }]}>
             <View
               style={[
                 s.searchRow,
@@ -1581,12 +1533,11 @@ export default function InboxScreen() {
           </View>
         </Animated.View>
       ) : (
-        <TabPageHeader
+        <ScreenHeader
           title="Messages"
-          gutter={gutter}
           actions={[
-            { name: 'search', onPress: openMessagesSearch, accessibilityLabel: 'Search messages', testID: 'inbox-header-search' },
-            { name: 'plus', onPress: () => openInboxComposeMenu(router, openCompose), accessibilityLabel: 'New message or group', testID: 'inbox-header-compose' },
+            { icon: 'search', onPress: openMessagesSearch, accessibilityLabel: 'Search messages', testID: 'inbox-header-search' },
+            { icon: 'plus', onPress: () => openInboxComposeMenu(router, openCompose), accessibilityLabel: 'New message or group', testID: 'inbox-header-compose' },
           ]}
         />
       )}
@@ -1659,7 +1610,7 @@ export default function InboxScreen() {
                       </View>
                     )}
                   </View>
-                  <Text style={[s.activeRailName, { color: theme.muted }]} numberOfLines={1}>Your story</Text>
+                  <Text style={[s.activeRailName, { color: x.secondary }]} numberOfLines={1}>Your story</Text>
                 </PressableScale>
               </View>
 
@@ -1702,7 +1653,7 @@ export default function InboxScreen() {
                           </View>
                         )}
                       </LiveHostRing>
-                      <Text style={[s.activeRailName, { color: theme.muted }]} numberOfLines={1}>{railDisplayName(row.name)}</Text>
+                      <Text style={[s.activeRailName, { color: x.secondary }]} numberOfLines={1}>{railDisplayName(row.name)}</Text>
                     </View>
                   );
                 }
@@ -1738,7 +1689,7 @@ export default function InboxScreen() {
                         </View>
                       )}
                     </View>
-                    <Text style={[s.activeRailName, { color: theme.muted }]} numberOfLines={1}>{railDisplayName(row.name)}</Text>
+                    <Text style={[s.activeRailName, { color: x.secondary }]} numberOfLines={1}>{railDisplayName(row.name)}</Text>
                   </PressableScale>
                 );
               })}
@@ -1762,7 +1713,6 @@ export default function InboxScreen() {
           onChange={setActiveTab}
           requestsCount={requestConvs.length}
           theme={theme}
-          gutter={gutter}
           onFilterPress={openFilterMenu}
         />
       )}
@@ -1781,7 +1731,7 @@ export default function InboxScreen() {
           contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
         >
-          <View style={{ paddingHorizontal: gutter }}>
+          <View>
             {messagesSearchLower || loadError ? renderEmptyState() : renderInboxEmptyState()}
             {!messagesSearchLower && !loadError && renderSuggestedSection()}
           </View>
@@ -1793,7 +1743,7 @@ export default function InboxScreen() {
             data={inboxRows}
             keyExtractor={item => item.key}
             renderItem={renderInboxRow}
-            contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.lg, paddingHorizontal: gutter }])}
+            contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.lg }])}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
@@ -2005,7 +1955,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   // Instagram-DM-style stories tray (below search, above the tabs) — chrome
   // (sizes/spacing) unchanged from the old "active people" rail this
   // replaced; only what the circles represent and do is new.
-  storyTrayWrap: { position: 'relative', marginBottom: SP.md },
+  storyTrayWrap: { position: 'relative', marginBottom: X_SPACE[4] },
   activeRail: {},
   activeRailItem: { width: 72, alignItems: 'center', gap: 6 },
   activeRailAvatar: {
@@ -2035,7 +1985,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF',
   },
   activeRailInitials: { fontSize: FS.md, fontFamily: FONT.bold, color: '#FFFFFF' },
-  activeRailName: { fontSize: 11, fontFamily: FONT.medium, width: 72, textAlign: 'center' },
+  activeRailName: { ...X_TYPE.meta, width: 72, textAlign: 'center' },
   storyTrayFade: {
     position: 'absolute', top: 0, bottom: 0, right: 0, width: 28,
   },
@@ -2081,53 +2031,17 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     marginTop: SP.xs, marginBottom: SP.md,
   },
 
-  // Threads-style empty inbox (centered badge + headline + full-width button)
-  inboxEmptyWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: SP.xxl,
-    paddingBottom: SP.lg,
-    gap: SP.sm,
-  },
-  inboxEmptyBadge: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SP.sm,
-  },
-  inboxEmptyTitle: {
-    fontSize: FS.lg,
-    fontFamily: FONT.bold,
-    textAlign: 'center',
-  },
-  inboxEmptySubtitle: {
-    fontSize: FS.sm,
-    fontFamily: FONT.regular,
-    textAlign: 'center',
-    maxWidth: 300,
-    marginBottom: SP.md,
-  },
-  inboxEmptyButton: {
-    width: '100%',
-  },
-
   // "Suggested" section (people to message) — below the conversation list,
   // or trailing the empty state, when on the Inbox pill.
-  suggestedSection: { marginTop: SP.lg },
-  composeSectionTitleLoose: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: SP.sm,
-  },
+  suggestedSection: { marginTop: X_SPACE[16] },
   suggestedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SP.sm,
-    gap: SP.md,
+    paddingHorizontal: X_GUTTER,
+    paddingVertical: X_SPACE[12],
+    gap: X_AVATAR_GAP,
+    borderBottomWidth: X_HAIRLINE,
+    borderBottomColor: xColors(theme).divider,
   },
   suggestedAvatar: {
     width: 48,
@@ -2137,8 +2051,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     justifyContent: 'center',
   },
   suggestedReason: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
+    ...X_TYPE.body,
     marginTop: 2,
   },
   suggestedActions: {
@@ -2163,54 +2076,48 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   // Requests-tab header: a small gray explainer line + a quiet "Delete all"
   // text action, right-aligned on its own line beneath — Instagram-style.
   requestsHeaderRow: {
-    paddingTop: SP.sm,
-    paddingBottom: SP.md,
-    gap: SP.xs,
+    paddingHorizontal: X_GUTTER,
+    paddingTop: X_SPACE[12],
+    paddingBottom: X_SPACE[12],
+    gap: X_SPACE[8],
   },
   requestsHeaderText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    lineHeight: 17,
+    ...X_TYPE.meta,
   },
   requestsDeleteAllPressable: {
     alignSelf: 'flex-end',
   },
   requestsDeleteAll: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
+    ...X_TYPE.meta,
+    fontFamily: FONT.bold,
   },
 
-  // Conversation row — Threads style: no per-row hairline (rhythm from
-  // spacing/height alone, not chrome), consistent height regardless of a
-  // row's optional content (order pill, AI badge).
+  // Conversation row — X style: 48pt avatar on the 16pt gutter, text column
+  // 12pt to its right, a full-width hairline along the bottom, and the same
+  // height regardless of a row's optional content (order pill, AI badge).
   convRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SP.sm,
+    paddingHorizontal: X_GUTTER,
+    paddingVertical: X_SPACE[12],
     minHeight: 72,
+    borderBottomWidth: X_HAIRLINE,
+    borderBottomColor: xColors(theme).divider,
   },
-  // Fixed slot, every row: nothing (ring included) renders outside this
-  // 56x56 box, so the row's left edge never shifts based on live state.
+  // Fixed 48x48 slot, every row: a LIVE ring is drawn inset over the photo's
+  // own edge (LiveHostRing ringGap={-2}, like the stories tray), so nothing
+  // renders outside this box and the text column never shifts.
   avatarContainer: {
-    width: 56,
-    height: 56,
+    width: X_AVATAR.md,
+    height: X_AVATAR.md,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatar56: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Live rows' photo — see the avatarContainer comment above for why this
-  // is 48 (not 56) inside the same 56x56 slot.
   avatar48: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: X_AVATAR.md,
+    height: X_AVATAR.md,
+    borderRadius: X_AVATAR.md / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2225,18 +2132,19 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     gap: 8,
     marginBottom: SP.md,
     paddingHorizontal: SP.md,
-    height: 44,
-    borderRadius: 12,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 0,
   },
   // The header's search-open state: the field sits inline with Cancel
   // instead of stacked full-width below a title, so it drops searchRow's own
   // bottom margin and grows to fill the space Cancel doesn't need.
+  // Same 44pt row (under the same top offset) as the reframe ScreenHeader it
+  // replaces while open — the Cancel pressable's 44pt box sets the height.
   searchHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm,
-    paddingBottom: 20,
   },
   searchRowInHeader: {
     flex: 1,
@@ -2252,14 +2160,13 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     justifyContent: 'center',
   },
   searchCancelText: {
-    fontSize: FS.sm,
+    ...X_TYPE.body,
     fontFamily: FONT.semibold,
   },
   searchInput: {
     flex: 1,
-    fontSize: FS.sm,
-    fontFamily: FONT.regular,
-    height: 40,
+    ...X_TYPE.body,
+    height: 36,
   },
   // The web <input> underneath RNW's TextInput otherwise keeps the browser's
   // own default focus ring (a thick amber/orange outline) on top of our
@@ -2273,20 +2180,19 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   convCenter: {
     flex: 1,
     minWidth: 0,
-    marginLeft: SP.md,
+    marginLeft: X_AVATAR_GAP,
   },
   convNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 3,
+    marginBottom: 2,
   },
   convName: {
     flex: 1,
-    fontSize: FS.base,
+    ...X_TYPE.name,
   },
   convTime: {
-    fontSize: FS.sm,
-    fontFamily: FONT.medium,
+    ...X_TYPE.meta,
     marginLeft: SP.xs,
   },
   // Trailing column: time above, unread dot below, right-aligned to the
@@ -2298,8 +2204,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     marginLeft: SP.sm,
   },
   convPreview: {
-    fontSize: 14,
-    fontFamily: FONT.regular,
+    ...X_TYPE.body,
   },
   // Threads-style unread marker: one small dot at the row's right edge,
   // replacing the old numeric badge/chevron.

@@ -12,23 +12,14 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { CategoryTile } from '@/components/search/CategoryTile';
 import { EditorialTile, type EditorialTileItem } from './EditorialTile';
 import { SP, FONT } from '@/lib/theme';
-import { TYPE_SCALE } from '@/constants/typography';
+import { SectionHeader } from '@/components/reframe';
+import { X_SPACE } from '@/constants/reframe';
 import { lowestPriceCents, initialsOf, type DiscoveryCategory } from '@/lib/discoveryShelves';
 
 const CATEGORY_TILE = 112;
 
 export function ShelfHeader({ title, onSeeAll, padded = true }: { title: string; onSeeAll?: () => void; padded?: boolean }) {
-  const { theme } = useAppTheme();
-  return (
-    <View style={[styles.header, padded && { paddingHorizontal: SP.md }]}>
-      <Text style={[TYPE_SCALE.headline, { color: theme.text }]}>{title}</Text>
-      {onSeeAll && (
-        <PressableScale onPress={onSeeAll} accessibilityRole="button" accessibilityLabel={`See all ${title.toLowerCase()}`} hitSlop={12} noMinHeight>
-          <Text style={[TYPE_SCALE.footnote, { color: theme.text, fontFamily: FONT.semibold }]}>See all</Text>
-        </PressableScale>
-      )}
-    </View>
-  );
+  return <SectionHeader title={title} actionLabel={onSeeAll ? 'See all' : undefined} onAction={onSeeAll} actionAccessibilityLabel={`See all ${title.toLowerCase()}`} inset={padded} />;
 }
 
 export function openCategory(router: ReturnType<typeof useRouter>, c: { slug: string; label: string }) {
@@ -40,7 +31,7 @@ export function ShopByCategoryRail({ categories, padded = true }: { categories: 
   const { theme } = useAppTheme();
   if (categories.length === 0) return null;
   return (
-    <View style={{ marginVertical: SP.md }}>
+    <View style={{ marginVertical: X_SPACE[8] }}>
       <ShelfHeader title="Shop by category" padded={padded} />
       <ScrollView
         horizontal
@@ -76,7 +67,7 @@ export function TrendingProductsRail({ products, onSeeAll }: { products: any[]; 
   const { theme } = useAppTheme();
   if (products.length === 0) return null;
   return (
-    <View style={{ marginVertical: SP.md }}>
+    <View style={{ marginVertical: X_SPACE[8] }}>
       <ShelfHeader title="Trending products" onSeeAll={onSeeAll} />
       <ScrollView
         horizontal
@@ -92,6 +83,5 @@ export function TrendingProductsRail({ products, onSeeAll }: { products: any[]; 
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   track: { gap: 12 },
 });

@@ -13,7 +13,8 @@ import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { FONT, SP } from '@/lib/theme';
-import { TYPE_SCALE } from '@/constants/typography';
+import { SectionHeader } from '@/components/reframe';
+import { X_GUTTER, X_SPACE } from '@/constants/reframe';
 import { RADII } from '@/constants/radii';
 import { hapticLight } from '@/lib/haptics';
 import type { DiscoverPost } from '@/lib/discoverFeed';
@@ -27,8 +28,8 @@ export function DiscoverShopTheLookRail({ posts, onPress }: { posts: DiscoverPos
   const { theme } = useAppTheme();
   if (posts.length === 0) return null;
   return (
-    <View style={{ marginVertical: SP.md, paddingHorizontal: SP.md }}>
-      <Text style={[TYPE_SCALE.headline, { color: theme.text, marginBottom: 10 }]}>Shop the Look</Text>
+    <View style={{ marginVertical: X_SPACE[8], paddingHorizontal: X_GUTTER }}>
+      <SectionHeader title="Shop the Look" inset={false} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.track}>
         {posts.map((post) => {
           const tag = post.productTags![0];

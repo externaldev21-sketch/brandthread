@@ -222,11 +222,11 @@ vi.mock('@/components/layout', () => ({
   ),
 }));
 
-vi.mock('@/components/layout/TabPageHeader', () => ({
-  TabPageHeader: ({ title, actions }: { title: string; actions?: Array<{ accessibilityLabel: string; onPress: () => void; testID?: string }> }) =>
+vi.mock('@/components/reframe', () => ({
+  ScreenHeader: ({ title, actions }: { title: string; actions?: Array<{ accessibilityLabel: string; onPress: () => void; testID?: string }> }) =>
     React.createElement(
       'View',
-      { testID: 'tab-page-header' },
+      { testID: 'screen-header' },
       React.createElement('Text', {}, title),
       ...(actions ?? []).map((action) =>
         React.createElement('TouchableOpacity', {
@@ -237,7 +237,24 @@ vi.mock('@/components/layout/TabPageHeader', () => ({
         }),
       ),
     ),
+  SegmentTabs: ({ tabs, onChange, trailing }: any) =>
+    React.createElement(
+      'View',
+      { testID: 'segment-tabs' },
+      ...tabs.map((tab: any) => React.createElement('TouchableOpacity', { key: tab.key, testID: tab.testID, onPress: () => onChange(tab.key) }, React.createElement('Text', {}, tab.label))),
+      trailing ?? null,
+    ),
+  SectionHeader: ({ title }: { title: string }) => React.createElement('Text', {}, title),
+  EmptyState: ({ title, message, actionLabel, onAction, testID }: any) =>
+    React.createElement(
+      'View',
+      { testID },
+      title ? React.createElement('Text', {}, title) : null,
+      React.createElement('Text', {}, message),
+      actionLabel ? React.createElement('TouchableOpacity', { testID: testID ? `${testID}-action` : undefined, onPress: onAction }, React.createElement('Text', {}, actionLabel)) : null,
+    ),
 }));
+
 
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
@@ -587,7 +604,7 @@ describe('buyer inbox', () => {
 
     expect(renderer!.root.findAllByProps({ testID: 'inbox-skeleton' }, { deep: false })).toHaveLength(0);
     expect(textContent(renderer!)).toContain('Keep it real in DMs');
-    const cta = renderer!.root.findByProps({ testID: 'primary-button-Send a message' });
+    const cta = renderer!.root.findByProps({ testID: 'inbox-empty-action' });
     expect(cta).toBeTruthy();
 
     await act(async () => {

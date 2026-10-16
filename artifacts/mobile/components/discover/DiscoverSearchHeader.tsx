@@ -11,13 +11,13 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { FONT, FS, GUTTER } from '@/lib/theme';
+import { FONT } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { IconButton } from '@/components/ui/IconButton';
-import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
+import { X_GUTTER, X_HAIRLINE, X_HEADER_HEIGHT, X_SPACE, X_TYPE, xColors } from '@/constants/reframe';
 
 export function DiscoverSearchHeader({
   title,
@@ -32,19 +32,22 @@ export function DiscoverSearchHeader({
 }) {
   const { theme } = useAppTheme();
   const topPad = useHeaderTopInset();
+  const c = xColors(theme);
 
   return (
-    <View style={[styles.row, { paddingTop: topPad + 12 }]}>
+    // Same top offset and 44pt row as the reframe ScreenHeader on the other
+    // tab pages, so every tab's title sits on the same baseline.
+    <View style={[styles.row, { marginTop: topPad + X_SPACE[4], paddingRight: onBellPress ? X_GUTTER - 12 : X_GUTTER }]}>
       <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{title}</Text>
       <TouchableOpacity
         onPress={onSearchPress}
         accessibilityRole="button"
         accessibilityLabel="Search products and brands"
-        style={[styles.searchBar, { backgroundColor: theme.surface, borderColor: theme.border }]}
+        style={[styles.searchBar, { backgroundColor: theme.surface, borderColor: c.divider }]}
         testID="discover-search-bar"
       >
-        <Feather name="search" size={16} color={theme.muted} />
-        <Text style={[styles.searchPlaceholder, { color: theme.muted }]} numberOfLines={1}>Search</Text>
+        <Feather name="search" size={16} color={c.secondary} />
+        <Text style={[styles.searchPlaceholder, { color: c.secondary }]} numberOfLines={1}>Search</Text>
       </TouchableOpacity>
       {onBellPress && (
         <IconButton
@@ -64,15 +67,13 @@ export function DiscoverSearchHeader({
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
-    paddingHorizontal: GUTTER, paddingBottom: SPACING.sm,
+    height: X_HEADER_HEIGHT, paddingLeft: X_GUTTER,
   },
-  title: {
-    fontSize: FS.lg, lineHeight: 23, fontFamily: FONT.bold, letterSpacing: -0.4,
-  },
+  title: { ...X_TYPE.title },
   searchBar: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
-    height: 36, borderRadius: RADII.pill, borderWidth: 1,
+    height: 36, borderRadius: RADII.pill, borderWidth: X_HAIRLINE,
     paddingHorizontal: SPACING.sm,
   },
-  searchPlaceholder: { ...TYPE_SCALE.body, fontFamily: FONT.regular },
+  searchPlaceholder: { ...X_TYPE.body, fontFamily: FONT.regular },
 });
