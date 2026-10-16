@@ -171,6 +171,7 @@ import { creditLabel, OFFICIAL_AVATAR_SOURCE } from '@/lib/officialAccount';
 import { noteThreadOnScreen } from '@/services/officialSeedService';
 import { previewOfficialPosts } from '@/lib/previewOfficialAccount';
 import type { PostCredit } from '@/services/socialService';
+import { LiveCartPush, LiveEdgeTab, useLiveEdgeTab } from '@/components/buyer-feed/LiveEdgeTab';
 import { a11yHidden } from '@/lib/a11yHidden';
 
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
@@ -2367,21 +2368,21 @@ export default function FeedScreen({
   // buyerHeaderHeight below) stays where it was.
   const buyerTopRowPaddingTop = Math.max(0, previewTopInset - 1);
   const buyerHeaderHeight = buyerTopRowPaddingTop + TOP_TABS_ROW_HEIGHT + 1;
-  // Cart sits beside LIVE, away from the right edge. 20pt between 24pt
-  // glyphs = each icon's 44pt touch box (hitSlop of half the gap each side)
-  // tiles exactly against its neighbour — LIVE, cart and search all get the
-  // same 44x44 target and the same spacing. Narrow phones use a tighter gap
-  // and gutter so the centered tabs still clear both 24pt icons.
-  const topRowIconGap = windowWidth < 350 ? 8 : 20;
+  // LIVE moved out of this row into the left-edge tab (LiveEdgeTab), so the
+  // cart alone holds the left cluster, nudged inward off the edge (clear of
+  // that tab's peeking dot) toward the centered tabs. Narrow phones use a
+  // tighter gap, gutter and nudge so the centered tabs still clear it.
+  const topRowIconGap = windowWidth < 350 ? 8 : 14;
   const topRowSideGutter = windowWidth < 350 ? 12 : 16;
+  const cartInset = windowWidth < 350 ? 22 : 30;
   // Guard width for the centered tabs (buyerTabSwitcherWrap below): the
-  // left cluster is 2 icons (LIVE, cart), the right is search alone.
+  // left cluster is the inset cart, the right is search alone.
   // Bounding the tabs' wrap symmetrically by the wider cluster's
   // width (not a flat 0) keeps the tabs screen-centered (both bounds equal
   // — that's what centering means here) while guaranteeing the underline
   // labels' own box never physically reaches into either icon cluster's
   // tap area at any screen width, down to 320pt.
-  const topRowSideGuard = 24 * 2 + topRowIconGap + 6;
+  const topRowSideGuard = Math.max(cartInset + 24, 24 * 2 + topRowIconGap) + 6;
   // The feed is the buyer Home tab, always shown with the tab bar's compact
   // (Instagram iOS 26-style) sizing — see BuyerTabBar/buyerTabBarMetrics —
   // so its own layout math uses the compact inset, not the regular one every
@@ -2429,6 +2430,10 @@ export default function FeedScreen({
     setTopBarHeight(prev => (prev === h ? prev : h));
   }, []);
   const [activeIndex, setActiveIndex] = useState(0);
+  // Left-edge LIVE tab (buyer Home header) — tucks back on any scroll,
+  // page change, feed-tab switch or leaving the screen.
+  const liveTab = useLiveEdgeTab();
+  const collapseLiveTab = liveTab.collapse;
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const pageWidth = viewportSize.width || windowWidth;
   const pageHeight = viewportSize.height || windowHeight;
@@ -2782,6 +2787,12 @@ export default function FeedScreen({
   // the real count and bump only if it went up (an add happened) — never on
   // first load, a plain refocus, or a removal.
   const screenFocused = useIsFocused();
+  useEffect(() => {
+    if (!screenFocused) collapseLiveTab();
+  }, [screenFocused, collapseLiveTab]);
+  useEffect(() => {
+    collapseLiveTab();
+  }, [activeIndex, feedTab, collapseLiveTab]);
   useEffect(() => {
     if (userId) {
       setGuestMutedPhrases([]);
@@ -3554,6 +3565,7 @@ export default function FeedScreen({
       <Animated.View style={[styles.feedContentFade, { opacity: feedContentOpacity }]}>
       {viewportReady && <FlatList
         ref={feedListRef}
+        onScrollBeginDrag={collapseLiveTab}
         // The creator player remounts once its videos load so it opens at the tapped one.
         key={`thread-${pageWidth}x${pageHeight}${isCreatorFeed && feedLoading ? '-loading' : ''}`}
         data={displayItems}
@@ -3855,20 +3867,8 @@ export default function FeedScreen({
               of glitch as the old shop pill's frosted background — see
               ShopSideTab above. */}
           <View style={styles.buyerTopRow}>
-            <View style={[styles.buyerTopCluster, { gap: topRowIconGap }]}>
-              <TouchableOpacity
-                style={styles.buyerTopIconBtn}
-                activeOpacity={0.7}
-                onPress={() => {
-                  router.push('/live-feed' as never);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Live"
-                hitSlop={{ top: 0, bottom: 0, left: topRowIconGap / 2, right: topRowIconGap / 2 }}
-                testID="buyer-home-live"
-              >
-                <Icon name="tv" size={24} color={ON_DARK} />
-              </TouchableOpacity>
+            <View style={[styles.buyerTopCluster, { paddingLeft: cartInset }]}>
+              <LiveCartPush controller={liveTab} cartX={cartInset} leftInset={insets.left} gutter={topRowSideGutter}>
               <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
                 <TouchableOpacity
                   style={styles.buyerTopIconBtn}
@@ -3878,7 +3878,7 @@ export default function FeedScreen({
                   }}
                   accessibilityRole="button"
                   accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
-                  hitSlop={{ top: 0, bottom: 0, left: topRowIconGap / 2, right: topRowIconGap / 2 }}
+                  hitSlop={{ top: 4, bottom: 4, left: 7, right: 7 }}
                   testID="buyer-home-cart-icon"
                 >
                   <Icon name="shopping-cart" size={24} color={ON_DARK} />
@@ -3891,6 +3891,7 @@ export default function FeedScreen({
                   )}
                 </TouchableOpacity>
               </Animated.View>
+              </LiveCartPush>
             </View>
 
             {/* Absolutely centered on the screen (left:0/right:0), not a
@@ -4033,6 +4034,17 @@ export default function FeedScreen({
           </View>
         )}
       </View>
+      )}
+
+      {/* LIVE edge tab — buyer Threads Home only, centered on the header row. */}
+      {isBuyerSurface && !isCreatorFeed && (
+        <LiveEdgeTab
+          controller={liveTab}
+          top={previewTopInset + 4 + TOP_TABS_ROW_HEIGHT / 2}
+          leftInset={insets.left}
+          gutter={topRowSideGutter}
+          onOpenLive={() => router.push('/live-feed' as never)}
+        />
       )}
 
       {/* Notifications now open the real /buyer-notifications screen instead of

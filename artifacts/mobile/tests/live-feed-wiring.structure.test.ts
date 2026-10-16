@@ -79,12 +79,15 @@ describe('Provider seam', () => {
 });
 
 describe('Entry points', () => {
-  it('the Threads header LIVE button opens the dedicated full-screen live-feed viewer', () => {
+  it('the Threads header LIVE edge tab opens the dedicated full-screen live-feed viewer', () => {
     // PR #134 replaced the conditional "jump to nearest live card in the
     // pager" button with an always-visible header glyph that opens the
-    // dedicated /live-feed screen (see app/live-feed.tsx).
-    expect(feed).toContain('testID="buyer-home-live"');
-    expect(feed).toContain("router.push('/live-feed' as never)");
+    // dedicated /live-feed screen (see app/live-feed.tsx). That glyph now
+    // lives in the left-edge slide-out tab (components/buyer-feed/LiveEdgeTab.tsx).
+    const edgeTab = read('components/buyer-feed/LiveEdgeTab.tsx');
+    expect(edgeTab).toContain('testID="buyer-home-live"');
+    expect(feed).toContain('<LiveEdgeTab');
+    expect(feed).toContain("onOpenLive={() => router.push('/live-feed' as never)}");
   });
 
   it('feed rail avatars wear the LIVE ring and open the stream', () => {
