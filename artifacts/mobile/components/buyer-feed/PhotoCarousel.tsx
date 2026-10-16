@@ -5,7 +5,9 @@
  *  - "1/6" counter, top-right, and a thin segment indicator at the bottom.
  *  - Remembers the slide per post (lib/carouselMemory) — come back, same slide.
  *  - Preloads the next slide's image so a swipe never shows a blank frame.
- *  - Every slide fills the same fixed page box (contain), so nothing jumps.
+ *  - Full-bleed like a video Thread: every slide covers the whole page,
+ *    behind the status bar, the feed header and the floating tab bar
+ *    (cover-cropped, never letterboxed), so there are no bands and no jump.
  *  - Taps are not handled here: the parent page's Pressable still owns
  *    single/double tap, so double-tap like works on any slide.
  */
@@ -101,7 +103,7 @@ export function PhotoCarousel({
               <CachedImage
                 source={{ uri }}
                 style={StyleSheet.absoluteFill}
-                contentFit="contain"
+                contentFit="cover"
                 transition={0}
                 priority={i === index ? 'high' : 'normal'}
                 onLoad={i === initialIndex ? onFirstImagePainted : undefined}
