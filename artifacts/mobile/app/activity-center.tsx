@@ -46,11 +46,10 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 
 import { FONT, FS, ICON, SP } from '@/lib/theme';
-
-import { EmptyState, SkeletonBlock, useScreenPadding } from '@/components/layout';
-
-import { ScreenHeader } from '@/components/ScreenHeader';
-
+import { minHitSlop } from '@/lib/hitSlop';
+import { SkeletonBlock, useScreenPadding } from '@/components/layout';
+import { EmptyState, ScreenHeader, SectionHeader, SegmentTabs } from '@/components/reframe';
+import { X_AVATAR_GAP, X_GUTTER, X_HAIRLINE, X_SPACE, X_TYPE, xColors } from '@/constants/reframe';
 import { useScrollReset } from '@/hooks/useScrollReset';
 
 import { CachedImage } from '@/components/CachedImage';
@@ -98,16 +97,7 @@ import { haptics, hapticFollow } from '@/lib/haptics';
 
 
 import { applyPreviewFollowState, getPreviewFollowing } from '@/lib/previewFollowStore';
-
-import { Chip } from '@/components/ui/Chip';
-
-import { minHitSlop } from '@/lib/hitSlop';
-
-import { ChipRow } from '@/components/ui/ChipRow';
-
-
 import { dismissActivity, dismissSuggestedPerson, getActivity, getSuggestedPeople, markActivityRead, markAllActivityRead, watchActivityRealtime, type SuggestedPerson } from '@/services/activityService';
-
 import { isOrderUpdateRow, unreadRowTint } from '@/lib/activity';
 import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
 
@@ -123,77 +113,24 @@ type ListSection = { key: ActivitySectionKey | 'highlights'; title: string; item
 // A row's tap area is drawn ≥40pt tall inside 16pt row padding → pad to 44.
 const ROW_TAP_HIT_SLOP = minHitSlop({ height: 40 });
 
-// ─── Filter chips ───────────────────────────────────────────────────────────
-// A horizontally scrolling row of pill chips below the header — Threads'
-// Activity tab (All / Replies / Mentions… over one feed:
-// https://mobbin.com/screens/cb296e3d-df9e-4c48-a030-0f08248197d5,
-// filtered: https://mobbin.com/screens/f19ed0eb-9ad1-4579-aa5f-dd9779fce52c).
-// The chip set and what each one matches live in lib/activity.ts
-// (ACTIVITY_CHIPS / matchesActivityChip). Selection is component state only.
+// ─── Filter tabs ────────────────────────────────────────────────────────────
+// X-style text tabs with a short white underline on the active one (the
+// shared reframe SegmentTabs), scrolling horizontally on the gutter — same
+// filter set as before: All / Follows / Likes / Comments / Orders / Thread
+// Cash (lib/activity.ts ACTIVITY_CHIPS / matchesActivityChip). Selection is
+// component state only.
 
-/** One shared design-system Chip with a stable per-chip handler. */
-const ActivityFilterChip = React.memo(function ActivityFilterChip({ chip, label, selected, onSelect }: {
-  chip: ActivityChip;
-  label: string;
-  selected: boolean;
-  onSelect: (key: ActivityChip) => void;
-}) {
-  const handlePress = useCallback(() => onSelect(chip), [chip, onSelect]);
-  return <Chip label={label} selected={selected} onPress={handlePress} testID={`activity-chip-${chip}`} />;
-});
+const ACTIVITY_TABS = ACTIVITY_CHIPS.map((chip) => ({
+  key: chip.key,
+  label: chip.label,
+  testID: `activity-chip-${chip.key}`,
+}));
 
-function ActivityFilterChips({ selected, onSelect, styles }: {
+function ActivityFilterChips({ selected, onSelect }: {
   selected: ActivityChip;
   onSelect: (key: ActivityChip) => void;
-  styles: Styles;
 }) {
-  // Gap chosen from the measured chip widths so the row never ends with a
-  // chip flush against the screen edge and the next one fully hidden — the
-  // next chip always visibly peeks in when the row scrolls (lib/activity.ts).
-  const [rowWidth, setRowWidth] = useState(0);
-  const [chipWidths, setChipWidths] = useState<Record<string, number>>({});
-  const widths = ACTIVITY_CHIPS.map((c) => chipWidths[c.key] ?? 0);
-  const gap = widths.every((w) => w > 0) ? chipRowGap(widths, rowWidth, SP.md) : SP.sm;
-  return (
-    // A plain View wrapper with an explicit height, not just the ScrollView's
-    // own style — a horizontal ScrollView with no non-zero cross-axis height
-    // of its own can collapse to nothing in this screen's flex column,
-    // letting the SectionList below render through/over it.
-    <View style={styles.chipRow} onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}>
-      <ChipRow
-        style={styles.chipScroll}
-        selectedIndex={ACTIVITY_CHIPS.findIndex((chip) => chip.key === selected)}
-        hapticOnSelect={false}
-        inset={SP.md}
-        gap={gap}
-        contentContainerStyle={[styles.chipScrollContent, { gap }]}
-      >
-        {ACTIVITY_CHIPS.map((chip) => (
-          <View
-            key={chip.key}
-            onLayout={(e) => {
-              const w = e.nativeEvent.layout.width;
-              setChipWidths((prev) => (prev[chip.key] === w ? prev : { ...prev, [chip.key]: w }));
-            }}
-          >
-            <ActivityFilterChip
-              chip={chip.key}
-              label={chip.label}
-              selected={chip.key === selected}
-              onSelect={onSelect}
-            />
-          </View>
-        ))}
-      </ChipRow>
-      {/* No edge-fade overlay on top of the chips: `chipScrollContent`'s own
-          trailing padding is what lets the last chip clip naturally at the
-          screen edge as a scroll affordance. A `GRAD_DARK_FADE` scrim used
-          to sit here (same one already removed from the tab-bar's own
-          bottom strip, see this file's history below) — it went fully
-          opaque at its own edge, painting a solid black block over the last
-          chip instead of fading it. */}
-    </View>
-  );
+  return <SegmentTabs tabs={ACTIVITY_TABS} value={selected} onChange={onSelect} scrollable testID="activity-filter-tabs" />;
 }
 
 // ─── Activity type badge ────────────────────────────────────────────────────
@@ -511,10 +448,11 @@ function SuggestedRow({ person, followState, styles, onFollow, onDismiss }: {
   const actor: ActivityActor = { id: person.userId, name: person.name, initials: person.initials, color: person.color, avatarUrl: person.avatarUrl ?? undefined };
   return (
     <View style={styles.suggestedRow}>
-      <Avatar actor={actor} size={44} styles={styles} />
+      {/* 40pt, same as every activity row, so the names share one text column. */}
+      <Avatar actor={actor} size={AVATAR_SIZE} styles={styles} />
       <View style={styles.center}>
-        <Text style={styles.message} numberOfLines={1}>{person.name}</Text>
-        <Text style={styles.detail} numberOfLines={2}>{person.reason}</Text>
+        <Text style={[styles.message, styles.messageBold]} numberOfLines={1}>{person.name}</Text>
+        <Text style={styles.detail} numberOfLines={1}>{person.reason}</Text>
       </View>
       <PressableScale
         style={[styles.followBtn, followState === 'done' ? styles.followBtnFollowing : styles.followBtnNotFollowing]}
@@ -557,7 +495,7 @@ function SuggestedForYouSection({ people, followStates, styles, onFollow, onDism
   if (people.length === 0) return null;
   return (
     <View style={styles.suggestedSection}>
-      <Text style={[styles.sectionTitle, styles.suggestedTitle]} accessibilityRole="header" numberOfLines={1} ellipsizeMode="tail">Suggested for you</Text>
+      <SectionHeader title="Suggested for you" />
       {people.map((person) => (
         <SuggestedRow
           key={person.userId}
@@ -919,7 +857,6 @@ export default function ActivityCenterScreen() {
     if (emptyActionHref) navigateOrShareStore(emptyActionHref, (href) => router.push(href as never));
   }, [emptyActionHref, router]);
   const emptyStateProps = {
-    icon: chipEmpty.icon as any,
     title: chipEmpty.title,
     message: chipEmpty.message,
     actionLabel: chipEmpty.action?.label,
@@ -1235,9 +1172,7 @@ export default function ActivityCenterScreen() {
   }, [listRef, revealHeld]);
 
   const renderSectionHeader = useCallback(({ section }: { section: ListSection }) => (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle} accessibilityRole="header" numberOfLines={1}>{section.title}</Text>
-    </View>
+    <SectionHeader title={section.title} style={styles.reframeSectionHeader} />
   ), [styles]);
 
   const errorMessage = errorKind === 'auth'
@@ -1270,13 +1205,14 @@ export default function ActivityCenterScreen() {
       <View onLayout={handleHeaderLayout}>
         <ScreenHeader
           title="Activity"
+          showBack
           actions={hasUnread ? [{
             icon: 'check-circle',
             onPress: () => { void handleMarkAll(); },
             accessibilityLabel: 'Mark all activity as read',
           }] : []}
         />
-        <ActivityFilterChips selected={chip} onSelect={setChip} styles={styles} />
+        <ActivityFilterChips selected={chip} onSelect={setChip} />
       </View>
 
       {status === 'loading' ? (
@@ -1284,8 +1220,7 @@ export default function ActivityCenterScreen() {
       ) : status === 'error' ? (
         <View style={styles.stateWrap}>
           <EmptyState
-            icon={errorKind === 'auth' ? 'lock' : 'wifi-off'}
-            variant="error"
+            tone="error"
             message={errorMessage}
             actionLabel="Try again"
             onAction={() => { void loadFirstPage('initial'); }}
@@ -1322,11 +1257,7 @@ export default function ActivityCenterScreen() {
             <View style={visibleSuggested.length > 0 ? undefined : styles.stateWrap}>
               {/* A filter with nothing in it says so specifically, per role,
                   with one next step where there's a real one (item 85). */}
-              {chip === 'all' ? (
-                <EmptyState {...emptyStateProps} illustration="bell" />
-              ) : (
-                <EmptyState {...emptyStateProps} />
-              )}
+              <EmptyState {...emptyStateProps} />
             </View>
           )}
           ListFooterComponent={listFooter}
@@ -1387,7 +1318,9 @@ export default function ActivityCenterScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
+export const makeStyles = (theme: AppThemePreset) => {
+  const x = xColors(theme);
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.background,
@@ -1399,13 +1332,16 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   listContentEmpty: {
     flexGrow: 1,
   },
-  // Explicit height on the wrapper (not just the ScrollView's own style) so
-  // this row always reserves real vertical space in the screen's flex
-  // column, however the horizontal ScrollView itself sizes on a given
-  // platform — nothing below it can ever render through/over the chips.
-  // Rendered directly below ScreenHeader (a plain sibling, full width), so
-  // the real 16pt inset comes only from the content container itself, which
-  // a ScrollView always honors for where its content begins.
+  // Section titles ("Highlights", "Today", …) come from the shared reframe
+  // SectionHeader (17 bold on the gutter); this only adds breathing room
+  // above each group.
+  reframeSectionHeader: {
+    paddingTop: X_SPACE[16],
+  },
+
+  // Pre-reframe chip row + section header, still used by app/seller-activity.tsx
+  // (which shares this stylesheet) until Phase 2 moves it onto the same
+  // reframe SegmentTabs/SectionHeader as Activity.
   chipRow: {
     height: 36 + SP.sm,
     position: 'relative',
@@ -1464,13 +1400,17 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // `center` both correctly set to shrink (see their own comments), nothing
   // should ever need clipping, but a row is never allowed to force the
   // screen to scroll horizontally no matter what a future change does here.
+  // X-style row: 40pt avatar on the 16pt gutter, text column 12pt to its
+  // right, and a full-width hairline along the bottom instead of a card.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SP.sm + 4,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.md,
-    minHeight: 68,
+    gap: X_AVATAR_GAP,
+    paddingHorizontal: X_GUTTER,
+    paddingVertical: X_SPACE[12],
+    minHeight: 64,
+    borderBottomWidth: X_HAIRLINE,
+    borderBottomColor: x.divider,
     width: '100%',
     overflow: 'hidden',
     // Opaque — a transparent row let SwipeableActions' revealed "..."/trash
@@ -1498,7 +1438,7 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SP.sm + 4,
+    gap: X_AVATAR_GAP,
   },
   // A plain `Pressable` (not `PressableScale`, deliberately — see the note
   // above) has no built-in press feedback; this restores a subtle dim.
@@ -1568,30 +1508,25 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     gap: 2,
   },
   message: {
-    color: theme.text,
-    fontFamily: FONT.regular,
-    fontSize: FS.base,
-    lineHeight: 20,
+    ...X_TYPE.body,
+    color: x.text,
   },
   messageBold: {
-    fontFamily: FONT.semibold,
-    color: theme.text,
+    fontFamily: FONT.bold,
+    color: x.text,
   },
   // The non-actor-name part of the sentence ("liked your post") reads as
   // gray, regular weight — only the actor's name is bold white.
   messageMuted: {
-    color: theme.muted,
+    color: x.secondary,
   },
   time: {
-    color: theme.muted,
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
+    ...X_TYPE.meta,
+    color: x.secondary,
   },
   detail: {
-    color: theme.muted,
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    lineHeight: 18,
+    ...X_TYPE.body,
+    color: x.secondary,
   },
   // Thread Cash "+$5.00": bold, and green — the owner's one deliberate
   // exception to Activity's monochrome rule (allowed accents: LIVE red,
@@ -1653,19 +1588,21 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     color: '#FFFFFF',
   },
   skeletonWrap: {
-    paddingHorizontal: SP.md,
-    paddingTop: SP.md,
+    paddingHorizontal: X_GUTTER,
+    paddingTop: X_SPACE[16],
   },
   skeletonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SP.sm + 4,
-    paddingVertical: SP.sm + 2,
+    gap: X_AVATAR_GAP,
+    paddingVertical: X_SPACE[12],
+    minHeight: 64,
   },
+  // Quiet X-style empty/error states sit at the top of the list, under the
+  // tabs, rather than floating in the middle of the screen.
   stateWrap: {
     flex: 1,
-    justifyContent: 'center',
-    paddingBottom: SP.xxl,
+    paddingTop: X_SPACE[8],
   },
   footer: {
     paddingVertical: SP.lg,
@@ -1675,24 +1612,17 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
 
   suggestedSection: {
-    marginTop: SP.md,
-    paddingTop: SP.sm,
-  },
-  // The title reuses the shared `sectionTitle` style (no horizontal padding
-  // of its own) but sits in a section whose *rows* set their own
-  // paddingHorizontal independently — so the title needs an explicit gutter
-  // or it renders flush against the screen edge. (PR #118 fix, re-applied
-  // on top of PR #123/#130's Threads-style rebuild of this section.)
-  suggestedTitle: {
-    paddingHorizontal: SP.md,
+    marginTop: X_SPACE[16],
   },
   suggestedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SP.sm + 4,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm + 2,
-    minHeight: 68,
+    gap: X_AVATAR_GAP,
+    paddingHorizontal: X_GUTTER,
+    paddingVertical: X_SPACE[12],
+    minHeight: 64,
+    borderBottomWidth: X_HAIRLINE,
+    borderBottomColor: x.divider,
   },
   dismissBtn: {
     width: 28,
@@ -1708,3 +1638,4 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     bottom: 0,
   },
 });
+};

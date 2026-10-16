@@ -321,7 +321,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   // imagery) and the LIVE-red badge — theme-independent on purpose.
   'components/discover/DiscoverDropRow.tsx',
   'components/discover/DiscoverEntityCard.tsx',
-  'components/discover/DiscoverFilterRow.tsx',
   'components/discover/DiscoverMasonryTile.tsx',
   'components/discover/DiscoverPager.tsx',
   'components/discover/DiscoverPeopleRow.tsx',

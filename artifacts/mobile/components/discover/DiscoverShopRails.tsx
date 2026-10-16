@@ -12,28 +12,14 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { CategoryTile } from '@/components/search/CategoryTile';
 import { EditorialTile, type EditorialTileItem } from './EditorialTile';
 import { SP, FONT } from '@/lib/theme';
-import { TYPE_SCALE } from '@/constants/typography';
+import { SectionHeader } from '@/components/reframe';
+import { X_SPACE } from '@/constants/reframe';
 import { lowestPriceCents, initialsOf, type DiscoveryCategory } from '@/lib/discoveryShelves';
-import { DiscoverSectionHeader } from './DiscoverSectionHeader';
 
 const CATEGORY_TILE = 112;
 
-export function ShelfHeader({ title, onSeeAll, padded = true, discoverHeader = false }: { title: string; onSeeAll?: () => void; padded?: boolean; discoverHeader?: boolean }) {
-  const { theme } = useAppTheme();
-  // Discover's one section-header style; Search keeps its own smaller header.
-  if (discoverHeader) {
-    return <DiscoverSectionHeader title={title} onSeeAll={onSeeAll} style={padded ? { paddingHorizontal: SP.md } : undefined} />;
-  }
-  return (
-    <View style={[styles.header, padded && { paddingHorizontal: SP.md }]}>
-      <Text style={[TYPE_SCALE.headline, { color: theme.text }]}>{title}</Text>
-      {onSeeAll && (
-        <PressableScale onPress={onSeeAll} accessibilityRole="button" accessibilityLabel={`See all ${title.toLowerCase()}`} hitSlop={12} noMinHeight>
-          <Text style={[TYPE_SCALE.footnote, { color: theme.text, fontFamily: FONT.semibold }]}>See all</Text>
-        </PressableScale>
-      )}
-    </View>
-  );
+export function ShelfHeader({ title, onSeeAll, padded = true }: { title: string; onSeeAll?: () => void; padded?: boolean; discoverHeader?: boolean }) {
+  return <SectionHeader title={title} actionLabel={onSeeAll ? 'See all' : undefined} onAction={onSeeAll} actionAccessibilityLabel={`See all ${title.toLowerCase()}`} inset={padded} />;
 }
 
 export function openCategory(router: ReturnType<typeof useRouter>, c: { slug: string; label: string }) {
@@ -45,8 +31,8 @@ export function ShopByCategoryRail({ categories, padded = true, discoverHeader =
   const { theme } = useAppTheme();
   if (categories.length === 0) return null;
   return (
-    <View style={{ marginVertical: SP.md }}>
-      <ShelfHeader title="Shop by category" padded={padded} discoverHeader={discoverHeader} />
+    <View style={{ marginVertical: X_SPACE[8] }}>
+      <ShelfHeader title="Shop by category" padded={padded} />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -81,8 +67,8 @@ export function TrendingProductsRail({ products, onSeeAll }: { products: any[]; 
   const { theme } = useAppTheme();
   if (products.length === 0) return null;
   return (
-    <View style={{ marginVertical: SP.md }}>
-      <ShelfHeader title="Trending products" onSeeAll={onSeeAll} discoverHeader />
+    <View style={{ marginVertical: X_SPACE[8] }}>
+      <ShelfHeader title="Trending products" onSeeAll={onSeeAll} />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -97,6 +83,5 @@ export function TrendingProductsRail({ products, onSeeAll }: { products: any[]; 
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   track: { gap: 12 },
 });

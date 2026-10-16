@@ -54,9 +54,7 @@ describe('each named screen wires its thread-motif illustration through the shar
     ['../components/profile/profileEmptyStates.ts', "illustration: 'spool'"],
     ['../app/(buyer)/friends.tsx', 'illustration="friends"'],
     ['../components/discover/search/SearchResults.tsx', 'illustration="search"'],
-    ['../components/discover/DiscoverGrid.tsx', 'illustration="trending"'],
-    ['../components/inbox/MessagesInbox.tsx', 'illustration="envelope"'],
-    ['../app/activity-center.tsx', 'illustration="bell"'],
+    ['../app/buyer-search.tsx', 'illustration="search"'],
     ['../app/(buyer)/orders.tsx', 'illustration="tee"'],
     ['../app/buyer-saved.tsx', 'illustration="bookmark"'],
   ];
@@ -69,5 +67,22 @@ describe('each named screen wires its thread-motif illustration through the shar
     const src = read('../components/profile/profileEmptyStates.ts');
     const likedBlock = src.slice(src.indexOf("'buyer:liked': {"), src.indexOf("'buyer:orders': {"));
     expect(likedBlock).toContain("illustration: 'heart'");
+  });
+});
+
+// X-style reframe pilot screens (Activity, Messages, Discover) moved off the
+// badge + illustration empty state onto the quiet reframe EmptyState (one
+// bold line, one gray line, optional text button) — see constants/reframe.ts.
+describe('reframe pilot screens use the quiet reframe EmptyState', () => {
+  const pilots = [
+    '../app/activity-center.tsx',
+    '../app/(buyer)/inbox.tsx',
+    '../app/(buyer)/discover.tsx',
+    '../components/discover/DiscoverGrid.tsx',
+  ];
+  it.each(pilots)('%s imports EmptyState from components/reframe and no illustration motif', (path) => {
+    const src = read(path);
+    expect(src).toMatch(/import \{[^}]*EmptyState[^}]*\} from '@\/components\/reframe'/);
+    expect(src).not.toMatch(/illustration="/);
   });
 });

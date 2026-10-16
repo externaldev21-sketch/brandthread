@@ -39,7 +39,8 @@ import { useAuth } from '@clerk/expo';
 import { ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { DiscoverSearchHeader } from '@/components/discover/DiscoverSearchHeader';
 import { DiscoverSearchOverlay, type BarRect } from '@/components/discover/search/DiscoverSearchOverlay';
-import { EmptyState } from '@/components/BrandthreadUI';
+import { EmptyState } from '@/components/reframe';
+import { X_GUTTER, X_SPACE } from '@/constants/reframe';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { useThreadRefresh } from '@/components/ui/ThreadRefresh';
 import { isPreviewCatalogEnabled, getPreviewCatalog, getPreviewCatalogByDemand } from '@/lib/previewCatalog';
@@ -476,8 +477,8 @@ export default function DiscoverScreen() {
           data={brands}
           keyExtractor={(b) => b.id}
           numColumns={2}
-          columnWrapperStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}
-          contentContainerStyle={{ gap: SP.sm, paddingBottom: tabBarClearance }}
+          columnWrapperStyle={{ gap: X_SPACE[12], paddingHorizontal: X_GUTTER }}
+          contentContainerStyle={{ gap: X_SPACE[12], paddingBottom: tabBarClearance }}
           ListHeaderComponent={brandsHeader}
           refreshControl={threadRefresh}
           renderItem={({ item }) => <DiscoverBrandCard brand={item} variant="tile" />}
@@ -486,9 +487,7 @@ export default function DiscoverScreen() {
               <ListSkeleton rows={3} />
             </ResponsiveContainer>
           ) : (
-            <View style={{ paddingHorizontal: SP.md, marginTop: SP.md }}>
-              <EmptyState icon="shopping-bag" title="No brands yet" description="Brands will show up here as sellers join." />
-            </View>
+            <EmptyState title="No brands yet" message="Brands will show up here as sellers join." />
           )}
         />
       )}
@@ -498,7 +497,9 @@ export default function DiscoverScreen() {
           ref={listRef as never}
           data={people}
           keyExtractor={(p) => p.userId}
-          contentContainerStyle={{ paddingBottom: tabBarClearance }}
+          numColumns={2}
+          columnWrapperStyle={{ gap: X_SPACE[12], paddingHorizontal: X_GUTTER }}
+          contentContainerStyle={{ gap: X_SPACE[12], paddingBottom: tabBarClearance }}
           ListHeaderComponent={header}
           refreshControl={threadRefresh}
           renderItem={({ item }) => <DiscoverPersonCard person={item} />}
@@ -507,9 +508,7 @@ export default function DiscoverScreen() {
               <ListSkeleton rows={4} />
             </ResponsiveContainer>
           ) : (
-            <View style={{ paddingHorizontal: SP.md, marginTop: SP.md }}>
-              <EmptyState icon="users" illustration="friends" title="No suggestions yet" description="Follow a few brands and buyers to get suggestions." />
-            </View>
+            <EmptyState title="No suggestions yet" message="Follow a few brands and buyers to get suggestions." />
           )}
         />
       )}
@@ -528,9 +527,7 @@ export default function DiscoverScreen() {
               <ListSkeleton rows={4} />
             </ResponsiveContainer>
           ) : (
-            <View style={{ paddingHorizontal: SP.md }}>
-              <EmptyState icon="zap" title="No drops yet" description="Upcoming drops from sellers will show up here." />
-            </View>
+            <EmptyState title="No drops yet" message="Upcoming drops from sellers will show up here." />
           )}
         />
       )}

@@ -16,9 +16,9 @@ import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-n
 import type { RefreshControlProps } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { TYPE_SCALE } from '@/constants/typography';
 import { SP } from '@/lib/theme';
-import { EmptyState } from '@/components/BrandthreadUI';
+import { EmptyState, SectionHeader } from '@/components/reframe';
+import { X_GUTTER, X_SPACE } from '@/constants/reframe';
 import { EditorialTile, TileRailSkeleton, type EditorialTileItem } from './EditorialTile';
 import { DiscoverTileView, DiscoverTileSkeleton } from './DiscoverTileView';
 import { DiscoverPeopleRow } from './DiscoverPeopleRow';
@@ -60,13 +60,7 @@ function withSponsoredRows(rows: GridRow[], anchors: ReadonlyArray<{ afterId: st
 }
 
 function RailHeader({ title, sub }: { title: string; sub?: string }) {
-  const { theme } = useAppTheme();
-  return (
-    <View style={{ marginBottom: 10 }}>
-      <Text style={[TYPE_SCALE.headline, { color: theme.text }]}>{title}</Text>
-      {!!sub && <Text style={[TYPE_SCALE.footnote, { color: theme.muted, marginTop: 2 }]}>{sub}</Text>}
-    </View>
-  );
+  return <SectionHeader title={title} subtitle={sub} inset={false} />;
 }
 // Masonry (For You): Pinterest's narrow outer margin and gutter.
 const MASONRY_SIDE = SP.sm;
@@ -261,10 +255,8 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
   ) : null;
   const listEmpty = !loading ? (
     <EmptyState
-      icon="activity"
-      illustration="trending"
       title="Nothing to show yet"
-      description="Posts from buyers and brands will show up here as the community grows."
+      message="Posts from buyers and brands will show up here as the community grows."
     />
   ) : null;
 

@@ -12,7 +12,8 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
-import { DiscoverSectionHeader } from './DiscoverSectionHeader';
+import { SectionHeader } from '@/components/reframe';
+import { X_GUTTER, X_HAIRLINE, X_SPACE, X_TYPE, xColors } from '@/constants/reframe';
 import FollowButton from '@/components/social/FollowButton';
 import type { DiscoverPersonSuggestion } from '@/lib/discoverFeed';
 
@@ -33,13 +34,13 @@ export function DiscoverPeopleRow({ people }: { people: DiscoverPersonSuggestion
   if (people.length === 0) return null;
   return (
     <View style={styles.section}>
-      <DiscoverSectionHeader title="People with your style" style={{ marginHorizontal: SP.md }} />
+      <SectionHeader title="People with your style" />
       <FlatList
         horizontal
         data={people}
         keyExtractor={(p) => p.userId}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 12, paddingHorizontal: SP.md }}
+        contentContainerStyle={{ gap: X_SPACE[12], paddingHorizontal: X_GUTTER }}
         renderItem={({ item }) => (
           // Two SIBLING tap targets, never nested: the card's own
           // PressableScale opens the profile; FollowButton is a plain
@@ -47,15 +48,15 @@ export function DiscoverPeopleRow({ people }: { people: DiscoverPersonSuggestion
           // Pressable renders as a nested <button> on web (invalid HTML,
           // and the two press handlers fight each other). See
           // tests/discover-no-nested-pressables.test.ts.
-          <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.card }]}>
+          <View style={[styles.card, { borderColor: xColors(theme).divider, backgroundColor: theme.card }]}>
             <PressableScale
               onPress={() => router.push(`/buyer-other-profile?userId=${encodeURIComponent(item.userId)}&name=${encodeURIComponent(item.name)}&handle=${encodeURIComponent(item.handle)}&initials=${encodeURIComponent(item.initials)}` as never)}
               style={styles.cardTapArea}
             >
               <PersonAvatar person={item} size={56} />
               <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{item.name}</Text>
-              <Text style={[styles.handle, { color: theme.muted }]} numberOfLines={1}>{item.handle}</Text>
-              <Text style={[styles.reason, { color: theme.muted }]} numberOfLines={2}>{item.reason}</Text>
+              <Text style={[styles.handle, { color: xColors(theme).secondary }]} numberOfLines={1}>{item.handle}</Text>
+              <Text style={[styles.reason, { color: xColors(theme).secondary }]} numberOfLines={2}>{item.reason}</Text>
             </PressableScale>
             <FollowButton
               userId={item.userId}
@@ -71,15 +72,15 @@ export function DiscoverPeopleRow({ people }: { people: DiscoverPersonSuggestion
 }
 
 const styles = StyleSheet.create({
-  section: { marginVertical: SP.md },
+  section: { marginVertical: X_SPACE[8] },
   card: {
-    width: 130, borderRadius: RADII.card, borderWidth: 1,
-    paddingHorizontal: SP.sm, paddingVertical: SP.md, alignItems: 'center', gap: 4,
+    width: 130, borderRadius: RADII.card, borderWidth: X_HAIRLINE,
+    paddingHorizontal: X_SPACE[12], paddingVertical: X_SPACE[16], alignItems: 'center', gap: X_SPACE[4],
   },
   cardTapArea: { alignItems: 'center', width: '100%' },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarInitials: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.md },
-  name: { fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 6, textAlign: 'center' },
-  handle: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center' },
-  reason: { fontFamily: FONT.regular, fontSize: 11, textAlign: 'center', marginTop: 2, minHeight: 28 },
+  name: { ...X_TYPE.name, marginTop: X_SPACE[8], textAlign: 'center' },
+  handle: { ...X_TYPE.meta, textAlign: 'center' },
+  reason: { ...X_TYPE.meta, textAlign: 'center', marginTop: 2, minHeight: 32 },
 });

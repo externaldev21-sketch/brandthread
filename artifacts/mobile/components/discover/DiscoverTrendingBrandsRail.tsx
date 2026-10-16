@@ -12,7 +12,8 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SP, FONT } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { TYPE_SCALE } from '@/constants/typography';
-import { DiscoverSectionHeader } from './DiscoverSectionHeader';
+import { SectionHeader } from '@/components/reframe';
+import { X_GUTTER, X_SPACE } from '@/constants/reframe';
 import { DiscoverBrandCard } from './DiscoverBrandCard';
 import type { DiscoverBrandCard as BrandCardData } from '@/lib/discoverFeed';
 
@@ -36,8 +37,8 @@ export function DiscoverTrendingBrandsRail({ brands, onSeeAll }: { brands: Brand
   const cardWidth = railCardWidth(width);
   if (brands.length === 0) return null;
   return (
-    <View style={{ marginVertical: SP.md }}>
-      <DiscoverSectionHeader title="Trending Brands" onSeeAll={onSeeAll} style={{paddingHorizontal: SP.md}} />
+    <View style={{ marginVertical: X_SPACE[8] }}>
+      <SectionHeader title="Trending Brands" actionLabel={onSeeAll ? "See all" : undefined} onAction={onSeeAll} actionAccessibilityLabel="See all trending brands" />
       {/* Edge-to-edge scroller (gutter on the content, not the clip box) so
           the peeking card is cut by the screen edge, and snaps per card. */}
       <ScrollView

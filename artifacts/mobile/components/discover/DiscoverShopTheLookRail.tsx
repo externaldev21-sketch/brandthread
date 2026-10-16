@@ -12,7 +12,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, SP } from '@/lib/theme';
-import { DiscoverSectionHeader } from './DiscoverSectionHeader';
+import { SectionHeader } from '@/components/reframe';
+import { X_GUTTER, X_SPACE } from '@/constants/reframe';
 import { RADII } from '@/constants/radii';
 import type { DiscoverPost } from '@/lib/discoverFeed';
 import { formatMoney } from '@/lib/format';
@@ -26,8 +27,8 @@ export function DiscoverShopTheLookRail({ posts, onPress }: { posts: DiscoverPos
   const { theme } = useAppTheme();
   if (posts.length === 0) return null;
   return (
-    <View style={{ marginVertical: SP.md, paddingHorizontal: SP.md }}>
-      <DiscoverSectionHeader title="Shop the Look" />
+    <View style={{ marginVertical: X_SPACE[8], paddingHorizontal: X_GUTTER }}>
+      <SectionHeader title="Shop the Look" inset={false} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.track}>
         {posts.map((post) => {
           const tag = post.productTags![0];
