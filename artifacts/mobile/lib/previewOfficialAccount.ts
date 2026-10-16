@@ -119,8 +119,8 @@ export function previewOfficialGrid(): SellerThreadPost[] {
 export function previewBulkItems() {
   const photo = (m: number, i: number) => ({ id: `demo-photo-${i}`, uri: uri(m), kind: 'photo' as const, duration: 0, width: 1080, height: 1350 });
   return [
-    { kind: 'video' as const, assets: [{ id: 'demo-video-1', uri: uri(VIDEO), kind: 'video' as const, duration: 14, width: 1080, height: 1920 }], caption: 'Night shift fits.', creditHandle: 'galoreyyz', creditName: '' },
-    { kind: 'video' as const, assets: [{ id: 'demo-video-2', uri: uri(VIDEO), kind: 'video' as const, duration: 22, width: 1080, height: 1920 }], caption: 'Bully Monday, live.', creditHandle: 'iammjonahdavid', creditName: 'Bully Monday' },
+    { kind: 'video' as const, assets: [{ id: 'demo-video-1', uri: VIDEO, kind: 'video' as const, duration: 14, width: 1080, height: 1920 }], caption: 'Night shift fits.', creditHandle: 'galoreyyz', creditName: '' },
+    { kind: 'video' as const, assets: [{ id: 'demo-video-2', uri: VIDEO, kind: 'video' as const, duration: 22, width: 1080, height: 1920 }], caption: 'Bully Monday, live.', creditHandle: 'iammjonahdavid', creditName: 'Bully Monday' },
     { kind: 'slideshow' as const, assets: POSTERS.map(photo), caption: 'Rae Urban Sport — the full editorial.', creditHandle: '', creditName: '' },
   ];
 }
