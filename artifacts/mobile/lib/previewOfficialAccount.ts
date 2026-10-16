@@ -7,9 +7,10 @@
 import { Asset } from 'expo-asset';
 import type { SellerThreadPost } from '@/services/socialService';
 import { OFFICIAL_ACCOUNT_ID, OFFICIAL_BIO, OFFICIAL_DISPLAY_NAME } from '@/lib/officialAccount';
+import { demoRunwayVideoUri } from '@/lib/demoMedia';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
-const VIDEO = require('../assets/videos/fashion_runway_04.mp4');
+const VIDEO = demoRunwayVideoUri(4);
 const POSTERS = [
   require('../assets/videos/fashion_runway_04.jpg'),
   require('../assets/videos/fashion_runway_06.jpg'),
@@ -60,7 +61,7 @@ export function previewOfficialPosts(): SellerThreadPost[] {
       ...base,
       id: 'preview-official-video',
       caption: 'Welcome to Brandthread. Fits, drops and the people behind them.',
-      mediaUris: [uri(VIDEO)],
+      mediaUris: [VIDEO],
       thumbnailUri: uri(POSTERS[0]),
       aspectRatio: '9:16',
       contentType: 'video',
