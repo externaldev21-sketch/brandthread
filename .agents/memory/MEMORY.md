@@ -112,3 +112,4 @@
 - [Saved alert consolidation](saved-alert-consolidation.md) — one preference and delivery path; new saves opt in while existing preferences remain intact.
 - [Publish identifier storage](publish-identifier-storage.md) — UUID-shaped IDs can remain text-backed; preserve deployed storage contracts across ORM merges.
 - [First App Store launch](first-app-store-launch.md) — use static config and defer optional native surfaces, OTA and required monitoring until the wizard links/provisions the app.
+- [Official content boundary](official-content-boundary.md) — one shared official-account system; starter creator permissions remain pending, so production public visibility stays off.

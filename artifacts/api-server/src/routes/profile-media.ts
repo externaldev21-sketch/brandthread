@@ -40,6 +40,7 @@ import {
 } from "../lib/safety";
 import { matchesMutedWords } from "../lib/contentModerator";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
+import { attachCredits } from "../lib/officialSeed/credit";
 import { parsePagination } from "../lib/pagination";
 import { viewerPostStates } from "../lib/viewerPostState";
 import { pinnedAtByPostId, pinnedFirst, pinnedAtSql } from "../lib/postPins";
@@ -66,6 +67,9 @@ const videoRowSelection = {
   visibility:   posts.visibility,
   createdAt:    posts.createdAt,
   pinnedAt:     pinnedAtSql(posts.id),
+  creditHandle: posts.creditHandle,
+  creditName:   posts.creditName,
+  isOfficialAccount: users.isOfficialAccount,
   accountType:  users.accountType,
   displayName:  users.displayName,
   brandName:    users.brandName,
@@ -94,6 +98,9 @@ type VideoRow = {
   visibility: { isPublic?: boolean; allowComments: boolean; allowReposts: boolean; showLikeCount: boolean } | null;
   createdAt: Date;
   pinnedAt?: Date | null;
+  creditHandle?: string | null;
+  creditName?: string | null;
+  isOfficialAccount?: boolean | null;
   accountType: string | null;
   displayName: string | null;
   brandName: string | null;
@@ -195,7 +202,10 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
       brandName:   row.accountType === "seller" ? row.brandName : null,
       username:    row.username,
       verified:    row.accountType === "seller" ? deriveSellerVerified(row as any) : false,
+      isOfficial:  row.isOfficialAccount === true,
     },
+    creditHandle:  row.creditHandle ?? null,
+    creditName:    row.creditName ?? null,
     taggedProducts: (tagsByPost.get(row.id) ?? []).map((tag) => ({
       productId:  tag.productId,
       position:   tag.position,
@@ -211,7 +221,7 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
     likedByMe:     stateFor(row.id).likedByMe,
     savedByMe:     stateFor(row.id).savedByMe,
   }));
-  return attachQuoteData(mapped, viewerId);
+  return attachQuoteData(await attachCredits(mapped), viewerId);
 }
 
 async function isMutualFollow(a: string, b: string): Promise<boolean> {
@@ -303,7 +313,7 @@ router.get("/users/:userId/videos", async (req, res) => {
 
     const where = and(
       eq(posts.userId, clerkId),
-      isSelf ? ownPostsCondition() : isSeller ? publicPostCondition() : buyerFriendPostsCondition(),
+      isSelf ? ownPostsCondition() : isSeller ? publicPostCondition(undefined, undefined, { officialViewerId: viewerId }) : buyerFriendPostsCondition(),
     );
 
     const [[{ total }], pageRows] = await Promise.all([

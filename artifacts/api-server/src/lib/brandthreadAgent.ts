@@ -21,7 +21,7 @@ import { logger } from "./logger";
  *  preview data agree on the same id. */
 export const BRANDTHREAD_AGENT_CLERK_ID = "brandthread-agent";
 export const BRANDTHREAD_AGENT_NAME = "Brandthread Agent";
-export const BRANDTHREAD_AGENT_HANDLE = "@brandthread";
+export const BRANDTHREAD_AGENT_HANDLE = "@brandthread_agent";
 export const BRANDTHREAD_AGENT_INITIALS = "BT";
 export const BRANDTHREAD_AGENT_COLOR = "#0A0A0B";
 export const AGENT_CONVERSATION_TYPE = "brandthread_agent";

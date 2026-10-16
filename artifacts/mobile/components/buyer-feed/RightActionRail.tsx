@@ -67,7 +67,7 @@ export interface RailEngagement {
 }
 
 export function RightActionRail({
-  creator, hostId, avatarColor, avatarUri, initials, accentColor,
+  creator, hostId, avatarColor, avatarUri, avatarSource, initials, accentColor,
   engagement, commentsCount, shares, saves,
   onOpenCreator, onPressInCreator, onFollow, onLike, onOpenComments, onRepost, onSave, onShare,
   heartScale, repostScale, saveScale,
@@ -82,6 +82,8 @@ export function RightActionRail({
    *  absent — none of the bundled demo posts have one yet, so this is a
    *  no-op there; real posts with a seller avatar URL will pick it up. */
   avatarUri?: string;
+  /** Bundled avatar image (the official @brandthread account's silver B); wins over `avatarUri`. */
+  avatarSource?: number;
   initials: string;
   accentColor: string;
   engagement: RailEngagement | undefined;
@@ -196,7 +198,11 @@ export function RightActionRail({
               site in the app (profile, inbox row, story tray) already
               uses the default. */}
           <LiveHostRing hostId={hostId} size={38} ringGap={1.5} ringWidth={2}>
-            {avatarUri ? (
+            {avatarSource ? (
+              <View style={[styles.avatar, { backgroundColor: '#000', overflow: 'hidden' }]}>
+                <Image source={avatarSource} style={{ width: '100%', height: '100%' }} resizeMode="cover" testID="rail-official-avatar" />
+              </View>
+            ) : avatarUri ? (
               <Image cachePolicy="memory-disk" source={{ uri: avatarUri }} style={styles.avatar} />
             ) : (
               <View style={[styles.avatar, { backgroundColor: avatarColor }]}>

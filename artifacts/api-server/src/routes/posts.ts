@@ -55,6 +55,9 @@ import { productsMissingFromCloset } from "../lib/closet/pieces";
 
 /** A buyer fit tags at most this many closet pieces (an outfit board holds 8). */
 const MAX_BUYER_TAGS = 8;
+import { isPlatformAdmin } from "../lib/platformAdmin";
+import { OFFICIAL_ACCOUNT_CLERK_ID, POST_AS_OFFICIAL } from "../lib/officialSeed/config";
+import { attachCredits, parseCredit, type CreditInput } from "../lib/officialSeed/credit";
 import {
   authorInGoodStanding,
   enqueueAutoFilterReport,
@@ -664,11 +667,28 @@ router.get("/feed", requireAuth, async (req, res) => {
 router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostBody), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
 
+  // ── Post as @brandthread ────────────────────────────────────────────────────
+  // Platform admins can publish a Thread as the official account. The admin
+  // stays the uploader (owns the media until publish, carries their own
+  // publishing restrictions); the official account becomes the author.
+  const postAsRaw = (req.body as { postAs?: unknown })?.postAs;
+  if (postAsRaw !== undefined && postAsRaw !== null && postAsRaw !== POST_AS_OFFICIAL) {
+    return res.status(400).json({ error: "postAs must be 'brandthread'", code: "VALIDATION_ERROR" });
+  }
+  const postAsOfficial = postAsRaw === POST_AS_OFFICIAL;
+  if (postAsOfficial && !(await isPlatformAdmin(clerkId))) {
+    return res.status(403).json({ error: "Only Brandthread admins can post as @brandthread.", code: "POST_AS_FORBIDDEN" });
+  }
+  const authorId = postAsOfficial ? OFFICIAL_ACCOUNT_CLERK_ID : clerkId;
+
   const [poster] = await db
     .select({ accountType: users.accountType })
     .from(users)
-    .where(eq(users.clerkId, clerkId))
+    .where(eq(users.clerkId, authorId))
     .limit(1);
+  if (postAsOfficial && !poster) {
+    return res.status(503).json({ error: "The @brandthread account is not set up yet.", code: "OFFICIAL_ACCOUNT_MISSING" });
+  }
 
   if (!poster || (poster.accountType !== "seller" && poster.accountType !== "buyer")) {
     return res.status(403).json({
@@ -722,6 +742,12 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
     return res.status(400).json({ error: "surface must be 'thread' or 'profile'" });
   }
   const surface: PostSurface = requestedSurface ?? (isBuyer ? "profile" : "thread");
+  const creditResult = parseCredit(req.body as CreditInput);
+  if (!creditResult.ok) return res.status(400).json({ error: creditResult.error, code: "VALIDATION_ERROR" });
+  const credit = creditResult.value;
+  if (!postAsOfficial && (credit.creditHandle || credit.creditName)) {
+    return res.status(400).json({ error: "Creator credits are only for @brandthread posts.", code: "CREDIT_REQUIRES_OFFICIAL" });
+  }
   if (isBuyer) {
     // Buyers can NEVER create Threads — enforced here, not just hidden in the UI.
     if (surface === "thread") {
@@ -851,7 +877,7 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
   }
   if (isDraft) {
     const [{ value: draftCount }] = await db.select({ value: count() }).from(posts)
-      .where(and(eq(posts.userId, clerkId), eq(posts.postStatus, "draft")));
+      .where(and(eq(posts.userId, authorId), eq(posts.postStatus, "draft")));
     if (Number(draftCount) >= MAX_DRAFTS_PER_USER) {
       return res.status(409).json({
         error: `You can keep up to ${MAX_DRAFTS_PER_USER} drafts. Delete one to save another.`,
@@ -880,7 +906,7 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
       .where(and(eq(posts.id, quotedPostId), publicPostCondition()))
       .limit(1);
     if (!original) return unavailable();
-    if (await isBlockedEitherWay(clerkId, original.userId)) return unavailable();
+    if (await isBlockedEitherWay(authorId, original.userId)) return unavailable();
     if (original.visibility?.allowReposts === false) {
       return res.status(403).json({ error: "Reposts are disabled for this post", code: "REPOSTS_DISABLED" });
     }
@@ -1004,7 +1030,7 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
 
   const [post] = await db.insert(posts).values({
     placeId: locationResult.placeId ?? null,
-    userId:    clerkId,
+    userId:    authorId,
     mediaUrl,
     thumbnailUrl: thumbnailUrl ?? null,
     mediaUrls: slideRecords.length > 0
@@ -1032,6 +1058,8 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
       : screenHeld ? `media:${(heldVerdict?.categories ?? []).join(",")}`.slice(0, 200) : null,
     quotedPostId: quoteTarget?.id ?? null,
     repostKind: quoteTarget ? "quote" : null,
+    creditHandle: credit.creditHandle,
+    creditName: credit.creditName,
     updatedAt: now,
   }).returning();
 
@@ -1045,7 +1073,7 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
     await recordHeldMedia({
       targetType: post.mediaType === "video" ? "video" : "post",
       targetId: post.id,
-      ownerId: clerkId,
+      ownerId: authorId,
       verdict: heldVerdict,
       refs: [...mediaRefs.videos, ...mediaRefs.images].filter((ref) => !ref.includes("?")).slice(0, 4),
       excerpt: publicPostText(caption, hashtags),
@@ -1057,20 +1085,20 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
   // its author. Drafts / scheduled / held quotes do neither until public.
   if (quoteTarget && postStatus === "published" && !postHeld) {
     await db.insert(interactions)
-      .values({ userId: clerkId, postId: quoteTarget.id, type: "repost", value: "quote" })
+      .values({ userId: authorId, postId: quoteTarget.id, type: "repost", value: "quote" })
       .onConflictDoNothing({
         target: [interactions.userId, interactions.postId],
         where: sql`type = 'repost' AND post_id IS NOT NULL`,
       })
       .catch((err) => req.log.warn({ err, postId: post.id }, "Could not record quote repost interaction"));
-    void notifyRepost({ postId: quoteTarget.id, reposterId: clerkId, variant: "quote" });
+    void notifyRepost({ postId: quoteTarget.id, reposterId: authorId, variant: "quote" });
   }
 
   if (captionDecision.action === "hold") {
     await enqueueAutoFilterReport({
       targetType: post.mediaType === "video" ? "video" : "post",
       targetId: post.id,
-      ownerId: clerkId,
+      ownerId: authorId,
       excerpt: publicPostText(caption, hashtags),
       category: captionDecision.category,
       label: post.mediaType === "video" ? "Video" : "Post",
@@ -1092,6 +1120,9 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
         postStatus === "published" && resolvedVisibility.isPublic !== false
           ? "public"
           : "private",
+        // Posting as @brandthread hands the admin's uploads to the official
+        // account, so the media route (which checks the post author) can serve them.
+        authorId,
       );
     } catch (err) {
       await db.delete(posts).where(eq(posts.id, post.id)).catch(() => {});
@@ -1114,7 +1145,7 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
       const sellerProds = await db
         .select({ id: products.id, name: products.name, images: products.images })
         .from(products)
-        .where(and(inArray(products.id, validIds), isNull(products.deletedAt), isBuyer ? undefined : eq(products.ownerId, clerkId)));
+        .where(and(inArray(products.id, validIds), isNull(products.deletedAt), isBuyer ? undefined : eq(products.ownerId, authorId)));
 
       if (sellerProds.length > 0) {
         await db.insert(postTaggedProducts).values(
@@ -1145,8 +1176,10 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
     scheduleHlsTranscode(post.id, singleVideo ? slideRecords[0].path : mediaPath);
   }
 
+  const [withCredit] = await attachCredits([withQuote]);
   return res.status(201).json({
-    ...withQuote,
+    ...withCredit,
+    postedAs: postAsOfficial ? POST_AS_OFFICIAL : undefined,
     location: createdLocation,
     taggedProducts,
     remixOf,
@@ -1159,6 +1192,26 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
         }
       : { status: "visible" },
   });
+});
+
+// ─── GET /api/posts/official ─────────────────────────────────────────────────
+// Admins only: the @brandthread account's published, scheduled and draft
+// Threads (newest first) for the bulk-upload screen. Visible to admins even
+// while OFFICIAL_SEED_CONTENT_PUBLIC is off.
+router.get("/official", requireAuth, async (req, res) => {
+  const clerkId = (req as any).clerkUserId as string;
+  if (!(await isPlatformAdmin(clerkId))) return res.status(403).json({ error: "Admin access required" });
+  const rows = await db.select().from(posts)
+    .where(and(
+      eq(posts.userId, OFFICIAL_ACCOUNT_CLERK_ID),
+      inArray(posts.postStatus, ["draft", "scheduled", "published"]),
+    ))
+    .orderBy(desc(posts.createdAt))
+    .limit(100);
+  const details = await postDetails(rows, clerkId);
+  const credits = new Map((await attachCredits(rows.map((r) => ({ id: r.id, creditHandle: r.creditHandle, creditName: r.creditName }))))
+    .map((r) => [r.id, r.credit]));
+  return res.json({ posts: details.map((d: any) => ({ ...d, credit: credits.get(d.id) ?? null })) });
 });
 
 // ─── GET /api/posts/mine ─────────────────────────────────────────────────────
@@ -1297,8 +1350,8 @@ router.patch("/:id", requireAuth, validateBody(updatePostBody), async (req, res)
     updates.surface = body.surface;
   }
   if (body.aspectRatio !== undefined) {
-    if (!["9:16", "3:4", "1:1"].includes(body.aspectRatio as string)) {
-      return res.status(400).json({ error: "aspectRatio must be 9:16, 3:4, or 1:1" });
+    if (!["9:16", "4:5", "3:4", "1:1"].includes(body.aspectRatio as string)) {
+      return res.status(400).json({ error: "aspectRatio must be 9:16, 4:5, 3:4, or 1:1" });
     }
     updates.aspectRatio = body.aspectRatio as string;
   }
@@ -1486,6 +1539,9 @@ async function loadOwnedPost(req: any, res: any) {
     res.status(404).json({ error: "Post not found" });
     return null;
   }
+  // Admins manage @brandthread posts as if they were their own.
+  const official = await loadOfficialPostForAdmin(clerkId, id);
+  if (official) return { clerkId, posterType: "seller" as const, existing: official };
   const posterType = await posterAccountType(clerkId);
   if (!posterType) {
     res.status(403).json({ error: "Only buyer and seller accounts can manage posts.", code: "ACCOUNT_TYPE_REQUIRED" });
@@ -1498,6 +1554,14 @@ async function loadOwnedPost(req: any, res: any) {
     return null;
   }
   return { clerkId, posterType, existing };
+}
+
+/** The official post `id` when `clerkId` is a platform admin, else null. */
+async function loadOfficialPostForAdmin(clerkId: string, id: string) {
+  const [row] = await db.select().from(posts)
+    .where(and(eq(posts.id, id), eq(posts.userId, OFFICIAL_ACCOUNT_CLERK_ID))).limit(1);
+  if (!row || !(await isPlatformAdmin(clerkId))) return null;
+  return row;
 }
 
 // POST /api/posts/:id/schedule { scheduledAt } — draft or scheduled -> scheduled (also reschedules)
@@ -1575,13 +1639,15 @@ router.delete("/:id", requireAuth, async (req, res) => {
     return res.status(404).json({ error: "Post not found" });
   }
   // Fetch existing post to get all media paths for cleanup
-  const [existing] = await db.select().from(posts)
+  const official = await loadOfficialPostForAdmin(clerkId, id);
+  const authorId = official ? OFFICIAL_ACCOUNT_CLERK_ID : clerkId;
+  const [existing] = official ? [official] : await db.select().from(posts)
     .where(and(eq(posts.id, id), eq(posts.userId, clerkId))).limit(1);
   if (!existing) return res.status(404).json({ error: "Post not found" });
 
   const [deleted] = await db.update(posts)
     .set({ postStatus: "deleted", scheduledAt: null, updatedAt: new Date() })
-    .where(and(eq(posts.id, id), eq(posts.userId, clerkId)))
+    .where(and(eq(posts.id, id), eq(posts.userId, authorId)))
     .returning({ id: posts.id });
   if (!deleted) return res.status(404).json({ error: "Post not found" });
   scheduleMuxAssetRemoval(existing.videoMuxAssetId);
@@ -1944,7 +2010,7 @@ router.get("/:id", async (req, res) => {
   }
 
   const [sellerRows, tags, likeRows, repostRows, commentCounts] = await Promise.all([
-    db.select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified, username: users.username })
+    db.select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified, username: users.username, isOfficial: users.isOfficialAccount })
       .from(users).where(eq(users.clerkId, post.userId)).limit(1),
     db.select({
       productId: postTaggedProducts.productId,
@@ -1965,8 +2031,9 @@ router.get("/:id", async (req, res) => {
   const minPriceByProduct = await productMinPrices(tags.map((t) => t.productId));
   const stateFor = await viewerPostStates(viewerId, [post.id]);
   const singleLocation = await locationsByPlaceId([post.placeId]);
+  const [withCredit] = await attachCredits([withLocation(post, singleLocation)]);
   const [detail] = await attachPostExtras(await attachQuoteData([{
-    ...withLocation(post, singleLocation),
+    ...withCredit,
     ...stateFor(post.id),
     seller:       sellerRows[0] ?? null,
     taggedProducts: tags.map((t) => ({ ...t, priceCents: minPriceByProduct[t.productId] ?? 0 })),

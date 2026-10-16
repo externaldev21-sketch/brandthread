@@ -77,6 +77,8 @@ export function CaptionBlock({
   postLabel,
   productMentions,
   onProductMention,
+  official,
+  credit,
 }: {
   creator: string;
   verified: boolean;
@@ -120,6 +122,10 @@ export function CaptionBlock({
   /** Caption labels linked to products; tapping one calls `onProductMention`. */
   productMentions?: PostProductMention[];
   onProductMention?: (mention: PostProductMention) => void;
+  /** The official @brandthread account: shows the "Official" badge beside the name. */
+  official?: boolean;
+  /** Creator credit line under the caption ("Video: @handle"); tappable when `onPress` is set. */
+  credit?: { label: string; onPress?: () => void };
 }) {
   const [blockWidth, setBlockWidth] = React.useState(0);
   const handleLayout = (e: LayoutChangeEvent) => {
@@ -199,6 +205,7 @@ export function CaptionBlock({
               clip's silver dress). The same text shadow as the rest of
               this block keeps it legible on light and dark video alike. */}
           {verified && <VerifiedBadge onMedia style={[styles.iconTextShadow, { marginLeft: 4 }]} />}
+          {official && <Text style={styles.sponsoredLabel} accessibilityLabel="Official Brandthread account" testID="caption-official-badge">Official</Text>}
           {sponsored && <Text style={styles.sponsoredLabel} accessibilityLabel="Sponsored">Sponsored</Text>}
         </View>
       </TouchableOpacity>
@@ -232,6 +239,19 @@ export function CaptionBlock({
 
       <TranslationLink translation={translation} style={styles.translationLink} />
       {!!belowCaptionSlot && <View style={styles.belowCaptionWrap}>{belowCaptionSlot}</View>}
+      {credit ? (
+        <TouchableOpacity
+          onPress={credit.onPress}
+          disabled={!credit.onPress}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6 }}
+          accessibilityRole={credit.onPress ? 'link' : 'text'}
+          accessibilityLabel={credit.onPress ? `${credit.label}. Opens their profile` : credit.label}
+          testID="caption-credit"
+        >
+          <Text style={[styles.credit, credit.onPress && styles.creditLink]} numberOfLines={1}>{credit.label}</Text>
+        </TouchableOpacity>
+      ) : null}
 
       <TouchableOpacity
         style={soundHit.boostStyle}
@@ -335,6 +355,11 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start', marginTop: -4, marginBottom: 8, color: ON_DARK,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
+  credit: {
+    fontSize: 12.5, fontFamily: FONT.medium, color: `${ON_DARK}CC`, marginTop: -2, marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  creditLink: { fontFamily: FONT.semibold, color: ON_DARK },
   // Same shadow, for icon glyphs (Feather renders as a text font, so
   // textShadow applies) — used by the verified badge above.
   iconTextShadow: {

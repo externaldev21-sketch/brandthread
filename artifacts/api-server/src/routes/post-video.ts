@@ -111,10 +111,16 @@ export function mediaUrl(req: express.Request, path: string): string {
   return `${req.protocol}://${req.get("host")}/api/posts/media/${path.replace(/^\/objects\//, "")}`;
 }
 
+/**
+ * Checks `clerkId` may write each composed object, then sets its visibility.
+ * `ownerId` (default `clerkId`) becomes the ACL owner — an admin posting as
+ * @brandthread hands their uploads to the official account this way.
+ */
 export async function setComposedMediaVisibility(
   clerkId: string,
   paths: Array<string | null | undefined>,
   visibility: "private" | "public",
+  ownerId: string = clerkId,
 ): Promise<void> {
   for (const path of paths.filter((value): value is string => !!value)) {
     const file = await storage.getObjectEntityFile(path);
@@ -122,7 +128,7 @@ export async function setComposedMediaVisibility(
       userId: clerkId, objectFile: file, requestedPermission: ObjectPermission.WRITE,
     });
     if (!allowed) throw new Error("Composed media is not owned by this seller");
-    await storage.trySetObjectEntityAclPolicy(path, { owner: clerkId, visibility });
+    await storage.trySetObjectEntityAclPolicy(path, { owner: ownerId, visibility });
   }
 }
 

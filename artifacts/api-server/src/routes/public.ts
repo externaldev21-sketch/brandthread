@@ -30,9 +30,11 @@ import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
 import { parseFeaturedHandles, shapeFeaturedBrands } from "../lib/onboardingFeaturedBrands";
 import { brandProductsBySeller, photoBrandsFirst } from "../lib/discoverBrandProducts";
+import { isPlatformImpersonationHandle } from "../lib/storeIdentity";
 import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant } from "../lib/publicProfile";
 import { matchesMutedWords } from "../lib/contentModerator";
-import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
+import { officialPostVisibleTo, publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
+import { attachCredits } from "../lib/officialSeed/credit";
 import { blockedUserIds, isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
 import { viewerPostStates } from "../lib/viewerPostState";
 import { taggedProductVisibleTo } from "../lib/productVisibility";
@@ -1540,6 +1542,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
       vacationMessage: users.vacationMessage,
       username:        users.username,
       storeLayout:     users.storeLayout,
+      isOfficialAccount: users.isOfficialAccount,
       coverVideoUrl:   users.coverVideoUrl,
       coverPosterUrl:  users.coverPosterUrl,
       coverVideoModerationStatus: users.coverVideoModerationStatus,
@@ -1577,6 +1580,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
       .where(and(
         eq(posts.userId, canonicalClerkId),
         sql<boolean>`coalesce((${posts.visibility}->>'isPublic')::boolean, true) = true`,
+        officialPostVisibleTo(viewerId, posts.userId),
         or(
           eq(posts.postStatus, "published"),
           and(eq(posts.postStatus, "scheduled"), lte(posts.scheduledAt, new Date())),
@@ -1588,7 +1592,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
     // the two lists above are capped pages, not counts.
     db.select({ activeProductsCount: count() }).from(products).where(activeProductsWhere),
     db.select({ publicPostsCount: count() }).from(posts)
-      .where(and(eq(posts.userId, canonicalClerkId), publicPostCondition())),
+      .where(and(eq(posts.userId, canonicalClerkId), publicPostCondition(undefined, undefined, { officialViewerId: viewerId }))),
     publicProfileLikes(canonicalClerkId),
     db.select({ total: count() }).from(follows).where(eq(follows.followingId, canonicalClerkId)),
     db.select({ total: count() }).from(follows).where(eq(follows.followerId, canonicalClerkId)),
@@ -1651,6 +1655,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
       // not a secret (Clerk IDs are sent on every authenticated request header).
       clerkId:      canonicalClerkId,
       verified: deriveSellerVerified(seller),
+      isOfficial: seller.isOfficialAccount === true,
       vacationMode: vacation.active,
       vacationMessage: vacation.active ? vacation.message : null,
       vacationUntil: vacation.until?.toISOString() ?? null,
@@ -1669,7 +1674,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
       coverVideoModerationStatus: undefined,
     },
     products: sellerProductsWithVariants,
-    posts: sellerPosts.map((p) => toPublicPost(p, tagsByPost.get(p.id) ?? [])),
+    posts: await attachCredits(sellerPosts.map((p) => ({ ...toPublicPost(p, tagsByPost.get(p.id) ?? []), creditHandle: p.creditHandle, creditName: p.creditName }))),
   });
 });
 
@@ -2000,8 +2005,12 @@ router.get("/posts", async (req, res) => {
         visibility:  posts.visibility,
         remixOfPostId: posts.remixOfPostId,
         createdAt:   posts.createdAt,
+        creditHandle: posts.creditHandle,
+        creditName:  posts.creditName,
         displayName: users.displayName,
         brandName:   users.brandName,
+        username:    users.username,
+        isOfficialAccount: users.isOfficialAccount,
         verified:    users.verified,
         verificationStatus: users.verificationStatus,
         activeStanding: users.activeStanding,
@@ -2014,7 +2023,7 @@ router.get("/posts", async (req, res) => {
         followedOnly,
         eq(users.accountType, "seller"),
         ownerId ? undefined : eq(posts.surface, "thread"),
-        publicPostCondition(),
+        publicPostCondition(undefined, undefined, { officialViewerId: viewerId }),
         notBlockedWith(viewerId, posts.userId),
         // For You only: honour the viewer's "Not interested" hides (post or creator).
         ownerId ? undefined : notHiddenFromViewer(viewerId, posts.id, posts.userId),
@@ -2117,8 +2126,12 @@ router.get("/posts", async (req, res) => {
       seller: {
         displayName: p.displayName,
         brandName:   p.brandName,
+        username:    p.username ?? null,
         verified:    deriveSellerVerified(p),
+        isOfficial:  p.isOfficialAccount === true,
       },
+      creditHandle:   p.creditHandle,
+      creditName:     p.creditName,
       taggedProducts: (tagsByPost[p.id] ?? []).map((t) => ({
         productId: t.productId,
         position:  t.position,
@@ -2133,7 +2146,7 @@ router.get("/posts", async (req, res) => {
       ...stateFor(p.id),
     }));
 
-    return res.json(await attachPostExtras(await attachQuoteData(baseResult, viewerId)));
+    return res.json(await attachPostExtras(await attachQuoteData(await attachCredits(baseResult), viewerId)));
   } catch (err) {
     req.log.error({ err }, "Failed to fetch public posts");
     return res.status(500).json({ error: "Failed to fetch posts" });
@@ -2253,6 +2266,7 @@ router.get("/profiles/:username", async (req, res) => {
         avatarUrl:   users.avatarUrl,
         profileImageUrl: users.profileImageUrl,
         verified:    users.verified,
+        isOfficialAccount: users.isOfficialAccount,
         deletedAt:   users.deletedAt,
         deletionRequestedAt: users.deletionRequestedAt,
         coverVideoUrl:  users.coverVideoUrl,
@@ -2311,6 +2325,7 @@ router.get("/profiles/:username", async (req, res) => {
       bio:         user.bio ?? null,
       avatarUrl,
       verified,
+      isOfficial:  user.isOfficialAccount === true,
       ...publicCoverFields(user),
     });
   } catch (err) {
@@ -2417,7 +2432,13 @@ router.get("/username-check", async (req, res) => {
       .from(users)
       .where(eq(sql`lower(${users.username})`, raw))
       .limit(1);
-    res.json(existing ? { available: false, error: "Username is already taken." } : { available: true });
+    if (existing) {
+      res.json({ available: false, error: "Username is already taken." });
+    } else if (isPlatformImpersonationHandle(raw)) {
+      res.json({ available: false, error: "That username is reserved." });
+    } else {
+      res.json({ available: true });
+    }
   } catch (err) {
     req.log.error({ err }, "Failed to check username availability");
     // Fail open: never block sign-up on a transient check failure — the

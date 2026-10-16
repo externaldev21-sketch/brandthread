@@ -97,7 +97,7 @@ export const BRANDTHREAD_AGENT_SEED: PreviewConversationSeed = {
   id: 'preview-conversation-brandthread',
   participantUserId: 'brandthread-agent',
   participantName: 'Brandthread Agent',
-  participantHandle: '@brandthread',
+  participantHandle: '@brandthread_agent',
   participantInitials: 'BT',
   participantColor: pickAvatarColor('brandthread-agent'),
   isBrandMark: true,

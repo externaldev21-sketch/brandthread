@@ -38,7 +38,7 @@ export async function publishCreatePost({ api, input, editId, onProgress, signal
   let mediaPath: string | undefined;
   let thumbnailUri: string | undefined;
   let thumbnailPath: string | undefined;
-  let aspectRatio: '9:16' | '3:4' | '1:1' = '9:16';
+  let aspectRatio: '9:16' | '4:5' | '3:4' | '1:1' = '9:16';
   let contentType: 'video' | 'slideshow' = 'video';
 
   let slidesPayload: Array<{ kind: 'photo' | 'video'; path: string; thumbnailPath: string; duration?: number }> | undefined;
@@ -154,6 +154,13 @@ export async function publishCreatePost({ api, input, editId, onProgress, signal
     visibility: details.visibility,
     isDraft,
     scheduledAt: isDraft ? null : details.scheduledAt,
+    ...(details.postAsOfficial && mode === 'thread' && !editId ? {
+      postAs: 'brandthread' as const,
+      creditHandle: details.creditHandle,
+      creditName: details.creditName,
+      // @brandthread has no products of its own.
+      productTags: [],
+    } : {}),
   };
   const post = editId
     ? await updateSellerPost(editId, {

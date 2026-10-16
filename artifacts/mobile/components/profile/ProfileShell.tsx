@@ -88,7 +88,7 @@ export interface ProfileIdentity {
   /** A moving profile picture — when set, plays instead of the static `avatarUrl` (its poster frame) in the video-header own-profile avatar. */
   avatarVideoUrl?: string | null;
   verified?: boolean;
-  /** "Seller" / "Buyer" — shown as a chip beside the handle. */
+  /** "Seller" / "Buyer" / "Official" (@brandthread) — shown as a chip beside the handle. */
   roleLabel: string;
   /** `headerVariant="video"` only: more chips stacked directly under the
    *  role chip, same height and style (e.g. the owner's plan chip). */
@@ -491,7 +491,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
       nameAccessory={identity.verified ? <Icon name="check-circle" size={16} color={ON_DARK} accessibilityLabel="Verified" /> : null}
       handle={identity.handle ?? null}
       chips={[
-        <ProfileChip key="role" size="sm" label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} />,
+        <ProfileChip key="role" size="sm" label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : identity.roleLabel === 'Official' ? 'check-circle' : 'user'} />,
         ...(identity.extraChips ?? []).map((c) => <ProfileChip key={c.label} size="sm" label={c.label} icon={c.icon} />),
       ]}
       meta={meta}
@@ -567,7 +567,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
           {/* Seller / Buyer badge: a small outline chip on its own line under
               the handle, same as the own-profile header. */}
           <View style={styles.roleChipRow}>
-            <ProfileChip label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} size="sm" />
+            <ProfileChip label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : identity.roleLabel === 'Official' ? 'check-circle' : 'user'} size="sm" />
           </View>
         </Animated.View>
       </View>

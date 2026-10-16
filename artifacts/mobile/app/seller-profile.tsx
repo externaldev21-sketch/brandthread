@@ -49,7 +49,8 @@ import {
 import {
   hasPaidPlan, isVisitorPreviewParam, planChipLabel, profileCapabilities, resolveProfileMode, viewAsVisitorHref,
 } from '@/lib/profileAccess';
-import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { previewOfficialProfile } from '@/lib/previewOfficialAccount';
 import { getSellerShopPage, taggedItemHref, type ShopProduct } from '@/services/profileService';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
 import { anchorFromEvent, type MenuAnchor, openContextMenu } from '@/lib/contextMenu';
@@ -75,6 +76,7 @@ import {
   ProfileButton, ProfileChip, ProfileGlassButton, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
+import { isOfficialAccountId, officialAvatarUri } from '@/lib/officialAccount';
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
@@ -111,6 +113,8 @@ interface SellerView {
   category?: string;
   initials: string;
   verified: boolean;
+  /** The official @brandthread account: silver B avatar, "Official" chip, no DMs. */
+  isOfficial: boolean;
   avatarUrl: string | null;
   bannerUrl: string | null;
   vacationMode: boolean;
@@ -152,7 +156,9 @@ function toSellerView(profile: any, fallbackId: string): SellerView {
     category: profile?.category ?? undefined,
     initials: initialsOf(brandName),
     verified: profile?.verified === true,
-    avatarUrl: httpOrNull(profile?.profileImageUrl) ?? httpOrNull(profile?.avatarUrl),
+    isOfficial: profile?.isOfficial === true,
+    avatarUrl: httpOrNull(profile?.profileImageUrl) ?? httpOrNull(profile?.avatarUrl)
+      ?? (profile?.isOfficial === true ? officialAvatarUri() : null),
     bannerUrl: httpOrNull(profile?.bannerUrl),
     vacationMode: Boolean(profile?.vacationMode),
     vacationMessage: profile?.vacationMessage ?? undefined,
@@ -298,6 +304,16 @@ export default function SellerProfileScreen() {
           setPlan({ planId: own.subscriptionPlanId ?? null, status: own.subscriptionStatus ?? null });
         } else {
           if (!routeSellerId) throw new Error('Seller not found.');
+          if (devPreview && isPreviewDemoMode() && isOfficialAccountId(routeSellerId)) {
+            // demo=1 preview only: the official account's sample profile.
+            view = toSellerView(previewOfficialProfile(), routeSellerId);
+            if (!active) return;
+            setSeller(view);
+            setLikes(view.likesCount ?? 0);
+            setFollowers(view.followersCount);
+            setFollowing(view.followingCount);
+            return;
+          }
           api.publicSellers.recordVisit(routeSellerId).catch(() => {});
           // Real per-source traffic tracking for the seller's own Dashboard —
           // fire-and-forget, never blocks this screen's own load.
@@ -785,7 +801,10 @@ export default function SellerProfileScreen() {
           labelStyle={{ fontFamily: FONT.bold, fontSize: FS.base }}
         />
       </View>
-      <ProfileButton label="Message" icon="message-circle" variant="outline" onPress={handleMessageSeller} disabled={previewAsVisitor} testID="seller-profile-message" />
+      {/* Nobody reads @brandthread's inbox — the account has no login. */}
+      {seller?.isOfficial ? null : (
+        <ProfileButton label="Message" icon="message-circle" variant="outline" onPress={handleMessageSeller} disabled={previewAsVisitor} testID="seller-profile-message" />
+      )}
     </View>
   );
 
@@ -889,8 +908,8 @@ export default function SellerProfileScreen() {
           initials: seller?.initials ?? '',
           avatarUrl: seller?.avatarUrl,
           verified: seller?.verified,
-          roleLabel: 'Seller',
           pronouns,
+          roleLabel: seller?.isOfficial ? 'Official' : 'Seller',
         }}
         avatar={{ ring: !!seller?.verified, liveHostId: canonicalSellerId ?? routeSellerId ?? null }}
         // A cover video, when set, leads the hero for every viewer (muted,

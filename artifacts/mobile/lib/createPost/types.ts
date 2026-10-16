@@ -66,6 +66,11 @@ export interface PostDetails {
   productMentions?: PostProductMention[];
   /** Seller only: "Behind the scenes" label. */
   bts?: boolean;
+  /** Admins only (THREAD): publish as the official @brandthread account. */
+  postAsOfficial?: boolean;
+  /** Creator credit for @brandthread reposts ("Video: @handle"); optional. */
+  creditHandle?: string;
+  creditName?: string;
 }
 
 export interface PublishInput {

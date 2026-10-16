@@ -3504,7 +3504,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       }>('/api/posts/compose-video/thumbnail', { mediaPath, offset }),
       /** Compose ordered photo slides with per-slide text overlays into portrait rendered images */
       composeSlideshow: (body: {
-        aspectRatio?: '1:1' | '3:4' | '9:16';
+        aspectRatio?: '1:1' | '4:5' | '3:4' | '9:16';
         surface?: 'thread' | 'profile';
         coverIndex?: number;
         slides: Array<{
