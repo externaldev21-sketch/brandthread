@@ -666,6 +666,8 @@ router.get("/media/*path", async (req, res) => {
         // The regex literal must match those index expressions exactly.
         sql`substring(${posts.mediaUrl} from '/api/posts/media/(.+)$') = ${suffix}`,
         sql`substring(${posts.thumbnailUrl} from '/api/posts/media/(.+)$') = ${suffix}`,
+        // Legacy photo carousels use mediaPaths rather than POST slide records.
+        sql`COALESCE(${posts.mediaPaths}::jsonb, '[]'::jsonb) ? ${objectPath}`,
         // POST carousel slides (and their posters) are matched by their exact
         // stored object path rather than a substring of the JSON payload.
         sql`EXISTS (
@@ -684,12 +686,16 @@ router.get("/media/*path", async (req, res) => {
     if (!linkedPost || !publiclyVisible) return res.status(404).end();
 
     // Promote a due scheduled object only at its first eligible public read.
-    await publishComposedMedia(linkedPost.userId, [objectPath]);
+    if (due) await publishComposedMedia(linkedPost.userId, [objectPath]);
     const file = await storage.getObjectEntityFile(objectPath);
     const allowed = await storage.canAccessObjectEntity({
       objectFile: file, requestedPermission: ObjectPermission.READ,
     });
     if (!allowed) return res.status(404).end();
+    // Expo web and its API are served on separate preview origins. Only media
+    // that passed the published-post and object-ACL checks is embeddable here;
+    // keep the API's restrictive default for all other responses.
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     if (await redirectToPublicMedia(res, objectPath)) return; // CDN / signed URL, not Express (BT-473)
     const [metadata] = await file.getMetadata();
     const size = Number(metadata.size ?? 0);
@@ -739,7 +745,8 @@ router.get("/media/*path", async (req, res) => {
     res.setHeader("Cache-Control", "public, max-age=3600");
     await pipeline(file.createReadStream({ start, end }), res);
     return;
-  } catch {
+  } catch (err) {
+    req.log.warn({ err, suffix }, "Could not serve composed post media");
     if (res.headersSent) {
       res.destroy();
       return;

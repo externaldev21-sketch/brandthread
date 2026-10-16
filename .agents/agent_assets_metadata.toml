@@ -173,3 +173,31 @@ mtime_ms = 1791766633479
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/9cd00427-3577-4da8-92fe-e3b1a25f4f2b/3aba0147-24c0-4abb-aa7f-264e26f72eed"
 storage_version_token = "1791766634413879"
 content_type = "text/html"
+
+[[outputs]]
+id = "scHUDcudVXOtxAO29seXh"
+uri = "file://.local/merge-audit/official-first-video.jpg"
+type = "image"
+title = "First @brandthread Thread — app capture"
+description = "Actual official video post and creator credit. The headless capture browser cannot decode H.264, so the video plane is black; this is not proof of device playback."
+logical_id = "88180053-33f4-4bff-a72b-e4d047fa9e82"
+content_hash = "sha256:a547ecca73614d07258a00df75e39f3078652ac2187b6cb9b2e0448983a494ab"
+size = 14768
+mtime_ms = 1792179734009
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/88180053-33f4-4bff-a72b-e4d047fa9e82/e0dbfc64-3b2c-442c-a176-87dce8c7b553"
+storage_version_token = "1792179830808607"
+content_type = "image/jpeg"
+
+[[outputs]]
+id = "_aQ9XxSfGQ-nsJicPIZ0Z"
+uri = "file://.local/merge-audit/official-video-01-poster.jpg"
+type = "image"
+title = "Video 01 — actual generated poster"
+description = "Poster extracted from Dev’s uploaded 01-unknown-creator.mp4, not a demo or placeholder."
+logical_id = "3852bf3d-4583-43e5-aad8-023a3a975f79"
+content_hash = "sha256:2c1c6f8e8f34faa6b1149545a3357fa06085073a9ccbca0c8e6dadd32c7a7d18"
+size = 5603
+mtime_ms = 1792179795345
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/3852bf3d-4583-43e5-aad8-023a3a975f79/5ee104bb-2962-4610-b2ed-d7436b6b682a"
+storage_version_token = "1792179831564205"
+content_type = "image/jpeg"

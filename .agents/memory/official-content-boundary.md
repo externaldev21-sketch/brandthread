@@ -14,3 +14,9 @@ Creator permission for the starter content is pending, especially Factorie. Keep
 **Why:** Development review is not permission to publicly redistribute another creator's work.
 
 **How to apply:** Never turn on production public visibility merely because the migration or development import succeeds.
+
+Owner-authorized workspace imports should not require granting a human account platform-admin access.
+
+**Why:** The development database had no platform admins, but the owner had already authorized importing the starter media. Granting a person extra ongoing access would be unrelated to that authorization.
+
+**How to apply:** Reuse the official composer publisher through a trusted, development-only server operation, keeping HTTP authorization intact and recording any review decisions. If automated moderation is unavailable, do not disable moderation globally or release unrelated held content.

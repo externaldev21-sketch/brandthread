@@ -7,7 +7,7 @@
  * GET  /api/posts/:id          — get single post + tags + counts (public)
  * POST /api/posts/:id/interact — toggle like / repost; record watch_time (requireAuth)
  */
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import {
   db, posts, postTaggedProducts, products, productVariants, users, interactions, follows, boosts, blocks,
   savedItems, orders,
@@ -664,7 +664,11 @@ router.get("/feed", requireAuth, async (req, res) => {
 // feed means a buyer post can never surface there no matter what fields are
 // set on it, but we additionally hard-block video/product-tagging for buyers
 // below so the write path itself can't be used to fake a Thread post.
-router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostBody), async (req, res) => {
+// Only the server-side starter importer can mark an in-process request. This
+// cannot be supplied in an HTTP body/header and grants no account admin role.
+const trustedOfficialSeedRequests = new WeakSet<object>();
+
+async function publishPost(req: Request, res: Response) {
   const clerkId = (req as any).clerkUserId as string;
 
   // ── Post as @brandthread ────────────────────────────────────────────────────
@@ -676,7 +680,7 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
     return res.status(400).json({ error: "postAs must be 'brandthread'", code: "VALIDATION_ERROR" });
   }
   const postAsOfficial = postAsRaw === POST_AS_OFFICIAL;
-  if (postAsOfficial && !(await isPlatformAdmin(clerkId))) {
+  if (postAsOfficial && !trustedOfficialSeedRequests.has(req) && !(await isPlatformAdmin(clerkId))) {
     return res.status(403).json({ error: "Only Brandthread admins can post as @brandthread.", code: "POST_AS_FORBIDDEN" });
   }
   const authorId = postAsOfficial ? OFFICIAL_ACCOUNT_CLERK_ID : clerkId;
@@ -1035,7 +1039,9 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
     thumbnailUrl: thumbnailUrl ?? null,
     mediaUrls: slideRecords.length > 0
       ? slideRecords.map((sl) => sl.url)
-      : mediaPath ? [mediaUrl] : (resolvedMediaPaths.length > 0 ? [] : (mediaUrls ?? (mediaUrl ? [mediaUrl] : []))),
+      : mediaType === "slideshow" && resolvedMediaPaths.length > 0
+        ? resolvedMediaPaths.map((path) => composedMediaUrl(req, path))
+        : mediaPath ? [mediaUrl] : (resolvedMediaPaths.length > 0 ? [] : (mediaUrls ?? (mediaUrl ? [mediaUrl] : []))),
     mediaPaths: slideRecords.length > 0 ? slideRecords.map((sl) => sl.path) : resolvedMediaPaths,
     slides: slideRecords,
     slideOverlays: safeSlideOverlays as any,
@@ -1192,7 +1198,48 @@ router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostB
         }
       : { status: "visible" },
   });
-});
+}
+
+router.post("/", requireAuth, rateLimit("post-create"), validateBody(createPostBody), publishPost);
+
+/**
+ * Trusted, development-only bulk-import entry point. Uses the exact composer
+ * publisher, including ownership, credits, moderation, tagging and media ACLs.
+ * Not mounted as a route, and never grants a human or the official account an
+ * admin role. The CLI is already running with workspace/database authority.
+ */
+export async function publishOfficialStarterPost(
+  body: Record<string, unknown>,
+  origin: string,
+): Promise<Record<string, any>> {
+  if (process.env.NODE_ENV !== "development" || process.env.REPLIT_DEPLOYMENT === "1") {
+    throw new Error("Starter import is allowed only in development.");
+  }
+  const url = new URL(origin);
+  const req = {
+    body: createPostBody.parse({ ...body, postAs: POST_AS_OFFICIAL, surface: "thread" }),
+    clerkUserId: OFFICIAL_ACCOUNT_CLERK_ID,
+    protocol: url.protocol.replace(":", ""),
+    get: (name: string) => name.toLowerCase() === "host" ? url.host : undefined,
+    log: { info: console.info, warn: console.warn, error: console.error, debug: console.debug },
+  } as unknown as Request;
+  let status = 200;
+  let result: Record<string, any> | undefined;
+  const res = {
+    status(code: number) { status = code; return this; },
+    json(value: Record<string, any>) { result = value; return this; },
+  } as unknown as Response;
+  trustedOfficialSeedRequests.add(req);
+  try {
+    await publishPost(req, res);
+    if (status !== 201 || !result?.id) {
+      throw new Error(`Official publisher returned ${status}: ${JSON.stringify(result)}`);
+    }
+    return result;
+  } finally {
+    trustedOfficialSeedRequests.delete(req);
+  }
+}
 
 // ─── GET /api/posts/official ─────────────────────────────────────────────────
 // Admins only: the @brandthread account's published, scheduled and draft

@@ -14,3 +14,9 @@ Cold-start screenshots can also capture an entirely black startup frame before t
 **Why:** Both buyer and seller previews produced black quick captures, but a browser that waited for startup displayed usable empty-account screens. A first-render log alone did not establish that the visible screen had settled.
 
 **How to apply:** If a quick capture is black, distinguish an actual runtime error from a short capture window. For a required startup check, wait for visible interactive content rather than repeatedly taking the same immediate screenshot or reporting success from compilation alone.
+
+The workspace's headless Chromium can lack H.264 decoding altogether.
+
+**Why:** The capture browser returned an empty `canPlayType('video/mp4; codecs="avc1.64001F"')` result for valid H.264/yuv420p uploads whose stored bytes and HTTP range responses were verified independently.
+
+**How to apply:** Check decoder capability before retrying black video captures. Present the real app capture and an extracted poster separately, disclose the capture limitation, and never substitute demo media or claim physical-device playback was verified.

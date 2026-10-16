@@ -6,6 +6,19 @@ const postsRoute = fs.readFileSync(path.resolve(__dirname, "..", "posts.ts"), "u
 const videoRoute = fs.readFileSync(path.resolve(__dirname, "..", "post-video.ts"), "utf8");
 
 describe("post video publication contract", () => {
+  it("preserves every owned photo when a slideshow also supplies its primary path", () => {
+    expect(postsRoute).toContain('mediaType === "slideshow" && resolvedMediaPaths.length > 0');
+    expect(postsRoute).toContain('resolvedMediaPaths.map((path) => composedMediaUrl(req, path))');
+  });
+
+  it("serves legacy carousel paths and allows embedding only after media ACL checks", () => {
+    expect(videoRoute).toContain("COALESCE(${posts.mediaPaths}::jsonb, '[]'::jsonb) ? ${objectPath}");
+    const acl = videoRoute.indexOf("if (!allowed) return res.status(404).end();");
+    const embed = videoRoute.indexOf('res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");');
+    expect(acl).toBeGreaterThan(0);
+    expect(embed).toBeGreaterThan(acl);
+  });
+
   it("returns signed owner preview URLs while composed objects remain private", () => {
     expect(videoRoute).toContain('router.post("/compose-video", requireAuth');
     expect(videoRoute).toContain('visibility: "private"');
