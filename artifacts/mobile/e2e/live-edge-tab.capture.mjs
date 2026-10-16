@@ -27,6 +27,21 @@ async function shoot(name, tab) {
   if (tab === 'following') await page.getByText('Following', { exact: true }).first().click();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${outDir}/${name}-1-collapsed.png` });
+  if (process.env.CAPTURE_MID) {
+    // Mid-animation, deterministically: drag the tab about halfway out and
+    // shoot while the finger is still down (the pan drives progress directly).
+    const box = await live.boundingBox();
+    const x = Math.max(2, box.x + box.width - 4), y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) await page.mouse.move(x + (Number(process.env.CAPTURE_MID) * i) / 10, y);
+    await page.waitForTimeout(200);
+    await page.screenshot({ path: `${outDir}/${name}-1b-mid-animation.png` });
+    // Back to the edge before the tap below.
+    for (let i = 9; i >= 0; i--) await page.mouse.move(x + (Number(process.env.CAPTURE_MID) * i) / 10, y);
+    await page.mouse.up();
+    await page.waitForTimeout(600);
+  }
   await live.click();
   await page.waitForTimeout(600);
   await page.screenshot({ path: `${outDir}/${name}-2-expanded-cart-hidden.png` });
