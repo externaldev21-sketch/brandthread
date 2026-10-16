@@ -12,6 +12,7 @@
  * an honest empty state (sellers have no tagged-post data yet).
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useStickyState } from '@/lib/stickyState';
 import { useAuth } from '@clerk/expo';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Platform, TextInput,
@@ -145,18 +146,21 @@ export default function ProfileScreen() {
   const [shopProducts, setShopProducts] = useState<ShopProduct[]>([]);
   const [shopLoading, setShopLoading] = useState(false);
   const [shopError, setShopError] = useState(false);
-  const [sellerPosts, setSellerPosts] = useState<SellerThreadPost[]>([]);
-  const [postsLoading, setPostsLoading] = useState(true);
+  // Sticky (memory-only, account-scoped — lib/stickyState.ts): a remount or
+  // revisit paints the last-known grid, header and stats on frame one
+  // instead of skeleton tiles, "–" stats and a bio/cover that pop in late.
+  const [sellerPosts, setSellerPosts, hadPosts] = useStickyState<SellerThreadPost[]>('sellerProfile:posts', []);
+  const [postsLoading, setPostsLoading] = useState(!hadPosts);
   const [postsError, setPostsError] = useState(false);
-  const [myStoryIds, setMyStoryIds] = useState<string[]>([]);
-  const [profile, setProfile] = useState<SellerProfileData | null>(null);
+  const [myStoryIds, setMyStoryIds] = useStickyState<string[]>('sellerProfile:storyIds', []);
+  const [profile, setProfile, hadProfile] = useStickyState<SellerProfileData | null>('sellerProfile:profile', null);
   const coverFlow = useProfileCover({
     own: true,
     cover: { videoUrl: profile?.coverVideoUrl ?? null, posterUrl: profile?.coverPosterUrl ?? null },
     userId,
   });
   const tagged = useTaggedPosts(userId, activeTab === 'Tagged' && !!userId && !isSellerDevPreview());
-  const [socialCounts, setSocialCounts] = useState<SocialCounts>({ followers: 0, following: 0, likes: 0 });
+  const [socialCounts, setSocialCounts] = useStickyState<SocialCounts>('sellerProfile:socialCounts', { followers: 0, following: 0, likes: 0 });
   const [productsCount, setProductsCount] = useState<number | null>(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [profileEditorVisible, setProfileEditorVisible] = useState(false);
@@ -173,7 +177,7 @@ export default function ProfileScreen() {
   // never to `!profile` — so a slow or failing seller-profile fetch can't
   // strand Posts/Followers/Following/Likes on "–" forever even though those
   // three come from independent, already-resolved sources.
-  const [statsInitialLoading, setStatsInitialLoading] = useState(true);
+  const [statsInitialLoading, setStatsInitialLoading] = useState(!(hadProfile && profile));
   const requestUserRef = useRef<string | null>(null);
 
   const loadPosts = useCallback(async () => {
@@ -336,14 +340,22 @@ export default function ProfileScreen() {
     setStatsInitialLoading(false);
   }, [authLoaded, userId, loadPosts, loadMyStories, loadProfile, loadSocialCounts, loadShopCount]);
 
+  // Only wipe what's on screen when the account actually changes — not on
+  // the first run, and not when this effect merely re-runs because a
+  // loader's identity changed — so the profile never blanks and refills.
+  const shownUserRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     requestUserRef.current = userId ?? null;
-    setSellerPosts([]);
-    setMyStoryIds([]);
-    setProfile(null);
-    setPostsLoading(true);
-    setSocialCounts({ followers: 0, following: 0, likes: 0 });
-    setStatsInitialLoading(true);
+    const accountChanged = shownUserRef.current !== undefined && shownUserRef.current !== (userId ?? null);
+    shownUserRef.current = userId ?? null;
+    if (accountChanged) {
+      setSellerPosts([]);
+      setMyStoryIds([]);
+      setProfile(null);
+      setPostsLoading(true);
+      setSocialCounts({ followers: 0, following: 0, likes: 0 });
+      setStatsInitialLoading(true);
+    }
     if (authLoaded && userId && !isSellerDevPreview()) void loadPage();
     if (authLoaded && (!userId || isSellerDevPreview())) { setPostsLoading(false); setStatsInitialLoading(false); }
     // New / edited / deleted posts publish through socialService — refresh.

@@ -14,8 +14,8 @@ import React, { forwardRef, useMemo } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
-import { TYPE_SCALE } from '@/constants/typography';
-import { EmptyState } from '@/components/BrandthreadUI';
+import { EmptyState, SectionHeader } from '@/components/reframe';
+import { X_GUTTER, X_SPACE } from '@/constants/reframe';
 import { EditorialTile, TileRailSkeleton, type EditorialTileItem } from './EditorialTile';
 import { DiscoverTileView, DiscoverTileSkeleton } from './DiscoverTileView';
 import { DiscoverPeopleRow } from './DiscoverPeopleRow';
@@ -31,13 +31,7 @@ export type { GridRow } from '@/lib/discoverGridPacking';
 const GAP = 1;
 
 function RailHeader({ title, sub }: { title: string; sub?: string }) {
-  const { theme } = useAppTheme();
-  return (
-    <View style={{ marginBottom: 10 }}>
-      <Text style={[TYPE_SCALE.headline, { color: theme.text }]}>{title}</Text>
-      {!!sub && <Text style={[TYPE_SCALE.footnote, { color: theme.muted, marginTop: 2 }]}>{sub}</Text>}
-    </View>
-  );
+  return <SectionHeader title={title} subtitle={sub} inset={false} />;
 }
 
 export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
@@ -139,10 +133,8 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
       ListHeaderComponent={ListHeaderComponent}
       ListEmptyComponent={!loading ? (
         <EmptyState
-          icon="activity"
-          illustration="trending"
           title="Nothing to show yet"
-          description="Posts from buyers and brands will show up here as the community grows."
+          message="Posts from buyers and brands will show up here as the community grows."
         />
       ) : null}
       renderItem={({ item: row }) => {
@@ -212,7 +204,7 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
         // Rail row (Just Dropped / High Demand)
         const items = row.kind === 'justDropped' ? justDroppedItems : highDemandItems;
         return (
-          <View style={{ marginVertical: SP.md, paddingHorizontal: SP.md }}>
+          <View style={{ marginVertical: X_SPACE[8], paddingHorizontal: X_GUTTER }}>
             <RailHeader
               title={row.kind === 'justDropped' ? 'Just Dropped' : 'High Demand'}
               sub={row.kind === 'justDropped' ? 'Fresh from sellers you follow' : 'Moving fast across the platform'}

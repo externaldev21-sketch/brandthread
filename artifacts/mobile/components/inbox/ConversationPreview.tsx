@@ -2,9 +2,10 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
-import { FONT, FS } from '@/lib/theme';
+import { FONT } from '@/lib/theme';
 import type { MessageAttachmentType } from '@/services/socialTypes';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
+import { X_TYPE } from '@/constants/reframe';
 
 const ATTACHMENT_META: Record<MessageAttachmentType, { icon: keyof typeof Feather.glyphMap; label: string }> = {
   image: { icon: 'image', label: 'Photo' },
@@ -47,9 +48,9 @@ export function ConversationPreview({ text, attachmentType, isFromMe, color, bol
       <View style={styles.row}>
         {prefix ? <Text style={[styles.text, { color, fontFamily }]}>{prefix}</Text> : null}
         {attachmentType === 'thread_cash' ? (
-          <ThreadCashBillIcon size={13} style={styles.icon} />
+          <ThreadCashBillIcon size={15} style={styles.icon} />
         ) : (
-          <Feather name={meta.icon} size={13} color={color} style={styles.icon} />
+          <Feather name={meta.icon} size={15} color={color} style={styles.icon} />
         )}
         <Text style={[styles.text, { color, fontFamily }]} numberOfLines={1}>{meta.label}{suffix}</Text>
       </View>
@@ -66,5 +67,6 @@ export function ConversationPreview({ text, attachmentType, isFromMe, color, bol
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   icon: { marginRight: 4 },
-  text: { fontSize: FS.sm, flexShrink: 1 },
+  // X-style preview line: 15/20 body, same size as the name above it.
+  text: { ...X_TYPE.body, flexShrink: 1 },
 });

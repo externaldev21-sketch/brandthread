@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useStickyState } from '@/lib/stickyState';
 import SellerHomeCommerceDashboard from '@/components/SellerHomeCommerceDashboard';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
 import { View, StyleSheet } from 'react-native';
@@ -37,8 +38,12 @@ export default function SellerHomeScreen() {
   const { userId, isLoaded, isSignedIn } = useAuth();
   const api = useApi();
 
-  const [loading, setLoading] = useState(true);
-  const [setupState, setSetupState] = useState<SetupState>(DEFAULT_SETUP);
+  // Sticky (lib/stickyState.ts): once this account's checklist state has
+  // been resolved, a remount/revisit mounts the dashboard straight away
+  // instead of showing this placeholder skeleton and then the dashboard's
+  // own, differently shaped one. The refresh below still runs every mount.
+  const [setupState, setSetupState, hadSetup] = useStickyState<SetupState>('seller-dashboard:setup', DEFAULT_SETUP);
+  const [loading, setLoading] = useState(!hadSetup);
 
   const loadSetup = useCallback(async () => {
     let onboardingComplete = false;

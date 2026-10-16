@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { getCachedTabData, setCachedTabData, setMemoryTabData } from '@/lib/tabDataCache';
 import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, LayoutAnimation, UIManager, Platform } from 'react-native';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
@@ -444,9 +445,16 @@ export default function ProductsScreen() {
   const cardWidth = (contentWidth - gridGap * (gridColumns - 1)) / gridColumns;
 
   const params = useLocalSearchParams<{ filter?: ProductFilter }>();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
   const [filter, setFilter] = useState<ProductFilter>(params.filter ?? 'all');
+  // Seed the first frame from the last 'all' list this account loaded (this
+  // session, or the app-start warmer's 'seller-products' entry) instead of
+  // a one-frame "No products yet" → skeleton → grid sequence.
+  const [products, setProducts] = useState<Product[]>(() => {
+    if (filter !== 'all') return [];
+    const cached = getCachedTabData<Product[]>('seller-products');
+    return Array.isArray(cached) ? cached : [];
+  });
+  const [stats, setStats] = useState<Stats | null>(() => getCachedTabData<Stats>('seller-products:stats') ?? null);
   const [sort, setSort] = useState<SortKey>('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [actionProduct, setActionProduct] = useState<Product | null>(null);
@@ -457,7 +465,8 @@ export default function ProductsScreen() {
   const [stockEditVisible, setStockEditVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [sortModalVisible, setSortModalVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // true until the first load answers, unless the seed above already has rows.
+  const [loading, setLoading] = useState(() => products.length === 0);
   const [refreshing, setRefreshing] = useState(false);
 
   const showPreviewOnlyFeedback = useCallback(() => {
@@ -480,7 +489,7 @@ export default function ProductsScreen() {
         setStats(EMPTY_STATS);
         return;
       }
-      setStats({
+      const next: Stats = {
         active: s.active,
         draft: s.draft,
         archived: s.archived,
@@ -488,7 +497,9 @@ export default function ProductsScreen() {
         outOfStock: s.outOfStock,
         preOrder: s.preOrder,
         totalInventoryValueCents: s.totalInventoryValueCents,
-      });
+      };
+      setStats(next);
+      setMemoryTabData('seller-products:stats', next);
     } catch { /* use defaults */ }
   }, [previewDemo, previewOnly]);
 
@@ -523,6 +534,8 @@ export default function ProductsScreen() {
       setLoading(false);
       return;
     }
+    // Background refreshes keep the current grid; the skeleton only shows
+    // when there's nothing on screen yet (see the render below).
     setLoading(true);
     try {
       const result = await getProducts({ filter, text: debouncedQuery || undefined });
@@ -531,7 +544,9 @@ export default function ProductsScreen() {
         setStats(EMPTY_STATS);
         return;
       }
-      setProducts(Array.isArray(result) ? result : []);
+      const rows = Array.isArray(result) ? result : [];
+      setProducts(rows);
+      if (filter === 'all' && !debouncedQuery) setCachedTabData('seller-products', rows);
       await loadStats();
     } catch {
       setProducts([]);

@@ -16,6 +16,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, ON_DARK } from '@/lib/theme';
+import { X_HAIRLINE, X_SPACE, X_TYPE, xColors } from '@/constants/reframe';
 import { RADII } from '@/constants/radii';
 import FollowButton, { type FollowState } from '@/components/social/FollowButton';
 
@@ -44,12 +45,13 @@ export function DiscoverEntityCard({
   followInitial?: FollowState;
 }) {
   const { theme } = useAppTheme();
+  const c = xColors(theme);
   return (
     // Two SIBLING tap targets, never nested — a Pressable inside a
     // Pressable renders as a nested <button> on web (invalid HTML, and the
     // two press handlers fight each other). See
     // tests/discover-no-nested-pressables.test.ts.
-    <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.card }]}>
+    <View style={[styles.card, { borderColor: c.divider, backgroundColor: theme.card }]}>
       <PressableScale onPress={onPress} style={styles.cardTapArea}>
         {imageUri ? (
           <CachedImage source={{ uri: imageUri }} style={[styles.image, styles.imageAlign]} contentFit="cover" />
@@ -66,7 +68,7 @@ export function DiscoverEntityCard({
           <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{name}</Text>
           {verified && <Feather name="check-circle" size={14} color={ON_DARK} />}
         </View>
-        <Text style={[styles.subline, { color: theme.muted }]} numberOfLines={1}>{subline ?? ' '}</Text>
+        <Text style={[styles.subline, { color: c.secondary }]} numberOfLines={1}>{subline ?? ' '}</Text>
       </PressableScale>
       <FollowButton
         userId={id}
@@ -89,16 +91,16 @@ const styles = StyleSheet.create({
   // numberOfLines/ellipsis wasn't enough by itself).
   card: {
     flex: 1, minWidth: 0, overflow: 'hidden',
-    borderRadius: RADII.card, borderWidth: 1, padding: SP.sm, alignItems: 'center', gap: 4,
+    borderRadius: RADII.card, borderWidth: X_HAIRLINE, padding: X_SPACE[12], alignItems: 'center', gap: X_SPACE[4],
   },
   cardTapArea: { alignItems: 'stretch', width: '100%', gap: 4 },
   image: { width: 64, height: 64, borderRadius: 32 },
   imageAlign: { alignSelf: 'center' },
   fallback: { alignItems: 'center', justifyContent: 'center' },
   initialsText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.md },
-  nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 6 },
-  name: { fontFamily: FONT.semibold, fontSize: FS.sm, flexShrink: 1, minWidth: 0 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: X_SPACE[4], marginTop: X_SPACE[8] },
+  name: { ...X_TYPE.name, flexShrink: 1, minWidth: 0 },
   // Always rendered (falls back to a single space) so every card reserves
   // the same subline height whether or not it has real subline text.
-  subline: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', flexShrink: 1, minWidth: 0 },
+  subline: { ...X_TYPE.meta, textAlign: 'center', flexShrink: 1, minWidth: 0 },
 });

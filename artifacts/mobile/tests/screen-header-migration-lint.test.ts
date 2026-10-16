@@ -57,7 +57,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/(buyer)/feed.tsx',
   'app/(buyer)/following.tsx',
   'app/(buyer)/friends.tsx',
-  'app/(buyer)/inbox.tsx',
   'app/(buyer)/index.tsx',
   'app/(buyer)/orders.tsx',
   'app/(buyer)/profile.tsx',

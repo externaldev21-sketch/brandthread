@@ -2125,13 +2125,6 @@ export default function FeedScreen({
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
-  useEffect(() => {
-    if (reduceMotion) return;
-    feedContentOpacity.setValue(0.3);
-    Animated.timing(feedContentOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-    // Only the tab switch itself should trigger this fade, not every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feedTab]);
   const [hasUnread, setHasUnread] = useState(false);
   // Real TikTok never shows a placeholder/skeleton box over the feed. Seed
   // the very first render from whatever we already have in memory for this
@@ -2180,7 +2173,12 @@ export default function FeedScreen({
     };
   }, []);
 
+  // Fade only on a real Threads/Following switch — never on mount, so the
+  // Home tab doesn't dim-and-fade-in its first post every time it mounts.
+  const fadedFeedTabRef = useRef(feedTab);
   useEffect(() => {
+    if (fadedFeedTabRef.current === feedTab) return;
+    fadedFeedTabRef.current = feedTab;
     if (reduceMotion) return;
     feedContentOpacity.setValue(0.3);
     Animated.timing(feedContentOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
@@ -2367,12 +2365,13 @@ export default function FeedScreen({
     }
     if (!screenFocused) return;
     let active = true;
-    // Read again on return from settings. Until then, do not briefly reveal
-    // a cached post whose caption was muted in the last visit.
-    setGuestMutedPhrases(null);
+    // Read again on return from settings. The first read hides the feed
+    // until it resolves (never reveal a muted caption); a re-read on refocus
+    // keeps the last-known list instead of blanking the whole feed and
+    // losing the scroll position every time Home is switched back to.
     void readGuestMutedWords().then(
       (words) => { if (active) setGuestMutedPhrases(words.map((word) => word.phrase)); },
-      () => { if (active) setGuestMutedPhrases(null); },
+      () => { if (active) setGuestMutedPhrases((prev) => prev); },
     );
     return () => { active = false; };
   }, [userId, screenFocused]);

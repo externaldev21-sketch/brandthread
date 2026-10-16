@@ -149,40 +149,21 @@ describe('SectionHeader (components/BrandthreadUI.tsx) never overflows a title+a
 describe('Activity screen "Suggested for you" section (the reported clipping bug)', () => {
   const source = readFileSync(resolve(process.cwd(), 'app/activity-center.tsx'), 'utf8');
 
-  it('gives the "Suggested for you" title numberOfLines + its own horizontal gutter', () => {
-    const marker = source.indexOf('Suggested for you</Text>');
-    expect(marker).toBeGreaterThan(-1);
-    const line = source.slice(source.lastIndexOf('<Text', marker), marker);
-    expect(line).toContain('numberOfLines={1}');
+  // Since the X-style reframe, every Activity section title (including
+  // "Suggested for you") renders through the shared reframe SectionHeader,
+  // which owns both guarantees: a single ellipsized line and the 16pt gutter.
+  const sectionHeaderSource = readFileSync(resolve(process.cwd(), 'components/reframe/SectionHeader.tsx'), 'utf8');
 
-    // The title reuses the shared `sectionTitle` style (no horizontal
-    // padding of its own) but sits in a section whose *rows* set their own
-    // paddingHorizontal independently — so the title needs an explicit
-    // gutter (on itself or its wrapping header row) or it renders flush
-    // against both screen edges. Root cause of the reported clipping.
-    //
-    // PR #123's Activity rebuild puts this gutter on the title's wrapping
-    // `suggestedHeaderRow`, not on `suggestedTitle` itself (the earlier fix
-    // put it directly on the title style) — either placement fixes the same
-    // clipping bug, so this checks the whole chain rather than one specific
-    // style key.
-    expect(line).toContain('suggestedTitle');
-    const suggestedTitleStyle = source.slice(
-      source.indexOf('suggestedTitle: {'),
-      source.indexOf('}', source.indexOf('suggestedTitle: {')),
-    );
-    const suggestedHeaderRowStyle = source.slice(
-      source.indexOf('suggestedHeaderRow: {'),
-      source.indexOf('}', source.indexOf('suggestedHeaderRow: {')),
-    );
-    expect(suggestedTitleStyle + suggestedHeaderRowStyle).toContain('paddingHorizontal');
+  it('gives the "Suggested for you" title numberOfLines + its own horizontal gutter', () => {
+    expect(source).toContain('<SectionHeader title="Suggested for you" />');
+    expect(sectionHeaderSource).toContain('numberOfLines={1}');
+    expect(sectionHeaderSource).toMatch(/inset = true/);
+    expect(sectionHeaderSource).toContain('inset: { paddingHorizontal: X_GUTTER }');
   });
 
   it('gives every other section header title numberOfLines too', () => {
-    const headerMarker = source.indexOf('{section.title}</Text>');
-    expect(headerMarker).toBeGreaterThan(-1);
-    const line = source.slice(source.lastIndexOf('<Text', headerMarker), headerMarker);
-    expect(line).toContain('numberOfLines={1}');
+    expect(source).toContain('<SectionHeader title={section.title}');
+    expect(sectionHeaderSource).toContain('numberOfLines={1}');
   });
 });
 

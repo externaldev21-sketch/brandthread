@@ -61,7 +61,7 @@ import { initDesignService } from '@/services/designService';
 import { initProductService } from '@/services/productService';
 import { initOrderService } from '@/services/orderService';
 import { initAnalyticsService } from '@/services/analyticsService';
-import { initTabDataCache } from '@/lib/tabDataCache';
+import { hydratePersistedTabData, initTabDataCache } from '@/lib/tabDataCache';
 import { initFeedPostsCache } from '@/lib/feedPostsCache';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { initBuyerProfile } from '@/lib/buyerProfile';
@@ -1080,6 +1080,9 @@ function ServiceConfigurer() {
     // full clear()+refetch flicker every time.
     setQueryKeyScope(newUserId);
     initTabDataCache(newUserId);
+    // Paint last-known Discover/Inbox content on a cold start's first visit
+    // instead of a skeleton (lib/stickyState.ts reads this synchronously).
+    void hydratePersistedTabData();
     initFeedPostsCache(newUserId);
     initSocialService(newUserId);
     initCartService(newUserId);

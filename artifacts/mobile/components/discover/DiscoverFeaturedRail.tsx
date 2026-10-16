@@ -11,9 +11,12 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
-import { TYPE_SCALE } from '@/constants/typography';
+import { SectionHeader } from '@/components/reframe';
+import { X_GUTTER, X_SPACE } from '@/constants/reframe';
 import { isPreviewDemoMode } from '@/lib/devPreview';
 import { DiscoverBrandCard } from './DiscoverBrandCard';
+import { useStickyState } from '@/lib/stickyState';
+import { DISCOVER_KEYS } from '@/lib/discoverTabData';
 import type { DiscoverBrandCard as BrandCardData } from '@/lib/discoverFeed';
 
 const CARD_WIDTH = 130;
@@ -24,10 +27,13 @@ const DEMO_BRANDS: BrandCardData[] = [
   { id: 'demo-featured-3', name: 'Studio Sable', verified: true, followersLabel: 'Featured' },
 ];
 
-export function DiscoverFeaturedRail() {
-  const { theme } = useAppTheme();
+/** Featured brands, sticky across remounts (lib/stickyState.ts) so the rail
+ *  is already in place on a revisit instead of popping in above the grid.
+ *  `settled` flips once the first fetch has answered either way. */
+export function useFeaturedBrands(): { brands: BrandCardData[]; settled: boolean } {
   const api = useApi();
-  const [brands, setBrands] = useState<BrandCardData[]>([]);
+  const [brands, setBrands, hadCache] = useStickyState<BrandCardData[]>(DISCOVER_KEYS.featured, [], { persist: !isPreviewDemoMode() });
+  const [settled, setSettled] = useState(hadCache);
 
   useEffect(() => {
     let alive = true;
@@ -41,15 +47,21 @@ export function DiscoverFeaturedRail() {
         if (alive) setBrands(rows.length > 0 ? rows : isPreviewDemoMode() ? DEMO_BRANDS : []);
       } catch {
         if (alive && isPreviewDemoMode()) setBrands(DEMO_BRANDS);
+      } finally {
+        if (alive) setSettled(true);
       }
     })();
     return () => { alive = false; };
-  }, [api]);
+  }, [api, setBrands]);
 
+  return { brands, settled };
+}
+
+export function DiscoverFeaturedRail({ brands }: { brands: BrandCardData[] }) {
   if (brands.length === 0) return null;
   return (
-    <View style={{ marginTop: SP.sm, marginBottom: SP.md, paddingHorizontal: SP.md }} testID="discover-featured-rail">
-      <Text style={[TYPE_SCALE.headline, { color: theme.text, marginBottom: 10 }]}>Featured</Text>
+    <View style={{ marginTop: X_SPACE[4], marginBottom: X_SPACE[8], paddingHorizontal: X_GUTTER }} testID="discover-featured-rail">
+      <SectionHeader title="Featured" inset={false} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.track}>
         {brands.map((brand) => (
           <View key={brand.id} style={{ width: CARD_WIDTH }}>

@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@clerk/expo';
 import { API_BASE_URL, useApi, type BrandthreadApi } from '@/lib/api';
 import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { useStickyState } from '@/lib/stickyState';
 import { demoStore, DEMO_ME_ID } from './demoStore';
 import {
   CommunityAuthRequiredError,
@@ -271,8 +272,10 @@ export function useCommunityMyId(): string | null {
  */
 export function useJoinedCommunities(pollMs = 20_000): { communities: Community[]; loading: boolean; reload: () => Promise<void> } {
   const client = useCommunityClient();
-  const [communities, setCommunities] = useState<Community[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Sticky across remounts (lib/stickyState.ts) so the Inbox's joined
+  // community rows are already in the list on a revisit, not merged in late.
+  const [communities, setCommunities, hadCache] = useStickyState<Community[]>(`communities:joined:${client.mode}`, []);
+  const [loading, setLoading] = useState(!hadCache);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const reload = useCallback(async () => {
