@@ -2389,8 +2389,9 @@ export default function FeedScreen({
   // tighter gap, gutter and nudge so the centered tabs still clear it.
   const topRowIconGap = windowWidth < 350 ? 8 : 14;
   const topRowSideGutter = windowWidth < 350 ? 12 : 16;
-  // Clears the resting red LIVE tab (LIVE_REST_WIDTH = 34pt from the screen
-  // edge) on every width: 16 + 30 = 46pt, narrow 12 + 28 = 40pt.
+  // Clears the resting vertical red LIVE tab (LIVE_REST_WIDTH = 17pt from
+  // the screen edge, 44pt touch target) on every width: 16 + 30 = 46pt,
+  // narrow 12 + 28 = 40pt.
   const cartInset = windowWidth < 350 ? 28 : 30;
   // Guard width for the centered tabs (buyerTabSwitcherWrap below): the
   // left cluster is the inset cart, the right is search alone.

@@ -1,11 +1,11 @@
 /**
  * Buyer Threads Home — LIVE edge tab.
  *
- * LIVE no longer sits in the header row. At rest it's a small solid red
- * "LIVE" tab docked flush on the LEFT screen edge at header height — square
- * on the edge side, lightly rounded on the open side, so it reads as half a
- * rectangle. Tap it (or drag it right) and it slides out into the full LIVE
- * button, physically shoving the header Cart aside: the Cart
+ * LIVE no longer sits in the header row. At rest it's a tall, thin red
+ * side tab stuck to the LEFT screen edge at header height, like a drawer
+ * handle: square on the edge side, rounded on the inner side, with "LIVE"
+ * running bottom-to-top. Tap it (or drag it right) and it turns 90° and grows
+ * into the full horizontal LIVE button as it slides out, physically shoving the header Cart aside: the Cart
  * slides right, fades and scales out, and stops taking touches until LIVE
  * tucks back in.
  *
@@ -24,6 +24,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Extrapolation,
   interpolate,
+  interpolateColor,
   runOnJS,
   useAnimatedStyle,
   useReducedMotion,
@@ -38,11 +39,16 @@ import { CREATE_CANVAS, ON_DARK } from '@/lib/theme';
 /** Full width of the expanded LIVE button. */
 export const LIVE_EDGE_WIDTH = 84;
 const LIVE_EDGE_HEIGHT = 32;
-/** Resting red tab: how far it reaches in from the screen edge, and its height. */
-export const LIVE_REST_WIDTH = 34;
-const LIVE_REST_HEIGHT = 19;
+/** Resting vertical red tab: its width (how far it reaches in from the screen
+ * edge) and its height. */
+export const LIVE_REST_WIDTH = 17;
+const LIVE_REST_HEIGHT = 50;
 /** Gap between the expanded LIVE button and the pushed Cart. */
 const PUSH_GAP = 10;
+
+const OUT_FILL = 'rgba(0,0,0,0.55)';
+const OUT_BORDER = 'rgba(255,255,255,0.35)';
+const TRANSPARENT = 'rgba(255,255,255,0)';
 
 // ~250ms, critically damped enough that nothing overshoots past the edge.
 const SPRING = { duration: 250, dampingRatio: 0.92 } as const;
@@ -94,8 +100,11 @@ export function LiveEdgeTab({
   onOpenLive: () => void;
 }) {
   const { progress, open, setOpen, collapse } = controller;
-  // Tucked, only the pill's right LIVE_REST_WIDTH shows — the red tab.
-  const tuckedX = -(LIVE_EDGE_WIDTH - LIVE_REST_WIDTH);
+  // The button box (LIVE_EDGE_WIDTH x LIVE_EDGE_HEIGHT) is centered on one
+  // point that slides from the middle of the resting tab (flush on the edge)
+  // to the middle of the expanded button.
+  const restCenterX = LIVE_REST_WIDTH / 2;
+  const tuckedX = restCenterX - LIVE_EDGE_WIDTH / 2;
   const outX = leftInset + gutter;
   const travel = outX - tuckedX;
 
@@ -134,16 +143,36 @@ export function LiveEdgeTab({
   const pillStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tuckedX + travel * progress.value }],
   }));
-  // Tucked: the red LIVE tab, pinned to the pill's visible right end.
-  const tuckedContentStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 0.35], [1, 0], Extrapolation.CLAMP),
-  }));
-  // The expanded button's dark fill + silver edge fade in as it leaves the
-  // edge, so at rest only the red tab is visible.
-  const outBackgroundStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 0.3], [0, 1], Extrapolation.CLAMP),
-  }));
-  // Out: icon + LIVE label.
+  // The expanded button itself (dark fill, silver edge, dot + tv + LIVE),
+  // turned -90° and squeezed to the resting tab's footprint at 0, and
+  // exactly its old self at 1 — so the tab reads as one shape turning and
+  // growing. Transform-only: the box's real layout size never changes.
+  const morphStyle = useAnimatedStyle(() => {
+    const p = progress.value;
+    return {
+      backgroundColor: interpolateColor(p, [0.1, 0.7], [CREATE_CANVAS.live, OUT_FILL]),
+      borderColor: interpolateColor(p, [0.1, 0.7], [TRANSPARENT, OUT_BORDER]),
+      transform: [
+        { rotate: `${-90 * (1 - p)}deg` },
+        { scaleX: interpolate(p, [0, 1], [LIVE_REST_HEIGHT / LIVE_EDGE_WIDTH, 1]) },
+        { scaleY: interpolate(p, [0, 1], [LIVE_REST_WIDTH / LIVE_EDGE_HEIGHT, 1]) },
+      ],
+    };
+  });
+  // Resting tab: crisp red rectangle with square edge-side corners and the
+  // sideways LIVE label, riding the same turn + grow and fading out early.
+  const restTabStyle = useAnimatedStyle(() => {
+    const p = progress.value;
+    return {
+      opacity: interpolate(p, [0, 0.3], [1, 0], Extrapolation.CLAMP),
+      transform: [
+        { rotate: `${-90 * (1 - p)}deg` },
+        { scaleX: interpolate(p, [0, 1], [1, LIVE_EDGE_WIDTH / LIVE_REST_HEIGHT]) },
+        { scaleY: interpolate(p, [0, 1], [1, LIVE_EDGE_HEIGHT / LIVE_REST_WIDTH]) },
+      ],
+    };
+  });
+  // Out: dot + icon + LIVE label.
   const outContentStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.value, [0.3, 0.8], [0, 1], Extrapolation.CLAMP),
   }));
@@ -168,19 +197,24 @@ export function LiveEdgeTab({
           accessibilityLabel={open ? 'Watch Live' : 'Show Live'}
           accessibilityHint={open ? undefined : 'Slides out the Live button'}
           accessibilityState={{ expanded: open }}
-          // 32pt box + 8pt above/below = 48pt tall; 34pt visible + 10pt
-          // right = 44pt wide — a full touch target for a tiny-looking tab.
-          hitSlop={{ top: 8, bottom: 8, left: 0, right: 10 }}
+          // At rest only the box's right 8.5pt is on screen (the tab's
+          // half-width), so the slop carries the touch target out to 44pt
+          // wide x 52pt tall, matching the tall tab. Expanded, it's the old
+          // tight slop so the tap-outside catcher still gets everything else.
+          hitSlop={open
+            ? { top: 8, bottom: 8, left: 0, right: 10 }
+            : { top: 10, bottom: 10, left: 0, right: 44 - restCenterX }}
           testID="buyer-home-live"
         >
-          <Animated.View style={[styles.outBackground, outBackgroundStyle]} pointerEvents="none" />
-          <Animated.View style={[styles.restTab, tuckedContentStyle]} pointerEvents="none">
-            <Text style={styles.restLabel} maxFontSizeMultiplier={1.1} numberOfLines={1}>LIVE</Text>
+          <Animated.View style={[styles.morph, morphStyle]} pointerEvents="none">
+            <Animated.View style={[styles.outContent, outContentStyle]}>
+              <View style={styles.dot} />
+              <Feather name="tv" size={15} color={ON_DARK} />
+              <Text style={styles.label} maxFontSizeMultiplier={1.2}>LIVE</Text>
+            </Animated.View>
           </Animated.View>
-          <Animated.View style={[styles.outContent, outContentStyle]} pointerEvents="none">
-            <View style={styles.dot} />
-            <Feather name="tv" size={15} color={ON_DARK} />
-            <Text style={styles.label} maxFontSizeMultiplier={1.2}>LIVE</Text>
+          <Animated.View style={[styles.restTab, restTabStyle]} pointerEvents="none">
+            <Text style={styles.restLabel} maxFontSizeMultiplier={1} numberOfLines={1}>LIVE</Text>
           </Animated.View>
         </Animated.View>
       </GestureDetector>
@@ -237,36 +271,34 @@ const styles = StyleSheet.create({
     width: LIVE_EDGE_WIDTH,
     height: LIVE_EDGE_HEIGHT,
   },
-  outBackground: {
+  morph: {
     position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
     borderRadius: LIVE_EDGE_HEIGHT / 2,
     // Solid fill, no BlurView: a live blur over the playing video
     // re-samples it every frame (see FeedTopBar / ShopSideTab).
-    backgroundColor: 'rgba(0,0,0,0.55)',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.35)',
   },
-  // Half a rectangle: the part past the screen edge is off-screen, so the
-  // left corners stay square and only the open right side is rounded.
+  // Laid out horizontally (LIVE_REST_HEIGHT wide x LIVE_REST_WIDTH tall) and
+  // turned -90° at rest, so "LIVE" reads bottom-to-top. After that turn the
+  // box's top edge sits on the screen edge (square corners) and its bottom
+  // edge is the inner side (rounded corners).
   restTab: {
     position: 'absolute',
-    right: 0,
-    top: (LIVE_EDGE_HEIGHT - LIVE_REST_HEIGHT) / 2,
-    width: LIVE_EDGE_WIDTH,
-    height: LIVE_REST_HEIGHT,
-    borderTopRightRadius: 4,
-    borderBottomRightRadius: 4,
+    left: (LIVE_EDGE_WIDTH - LIVE_REST_HEIGHT) / 2,
+    top: (LIVE_EDGE_HEIGHT - LIVE_REST_WIDTH) / 2,
+    width: LIVE_REST_HEIGHT,
+    height: LIVE_REST_WIDTH,
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 6,
     backgroundColor: CREATE_CANVAS.live,
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'center',
   },
   restLabel: {
-    width: LIVE_REST_WIDTH,
-    textAlign: 'center',
     color: ON_DARK,
-    fontSize: 10.5,
+    fontSize: 9.5,
     fontWeight: '800',
-    letterSpacing: 0.2,
+    letterSpacing: 0.8,
   },
   outContent: {
     position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
