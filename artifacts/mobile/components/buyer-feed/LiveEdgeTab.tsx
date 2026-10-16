@@ -1,10 +1,11 @@
 /**
  * Buyer Threads Home — LIVE edge tab.
  *
- * LIVE no longer sits in the header row. It's a slim pill docked on the
- * LEFT screen edge at header height, mostly tucked off-screen with just the
- * red live dot peeking out. Tap it (or drag it right) and it slides out into
- * the full LIVE button, physically shoving the header Cart aside: the Cart
+ * LIVE no longer sits in the header row. At rest it's a small solid red
+ * "LIVE" tab docked flush on the LEFT screen edge at header height — square
+ * on the edge side, lightly rounded on the open side, so it reads as half a
+ * rectangle. Tap it (or drag it right) and it slides out into the full LIVE
+ * button, physically shoving the header Cart aside: the Cart
  * slides right, fades and scales out, and stops taking touches until LIVE
  * tucks back in.
  *
@@ -32,13 +33,14 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { hapticLight } from '@/lib/haptics';
-import { ON_DARK } from '@/lib/theme';
+import { CREATE_CANVAS, ON_DARK } from '@/lib/theme';
 
 /** Full width of the expanded LIVE button. */
 export const LIVE_EDGE_WIDTH = 84;
 const LIVE_EDGE_HEIGHT = 32;
-/** How much of the tucked pill peeks in from the screen edge. */
-const LIVE_EDGE_PEEK = 22;
+/** Resting red tab: how far it reaches in from the screen edge, and its height. */
+export const LIVE_REST_WIDTH = 34;
+const LIVE_REST_HEIGHT = 19;
 /** Gap between the expanded LIVE button and the pushed Cart. */
 const PUSH_GAP = 10;
 
@@ -92,7 +94,8 @@ export function LiveEdgeTab({
   onOpenLive: () => void;
 }) {
   const { progress, open, setOpen, collapse } = controller;
-  const tuckedX = -(LIVE_EDGE_WIDTH - LIVE_EDGE_PEEK);
+  // Tucked, only the pill's right LIVE_REST_WIDTH shows — the red tab.
+  const tuckedX = -(LIVE_EDGE_WIDTH - LIVE_REST_WIDTH);
   const outX = leftInset + gutter;
   const travel = outX - tuckedX;
 
@@ -131,9 +134,14 @@ export function LiveEdgeTab({
   const pillStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tuckedX + travel * progress.value }],
   }));
-  // Tucked: just the dot, pinned to the pill's visible right end.
+  // Tucked: the red LIVE tab, pinned to the pill's visible right end.
   const tuckedContentStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.value, [0, 0.35], [1, 0], Extrapolation.CLAMP),
+  }));
+  // The expanded button's dark fill + silver edge fade in as it leaves the
+  // edge, so at rest only the red tab is visible.
+  const outBackgroundStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.3], [0, 1], Extrapolation.CLAMP),
   }));
   // Out: icon + LIVE label.
   const outContentStyle = useAnimatedStyle(() => ({
@@ -160,11 +168,14 @@ export function LiveEdgeTab({
           accessibilityLabel={open ? 'Watch Live' : 'Show Live'}
           accessibilityHint={open ? undefined : 'Slides out the Live button'}
           accessibilityState={{ expanded: open }}
+          // 32pt box + 8pt above/below = 48pt tall; 34pt visible + 10pt
+          // right = 44pt wide — a full touch target for a tiny-looking tab.
           hitSlop={{ top: 8, bottom: 8, left: 0, right: 10 }}
           testID="buyer-home-live"
         >
-          <Animated.View style={[styles.tuckedContent, tuckedContentStyle]} pointerEvents="none">
-            <View style={styles.dot} />
+          <Animated.View style={[styles.outBackground, outBackgroundStyle]} pointerEvents="none" />
+          <Animated.View style={[styles.restTab, tuckedContentStyle]} pointerEvents="none">
+            <Text style={styles.restLabel} maxFontSizeMultiplier={1.1} numberOfLines={1}>LIVE</Text>
           </Animated.View>
           <Animated.View style={[styles.outContent, outContentStyle]} pointerEvents="none">
             <View style={styles.dot} />
@@ -225,19 +236,37 @@ const styles = StyleSheet.create({
     left: 0,
     width: LIVE_EDGE_WIDTH,
     height: LIVE_EDGE_HEIGHT,
+  },
+  outBackground: {
+    position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
     borderRadius: LIVE_EDGE_HEIGHT / 2,
     // Solid fill, no BlurView: a live blur over the playing video
     // re-samples it every frame (see FeedTopBar / ShopSideTab).
     backgroundColor: 'rgba(0,0,0,0.55)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.35)',
-    overflow: 'hidden',
   },
-  tuckedContent: {
-    position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
+  // Half a rectangle: the part past the screen edge is off-screen, so the
+  // left corners stay square and only the open right side is rounded.
+  restTab: {
+    position: 'absolute',
+    right: 0,
+    top: (LIVE_EDGE_HEIGHT - LIVE_REST_HEIGHT) / 2,
+    width: LIVE_EDGE_WIDTH,
+    height: LIVE_REST_HEIGHT,
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+    backgroundColor: CREATE_CANVAS.live,
     alignItems: 'flex-end',
     justifyContent: 'center',
-    paddingRight: (LIVE_EDGE_PEEK - 7) / 2,
+  },
+  restLabel: {
+    width: LIVE_REST_WIDTH,
+    textAlign: 'center',
+    color: ON_DARK,
+    fontSize: 10.5,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   outContent: {
     position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,

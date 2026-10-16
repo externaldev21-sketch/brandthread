@@ -2389,7 +2389,9 @@ export default function FeedScreen({
   // tighter gap, gutter and nudge so the centered tabs still clear it.
   const topRowIconGap = windowWidth < 350 ? 8 : 14;
   const topRowSideGutter = windowWidth < 350 ? 12 : 16;
-  const cartInset = windowWidth < 350 ? 22 : 30;
+  // Clears the resting red LIVE tab (LIVE_REST_WIDTH = 34pt from the screen
+  // edge) on every width: 16 + 30 = 46pt, narrow 12 + 28 = 40pt.
+  const cartInset = windowWidth < 350 ? 28 : 30;
   // Guard width for the centered tabs (buyerTabSwitcherWrap below): the
   // left cluster is the inset cart, the right is search alone.
   // Bounding the tabs' wrap symmetrically by the wider cluster's
@@ -3891,7 +3893,9 @@ export default function FeedScreen({
                   }}
                   accessibilityRole="button"
                   accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
-                  hitSlop={{ top: 4, bottom: 4, left: 7, right: 7 }}
+                  // Left slop kept short so it doesn't reach into the LIVE
+                  // tab's own 44pt touch target (screen x 0-44).
+                  hitSlop={{ top: 4, bottom: 4, left: 2, right: 7 }}
                   testID="buyer-home-cart-icon"
                 >
                   <Icon name="shopping-cart" size={24} color={ON_DARK} />
