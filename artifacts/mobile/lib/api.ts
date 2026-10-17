@@ -1299,6 +1299,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       sizeChart: (body: unknown) =>
         postExpensive<{ unit: 'cm' | 'in'; note: string; rows: Record<string, string | number>[]; sizeChart: { columns: string[]; rows: { size: string; values: string[] }[]; unit: 'inches' | 'cm'; notes?: string } }>('/api/ai-helpers/size-chart', body),
       save: (body: unknown) => post<{ saved: true }>('/api/ai-helpers/save', body),
+      /** Five AI brand name ideas from a short description (free text tool). */
+      brandNames: (body: { description: string; style?: string }) =>
+        postExpensive<{ names: string[] }>('/api/ai-helpers/brand-names', body),
     },
     products: {
       list:           ()                       => get('/api/products'),
