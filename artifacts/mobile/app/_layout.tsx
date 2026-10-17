@@ -37,6 +37,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { flushPendingBuyerOnboardingSync } from '@/lib/buyerOnboardingSync';
 import { flushPendingBuyerSurvey } from '@/lib/onboardingSurvey';
 import { RoleProvider } from '@/contexts/RoleContext';
+import { QuickAccountSwitchProvider } from '@/contexts/QuickAccountSwitchContext';
 import { ThreadPullProvider } from '@/contexts/ThreadPullTransitionContext';
 import { AppThemeProvider, useAppTheme, peekPersistedTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton } from '@/components/BrandthreadUI';
@@ -1755,7 +1756,9 @@ function RootLayout() {
                                 <CallSessionProvider>
                                   <FirstRunTipsProvider>
                                     <ReportSheetProvider>
-                                      <RootLayoutNav />
+                                      <QuickAccountSwitchProvider>
+                                        <RootLayoutNav />
+                                      </QuickAccountSwitchProvider>
                                     </ReportSheetProvider>
                                     <GlobalCallOverlay />
                                     <SaveHeartHost />

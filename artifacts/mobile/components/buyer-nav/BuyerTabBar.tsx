@@ -14,9 +14,11 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticTabChange } from '@/lib/haptics';
 import { useActivityUnreadCount } from '@/components/ActivityBellButton';
 import {
-  TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarSlot, CrossfadeNavIcon, tabIconColor,
+  TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarMediaLift, TabBarSlot, CrossfadeNavIcon, tabIconColor,
   useTabBarActiveIndex,
 } from '@/components/tab-bar/TabBarParts';
+import { useHoldToSwitch } from '@/components/tab-bar/useHoldToSwitch';
+import { useQuickAccountSwitch } from '@/contexts/QuickAccountSwitchContext';
 import { BuyerNavIcon, type BuyerNavIconName } from './BuyerNavIcon';
 import { COMPACT_ICON_SCALE, COMPACT_ICON_STROKE_SCALE, useBuyerTabBarMetrics } from './buyerTabBarMetrics';
 import { TAB_BAR_SLIDE_EASING, TAB_BAR_SLIDE_MS } from '@/constants/motion';
@@ -147,12 +149,25 @@ export function BuyerTabBar({
   const hiddenByScreen = useTabBarHiddenByScreen();
   const isFullScreenRoute = BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(firstSegment) || hiddenByScreen;
 
+  // Where the pill parks (faded out) while Profile is active: the Profile
+  // circle's center, in the pill's own slot-index units measured from the
+  // capsule's origin. The capsule and the circle are siblings in one flex
+  // row (`styles.bar`), both at fixed regular-mode sizes with `gap` between
+  // them, so this is the circle's exact position in the same coordinate
+  // space the pill's `translateX` already uses — no separate measurement
+  // pass that could be stale or missing on the first frame. Without it the
+  // pill used to glide (invisibly) back to Home while hidden on Profile,
+  // so Profile -> any tab swept in from the far left instead of from the
+  // circle. (Same as PR #1050.)
+  const profileCircleCenterX = regularMetrics.capsuleWidth + regularMetrics.gap + regularMetrics.circleSize * 0.5;
+  const profileParkIndex = (profileCircleCenterX - regularMetrics.capsulePadding) / regularMetrics.itemWidth - 0.5;
+
   // Owns the pill's position so a tab press can kick the glide immediately,
   // before the tabPress event and the screen swap — see the hook's doc.
   const {
     x: indicatorX, target: indicatorTarget, opacity: indicatorOpacity,
     press: pressIndicator, hide: hideIndicator,
-  } = useTabBarActiveIndex(activeIndex, reducedMotion);
+  } = useTabBarActiveIndex(activeIndex, reducedMotion, profileParkIndex);
 
   // 0 = regular, 1 = compact. Every animated style below reads this one
   // value so the capsule/circle/pill/icons all move as one coordinated
@@ -255,8 +270,20 @@ export function BuyerTabBar({
 
   const openRoute = React.useCallback((routeName: string) => {
     const route = state.routes.find(candidate => candidate.name === routeName);
-    const focused = activeRoute === routeName;
-    if (focused) return;
+    // Compare against where the navigator is *going*, not the last committed
+    // `state` this bar rendered with: during a rapid burst a tap on the tab
+    // that's still on screen (but already being navigated away from) must
+    // still navigate back to it, and a second tap on the tab already
+    // requested must not queue a duplicate navigation.
+    const latest = navigation.getState?.() ?? state;
+    const focused = (latest.routes[latest.index]?.name ?? activeRoute) === routeName;
+    if (focused) {
+      // A re-tap on the tab that's settled on screen: no navigation, no
+      // haptic — just the standard tabPress, which the screens' own
+      // useScrollToTop (hooks/useScrollReset.ts) turns into scroll-to-top.
+      if (route && activeRoute === routeName) navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+      return;
+    }
     const event = route
       ? navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
       : null;
@@ -270,7 +297,19 @@ export function BuyerTabBar({
     }
     hapticTabChange();
     navigation.navigate(routeName as never);
-  }, [activeRoute, activeIndex, navigation, state.routes, pressIndicator, hideIndicator]);
+  }, [activeRoute, activeIndex, navigation, state, pressIndicator, hideIndicator]);
+
+  // Hold Profile to switch accounts (components/tab-bar/HoldRing.tsx): a
+  // plain tap still opens Profile (the circle's own onPress); a completed
+  // ring switches to the other account. No `onLongPress` on the circle —
+  // it would swallow the tap.
+  const { quickSwitch } = useQuickAccountSwitch();
+  const profileHold = useHoldToSwitch({
+    onComplete: quickSwitch,
+    // Touch-down hid the pill eagerly (Profile isn't a pill slot); a hold
+    // that didn't open Profile puts it back on the tab still on screen.
+    onHoldRelease: () => { if (activeIndex >= 0) pressIndicator(activeIndex); },
+  });
 
   const onLongPress = React.useCallback((routeName: string) => {
     const route = state.routes.find(candidate => candidate.name === routeName);
@@ -321,11 +360,17 @@ export function BuyerTabBar({
       <Animated.View
         style={[
           styles.shadow,
+          styles.capsuleAbove,
           { width: regularMetrics.capsuleWidth, height: regularMetrics.capsuleHeight, borderRadius: radius.bar },
           capsuleAnimatedStyle,
         ]}
       >
-        <TabBarGlass theme={theme} radius={radius.bar} />
+        {/* `progress` is 1 exactly while the bar is compact over the Threads
+            feed's full-bleed video, 0 everywhere else — so the denser
+            backing and the lift shadow only exist over video and fade in
+            and out with the same capsule transition. */}
+        <TabBarMediaLift radius={radius.bar} overMedia={progress} />
+        <TabBarGlass theme={theme} radius={radius.bar} overMedia={progress} />
 
         <TabBarIndicator
           x={indicatorX}
@@ -393,8 +438,9 @@ export function BuyerTabBar({
         selected={profileFocused}
         onPress={() => openRoute('profile')}
         onPressIn={hideIndicator}
-        onLongPress={() => onLongPress('profile')}
+        hold={profileHold}
         testID="buyer-tab-profile"
+        overMedia={progress}
       >
         <Animated.View style={circleIconScaleStyle}>
           <BuyerNavIcon
@@ -421,6 +467,11 @@ const styles = StyleSheet.create({
   },
   // Shadow lives on an unclipped wrapper; the glass inside clips to the radius.
   shadow: TAB_BAR_SHADOW,
+  // Stacks the capsule (and so the pill inside it) over the Profile circle
+  // only where they overlap — which is nowhere at rest, so nothing visible
+  // changes; it just keeps the pill readable while it glides to/from its
+  // park on the circle instead of sliding underneath the circle's glass.
+  capsuleAbove: { zIndex: 1 },
   slotRow: {
     flexDirection: 'row',
     alignSelf: 'flex-start',

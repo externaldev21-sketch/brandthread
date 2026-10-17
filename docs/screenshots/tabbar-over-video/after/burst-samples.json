@@ -1,0 +1,1488 @@
+{
+  "presses": [
+    {
+      "route": "discover",
+      "down": 24078.300000000745,
+      "visible": 24214.300000000745
+    },
+    {
+      "route": "inbox",
+      "down": 24396.5,
+      "visible": 24507.5
+    },
+    {
+      "route": "activity",
+      "down": 24679.10000000149,
+      "visible": 24796.699999999255
+    },
+    {
+      "route": "index",
+      "down": 24962.199999999255,
+      "visible": 25134.400000002235
+    },
+    {
+      "route": "discover",
+      "down": 25313.400000002235,
+      "visible": 25460.60000000149
+    },
+    {
+      "route": "activity",
+      "down": 25645.699999999255,
+      "visible": 25720.60000000149
+    },
+    {
+      "route": "inbox",
+      "down": 25878.699999999255,
+      "visible": 25990.699999999255
+    },
+    {
+      "route": "index",
+      "down": 26161.60000000149,
+      "visible": 26343.699999999255
+    },
+    {
+      "route": "activity",
+      "down": 26495.900000002235,
+      "visible": 26661.300000000745
+    },
+    {
+      "route": "discover",
+      "down": 26829,
+      "visible": 26900.400000002235
+    }
+  ],
+  "samples": [
+    {
+      "t": 24042.028,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 24058.6,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 24075.3,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 24091.9,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24208.6,
+      "pill": {
+        "x": 13.4742,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24225.2,
+      "pill": {
+        "x": 60.6289,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24242,
+      "pill": {
+        "x": 67.0235,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24258.6,
+      "pill": {
+        "x": 71.3804,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24275.3,
+      "pill": {
+        "x": 74.1971,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24291.9,
+      "pill": {
+        "x": 76.0161,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24308.6,
+      "pill": {
+        "x": 77.1584,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24325.3,
+      "pill": {
+        "x": 77.8756,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24342,
+      "pill": {
+        "x": 78.318,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24358.6,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24375.2,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24391.9,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24408.7,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24508.6,
+      "pill": {
+        "x": 83.0214,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24525.3,
+      "pill": {
+        "x": 130.304,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24542,
+      "pill": {
+        "x": 136.832,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24558.6,
+      "pill": {
+        "x": 141.233,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24575.3,
+      "pill": {
+        "x": 144.102,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24591.9,
+      "pill": {
+        "x": 145.955,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24608.6,
+      "pill": {
+        "x": 147.12,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24625.3,
+      "pill": {
+        "x": 147.852,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24641.9,
+      "pill": {
+        "x": 148.304,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24658.6,
+      "pill": {
+        "x": 149,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24675.2,
+      "pill": {
+        "x": 149,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24691.9,
+      "pill": {
+        "x": 149,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24792,
+      "pill": {
+        "x": 153.409,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24808.6,
+      "pill": {
+        "x": 200.583,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24825.3,
+      "pill": {
+        "x": 206.992,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24841.9,
+      "pill": {
+        "x": 211.339,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24858.6,
+      "pill": {
+        "x": 214.17,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24875.2,
+      "pill": {
+        "x": 215.999,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24891.9,
+      "pill": {
+        "x": 217.148,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24908.6,
+      "pill": {
+        "x": 217.869,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24925.2,
+      "pill": {
+        "x": 218.314,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24941.9,
+      "pill": {
+        "x": 219,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24958.6,
+      "pill": {
+        "x": 219,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24975.3,
+      "pill": {
+        "x": 180.5,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25108.6,
+      "pill": {
+        "x": 166.279,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25125.2,
+      "pill": {
+        "x": 39.0094,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25141.9,
+      "pill": {
+        "x": 28.5536,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25158.5,
+      "pill": {
+        "x": 21.4694,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25175.3,
+      "pill": {
+        "x": 16.858,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25192,
+      "pill": {
+        "x": 13.8671,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25208.6,
+      "pill": {
+        "x": 11.9945,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25225.3,
+      "pill": {
+        "x": 10.8334,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25241.9,
+      "pill": {
+        "x": 10.1117,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25258.6,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25275.2,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25291.9,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25308.5,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25325.3,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25458.6,
+      "pill": {
+        "x": 11.6613,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25475.2,
+      "pill": {
+        "x": 59.2012,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25491.9,
+      "pill": {
+        "x": 66.0406,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25508.5,
+      "pill": {
+        "x": 70.7071,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25525.2,
+      "pill": {
+        "x": 73.7598,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25541.9,
+      "pill": {
+        "x": 75.7379,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25558.5,
+      "pill": {
+        "x": 76.9893,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25575.3,
+      "pill": {
+        "x": 77.7671,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25591.9,
+      "pill": {
+        "x": 78.2536,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25608.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25625.2,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25641.9,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25658.6,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25708.5,
+      "pill": {
+        "x": 85.8096,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25725.2,
+      "pill": {
+        "x": 165.074,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25741.8,
+      "pill": {
+        "x": 183.079,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25758.6,
+      "pill": {
+        "x": 195.61,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25775.3,
+      "pill": {
+        "x": 204.132,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25791.9,
+      "pill": {
+        "x": 209.661,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25808.6,
+      "pill": {
+        "x": 213.185,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25825.3,
+      "pill": {
+        "x": 215.423,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25841.9,
+      "pill": {
+        "x": 216.817,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25858.5,
+      "pill": {
+        "x": 217.673,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25875.2,
+      "pill": {
+        "x": 187.5,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25891.9,
+      "pill": {
+        "x": 187.5,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25991.9,
+      "pill": {
+        "x": 183.077,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 26008.6,
+      "pill": {
+        "x": 157.926,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 26025.2,
+      "pill": {
+        "x": 154.768,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 26041.9,
+      "pill": {
+        "x": 152.672,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 26058.6,
+      "pill": {
+        "x": 151.3,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 26075.2,
+      "pill": {
+        "x": 150.425,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 26091.9,
+      "pill": {
+        "x": 149.877,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 26108.5,
+      "pill": {
+        "x": 149.534,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 26125.2,
+      "pill": {
+        "x": 149.325,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 26141.8,
+      "pill": {
+        "x": 149,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 26158.5,
+      "pill": {
+        "x": 149,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 26175.2,
+      "pill": {
+        "x": 110.5,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 26325.2,
+      "pill": {
+        "x": 100.477,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 26341.9,
+      "pill": {
+        "x": 28.8061,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 26358.6,
+      "pill": {
+        "x": 21.8645,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 26375.2,
+      "pill": {
+        "x": 17.1997,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 26391.8,
+      "pill": {
+        "x": 14.1653,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 26408.5,
+      "pill": {
+        "x": 12.2168,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 26425.2,
+      "pill": {
+        "x": 10.9788,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 26441.9,
+      "pill": {
+        "x": 10.2078,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 26458.5,
+      "pill": {
+        "x": 9.73228,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 26475.2,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 26491.8,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 26508.5,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26658.5,
+      "pill": {
+        "x": 21.2552,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26675.2,
+      "pill": {
+        "x": 163.052,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26691.9,
+      "pill": {
+        "x": 182.593,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26708.5,
+      "pill": {
+        "x": 195.763,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26725.1,
+      "pill": {
+        "x": 204.346,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26741.9,
+      "pill": {
+        "x": 209.866,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26758.5,
+      "pill": {
+        "x": 213.393,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26775.2,
+      "pill": {
+        "x": 215.566,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26791.9,
+      "pill": {
+        "x": 216.917,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26808.5,
+      "pill": {
+        "x": 219,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26825.1,
+      "pill": {
+        "x": 219,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26841.8,
+      "pill": {
+        "x": 180.5,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26891.9,
+      "pill": {
+        "x": 171.287,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26908.5,
+      "pill": {
+        "x": 107.23,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26925.2,
+      "pill": {
+        "x": 97.7831,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26941.8,
+      "pill": {
+        "x": 91.1675,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26958.5,
+      "pill": {
+        "x": 86.761,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26975.2,
+      "pill": {
+        "x": 83.8678,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26991.8,
+      "pill": {
+        "x": 82.0189,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27008.5,
+      "pill": {
+        "x": 80.8605,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27025.1,
+      "pill": {
+        "x": 80.1345,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27041.8,
+      "pill": {
+        "x": 79.6894,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27058.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27075.2,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27091.8,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27108.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27125.2,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27141.8,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27158.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27175.2,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27191.9,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27208.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27225.1,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27241.8,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27258.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27275.2,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27291.8,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27308.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27325.2,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27341.9,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27358.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27375.1,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27391.8,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27408.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27425.1,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27441.9,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27458.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27475.2,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27491.9,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27508.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27525.2,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27541.8,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27558.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27575.1,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27591.8,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27608.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27625.2,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27641.8,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27658.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27675.2,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27691.8,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27708.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27725.2,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27741.9,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27758.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27775.1,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27791.8,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27808.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27825.1,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27841.8,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27858.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27875.1,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27891.8,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27908.5,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27925.1,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    }
+  ]
+}

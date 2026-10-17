@@ -72,12 +72,15 @@ export default function TabLayout() {
     prevPathnameRef.current = pathname;
     if (Platform.OS !== 'web') settled.unsettle();
   }
+  // Restarted on every route change (`pathname`) so a rapid tap burst can't
+  // settle — and snap the scenes — mid-way through a later tap's slide. See
+  // the buyer layout (app/(buyer)/_layout.tsx) for the full story.
   useEffect(() => {
     if (settled.value) return;
     const duration = reduceMotion ? REDUCED_MOTION_SLIDE_DURATION : SLIDE_DURATION;
     const timer = setTimeout(() => settled.settleImmediately(), duration);
     return () => clearTimeout(timer);
-  }, [settled.value, settled.settleImmediately, reduceMotion]);
+  }, [settled.value, settled.settleImmediately, reduceMotion, pathname]);
 
   return (
     <Tabs

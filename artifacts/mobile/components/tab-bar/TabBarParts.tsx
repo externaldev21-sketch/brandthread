@@ -24,6 +24,8 @@ import type { TabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { BuyerNavIcon, type BuyerNavIconName } from '@/components/buyer-nav/BuyerNavIcon';
 import { Glass } from '@/components/ui/Glass';
 import { radius, nestedRadius } from '@/constants/radii';
+import { HoldRing, type HoldToSwitch } from '@/components/tab-bar/HoldRing';
+import { STALE_COMMIT_MS, initialPillState, pillCommit, pillPress, pillSettle } from '@/lib/tabPillRetarget';
 
 
 /**
@@ -43,10 +45,15 @@ const POP_UP = { mass: 0.5, stiffness: 650, damping: 14 } as const;
 const POP_SETTLE = { mass: 0.6, stiffness: 300, damping: 12 } as const;
 // Pill glide between tabs, and the selected icon's pop — one spring drives
 // both so they read as a single coordinated motion instead of two out-of-sync
-// ones. `overshootClamping` keeps it from ever ringing past its target (the
-// "FEEL 10x better" pass's own gate rules out bounce/overshoot on the pill),
-// while still settling briskly.
-export const INDICATOR_SPRING = { mass: 1, stiffness: 220, damping: 20, overshootClamping: true } as const;
+// ones. Critically damped (damping 70 ≈ 2·√1200) so it can never ring past
+// its target, and stiff enough to keep up with 5+ taps a second: halfway by
+// ~50ms, 95% by ~140ms, landed by ~200ms (was 220/20: 95% at ~190ms, then
+// a clamped, full-speed stop). `energyThreshold` ends the spring within ~1%
+// of the slot instead of running an invisible sub-pixel tail. Same values
+// as the Replit workspace's own pillGlide rework.
+export const INDICATOR_SPRING = {
+  mass: 1, stiffness: 1200, damping: 70, overshootClamping: true, energyThreshold: 1e-4,
+} as const;
 const REDUCED_MOTION = { duration: 160 } as const;
 
 // Wraps Pressable so it can take a Reanimated-driven `style` (the buyer bar's
@@ -57,13 +64,32 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 // ─── Glass surface ────────────────────────────────────────────────────────────
 
-export function TabBarGlass({ theme, radius, animatedStyle }: { theme: AppThemePreset; radius: number; animatedStyle?: object }) {
+export function TabBarGlass({ theme, radius, animatedStyle, overMedia }: {
+  theme: AppThemePreset;
+  radius: number;
+  animatedStyle?: object;
+  /** 0..1 — how far the bar is sitting over full-bleed video (the buyer
+   *  feed). Fades in a dense dark backing *under* the blur, so the glass
+   *  reads as one solid floating bar instead of a tinted window onto the
+   *  video. Omitted (seller bar) or 0 renders exactly as before. */
+  overMedia?: SharedValue<number>;
+}) {
   // iOS and web get a live backdrop blur. expo-blur's Android blur needs the
   // whole navigator wrapped in a BlurTargetView, which cannot sample video
   // surfaces and redraws the feed every frame, so Android uses a denser tint.
   const hasBlur = Platform.OS !== 'android';
+  // Opacity on this sibling only — never on the BlurView or an ancestor of
+  // it, which UIVisualEffectView renders incorrectly.
+  const backingStyle = useAnimatedStyle(() => ({ opacity: overMedia ? overMedia.value : 0 }));
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden', pointerEvents: 'none' }, animatedStyle]}>
+      {/* Painted first, so the blur samples it: over a playing video the
+          blur then mostly sees this static dark layer, and the bar no
+          longer pumps brightness/colour with every video frame or lets the
+          video's own lines show through it. */}
+      {/* Own radius too (not only the wrapper's overflow clip): on web a
+          transformed ancestor can drop that clip and leave square corners. */}
+      {overMedia && <Animated.View style={[StyleSheet.absoluteFill, styles.mediaBacking, { borderRadius: radius }, backingStyle]} />}
       {hasBlur && (
         <BlurView
           intensity={Platform.OS === 'ios' ? 60 : 70}
@@ -219,7 +245,7 @@ const PRESS_HIGHLIGHT_SIZE = 40;
 
 export function TabBarSlot({
   focused, width, height, onPress, onPressIn: onExternalPressIn, onLongPress, testID, accessibilityLabel, hidden = false, badge, children,
-  animatedStyle, hitSlop, pillTarget, pillIndex, theme,
+  animatedStyle, hitSlop, pillTarget, pillIndex, theme, hold,
 }: {
   focused: boolean;
   width: number;
@@ -253,11 +279,21 @@ export function TabBarSlot({
    *  currently — both bars' capsule slots pass these). */
   pillTarget?: SharedValue<number>;
   pillIndex?: number;
+  /** Hold-to-switch (useHoldToSwitch): layered on top of this slot's own
+   *  press handling, and its ring drawn as a circle around the icon — the
+   *  seller bar's Profile slot. `onPress` then runs only for a plain tap,
+   *  never for a cancelled or completed hold. */
+  hold?: HoldToSwitch;
 }) {
   const { onPressIn, onPressOut, iconStyle, highlightStyle } = useTabMotion(focused, pillTarget, pillIndex);
   const handlePressIn = () => {
     onExternalPressIn?.();
+    hold?.onPressIn();
     onPressIn();
+  };
+  const handlePressOut = () => {
+    hold?.onPressOut();
+    onPressOut();
   };
   return (
     <AnimatedPressable
@@ -266,10 +302,10 @@ export function TabBarSlot({
       accessibilityState={{ selected: focused }}
       aria-selected={focused}
       {...a11yHidden(hidden)}
-      onPress={onPress}
+      onPress={hold ? () => { if (hold.releasedAsTap()) onPress(); } : onPress}
       onLongPress={onLongPress}
       onPressIn={handlePressIn}
-      onPressOut={onPressOut}
+      onPressOut={handlePressOut}
       testID={testID}
       hitSlop={hitSlop}
       style={[styles.slot, { width, height, pointerEvents: hidden ? 'none' : 'auto' }, animatedStyle]}
@@ -286,6 +322,11 @@ export function TabBarSlot({
         {children}
         {badge}
       </Animated.View>
+      {hold && (
+        <View pointerEvents="none" style={styles.pressHighlight}>
+          <HoldRing size={PRESS_HIGHLIGHT_SIZE} radius={PRESS_HIGHLIGHT_SIZE / 2} progress={hold.progress} />
+        </View>
+      )}
     </AnimatedPressable>
   );
 }
@@ -294,7 +335,7 @@ export function TabBarSlot({
 
 export function TabBarCircle({
   theme, size, active = false, onPress, onPressIn: onExternalPressIn, onLongPress, testID, accessibilityLabel, accessibilityRole = 'button',
-  selected, children, animatedStyle, hitSlop, glassAnimatedStyle,
+  selected, children, animatedStyle, hitSlop, glassAnimatedStyle, overMedia, hold,
 }: {
   theme: AppThemePreset;
   size: number;
@@ -319,11 +360,21 @@ export function TabBarCircle({
   /** Reanimated style layered onto the inner glass surface's own radius so
    *  its corner rounding tracks an animated `size` (see `animatedStyle`). */
   glassAnimatedStyle?: object;
+  /** See TabBarGlass's `overMedia`. */
+  overMedia?: SharedValue<number>;
+  /** Hold-to-switch (useHoldToSwitch) — the buyer bar's Profile button; see
+   *  components/tab-bar/HoldRing.tsx. Same contract as TabBarSlot's `hold`. */
+  hold?: HoldToSwitch;
 }) {
   const { onPressIn, onPressOut, iconStyle, highlightStyle } = useTabMotion(active);
   const handlePressIn = () => {
     onExternalPressIn?.();
+    hold?.onPressIn();
     onPressIn();
+  };
+  const handlePressOut = () => {
+    hold?.onPressOut();
+    onPressOut();
   };
   const inset = 5;
   return (
@@ -332,15 +383,16 @@ export function TabBarCircle({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={selected === undefined ? {} : { selected }}
       aria-selected={selected}
-      onPress={onPress}
+      onPress={hold ? () => { if (hold.releasedAsTap()) onPress(); } : onPress}
       onLongPress={onLongPress}
       onPressIn={handlePressIn}
-      onPressOut={onPressOut}
+      onPressOut={handlePressOut}
       testID={testID}
       hitSlop={hitSlop}
       style={[TAB_BAR_SHADOW, { width: size, height: size, borderRadius: radius.bar }, animatedStyle]}
     >
-      <TabBarGlass theme={theme} radius={radius.bar} animatedStyle={glassAnimatedStyle} />
+      {overMedia && <TabBarMediaLift radius={radius.bar} overMedia={overMedia} />}
+      <TabBarGlass theme={theme} radius={radius.bar} animatedStyle={glassAnimatedStyle} overMedia={overMedia} />
       {/* Full-circle press fill — this button IS the circle (no row/capsule
           edge to clip against), so it's sized to the whole button rather
           than the fixed PRESS_HIGHLIGHT_SIZE the packed capsule slots use. */}
@@ -365,6 +417,7 @@ export function TabBarCircle({
         />
       )}
       <Animated.View style={[styles.circleContent, iconStyle]}>{children}</Animated.View>
+      {hold && <HoldRing size={size} radius={radius.bar} progress={hold.progress} />}
     </AnimatedPressable>
   );
 }
@@ -382,10 +435,23 @@ export function TabBarCircle({
  * The `useEffect` below is the correctness fallback for a focus change that
  * never went through `press()` — back button, deep link, programmatic
  * navigation, or a press that got cancelled before `onPress` fired.
+ *
+ * Rapid tapping: every press retargets the glide from wherever the pill is,
+ * and a late navigation commit from an earlier tap in the burst is held
+ * instead of dragging the pill back — see lib/tabPillRetarget.ts.
+ *
+ * `parkedAt` (optional) is where the pill rests, faded out, while no capsule
+ * slot is active — in the same slot-index units as `x`, measured from the
+ * capsule's own origin, so it may sit past the last slot (the buyer bar
+ * parks it on its Profile circle, see BuyerTabBar's `profileParkIndex`).
+ * With it, leaving that state glides out *from* the park on the same spring
+ * as a tab -> tab move, and entering it glides *to* the park while fading.
+ * Without it (seller bar, buyer search), hiding/showing fades in place
+ * exactly as before. (Same contract as PR #1050's.)
  */
-export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean) {
-  const restingX = Math.max(activeIndex, 0);
+export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean, parkedAt?: number) {
   const shown = activeIndex >= 0;
+  const restingX = shown ? activeIndex : (parkedAt ?? 0);
   // Tracked in slot-index "units" rather than raw pixels so the resting/glide
   // position stays correct while `itemWidth` itself is also animating
   // between its regular and compact values (see TabBarIndicator's style
@@ -394,40 +460,67 @@ export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean)
   const x = useSharedValue(restingX);
   const target = useSharedValue(restingX);
   const opacity = useSharedValue(shown ? 1 : 0);
-  const committedIndex = useRef(restingX);
   const committedShown = useRef(shown);
+  // Press/commit bookkeeping for rapid tapping — see lib/tabPillRetarget.ts.
+  const retarget = useRef(initialPillState(restingX));
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // withSpring always starts from x's current value, so every move — a new
+  // tap mid-glide included — travels from where the pill visibly is.
+  const glideTo = useCallback((index: number) => {
+    target.set(index);
+    x.set(reduceMotion ? index : withSpring(index, INDICATOR_SPRING));
+  }, [reduceMotion, x, target]);
+
+  useEffect(() => () => {
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+  }, []);
 
   useEffect(() => {
     opacity.set(withTiming(shown ? 1 : 0, { duration: 180 }));
     if (committedShown.current !== shown) {
-      // Appearing (e.g. back from Profile or search) or hiding fades in
-      // place — only a move between tabs glides.
       committedShown.current = shown;
-      committedIndex.current = restingX;
+      retarget.current = initialPillState(restingX);
       target.set(restingX);
-      x.set(restingX);
+      // With a park (buyer Profile circle), appearing/hiding glides between
+      // the park and the tab from wherever the pill currently is. Without
+      // one (e.g. back from buyer search) it fades in place — only a move
+      // between tabs glides.
+      x.set(parkedAt === undefined || reduceMotion ? restingX : withSpring(restingX, INDICATOR_SPRING));
       return;
     }
-    if (committedIndex.current === restingX) return;
-    committedIndex.current = restingX;
-    target.set(restingX);
-    x.set(reduceMotion ? restingX : withSpring(restingX, INDICATOR_SPRING));
-  }, [shown, restingX, reduceMotion, x, target, opacity]);
+    const step = pillCommit(retarget.current, restingX, Date.now());
+    retarget.current = step.state;
+    if (step.moveTo !== null) glideTo(step.moveTo);
+  }, [shown, restingX, parkedAt, reduceMotion, opacity, target, x, glideTo]);
 
   const press = useCallback((index: number) => {
     committedShown.current = true;
-    committedIndex.current = index;
     opacity.set(withTiming(1, { duration: 180 }));
-    target.set(index);
-    x.set(reduceMotion ? index : withSpring(index, INDICATOR_SPRING));
-  }, [reduceMotion, x, target, opacity]);
+    const step = pillPress(retarget.current, index, Date.now());
+    retarget.current = step.state;
+    if (step.moveTo !== null) glideTo(step.moveTo);
+    // If this press never turns into a committed route (finger slid off,
+    // tabPress prevented), send the pill back to the route that is.
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => {
+      settleTimer.current = null;
+      const settle = pillSettle(retarget.current, Date.now());
+      retarget.current = settle.state;
+      if (settle.moveTo !== null) glideTo(settle.moveTo);
+    }, STALE_COMMIT_MS + 20);
+  }, [opacity, glideTo]);
 
   /** For a side circle (e.g. buyer Profile) that isn't one of the pill's own
-   *  slots — hides the pill the instant that circle is pressed. */
+   *  slots — hides the pill the instant that circle is pressed, gliding it
+   *  onto `parkedAt` (when given) as it fades. */
   const hide = useCallback(() => {
     committedShown.current = false;
     opacity.set(withTiming(0, { duration: 180 }));
-  }, [opacity]);
+    if (parkedAt === undefined) return;
+    retarget.current = { ...retarget.current, target: parkedAt, pending: null };
+    glideTo(parkedAt);
+  }, [parkedAt, opacity, glideTo]);
 
   return { x, target, opacity, press, hide };
 }
@@ -562,7 +655,25 @@ export const TAB_BAR_SHADOW = {
   boxShadow: '0px 10px 30px rgba(0, 0, 0, 0.38), 0px 2px 6px rgba(0, 0, 0, 0.22)',
 } as const;
 
+/** Dark backing under the glass while the bar sits over video — dense
+ *  enough that busy footage can't show through, light enough that the
+ *  blur still softens what's left. */
+export const TAB_BAR_MEDIA_BACKING = 'rgba(0, 0, 0, 0.7)';
+
+/**
+ * A tighter, darker drop shadow that fades in over video (see `overMedia`
+ * on TabBarGlass): the regular shadow is invisible against dark footage, so
+ * this one is what lifts the bar off the video. Lives on its own unclipped
+ * layer behind the glass so only its opacity animates.
+ */
+export function TabBarMediaLift({ radius, overMedia }: { radius: number; overMedia: SharedValue<number> }) {
+  const style = useAnimatedStyle(() => ({ opacity: overMedia.value }));
+  return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.mediaLift, { borderRadius: radius }, style]} />;
+}
+
 const styles = StyleSheet.create({
+  mediaBacking: { backgroundColor: TAB_BAR_MEDIA_BACKING },
+  mediaLift: { boxShadow: '0px 6px 16px rgba(0, 0, 0, 0.55), 0px 1px 3px rgba(0, 0, 0, 0.4)' },
   // Fixed-diameter circle, centered regardless of the parent's own size —
   // never sized to the row/slot width, so it can't be clipped at either end
   // of the capsule (see PRESS_HIGHLIGHT_SIZE).

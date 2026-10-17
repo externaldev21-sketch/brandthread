@@ -49,6 +49,8 @@ import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceM
 import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { useAuth } from '@clerk/expo';
+import { getCachedTabData } from '@/lib/tabDataCache';
+import { keepIfSame } from '@/lib/keepIfSame';
 import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSafety';
 import {
@@ -234,6 +236,10 @@ const COMPOSER_ICON = 20;
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+/** Threads opened this session, by account + conversation id — see the
+ *  `seed` state initializers in the screen below. Memory only. */
+const openedThreads = new Map<string, { conv: Conversation; messages: Message[] }>();
+
 export default function BuyerConversationScreen() {
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
@@ -285,9 +291,21 @@ export default function BuyerConversationScreen() {
   const myId = userId ?? MY_USER_ID;
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
 
-  const [conv, setConv] = useState<Conversation | null>(null);
+  // Paint the last-known thread on the first frame (reopening a thread this
+  // session) — or at least its header, from the Inbox's own cached list —
+  // instead of a blank screen that fills in once the fetch answers.
+  const threadKey = params.id ? `${userId ?? 'anon'}:${params.id}` : null;
+  const seed = threadKey ? openedThreads.get(threadKey) : undefined;
+  const [conv, setConv] = useState<Conversation | null>(() => (
+    seed?.conv
+      ?? (params.id ? getCachedTabData<{ conversations?: Conversation[] }>('inbox')?.conversations?.find((c) => c.id === params.id) ?? null : null)
+  ));
   const callLog = useCallLog(conv?.id ?? params.id ?? '');
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => seed?.messages ?? []);
+  // Remember what's on screen for the next open of this thread.
+  useEffect(() => {
+    if (threadKey && conv && messages.length > 0) openedThreads.set(threadKey, { conv, messages });
+  }, [threadKey, conv, messages]);
   const [text, setText] = useState('');
   const { showUndo } = useUndoToast();
   const textInputRef = useRef<TextInput>(null);
@@ -482,7 +500,7 @@ export default function BuyerConversationScreen() {
       setMessaging({ blockedByMe: !!safety?.blockedByMe, unavailable: !!safety?.unavailable });
       if (loadedConv) {
         const msgs = await getMessages(loadedConv.id);
-        setMessages(msgs);
+        setMessages((prev) => keepIfSame(prev, msgs));
 
         if (!hasComputedUnreadRef.current) {
           hasComputedUnreadRef.current = true;
@@ -521,7 +539,8 @@ export default function BuyerConversationScreen() {
   useFocusEffect(useCallback(() => {
     if (!conv?.id || isPreviewConversationId(conv.id)) return;
     const interval = setInterval(() => {
-      getMessages(conv.id).then(setMessages).catch(() => {});
+      // keepIfSame: a poll that finds nothing new doesn't re-render the thread.
+      getMessages(conv.id).then((msgs) => setMessages((prev) => keepIfSame(prev, msgs))).catch(() => {});
     }, 12000);
     return () => clearInterval(interval);
   }, [conv?.id]));

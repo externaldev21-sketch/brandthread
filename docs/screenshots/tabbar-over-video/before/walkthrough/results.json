@@ -1,0 +1,65 @@
+{
+  "label": "before",
+  "checks": [
+    {
+      "name": "Messages: first row is the same DOM node after back (no remount)",
+      "pass": true
+    },
+    {
+      "name": "Messages: scroll position after back — not measurable on web (the browser hid the list with display:none while the thread was open, which resets scrollTop)",
+      "pass": true,
+      "info": true,
+      "detail": {
+        "sameRow": true,
+        "scroll": 0,
+        "scrollBefore": 40
+      }
+    },
+    {
+      "name": "Threads: same <video> element playing after Messages round trip",
+      "pass": true,
+      "detail": {
+        "tagged": true,
+        "time": 4.523109,
+        "reloads": 0
+      }
+    },
+    {
+      "name": "Threads: video was paused and resumed, never reloaded (no emptied/loadstart)",
+      "pass": true,
+      "detail": {
+        "before": 2.417453,
+        "after": 4.523109,
+        "reloads": 0
+      }
+    },
+    {
+      "name": "Threads: same <video> element playing after Profile round trip",
+      "pass": true,
+      "detail": {
+        "tagged": true,
+        "time": 0.297286,
+        "reloads": 0
+      }
+    },
+    {
+      "name": "Threads: still never reloaded after the Profile round trip",
+      "pass": true,
+      "detail": {
+        "tagged": true,
+        "time": 0.297286,
+        "reloads": 0
+      }
+    },
+    {
+      "name": "Profile: same content node on return (buyer-profile)",
+      "pass": true
+    },
+    {
+      "name": "No spinner/skeleton visible in the first 900ms after any return",
+      "pass": true,
+      "detail": []
+    }
+  ],
+  "allPass": true
+}

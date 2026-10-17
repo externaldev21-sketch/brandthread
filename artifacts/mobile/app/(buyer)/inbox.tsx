@@ -12,8 +12,10 @@ import { ListSkeleton } from '@/components/layout';
 import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
+import { useFocusEffectAfterPaint } from '@/hooks/useFocusEffectAfterPaint';
+import { keepIfSame } from '@/lib/keepIfSame';
 import { useAuth, useUser } from '@clerk/expo';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, SCREEN_BG, CONTENT_MAX_WIDTH } from '@/lib/theme';
@@ -430,10 +432,9 @@ export default function InboxScreen() {
           PREVIEW_MY_STORY,
           ...getPreviewStoryTrayRows().map(r => getPreviewStoryFor(r.authorId)).filter((s): s is Story => !!s),
         ]).catch(() => {});
-      } else {
-        setStoryTrayRows([]);
-        setMyStoryId(null);
       }
+      // Otherwise keep the tray that's already showing: this runs on every
+      // focus, and a failed refresh shouldn't make the stories vanish.
     }
   }, [userId, api]);
 
@@ -486,6 +487,10 @@ export default function InboxScreen() {
     snackbarTimer.current = setTimeout(() => setSnackbarMessage(null), 2500);
   }, []);
 
+  // What's on screen right now, for loadData's error path below.
+  const conversationsRef = useRef(conversations);
+  conversationsRef.current = conversations;
+
   const loadData = useCallback(async () => {
     // isBuyerDevPreview() (not just !userId): a stubbed/fake-signed-in Clerk
     // session (this app's own audit/e2e harnesses fake a signed-in user so
@@ -521,7 +526,9 @@ export default function InboxScreen() {
       if (isPreviewInboxEnabled() && convs.length === 0) {
         setConversations(getPreviewConversations());
       } else {
-        setConversations(convs);
+        // Same rows as on screen (the usual refocus refresh): keep the
+        // current array so the list doesn't re-render for nothing.
+        setConversations((prev) => keepIfSame(prev, convs));
         setCachedTabData('inbox', { conversations: convs });
       }
     } catch {
@@ -532,10 +539,11 @@ export default function InboxScreen() {
       if (isPreviewInboxEnabled()) {
         setLoadError(false);
         setConversations(getPreviewConversations());
-      } else {
+      } else if (conversationsRef.current.length === 0) {
         setLoadError(true);
-        setConversations([]);
       }
+      // Otherwise this was a background refresh (every focus runs one):
+      // keep the thread list on screen instead of wiping it to an error.
     } finally {
       setLoading(false);
     }
@@ -571,7 +579,9 @@ export default function InboxScreen() {
     }
   }, [loadData]);
 
-  useFocusEffect(useCallback(() => {
+  // After the tab has painted from what's already on screen, and skipped
+  // entirely when a fast tab burst only passes through Inbox.
+  useFocusEffectAfterPaint(useCallback(() => {
     loadData();
     loadSuggested();
     loadStoryTray();

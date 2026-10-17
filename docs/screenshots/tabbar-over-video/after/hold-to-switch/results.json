@@ -1,0 +1,760 @@
+{
+  "summary": {
+    "label": "after",
+    "earlyRelease": {
+      "firstVisibleMs": 264,
+      "lastVisibleMs": 479,
+      "minDashoffset": 171.4063324682283,
+      "pathAfter": "/?bt_preview=buyer"
+    },
+    "fullHold": {
+      "firstVisibleMs": 260,
+      "lastVisibleMs": 803,
+      "minDashoffset": 0,
+      "pathAfter": "/?bt_preview=buyer",
+      "toast": "A\n@atelier.noire",
+      "sellerBarShown": true
+    },
+    "tap": {
+      "pathAfter": "/profile"
+    }
+  },
+  "raw": {
+    "label": "after",
+    "earlyRelease": {
+      "ring": [
+        {
+          "t": 8,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 10,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 26,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 42,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 59,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 76,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 94,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 111,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 127,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 142,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 159,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 176,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 196,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 212,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 230,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 246,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 264,
+          "visible": true,
+          "dashoffset": 208.9804048224479
+        },
+        {
+          "t": 280,
+          "visible": true,
+          "dashoffset": 201.49265450936218
+        },
+        {
+          "t": 297,
+          "visible": true,
+          "dashoffset": 193.9597972666794
+        },
+        {
+          "t": 312,
+          "visible": true,
+          "dashoffset": 186.4269400239968
+        },
+        {
+          "t": 328,
+          "visible": true,
+          "dashoffset": 178.93918971091108
+        },
+        {
+          "t": 346,
+          "visible": true,
+          "dashoffset": 171.4063324682283
+        },
+        {
+          "t": 364,
+          "visible": true,
+          "dashoffset": 172.74939129792185
+        },
+        {
+          "t": 385,
+          "visible": true,
+          "dashoffset": 182.70736737729231
+        },
+        {
+          "t": 402,
+          "visible": true,
+          "dashoffset": 191.3335613603152
+        },
+        {
+          "t": 409,
+          "visible": true,
+          "dashoffset": 198.69142212703966
+        },
+        {
+          "t": 426,
+          "visible": true,
+          "dashoffset": 204.8465848627759
+        },
+        {
+          "t": 442,
+          "visible": true,
+          "dashoffset": 209.62734405644463
+        },
+        {
+          "t": 459,
+          "visible": true,
+          "dashoffset": 213.20754549690642
+        },
+        {
+          "t": 479,
+          "visible": true,
+          "dashoffset": 215.4789325531314
+        },
+        {
+          "t": 493,
+          "visible": false,
+          "dashoffset": 216.46242471440783
+        },
+        {
+          "t": 512,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 526,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 542,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 559,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 576,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 592,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 609,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 626,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 643,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 659,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 676,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 692,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 709,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 726,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 742,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 759,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 776,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 793,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 809,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 826,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 842,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 859,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 875,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 892,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 909,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 926,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 944,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 959,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 976,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 993,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1009,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1026,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1043,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1059,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1076,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1092,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1109,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1126,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1142,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1159,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1175,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1193,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1209,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1226,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1242,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1259,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1276,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1292,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1309,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1326,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1342,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1359,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1376,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1392,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1409,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        }
+      ],
+      "pathAfter": "/?bt_preview=buyer"
+    },
+    "fullHold": {
+      "ring": [
+        {
+          "t": 7,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 20,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 37,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 54,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 70,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 87,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 103,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 120,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 137,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 154,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 170,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 190,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 210,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 228,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 244,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 260,
+          "visible": true,
+          "dashoffset": 208.9804048224479
+        },
+        {
+          "t": 274,
+          "visible": true,
+          "dashoffset": 201.4475475797653
+        },
+        {
+          "t": 288,
+          "visible": true,
+          "dashoffset": 193.9597972666794
+        },
+        {
+          "t": 305,
+          "visible": true,
+          "dashoffset": 186.4269400239968
+        },
+        {
+          "t": 321,
+          "visible": true,
+          "dashoffset": 178.89408278131424
+        },
+        {
+          "t": 338,
+          "visible": true,
+          "dashoffset": 171.4063324682283
+        },
+        {
+          "t": 356,
+          "visible": true,
+          "dashoffset": 163.87347522554572
+        },
+        {
+          "t": 372,
+          "visible": true,
+          "dashoffset": 156.34061798286314
+        },
+        {
+          "t": 389,
+          "visible": true,
+          "dashoffset": 148.8528676697772
+        },
+        {
+          "t": 405,
+          "visible": true,
+          "dashoffset": 141.32001042709462
+        },
+        {
+          "t": 421,
+          "visible": true,
+          "dashoffset": 133.78715318441203
+        },
+        {
+          "t": 438,
+          "visible": true,
+          "dashoffset": 126.25429594172904
+        },
+        {
+          "t": 455,
+          "visible": true,
+          "dashoffset": 118.76654562864353
+        },
+        {
+          "t": 472,
+          "visible": true,
+          "dashoffset": 111.23368838596096
+        },
+        {
+          "t": 489,
+          "visible": true,
+          "dashoffset": 103.745938072875
+        },
+        {
+          "t": 505,
+          "visible": true,
+          "dashoffset": 96.16797390059537
+        },
+        {
+          "t": 522,
+          "visible": true,
+          "dashoffset": 88.68022358750986
+        },
+        {
+          "t": 538,
+          "visible": true,
+          "dashoffset": 81.14736634482685
+        },
+        {
+          "t": 555,
+          "visible": true,
+          "dashoffset": 73.65961603174134
+        },
+        {
+          "t": 573,
+          "visible": true,
+          "dashoffset": 66.12675878905877
+        },
+        {
+          "t": 590,
+          "visible": true,
+          "dashoffset": 58.59390154637577
+        },
+        {
+          "t": 607,
+          "visible": true,
+          "dashoffset": 51.106151233290255
+        },
+        {
+          "t": 622,
+          "visible": true,
+          "dashoffset": 43.61840092020433
+        },
+        {
+          "t": 638,
+          "visible": true,
+          "dashoffset": 36.08554367752174
+        },
+        {
+          "t": 656,
+          "visible": true,
+          "dashoffset": 28.55268643483917
+        },
+        {
+          "t": 672,
+          "visible": true,
+          "dashoffset": 21.01982919215658
+        },
+        {
+          "t": 689,
+          "visible": true,
+          "dashoffset": 13.486971949473578
+        },
+        {
+          "t": 705,
+          "visible": true,
+          "dashoffset": 5.954114706791009
+        },
+        {
+          "t": 722,
+          "visible": true,
+          "dashoffset": 0
+        },
+        {
+          "t": 737,
+          "visible": true,
+          "dashoffset": 0
+        },
+        {
+          "t": 753,
+          "visible": true,
+          "dashoffset": 0
+        },
+        {
+          "t": 770,
+          "visible": true,
+          "dashoffset": 0
+        },
+        {
+          "t": 787,
+          "visible": true,
+          "dashoffset": 0
+        },
+        {
+          "t": 803,
+          "visible": true,
+          "dashoffset": 0
+        },
+        {
+          "t": 950,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 981,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1036,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1069,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1100,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1126,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1133,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1327,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        },
+        {
+          "t": 1415,
+          "visible": false,
+          "dashoffset": 216.51326206513048
+        }
+      ],
+      "pathAfter": "/?bt_preview=buyer",
+      "toast": "A\n@atelier.noire",
+      "sellerBar": 1
+    },
+    "tap": {
+      "pathAfter": "/profile"
+    }
+  }
+}

@@ -60,12 +60,18 @@ function BuyerTabLayout() {
     prevPathnameRef.current = pathname;
     if (Platform.OS !== 'web') settled.unsettle();
   }
+  // `pathname` is a dependency so every tab change restarts the timer. Keyed
+  // on `settled.value` alone, a rapid burst (tap, tap, tap…) only ever
+  // armed it on the first tap — it then fired mid-way through a later tap's
+  // slide, froze every scene at its *rounded* rest position (a visible
+  // snap), and the next tap's unsettle jumped them back onto the live
+  // interpolation: the "screens glitch when I tap fast" jump.
   useEffect(() => {
     if (settled.value) return;
     const duration = reduceMotion ? REDUCED_MOTION_SLIDE_DURATION : SLIDE_DURATION;
     const timer = setTimeout(() => settled.settleImmediately(), duration);
     return () => clearTimeout(timer);
-  }, [settled.value, settled.settleImmediately, reduceMotion]);
+  }, [settled.value, settled.settleImmediately, reduceMotion, pathname]);
 
   const loadBadgeCount = useCallback(async () => {
     try {

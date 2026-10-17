@@ -813,8 +813,12 @@ export default function OrdersScreen() {
       const valid: OrderListFilter[] = ['all', 'new', 'unfulfilled', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'cancelled', 'unpaid', 'open', 'archived'];
       if (requested && valid.includes(requested as OrderListFilter)) {
         setActiveFilter(requested as OrderListFilter);
+        // Consume the deep link so a plain return to this tab keeps the
+        // seller's own filter instead of re-forcing the link's (see
+        // products.tsx).
+        router.setParams({ filter: undefined } as never);
       }
-    }, [params.filter]),
+    }, [params.filter, router]),
   );
 
   useFocusEffect(
