@@ -33,6 +33,7 @@ import type {
 } from '@/lib/checkoutPayment';
 import { classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsError';
 import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
+import type { LiveAvailabilityStatus } from '@/lib/live/liveAvailability';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 import type { GiftCard, GiftCardHistoryEntry, GiftCardSettings, GiftCardStoreInfo } from '@/lib/giftCards';
@@ -1121,7 +1122,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     // ── Live replays + Live tips (PR: live-replays-profile-tips) ──────────────
     liveReplays: {
       bySeller: (sellerId: string, opts: { limit?: number; offset?: number } = {}) =>
-        get<{ replays: LiveReplay[]; hasMore: boolean }>(
+        get<{ replays: LiveReplay[]; hasMore: boolean; recordingEnabled?: boolean }>(
           `/api/live-replays/by-seller/${encodeURIComponent(sellerId)}?limit=${opts.limit ?? 30}&offset=${opts.offset ?? 0}`,
         ),
       get: (streamId: string) => get<{ replay: LiveReplay }>(`/api/live-replays/${encodeURIComponent(streamId)}`),
@@ -3620,6 +3621,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     live: {
       start:          (data: { title: string; description?: string; productTags?: any[]; thumbnailUrl?: string; scheduledLiveId?: string }) =>
         post<any>('/api/live/start', data),
+      /** Env-gated availability: streaming (Agora app) and replays (Cloud Recording). */
+      status:         () => get<LiveAvailabilityStatus>('/api/live/status'),
       active:         () => get<{ streams: any[] }>('/api/live/active'),
       get:            (id: string) => get<{ stream: any }>(`/api/live/${encodeURIComponent(id)}`),
       join:           (id: string) => trackAfter(post<any>(`/api/live/${encodeURIComponent(id)}/join`, {}), [['live_joined']]),
