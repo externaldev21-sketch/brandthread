@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { StatusBadge } from '@/components/BrandthreadUI';
 import {
@@ -7,7 +7,9 @@ import {
   SellerDashboardListItem,
   SellerDashboardSectionHeader,
 } from '@/components/SellerDashboardSections';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
+import { FONT, FS, SP } from '@/lib/theme';
 import type { RecentOrderSummary } from '@/lib/sellerDashboardStats';
 
 export function orderStatusVariant(status: string): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
@@ -44,12 +46,25 @@ export function SellerDashboardRecentOrders({
   orders,
   onOpenOrder,
   onSeeAll,
+  emptyMessage,
 }: {
   orders: RecentOrderSummary[];
   onOpenOrder: (id: string) => void;
   onSeeAll: () => void;
+  /** Shown under the section title when there are no orders yet (Shopify
+   *  home keeps its sections on screen at zero); omit to hide the section. */
+  emptyMessage?: string;
 }) {
-  if (orders.length === 0) return null;
+  const { theme } = useAppTheme();
+  if (orders.length === 0) {
+    if (!emptyMessage) return null;
+    return (
+      <View testID="seller-dashboard-recent-orders">
+        <SellerDashboardSectionHeader title="Recent orders" action="See all" onAction={onSeeAll} />
+        <Text style={[emptyStyles.text, { color: theme.muted }]}>{emptyMessage}</Text>
+      </View>
+    );
+  }
 
   return (
     <View testID="seller-dashboard-recent-orders">
@@ -71,3 +86,7 @@ export function SellerDashboardRecentOrders({
     </View>
   );
 }
+
+const emptyStyles = StyleSheet.create({
+  text: { fontFamily: FONT.regular, fontSize: FS.sm, paddingVertical: SP.sm },
+});

@@ -492,54 +492,18 @@ export function OrderRow({
 // ─── Legacy OrderCard export (kept for test compatibility) ────────────────────
 export const OrderCard = OrderRow;
 
-// ─── Sort Modal ───────────────────────────────────────────────────────────────
-
-function SortModal({
-  visible, current, onSelect, onClose,
-}: {
-  visible: boolean;
-  current: OrderSortKey;
-  onSelect: (k: OrderSortKey) => void;
-  onClose: () => void;
-}) {
-  const { theme } = useAppTheme();
-  const STRONG = theme.text;
-  const s = React.useMemo(() => createStyles(theme), [theme]);
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close sort menu" />
-      <SheetRise style={s.modalSheet}>
-        <View style={s.modalHandle} />
-        <Text style={s.modalTitle}>Sort Orders</Text>
-        {SORTS.map(({ key, label }) => (
-          <TouchableOpacity
-            key={key}
-            style={[s.sortOption, current === key && s.sortOptionActive]}
-            onPress={() => { Haptics.selectionAsync(); onSelect(key); onClose(); }}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel={`Sort by ${label}`}
-          >
-            <Text style={[s.sortOptionText, current === key && s.sortOptionTextActive]}>
-              {label}
-            </Text>
-            {current === key && <Feather name="check" size={ICON.sm} color={STRONG} />}
-          </TouchableOpacity>
-        ))}
-        <Button label="Cancel" variant="secondary" fullWidth style={s.modalCloseBtn} onPress={onClose} accessibilityLabel="Cancel sorting" />
-      </SheetRise>
-    </Modal>
-  );
-}
-
 // ─── Filter Sheet ─────────────────────────────────────────────────────────────
 
+// One filter control for the list (Depop's shop filter sheet): "Sort by"
+// lives here instead of behind a second icon button in the header.
 function FilterSheet({
-  visible, current, onSelect, onClose,
+  visible, current, onSelect, currentSort, onSelectSort, onClose,
 }: {
   visible: boolean;
   current: OrderFilterKey;
   onSelect: (k: OrderFilterKey) => void;
+  currentSort: OrderSortKey;
+  onSelectSort: (k: OrderSortKey) => void;
   onClose: () => void;
 }) {
   const { theme } = useAppTheme();
@@ -551,7 +515,24 @@ function FilterSheet({
       <SheetRise style={s.modalSheet}>
         <View style={s.modalHandle} />
         <Text style={s.modalTitle}>Filter Orders</Text>
-        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
+        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480 }}>
+          <Text style={s.filterSectionLabel}>Sort by</Text>
+          {SORTS.map(({ key, label }) => (
+            <TouchableOpacity
+              key={`sort-${key}`}
+              style={[s.sortOption, currentSort === key && s.sortOptionActive]}
+              onPress={() => { Haptics.selectionAsync(); onSelectSort(key); onClose(); }}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Sort by ${label}`}
+            >
+              <Text style={[s.sortOptionText, currentSort === key && s.sortOptionTextActive]}>
+                {label}
+              </Text>
+              {currentSort === key && <Feather name="check" size={ICON.sm} color={STRONG} />}
+            </TouchableOpacity>
+          ))}
+          <Text style={[s.filterSectionLabel, { marginTop: SP.md }]}>Status</Text>
           {ALL_FILTERS.map(({ key, label }) => (
             <TouchableOpacity
               key={key}
@@ -714,7 +695,6 @@ export default function OrdersScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<OrderListFilter>(initialFilter);
   const [sort, setSort] = useState<OrderSortKey>('newest');
-  const [sortModalVisible, setSortModalVisible] = useState(false);
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [stats, setStats] = useState<OrderStats | null>(null);
@@ -1015,6 +995,7 @@ export default function OrdersScreen() {
 
   const handleMoreMenu = useCallback(() => {
     showActionSheet('Orders', 'Choose an action', [
+      { text: 'Returns', onPress: () => setActiveFilter('returned') },
       { text: 'Export CSV', onPress: handleExportCsv },
       { text: 'Bulk Actions', onPress: () => showActionSheet('Bulk', 'Long-press orders to select.', [{ text: 'OK' }]) },
       { text: 'Refresh', onPress: onRefresh },
@@ -1025,6 +1006,9 @@ export default function OrdersScreen() {
   // ─── Render helpers ────────────────────────────────────────────────────────
 
   const hasActiveFilter = activeFilter !== 'all';
+  // Search, filter and status chips only once there is something to search or
+  // filter (Shopify's empty Orders screen is just the title + empty state).
+  const hasAnyOrders = loading || orders.length > 0 || activeFilter !== 'all' || searchQuery.trim().length > 0;
   const currentSortLabel = SORTS.find(s => s.key === sort)?.label ?? 'Sort';
 
   // Row handlers go through a ref so every row receives the same function
@@ -1102,7 +1086,7 @@ export default function OrdersScreen() {
               : ''}
           </Text>
           {sort !== 'newest' && (
-            <TouchableOpacity onPress={() => setSortModalVisible(true)} accessibilityRole="button" accessibilityLabel={`Current sort: ${currentSortLabel}. Change sort`}>
+            <TouchableOpacity onPress={() => setFilterSheetVisible(true)} accessibilityRole="button" accessibilityLabel={`Current sort: ${currentSortLabel}. Change sort`}>
               <Text style={s.sortIndicator}>{currentSortLabel} ↕</Text>
             </TouchableOpacity>
           )}
@@ -1123,11 +1107,15 @@ export default function OrdersScreen() {
         <EmptyState
           icon="shopping-bag"
           title="No orders yet"
-          message="Orders show up here once a buyer checks out."
+          message={orders.length === 0
+            ? 'Share your store to get your first sale.'
+            : 'Orders show up here once a buyer checks out.'}
+          actionLabel={orders.length === 0 ? 'Share store' : undefined}
+          onAction={orders.length === 0 ? () => router.push('/share-store' as never) : undefined}
         />
       )}
     </View>
-  ), [loadError]);
+  ), [loadError, orders.length, router]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -1136,11 +1124,7 @@ export default function OrdersScreen() {
       {/* ── Fixed header ── */}
       <SellerListHeader
         title="Orders"
-        titleMenu={[
-          { key: 'all', label: 'All orders', selected: activeFilter === 'all', onSelect: () => setActiveFilter('all') },
-          { key: 'returned', label: 'Returns', selected: activeFilter === 'returned', onSelect: () => setActiveFilter('returned') },
-        ]}
-        titleAccessibilityLabel="Orders, choose a view"
+        showControls={hasAnyOrders}
         actions={[{ icon: 'more-horizontal', onPress: handleMoreMenu, accessibilityLabel: 'More order actions' }]}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
@@ -1148,8 +1132,6 @@ export default function OrdersScreen() {
         onFilterPress={() => setFilterSheetVisible(true)}
         hasActiveFilter={hasActiveFilter}
         filterAccessibilityLabel={hasActiveFilter ? `Filter: ${activeFilter}` : 'Filter orders'}
-        onSortPress={() => setSortModalVisible(true)}
-        sortAccessibilityLabel={`Sort: ${currentSortLabel}`}
         chips={FILTERS.map(({ key, label }) => ({
           key,
           label,
@@ -1219,19 +1201,14 @@ export default function OrdersScreen() {
         </View>
       )}
 
-      {/* Sort Modal */}
-      <SortModal
-        visible={sortModalVisible}
-        current={sort}
-        onSelect={k => setSort(k)}
-        onClose={() => setSortModalVisible(false)}
-      />
 
       {/* Filter Sheet */}
       <FilterSheet
         visible={filterSheetVisible}
         current={FILTERS.some(filter => filter.key === activeFilter) ? 'all' : activeFilter as OrderFilterKey}
         onSelect={k => setActiveFilter(k)}
+        currentSort={sort}
+        onSelectSort={k => setSort(k)}
         onClose={() => setFilterSheetVisible(false)}
       />
 
@@ -1681,6 +1658,12 @@ const createStyles = (theme: any) => {
   sortOptionTextActive: {
     color: STRONG,
     fontFamily: FONT.semibold,
+  },
+  filterSectionLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: MUTED,
+    marginBottom: SP.xs,
   },
   modalCloseBtn: {
     marginTop: SP.md,

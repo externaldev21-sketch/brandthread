@@ -28,6 +28,7 @@ import {
   Pressable,
   Alert,
   Animated,
+  ScrollView,
   useWindowDimensions,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
@@ -41,7 +42,7 @@ import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { useReducedMotion } from 'react-native-reanimated';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import Composer from '@/components/ui/Composer';
+import Composer, { COMPOSER_SEND_SIZE } from '@/components/ui/Composer';
 import MarkdownLite from '@/components/ai/MarkdownLite';
 import { useColors } from '@/hooks/useColors';
 import {
@@ -321,19 +322,12 @@ function MessageBubble({
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
 interface EmptyStateProps {
-  context: AIScreenContext;
-  onPillPress: (text: string) => void;
   isTablet: boolean;
 }
 
-function EmptyState({ context, onPillPress, isTablet }: EmptyStateProps) {
+function EmptyState({ isTablet }: EmptyStateProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const prompts =
-    SCREEN_PROMPTS[context.screen as keyof typeof SCREEN_PROMPTS] ??
-    SCREEN_PROMPTS['home'] ??
-    [];
-  const pills = prompts.slice(0, 4);
 
   return (
     <View style={[styles.emptyState, isTablet && styles.emptyStateTablet]}>
@@ -345,25 +339,71 @@ function EmptyState({ context, onPillPress, isTablet }: EmptyStateProps) {
       <Text style={styles.emptySubtitle}>
         Ask about your brand, products, content, store, or performance.
       </Text>
-      {/* One column, not a 2×2 grid — a grid produced uneven heights once
-          text wrapped to 2 or 3 lines (audit: grey-filled, ragged tiles).
-          Every chip spans the same width and reads left-aligned, so all 4
-          stay the same height regardless of how long each prompt is.
-          Monochrome only: thin silver outline, white text, no fill —
-          never colors.mutedForeground/a tinted background. Tapping sends
-          immediately (Dev's call) instead of only populating the composer. */}
-      <View style={styles.pillList}>
-        {pills.map((prompt, i) => (
-          <TouchableOpacity
-            key={i}
-            style={styles.pill}
-            onPress={() => onPillPress(prompt)}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.pillText} numberOfLines={2}>{prompt}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+    </View>
+  );
+}
+
+// ─── Suggestion chips ─────────────────────────────────────────────────────────
+
+/**
+ * Suggested prompts as one horizontal row of pill chips sitting right above
+ * the composer (Microsoft Copilot mobbin.com/screens/ef2922b1-15ce-468e-
+ * b028-2ed58480b34f, Shopify Sidekick mobbin.com/screens/635cf029-446c-
+ * 4cdb-a3aa-bb1278e8291e) — replaces the column of full-width boxes.
+ * Monochrome: thin silver outline, white text, no fill. Tapping still sends
+ * immediately (Dev's call).
+ */
+function SuggestionChips({ context, onPillPress }: { context: AIScreenContext; onPillPress: (text: string) => void }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const prompts =
+    SCREEN_PROMPTS[context.screen as keyof typeof SCREEN_PROMPTS] ??
+    SCREEN_PROMPTS['home'] ??
+    [];
+  const pills = prompts.slice(0, 4);
+  if (pills.length === 0) return null;
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      style={styles.chipScroll}
+      contentContainerStyle={styles.chipRow}
+      testID="ai-suggestion-chips"
+    >
+      {pills.map((prompt, i) => (
+        <TouchableOpacity
+          key={i}
+          style={styles.pill}
+          onPress={() => onPillPress(prompt)}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel={prompt}
+        >
+          <Text style={styles.pillText} numberOfLines={1}>{prompt}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+}
+
+/** Send arrow shown, dimmed, while the input is empty — the shared Composer
+ *  only renders its own send button once there is text, which left this
+ *  screen with no visible way to send. */
+function IdleSendArrow() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View
+      style={styles.idleSend}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel="Send"
+      accessibilityState={{ disabled: true }}
+      testID="ai-composer-send-idle"
+    >
+      <Feather name="arrow-up" size={18} color={colors.mutedForeground} />
     </View>
   );
 }
@@ -816,11 +856,7 @@ export default function AiBrainScreen() {
               ListFooterComponent={
                 sessionMessages.length === 0 ? (
                   <View style={styles.emptyWrapper}>
-                    <EmptyState
-                      context={parsedContext}
-                      onPillPress={handlePillPress}
-                      isTablet={isTablet}
-                    />
+                    <EmptyState isTablet={isTablet} />
                   </View>
                 ) : null
               }
@@ -836,6 +872,10 @@ export default function AiBrainScreen() {
               onStop={handleStop}
               canSend={canSend}
               enterToSend={false}
+              rightAccessory={<IdleSendArrow />}
+              topSlot={sessionMessages.length === 0 && !isGenerating ? (
+                <SuggestionChips context={parsedContext} onPillPress={handlePillPress} />
+              ) : null}
               accessibilityLabel="Message Brandthread AI"
               placeholder={
                 isAuthLoaded || isSellerDevPreview() || isBuyerDevPreview()
@@ -965,26 +1005,39 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     textAlign: 'center',
     lineHeight: 20,
   },
-  pillList: {
-    gap: SP.sm,
-    width: '100%',
+  // Horizontal chip row above the composer. Bleeds to the screen edges
+  // (cancelling the composer's 12pt side padding) so chips scroll off the
+  // edge instead of being clipped inside it; content keeps the 12pt inset.
+  chipScroll: {
+    marginHorizontal: -12,
+    marginBottom: SP.sm,
   },
-  // Outline chip: thin silver border, no fill, white text — was a
-  // translucent-white-on-black fill (read as grey) with grey text.
+  chipRow: {
+    paddingHorizontal: 12,
+    gap: SP.sm,
+  },
+  // Outline chip: thin silver border, no fill, white text.
   pill: {
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: 999,
+    paddingVertical: 8,
     paddingHorizontal: 14,
-    width: '100%',
   },
   pillText: {
     color: colors.foreground,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    textAlign: 'left',
+  },
+  idleSend: {
+    width: COMPOSER_SEND_SIZE,
+    height: COMPOSER_SEND_SIZE,
+    borderRadius: COMPOSER_SEND_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
 
   // ── User bubble

@@ -61,9 +61,15 @@ export interface SellerListHeaderProps {
   onFilterPress: () => void;
   hasActiveFilter: boolean;
   filterAccessibilityLabel: string;
-  onSortPress: () => void;
-  sortAccessibilityLabel: string;
+  /** Omit to fold sorting into the filter sheet (one filter control, the
+   *  Depop/Shopify pattern) instead of a second icon button. */
+  onSortPress?: () => void;
+  sortAccessibilityLabel?: string;
   chips: SellerListHeaderChip[];
+  /** false hides search, filter and status chips — for a list with no data
+   *  at all, where there is nothing to search or filter (Shopify's empty
+   *  Orders/Products screens show only the title and the empty state). */
+  showControls?: boolean;
 }
 
 /** The count-line row every screen renders itself (inside its own list's
@@ -90,7 +96,7 @@ export function SellerListHeader({
   searchValue, onSearchChange, searchPlaceholder,
   onFilterPress, hasActiveFilter, filterAccessibilityLabel,
   onSortPress, sortAccessibilityLabel,
-  chips,
+  chips, showControls = true,
 }: SellerListHeaderProps) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
@@ -187,6 +193,7 @@ export function SellerListHeader({
         </Modal>
       )}
 
+      {showControls && (<>
       {/* Search row */}
       <View style={s.searchRow}>
         <View style={s.searchBoxRow}>
@@ -204,13 +211,15 @@ export function SellerListHeader({
         >
           <Feather name="sliders" size={14} color={hasActiveFilter ? theme.accentLight : theme.muted} />
         </PressableScale>
-        <PressableScale
-          style={s.controlBtn}
-          onPress={onSortPress}
-          accessibilityLabel={sortAccessibilityLabel}
-        >
-          <Feather name="chevrons-down" size={14} color={theme.muted} />
-        </PressableScale>
+        {onSortPress && (
+          <PressableScale
+            style={s.controlBtn}
+            onPress={onSortPress}
+            accessibilityLabel={sortAccessibilityLabel ?? 'Sort'}
+          >
+            <Feather name="chevrons-down" size={14} color={theme.muted} />
+          </PressableScale>
+        )}
       </View>
 
       {/* Status chips — horizontal scroll, edge-to-edge. `pillsRow`'s own
@@ -226,10 +235,13 @@ export function SellerListHeader({
             label={chip.label}
             active={chip.active}
             onPress={chip.onPress}
-            count={chip.count}
+            // A "0" badge on every chip of a new store is noise and widened
+            // the row past the 390pt screen edge; only real counts show.
+            count={chip.count ? chip.count : undefined}
           />
         ))}
       </ScrollView>
+      </>)}
     </View>
   );
 }

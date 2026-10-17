@@ -29,6 +29,7 @@ import {
 } from '@/lib/theme';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { Button } from '@/components/ui/Button';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { AccountSwitcherSheet } from '@/components/AccountSwitcherSheet';
 import { ListRow } from '@/components/ui/ListRow';
@@ -38,7 +39,7 @@ import { getSellerShopPage, taggedItemHref, type ShopProduct } from '@/services/
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import {
-  ProfileChip, ProfileEditMessagesRow, ShopPill, type ProfileStat, type ProfileTab,
+  ProfileChip, ShopPill, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
 import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar';
 import { useSellerActivityUnread } from '@/hooks/useSellerActivityUnread';
@@ -133,6 +134,7 @@ function DraftsFolderTile({
 // ─── Screen ─────────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
+  const { theme } = useAppTheme();
   const router  = useRouter();
   const api = useApi();
   const hasUnreadActivity = useSellerActivityUnread();
@@ -158,7 +160,6 @@ export default function ProfileScreen() {
   const tagged = useTaggedPosts(userId, activeTab === 'Tagged' && !!userId && !isSellerDevPreview());
   const [socialCounts, setSocialCounts] = useState<SocialCounts>({ followers: 0, following: 0, likes: 0 });
   const [productsCount, setProductsCount] = useState<number | null>(null);
-  const [unreadMessages, setUnreadMessages] = useState(0);
   const [profileEditorVisible, setProfileEditorVisible] = useState(false);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
@@ -285,22 +286,6 @@ export default function ProfileScreen() {
     } catch { /* zero counts remain visible */ }
   }, [api, authLoaded, userId]);
 
-  const loadUnreadMessages = useCallback(async () => {
-    // isSellerDevPreview() (not just !userId): a stubbed/fake-signed-in
-    // Clerk session (this app's own audit/e2e harnesses fake a signed-in
-    // user so protected screens render at all) still reports a truthy
-    // userId, which would otherwise fall through to the real backend-less
-    // endpoints below and log a console 404 — see the identical
-    // isSellerDevPreview() fix in app/seller-inbox.tsx.
-    if (!authLoaded || !userId || isSellerDevPreview()) return;
-    try {
-      const list = await api.conversations.list();
-      const total = (list as Array<{ unreadCount?: number; type?: string }>)
-        .filter((c) => c.type !== 'buyer_to_buyer')
-        .reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
-      setUnreadMessages(total);
-    } catch { /* badge just stays at its last known count */ }
-  }, [api, authLoaded, userId]);
 
   const loadShopCount = useCallback(async () => {
     // isSellerDevPreview() (not just !userId): a stubbed/fake-signed-in
@@ -361,8 +346,7 @@ export default function ProfileScreen() {
   useFocusEffect(useCallback(() => {
     void loadShopCount();
     void loadSocialCounts();
-    void loadUnreadMessages();
-  }, [loadShopCount, loadSocialCounts, loadUnreadMessages]));
+  }, [loadShopCount, loadSocialCounts]));
 
   // Following someone from the feed or a list moves "Following" immediately.
   useEffect(() => subscribeProfileEvents((event) => {
@@ -655,22 +639,11 @@ export default function ProfileScreen() {
               testID="seller-activity-bell"
             />
             <ProfileTopBarIcon
-              name="share-2"
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setShareSheetVisible(true);
-              }}
-              accessibilityLabel="Share profile"
-              accessibilityHint="Opens a shareable profile card, QR code, and link"
-              testID="seller-share-profile-btn"
-            />
-            <ProfileTopBarIcon
               name="more-horizontal"
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMenuOpen(true); }}
               accessibilityLabel="More options"
               testID="seller-profile-more"
             />
-            <ProfileTopBarIcon name="settings" onPress={() => nav('/settings')} accessibilityLabel="Seller settings" />
           </ProfileTopBarIconRow>
         )}
         meta={(
@@ -703,13 +676,39 @@ export default function ProfileScreen() {
               style={s.dashboardRow}
               testID="profile-dashboard-row"
             />
+            {/* Polish #99 / #86: on your OWN profile the two actions are
+                Edit profile + Share profile, both secondary and equal —
+                Depop's own shop (mobbin.com/screens/2cf32147-3d07-4b1e-
+                beb5-f5b255c194a0) and the buyer own-profile row, 1:1.
+                Messages was the filled "primary" here, which read as the
+                main thing to do on your own profile; buyer messages stay
+                one tap away in the Studio menu. The labelled Share button
+                replaces the unlabelled top-bar share icon. */}
             <View style={s.actionRow}>
-              <ProfileEditMessagesRow
-                onEdit={() => nav('/edit-profile')}
-                onEditLongPress={openProfileEditor}
-                onMessages={() => nav('/seller-inbox')}
-                unreadCount={unreadMessages}
-              />
+              <View style={s.actionFlex}>
+                <Button
+                  label="Edit profile"
+                  variant="secondary"
+                  size="compact"
+                  fullWidth
+                  onPress={() => nav('/edit-profile')}
+                  accessibilityHint="Opens your full profile editor."
+                  style={[s.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
+                  testID="profile-edit-details"
+                />
+              </View>
+              <View style={s.actionFlex}>
+                <Button
+                  label="Share profile"
+                  variant="secondary"
+                  size="compact"
+                  fullWidth
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShareSheetVisible(true); }}
+                  accessibilityHint="Opens a shareable profile card, QR code, and link"
+                  style={[s.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
+                  testID="seller-share-profile-btn"
+                />
+              </View>
             </View>
           </>
         )}
@@ -765,6 +764,10 @@ export default function ProfileScreen() {
         title={brandTitle}
         onClose={() => setMenuOpen(false)}
         items={[
+          // One menu (polish #98): Settings moved here from its own gear icon.
+          { key: 'settings', icon: 'settings', label: 'Settings', onPress: () => nav('/settings') },
+          // Was Edit's long-press (the shared Button has no long press).
+          { key: 'quick-edit', icon: 'edit-3', label: 'Edit name and bio', onPress: openProfileEditor },
           caps.showShare && { key: 'share', icon: 'share-2', label: 'Share profile', onPress: () => setShareSheetVisible(true) },
           caps.showViewAsVisitor && userId && {
             key: 'view-as-visitor', icon: 'eye', label: 'View as visitor',
@@ -892,6 +895,8 @@ const s = StyleSheet.create({
     borderRadius: RADIUS.md, marginBottom: SP.sm,
   },
   actionRow: { flexDirection: 'row', gap: SP.sm },
+  actionFlex: { flex: 1, minWidth: 0 },
+  actionButton: { borderRadius: 8, paddingHorizontal: SP.sm },
   shopPillWrap: { paddingTop: SP.sm, paddingBottom: SP.sm },
   draftsTile: {
     borderWidth: 1, borderColor: BORDER, backgroundColor: CARD,

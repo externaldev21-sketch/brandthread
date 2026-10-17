@@ -36,6 +36,8 @@ describe('Orders empty state has a title, matching Products/Collections/Messages
   it('shows "No orders yet" with the requested subtitle, no fake numbers', () => {
     const source = read(SCREENS.Orders);
     expect(source).toContain('title="No orders yet"');
-    expect(source).toContain('message="Orders show up here once a buyer checks out."');
+    // Polish #94: a store with no orders at all gets a real next step.
+    expect(source).toContain("'Share your store to get your first sale.'");
+    expect(source).toContain("'Orders show up here once a buyer checks out.'");
   });
 });

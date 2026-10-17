@@ -35,10 +35,11 @@ describe('Dashboard: store URL + copy icon row next to the title', () => {
     expect(fnBody).not.toContain('Alert.alert');
   });
 
-  it('sits on the same row as the Dashboard title, baseline-aligned, and both tapping the URL text and the icon copy', () => {
-    expect(dashboard).toContain('titleRow: { flex: 1, flexDirection: \'row\', alignItems: \'baseline\'');
+  it('sits under the store name, next to the store avatar (polish #85), and both tapping the URL text and the icon copy', () => {
+    expect(dashboard).toContain('titleRow: { flex: 1, flexDirection: \'row\', alignItems: \'center\'');
     const rowBlock = dashboard.slice(dashboard.indexOf('style={styles.titleRow}'), dashboard.indexOf('<ActivityBellButton'));
-    expect(rowBlock).toContain('Dashboard</Text>');
+    expect(rowBlock).toContain('<Avatar uri={storeIdentity.logoUrl}');
+    expect(rowBlock).toContain("{storeIdentity.name ?? 'Dashboard'}");
     expect(rowBlock).toContain('onPress={handleCopyStoreUrl}');
     expect(rowBlock).toContain('testID="seller-dashboard-store-url"');
     expect(rowBlock).toContain("name={storeUrlCopied ? 'check' : 'copy'}");

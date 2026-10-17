@@ -27,14 +27,17 @@ describe('seller profile action layout', () => {
   // reachable from the top-bar share icon) and Contact was folded into the
   // new Messages button. Settings stays in the top-right gear; Go Live and
   // Create Post live in the Studio control center.
-  it('shows the Professional dashboard row and the Edit + Messages action row below it', () => {
+  it('shows the Professional dashboard row and the Edit profile + Share profile row below it', () => {
     expect(profileSource).toContain('Professional dashboard');
-    expect(profileSource).toContain('<ProfileEditMessagesRow');
-    expect(profileSource).toContain("onEdit={() => nav('/edit-profile')}");
-    expect(profileSource).toContain("onMessages={() => nav('/seller-inbox')}");
-    // The top-bar share icon (testID="seller-share-profile-btn") keeps its
-    // own "Share profile" accessibility label — only the action row's
-    // separate Share text button is gone.
+    // Polish #99: on your own profile Edit and Share are equal secondary
+    // buttons (Depop own shop / the buyer own profile); Messages is no
+    // longer the filled "primary" action, and the labelled Share button
+    // replaces the old unlabelled top-bar share icon.
+    expect(profileSource).not.toContain('<ProfileEditMessagesRow');
+    expect(profileSource).toContain('label="Edit profile"');
+    expect(profileSource).toContain('label="Share profile"');
+    expect(profileSource).toContain("onPress={() => nav('/edit-profile')}");
+    expect(profileSource).not.toContain('name="share-2"\n');
     expect(profileSource).not.toContain('testID="profile-share-btn"');
     expect(profileSource).not.toContain('testID="profile-contact-btn"');
     expect(profileSource).not.toContain("label='Go Live'");
