@@ -41,6 +41,9 @@ onboarding redirect).
 | Featured | `GET/POST /admin/featured` · `PATCH/DELETE /admin/featured/:id` · public read: `GET /api/public/featured` |
 | Announcements | `GET/POST /admin/announcements` · `GET /admin/announcements/audience?audience=` |
 | Invite codes | `GET/POST /admin/invites` · `POST /admin/invites/:id/disable\|enable` |
+| Held content | `GET /admin/held?type=all\|post\|story\|comment\|media&cursor=` · `GET /admin/held/counts` · `POST /admin/held/:type/:id/approve\|remove` (same queue as `/api/moderation/held`, admin-gated + audited) |
+| Repeat infringers | `GET /admin/repeat-infringers` (sellers with IP strikes + their cases) · `POST /admin/repeat-infringers/:userId/clear {resetStrikes?}` |
+| Feed ranking | `GET /admin/ranking` · `PATCH /admin/ranking` (partial config, clamped) · `POST /admin/ranking/reset` — `RANKING_WEIGHTS_JSON` env still wins over stored values |
 | Audit | `GET /admin/audit?actor=&action=&targetId=` |
 
 Nothing here deletes accounts or data, and nothing moves money: refunds and disputes are
