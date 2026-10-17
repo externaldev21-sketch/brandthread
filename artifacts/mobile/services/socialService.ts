@@ -310,51 +310,150 @@ export async function createPost(params: {
   notify();
   return post;
 }
+/** Real (server) post ids are UUIDs; anything else is a local/preview id. */
+const SERVER_POST_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function isServerPostId(id: string | null | undefined): id is string {
+  return !!id && SERVER_POST_ID_RE.test(id);
+}
+
+/** Whether the signed-in viewer wrote this post. Real posts carry the Clerk
+ *  user id as authorId; preview-session posts carry MY_USER_ID. */
+export function isOwnPost(post: Pick<BuyerPost, 'authorId'> | null | undefined, userId: string | null | undefined): boolean {
+  if (!post) return false;
+  return post.authorId === MY_USER_ID || (!!userId && post.authorId === userId);
+}
+
+/** PATCH /api/posts/:id for a real account's own post. Throws on failure. */
+function patchOwnPost(id: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  return serviceRequest<Record<string, unknown>>(`/api/posts/${encodeURIComponent(id)}`, {
+    method: 'PATCH', body: JSON.stringify(body),
+  });
+}
+
+/** Own-post library row (GET /api/posts/mine, postDetails shape) to BuyerPost. */
+function ownPostToBuyerPost(raw: any, profile: BuyerSocialProfile, userId: string): BuyerPost {
+  const name = profile.name || raw?.seller?.displayName || 'You';
+  const isVideo = raw?.mediaType === 'video';
+  const urls: string[] = Array.isArray(raw?.mediaUrls) ? raw.mediaUrls : [];
+  return {
+    id: raw.id,
+    authorId: raw.userId ?? userId,
+    authorName: name,
+    authorHandle: profile.username ? `@${profile.username}` : '',
+    authorInitials: profile.avatarInitials || name.slice(0, 1).toUpperCase(),
+    authorColor: profile.avatarColor || pickAvatarColor(userId),
+    authorAccountType: 'buyer',
+    feedEligibility: 'profile_only',
+    profileVisibility: raw?.visibility?.isPublic === false ? 'friends_only' : 'public',
+    type: isVideo ? 'video' : raw?.mediaType === 'slideshow' ? 'slideshow' : 'photo',
+    caption: raw?.caption ?? '',
+    hashtags: Array.isArray(raw?.hashtags) ? raw.hashtags : [],
+    mediaColors: [],
+    mediaUrl: isVideo ? (raw?.mediaUrl || undefined) : (urls[0] || raw?.mediaUrl || raw?.thumbnailUrl || undefined),
+    mediaUrls: urls,
+    slides: mapSlides(raw?.slides),
+    aspectRatio: raw?.aspectRatio,
+    likesCount: Number(raw?.likesCount ?? 0),
+    commentsCount: Number(raw?.commentsCount ?? 0),
+    repostsCount: Number(raw?.repostsCount ?? 0),
+    likedByMe: false,
+    savedByMe: false,
+    repostedByMe: false,
+    isArchived: raw?.postStatus === 'archived',
+    isDraft: raw?.postStatus === 'draft',
+    createdAt: raw?.createdAt,
+    updatedAt: raw?.updatedAt ?? raw?.createdAt,
+  };
+}
+
+/** My archived posts (only I can see them). Real accounts read the server. */
+export async function getMyArchivedPosts(k: SocialKeys = K()): Promise<BuyerPost[]> {
+  if (isBuyerDevPreview()) return previewMyPosts.filter(p => p.isArchived);
+  if (k.userId === 'anon') return [];
+  const [remote, profile] = await Promise.all([
+    serviceRequest<unknown[]>('/api/posts/mine?status=archived'),
+    getMyProfile(k),
+  ]);
+  return Array.isArray(remote)
+    ? remote.filter((raw: any) => raw?.id).map(raw => ({ ...ownPostToBuyerPost(raw, profile, k.userId), isArchived: true }))
+    : [];
+}
+
+/**
+ * Edit one of my posts. Real accounts PATCH the server and throw on failure
+ * (a 422 CONTENT_REJECTED carries the moderation message); the returned post
+ * reflects what the server saved.
+ */
 export async function updatePost(id: string, updates: Partial<Pick<BuyerPost, 'caption' | 'hashtags' | 'profileVisibility' | 'isDraft'>>, k: SocialKeys = K()): Promise<BuyerPost | null> {
-  const posts = await getMyPosts(k);
-  const idx = posts.findIndex(p => p.id === id);
-  if (idx < 0) return null;
-  const updated = { ...posts[idx], ...updates, updatedAt: iso() };
-  posts[idx] = updated;
-  await save(k.posts, posts);
+  if (isBuyerDevPreview()) {
+    const idx = previewMyPosts.findIndex(p => p.id === id);
+    if (idx < 0) return null;
+    const updated = { ...previewMyPosts[idx], ...updates, updatedAt: iso() };
+    previewMyPosts[idx] = updated;
+    notify();
+    return updated;
+  }
+  const body: Record<string, unknown> = {};
+  if (updates.caption !== undefined) body.caption = updates.caption;
+  if (updates.hashtags !== undefined) body.hashtags = updates.hashtags;
+  if (updates.isDraft !== undefined) body.isDraft = updates.isDraft;
+  const saved = await patchOwnPost(id, body);
   notify();
-  return updated;
+  const profile = await getMyProfile(k);
+  return ownPostToBuyerPost(saved, profile, k.userId);
 }
 export async function deletePost(id: string): Promise<void> {
   const k = K();
-  const posts = await getMyPosts(k);
   if (isBuyerDevPreview()) {
     const idx = previewMyPosts.findIndex(p => p.id === id);
     if (idx >= 0) previewMyPosts.splice(idx, 1);
   } else {
-    await save(k.posts, posts.filter(p => p.id !== id));
+    // Soft delete on the server; throws (and changes nothing locally) on failure.
+    await serviceRequest(`/api/posts/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
   const p = await getMyProfile(k);
   await updateMyProfile({ postsCount: Math.max(0, p.postsCount - 1) }, k);
   notify();
 }
 export async function archivePost(id: string): Promise<void> {
-  const k = K();
-  await updatePost(id, {}, k);
-  const posts = await getMyPosts(k);
-  const idx = posts.findIndex(p => p.id === id);
-  if (idx >= 0) { posts[idx].isArchived = true; await save(k.posts, posts); notify(); }
+  if (isBuyerDevPreview()) {
+    const post = previewMyPosts.find(p => p.id === id);
+    if (post) { post.isArchived = true; notify(); }
+    return;
+  }
+  await patchOwnPost(id, { postStatus: 'archived' });
+  notify();
 }
 export async function unarchivePost(id: string): Promise<void> {
-  const k = K();
-  const posts = await getMyPosts(k);
-  const idx = posts.findIndex(p => p.id === id);
-  if (idx >= 0) { posts[idx].isArchived = false; await save(k.posts, posts); notify(); }
-}
-export async function likePost(id: string): Promise<void> {
-  const k = K();
-  const posts = await getMyPosts(k);
-  const idx = posts.findIndex(p => p.id === id);
-  if (idx >= 0) {
-    posts[idx].likedByMe = !posts[idx].likedByMe;
-    posts[idx].likesCount += posts[idx].likedByMe ? 1 : -1;
-    await save(k.posts, posts); notify();
+  if (isBuyerDevPreview()) {
+    const post = previewMyPosts.find(p => p.id === id);
+    if (post) { post.isArchived = false; notify(); }
+    return;
   }
+  await patchOwnPost(id, { postStatus: 'published' });
+  notify();
+}
+/**
+ * Like / unlike a post. `liked` is the desired end state. Real posts persist
+ * through POST /api/posts/:id/interact and throw on failure (the caller rolls
+ * back or queues a retry); preview posts update the preview session store.
+ */
+export async function likePost(id: string, liked: boolean): Promise<{ count?: number }> {
+  if (isBuyerDevPreview() || !isServerPostId(id)) {
+    const post = previewMyPosts.find(p => p.id === id);
+    if (post && post.likedByMe !== liked) {
+      post.likedByMe = liked;
+      post.likesCount = Math.max(0, post.likesCount + (liked ? 1 : -1));
+      notify();
+    }
+    return {};
+  }
+  const result = await serviceRequest<{ action: string; count?: number }>(
+    `/api/posts/${encodeURIComponent(id)}/interact`,
+    { method: 'POST', body: JSON.stringify({ type: 'like', value: liked ? 'add' : 'remove' }) },
+  );
+  notify();
+  return { count: typeof result?.count === 'number' ? result.count : undefined };
 }
 
 // ─── Friend-post engagement (likes persisted independently of K().posts) ─────────

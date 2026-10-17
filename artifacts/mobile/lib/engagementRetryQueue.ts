@@ -35,6 +35,12 @@ let queue: QueuedEngagementAction[] = [];
 let loaded = false;
 let loadPromise: Promise<void> | null = null;
 let executor: ((action: QueuedEngagementAction) => Promise<void>) | null = null;
+/**
+ * App-wide executor used while no screen has registered its own (the feed
+ * registers one only while mounted). Returns false for a kind it can't replay
+ * on its own, which leaves that action queued, untouched, for the screen.
+ */
+let fallbackExecutor: ((action: QueuedEngagementAction) => Promise<boolean>) | null = null;
 let processing = false;
 const listeners = new Set<(queue: QueuedEngagementAction[]) => void>();
 
@@ -69,6 +75,11 @@ export function setEngagementRetryExecutor(fn: ((action: QueuedEngagementAction)
   executor = fn;
 }
 
+/** Register the app-wide executor (see lib/engagementRetryFallback.ts). */
+export function setFallbackEngagementRetryExecutor(fn: ((action: QueuedEngagementAction) => Promise<boolean>) | null): void {
+  fallbackExecutor = fn;
+}
+
 /** True for connectivity/server-outage failures — anything else (a real 4xx rejection) should roll back instead of queuing. */
 export function isRetryableFailure(error: unknown): boolean {
   return classifyNetworkError(error) !== null;
@@ -92,14 +103,19 @@ export async function enqueueEngagementRetry(action: Pick<QueuedEngagementAction
 
 export async function processEngagementRetryQueue(): Promise<void> {
   await load();
-  if (processing || !executor || queue.length === 0) return;
+  if (processing || (!executor && !fallbackExecutor) || queue.length === 0) return;
   processing = true;
   try {
-    const active = executor;
+    const primary = executor;
+    const fallback = fallbackExecutor;
     const remaining: QueuedEngagementAction[] = [];
     for (const action of queue) {
       try {
-        await active(action);
+        if (primary) {
+          await primary(action);
+        } else if (!(await fallback!(action))) {
+          remaining.push(action);
+        }
       } catch (error) {
         if (isRetryableFailure(error) && action.attempts + 1 < MAX_ATTEMPTS) {
           remaining.push({ ...action, attempts: action.attempts + 1 });
@@ -139,5 +155,6 @@ export function __resetEngagementRetryQueueForTests(): void {
   loaded = false;
   loadPromise = null;
   executor = null;
+  fallbackExecutor = null;
   processing = false;
 }

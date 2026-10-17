@@ -39,6 +39,7 @@ import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { locationsByPlaceId, resolvePostLocation, withLocation } from "../lib/places";
 import { decodeCursor, encodeCursor } from "../lib/cursor";
 import { mergeHashtags, syncPostHashtags } from "../lib/hashtags";
+import { notifyPostTagsIfLive, syncPostUserTags } from "../lib/postUserTags";
 import { attachQuoteData, postCardImage } from "../lib/quotedPosts";
 import {
   authorInGoodStanding,
@@ -947,6 +948,10 @@ router.post("/", requireAuth, async (req, res) => {
   // not fail the post itself.
   await syncPostHashtags(post.id, post.hashtags ?? [], post.createdAt)
     .catch((err) => req.log.error({ err, postId: post.id }, "Could not index post hashtags"));
+  // People @mentioned in the caption are tagged (profile "Tagged" tab). Like
+  // the hashtag index, a failure here must not fail the post itself.
+  await syncPostUserTags(post.id, clerkId, post.caption)
+    .catch((err) => req.log.error({ err, postId: post.id }, "Could not save post tags"));
   if (!captionHeld && screenHeld && heldVerdict) {
     await recordHeldMedia({
       targetType: post.mediaType === "video" ? "video" : "post",
@@ -1031,6 +1036,8 @@ router.post("/", requireAuth, async (req, res) => {
   if (post.mediaType === "video" && postStatus === "published" && !captionHeld) {
     scheduleAutoCaptions(post.id);
   }
+  // "Tagged you" only once the post is live; drafts/scheduled/held notify on go-live.
+  await notifyPostTagsIfLive(post.id);
 
   return res.status(201).json({
     ...withQuote,
@@ -1344,6 +1351,14 @@ router.patch("/:id", requireAuth, async (req, res) => {
     if (shouldBePublic) {
       await setComposedMediaVisibility(clerkId, nextMediaPaths, "public");
     }
+    // Caption edits re-sync who is tagged (removed @mentions untag). Tags
+    // never fail the edit itself; "tagged you" goes out once the post is live
+    // (idempotent, so a draft -> published transition notifies here too).
+    if (body.caption !== undefined) {
+      await syncPostUserTags(id, clerkId, updated.caption)
+        .catch((err) => req.log.error({ err, postId: id }, "Could not sync post tags"));
+    }
+    await notifyPostTagsIfLive(id);
     return res.json((await postDetails([updated], clerkId))[0]);
   } catch (err) {
     req.log.error({ err, clerkId, postId: id }, "Failed to update seller post");
@@ -1744,7 +1759,7 @@ router.get("/:id", async (req, res) => {
     }
   }
 
-  const [sellerRows, tags, likeRows, repostRows] = await Promise.all([
+  const [sellerRows, tags, likeRows, repostRows, myLikeRows, mySaveRows] = await Promise.all([
     db.select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified })
       .from(users).where(eq(users.clerkId, post.userId)).limit(1),
     db.select({
@@ -1760,6 +1775,16 @@ router.get("/:id", async (req, res) => {
       .where(and(eq(interactions.postId, id), eq(interactions.type, "like"))),
     db.select({ count: count() }).from(interactions)
       .where(and(eq(interactions.postId, id), eq(interactions.type, "repost"))),
+    // The signed-in viewer's own like / save, so the post viewer opens with
+    // the right heart and bookmark state.
+    viewerId
+      ? db.select({ id: interactions.id }).from(interactions)
+        .where(and(eq(interactions.postId, id), eq(interactions.type, "like"), eq(interactions.userId, viewerId))).limit(1)
+      : Promise.resolve([]),
+    viewerId
+      ? db.select({ id: savedItems.id }).from(savedItems)
+        .where(and(eq(savedItems.targetId, id), eq(savedItems.itemType, "post"), eq(savedItems.userId, viewerId))).limit(1)
+      : Promise.resolve([]),
   ]);
 
   const minPriceByProduct = await productMinPrices(tags.map((t) => t.productId));
@@ -1770,6 +1795,8 @@ router.get("/:id", async (req, res) => {
     taggedProducts: tags.map((t) => ({ ...t, priceCents: minPriceByProduct[t.productId] ?? 0 })),
     likeCount:    post.visibility?.showLikeCount === false ? null : likeRows[0]?.count ?? 0,
     repostCount:  repostRows[0]?.count ?? 0,
+    likedByMe:    myLikeRows.length > 0,
+    savedByMe:    mySaveRows.length > 0,
   }], viewerId);
   return res.json(detail);
 });

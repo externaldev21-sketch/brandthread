@@ -10,7 +10,7 @@ import { buildPostUrl } from '@/lib/shareLinks';
 import { QuotedPostCard } from '@/components/social/QuotedPostCard';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Modal, Share, Animated, useWindowDimensions, Platform,
+  TextInput, Modal, Share, Animated, useWindowDimensions, Platform, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -29,9 +29,12 @@ import {
 } from '@/lib/theme';
 import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
 import {
-  getComments, likePost, repostPost, saveItem, getMyPosts, getPostById, updatePost, deletePost,
+  getComments, likePost, repostPost, saveItem, removeSavedItem, isItemSaved, getMyPosts, getMyArchivedPosts,
+  getPostById, updatePost, deletePost, isServerPostId, isOwnPost,
   MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE,
 } from '@/services/socialService';
+import { enqueueEngagementRetry, isRetryableFailure } from '@/lib/engagementRetryQueue';
+import { apiErrorMessage } from '@/lib/safety';
 import type { BuyerPost, Comment, PostSlide } from '@/services/socialTypes';
 import { mapSlides } from '@/services/socialService';
 import { PostCarousel } from '@/components/social/PostCarousel';
@@ -141,7 +144,7 @@ function publicPostToBuyerPost(raw: any): BuyerPost | null {
     slides: mapSlides(raw.slides),
     aspectRatio: raw.aspectRatio,
     likesCount: Number(raw.likeCount ?? 0), commentsCount: 0, repostsCount: Number(raw.repostCount ?? 0),
-    likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
+    likedByMe: raw.likedByMe === true, savedByMe: raw.savedByMe === true, repostedByMe: false, isArchived: false, isDraft: false,
     createdAt: raw.createdAt, updatedAt: raw.updatedAt ?? raw.createdAt,
   };
 }
@@ -159,7 +162,7 @@ async function loadPublicPost(api: ReturnType<typeof useApi>, id: string): Promi
       type: p.mediaType ?? 'photo', caption: p.caption ?? '', hashtags: p.hashtags ?? [], mediaColors: [],
       mediaUrl: p.mediaUrl, mediaUrls: urls, slides: mapSlides(p.slides), aspectRatio: p.aspectRatio,
       likesCount: p.likeCount ?? 0, commentsCount: 0, repostsCount: p.repostCount ?? 0,
-      likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
+      likedByMe: p.likedByMe === true, savedByMe: p.savedByMe === true, repostedByMe: false, isArchived: false, isDraft: false,
       createdAt: p.createdAt, updatedAt: p.updatedAt ?? p.createdAt,
     };
   } catch { return null; }
@@ -206,14 +209,20 @@ export default function BuyerPostViewer() {
   }, [api, userId, post?.id]);
 
   // When post is null (not yet loaded or not found in my posts), assume non-owner
-  // so report is visible and owner-only controls are hidden.
-  const isOwner = post !== null && post.authorId === MY_USER_ID;
+  // so report is visible and owner-only controls are hidden. Real accounts'
+  // posts carry the Clerk user id; preview posts carry MY_USER_ID.
+  const isOwner = isOwnPost(post, userId);
 
   const loadPost = useCallback(async () => {
     let found: BuyerPost | null = null;
     try {
       const all = await getMyPosts();
       found = all.find(p => p.id === params.postId) ?? await getPostById(params.postId) ?? await loadPublicPost(api, params.postId);
+      // My own archived post (opened from Archive) is hidden from every
+      // public/profile read above.
+      if (!found && userId && isServerPostId(params.postId)) {
+        found = (await getMyArchivedPosts()).find(p => p.id === params.postId) ?? null;
+      }
     } catch {
       // A failed lookup leaves the placeholder, as before — or, in the
       // preview, falls through to the seeded post below.
@@ -232,8 +241,13 @@ export default function BuyerPostViewer() {
       setReposted(found.repostedByMe ?? false);
       setSaved(found.savedByMe ?? false);
       setEditCaption(found.caption);
+      // The buyer-social post read doesn't report saves; ask the saved list.
+      if (!found.savedByMe && userId && isServerPostId(found.id)) {
+        const id = found.id;
+        isItemSaved(id).then((isSaved) => { if (isSaved) setSaved(true); }).catch(() => {});
+      }
     }
-  }, [params.postId, api]);
+  }, [params.postId, api, userId]);
 
   useEffect(() => {
     loadPost();
@@ -243,11 +257,46 @@ export default function BuyerPostViewer() {
   }, [loadPost, params.postId]);
 
   const handleLike = async () => {
+    if (!params.postId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const postId = params.postId;
     const newLiked = !liked;
     setLiked(newLiked);
     setLikeCount(c => newLiked ? c + 1 : Math.max(0, c - 1));
-    if (params.postId) await likePost(params.postId);
+    try {
+      const { count } = await likePost(postId, newLiked);
+      if (typeof count === 'number') setLikeCount(count);
+    } catch (error) {
+      // Offline / server outage: keep the optimistic state and replay later.
+      if (isRetryableFailure(error)) {
+        void enqueueEngagementRetry({ kind: 'like', targetId: postId, payload: { value: newLiked ? 'add' : 'remove' } });
+        return;
+      }
+      setLiked(!newLiked);
+      setLikeCount(c => newLiked ? Math.max(0, c - 1) : c + 1);
+      Alert.alert(newLiked ? "Couldn't like post" : "Couldn't unlike post", apiErrorMessage(error, 'Try again.'));
+    }
+  };
+
+  const handleToggleSave = async () => {
+    if (!params.postId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const postId = params.postId;
+    const next = !saved;
+    setSaved(next);
+    try {
+      if (next) {
+        await saveItem(
+          { type: 'post', targetId: postId, title: caption || 'Post', accentColor: mediaColor1 },
+          { onRemoteSaved: () => { void requestContextualPushPermission(userId, api); } },
+        );
+      } else {
+        await removeSavedItem(postId);
+      }
+    } catch (error) {
+      setSaved(!next);
+      Alert.alert(next ? "Couldn't save post" : "Couldn't remove from saved", apiErrorMessage(error, 'Try again.'));
+    }
   };
 
   const handleShare = async () => {
@@ -262,19 +311,40 @@ export default function BuyerPostViewer() {
     } catch {}
   };
 
+  const [savingCaption, setSavingCaption] = useState(false);
   const handleSaveCaption = async () => {
-    if (!post) return;
-    await updatePost(post.id, { caption: editCaption });
-    setPost(prev => prev ? { ...prev, caption: editCaption } : prev);
-    setEditOpen(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (!post || savingCaption) return;
+    setSavingCaption(true);
+    try {
+      const saved = await updatePost(post.id, { caption: editCaption });
+      const nextCaption = saved?.caption ?? editCaption;
+      setPost(prev => prev ? { ...prev, caption: nextCaption } : prev);
+      setEditOpen(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      // Keep the sheet open with the draft so nothing typed is lost; a
+      // moderation rejection (422) explains what to change.
+      Alert.alert("Couldn't save caption", apiErrorMessage(error, 'Your caption was not saved. Try again.'));
+    } finally {
+      setSavingCaption(false);
+    }
   };
 
+  const [deleting, setDeleting] = useState(false);
   const handleDelete = async () => {
-    if (!post) return;
-    await deletePost(post.id);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    goBackOr(router);
+    if (!post || deleting) return;
+    setDeleting(true);
+    try {
+      await deletePost(post.id);
+      setDeleteConfirm(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      goBackOr(router);
+    } catch (error) {
+      setDeleteConfirm(false);
+      Alert.alert("Couldn't delete post", apiErrorMessage(error, 'Try again.'));
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // Use params as display fallback while the async load completes
@@ -426,16 +496,8 @@ export default function BuyerPostViewer() {
           </TouchableOpacity>
           <TouchableOpacity accessibilityLabel="Save post" accessibilityRole="button"
             style={s.engageBtn}
-            onPress={async () => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              if (!saved && params.postId) {
-                setSaved(true);
-                await saveItem(
-                  { type: 'post', targetId: params.postId, title: caption || 'Post', accentColor: mediaColor1 },
-                  { onRemoteSaved: () => { void requestContextualPushPermission(userId, api); } },
-                );
-              }
-            }}
+            accessibilityState={{ selected: saved }}
+            onPress={handleToggleSave}
           >
             <Feather name="bookmark" size={22} color={saved ? PURPLE : FG} />
           </TouchableOpacity>
@@ -533,7 +595,7 @@ export default function BuyerPostViewer() {
               />
               <View style={s.modalActions}>
                 <Button label="Cancel" variant="secondary" style={s.modalActionBtn} onPress={() => setEditOpen(false)} />
-                <Button label="Save" variant="primary" style={s.modalActionBtn} onPress={handleSaveCaption} />
+                <Button label="Save" variant="primary" style={s.modalActionBtn} onPress={handleSaveCaption} disabled={savingCaption} />
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -550,7 +612,7 @@ export default function BuyerPostViewer() {
               <Text style={s.modalDesc}>This will permanently remove the post from your profile. This cannot be undone.</Text>
               <View style={s.modalActions}>
                 <Button label="Cancel" variant="secondary" style={s.modalActionBtn} onPress={() => setDeleteConfirm(false)} />
-                <Button label="Delete" variant="destructive" style={s.modalActionBtn} onPress={handleDelete} />
+                <Button label="Delete" variant="destructive" style={s.modalActionBtn} onPress={handleDelete} disabled={deleting} />
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
