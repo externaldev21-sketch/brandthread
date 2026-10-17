@@ -1,5 +1,10 @@
+/**
+ * Mobile App Builder — marketing page for a product that does not exist yet.
+ * Intentionally NOT linked from anywhere (needs-Dev: there is no app-builder
+ * backend). "Start building" says so honestly instead of doing nothing.
+ */
 import React from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -36,7 +41,14 @@ export default function MobileAppBuilderScreen() {
           <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>
             Turn your storefront into a fully branded iOS & Android app — no code required.
           </Text>
-          <TouchableOpacity style={[styles.ctaBtn, { backgroundColor: primary }]} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={[styles.ctaBtn, { backgroundColor: primary }]}
+            activeOpacity={0.85}
+            onPress={() => Alert.alert(
+              'Not available yet',
+              'The Mobile App Builder isn’t available yet, so nothing has been set up. Your Brandthread storefront already works on every phone in the meantime.',
+            )}
+          >
             <Feather name="zap" size={15} color={colors.primaryForeground} />
             <Text style={[styles.ctaText, { color: colors.primaryForeground }]}>Start building</Text>
           </TouchableOpacity>
