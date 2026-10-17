@@ -159,7 +159,7 @@ export default function BuyerReturnRequestScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsMultipleSelection: true,
-        quality: 0.7,
+        quality: 0.9,
         selectionLimit: MAX_PHOTOS - evidencePhotos.length,
       });
       if (!result.canceled) {

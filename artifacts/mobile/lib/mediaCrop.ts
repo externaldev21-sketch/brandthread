@@ -153,6 +153,9 @@ export function isIdentityCrop(transform: CropTransform): boolean {
   return transform.scale === 1 && transform.tx === 0 && transform.ty === 0;
 }
 
+/** The crop is re-encoded once on device; keep it visually lossless. */
+export const CROP_JPEG_QUALITY = 1;
+
 function getImageSize(uri: string): Promise<{ width: number; height: number }> {
   // Lazy require — keeps this module's pure math functions importable
   // (and unit-testable) without pulling in react-native at module-eval time.
@@ -163,18 +166,13 @@ function getImageSize(uri: string): Promise<{ width: number; height: number }> {
   });
 }
 
-/** Minimum output size for a cropped 3:4 render, so a tightly-zoomed crop of
- *  a modest source photo never uploads a soft/undersized image. */
-export const MIN_CROP_OUTPUT_WIDTH = 1080;
-export const MIN_CROP_OUTPUT_HEIGHT = 1440;
-
 /**
  * Applies a normalized crop rect to a source image via
- * expo-image-manipulator, resizing up to at least MIN_CROP_OUTPUT_WIDTH x
- * MIN_CROP_OUTPUT_HEIGHT when the cropped region is smaller, and returns the
- * new local URI. Falls back to the original URI on any failure — a failed
- * crop must never block the creator from continuing with the photo they
- * picked.
+ * expo-image-manipulator at the source's native resolution and returns the
+ * new local URI. No upscaling (it adds no detail, only bytes) and quality 1:
+ * the server does the one optimized encode. Falls back to the original URI on
+ * any failure — a failed crop must never block the creator from continuing
+ * with the photo they picked.
  */
 export async function applyCropRect(
   uri: string,
@@ -189,15 +187,11 @@ export async function applyCropRect(
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const ImageManipulator: typeof ImageManipulatorTypes = require('expo-image-manipulator');
     const actions: ImageManipulatorTypes.Action[] = [{ crop: pixelRect }];
-    if (pixelRect.width < MIN_CROP_OUTPUT_WIDTH || pixelRect.height < MIN_CROP_OUTPUT_HEIGHT) {
-      const upscale = Math.max(MIN_CROP_OUTPUT_WIDTH / pixelRect.width, MIN_CROP_OUTPUT_HEIGHT / pixelRect.height);
-      actions.push({ resize: { width: Math.round(pixelRect.width * upscale), height: Math.round(pixelRect.height * upscale) } });
-    }
 
     const result = await ImageManipulator.manipulateAsync(
       uri,
       actions,
-      { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG },
+      { compress: CROP_JPEG_QUALITY, format: ImageManipulator.SaveFormat.JPEG },
     );
     return result.uri;
   } catch {

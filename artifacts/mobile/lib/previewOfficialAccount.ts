@@ -54,6 +54,9 @@ const base = {
   isOfficial: true,
 };
 
+/** Every bundled runway sample (video and stills) is 1080x1920. */
+const SAMPLE_DIMS = { width: 1080, height: 1920 };
+
 export function previewOfficialPosts(): SellerThreadPost[] {
   return [
     {
@@ -63,6 +66,9 @@ export function previewOfficialPosts(): SellerThreadPost[] {
       mediaUris: [uri(VIDEO)],
       thumbnailUri: uri(POSTERS[0]),
       aspectRatio: '9:16',
+      // Measured sizes of the bundled samples, as the API would send them.
+      mediaDims: [SAMPLE_DIMS],
+      posterDims: SAMPLE_DIMS,
       contentType: 'video',
       likesCount: 18300,
       viewsCount: 64200,
@@ -75,6 +81,8 @@ export function previewOfficialPosts(): SellerThreadPost[] {
       mediaUris: POSTERS.map(uri),
       thumbnailUri: uri(POSTERS[0]),
       aspectRatio: '4:5',
+      mediaDims: POSTERS.map(() => SAMPLE_DIMS),
+      posterDims: SAMPLE_DIMS,
       contentType: 'slideshow',
       likesCount: 9400,
       viewsCount: 30100,

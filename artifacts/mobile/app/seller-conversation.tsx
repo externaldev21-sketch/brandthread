@@ -789,7 +789,7 @@ export default function SellerConversationScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       selectionLimit: 15,
-      quality: 0.85,
+      quality: 0.9,
       base64: true,
     });
     if (result.canceled || !result.assets.length) return;
@@ -833,7 +833,7 @@ export default function SellerConversationScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
       videoMaxDuration: 59,
-      quality: 0.7,
+      quality: 0.9,
       base64: true,
     });
     if (result.canceled || !result.assets.length) return;

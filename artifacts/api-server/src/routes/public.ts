@@ -34,6 +34,8 @@ import {
 } from "../lib/pagination";
 import { setPublicCacheHeaders, setViewerScopedCacheHeaders } from "../lib/httpCache";
 import { applySalesToVariants } from "../lib/pricing/salesRuntime";
+import { postDimsPayload } from "../lib/mediaDimensions";
+import { postDimsColumns } from "../lib/postDimsColumns";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -714,6 +716,7 @@ router.get("/search", async (req, res): Promise<void> => {
           caption:   posts.caption,
           mediaUrl:  posts.mediaUrl,
           thumbnailUrl: posts.thumbnailUrl,
+          ...postDimsColumns,
           authorId:  posts.userId,
           createdAt: posts.createdAt,
           relevance: relevanceScore(sql`COALESCE(${posts.caption}, '')`, term),
@@ -855,6 +858,7 @@ router.get("/search", async (req, res): Promise<void> => {
         caption:       v.caption,
         thumbnailUrl:  v.thumbnailUrl ?? null,
         videoUrl:      v.mediaUrl,
+        ...postDimsPayload(v),
         authorId:      v.authorId,
         authorName:    author.name,
         authorHandle:  author.handle,
@@ -1707,6 +1711,8 @@ router.get("/posts", async (req, res) => {
         mediaUrls:   posts.mediaUrls,
         mediaType:   posts.mediaType,
         aspectRatio: posts.aspectRatio,
+        slides:      posts.slides,
+        ...postDimsColumns,
         caption:     posts.caption,
         placeId:     posts.placeId,
         hashtags:    posts.hashtags,
@@ -1818,6 +1824,8 @@ router.get("/posts", async (req, res) => {
       mediaUrls:      p.mediaUrls,
       mediaType:      p.mediaType,
       aspectRatio:    p.aspectRatio,
+      slides:         p.slides,
+      ...postDimsPayload(p),
       caption:        p.caption,
       hashtags:       p.hashtags,
       styleTags:      p.styleTags,

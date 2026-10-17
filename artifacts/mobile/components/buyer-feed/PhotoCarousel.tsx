@@ -4,8 +4,13 @@
  *
  *  - "1/6" counter, top-right, and a thin segment indicator at the bottom.
  *  - Remembers the slide per post (lib/carouselMemory) — come back, same slide.
- *  - Preloads the next slide's image so a swipe never shows a blank frame.
- *  - Every slide fills the same fixed page box (contain), so nothing jumps.
+ *  - Preloads the next two slides (and the one behind) into memory+disk, so a
+ *    swipe never shows a blank frame.
+ *  - Final size on the first frame: each slide's box is computed from its
+ *    server-stored pixel size (`aspects`, lib/mediaFrame) — never from an
+ *    image onLoad or an onLayout — and painted with no placeholder and no
+ *    fade, so returning to a cached slideshow shows it instantly at the same
+ *    size.
  *  - Taps are not handled here: the parent page's Pressable still owns
  *    single/double tap, so double-tap like works on any slide.
  */
@@ -15,12 +20,15 @@ import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { CachedImage } from '@/components/CachedImage';
 import { rememberSlide, rememberedSlide } from '@/lib/carouselMemory';
+import { containRect } from '@/lib/mediaFrame';
 import { CREATE_CANVAS as MEDIA, FONT } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 
 export type PhotoCarouselProps = {
   postId: string;
   uris: string[];
+  /** Width / height per slide (from the post's stored pixel sizes). */
+  aspects?: number[];
   pageWidth: number;
   pageHeight: number;
   /** Distance from the page top to the counter (clears the feed's top bar). */
@@ -34,7 +42,7 @@ export type PhotoCarouselProps = {
 };
 
 export function PhotoCarousel({
-  postId, uris, pageWidth, pageHeight, counterTop, indicatorBottom, onIndexChange, onFirstImagePainted, isActive = true,
+  postId, uris, aspects, pageWidth, pageHeight, counterTop, indicatorBottom, onIndexChange, onFirstImagePainted, isActive = true,
 }: PhotoCarouselProps) {
   const pages = useMemo(() => (uris.length > 0 ? uris : ['']), [uris]);
   const count = pages.length;
@@ -63,11 +71,11 @@ export function PhotoCarousel({
     return undefined;
   }, [initialIndex, pageWidth]);
 
-  // Preload one ahead (and one behind) of the visible slide.
+  // Preload two ahead (and one behind) of the visible slide.
   useEffect(() => {
     if (!isActive) return;
-    const neighbours = [pages[index + 1], pages[index - 1]].filter((u): u is string => !!u);
-    if (neighbours.length > 0) void Image.prefetch(neighbours).catch(() => false);
+    const neighbours = [pages[index + 1], pages[index + 2], pages[index - 1]].filter((u): u is string => !!u);
+    if (neighbours.length > 0) void Image.prefetch(neighbours, 'memory-disk').catch(() => false);
   }, [index, isActive, pages]);
 
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -100,9 +108,11 @@ export function PhotoCarousel({
             {uri ? (
               <CachedImage
                 source={{ uri }}
-                style={StyleSheet.absoluteFill}
+                style={{ position: 'absolute', ...containRect(aspects?.[i] ?? 9 / 16, pageWidth, pageHeight) }}
                 contentFit="contain"
                 transition={0}
+                placeholder={null}
+                recyclingKey={`${postId}-${i}`}
                 priority={i === index ? 'high' : 'normal'}
                 onLoad={i === initialIndex ? onFirstImagePainted : undefined}
                 accessibilityLabel={`Photo ${i + 1} of ${count}`}

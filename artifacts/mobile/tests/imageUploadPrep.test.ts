@@ -1,23 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_UPLOAD_EDGE, fitWithin, outputFormatFor, prepareImageForUpload } from '@/lib/imageUploadPrep';
+import { MAX_UPLOAD_EDGE, UPLOAD_QUALITY, fitWithin, outputFormatFor, prepareImageForUpload, uploadPlan } from '@/lib/imageUploadPrep';
 import { resolveCdnBase, rewriteAssetUrl, rewriteImageSource } from '@/lib/cdnUrl';
 
 describe('fitWithin', () => {
   it('caps the long edge and keeps the aspect ratio', () => {
-    expect(fitWithin(4096, 2048)).toEqual({ width: 2048, height: 1024 });
-    expect(fitWithin(3024, 4032)).toEqual({ width: 1536, height: 2048 });
-    const out = fitWithin(4000, 3000);
+    expect(fitWithin(8192, 4096)).toEqual({ width: 4096, height: 2048 });
+    expect(fitWithin(6048, 8064)).toEqual({ width: 3072, height: 4096 });
+    const out = fitWithin(8000, 6000);
     expect(out.width / out.height).toBeCloseTo(4 / 3, 2);
     expect(Math.max(out.width, out.height)).toBe(MAX_UPLOAD_EDGE);
   });
 
   it('never upscales', () => {
     expect(fitWithin(640, 480)).toEqual({ width: 640, height: 480 });
-    expect(fitWithin(2048, 100)).toEqual({ width: 2048, height: 100 });
+    expect(fitWithin(4096, 100)).toEqual({ width: 4096, height: 100 });
+    expect(fitWithin(4032, 3024)).toEqual({ width: 4032, height: 3024 });
   });
 
   it('keeps every side at least 1px and passes invalid sizes through', () => {
-    expect(fitWithin(20000, 2)).toEqual({ width: 2048, height: 1 });
+    expect(fitWithin(40000, 2)).toEqual({ width: 4096, height: 1 });
     expect(fitWithin(0, 500)).toEqual({ width: 0, height: 500 });
   });
 });
@@ -36,6 +37,23 @@ describe('outputFormatFor', () => {
     expect(outputFormatFor(null, 'file:///a/b.PNG?x=1')).toBe('png');
     expect(outputFormatFor(undefined, 'file:///a/b.gif')).toBeNull();
     expect(outputFormatFor(undefined, 'file:///a/b')).toBe('jpeg');
+  });
+});
+
+describe('uploadPlan — no client re-encode for normal photos', () => {
+  it('sends a 12 MP iPhone JPEG/PNG/WebP exactly as picked', () => {
+    expect(uploadPlan('image/jpeg', 'file:///a.jpg', 4032, 3024)).toEqual({ reencode: false });
+    expect(uploadPlan('image/png', 'file:///a.png', 1290, 2796)).toEqual({ reencode: false });
+    expect(uploadPlan('image/webp', 'file:///a.webp', 3000, 3000)).toEqual({ reencode: false });
+  });
+
+  it('converts HEIC (server cannot decode it) without resizing', () => {
+    expect(uploadPlan('image/heic', 'file:///a.heic', 4032, 3024)).toEqual({ reencode: true, resize: null });
+  });
+
+  it('only downscales giant 48 MP originals, to 4096, at quality 1', () => {
+    expect(uploadPlan('image/jpeg', 'file:///a.jpg', 8064, 6048)).toEqual({ reencode: true, resize: { width: 4096, height: 3072 } });
+    expect(UPLOAD_QUALITY).toBe(1);
   });
 });
 

@@ -62,7 +62,7 @@ export default function BuyerRefundRequestScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsMultipleSelection: true,
-      quality: 0.8,
+      quality: 0.9,
     });
     if (!result.canceled) {
       setEvidencePhotos(prev => [...prev, ...result.assets.map(a => a.uri)].slice(0, 5));

@@ -14,6 +14,8 @@ import {
   planSponsoredSlots, SPONSORED_COST_PER_IMPRESSION_CENTS,
   type SponsoredCandidate,
 } from "./sponsored";
+import { postDimsPayload } from "../mediaDimensions";
+import { postDimsColumns } from "../postDimsColumns";
 
 const CANDIDATE_LIMIT = 100;
 
@@ -74,6 +76,7 @@ async function hydrateSponsoredPosts(postIds: string[]) {
     .select({
       id: posts.id, userId: posts.userId, mediaUrl: posts.mediaUrl, thumbnailUrl: posts.thumbnailUrl,
       mediaUrls: posts.mediaUrls, mediaType: posts.mediaType, aspectRatio: posts.aspectRatio,
+      slides: posts.slides, ...postDimsColumns,
       caption: posts.caption, hashtags: posts.hashtags, styleTags: posts.styleTags, sound: posts.sound,
       visibility: posts.visibility, createdAt: posts.createdAt,
       displayName: users.displayName, brandName: users.brandName, username: users.username,
@@ -111,6 +114,7 @@ async function hydrateSponsoredPosts(postIds: string[]) {
   return rows.map((p) => ({
     id: p.id, userId: p.userId, mediaUrl: p.mediaUrl, thumbnailUrl: p.thumbnailUrl,
     mediaUrls: p.mediaUrls, mediaType: p.mediaType, aspectRatio: p.aspectRatio,
+    slides: p.slides, ...postDimsPayload(p),
     caption: p.caption, hashtags: p.hashtags, styleTags: p.styleTags, sound: p.sound,
     visibility: p.visibility, createdAt: p.createdAt,
     seller: { displayName: p.displayName, brandName: p.brandName, username: p.username, verified: deriveSellerVerified(p) },

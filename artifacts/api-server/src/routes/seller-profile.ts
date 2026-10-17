@@ -44,8 +44,10 @@ router.use(requireAuth);
 const objectStorage = new ObjectStorageService();
 
 const IMAGE_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
-const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
-const MAX_BANNER_BYTES = 8 * 1024 * 1024;
+// Originals now arrive untouched from the app (no client re-encode), so the caps
+// fit a full-res phone photo; the server does the one encode (lib/productImageResize).
+const MAX_AVATAR_BYTES = 15 * 1024 * 1024;
+const MAX_BANNER_BYTES = 20 * 1024 * 1024;
 
 function hasValidImageSignature(bytes: Buffer, contentType: string): boolean {
   if (contentType === "image/jpeg" || contentType === "image/jpg") {

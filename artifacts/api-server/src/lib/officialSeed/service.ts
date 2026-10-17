@@ -14,6 +14,8 @@ import { deriveSellerVerified } from "../sellerEligibility";
 import { attachCredits } from "./credit";
 import { OFFICIAL_ACCOUNT_CLERK_ID, OFFICIAL_SEED_CONFIG } from "./config";
 import { planSeedPage, seedEligibility, type SeedCursor, type SeedPageItem } from "./plan";
+import { postDimsPayload } from "../mediaDimensions";
+import { postDimsColumns } from "../postDimsColumns";
 
 // ─── Real-post pool size (cached) ────────────────────────────────────────────
 
@@ -79,6 +81,7 @@ export async function hydrateOfficialPosts(postIds: string[]) {
     .select({
       id: posts.id, userId: posts.userId, mediaUrl: posts.mediaUrl, thumbnailUrl: posts.thumbnailUrl,
       mediaUrls: posts.mediaUrls, slides: posts.slides, mediaType: posts.mediaType, aspectRatio: posts.aspectRatio,
+      ...postDimsColumns,
       caption: posts.caption, hashtags: posts.hashtags, styleTags: posts.styleTags, sound: posts.sound,
       visibility: posts.visibility, createdAt: posts.createdAt,
       creditHandle: posts.creditHandle, creditName: posts.creditName,
@@ -113,6 +116,7 @@ export async function hydrateOfficialPosts(postIds: string[]) {
   const base = rows.map((p) => ({
     id: p.id, userId: p.userId, mediaUrl: p.mediaUrl, thumbnailUrl: p.thumbnailUrl,
     mediaUrls: p.mediaUrls, slides: p.slides, mediaType: p.mediaType, aspectRatio: p.aspectRatio,
+    ...postDimsPayload(p),
     caption: p.caption, hashtags: p.hashtags, styleTags: p.styleTags, sound: p.sound,
     visibility: p.visibility, createdAt: p.createdAt,
     creditHandle: p.creditHandle, creditName: p.creditName,

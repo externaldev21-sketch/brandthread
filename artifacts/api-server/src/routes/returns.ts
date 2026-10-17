@@ -24,7 +24,7 @@ router.use(requireAuth);
 // (the buyer and the order's seller, already authorised by each route) get
 // short-lived signed URLs, never the raw private path.
 const EVIDENCE_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
-const MAX_EVIDENCE_BYTES = 8 * 1024 * 1024;
+const MAX_EVIDENCE_BYTES = 20 * 1024 * 1024;
 const MAX_EVIDENCE_PHOTOS = 5;
 
 export function evidencePrefix(buyerId: string): string {

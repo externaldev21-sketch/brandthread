@@ -10,6 +10,7 @@
  * routes (`/api/seller/*`, `/api/buyer/*`, `/api/thread-cash`, …) and must
  * never be spread into a public payload.
  */
+import { postDimsPayload } from "./mediaDimensions";
 
 /** Keys that must never appear anywhere in a profile payload served to a non-owner. */
 export const PRIVATE_PROFILE_KEYS = [
@@ -100,6 +101,8 @@ export function toPublicPost(p: Row, taggedProducts: Row[]): Row {
     mediaUrls: p.mediaUrls ?? [],
     mediaType: p.mediaType,
     aspectRatio: p.aspectRatio,
+    slides: p.slides ?? [],
+    ...postDimsPayload(p),
     caption: p.caption ?? null,
     hashtags: p.hashtags ?? [],
     styleTags: p.styleTags ?? [],

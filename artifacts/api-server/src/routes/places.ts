@@ -22,6 +22,8 @@ import {
 } from "../lib/places";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import { mutedPhrasesFor, notBlockedWith, optionalViewerId, profilesById } from "../lib/safety";
+import { postDimsPayload } from "../lib/mediaDimensions";
+import { postDimsColumns } from "../lib/postDimsColumns";
 
 const router = Router();
 const PAGE_DEFAULT = 30;
@@ -87,6 +89,7 @@ async function postsForPlace(placeId: string, sort: SortMode, cursorRaw: string 
     .select({
       id: posts.id, userId: posts.userId, mediaType: posts.mediaType, mediaUrl: posts.mediaUrl,
       mediaUrls: posts.mediaUrls, thumbnailUrl: posts.thumbnailUrl, aspectRatio: posts.aspectRatio,
+      slides: posts.slides, ...postDimsColumns,
       caption: posts.caption, hashtags: posts.hashtags, visibility: posts.visibility, createdAt: posts.createdAt,
       likes: sql<number>`(SELECT count(*)::int FROM interactions i WHERE i.post_id = posts.id AND i.type = 'like')`,
     })
@@ -111,6 +114,7 @@ async function postsForPlace(placeId: string, sort: SortMode, cursorRaw: string 
     return {
       id: r.id, mediaType: r.mediaType, mediaUrl: r.mediaUrl, mediaUrls: r.mediaUrls,
       thumbnailUrl: r.thumbnailUrl, aspectRatio: r.aspectRatio, caption: r.caption, hashtags: r.hashtags,
+      slides: r.slides, ...postDimsPayload(r),
       createdAt: r.createdAt,
       likesCount: r.visibility?.showLikeCount === false ? null : Number(r.likes ?? 0),
       commentsCount: comments.get(r.id) ?? 0,

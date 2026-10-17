@@ -46,7 +46,7 @@ describe("post video publication contract", () => {
     expect(videoRoute).toContain('router.post("/compose-video/thumbnail", requireAuth');
     expect(videoRoute).toContain("validObjectPath(mediaPath)");
     expect(videoRoute).toContain("requestedPermission: ObjectPermission.WRITE");
-    expect(videoRoute).toContain('"-ss", String(clampedOffset)');
+    expect(videoRoute).toContain("posterArgs(localPath, thumbnail, clampedOffset");
     expect(videoRoute).toContain('visibility: "private"');
   });
 });

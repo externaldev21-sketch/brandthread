@@ -396,7 +396,7 @@ export default function StoreCollectionsScreen() {
             onPress={async () => {
               const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
               if (!perm.granted) { Alert.alert('Permission required', 'Allow access to your photo library.'); return; }
-              const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85, aspect: [16, 9], allowsEditing: true });
+              const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 1, aspect: [16, 9], allowsEditing: true });
               if (result.canceled || !result.assets[0]) return;
               setCoverUploading(true);
               try {

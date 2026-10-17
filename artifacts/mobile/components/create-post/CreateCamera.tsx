@@ -280,7 +280,7 @@ export function CreateCamera({
     setMenuOpen(false);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
-      const result = await cameraRef.current?.takePictureAsync({ quality: 0.9 });
+      const result = await cameraRef.current?.takePictureAsync({ quality: 1 });
       if (result?.uri) onPhoto(result.uri);
       else setCaptureError('That photo could not be saved.');
     } catch {
