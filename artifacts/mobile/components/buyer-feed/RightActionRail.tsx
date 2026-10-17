@@ -1,62 +1,173 @@
 /**
- * Buyer Threads Home feed — right action rail.
+ * Buyer Threads Home feed — right action rail, TikTok's stack exactly:
+ * creator avatar (+ follow badge), Like, Comment, Save, Share, then the
+ * spinning sound disc. Repost is not on the rail any more; it's the first
+ * action in the share sheet, where TikTok has it (components/
+ * ThreadShareSheet.tsx).
  *
- * avatar+follow badge, like, comment, repost, save, share, and a spinning
- * sound disc (TikTok's music-disc affordance) — solid white icons with a
- * subtle drop shadow, evenly spaced, real counts underneath. Positioned off
- * the same `bottomClearance` the caption block and tab bar use, so it never
- * overlaps the tab bar at any viewport.
+ * Fixed geometry. Every row has a fixed height (RAIL_LAYOUT below) and the
+ * caller pins the rail's `bottom` to one constant above the tab bar, so the
+ * rail is pixel-identical on every post — video or slideshow, long or short
+ * caption, Shop button or not. Nothing here measures itself or the post.
+ * Counts reserve their line even when 0, and the avatar placeholder is the
+ * same size as the photo, so nothing changes size while data loads.
  *
- * Sizing/placement (26pt icons, 38pt avatar/action-column width) ported
- * from dev PR #133 ("shrink feed rail/caption below pre-#129 sizes —
- * smaller, tighter"), which supersedes PR #129's own 34pt/44pt pass and the
- * earlier PR #88 sizing this rail originally shipped with. Icon drop
- * shadows are from PR #122 (rail icon shadows) — see `iconShadow` below and
- * `EngagementButton`'s own `iconShadow` style, applied to every
- * EngagementButton-driven icon here (like/repost/save/follow).
+ * Measured from TikTok iOS For You frames on Mobbin, scaled to 390x844
+ * (see docs/screenshots/tiktok-rail/README.md): avatar top at y=374, icon
+ * pitch 65pt (Like/Comment/Save/Share glyph tops at 452/516/581/646), the
+ * disc's bottom at y=747 (just above the progress line), glyph centre 30pt in from the
+ * right edge.
+ *
+ * Purely visual: the feed owns persistence, rollback, toasts and haptics.
+ * When the feed swaps the post the rail is bound to (it renders once, above
+ * the pager), values change in place with no animation.
  */
 import React from 'react';
-import { Animated, Image, Text, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
+import { Animated, Easing, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { EngagementButton } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
 import { hapticLight } from '@/lib/haptics';
-import { FONT, FS, GOLD, ON_DARK } from '@/lib/theme';
+import { FONT, ON_DARK } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 import { useLiveStreamForHost } from '@/lib/live/useLiveDirectory';
-import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
+
+/** Fixed row heights. The rail's total height never depends on the post. */
+export const RAIL_LAYOUT = {
+  width: 48,
+  avatar: 48,
+  badge: 20,
+  /** Avatar top -> Like icon box top (avatar + the follow badge's half below it + air). */
+  avatarBlock: 73,
+  /** One action: icon box + count line + the space to the next row's icon. */
+  item: 65,
+  icon: 32,
+  countLine: 15,
+  disc: 40,
+} as const;
+export const RAIL_HEIGHT = RAIL_LAYOUT.avatarBlock + RAIL_LAYOUT.item * 4 + RAIL_LAYOUT.disc;
+/** Rail's right inset: puts the glyph centre 30pt in from the screen edge (TikTok). */
+export const RAIL_RIGHT = 6;
+/** The disc's bottom edge sits this far above the progress line's top (TikTok: disc bottom at y=747 of 844). */
+export const RAIL_DISC_TO_PROGRESS = 12;
+
+const LIKE_RED = '#EF4444';
+// TikTok's saved-bookmark yellow.
+const SAVE_YELLOW = '#FACE15';
+
+/** Counts always show, starting at "0" (never a blank line). */
+export function formatRailCount(n: number | undefined): string {
+  return formatCount(Number(n) || 0) || '0';
+}
 
 export interface RailEngagement {
   liked?: boolean;
   likes?: number;
   saved?: boolean;
   saves?: number;
-  reposted?: boolean;
-  reposts?: number;
   following?: boolean;
 }
 
+export interface RailAnims {
+  heartScale: Animated.Value;
+  likeRing: Animated.Value;
+  saveDrop: Animated.Value;
+  saveScale: Animated.Value;
+}
+
+function RailAction({
+  icon, size, count, color, label, checked, onPress, testID, scale, translateY, children,
+}: {
+  icon: React.ComponentProps<typeof FontAwesome>['name'];
+  size: number;
+  count: number;
+  color: string;
+  label: string;
+  checked?: boolean;
+  onPress: () => void;
+  testID: string;
+  scale?: Animated.Value;
+  translateY?: Animated.AnimatedInterpolation<number>;
+  children?: React.ReactNode;
+}) {
+  return (
+    <View style={styles.item}>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+        hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={checked === undefined ? undefined : { checked }}
+        testID={testID}
+      >
+        <View style={styles.iconBox}>
+          {children}
+          <Animated.View style={{ transform: [{ scale: scale ?? 1 }, { translateY: translateY ?? 0 }] }}>
+            <FontAwesome name={icon} size={size} color={color} style={styles.iconShadow} />
+          </Animated.View>
+        </View>
+        <Text style={styles.count} numberOfLines={1}>{formatRailCount(count)}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/** TikTok's spinning record: the creator's avatar on a dark disc. Decorative. */
+function SoundDisc({
+  sound, avatarUri, avatarColor, initials, spinning, testID,
+}: {
+  sound?: string;
+  avatarUri?: string;
+  avatarColor: string;
+  initials: string;
+  spinning: boolean;
+  testID: string;
+}) {
+  const spin = React.useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    if (!spinning) return undefined;
+    spin.setValue(0);
+    const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 6000, easing: Easing.linear, useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [spinning, spin]);
+  return (
+    <View
+      style={styles.discSlot}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={sound ? `Sound: ${sound}` : 'Original sound'}
+      testID={testID}
+    >
+      <Animated.View style={[styles.disc, { transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }]}>
+        <View style={[styles.discArt, { backgroundColor: avatarColor }]}>
+          {avatarUri
+            ? <Image source={{ uri: avatarUri }} style={styles.discArtImage} />
+            : <Text style={styles.discInitials}>{initials.slice(0, 2)}</Text>}
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
 export function RightActionRail({
-  creator, hostId, avatarColor, avatarUri, initials, accentColor,
+  creator, hostId, avatarColor, avatarUri, initials, sound,
   engagement, commentsCount, shares, saves,
-  onOpenCreator, onFollow, onLike, onOpenComments, onRepost, onSave, onShare,
-  heartScale, likeRing, repostSpin, repostScale, saveDrop, saveScale,
-  style, testIdBase, reduceMotion,
+  onOpenCreator, onFollow, onLike, onOpenComments, onSave, onShare,
+  anims, discSpinning = true, style, testIdBase, reduceMotion,
 }: {
   creator: string;
-  /** The video's host/seller id — used to show a live ring around the
-   *  avatar (see LiveHostRing) when that seller is currently live. */
+  /** The post's seller id — shows the live ring when that seller is live. */
   hostId?: string;
   avatarColor: string;
-  /** Seller avatar photo. Falls back to the initials swatch below when
-   *  absent — none of the bundled demo posts have one yet, so this is a
-   *  no-op there; real posts with a seller avatar URL will pick it up. */
+  /** Seller avatar photo; the initials swatch (same size) shows until/unless it loads. */
   avatarUri?: string;
   initials: string;
-  accentColor: string;
+  /** Sound name, for the disc's accessibility label. */
+  sound?: string;
   engagement: RailEngagement | undefined;
   commentsCount: number;
   shares: number;
@@ -65,357 +176,219 @@ export function RightActionRail({
   onFollow: () => Promise<void> | void;
   onLike: () => Promise<void> | void;
   onOpenComments: () => void;
-  onRepost: () => Promise<void> | void;
   onSave: () => Promise<void> | void;
   onShare: () => void;
-  heartScale: Animated.Value;
-  likeRing: Animated.Value;
-  repostSpin: Animated.Value;
-  repostScale: Animated.Value;
-  saveDrop: Animated.Value;
-  saveScale: Animated.Value;
+  anims: RailAnims;
+  /** False while the post is paused, so the disc stops with the video. */
+  discSpinning?: boolean;
   style?: any;
+  /** The bound post's id — test ids, and the "post changed" signal below. */
   testIdBase: string;
-  /** Skips the follow badge's rotate/color-fill/fade sub-steps and just
-   *  jumps to its resting state — same "disable non-essential motion"
-   *  gate the rest of the feed's motion pass respects. */
+  /** Skips the follow badge's rotate/fill/fade and the disc spin. */
   reduceMotion?: boolean;
 }) {
-  // Bug fix (urgent rail-fixes pass): when this creator is currently live,
-  // the small "LIVE" pill from LiveHostRing/LiveAvatarRing (PR #288) sits
-  // anchored at the ring's bottom edge — the same spot the follow "+"
-  // badge below used to occupy, so the two collided/stacked when a live
-  // creator wasn't yet followed. IG's own avatar treatment doesn't show a
-  // competing follow badge over a live ring, so the "+" badge is simply
-  // suppressed for the duration this creator is live — the LIVE pill's own
-  // position/styling (from #288) is untouched, and the badge reappears in
-  // its normal spot the moment the stream ends.
+  // While the creator is live, the LIVE pill owns the avatar's bottom edge,
+  // so the follow badge stays hidden until the stream ends.
   const isLive = !!useLiveStreamForHost(hostId);
-  // Pads each plain (non-EngagementButton) rail control's real tap area up
-  // to 44x44 without growing its visible footprint — see
-  // useHitAreaBoost's doc comment. The EngagementButton-driven icons
-  // (like/repost/save) get the same treatment inside that component itself.
-  const avatarHit = useHitAreaBoost();
-  const commentHit = useHitAreaBoost();
-  const shareHit = useHitAreaBoost();
-  const [badgeVisible, setBadgeVisible] = React.useState(!engagement?.following);
-  const [showCheck, setShowCheck] = React.useState(!!engagement?.following);
-  const wasFollowing = React.useRef(!!engagement?.following);
-  const followBadgeRotate = React.useRef(new Animated.Value(engagement?.following ? 1 : 0)).current;
-  const followBadgeColor = React.useRef(new Animated.Value(engagement?.following ? 1 : 0)).current;
-  const followBadgeOpacity = React.useRef(new Animated.Value(engagement?.following ? 0 : 1)).current;
+  const following = !!engagement?.following;
+  const [badgeVisible, setBadgeVisible] = React.useState(!following);
+  const [showCheck, setShowCheck] = React.useState(following);
+  const shown = React.useRef({ postId: testIdBase, following });
+  const badgeRotate = React.useRef(new Animated.Value(following ? 1 : 0)).current;
+  const badgeFill = React.useRef(new Animated.Value(following ? 1 : 0)).current;
+  const badgeOpacity = React.useRef(new Animated.Value(following ? 0 : 1)).current;
 
   React.useEffect(() => {
-    const isFollowing = !!engagement?.following;
-    if (isFollowing === wasFollowing.current) return;
-    wasFollowing.current = isFollowing;
-
-    if (!isFollowing) {
-      // Unfollowed again (or reset) — badge comes straight back, no replay
-      // of the follow animation.
-      setBadgeVisible(true);
-      setShowCheck(false);
-      followBadgeRotate.setValue(0);
-      followBadgeColor.setValue(0);
-      followBadgeOpacity.setValue(1);
+    const prev = shown.current;
+    shown.current = { postId: testIdBase, following };
+    if (prev.postId === testIdBase && prev.following === following) return;
+    // A different post (swipe), an unfollow or a rollback: jump straight to
+    // the resting state. Only following the creator of the post on screen
+    // plays the + -> check animation.
+    if (prev.postId !== testIdBase || !following || reduceMotion) {
+      badgeRotate.setValue(following ? 1 : 0);
+      badgeFill.setValue(following ? 1 : 0);
+      badgeOpacity.setValue(following ? 0 : 1);
+      setShowCheck(following);
+      setBadgeVisible(!following);
       return;
     }
-
-    if (reduceMotion) {
-      setBadgeVisible(false);
-      return;
-    }
-
-    // Sub-steps per the motion pass: '+' rotates into a checkmark (150ms),
-    // the badge fills from white to black (100ms), holds briefly, then
-    // fades out (200ms) before unmounting.
-    Animated.timing(followBadgeRotate, { toValue: 1, duration: 150, useNativeDriver: true }).start(() => {
+    Animated.timing(badgeRotate, { toValue: 1, duration: 150, useNativeDriver: true }).start(() => {
       setShowCheck(true);
-      Animated.timing(followBadgeColor, { toValue: 1, duration: 100, useNativeDriver: false }).start(() => {
-        Animated.timing(followBadgeOpacity, { toValue: 0, duration: 200, delay: 250, useNativeDriver: true }).start(() => {
-          setBadgeVisible(false);
+      Animated.timing(badgeFill, { toValue: 1, duration: 100, useNativeDriver: false }).start(() => {
+        Animated.timing(badgeOpacity, { toValue: 0, duration: 200, delay: 250, useNativeDriver: true }).start(({ finished }) => {
+          if (finished && shown.current.following) setBadgeVisible(false);
         });
       });
     });
-  }, [engagement?.following, reduceMotion, followBadgeRotate, followBadgeColor, followBadgeOpacity]);
+  }, [testIdBase, following, reduceMotion, badgeRotate, badgeFill, badgeOpacity]);
+
+  const likes = engagement?.likes ?? 0;
+  const liked = !!engagement?.liked;
+  const saveCount = engagement?.saves ?? saves;
+  const saved = !!engagement?.saved;
 
   return (
-    <Animated.View style={[styles.rail, style]}>
-      <View style={styles.avatarWrap}>
-        <TouchableOpacity
-          style={avatarHit.boostStyle}
-          onLayout={avatarHit.onLayout}
-          activeOpacity={0.8}
+    <View style={[styles.rail, style]} pointerEvents="box-none" testID="thread-action-rail">
+      <View style={styles.avatarBlock}>
+        <Pressable
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onOpenCreator(); }}
+          style={({ pressed }) => pressed && styles.pressed}
           accessibilityRole="button"
           accessibilityLabel={`View ${creator}'s profile`}
+          testID={`avatar-btn-${testIdBase}`}
         >
-          {/* ringGap 1.5 (was the component's own default, 3) — that
-              default was the "dark gap between the photo and the ring"
-              the owner flagged; the ring now hugs the avatar with only a
-              1.5pt gap, plus ringWidth 2.
-
-              showTag intentionally left at its default (true): the red
-              ring only ever renders when this host is genuinely live
-              (LiveHostRing checks the live directory itself), so the
-              "LIVE" tag must always accompany it. This previously read
-              `showTag={!!engagement?.following}`, which tied the tag to
-              whether the viewer follows the creator — wiring left over
-              from the follow badge above and unrelated to live status.
-              That produced a real, undiagnosed bug: a genuinely-live
-              creator the viewer doesn't follow got the red ring with no
-              LIVE tag, which reads as an unexplained red ring on a
-              non-live post. Every other LiveHostRing/LiveAvatarRing call
-              site in the app (profile, inbox row, story tray) already
-              uses the default. */}
-          <LiveHostRing hostId={hostId} size={38} ringGap={1.5} ringWidth={2}>
-            {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-                <Text style={styles.avatarText}>{initials}</Text>
-              </View>
-            )}
+          <LiveHostRing hostId={hostId} size={RAIL_LAYOUT.avatar} ringGap={1.5} ringWidth={2}>
+            {/* Seamless: the photo just clips to a circle — no border, ring
+                or outline. The initials swatch underneath is the same size,
+                so a slow avatar never changes the rail's layout. */}
+            <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+              <Text style={styles.avatarText}>{initials}</Text>
+              {avatarUri ? <Image source={{ uri: avatarUri }} style={StyleSheet.absoluteFill} /> : null}
+            </View>
           </LiveHostRing>
-        </TouchableOpacity>
+        </Pressable>
         {badgeVisible && !isLive && (
-          // Plain TouchableOpacity, not EngagementButton — EngagementButton
-          // applies the `style` prop passed to it to its *inner* content
-          // view, not the outer touchable wrapper, so a positioning style
-          // like this one landed on a zero-size outer box and only
-          // happened to look roughly right by flow-layout coincidence.
-          // That's what let it drift onto the ring/initials; this needs
-          // exact placement (see the math in the PR description), so it's
-          // a plain absolutely-positioned button instead. The animated
-          // outer View owns rotate/color/fade; the inner touchable just
-          // fills it so the tap target doesn't shrink mid-animation.
           <Animated.View
             style={[
               styles.followBadge,
               {
-                opacity: followBadgeOpacity,
-                backgroundColor: followBadgeColor.interpolate({ inputRange: [0, 1], outputRange: [ON_DARK, '#000000'] }),
-                transform: [{ rotate: followBadgeRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }],
+                opacity: badgeOpacity,
+                backgroundColor: badgeFill.interpolate({ inputRange: [0, 1], outputRange: [ON_DARK, '#000000'] }),
+                transform: [{ rotate: badgeRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }],
               },
             ]}
           >
-            <TouchableOpacity
+            <Pressable
               style={styles.followBadgeTouchable}
-              activeOpacity={0.8}
-              disabled={!!engagement?.following}
+              disabled={following}
+              hitSlop={10}
               accessibilityRole="button"
               accessibilityLabel={`Follow ${creator}`}
               onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onFollow(); }}
               testID={`follow-btn-${testIdBase}`}
             >
-              <Feather
-                name={showCheck ? 'check' : 'plus'}
-                size={11}
-                color={showCheck ? ON_DARK : '#000000'}
-              />
-            </TouchableOpacity>
+              <Feather name={showCheck ? 'check' : 'plus'} size={13} color={showCheck ? ON_DARK : '#000000'} />
+            </Pressable>
           </Animated.View>
         )}
       </View>
 
-      <View style={styles.likeWrap} pointerEvents="box-none">
+      <RailAction
+        icon="heart"
+        size={29}
+        count={likes}
+        color={liked ? LIKE_RED : ON_DARK}
+        label={`${liked ? 'Unlike' : 'Like'}, ${likes} likes`}
+        checked={liked}
+        scale={anims.heartScale}
+        // Light haptic in the same tick the heart's bump starts (the feed's
+        // onLike runs bumpRailHeart before awaiting the request).
+        onPress={() => { hapticLight(); void onLike(); }}
+        testID={`like-btn-${testIdBase}`}
+      >
         <Animated.View
           pointerEvents="none"
           style={[
             styles.likeRing,
             {
-              opacity: likeRing.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.55, 0] }),
-              transform: [{ scale: likeRing.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.9] }) }],
+              opacity: anims.likeRing.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.55, 0] }),
+              transform: [{ scale: anims.likeRing.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.9] }) }],
             },
           ]}
         />
-        <EngagementButton
-          icon="heart"
-          solidIcon="heart"
-          iconSize={26}
-          count={formatCount(engagement?.likes ?? 0)}
-          value={engagement?.likes ?? 0}
-          active={engagement?.liked ?? false}
-          activeColor="#EF4444"
-          inactiveColor={ON_DARK}
-          accessibilityLabel={`${engagement?.liked ? 'Unlike' : 'Like'}, ${engagement?.likes ?? 0} likes`}
-          accessibilityState={{ checked: engagement?.liked ?? false }}
-          scaleAnim={heartScale}
-          style={styles.actionContent}
-          // "Light" tier per the haptics tokens in lib/haptics.ts — unchanged
-          // from earlier polish rounds. Fires synchronously here, in the
-          // same tick EngagementButton's tapSpring kicks off (both happen
-          // before `onLike` is awaited), so the haptic and the icon's
-          // squash-overshoot-settle spring read as one moment.
-          onPress={async () => { hapticLight(); await onLike(); }}
-          tapSpring
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          testID={`like-btn-${testIdBase}`}
-        />
-      </View>
+      </RailAction>
 
-      <TouchableOpacity
-        style={[styles.btn, commentHit.boostStyle]}
-        onLayout={commentHit.onLayout}
-        activeOpacity={0.7}
-        hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+      <RailAction
+        icon="commenting"
+        size={29}
+        count={commentsCount}
+        color={ON_DARK}
+        label={`Comments, ${commentsCount}`}
         onPress={onOpenComments}
-        accessibilityRole="button"
-        accessibilityLabel={`Comments, ${commentsCount}`}
-      >
-        <FontAwesome name="commenting" size={26} color={ON_DARK} style={styles.iconShadow} />
-        <Text style={styles.count}>{formatCount(commentsCount)}</Text>
-      </TouchableOpacity>
-
-      <EngagementButton
-        icon="repeat"
-        solidIcon="retweet"
-        iconSize={26}
-        count={formatCount(engagement?.reposts ?? 0)}
-        active={engagement?.reposted ?? false}
-        activeColor={accentColor}
-        inactiveColor={ON_DARK}
-        accessibilityLabel={`${engagement?.reposted ? 'Undo repost' : 'Repost'}, ${engagement?.reposts ?? 0} reposts`}
-        accessibilityState={{ checked: engagement?.reposted ?? false }}
-        style={styles.actionContent}
-        rotateAnim={repostSpin}
-        scaleAnim={repostScale}
-        onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onRepost(); }}
-        hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-        testID={`repost-btn-${testIdBase}`}
+        testID={`comment-btn-${testIdBase}`}
       />
 
-      <EngagementButton
+      <RailAction
         icon="bookmark"
-        solidIcon="bookmark"
-        iconSize={26}
-        count={formatCount(engagement?.saves ?? saves)}
-        value={engagement?.saves ?? saves}
-        active={engagement?.saved ?? false}
-        activeColor={GOLD}
-        inactiveColor={ON_DARK}
-        accessibilityLabel={`${engagement?.saved ? 'Unsave' : 'Save'}, ${engagement?.saves ?? saves} saves`}
-        accessibilityState={{ checked: engagement?.saved ?? false }}
-        style={styles.actionContent}
-        translateYAnim={saveDrop}
-        scaleAnim={saveScale}
-        onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onSave(); }}
-        hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+        size={28}
+        count={saveCount}
+        color={saved ? SAVE_YELLOW : ON_DARK}
+        label={`${saved ? 'Unsave' : 'Save'}, ${saveCount} saves`}
+        checked={saved}
+        scale={anims.saveScale}
+        translateY={anims.saveDrop.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, -6, 0] })}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); void onSave(); }}
         testID={`save-btn-${testIdBase}`}
       />
 
-      <TouchableOpacity
-        style={[styles.btn, shareHit.boostStyle]}
-        onLayout={shareHit.onLayout}
-        activeOpacity={0.7}
-        hitSlop={{ top: 6, bottom: 10, left: 10, right: 10 }}
-        accessibilityRole="button"
-        accessibilityLabel="Share post"
+      <RailAction
+        icon="share"
+        size={28}
+        count={shares}
+        color={ON_DARK}
+        label={`Share, ${shares} shares`}
         onPress={onShare}
-      >
-        <FontAwesome name="share" size={26} color={ON_DARK} style={styles.iconShadow} />
-        <Text style={styles.count}>{formatCount(shares)}</Text>
-      </TouchableOpacity>
-    </Animated.View>
+        testID={`share-btn-${testIdBase}`}
+      />
+
+      <SoundDisc
+        sound={sound}
+        avatarUri={avatarUri}
+        avatarColor={avatarColor}
+        initials={initials}
+        spinning={discSpinning && !reduceMotion}
+        testID={`sound-disc-${testIdBase}`}
+      />
+    </View>
   );
 }
 
+const shadowText = Platform.select({
+  web: { textShadow: '0px 1px 2px rgba(0,0,0,0.45), 0px 0px 8px rgba(0,0,0,0.25)' } as object,
+  default: { textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+});
+
 const styles = StyleSheet.create({
-  // Corrected pass, smaller than even the pre-#129 numbers per the owner's
-  // explicit direction (SMALLER and TIGHTER than before, so the video
-  // stands out): 38pt avatar, 26pt icon glyphs, 12pt rhythm between items,
-  // 8pt right inset. (PR #133.)
-  rail: {
-    position: 'absolute', right: 10, width: 38, alignItems: 'center', gap: 14,
-  },
-  // marginBottom bumped 2 -> 6 (self-audit find #1): the follow badge now
-  // hangs 13.5pt below the avatar's own bottom edge (see followBadge's own
-  // math below), which only left ~2.5pt of clearance to the heart button
-  // beneath it at the rail's default 14pt gap — tight enough to read as
-  // crowded. This adds breathing room without moving the avatar itself.
-  avatarWrap: { alignItems: 'center', marginBottom: 6 },
+  rail: { position: 'absolute', width: RAIL_LAYOUT.width, height: RAIL_HEIGHT, alignItems: 'center' },
+  avatarBlock: { width: RAIL_LAYOUT.width, height: RAIL_LAYOUT.avatarBlock, alignItems: 'center' },
   avatar: {
-    width: 38, height: 38, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: ON_DARK,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
-  },
-  // fontSize bumped FS.xs (11) -> FS.sm (self-audit find #2): two-letter
-  // initials read small and cramped centered in the 38pt circle at 11pt.
-  avatarText: { fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
-  // 16pt, black-on-white (not the seller's own accent color, which could
-  // wash out or clash against any given video), positioned BELOW the ring
-  // (TikTok-style) rather than on top of it.
-  //
-  // The math (avatar 38pt, LiveHostRing's ringGap 1.5 / ringWidth 2 above):
-  //   ring outer radius  = avatar/2 + ringGap + ringWidth = 19 + 1.5 + 2 = 22.5
-  //   ring outer bottom  = avatar center-y (19) + 22.5 = 41.5
-  //   badge center-y     = ring outer bottom + 2         = 43.5
-  //   badge top          = badge center-y - badge/2 (8)  = 35.5
-  //   badge bottom       = badge center-y + badge/2 (8)  = 51.5
-  //   `bottom` offset from the avatar's own bottom (38)  = -(51.5 - 38) = -13.5
-  // avatarWrap centers its children (alignItems: 'center'), which is what
-  // centers this horizontally too since no left/right is set.
-  followBadge: {
-    position: 'absolute', bottom: -13.5, width: 16, height: 16, borderRadius: RADII.pill,
+    width: RAIL_LAYOUT.avatar, height: RAIL_LAYOUT.avatar, borderRadius: RADII.pill, overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: '#000',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
+  },
+  avatarText: { fontSize: 15, fontFamily: FONT.bold, color: ON_DARK },
+  // Centred on the avatar's bottom edge, TikTok-style. No border: it must
+  // never draw a ring onto the avatar.
+  followBadge: {
+    position: 'absolute', top: RAIL_LAYOUT.avatar - RAIL_LAYOUT.badge / 2,
+    width: RAIL_LAYOUT.badge, height: RAIL_LAYOUT.badge, borderRadius: RADII.pill,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 3,
   },
   followBadgeTouchable: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
-  // `minWidth` (not a fixed `width`) here — unlike `actionContent` below,
-  // which sizes the *inner* content view EngagementButton wraps, this style
-  // lands directly on the outer TouchableOpacity that useHitAreaBoost also
-  // sizes, and a *fixed* width on that same box would take priority over —
-  // and suppress — the boost's own `minWidth`. `minWidth: 38` still renders
-  // exactly as wide as the old fixed `width: 38` did (content here is never
-  // wider than 38 at this column's icon/count sizes), so this is a no-op
-  // until the boost widens it further.
-  btn: { minWidth: 38, alignItems: 'center', gap: 3 },
-  actionContent: { width: 38, alignItems: 'center', gap: 3 },
-  likeWrap: { width: 38, alignItems: 'center', justifyContent: 'center' },
+  item: { width: RAIL_LAYOUT.width, height: RAIL_LAYOUT.item, alignItems: 'center' },
+  action: { width: RAIL_LAYOUT.width, alignItems: 'center' },
+  pressed: { opacity: 0.7 },
+  iconBox: { width: RAIL_LAYOUT.icon + 8, height: RAIL_LAYOUT.icon, alignItems: 'center', justifyContent: 'center' },
+  iconShadow: shadowText,
   likeRing: {
-    position: 'absolute', top: 2, width: 34, height: 34, borderRadius: RADII.pill,
-    borderWidth: 2, borderColor: '#EF4444',
+    position: 'absolute', width: 34, height: 34, borderRadius: RADII.pill, borderWidth: 2, borderColor: LIKE_RED,
   },
-  // 12pt semibold, pure white, one shared shadow — identical to
-  // EngagementButton's own `count` style (components/EngagementButton.tsx)
-  // so like/repost/save (EngagementButton-driven) and comment/share (plain,
-  // below) read as one consistent row instead of some counts looking
-  // brighter than others depending on how much of the legibility scrim
-  // happens to fall behind that particular icon.
-  //
-  // TikTok two-layer shadow pass (still-washed-out round — see this same
-  // block's comment in EngagementButton.tsx's `count`/`iconShadow` for the
-  // full reasoning): web gets a tight-plus-wide stacked `textShadow`, native
-  // keeps the single strongest shadow RN's Text props can express. Kept in
-  // sync with EngagementButton.tsx's matching styles, per that file's own
-  // convention.
-  count: Platform.select({
-    web: {
-      fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
-      textShadow: '0px 1px 1px rgba(0,0,0,0.9), 0px 1px 6px rgba(0,0,0,0.55)',
-    } as object,
-    default: {
-      fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
-      textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6,
-    },
-  }),
-  // Stronger drop shadow (was 0.5/radius 2, then 0.45/radius 4, then
-  // 0.7/radius 6) applied to the rail's two plain icons (comment, share —
-  // the EngagementButton-driven icons get the matching `iconShadow` style
-  // inside EngagementButton.tsx itself, kept identical to this one), tuned
-  // against a bright/high-key clip (Atelier Noire's runway floor, live
-  // Replit preview at 390x844) where the previous shadow still washed out
-  // for thinner-stroke glyphs (repost/save/share) even though it read fine
-  // on bold ones (heart, comment). (PR #122, strengthened for feed
-  // legibility round, strengthened again in the urgent rail-fixes pass
-  // (#324), strengthened again here with a real two-layer shadow on web.)
-  iconShadow: Platform.select({
-    web: {
-      textShadow: '0px 1px 2px rgba(0,0,0,0.9), 0px 2px 10px rgba(0,0,0,0.6)',
-    } as object,
-    default: {
-      textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8,
-    },
-  }),
+  // 13pt semibold white with a shadow; fixed line height + tabular digits so
+  // a count changing (or loading) never moves anything.
+  count: {
+    width: 64, height: RAIL_LAYOUT.countLine, marginTop: 1, textAlign: 'center',
+    fontSize: 13, lineHeight: RAIL_LAYOUT.countLine, fontFamily: FONT.semibold, color: ON_DARK,
+    ...TABULAR_NUMS, ...shadowText,
+  },
+  discSlot: { width: RAIL_LAYOUT.width, height: RAIL_LAYOUT.disc, alignItems: 'center', justifyContent: 'center' },
+  disc: {
+    width: RAIL_LAYOUT.disc, height: RAIL_LAYOUT.disc, borderRadius: RADII.pill, backgroundColor: '#161616',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
+  },
+  discArt: { width: 24, height: 24, borderRadius: RADII.pill, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  discArtImage: { width: 24, height: 24 },
+  discInitials: { fontSize: 9, fontFamily: FONT.bold, color: ON_DARK },
 });

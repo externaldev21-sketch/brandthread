@@ -10,7 +10,7 @@ import {
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Feather, FontAwesome } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useRouter, useIsFocused } from 'expo-router';
 import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useAuth } from '@clerk/expo';
@@ -87,14 +87,16 @@ import {
 import { formatCount } from '@/lib/engagementUtils';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
-import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useBuyerTabBarInset, useBuyerTabBarMetrics, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { SheetRise } from '@/components/motion/SheetRise';
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { RADII, radius } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadExactCreatorVideoReplay, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
-import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
+import { RAIL_DISC_TO_PROGRESS, RAIL_RIGHT, RightActionRail, type RailAnims } from '@/components/buyer-feed/RightActionRail';
+import { PausedPlayIcon } from '@/components/buyer-feed/PausedPlayIcon';
+import { useFeedSound } from '@/hooks/useFeedSound';
 import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer-feed/ShopSideTab';
@@ -119,21 +121,18 @@ export interface CreatorFeedConfig {
 
 const THREAD_PAGE_SIZE = 30;
 
-// Vertical rhythm in the bottom chrome zone, measured from TikTok: the
-// scrub/progress bar sits just above the tab bar (at `bottomClearance`,
-// 0-4pt of gap to the bar), so the right rail's last item (share) and the
-// caption block's last line (the sound row) both need extra clearance above
-// that same `bottomClearance` anchor, or they end up touching/overlapping
-// the bar — which is exactly what a bare `bottom: bottomClearance` on both
-// of them used to do. These two constants are that clearance:
-//   - RAIL_BOTTOM_GAP: clearance from the rail's last item (share) to the
-//     bar's top, raised from 16 to 24 so the share count clears the bar
-//     with real room and roughly tracks the caption block's first line
-//     (creator name row) rather than sitting near its own last line (the
-//     sound row) — see the PR description for the exact numbers; this was
-//     tuned from the code's own layout constants, not a rendered screen.
-//   - CAPTION_BOTTOM_GAP: >=12pt from the sound line to the bar's top.
-const RAIL_BOTTOM_GAP = 24;
+// Bottom chrome, measured from TikTok iOS (Mobbin, 390x844) — every value is
+// a constant, so the progress line, rail and caption sit in exactly the same
+// place on every post (nothing is measured per post or per media type):
+//   - SCRUB_TAB_GAP: visible gap between the progress line and the top of the
+//     floating tab bar. The tab bar itself is untouched; the line moves.
+//   - The rail's bottom (its sound disc) sits RAIL_DISC_TO_PROGRESS above the
+//     progress line (see components/buyer-feed/RightActionRail.tsx).
+//   - CAPTION_BOTTOM_GAP: progress line -> the caption's last line. The
+//     caption block grows upward from that one anchor.
+const SCRUB_TAB_GAP = 7;
+/** The resting progress line's thickness (ScrubProgressBar's track). */
+const PROGRESS_LINE_HEIGHT = 2;
 
 // Top chrome rhythm — measured from TikTok's For You feed (Mobbin refs cited
 // in the PR): one row (icons + centered Following/Threads switcher) raised
@@ -143,7 +142,7 @@ const TOP_TABS_ROW_HEIGHT = 34;
 // no more real pages behind it, so scrolling never dead-ends or shows an
 // end card — see the `canLoopFeed`/`displayItems` comment below.
 const FEED_LOOP_REPEAT = 6;
-const CAPTION_BOTTOM_GAP = 10;
+const CAPTION_BOTTOM_GAP = 8;
 
 // ─── Buyer demand page — sentinel and type guard ──────────────────────────────
 // The sentinel is the first element in displayItems when buyerMode=true.
@@ -359,8 +358,6 @@ interface SpotlightItem {
   sponsoredBoostId?: string;
 }
 type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
-
-const SOUND_PREF_KEY = 'bt:feed-sound-on:v1';
 
 const FASHION_PREVIEW_VIDEO_SOURCES: VideoSource[] = [
   require('../../assets/videos/fashion_runway_01.mp4'),
@@ -898,12 +895,12 @@ function formatPlaybackTime(totalSeconds: number): string {
  * bottom-left caption/sound stack, passed in by the caller, which already
  * knows CaptionBlock's real height). A fixed offset is how this bug
  * happened in the first place: the bubble used to hug the thumb at a
- * hand-picked `bottom: 22`, which put it squarely behind CaptionBlock's
- * sound/mute pill (CaptionBlock renders after this bar, so it painted on
- * top) whenever a drag showed the bubble. Deriving the clearance from
- * CaptionBlock's actual exported height (`CAPTION_BLOCK_HEIGHT`/
- * `_WITH_REPOST`, see components/buyer-feed/CaptionBlock.tsx) instead of a
- * second hand-tuned number means the two can't drift apart again. */
+ * hand-picked `bottom: 22`, which put it squarely behind the caption block
+ * (CaptionBlock renders after this bar, so it painted on top) whenever a
+ * drag showed the bubble. Deriving the clearance from CaptionBlock's real
+ * height instead of a second hand-tuned number means the two can't drift
+ * apart. (Only this drag bubble uses the measured height; the caption and
+ * rail positions are fixed constants.) */
 function ScrubProgressBar({
   player, progress, bottom, chromeTop, externallyPaused = false,
 }: {
@@ -1196,6 +1193,11 @@ function LiveVideoVisual({
     p.muted = muted;
     if (progressBottom != null) p.timeUpdateEventInterval = 0.25;
   });
+  // Sound is always on; on web it turns on with the page's first gesture
+  // (useFeedSound), which has to reach players that already exist.
+  useEffect(() => {
+    player.muted = muted;
+  }, [player, muted]);
   const [hasStarted, setHasStarted] = useState(false);
   // Kept mounted (opacity-only), not conditionally rendered — conditional
   // mount/unmount can only pop the pause glyph in, never fade it out on
@@ -1343,8 +1345,9 @@ function LiveVideoVisual({
           contentFit={fit}
           nativeControls={false}
         />
-        <Animated.View style={[styles.pauseOverlay, { opacity: pauseOverlayOpacity }]} pointerEvents="none">
-          <FontAwesome name="play" size={56} color={ON_DARK} />
+        {/* Stays up for as long as the video is paused, gone on resume. */}
+        <Animated.View style={[styles.pauseOverlay, { opacity: pauseOverlayOpacity }]} pointerEvents="none" testID="feed-paused-icon">
+          <PausedPlayIcon />
         </Animated.View>
       </View>
       {progressBottom != null && isActive && (
@@ -1409,7 +1412,7 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange, onFirstImagePa
 // presentational components to them below.
 
 function SpotlightPageImpl({
-  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, videoFrameInset, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, onVideoWatched, soundOn, onToggleSound, onFirstFramePainted, reduceMotion = false,
+  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, videoFrameInset, immersive: immersiveProp = false, hasTabBar = true, engagement, onDoubleTapLike, onShopTag, onOpenCreator, onNotInterested, onVideoWatched, soundOn, railAnims, onPausedChange, onFirstFramePainted, reduceMotion = false,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -1423,6 +1426,8 @@ function SpotlightPageImpl({
   isFirstItem?: boolean;
   pageWidth: number;
   pageHeight: number;
+  /** The progress line's distance from the page bottom — the one fixed
+   *  anchor the scrubber and caption hang off (see SCRUB_TAB_GAP). */
   bottomClearance: number;
   /**
    * Height of the sharp video frame's bottom cutoff, from the page's bottom
@@ -1444,18 +1449,17 @@ function SpotlightPageImpl({
   /** Opens the creator's profile (or returns to it from the creator player). */
   onOpenCreator: (item: SpotlightItem) => void;
   engagement: EngagementState | undefined;
-  onLike: (id: string) => Promise<void>;
   onDoubleTapLike: (id: string) => void;
-  onSave: (id: string) => Promise<void>;
-  onRepost: (id: string) => Promise<void>;
-  onFollow: (id: string) => Promise<void>;
-  onOpenComments: (id: string) => void;
   onShopTag: (item: SpotlightItem, tag: SpotlightProductTag) => void;
   onNotInterested: (id: string) => void;
   onVideoWatched: (id: string) => void;
-  /** Whether the app-wide feed sound preference is on. */
+  /** Feed sound (always on; on web, on after the first gesture — see useFeedSound). */
   soundOn: boolean;
-  onToggleSound: () => void;
+  /** The rail's animation values — the rail renders once above the pager
+   *  (ThreadRailOverlay), and double-tap-to-like bumps its heart. */
+  railAnims: RailAnims;
+  /** Tells the feed when the active post is paused, so the rail's disc stops. */
+  onPausedChange?: (id: string, paused: boolean) => void;
   /** Only passed for the very first feed item — see `VideoVisualProps`. */
   onFirstFramePainted?: () => void;
   /** Gates the follow badge's rotate/color-fill/fade sub-steps. */
@@ -1476,7 +1480,6 @@ function SpotlightPageImpl({
   const [holdPaused, setHoldPaused] = useState(false);
   /** 2x while holding the right side of the video. */
   const [speedActive, setSpeedActive] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   // Shop tag pill's shared expand/collapse state — see ShopSideTab.tsx's
   // module comment for why this is lifted up here (its backdrop and its
@@ -1500,16 +1503,7 @@ function SpotlightPageImpl({
   // Reanimated replay off, the same way a changing `key` would remount it
   // but without paying for an unmount/remount each time.
   const [heartBurstTrigger, setHeartBurstTrigger] = useState(0);
-  const heartScale = useRef(new Animated.Value(1)).current;
-  /** Ring that flashes out from behind the rail heart on like — a second,
-   * smaller echo of the double-tap burst so a single tap on the rail icon
-   * gets its own moment instead of only the icon itself popping. */
-  const likeRing = useRef(new Animated.Value(0)).current;
   const speedPillOpacity = useRef(new Animated.Value(0)).current;
-  const repostSpin = useRef(new Animated.Value(0)).current;
-  const repostScale = useRef(new Animated.Value(1)).current;
-  const saveDrop = useRef(new Animated.Value(0)).current;
-  const saveScale = useRef(new Animated.Value(1)).current;
   const lastTap = useRef(0);
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1540,6 +1534,14 @@ function SpotlightPageImpl({
     if (holdTimer.current) clearTimeout(holdTimer.current);
   }, []);
 
+  // TikTok: swiping away from a paused video and back plays it again.
+  React.useEffect(() => {
+    if (!isActive) setPaused(false);
+  }, [isActive]);
+  React.useEffect(() => {
+    if (isActive) onPausedChange?.(item.id, paused || holdPaused);
+  }, [isActive, paused, holdPaused, item.id, onPausedChange]);
+
   function burstHeart() {
     heartBurst.setValue(1);
     heartBurstScale.setValue(0.8);
@@ -1551,45 +1553,13 @@ function SpotlightPageImpl({
     setHeartBurstTrigger(t => t + 1);
   }
 
-  // 1 -> 1.15 -> 1 over 180ms total (was a 1.35 spring — stronger overshoot
-  // than this motion pass calls for), timing not spring so the 180ms is
-  // exact rather than however long that spring happened to settle in.
-  function bumpHeart() {
-    Animated.sequence([
-      Animated.timing(heartScale, { toValue: 1.15, duration: 90, useNativeDriver: true }),
-      Animated.timing(heartScale, { toValue: 1, duration: 90, useNativeDriver: true }),
-    ]).start();
-    likeRing.setValue(0);
-    Animated.timing(likeRing, { toValue: 1, duration: 480, useNativeDriver: true }).start();
-  }
-
-  /** Arrows spin a full turn with a pop of scale — repost toggled either way. */
-  function spinRepost() {
-    repostSpin.setValue(0);
-    Animated.timing(repostSpin, { toValue: 1, duration: 420, useNativeDriver: true }).start();
-    Animated.sequence([
-      Animated.spring(repostScale, { toValue: 1.3, useNativeDriver: true, speed: 40 }),
-      Animated.spring(repostScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
-    ]).start();
-  }
-
-  /** Bookmark lifts, pops gold, then drops/settles — save toggled either way. */
-  function dropSave() {
-    saveDrop.setValue(0);
-    Animated.timing(saveDrop, { toValue: 1, duration: 360, useNativeDriver: true }).start();
-    Animated.sequence([
-      Animated.spring(saveScale, { toValue: 1.4, useNativeDriver: true, speed: 40 }),
-      Animated.spring(saveScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
-    ]).start();
-  }
-
   function handleQuickTap() {
     const now = Date.now();
     if (now - lastTap.current < 280) {
       lastTap.current = 0;
       if (pauseTimer.current) { clearTimeout(pauseTimer.current); pauseTimer.current = null; }
       onDoubleTapLike(item.id);
-      bumpHeart();
+      bumpRailHeart(railAnims);
       burstHeart();
       // Medium tier, not the "light" tier the rail's own like tap uses
       // (hapticLight/hapticToggle, lib/haptics.ts) — double-tap-to-like is a
@@ -1674,13 +1644,12 @@ function SpotlightPageImpl({
                 fallbackColor={item.accentColor}
                 immersive={immersive}
                 progressBottom={immersive ? bottomClearance : undefined}
-                // Drag-time scrub bubble must clear the WHOLE caption/sound
+                // Drag-time scrub bubble must clear the WHOLE caption
                 // stack (see ScrubProgressBar's comment) — its top edge is
                 // this same bottomClearance anchor plus CAPTION_BOTTOM_GAP
                 // plus the stack's *measured* height (captionBlockHeight,
-                // from CaptionBlock's onHeightChange below — the nominal
-                // CAPTION_BLOCK_HEIGHT constants are minimums only, real
-                // content routinely renders taller), plus a small margin.
+                // from CaptionBlock's onHeightChange below), plus a small
+                // margin. This moves only the bubble, never the caption.
                 chromeTop={immersive
                   ? bottomClearance + CAPTION_BOTTOM_GAP + captionBlockHeight + 8
                   : undefined}
@@ -1739,59 +1708,9 @@ function SpotlightPageImpl({
         />
       )}
 
-      {/* ─ Right action rail (components/buyer-feed/RightActionRail) ─
-          bottom: bottomClearance + RAIL_BOTTOM_GAP, not bare bottomClearance
-          — see the RAIL_BOTTOM_GAP/CAPTION_BOTTOM_GAP comment above. Sizing
-          ported from dev PR #129; icon shadows from PR #122. Sound toggle
-          lives in the caption block (CaptionBlock's sound row) instead of a
-          rail-mounted disc — matches dev's #129 rail exactly. */}
-      <RightActionRail
-        style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP, right: 10 + insets.right }]}
-        creator={item.creator}
-        hostId={item.sellerId}
-        avatarColor={item.avatarColor}
-        initials={item.initials}
-        accentColor={item.accentColor}
-        engagement={engagement}
-        commentsCount={(item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta}
-        shares={item.shares}
-        saves={item.saves}
-        onOpenCreator={() => { onOpenCreator(item); }}
-        onFollow={() => onFollow(item.id)}
-        onLike={async () => { bumpHeart(); await onLike(item.id); }}
-        onOpenComments={() => onOpenComments(item.id)}
-        onRepost={async () => { spinRepost(); await onRepost(item.id); }}
-        onSave={async () => { dropSave(); await onSave(item.id); }}
-        onShare={() => setShareOpen(true)}
-        heartScale={heartScale}
-        likeRing={likeRing}
-        repostSpin={repostSpin}
-        repostScale={repostScale}
-        saveDrop={saveDrop}
-        saveScale={saveScale}
-        testIdBase={item.id}
-        reduceMotion={reduceMotion}
-      />
-
-      <ThreadShareSheet
-        visible={shareOpen}
-        postId={item.id}
-        creator={item.creator}
-        caption={item.caption}
-        productName={item.productName}
-        mediaUri={item.mediaUris[0]}
-        isVideo={item.contentType === 'video'}
-        onClose={() => setShareOpen(false)}
-        onReport={() => openReport({
-          targetType: item.contentType === 'video' ? 'video' : 'post',
-          targetId: item.id,
-          label: 'Post',
-          ownerId: item.sellerId,
-          ownerName: item.creator,
-        })}
-        onNotInterested={() => onNotInterested(item.id)}
-        onFeedback={showToast}
-      />
+      {/* The right action rail and its share sheet render once above the
+          pager (ThreadRailOverlay in FeedScreen), not per cell, so they
+          never move while swiping. */}
 
       <LongPressMenu
         visible={menuOpen}
@@ -1808,19 +1727,27 @@ function SpotlightPageImpl({
         onClose={() => setMenuOpen(false)}
       />
 
-      {/* ─ Bottom-left overlay: creator, caption, sound (components/buyer-feed/CaptionBlock) ─
-          bottom: bottomClearance + CAPTION_BOTTOM_GAP, not bare
-          bottomClearance — same reason as the rail above. The shop tag is
-          the ShopSideTab rendered above instead of a CaptionBlock slot. */}
+      {/* Bottom legibility fade, under the caption (not over it) so the name
+          and caption stay pure white on light clips. */}
+      {immersive && (
+        <LinearGradient
+          pointerEvents="none"
+          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.42)', 'rgba(0,0,0,0.6)']}
+          locations={[0, 0.35, 0.7, 1]}
+          style={[styles.bottomScrim, { height: 260 }]}
+          testID="caption-scrim"
+        />
+      )}
+
+      {/* ─ Bottom-left overlay: Shop pill, creator, caption (components/buyer-feed/CaptionBlock) ─
+          One fixed anchor for every post: CAPTION_BOTTOM_GAP above the
+          progress line (bottomClearance). */}
       <CaptionBlock
         style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}
         creator={item.creator}
         verified={!!item.verified}
         sponsored={item.sponsored}
         caption={item.caption}
-        sound={item.sound}
-        soundOn={soundOn}
-        onToggleSound={onToggleSound}
         friendReposts={friendReposts}
         hasRepostIdentity={hasRepostIdentity}
         repostLabel={repostLabel}
@@ -1876,19 +1803,127 @@ const SpotlightPage = React.memo(SpotlightPageImpl, (prev, next) => (
   && prev.hasTabBar === next.hasTabBar
   && prev.soundOn === next.soundOn
   && engagementEqual(prev.engagement, next.engagement)
-  && prev.onLike === next.onLike
   && prev.onDoubleTapLike === next.onDoubleTapLike
-  && prev.onSave === next.onSave
-  && prev.onRepost === next.onRepost
-  && prev.onFollow === next.onFollow
-  && prev.onOpenComments === next.onOpenComments
+  && prev.railAnims === next.railAnims
+  && prev.onPausedChange === next.onPausedChange
   && prev.onShopTag === next.onShopTag
   && prev.onOpenCreator === next.onOpenCreator
   && prev.onNotInterested === next.onNotInterested
   && prev.onVideoWatched === next.onVideoWatched
-  && prev.onToggleSound === next.onToggleSound
   && prev.reduceMotion === next.reduceMotion
 ));
+
+// ─── Right action rail, rendered once above the pager ─────────────────────────
+
+function createRailAnims(): RailAnims {
+  return {
+    heartScale: new Animated.Value(1),
+    likeRing: new Animated.Value(0),
+    saveDrop: new Animated.Value(0),
+    saveScale: new Animated.Value(1),
+  };
+}
+
+/** 1 -> 1.15 -> 1 over 180ms, plus the red ring flashing out from behind the heart. */
+function bumpRailHeart(anims: RailAnims) {
+  Animated.sequence([
+    Animated.timing(anims.heartScale, { toValue: 1.15, duration: 90, useNativeDriver: true }),
+    Animated.timing(anims.heartScale, { toValue: 1, duration: 90, useNativeDriver: true }),
+  ]).start();
+  anims.likeRing.setValue(0);
+  Animated.timing(anims.likeRing, { toValue: 1, duration: 480, useNativeDriver: true }).start();
+}
+
+/** Bookmark lifts, pops, then drops/settles — save toggled either way. */
+function dropRailSave(anims: RailAnims) {
+  anims.saveDrop.setValue(0);
+  Animated.timing(anims.saveDrop, { toValue: 1, duration: 360, useNativeDriver: true }).start();
+  Animated.sequence([
+    Animated.spring(anims.saveScale, { toValue: 1.4, useNativeDriver: true, speed: 40 }),
+    Animated.spring(anims.saveScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
+  ]).start();
+}
+
+/**
+ * The rail (and its share sheet) for whichever post is on screen. Rendered
+ * ONCE as an overlay above the pager instead of inside every page, so it
+ * physically never moves during a swipe: when the active post changes, the
+ * avatar, follow badge, like/save state and counts swap in place with no
+ * animation. Its position is one constant (`bottom`), the same for every
+ * post type.
+ */
+function ThreadRailOverlay({
+  item, engagement, bottom, anims, paused, reduceMotion,
+  onLike, onSave, onRepost, onFollow, onOpenComments, onOpenCreator, onNotInterested,
+}: {
+  item: SpotlightItem;
+  engagement: EngagementState | undefined;
+  bottom: number;
+  anims: RailAnims;
+  paused: boolean;
+  reduceMotion: boolean;
+  onLike: (id: string) => Promise<void>;
+  onSave: (id: string) => Promise<void>;
+  onRepost: (id: string) => Promise<void>;
+  onFollow: (id: string) => Promise<void>;
+  onOpenComments: (id: string) => void;
+  onOpenCreator: (item: SpotlightItem) => void;
+  onNotInterested: (id: string) => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const { openReport } = useReportSheet();
+  const { showToast } = useFeedToast();
+  const commentCountDelta = useCommentCountDelta(item.id);
+  const [shareOpen, setShareOpen] = useState(false);
+  const report = () => openReport({
+    targetType: item.contentType === 'video' ? 'video' : 'post',
+    targetId: item.id,
+    label: 'Post',
+    ownerId: item.sellerId,
+    ownerName: item.creator,
+  });
+  return (
+    <>
+      <RightActionRail
+        style={{ bottom, right: RAIL_RIGHT + insets.right }}
+        creator={item.creator}
+        hostId={item.sellerId}
+        avatarColor={item.avatarColor}
+        initials={item.initials}
+        sound={item.sound}
+        engagement={engagement}
+        commentsCount={(item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta}
+        shares={item.shares}
+        saves={item.saves}
+        onOpenCreator={() => onOpenCreator(item)}
+        onFollow={() => onFollow(item.id)}
+        onLike={async () => { bumpRailHeart(anims); await onLike(item.id); }}
+        onOpenComments={() => onOpenComments(item.id)}
+        onSave={async () => { dropRailSave(anims); await onSave(item.id); }}
+        onShare={() => setShareOpen(true)}
+        anims={anims}
+        discSpinning={item.contentType === 'video' && !paused}
+        testIdBase={item.id}
+        reduceMotion={reduceMotion}
+      />
+      <ThreadShareSheet
+        visible={shareOpen}
+        postId={item.id}
+        creator={item.creator}
+        caption={item.caption}
+        productName={item.productName}
+        mediaUri={item.mediaUris[0]}
+        isVideo={item.contentType === 'video'}
+        reposted={engagement?.reposted ?? false}
+        onRepost={() => onRepost(item.id)}
+        onClose={() => setShareOpen(false)}
+        onReport={report}
+        onNotInterested={() => onNotInterested(item.id)}
+        onFeedback={showToast}
+      />
+    </>
+  );
+}
 
 // CommentsModal replaced by navigation to /buyer-post-comments (see handleOpenComments).
 
@@ -2083,6 +2118,12 @@ export default function FeedScreen({
   // "line" the immersive video frame stops at. See videoFrameInset's doc
   // comment on SpotlightPageImpl for why the two must stay separate.
   const buyerBarTopInset = useBuyerTabBarTopInset('compact');
+  // The compact capsule is the regular one scaled down about its centre
+  // (BuyerTabBar's capsuleAnimatedStyle), so its visible top edge sits half
+  // the height difference below the compact layout's barTopInset.
+  const regularBarMetrics = useBuyerTabBarMetrics(1, 'regular');
+  const compactBarMetrics = useBuyerTabBarMetrics(1, 'compact');
+  const buyerBarVisualTop = buyerBarTopInset + (regularBarMetrics.capsuleHeight - compactBarMetrics.capsuleHeight) / 2;
   const router = useRouter();
   const { userId } = useAuth();
   // Guests browse the feed; like/save/repost/follow prompt sign-in (returnTo).
@@ -2091,19 +2132,16 @@ export default function FeedScreen({
   const { showToast } = useFeedToast();
 
   const [engagements, setEngagements] = useState<Record<string, EngagementState>>({});
-  // The feed's sound on/off choice — a single app-wide preference (not
-  // per-post), persisted so it survives leaving and returning to the feed.
-  const [soundOn, setSoundOn] = useState(false);
-  useEffect(() => {
-    AsyncStorage.getItem(SOUND_PREF_KEY).then(v => { if (v === 'on') setSoundOn(true); }).catch(() => {});
-  }, []);
-  const toggleSound = useCallback(() => {
-    setSoundOn(prev => {
-      const next = !prev;
-      AsyncStorage.setItem(SOUND_PREF_KEY, next ? 'on' : 'off').catch(() => {});
-      return next;
-    });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  // Sound is always on (no mute control) — see hooks/useFeedSound.ts.
+  const soundOn = useFeedSound();
+  // The one rail above the pager (ThreadRailOverlay) and the double-tap
+  // gesture inside each page share these animation values.
+  const railAnims = useRef<RailAnims | null>(null);
+  if (!railAnims.current) railAnims.current = createRailAnims();
+  // Which post is paused right now (tap/hold), so the rail's disc stops with it.
+  const [pausedPostId, setPausedPostId] = useState<string | null>(null);
+  const handlePausedChange = useCallback((id: string, isPaused: boolean) => {
+    setPausedPostId(prev => (isPaused ? id : prev === id ? null : prev));
   }, []);
   const [showGestureGuide, setShowGestureGuide] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -2969,6 +3007,16 @@ export default function FeedScreen({
   const bottomClearance = isBuyerSurface
     ? buyerBarInset
     : Math.max(previewBottomInset, 8) + 14;
+  // The progress line (its bottom edge, from the page bottom): SCRUB_TAB_GAP
+  // above the floating tab bar's visible top on Buyer Home. The scrubber,
+  // caption and rail all hang off this one value, so none of them depends on
+  // the post.
+  const progressLine = isBuyerSurface ? buyerBarVisualTop + SCRUB_TAB_GAP : bottomClearance;
+  const activeItem = displayItems[activeIndex];
+  const activeSpotlight = activeItem && !isDemandPageItem(activeItem as FeedItem) && !isJustDroppedItem(activeItem)
+    && !isLiveStreamItem(activeItem as SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem) && 'contentType' in activeItem
+    ? activeItem as SpotlightItem
+    : null;
 
   return (
     <FeedToastProvider>
@@ -3177,23 +3225,19 @@ export default function FeedScreen({
               isFirstItem={contentIndex === 0}
                 pageWidth={pageWidth}
               pageHeight={pageHeight}
-              bottomClearance={bottomClearance}
+              bottomClearance={progressLine}
               videoFrameInset={isBuyerSurface ? buyerBarTopInset : undefined}
               immersive={isBuyerSurface}
               hasTabBar={!isCreatorFeed}
               onOpenCreator={handleOpenCreator}
               engagement={engagements[spotlight.id] ?? initialEngagement(spotlight)}
-              onLike={handleLike}
               onDoubleTapLike={handleDoubleTapLike}
-              onSave={handleSave}
-              onRepost={handleRepost}
-              onFollow={handleFollow}
-              onOpenComments={handleOpenComments}
+              railAnims={railAnims.current!}
+              onPausedChange={handlePausedChange}
               onShopTag={handleShopTag}
               onNotInterested={handleNotInterested}
               onVideoWatched={handleVideoWatched}
               soundOn={soundOn}
-              onToggleSound={toggleSound}
               onFirstFramePainted={contentIndex === 0 ? handleFirstCellPainted : undefined}
               reduceMotion={!!reduceMotion}
             />
@@ -3243,12 +3287,9 @@ export default function FeedScreen({
             locations={[0, 0.5, 1]}
             style={[styles.topScrim, { height: 140 }]}
           />
-          <LinearGradient
-            pointerEvents="none"
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.42)', 'rgba(0,0,0,0.6)']}
-            locations={[0, 0.35, 0.7, 1]}
-            style={[styles.bottomScrim, { height: 260 }]}
-          />
+          {/* The bottom scrim lives inside each page now, under the
+              caption (see SpotlightPageImpl): as an overlay up here it was
+              painted on top of the caption and dimmed it to grey. */}
           <LinearGradient
             pointerEvents="none"
             colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.08)', 'rgba(0,0,0,0.25)']}
@@ -3258,6 +3299,29 @@ export default function FeedScreen({
             style={styles.railEdgeFade}
           />
         </>
+      )}
+
+      {/* ─ Right action rail: one instance above the pager, bound to the
+          active post (see ThreadRailOverlay), at one fixed position — the
+          disc's bottom RAIL_DISC_TO_PROGRESS above the progress line. */}
+      {viewportReady && activeSpotlight && (
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: feedContentOpacity }]} pointerEvents="box-none">
+          <ThreadRailOverlay
+            item={activeSpotlight}
+            engagement={engagements[activeSpotlight.id] ?? initialEngagement(activeSpotlight)}
+            bottom={progressLine + PROGRESS_LINE_HEIGHT + RAIL_DISC_TO_PROGRESS}
+            anims={railAnims.current!}
+            paused={pausedPostId === activeSpotlight.id}
+            reduceMotion={!!reduceMotion}
+            onLike={handleLike}
+            onSave={handleSave}
+            onRepost={handleRepost}
+            onFollow={handleFollow}
+            onOpenComments={handleOpenComments}
+            onOpenCreator={handleOpenCreator}
+            onNotInterested={handleNotInterested}
+          />
+        </Animated.View>
       )}
 
       {/* ─ Top bar overlay ─ */}

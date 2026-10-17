@@ -1,12 +1,13 @@
 /**
  * Buyer Threads Home feed — bottom-left info block.
  *
- * Repost identity (when present) → @handle + verified badge → 2-line
- * caption with a "more" expand → sound line. Sized and positioned per
- * Mobbin's TikTok For You references gathered for this rebuild: username
- * ~17pt bold, caption ~14.5pt/2 lines with a bold "more", a small
- * pill-shaped sound row below — see the PR description for the full
- * measurement list.
+ * Repost identity (only when it's true) → name + verified check → 2-line
+ * caption with a "more" expand. No sound line: the sound lives on the
+ * rail's spinning disc, like TikTok. The caller pins `bottom` to one fixed
+ * anchor above the progress line and the block grows upward from it, so it
+ * sits in the same place on every post (video or slideshow) and never
+ * measures itself to position anything. Tight TikTok rhythm (Mobbin,
+ * 390x844): 16/20 name, 4pt, 14/18 caption.
  *
  * `topSlot` (resting-pill redesign): the Shop tag pill (components/
  * buyer-feed/ShopSideTab.tsx's `ShopTagPill`) renders here again — back at
@@ -25,6 +26,7 @@ import { FONT, FS, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 import { CaptionSpans } from '@/components/social/CaptionText';
+import { captionNeedsMore, clampCaption } from './captionClamp';
 
 export interface RepostFriend {
   userId: string;
@@ -32,17 +34,14 @@ export interface RepostFriend {
   avatarUrl?: string | null;
 }
 
-// This block's own reserved height (see `root`/`rootWithRepost` below) —
-// exported so callers that need to keep some *other* overlay clear of this
-// whole stack (not just its own bottom edge) can compute that without
-// hand-copying these numbers. See feed.tsx's ScrubProgressBar bubble, which
-// used to hardcode its own clearance and drifted out of sync with this
-// block, letting the drag-time bubble render behind the sound/mute pill.
-export const CAPTION_BLOCK_HEIGHT = 56;
+// Starting estimate of this block's height (Shop pill or repost row + name +
+// 2 caption lines) for the feed's scrub-time bubble until `onHeightChange`
+// reports the real one. Only that drag bubble uses it — nothing about the
+// caption's or the rail's position does.
 export const CAPTION_BLOCK_HEIGHT_WITH_REPOST = 92;
 
 export function CaptionBlock({
-  creator, verified, caption, sound, soundOn, onToggleSound,
+  creator, verified, caption,
   friendReposts, hasRepostIdentity, repostLabel, onOpenRepostIdentity,
   captionExpanded, onToggleCaptionExpanded,
   onOpenCreator,
@@ -54,9 +53,6 @@ export function CaptionBlock({
   creator: string;
   verified: boolean;
   caption: string;
-  sound: string;
-  soundOn: boolean;
-  onToggleSound: () => void;
   friendReposts: RepostFriend[];
   hasRepostIdentity: boolean;
   repostLabel: string;
@@ -66,7 +62,7 @@ export function CaptionBlock({
   onOpenCreator: () => void;
   style?: any;
   /** Reports this block's real rendered height — bigger than the
-   *  `CAPTION_BLOCK_HEIGHT`/`_WITH_REPOST` *minimums* whenever a 2-line
+   *  `CAPTION_BLOCK_HEIGHT_WITH_REPOST` estimate whenever a 2-line
    *  caption, a repost row, or just different font metrics push it taller.
    *  Callers that need to keep some other overlay clear of the whole stack
    *  (the feed's scrub-bubble; see ScrubProgressBar in feed.tsx) should use
@@ -84,20 +80,22 @@ export function CaptionBlock({
     ? (e: LayoutChangeEvent) => onHeightChange(e.nativeEvent.layout.height)
     : undefined;
   // Pads each control's real tap area up to 44x44 without changing its
-  // visual footprint — see useHitAreaBoost's doc comment. `soundHit` and
-  // `repostHit` apply to controls with a painted pill background, so their
-  // boost lands on an outer, unstyled wrapper around the unchanged visual
-  // pill rather than on the pill itself (growing padding on the pill's own
-  // style would visibly enlarge the pill).
+  // visual footprint — see useHitAreaBoost's doc comment. `repostHit`
+  // applies to a control with a painted pill background, so its boost lands
+  // on an outer, unstyled wrapper around the unchanged visual pill rather
+  // than on the pill itself (growing padding on the pill's own style would
+  // visibly enlarge the pill).
   const repostHit = useHitAreaBoost();
-  const creatorHit = useHitAreaBoost();
-  const captionHit = useHitAreaBoost();
-  const soundHit = useHitAreaBoost();
+  // Name and caption use hitSlop, not useHitAreaBoost: the boost measures
+  // the row after first layout and then re-lays it out (and centred it),
+  // which read as the caption jumping on every new post.
+  const needsMore = captionNeedsMore(caption);
   return (
     <Animated.View
-      style={[styles.root, hasRepostIdentity && styles.rootWithRepost, style]}
+      style={[styles.root, style]}
       pointerEvents="box-none"
       onLayout={handleLayout}
+      testID="caption-block"
     >
       {!!topSlot && <View style={styles.topSlotWrap}>{topSlot}</View>}
       {hasRepostIdentity && (
@@ -140,8 +138,8 @@ export function CaptionBlock({
       )}
 
       <TouchableOpacity
-        style={creatorHit.boostStyle}
-        onLayout={creatorHit.onLayout}
+        style={styles.leftAligned}
+        hitSlop={{ top: 11, bottom: 6 }}
         activeOpacity={0.8}
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onOpenCreator(); }}
         accessibilityRole="button"
@@ -159,55 +157,37 @@ export function CaptionBlock({
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={captionHit.boostStyle}
-        onLayout={captionHit.onLayout}
-        onPress={() => caption.length > 86 && onToggleCaptionExpanded()}
-        activeOpacity={caption.length > 86 ? 0.7 : 1}
-        accessibilityRole={caption.length > 86 ? 'button' : 'text'}
-        accessibilityLabel={caption.length > 86 ? (captionExpanded ? 'Collapse caption' : 'Expand caption') : undefined}
+        style={styles.leftAligned}
+        onPress={() => needsMore && onToggleCaptionExpanded()}
+        activeOpacity={needsMore ? 0.7 : 1}
+        accessibilityRole={needsMore ? 'button' : 'text'}
+        accessibilityLabel={needsMore ? (captionExpanded ? 'Collapse caption' : 'Expand caption') : undefined}
         hitSlop={{ top: 4, bottom: 4 }}
       >
-        <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : 2}>
-          <CaptionSpans text={caption} />
-          {caption.length > 86 && (
-            <Text style={styles.moreText}>{captionExpanded ? '  less' : '  more'}</Text>
-          )}
+        {/* Collapsed: the text is cut to fit 2 lines *before* rendering so
+            "… more" always lands at the end of line 2 instead of being
+            clipped away with the overflow. */}
+        <Text style={styles.caption} numberOfLines={captionExpanded || !needsMore ? undefined : 2} testID="caption-text">
+          <CaptionSpans text={captionExpanded || !needsMore ? caption : clampCaption(caption)} />
+          {needsMore && (captionExpanded
+            ? <Text style={styles.moreText}>{'  less'}</Text>
+            : <Text style={styles.moreText} testID="caption-more">{'… more'}</Text>)}
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={soundHit.boostStyle}
-        onLayout={soundHit.onLayout}
-        onPress={onToggleSound}
-        activeOpacity={0.75}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityRole="button"
-        accessibilityLabel={soundOn ? 'Mute sound' : 'Unmute sound'}
-        accessibilityState={{ checked: soundOn }}
-      >
-        <View style={styles.soundRow}>
-          <Feather name="music" size={12} color={`${ON_DARK}E6`} style={styles.iconTextShadow} />
-          <Text style={styles.soundText} numberOfLines={1} ellipsizeMode="tail">{sound}</Text>
-        </View>
-      </TouchableOpacity>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  // One consistent vertical rhythm, set as explicit per-step margins (not a
-  // uniform `gap`, since each step needs its own value): creator name row ->
-  // 6pt -> caption -> 8pt -> sound line -> (the caller's own gap to the
-  // progress bar, see RAIL_BOTTOM_GAP/CAPTION_BOTTOM_GAP in
-  // app/(tabs)/feed.tsx). The shop tag no longer starts this stack (it's
-  // the screen-edge ShopSideTab now) — minHeight shrunk by its old 44pt-tall
-  // pill + 12pt gap (56pt) accordingly, so there's no leftover reserved
-  // space where it used to sit.
+  // Vertical rhythm: Shop pill -> 8pt -> name row (20pt line) -> 4pt ->
+  // caption (18pt lines), then the caller's CAPTION_BOTTOM_GAP to the
+  // progress line (app/(tabs)/feed.tsx). No minHeight: the block's bottom is
+  // the anchor and it only grows up.
   root: {
-    position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: CAPTION_BLOCK_HEIGHT,
+    position: 'absolute', left: 12, right: 80, bottom: 26,
     justifyContent: 'flex-end',
   },
-  rootWithRepost: { minHeight: CAPTION_BLOCK_HEIGHT_WITH_REPOST },
   // 8px gap above the creator name (or repost row) below it — see the
   // module comment's `topSlot` note.
   topSlotWrap: { marginBottom: 8 },
@@ -226,13 +206,13 @@ const styles = StyleSheet.create({
   repostAvatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#35353A' },
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   repostIdentityText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
-  creatorRow: { minHeight: 30, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  creatorRow: { minHeight: 22, marginBottom: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
   // Shared legibility shadow for every text overlay in this block (name,
   // caption, sound) plus the verified badge glyph — strong enough to hold
   // up against a bright/high-key clip (e.g. Maison Vela's silver dress),
   // where the old, lighter shadow washed out to nearly nothing.
   creatorName: {
-    fontSize: 16, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
+    fontSize: 16, lineHeight: 20, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   sponsoredLabel: {
@@ -241,23 +221,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   caption: {
-    fontSize: 14, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 8,
-    lineHeight: 19, letterSpacing: 0.1,
+    fontSize: 14, fontFamily: FONT.medium, color: `${ON_DARK}F2`,
+    lineHeight: 18, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   moreText: { fontFamily: FONT.bold, color: ON_DARK },
+  leftAligned: { alignSelf: 'stretch', alignItems: 'flex-start' },
   // Same shadow, for icon glyphs (Feather renders as a text font, so
   // textShadow applies) — used by the verified badge above.
   iconTextShadow: {
-    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-  },
-  soundRow: {
-    height: 24, flexDirection: 'row', alignItems: 'center', gap: 6,
-    alignSelf: 'flex-start', paddingHorizontal: 9, borderRadius: RADII.pill,
-    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
-  },
-  soundText: {
-    fontSize: 12, fontFamily: FONT.medium, color: `${ON_DARK}E6`, flexShrink: 1,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
 });

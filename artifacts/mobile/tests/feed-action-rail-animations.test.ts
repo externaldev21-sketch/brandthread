@@ -1,12 +1,11 @@
 /**
  * Structure tests: the feed's action rail buttons stay solid-filled (never
- * outlined) and get distinct micro-animations — repost spins/morphs, save
- * drops/settles — each with haptics, on top of the existing like burst.
+ * outlined) and keep their micro-animations — the like bump + ring and the
+ * save drop/settle — each with haptics, on top of the double-tap burst.
  *
- * The rail itself moved into its own component as part of the buyer feed
- * presentation-layer rebuild (see components/buyer-feed/RightActionRail.tsx);
- * the animation-driving functions (spinRepost/dropSave/bumpHeart) and their
- * Animated.Values stayed in app/(tabs)/feed.tsx and are passed down as props.
+ * The rail lives in components/buyer-feed/RightActionRail.tsx and renders
+ * once above the pager; the animation-driving functions (bumpRailHeart/
+ * dropRailSave) and their Animated.Values live in app/(tabs)/feed.tsx.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -14,40 +13,41 @@ import { describe, expect, it } from 'vitest';
 
 const feed = readFileSync(resolve(__dirname, '../app/(tabs)/feed.tsx'), 'utf8');
 const rail = readFileSync(resolve(__dirname, '../components/buyer-feed/RightActionRail.tsx'), 'utf8');
-const engagementButton = readFileSync(resolve(__dirname, '../components/EngagementButton.tsx'), 'utf8');
 
 describe('Action rail icons stay solid-filled', () => {
-  it('like, repost, and save all render through FontAwesome solid glyphs', () => {
-    expect(rail).toMatch(/icon="heart"\s*\n\s*solidIcon="heart"/);
-    expect(rail).toMatch(/icon="repeat"\s*\n\s*solidIcon="retweet"/);
-    expect(rail).toMatch(/icon="bookmark"\s*\n\s*solidIcon="bookmark"/);
+  it('like, comment, save and share all render solid FontAwesome glyphs', () => {
+    expect(rail).toMatch(/icon="heart"/);
+    expect(rail).toMatch(/icon="commenting"/);
+    expect(rail).toMatch(/icon="bookmark"/);
+    expect(rail).toMatch(/icon="share"/);
+    expect(rail).toContain('<FontAwesome name={icon}');
   });
 
-  it('comment and share use solid FontAwesome glyphs directly', () => {
-    expect(rail).toContain('<FontAwesome name="commenting"');
-    expect(rail).toContain('<FontAwesome name="share"');
+  it('has no repost button (repost lives in the share sheet)', () => {
+    expect(rail).not.toMatch(/onRepost|repost-btn|retweet/);
   });
 });
 
-describe('Repost and save micro-animations', () => {
-  it('repost spins a full turn on toggle, with haptics', () => {
-    expect(feed).toContain('function spinRepost(');
-    expect(rail).toContain('rotateAnim={repostSpin}');
-    expect(rail).toContain('onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onRepost(); }}');
-    expect(feed).toContain('onRepost={async () => { spinRepost(); await onRepost(item.id); }}');
+describe('Like and save micro-animations', () => {
+  // The rail renders once above the pager (ThreadRailOverlay in feed.tsx);
+  // its Animated.Values are created once in FeedScreen and shared with the
+  // double-tap gesture inside each page.
+  it('like bumps the heart and flashes the ring, with haptics', () => {
+    expect(feed).toContain('function bumpRailHeart(');
+    expect(feed).toContain('onLike={async () => { bumpRailHeart(anims); await onLike(item.id); }}');
+    expect(rail).toContain('scale={anims.heartScale}');
+    expect(rail).toContain("onPress={() => { hapticLight(); void onLike(); }}");
+  });
+
+  it('double-tap like bumps the same rail heart', () => {
+    expect(feed).toContain('bumpRailHeart(railAnims);');
   });
 
   it('save lifts then drops/settles on toggle, with haptics', () => {
-    expect(feed).toContain('function dropSave(');
-    expect(rail).toContain('translateYAnim={saveDrop}');
-    expect(rail).toContain('onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onSave(); }}');
-    expect(feed).toContain('onSave={async () => { dropSave(); await onSave(item.id); }}');
-  });
-
-  it('EngagementButton composes rotate and translateY alongside the existing scale animation', () => {
-    expect(engagementButton).toContain('rotateAnim?: Animated.Value');
-    expect(engagementButton).toContain('translateYAnim?: Animated.Value');
-    expect(engagementButton).toContain("outputRange: ['0deg', '360deg']");
-    expect(engagementButton).toContain('outputRange: [0, -6, 0]');
+    expect(feed).toContain('function dropRailSave(');
+    expect(feed).toContain('onSave={async () => { dropRailSave(anims); await onSave(item.id); }}');
+    expect(rail).toContain('scale={anims.saveScale}');
+    expect(rail).toContain('outputRange: [0, -6, 0]');
+    expect(rail).toContain("onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); void onSave(); }}");
   });
 });

@@ -42,6 +42,10 @@ interface ThreadShareSheetProps {
   productName?: string;
   mediaUri?: string;
   isVideo: boolean;
+  /** Whether the viewer has reposted this post — the first action reads "Remove repost" then. */
+  reposted: boolean;
+  /** Toggles the repost (the feed's handleRepost: API call, education sheet, toasts). */
+  onRepost: () => Promise<void> | void;
   onClose: () => void;
   onReport: () => void;
   onNotInterested: () => void;
@@ -58,6 +62,8 @@ export function ThreadShareSheet({
   productName,
   mediaUri,
   isVideo,
+  reposted,
+  onRepost,
   onClose,
   onReport,
   onNotInterested,
@@ -277,6 +283,19 @@ export function ThreadShareSheet({
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.actionRow}
             >
+              {/* Repost leads the top row, where TikTok has it (it moved off
+                  the feed's right rail). The sheet closes first so the
+                  first-repost education sheet never stacks on top of it. */}
+              <ShareAction
+                label={reposted ? 'Remove repost' : 'Repost'}
+                icon="repeat"
+                active={reposted}
+                testID="thread-share-repost"
+                onPress={() => {
+                  onClose();
+                  void onRepost();
+                }}
+              />
               {friends.map(friend => (
                 <ShareAction
                   key={friend.userId}
@@ -359,6 +378,8 @@ function ShareAction({
   busy,
   muted,
   avatar,
+  active,
+  testID,
 }: {
   label: string;
   icon?: React.ComponentProps<typeof Feather>['name'];
@@ -366,6 +387,9 @@ function ShareAction({
   busy?: boolean;
   muted?: boolean;
   avatar?: { initials: string; color: string };
+  /** Filled (inverted) circle — e.g. Repost once the post is reposted. */
+  active?: boolean;
+  testID?: string;
 }) {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
@@ -376,13 +400,14 @@ function ShareAction({
       disabled={busy}
       accessibilityRole="button"
       accessibilityLabel={label}
-      testID={`thread-share-${label.toLowerCase().replace(/\s+/g, '-')}`}
+      accessibilityState={active === undefined ? undefined : { checked: active }}
+      testID={testID ?? `thread-share-${label.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      <View style={[styles.actionCircle, muted && styles.actionCircleMuted, avatar && { backgroundColor: avatar.color }]}>
+      <View style={[styles.actionCircle, muted && styles.actionCircleMuted, active && { backgroundColor: theme.text, borderColor: theme.text }, avatar && { backgroundColor: avatar.color }]}>
          {busy ? <ActivityIndicator color={theme.onAccent} /> : avatar ? (
           <Text style={styles.avatarText}>{avatar.initials}</Text>
         ) : (
-           <Feather name={icon ?? 'send'} size={22} color={theme.text} />
+           <Feather name={icon ?? 'send'} size={22} color={active ? theme.card : theme.text} />
         )}
       </View>
       <Text style={styles.actionLabel} numberOfLines={2}>{label}</Text>
