@@ -595,6 +595,79 @@ export async function getInsights(accessToken: string, campaignId: string): Prom
   };
 }
 
+// ─── Delivery estimate (reach) ───────────────────────────────────────────────
+
+export interface DeliveryEstimate {
+  /** False while Meta is still computing the estimate for this audience. */
+  ready: boolean;
+  /** Meta's estimated people reached per day at the given daily spend; null if Meta returned no curve. */
+  dailyReach: number | null;
+  /** Meta's estimated monthly active audience size for the targeting. */
+  audienceSizeLower: number | null;
+  audienceSizeUpper: number | null;
+}
+
+/**
+ * Turns a `delivery_estimate` response row into a reach number for a daily
+ * spend. `daily_outcomes_curve` is Meta's own spend → reach curve (spend in
+ * the account currency's minor units); the reach at `dailySpendCents` is read
+ * off that curve by linear interpolation between Meta's two nearest points
+ * (capped at the last point) — nothing is invented beyond Meta's numbers.
+ */
+export function parseDeliveryEstimate(row: any, dailySpendCents: number): DeliveryEstimate {
+  const toNum = (v: unknown): number | null => {
+    const parsed = Number(v);
+    return v === undefined || v === null || !Number.isFinite(parsed) ? null : parsed;
+  };
+  const curve = (Array.isArray(row?.daily_outcomes_curve) ? row.daily_outcomes_curve : [])
+    .map((p: any) => ({ spend: toNum(p?.spend), reach: toNum(p?.reach) }))
+    .filter((p: { spend: number | null; reach: number | null }): p is { spend: number; reach: number } =>
+      p.spend !== null && p.reach !== null)
+    .sort((a: { spend: number }, b: { spend: number }) => a.spend - b.spend);
+
+  let dailyReach: number | null = null;
+  if (curve.length > 0) {
+    const last = curve[curve.length - 1];
+    if (dailySpendCents >= last.spend) {
+      dailyReach = last.reach;
+    } else {
+      for (let i = 0; i < curve.length; i++) {
+        const hi = curve[i];
+        if (hi.spend < dailySpendCents) continue;
+        const lo = i > 0 ? curve[i - 1] : { spend: 0, reach: 0 };
+        const span = hi.spend - lo.spend;
+        dailyReach = span > 0
+          ? lo.reach + ((dailySpendCents - lo.spend) / span) * (hi.reach - lo.reach)
+          : hi.reach;
+        break;
+      }
+    }
+    if (dailyReach !== null) dailyReach = Math.round(dailyReach);
+  }
+
+  return {
+    ready: row?.estimate_ready !== false,
+    dailyReach,
+    audienceSizeLower: toNum(row?.estimate_mau_lower_bound),
+    audienceSizeUpper: toNum(row?.estimate_mau_upper_bound),
+  };
+}
+
+/** Meta's own reach estimate for a targeting spec + optimization goal. */
+export async function getDeliveryEstimate(
+  accessToken: string,
+  adAccountId: string,
+  params: { targeting: Record<string, unknown>; optimizationGoal: string; dailySpendCents: number },
+): Promise<DeliveryEstimate> {
+  const url = `${graphBase()}/${adAccountId}/delivery_estimate?${qs({
+    optimization_goal: params.optimizationGoal,
+    targeting_spec: JSON.stringify(params.targeting),
+    access_token: accessToken,
+  })}`;
+  const body = await metaGet(url, "metaGraph.getDeliveryEstimate");
+  return parseDeliveryEstimate(body.data?.[0] ?? {}, params.dailySpendCents);
+}
+
 // ─── Conversions API ────────────────────────────────────────────────────────
 
 /**
