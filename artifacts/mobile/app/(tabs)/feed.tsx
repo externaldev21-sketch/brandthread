@@ -97,9 +97,9 @@ import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
 import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
-import { PhotoCarousel } from '@/components/buyer-feed/PhotoCarousel';
+import { PHOTO_SLIDE_FIT, PhotoCarousel } from '@/components/buyer-feed/PhotoCarousel';
 import { rememberedSlide } from '@/lib/carouselMemory';
-import { containRect, fitForPage, resolveAspect } from '@/lib/mediaFrame';
+import { fitForPage, resolveAspect, slideFrame } from '@/lib/mediaFrame';
 import { creditLabel, OFFICIAL_AVATAR_SOURCE } from '@/lib/officialAccount';
 import { noteThreadOnScreen } from '@/services/officialSeedService';
 import { previewOfficialPosts } from '@/lib/previewOfficialAccount';
@@ -2665,7 +2665,8 @@ export default function FeedScreen({
     if (!firstSpotlight) return { style: StyleSheet.absoluteFill, fit: 'cover' as const };
     if (firstSpotlight.contentType !== 'video') {
       const aspect = firstSpotlight.mediaAspects?.[overlaySlideIndex] ?? 9 / 16;
-      return { style: { position: 'absolute' as const, ...containRect(aspect, pageWidth, pageHeight) }, fit: 'contain' as const };
+      const frame = slideFrame(PHOTO_SLIDE_FIT, aspect, pageWidth, pageHeight);
+      return { style: frame.style, fit: frame.contentFit };
     }
     return { style: StyleSheet.absoluteFill, fit: fitForPage(firstSpotlight.posterAspect ?? 9 / 16, pageWidth, pageHeight) };
   }, [firstSpotlight, overlaySlideIndex, pageWidth, pageHeight]);

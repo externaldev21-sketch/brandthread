@@ -20,9 +20,12 @@ import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { CachedImage } from '@/components/CachedImage';
 import { rememberSlide, rememberedSlide } from '@/lib/carouselMemory';
-import { containRect } from '@/lib/mediaFrame';
+import { slideFrame, type SlideFit } from '@/lib/mediaFrame';
 import { CREATE_CANVAS as MEDIA, FONT } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
+
+/** How a slide sits on the page; the feed's first-frame overlay reads this too. */
+export const PHOTO_SLIDE_FIT: SlideFit = 'contain';
 
 export type PhotoCarouselProps = {
   postId: string;
@@ -108,8 +111,7 @@ export function PhotoCarousel({
             {uri ? (
               <CachedImage
                 source={{ uri }}
-                style={{ position: 'absolute', ...containRect(aspects?.[i] ?? 9 / 16, pageWidth, pageHeight) }}
-                contentFit="contain"
+                {...slideFrame(PHOTO_SLIDE_FIT, aspects?.[i] ?? 9 / 16, pageWidth, pageHeight)}
                 transition={0}
                 placeholder={null}
                 recyclingKey={`${postId}-${i}`}

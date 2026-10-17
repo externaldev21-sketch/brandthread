@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { aspectOf, containRect, fitForPage, resolveAspect } from '@/lib/mediaFrame';
+import { aspectOf, containRect, fitForPage, resolveAspect, slideFrame } from '@/lib/mediaFrame';
 
 describe('mediaFrame — final size on the first frame', () => {
   it('reads an aspect from stored pixel sizes', () => {
@@ -32,5 +32,15 @@ describe('mediaFrame — final size on the first frame', () => {
     expect(resolveAspect({ width: 1080, height: 1920 }, { postId: 'p2', what: 'poster' })).toBeCloseTo(9 / 16);
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
+  });
+
+  it('gives the overlay and the carousel one frame per fit (no size change at handoff)', () => {
+    expect(slideFrame('contain', 3 / 4, 390, 844)).toEqual({
+      style: { position: 'absolute', left: 0, top: 162, width: 390, height: 520 }, contentFit: 'contain',
+    });
+    // Full-bleed: the whole page, whatever the photo's own ratio.
+    expect(slideFrame('cover', 3 / 4, 390, 844)).toEqual({
+      style: { position: 'absolute', left: 0, top: 0, width: 390, height: 844 }, contentFit: 'cover',
+    });
   });
 });

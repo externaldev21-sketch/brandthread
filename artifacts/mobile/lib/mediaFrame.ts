@@ -54,6 +54,24 @@ export function fitForPage(mediaAspect: number, pageWidth: number, pageHeight: n
   return crop <= FULL_PAGE_COVER_CROP_THRESHOLD ? 'cover' : 'contain';
 }
 
+export type SlideFit = 'contain' | 'cover';
+
+/**
+ * The on-screen box + fit for a photo slide. `contain` letterboxes the photo
+ * in its own exact rect; `cover` fills the page (full-bleed). The feed's
+ * first-frame overlay and PhotoCarousel both use this, so the handoff
+ * between them can never change the photo's size.
+ */
+export function slideFrame(fit: SlideFit, aspect: number, pageWidth: number, pageHeight: number): {
+  style: { position: 'absolute'; left: number; top: number; width: number; height: number };
+  contentFit: SlideFit;
+} {
+  const rect = fit === 'cover'
+    ? { left: 0, top: 0, width: pageWidth, height: pageHeight }
+    : containRect(aspect, pageWidth, pageHeight);
+  return { style: { position: 'absolute', ...rect }, contentFit: fit };
+}
+
 /** The exact on-screen box for media of `aspect` letterboxed inside the page. */
 export function containRect(aspect: number, pageWidth: number, pageHeight: number): { left: number; top: number; width: number; height: number } {
   if (!(aspect > 0) || !(pageWidth > 0) || !(pageHeight > 0)) return { left: 0, top: 0, width: pageWidth, height: pageHeight };
