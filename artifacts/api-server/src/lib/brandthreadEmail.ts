@@ -530,7 +530,7 @@ export async function sendIpTakedownSellerEmail(options: {
     subtitle: `Case ${options.caseReference}`,
     bodyHtml: `<p>${listing} was removed from Brandthread after a ${escapeHtml(options.rightsType)} report from a rights holder.</p>
       ${warning}
-      <p>If you believe this was a mistake, reply to this email within 10 business days with a counter-notice that includes your full name and contact details, a description of the removed listing, a statement under penalty of perjury that you have a good-faith belief it was removed by mistake or misidentification, and your consent to resolve any dispute in the courts of your location. Keep the case reference in the subject line.</p>
+      <p>If you believe this was a mistake, file a counter-notice in the Brandthread app (Settings → Legal → IP takedowns) or reply to this email within 10 business days with a counter-notice that includes your full name and contact details, a description of the removed listing, a statement under penalty of perjury that you have a good-faith belief it was removed by mistake or misidentification, and your consent to resolve any dispute in the courts of your location. Keep the case reference in the subject line.</p>
       <p style="margin-bottom:0;color:#666666;">Questions: legal@brandthread.app</p>`,
   });
   return sendBrandthreadEmail({

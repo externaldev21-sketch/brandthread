@@ -328,6 +328,8 @@ export const ipCases = pgTable('ip_cases', {
   counterNoticeStatus: text('counter_notice_status').notNull().default('none'),
   counterNoticeStatement: text('counter_notice_statement'),
   counterNoticeReceivedAt: timestamp('counter_notice_received_at', { withTimezone: true }),
+  // Structured seller counter-notice (migration 280); see api-server lib/ipCounterNotice.ts.
+  counterNoticeDetails: jsonb('counter_notice_details').$type<Record<string, unknown>>(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({

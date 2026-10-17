@@ -34,6 +34,7 @@ import type {
 import { classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsError';
 import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
 import type { LiveAvailabilityStatus } from '@/lib/live/liveAvailability';
+import type { CounterNoticeInput, SellerIpCase } from '@/lib/counterNotice';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 import type { GiftCard, GiftCardHistoryEntry, GiftCardSettings, GiftCardStoreInfo } from '@/lib/giftCards';
@@ -1329,6 +1330,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ caseReference: string; statusToken: string; status: string }>('/api/ip-cases', body),
       status: (caseReference: string, token: string) =>
         get<{ caseReference: string; status: string }>(`/api/ip-cases/${encodeURIComponent(caseReference)}/status?token=${encodeURIComponent(token)}`),
+      /** Seller: own listings taken down after an IP report. */
+      mine: () => get<{ cases: SellerIpCase[] }>('/api/ip-cases/seller/mine'),
+      /** Seller: DMCA counter-notice (every 17 U.S.C. § 512(g)(3) element). */
+      counterNotice: (caseReference: string, body: CounterNoticeInput) =>
+        post<{ ok: true; counterNoticeStatus: 'received' }>(`/api/ip-cases/seller/${encodeURIComponent(caseReference)}/counter-notice`, body),
     },
     orders: {
       list:           ()                       => quietGet('/api/orders'),

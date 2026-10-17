@@ -1593,6 +1593,8 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="seller-giveaways" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-giveaway-create" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-giveaway-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-ip-cases" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-counter-notice" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="giveaway" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drop-create"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drop-preview"      options={{ headerShown: false, animation: 'ios_from_right' }} />

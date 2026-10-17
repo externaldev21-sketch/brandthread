@@ -66,6 +66,13 @@ const notice = (url: string, extra: Record<string, unknown> = {}) => ({
   goodFaithStatement: true, accuracyStatement: true, signature: "Rae Rights", ...extra,
 });
 
+const counterNotice = (extra: Record<string, unknown> = {}) => ({
+  fullName: "Sam Seller", address: "12 Market Street, Portland, OR 97201, USA", phone: "+1 503 555 0100",
+  email: "sam@example.test", removedMaterial: "My listing 'Wrongly removed' at brandthread.app/product/...",
+  explanation: "This is my own design and I hold the rights to it.",
+  perjuryStatement: true, consentToJurisdiction: true, signature: "Sam Seller", ...extra,
+});
+
 async function newProduct(name: string): Promise<string> {
   const [row] = await db.insert(products).values({ ownerId: SELLER, name, status: "active" }).returning({ id: products.id });
   productIds.push(row.id);
@@ -209,22 +216,45 @@ describe("counter-notice", () => {
   it("rejects a counter-notice before any takedown and from anyone but the seller", async () => {
     const id = await newProduct("No takedown yet");
     const created = await call("/api/ip-cases", { method: "POST", body: notice(`https://brandthread.app/product/${id}`) });
-    const statement = "This is my own design and I hold the rights to it.";
-    const early = await call(`/api/ip-cases/seller/${created.body.caseReference}/counter-notice`, { method: "POST", user: SELLER, body: { statement, goodFaith: true } });
+    const early = await call(`/api/ip-cases/seller/${created.body.caseReference}/counter-notice`, { method: "POST", user: SELLER, body: counterNotice() });
     expect(early.status).toBe(409);
-    const stranger = await call(`/api/ip-cases/seller/${created.body.caseReference}/counter-notice`, { method: "POST", user: BUYER, body: { statement, goodFaith: true } });
+    const stranger = await call(`/api/ip-cases/seller/${created.body.caseReference}/counter-notice`, { method: "POST", user: BUYER, body: counterNotice() });
     expect(stranger.status).toBe(404);
-    expect((await call(`/api/ip-cases/seller/${created.body.caseReference}/counter-notice`, { method: "POST", body: { statement, goodFaith: true } })).status).toBe(401);
+    expect((await call(`/api/ip-cases/seller/${created.body.caseReference}/counter-notice`, { method: "POST", body: counterNotice() })).status).toBe(401);
   });
 
   it("records the seller's counter-notice, then reinstating restores the listing and removes the strike", async () => {
     const removed = await fileAndRemove("Wrongly removed");
     const [before] = await db.select().from(users).where(eq(users.clerkId, SELLER));
-    const statement = "This is my own design and I hold the rights to it.";
-    expect((await call(`/api/ip-cases/seller/${removed.reference}/counter-notice`, { method: "POST", user: SELLER, body: { statement: "short", goodFaith: true } })).status).toBe(400);
-    const filed = await call(`/api/ip-cases/seller/${removed.reference}/counter-notice`, { method: "POST", user: SELLER, body: { statement, goodFaith: true } });
+    const url = `/api/ip-cases/seller/${removed.reference}/counter-notice`;
+    // Every 512(g)(3) element is required.
+    for (const missing of [
+      { explanation: "short" }, { fullName: "" }, { address: "" }, { phone: "" }, { removedMaterial: "" },
+      { perjuryStatement: false }, { consentToJurisdiction: false }, { signature: "" }, { signature: "Someone Else" },
+    ]) {
+      const bad = await call(url, { method: "POST", user: SELLER, body: counterNotice(missing) });
+      expect(bad.status, JSON.stringify(missing)).toBe(400);
+      expect(bad.body.code).toBe("INVALID_COUNTER_NOTICE");
+    }
+
+    const mineBefore = await call("/api/ip-cases/seller/mine", { user: SELLER });
+    expect(mineBefore.status).toBe(200);
+    const listed = mineBefore.body.cases.find((c: any) => c.caseReference === removed.reference);
+    expect(listed).toMatchObject({ listingName: "Wrongly removed", counterNoticeStatus: "none", canFileCounterNotice: true });
+    expect(listed).not.toHaveProperty("claimantEmail");
+    expect((await call("/api/ip-cases/seller/mine", { user: BUYER })).body.cases).toEqual([]);
+
+    const filed = await call(url, { method: "POST", user: SELLER, body: counterNotice() });
     expect(filed.status).toBe(201);
-    expect((await call(`/api/ip-cases/seller/${removed.reference}/counter-notice`, { method: "POST", user: SELLER, body: { statement, goodFaith: true } })).status).toBe(409);
+    expect((await call(url, { method: "POST", user: SELLER, body: counterNotice() })).status).toBe(409);
+    const [stored] = await db.select().from(ipCases).where(eq(ipCases.id, removed.caseId));
+    expect(stored.counterNoticeDetails).toMatchObject({ fullName: "Sam Seller", phone: "+1 503 555 0100", signature: "Sam Seller" });
+    expect(stored.counterNoticeStatement).toContain("penalty of perjury");
+    expect(stored.counterNoticeStatement).toContain("Federal District Court");
+    expect(stored.counterNoticeStatement).toContain("12 Market Street");
+    const mineAfter = await call("/api/ip-cases/seller/mine", { user: SELLER });
+    expect(mineAfter.body.cases.find((c: any) => c.caseReference === removed.reference))
+      .toMatchObject({ counterNoticeStatus: "received", canFileCounterNotice: false });
 
     const queue = await call("/api/ip-cases?counterNotice=received", { user: ADMIN });
     expect(queue.body.map((c: any) => c.id)).toContain(removed.caseId);

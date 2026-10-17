@@ -18,6 +18,7 @@ import {
   repeatInfringerThreshold,
   validateNotice,
 } from "../lib/ipEnforcement";
+import { composeCounterNoticeText, validateCounterNotice, type CounterNoticeDetails } from "../lib/ipCounterNotice";
 
 const router = Router();
 const RIGHTS_TYPES = ["copyright", "trademark", "counterfeit", "other"] as const;
@@ -129,7 +130,10 @@ router.get("/:reference/status", async (req, res) => {
   return res.json(publicCase(caseRow));
 });
 
-async function recordCounterNotice(caseId: string, statement: string, actorId: string, via: "seller" | "moderator") {
+async function recordCounterNotice(
+  caseId: string, statement: string, actorId: string, via: "seller" | "moderator",
+  details: CounterNoticeDetails | null = null,
+) {
   return db.transaction(async (tx) => {
     const [existing] = await tx.select().from(ipCases).where(eq(ipCases.id, caseId)).limit(1).for("update");
     if (!existing) return "missing" as const;
@@ -137,6 +141,7 @@ async function recordCounterNotice(caseId: string, statement: string, actorId: s
     const now = new Date();
     await tx.update(ipCases).set({
       counterNoticeStatus: "received", counterNoticeStatement: statement,
+      ...(details ? { counterNoticeDetails: details as unknown as Record<string, unknown> } : {}),
       counterNoticeReceivedAt: now, updatedAt: now,
     }).where(eq(ipCases.id, caseId));
     await tx.insert(ipCaseAuditHistory).values({
@@ -147,18 +152,43 @@ async function recordCounterNotice(caseId: string, statement: string, actorId: s
   });
 }
 
+// Seller's own takedowns (newest first) so they can see each case and file a
+// counter-notice in the app. Never exposes claimant details.
+router.get("/seller/mine", requireAuth, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const rows = await db.select({
+    caseReference: ipCases.publicReference, rightsType: ipCases.rightsType, status: ipCases.status,
+    listingProductId: ipCases.listingProductId, listingName: products.name,
+    takedownAt: ipCases.takedownAt, counterNoticeStatus: ipCases.counterNoticeStatus,
+    counterNoticeReceivedAt: ipCases.counterNoticeReceivedAt,
+  }).from(ipCases)
+    .leftJoin(products, eq(products.id, ipCases.listingProductId))
+    .where(and(eq(ipCases.sellerId, sellerId), sql`${ipCases.takedownAt} IS NOT NULL`))
+    .orderBy(desc(ipCases.takedownAt))
+    .limit(100);
+  return res.json({
+    cases: rows.map((row) => ({
+      ...row,
+      canFileCounterNotice: canReceiveCounterNotice({ takedownAt: row.takedownAt, counterNoticeStatus: row.counterNoticeStatus }),
+    })),
+  });
+});
+
 // Seller-side counter-notice: only the owner of the taken-down listing can file
-// it, once, after a takedown. A moderator then reinstates or upholds.
+// it, once, after a takedown. Every element 17 U.S.C. § 512(g)(3) requires is
+// validated (lib/ipCounterNotice.ts). A moderator then reinstates or upholds.
 router.post("/seller/:reference/counter-notice", requireAuth, rateLimit("report"), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
-  const statement = typeof req.body?.statement === "string" ? req.body.statement.trim() : "";
-  if (statement.length < 20 || statement.length > 5000 || req.body?.goodFaith !== true) {
-    return res.status(400).json({ error: "Describe why the listing was removed by mistake and confirm your good-faith statement" });
+  const parsed = validateCounterNotice(req.body);
+  if (!parsed.ok) {
+    return res.status(400).json({ error: parsed.error, code: "INVALID_COUNTER_NOTICE", field: parsed.field });
   }
+  const reference = String(req.params.reference);
   const [caseRow] = await db.select({ id: ipCases.id }).from(ipCases)
-    .where(and(eq(ipCases.publicReference, String(req.params.reference)), eq(ipCases.sellerId, sellerId))).limit(1);
+    .where(and(eq(ipCases.publicReference, reference), eq(ipCases.sellerId, sellerId))).limit(1);
   if (!caseRow) return res.status(404).json({ error: "Case not found" });
-  const result = await recordCounterNotice(caseRow.id, statement, sellerId, "seller");
+  const statement = composeCounterNoticeText(reference, parsed.value);
+  const result = await recordCounterNotice(caseRow.id, statement, sellerId, "seller", parsed.value);
   if (result === "missing") return res.status(404).json({ error: "Case not found" });
   if (result === "not_allowed") return res.status(409).json({ error: "A counter-notice can only be filed once, after a takedown" });
   return res.status(201).json({ ok: true, counterNoticeStatus: "received" });
