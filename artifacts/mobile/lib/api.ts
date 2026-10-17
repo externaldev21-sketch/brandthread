@@ -964,6 +964,10 @@ export interface LocalUserProfile {
   deletionCancelled?: boolean;
   /** Derived age band (the date of birth is never stored). null = not asked yet. */
   ageBand?: 'under_13' | '13_17' | '18_plus' | null;
+  /** Free-text pronouns (≤ 30 chars); null = not set. */
+  pronouns?: string | null;
+  /** Edit Profile "Style badge"; null = never set. */
+  styleBadge?: { label: string; emoji: string; enabled: boolean } | null;
 }
 
 export interface ShopifyImportJob {
@@ -1101,6 +1105,25 @@ export interface AccessWaitlist {
   items: { id: string; email: string; createdAt: string; invitedAt: string | null; code: string | null }[];
   counts: { total: number; invited: number; pending: number };
 }
+/** Server-side account app settings — mirrors api-server lib/userAppSettings.ts. */
+export interface MeAppSettings {
+  readReceipts: boolean;
+  activityStatus: boolean;
+  groupAdds: 'everyone' | 'friends';
+  storyReplies: 'everyone' | 'friends' | 'off';
+  hideLikeCounts: boolean;
+  personalizedRecommendations: boolean;
+  sensitiveContent: 'less' | 'standard' | 'more';
+  reduceMotion: boolean;
+  captions: boolean;
+  autoplayVideos: boolean;
+  highQualityUploads: boolean;
+  dataSaver: boolean;
+  highContrast: boolean;
+  loginAlerts: boolean;
+  appLanguage: string;
+}
+
 export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () => 'anonymous') {
   const get     = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope);
   const freshGet = <T>(path: string) => request<T>(path, { method: 'GET', cache: 'no-store' }, getToken, false, getCacheScope);
@@ -1227,6 +1250,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         contactEmail?: string;
         tags?:         string[];
         socialLinks?:  Record<string, string>;
+        /** ≤ 30 chars; "" clears it. */
+        pronouns?:     string;
+        /** label ≤ 24, emoji ≤ 8; null clears it. */
+        styleBadge?:   { label: string; emoji: string; enabled: boolean } | null;
       }) => patch<any>('/api/auth/profile', body),
       /** Upload the current account's profile photo (buyer or seller). Cropped to a
        *  square client-side and displayed as a circle. Shared with the seller avatar
@@ -2817,6 +2844,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
           iBlockedThem: boolean;
           isPrivate?: boolean; followRequested?: boolean; contentHidden?: boolean;
+          /** Public profile extras; styleBadge is present only when the owner enabled it. */
+          pronouns?: string | null; styleBadge?: { label: string; emoji: string } | null;
         }>(`/api/social/profile/${encodeURIComponent(userId)}`),
       /** Posts where someone tagged this profile (the profile "Tagged" tab). */
       tagged: (userId: string, limit = 30, offset = 0) =>
@@ -3045,6 +3074,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       update: (settings: { dmPrivacy?: 'requests' | 'followers_only'; isPrivate?: boolean }) =>
         patch<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean }>('/api/auth/privacy', settings),
     },
+    /**
+     * Account app settings (privacy, content, accessibility, security),
+     * stored server-side so they follow the account across devices and the
+     * API can enforce them. See artifacts/api-server/src/lib/userAppSettings.ts.
+     */
+    meSettings: {
+      get: () => freshGet<{ settings: MeAppSettings; updatedAt: string | null }>('/api/me/settings'),
+      update: (body: Partial<MeAppSettings>) =>
+        patch<{ settings: MeAppSettings; updatedAt: string }>('/api/me/settings', body),
+      resetRecommendations: () => post<{ ok: boolean }>('/api/me/settings/reset-recommendations', {}),
+    },
     /** Private-account follow requests (incoming) and the Close Friends list. */
     followRequests: {
       list: (limit = 50, offset = 0) =>
@@ -3084,6 +3124,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       get: () => get<{ seenTipIds: string[]; skipAll: boolean }>('/api/first-run-tips/seen'),
       markSeen: (tipId: string) => post<void>(`/api/first-run-tips/${encodeURIComponent(tipId)}/seen`, {}),
       skipAll: () => post<void>('/api/first-run-tips/skip-all', {}),
+      /** Explicit on/off for Settings > Tips (false turns "Skip all tips" back off). */
+      setSkipAll: (skipAll: boolean) => post<void>('/api/first-run-tips/skip-all', { skipAll }),
       reset: () => post<void>('/api/first-run-tips/reset', {}),
     },
     /** Public seller storefront — profile + products + posts */

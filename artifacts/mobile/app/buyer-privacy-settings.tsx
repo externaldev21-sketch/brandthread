@@ -14,6 +14,8 @@ import { Card, ListRow, Button, OptionSheet, OptionSheetOption } from '@/compone
 import { getPrivacySettings, updatePrivacySettings } from '@/services/socialService';
 import { PrivacySettings, AudienceOption, DmPrivacy } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+import { hydrateBuyerSettings, updateBuyerSettings } from '@/lib/buyerSettingsSync';
+import { apiErrorMessage } from '@/lib/safety';
 
 const AUDIENCE_LABEL: Record<AudienceOption, string> = {
   everyone: 'Everyone',
@@ -59,7 +61,12 @@ export default function BuyerPrivacySettings() {
 
   useFocusEffect(
     useCallback(() => {
-      getPrivacySettings().then(setSettings);
+      // Activity status / read receipts are account settings on the server
+      // (shared with Settings → Who can message and see me); they win over
+      // the local copy once loaded.
+      Promise.all([getPrivacySettings(), hydrateBuyerSettings(api).catch(() => null)]).then(([local, remote]) => {
+        setSettings(remote ? { ...local, activityStatusVisible: remote.activityStatus, readReceiptsEnabled: remote.readReceipts } : local);
+      });
       // Load server-side DM privacy setting
       api.privacy.get().then(({ dmPrivacy: p, isPrivate }) => {
         setDmPrivacy(p);
@@ -68,6 +75,21 @@ export default function BuyerPrivacySettings() {
       api.followRequests.list(50, 0).then((rows) => setRequestCount(Array.isArray(rows) ? rows.length : 0)).catch(() => {});
     }, [])
   );
+
+  // Server-backed toggles save immediately (not via Save), rolled back with
+  // the real error if the server refuses.
+  async function applyServerToggle(key: 'activityStatusVisible' | 'readReceiptsEnabled', next: boolean) {
+    setSettings(s => s ? { ...s, [key]: next } : s);
+    try {
+      await updateBuyerSettings(api, key === 'activityStatusVisible' ? { activityStatus: next } : { readReceipts: next });
+      // Persist just this key locally; other unsaved edits on screen stay as they are.
+      await updatePrivacySettings({ [key]: next });
+      setSaveError(null);
+    } catch (error) {
+      setSettings(s => s ? { ...s, [key]: !next } : s);
+      setSaveError(apiErrorMessage(error, "Couldn't save. Try again."));
+    }
+  }
 
   function update(key: keyof PrivacySettings, val: any) {
     setSettings(s => s ? { ...s, [key]: val } : s);
@@ -219,15 +241,15 @@ export default function BuyerPrivacySettings() {
           <ListRow
             icon="activity"
             title="Activity status"
-            subtitle="Let friends see when you're active"
-            toggle={{ value: settings.activityStatusVisible, onChange: v => update('activityStatusVisible', v) }}
+            subtitle="Saved to your account. Brandthread doesn't show online status yet."
+            toggle={{ value: settings.activityStatusVisible, onChange: v => { void applyServerToggle('activityStatusVisible', v); } }}
           />
           <View style={styles.divider} />
           <ListRow
             icon="check-square"
             title="Read receipts"
             subtitle="Show when you've read messages"
-            toggle={{ value: settings.readReceiptsEnabled, onChange: v => update('readReceiptsEnabled', v) }}
+            toggle={{ value: settings.readReceiptsEnabled, onChange: v => { void applyServerToggle('readReceiptsEnabled', v); } }}
           />
         </Card>
 

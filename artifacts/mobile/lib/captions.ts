@@ -3,7 +3,9 @@
  * per-post track loader. Captions only load when the `autoCaptions` flag is on.
  */
 import { useCallback, useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useApi } from '@/lib/api';
+import { patchBuyerSettings } from '@/lib/buyerSettings';
+import { useBuyerSettings } from '@/hooks/useBuyerSettings';
 import type { CaptionSegment } from '@/components/social/CaptionsOverlay';
 
 export const CAPTIONS_PREF_KEY = 'bt:captions-enabled';
@@ -16,21 +18,19 @@ export interface CaptionTrack {
   segments: CaptionSegment[];
 }
 
-/** The viewer's saved CC preference (default on once captions exist). */
+/**
+ * The viewer's CC preference — the account's "Always show captions" setting
+ * (Settings → Accessibility), so the CC button and the setting are one value.
+ * Toggling CC here saves it locally at once and syncs it to the account.
+ */
 export function useCaptionsPreference(): [boolean, (next: boolean) => void] {
-  const [enabled, setEnabled] = useState(true);
-  useEffect(() => {
-    let cancelled = false;
-    void AsyncStorage.getItem(CAPTIONS_PREF_KEY)
-      .then((value) => { if (!cancelled && value !== null) setEnabled(value === '1'); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
+  const { captions } = useBuyerSettings();
+  const api = useApi();
   const update = useCallback((next: boolean) => {
-    setEnabled(next);
-    void AsyncStorage.setItem(CAPTIONS_PREF_KEY, next ? '1' : '0').catch(() => {});
-  }, []);
-  return [enabled, update];
+    void patchBuyerSettings({ captions: next });
+    api.meSettings.update({ captions: next }).catch(() => {});
+  }, [api]);
+  return [captions, update];
 }
 
 /** First ready track of a video post, or null. Never throws; 503/404 read as "no captions". */

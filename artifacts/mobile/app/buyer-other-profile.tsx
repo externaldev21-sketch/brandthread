@@ -57,6 +57,7 @@ import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
 import { radius } from '@/constants/radii';
+import { publicStyleBadgeLabel } from '@/lib/profileExtras';
 
 type ContentTab = 'Posts' | 'Tagged';
 const CONTENT_TAB_ITEMS: ProfileTab[] = [
@@ -76,6 +77,8 @@ type RemoteProfile = {
   postsCount: number;
   /** Private account: a follow request from me is pending / the account is private. */
   followRequested?: boolean; isPrivate?: boolean;
+  /** Public profile extras; styleBadge is sent only when the owner enabled it. */
+  pronouns?: string | null; styleBadge?: { label: string; emoji: string } | null;
 };
 
 export default function BuyerOtherProfileScreen() {
@@ -383,8 +386,11 @@ export default function BuyerOtherProfileScreen() {
       : []),
   ];
 
+  const styleBadgeLabel = publicStyleBadgeLabel(profile?.styleBadge);
   const meta = (
     <ProfileMeta bio={profile?.bio ?? null}>
+      {styleBadgeLabel ? <ProfileChip label={styleBadgeLabel} /> : null}
+      {profile?.pronouns ? <ProfileChip label={profile.pronouns} /> : null}
       {isFollowedBy && !isMutual ? <ProfileChip label="Follows you" icon="user-check" /> : null}
       {isMutual ? <ProfileChip label="Friends" icon="users" tone="accent" /> : null}
       {isMutual && threadCashSendEnabled ? (

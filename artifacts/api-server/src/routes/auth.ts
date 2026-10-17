@@ -11,6 +11,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { awardLoyaltyPointsOnce } from "./loyalty";
 import { sendWelcomeEmail } from "../lib/brandthreadEmail";
+import { recordSignInAndAlert } from "../lib/loginAlerts";
 import { isMailerConfigured, sendPasswordResetEmail } from "../lib/mailer";
 import {
   DELETION_GRACE_DAYS,
@@ -35,6 +36,13 @@ import {
   preserveExistingEmail,
 } from "../lib/authProfile";
 import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
+import {
+  pronounsForStorage,
+  pronounsSchema,
+  styleBadgeForStorage,
+  styleBadgeSchema,
+  type StyleBadge,
+} from "../lib/profileExtras";
 import { createWelcomeConversationOnce } from "../lib/brandthreadAgent";
 import { AGE_RESTRICTED_MESSAGE, bandMaySellOrEarn, denyIfAgeRestricted } from "../lib/ageGate";
 import { LEGAL_ACCEPTANCE_SOURCES, recordLegalAcceptance, type LegalAcceptanceSource } from "../lib/legalAcceptance";
@@ -80,6 +88,9 @@ const profileBodySchema = z.object({
   contactEmail: z.union([z.literal(""), requestPrimitives.email]).optional(),
   tags: z.array(z.string().trim().min(1).max(30)).max(20).optional(),
   socialLinks: z.record(z.string(), z.string().trim().max(300)).optional(),
+  // Public profile extras (migration 271)
+  pronouns: pronounsSchema.optional(),
+  styleBadge: styleBadgeSchema.optional(),
 }).passthrough();
 const privacyBodySchema = z.object({
   dmPrivacy: z.enum(["requests", "followers_only"]).optional(),
@@ -223,6 +234,16 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
         req.log.warn({ err, clerkUserId }, "Welcome email delivery failed");
       });
     }
+    // Login alerts (Settings → Password and security): records this Clerk
+    // session and emails the owner when it's a new sign-in. Off the
+    // request path; never fails the sync.
+    void recordSignInAndAlert({
+      userId: clerkUserId,
+      sessionId: getAuth(req).sessionId,
+      email: user.email,
+      name: user.displayName ?? user.name,
+      userAgent: req.get("user-agent") ?? null,
+    });
     res.status(created ? 201 : 200).json({ ...user, deletionCancelled });
   } catch (err) {
     if ((err as any)?.statusCode === 410) {
@@ -785,7 +806,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
   const clerkId = (req as any).clerkUserId as string;
   const {
     displayName, brandName, bio, website, name, username, accountType, appThemeId, appIconId, expectedClerkId,
-    category, location, contactEmail, tags, socialLinks,
+    category, location, contactEmail, tags, socialLinks, pronouns, styleBadge,
   } = req.body as {
     displayName?: string;
     brandName?:   string;
@@ -802,6 +823,8 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
     contactEmail?: string;
     tags?:         string[];
     socialLinks?:  Record<string, string>;
+    pronouns?:     string;
+    styleBadge?:   StyleBadge | null;
   };
   if (expectedClerkId && expectedClerkId !== clerkId) {
     (req as any).log?.warn("profile update rejected after account context changed");
@@ -840,6 +863,8 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
   if (contactEmail !== undefined) updates.contactEmail = contactEmail;
   if (tags         !== undefined) updates.tags         = tags;
   if (socialLinks  !== undefined) updates.socialLinks   = socialLinks;
+  if (pronouns     !== undefined) updates.pronouns      = pronounsForStorage(pronouns);
+  if (styleBadge   !== undefined) updates.styleBadge    = styleBadgeForStorage(styleBadge);
 
   // Username: format + uniqueness check + 30-day change cooldown
   if (username !== undefined) {

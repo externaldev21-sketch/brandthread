@@ -1,5 +1,10 @@
+import { useSyncExternalStore } from 'react';
 import colors from '@/constants/colors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getBuyerSettingsSnapshot, subscribeBuyerSettings } from '@/lib/buyerSettings';
+
+const subscribeHighContrast = (onChange: () => void) => subscribeBuyerSettings(onChange);
+const getHighContrast = () => getBuyerSettingsSnapshot().highContrast;
 
 /**
  * Returns the design tokens for the current color scheme.
@@ -15,6 +20,10 @@ export function useColors() {
   // older persisted contexts safe during an incremental rollout.
   const palette = theme as typeof theme & Record<string, any>;
   const value = (key: string, fallback: string) => palette[key] ?? fallback;
+  // Settings → Accessibility → High contrast: secondary text and hairlines
+  // use the foreground color instead of the dimmer muted/border tones.
+  const highContrast = useSyncExternalStore(subscribeHighContrast, getHighContrast, getHighContrast);
+  const foreground = value('text', colors.dark.foreground);
   return {
     ...colors.dark,
     text: value('text', colors.dark.text),
@@ -25,13 +34,13 @@ export function useColors() {
     secondary: value('surface', colors.dark.secondary),
     secondaryForeground: value('text', colors.dark.secondaryForeground),
     muted: value('surfaceGlass', colors.dark.muted),
-    mutedForeground: value('muted', colors.dark.mutedForeground),
+    mutedForeground: highContrast ? foreground : value('muted', colors.dark.mutedForeground),
     tint: theme.accent,
     primary: theme.accent,
     primaryForeground: theme.onAccent,
     accent: value('accentDim', theme.accentDim),
     accentForeground: value('accentLight', theme.accentLight),
-    border: value('border', colors.dark.border),
+    border: highContrast ? value('muted', colors.dark.mutedForeground) : value('border', colors.dark.border),
     input: value('input', colors.dark.input),
     destructive: value('error', colors.dark.destructive),
     success: value('success', colors.dark.success),

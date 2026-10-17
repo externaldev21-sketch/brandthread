@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { db, users } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { getStoreLanguage } from "../lib/storeLanguage";
 
 const escapeHtml = (value: string) =>
   value.replace(/[&<>"']/g, (char) => ({
@@ -18,6 +19,7 @@ export async function profileLanding(req: Request, res: Response): Promise<void>
 
   try {
     const [profile] = await db.select({
+      clerkId: users.clerkId,
       username: users.username,
       accountType: users.accountType,
       displayName: users.displayName,
@@ -43,6 +45,12 @@ export async function profileLanding(req: Request, res: Response): Promise<void>
     const image = avatar ? `<img src="${escapeHtml(avatar)}" alt="" class="avatar">` :
       `<div class="avatar placeholder" aria-hidden="true">${escapeHtml(profile.username.slice(0, 1).toUpperCase())}</div>`;
     const url = `https://brandthread.app/u/${encodeURIComponent(profile.username)}`;
+    // A seller's bio is written in their "Store language"; tag it so browsers
+    // and screen readers read it correctly. The page chrome stays English.
+    const bioLang = profile.accountType === "seller" && profile.clerkId
+      ? await getStoreLanguage(profile.clerkId)
+      : null;
+    const bioLangAttr = bioLang && bioLang !== "en" ? ` lang="${bioLang}"` : "";
 
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; img-src https:; base-uri 'none'; form-action 'none'");
@@ -66,7 +74,7 @@ h1{font-size:26px;line-height:1.2;margin:22px 0 6px}.handle{color:#a6a6a6;margin
 </style></head><body><main>
 <div class="brand">BRANDTHREAD</div>${image}
 <h1>${name}</h1><p class="handle">@${handle}</p>
-${bio ? `<p class="bio">${bio}</p>` : `<p class="bio">On Brandthread</p>`}
+${bio ? `<p class="bio"${bioLangAttr}>${bio}</p>` : `<p class="bio">On Brandthread</p>`}
 <a class="button" href="brandthread://u/${encodeURIComponent(profile.username)}">Open in Brandthread</a>
 <p class="link">${escapeHtml(url)}</p>
 </main></body></html>`);

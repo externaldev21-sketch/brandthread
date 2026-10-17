@@ -13,7 +13,8 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
-import { loadStyleBadge, saveStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeState } from '@/lib/styleBadge';
+import { loadStoredStyleBadge, saveStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeState } from '@/lib/styleBadge';
+import { profileSaveErrorMessage, styleBadgeForServer, styleBadgeFromServer } from '@/lib/profileExtras';
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 import { useApi } from '@/lib/api';
@@ -311,9 +312,17 @@ export default function BuyerEditProfileScreen() {
   }
 
   const loadProfile = useCallback(() => {
-    Promise.all([loadStyleBadge(), loadBuyerProfile(), getMyProfile()])
-      .then(([badgeState, profileState, socialProfile]) => {
-        setBadge(badgeState);
+    Promise.all([
+      loadStoredStyleBadge(),
+      loadBuyerProfile(),
+      getMyProfile(),
+      // Server is authoritative for the badge + pronouns; fall back to local.
+      preview ? Promise.resolve(null) : api.auth.me().catch(() => null),
+    ])
+      .then(([localBadge, profileState, socialProfile, me]) => {
+        // Never-set badge starts switched off so nobody publishes the
+        // placeholder "Archive Fashion" badge without choosing it.
+        setBadge(styleBadgeFromServer(me?.styleBadge) ?? localBadge ?? { ...DEFAULT_STYLE_BADGE, enabled: false });
         const merged: CoreFields = {
           name: profileState.name || socialProfile.name,
           username: profileState.username || socialProfile.username || DEFAULT_BUYER_PROFILE.username,
@@ -321,7 +330,7 @@ export default function BuyerEditProfileScreen() {
           link: profileState.links || socialProfile.website || '',
         };
         setExtra({
-          pronouns: profileState.pronouns || socialProfile.pronouns || '',
+          pronouns: me?.pronouns || profileState.pronouns || socialProfile.pronouns || '',
           gender: profileState.gender || '',
           aiCreator: profileState.aiCreator,
         });
@@ -333,7 +342,7 @@ export default function BuyerEditProfileScreen() {
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
-  }, []);
+  }, [api, preview]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
 
@@ -445,6 +454,8 @@ export default function BuyerEditProfileScreen() {
           name: cleanedFields.name,
           bio: cleanedFields.bio,
           website: cleanedFields.links,
+          pronouns: cleanedFields.pronouns.trim().slice(0, 30),
+          styleBadge: styleBadgeForServer(cleanedBadge),
         }),
       ]);
 
@@ -453,8 +464,10 @@ export default function BuyerEditProfileScreen() {
       setLoadedProfile(cleanedFields);
       showToast('Profile updated');
       setTimeout(() => goBackOr(router), 500);
-    } catch {
-      Alert.alert('Could not save', 'Something went wrong saving your profile. Please try again.');
+    } catch (err) {
+      const mapped = profileSaveErrorMessage(err);
+      if (mapped.field === 'username') { setUsernameStatus('invalid'); setUsernameError(mapped.message); }
+      Alert.alert('Could not save', mapped.message);
     } finally {
       setSaving(false);
     }

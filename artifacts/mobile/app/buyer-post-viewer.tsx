@@ -46,6 +46,7 @@ import { CaptionsOverlay, type CaptionSegment } from '@/components/social/Captio
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useCaptionsPreference, useReadyCaptionTrack } from '@/lib/captions';
 import { LocationTag } from '@/components/social/LocationTag';
+import { useBuyerSettings } from '@/hooks/useBuyerSettings';
 
 function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () => void; captions?: CaptionSegment[] }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; p.timeUpdateEventInterval = 0.25; });
@@ -57,10 +58,13 @@ function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () =
   }, [player, captions]);
   const isFocused = useIsFocused();
   useMeaningfulVideoWatch(player, isFocused, onWatched);
+  // Settings → Accessibility → Autoplay videos: off leaves the video paused
+  // until the viewer taps play (native controls are always shown).
+  const { autoplayVideos } = useBuyerSettings();
   useEffect(() => {
-    player.play();
+    if (autoplayVideos) player.play();
     return () => { player.pause(); };
-  }, [player]);
+  }, [player, autoplayVideos]);
   return (
     <>
       <VideoView
@@ -193,6 +197,7 @@ export default function BuyerPostViewer() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const { hideLikeCounts } = useBuyerSettings();
   const [reposted, setReposted] = useState(false);
   const [saved, setSaved] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -391,7 +396,8 @@ export default function BuyerPostViewer() {
         <View style={s.engagementBar}>
           <TouchableOpacity style={s.engageBtn} onPress={handleLike}>
             <Feather name="heart" size={22} color={liked ? RED : FG} />
-            <Text style={[s.engageCount, liked && { color: RED }]}>{likeCount}</Text>
+            {/* Settings → Content you see → Hide like and share counts */}
+            {hideLikeCounts ? null : <Text style={[s.engageCount, liked && { color: RED }]}>{likeCount}</Text>}
           </TouchableOpacity>
           <TouchableOpacity
             style={s.engageBtn}

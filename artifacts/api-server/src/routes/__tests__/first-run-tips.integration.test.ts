@@ -6,6 +6,7 @@
  *  - GET /api/first-run-tips/seen starts empty for a brand-new account.
  *  - POST /:tipId/seen marks a tip seen, idempotently.
  *  - POST /skip-all persists the global suppression flag.
+ *  - POST /skip-all { skipAll: false } turns it back off (400 on a bad body).
  *  - POST /reset ("Replay tips") clears seen tips AND skipAll.
  *  - Auth required; one account's state never leaks into another's.
  */
@@ -103,6 +104,30 @@ describe("first-run tips API", () => {
     const otherResponse = await fetch(`${base}/api/first-run-tips/seen`);
     const otherBody = await otherResponse.json() as any;
     expect(otherBody.skipAll).toBe(false);
+  });
+
+  it("skip-all { skipAll: false } turns it back off and keeps seen tips", async () => {
+    authState.clerkUserId = userB;
+    await fetch(`${base}/api/first-run-tips/kept-tip/seen`, { method: "POST" });
+    await fetch(`${base}/api/first-run-tips/skip-all`, { method: "POST" });
+
+    const off = await fetch(`${base}/api/first-run-tips/skip-all`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ skipAll: false }),
+    });
+    expect(off.status).toBe(204);
+
+    const body = await (await fetch(`${base}/api/first-run-tips/seen`)).json() as any;
+    expect(body.skipAll).toBe(false);
+    expect(body.seenTipIds).toContain("kept-tip");
+
+    const bad = await fetch(`${base}/api/first-run-tips/skip-all`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ skipAll: "no" }),
+    });
+    expect(bad.status).toBe(400);
   });
 
   it("reset (Replay tips) clears seen tips and skipAll for the account", async () => {

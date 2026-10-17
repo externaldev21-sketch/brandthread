@@ -93,6 +93,7 @@ import {
   sameSenderClose, groupCornerRadii, lastOwnMessageId, messagePreviewText,
 } from '@/lib/chatGrouping';
 import { radius } from '@/constants/radii';
+import { uploadQuality } from '@/lib/buyerSettings';
 
 /** Well-known clerkId of the official Brandthread Agent account — matches
  *  the preview seed (lib/previewInboxData.ts) and the api-server system
@@ -890,7 +891,7 @@ export default function BuyerConversationScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       selectionLimit: 15,
-      quality: 0.85,
+      quality: uploadQuality(0.85),
       base64: true,
     });
     if (result.canceled || !result.assets.length) return;

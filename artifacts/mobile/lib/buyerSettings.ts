@@ -44,6 +44,7 @@ export interface BuyerSettingsState {
   theme: 'system' | 'dark' | 'light';
   reduceMotion: boolean;
   captions: boolean;
+  highContrast: boolean;
 }
 
 export const DEFAULT_BUYER_SETTINGS: BuyerSettingsState = {
@@ -56,7 +57,9 @@ export const DEFAULT_BUYER_SETTINGS: BuyerSettingsState = {
   allowTags: 'everyone',
   manualTagApproval: false,
   messageRequests: true,
-  groupAdds: 'friends',
+  // Matches the server default (api-server lib/userAppSettings.ts): group
+  // creation was never restricted, so 'everyone' is what actually happens.
+  groupAdds: 'everyone',
   hiddenWords: true,
   hideLikeCounts: false,
   sensitiveContent: 'standard',
@@ -88,20 +91,45 @@ export const DEFAULT_BUYER_SETTINGS: BuyerSettingsState = {
   theme: 'system',
   reduceMotion: false,
   captions: true,
+  highContrast: false,
 };
 
+// In-memory snapshot + listeners so app-wide effects (reduce motion, high
+// contrast, upload quality, save login info) react to a change immediately,
+// without every consumer re-reading AsyncStorage.
+let snapshot: BuyerSettingsState = { ...DEFAULT_BUYER_SETTINGS };
+const listeners = new Set<(s: BuyerSettingsState) => void>();
+
+/** Last loaded/saved settings (defaults until the first load). Synchronous. */
+export function getBuyerSettingsSnapshot(): BuyerSettingsState {
+  return snapshot;
+}
+
+export function subscribeBuyerSettings(fn: (s: BuyerSettingsState) => void): () => void {
+  listeners.add(fn);
+  return () => { listeners.delete(fn); };
+}
+
+function publish(next: BuyerSettingsState) {
+  snapshot = next;
+  listeners.forEach((fn) => fn(next));
+}
+
 export async function loadBuyerSettings(): Promise<BuyerSettingsState> {
+  let next: BuyerSettingsState;
   try {
     const raw = await AsyncStorage.getItem(KEY);
-    if (!raw) return { ...DEFAULT_BUYER_SETTINGS };
-    return { ...DEFAULT_BUYER_SETTINGS, ...JSON.parse(raw) };
+    next = raw ? { ...DEFAULT_BUYER_SETTINGS, ...JSON.parse(raw) } : { ...DEFAULT_BUYER_SETTINGS };
   } catch {
-    return { ...DEFAULT_BUYER_SETTINGS };
+    next = { ...DEFAULT_BUYER_SETTINGS };
   }
+  if (JSON.stringify(next) !== JSON.stringify(snapshot)) publish(next);
+  return next;
 }
 
 export async function saveBuyerSettings(settings: BuyerSettingsState) {
   await AsyncStorage.setItem(KEY, JSON.stringify(settings));
+  publish(settings);
 }
 
 export async function patchBuyerSettings(patch: Partial<BuyerSettingsState>) {
@@ -109,4 +137,15 @@ export async function patchBuyerSettings(patch: Partial<BuyerSettingsState>) {
   const next = { ...current, ...patch };
   await saveBuyerSettings(next);
   return next;
+}
+
+/**
+ * Upload quality (Settings → Accessibility & data usage → "Upload at highest
+ * quality"): the image-picker / camera JPEG quality to use for a buyer upload.
+ * Highest quality keeps the caller's own value; off caps it for smaller,
+ * faster uploads.
+ */
+export const REDUCED_UPLOAD_QUALITY = 0.6;
+export function uploadQuality(preferred: number, settings: Pick<BuyerSettingsState, 'highQualityUploads'> = snapshot): number {
+  return settings.highQualityUploads ? preferred : Math.min(preferred, REDUCED_UPLOAD_QUALITY);
 }

@@ -12,7 +12,9 @@ import {
 } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyProfile } from '@/services/socialService';
-import type { BuyerSocialProfile } from '@/services/socialTypes';
+import { useApi } from '@/lib/api';
+import { isBuyerDevPreview } from '@/lib/devPreview';
+import { profileQrUrl } from '@/lib/profileExtras';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { radius } from '@/constants/radii';
 
@@ -23,16 +25,27 @@ export default function BuyerQRCode() {
   const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [profile, setProfile] = useState<BuyerSocialProfile | null>(null);
+  const api = useApi();
+  // The QR must only ever encode a handle the server has saved — /u/<username>
+  // resolves against the account, so a local-only handle would 404.
+  const [profile, setProfile] = useState<{ name: string; username: string | null } | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
-    getMyProfile().then(setProfile);
-  }, []);
+    let alive = true;
+    if (__DEV__ && isBuyerDevPreview()) {
+      // Dev-web preview has no account; the local profile stands in.
+      getMyProfile().then(p => { if (alive) setProfile({ name: p.name, username: p.username || null }); });
+      return () => { alive = false; };
+    }
+    api.auth.me()
+      .then(me => { if (alive) setProfile({ name: me.displayName || me.name, username: me.username }); })
+      .catch(() => { if (alive) setLoadFailed(true); });
+    return () => { alive = false; };
+  }, [api]);
 
-  const handle = profile?.username ? `@${profile.username}` : null;
-  const canonicalUrl = profile?.username
-    ? `https://brandthread.app/u/${profile.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '')}`
-    : null;
+  const canonicalUrl = profileQrUrl(profile?.username);
+  const handle = canonicalUrl && profile?.username ? `@${profile.username.trim().toLowerCase()}` : null;
   // Legacy alias — used by existing Share call below; keep for compatibility.
   const qrValue = canonicalUrl ?? 'https://brandthread.app';
 
@@ -79,7 +92,13 @@ export default function BuyerQRCode() {
           ) : (
             <View style={[s.qrWrap, { alignItems: 'center', justifyContent: 'center' }]}>
               <Feather name="user-x" size={40} color={MUTED} />
-              <Text style={[s.hint, { marginTop: 8, marginBottom: 0 }]}>Set a username to generate your QR code</Text>
+              <Text style={[s.hint, { marginTop: 8, marginBottom: 0 }]}>
+                {loadFailed
+                  ? "Couldn't load your profile. Check your connection and try again."
+                  : profile
+                    ? 'Set a username in Personal Details to generate your QR code'
+                    : 'Loading…'}
+              </Text>
             </View>
           )}
 
@@ -109,7 +128,7 @@ export default function BuyerQRCode() {
           <View style={s.infoRow}>
             <Feather name="user" size={17} color={PURPLE} />
             <Text style={s.infoLabel}>Profile</Text>
-            <Text style={s.infoValue}>{profile?.name ?? 'Your Name'}</Text>
+            <Text style={s.infoValue}>{profile?.name || '—'}</Text>
           </View>
           <View style={s.divider} />
           <View style={s.infoRow}>

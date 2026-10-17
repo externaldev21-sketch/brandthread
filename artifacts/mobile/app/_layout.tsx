@@ -33,6 +33,7 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
 import { tokenCache } from '@/lib/tokenCache';
+import { AppSettingsEffects } from '@/components/AppSettingsEffects';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { flushPendingBuyerOnboardingSync } from '@/lib/buyerOnboardingSync';
 import { flushPendingBuyerSurvey } from '@/lib/onboardingSurvey';
@@ -106,6 +107,7 @@ import { MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
 import { consumeAnimationOverride } from '@/lib/navigationAnimationOverride';
 import { setRequestGuard } from '@workspace/api-client-react';
+import { onAccountRoleChanged } from '@/lib/accountTypeSwitch';
 
 // Generated API hooks share this guard with the app-local API clients so
 // signed-out seller preview never reaches the backend through an alternate
@@ -682,6 +684,14 @@ function AuthGate() {
   const [devWebPreviewReady, setDevWebPreviewReady] = useState(!DEV_WEB_ONBOARDING_PREVIEW);
   const [pendingCommunityInvite, setPendingCommunityInvite] = useState<string | null>(null);
   const prevSignedInRef = useRef<boolean | null>(null);
+
+  // Settings -> Account type: apply a server-accepted buyer/seller switch
+  // immediately (the screen has already persisted 'user_role'), so the role
+  // corrections below route to the new home instead of bouncing back.
+  useEffect(() => onAccountRoleChanged((role) => {
+    setStoredRole(role);
+    setActiveSeller(role === 'seller');
+  }), [setActiveSeller]);
 
   // Clear per-account caches on sign-out so a different account gets fresh data.
   // We detect the false→true transition separately and never clear on the very
@@ -1351,6 +1361,7 @@ function RootLayoutNav() {
       <AnalyticsBridge />
       <LegalAcceptanceGate />
       <AppLockGate />
+      <AppSettingsEffects />
     </View>
   );
 }
@@ -1566,6 +1577,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="app-theme"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="appearance"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-settings-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="open-source-licenses"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-personal-details" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-my-sizes" options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1680,6 +1692,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="shipping-delivery"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="locations"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="languages"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="app-language"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="metafields"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="mobile-app-builder" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="orders"             options={{ headerShown: false, animation: 'ios_from_right' }} />
