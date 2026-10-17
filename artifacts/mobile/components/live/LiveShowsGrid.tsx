@@ -13,7 +13,7 @@
  * Exported for the feed header's LIVE tab to mount in place of the feed,
  * and also served full-screen at /live-feed.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { CachedImage } from '@/components/CachedImage';
 import { ThemedRefreshControl } from '@/components/ui/ThemedRefreshControl';
@@ -113,7 +113,9 @@ export function LiveShowsGrid({
   const { theme } = useAppTheme();
   const { width } = useWindowDimensions();
   const availability = useLiveAvailability();
-  const provider = useMemo(() => getLiveStreamProvider(), []);
+  // Not memoised: the factory returns the same instance unless the preview
+  // provider was rebuilt for `&demo=1` (lib/live/liveProvider.ts).
+  const provider = getLiveStreamProvider();
   const [streams, setStreams] = useState<LiveStream[] | null>(null);
   const [upcoming, setUpcoming] = useState<UpcomingLive[]>([]);
   const [error, setError] = useState(false);

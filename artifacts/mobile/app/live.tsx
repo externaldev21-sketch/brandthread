@@ -18,7 +18,7 @@
  * shows (`?bt_preview=…&demo=1` only) play bundled clips with `VideoVisual`.
  * No Agora key on the server → "LIVE isn't available yet", never a fake show.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo, ActivityIndicator, Animated, FlatList, Platform,
   Pressable, Share, StyleSheet, View, type GestureResponderEvent, type ViewToken,
@@ -202,7 +202,9 @@ export default function LiveScreen() {
   const api = useApi();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ streamId?: string; hostId?: string }>();
-  const provider = useMemo(() => getLiveStreamProvider(), []);
+  // Not memoised: the factory returns the same instance unless the preview
+  // provider was rebuilt for `&demo=1` (lib/live/liveProvider.ts).
+  const provider = getLiveStreamProvider();
   const pager = useLivePager(provider, { streamId: params.streamId ?? null, hostId: params.hostId ?? null });
   const { streams, activeIndex, setActiveIndex } = pager;
 
