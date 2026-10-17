@@ -6,7 +6,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api, ShopifyImportJob } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { normalizeStoreSlug } from '@/lib/storefrontUrl';
-import { isPreviewDemoMode } from '@/lib/devPreview';
 import {
   BuilderListKey, SERVER_BUILDER_KEY, normalizeBuilderList, reconcileDecision,
   builderSaveErrorMessage,
@@ -736,6 +735,19 @@ export async function redoLastAction(): Promise<Storefront> {
 // change is written locally only after the server accepted it, and a failed
 // save throws StoreSaveError with text the screen shows as-is.
 
+/**
+ * Signed-out web demo (`demo=1`) — no server account, so builder lists and
+ * suggestions stay on-device there. Imported lazily: devPreview pulls in
+ * react-native, which this service otherwise doesn't need at load time.
+ */
+async function inDemoMode(): Promise<boolean> {
+  try {
+    return (await import('@/lib/devPreview')).isPreviewDemoMode();
+  } catch {
+    return false;
+  }
+}
+
 export class StoreSaveError extends Error {
   constructor(message: string) {
     super(message);
@@ -745,7 +757,7 @@ export class StoreSaveError extends Error {
 
 async function commitBuilderList(store: Storefront, key: BuilderListKey): Promise<Storefront> {
   // The signed-out web demo (demo=1) has no server account — keep it local.
-  if (!isPreviewDemoMode()) {
+  if (!(await inDemoMode())) {
     try {
       await api.store.save({ [SERVER_BUILDER_KEY[key]]: store[key] });
     } catch (error) {
@@ -764,7 +776,7 @@ async function loadBuilderList<K extends BuilderListKey>(
 ): Promise<Storefront[K]> {
   const store = await getStorefront({ refreshRemote: false });
   onLocal?.(store[key]);
-  if (isPreviewDemoMode()) return store[key];
+  if (await inDemoMode()) return store[key];
   let remote: any;
   try {
     remote = await api.store.get();
@@ -1098,7 +1110,7 @@ export class AISuggestionsUnavailableError extends Error {
 export async function generateAISuggestions(): Promise<Storefront> {
   const store = await getStorefront({ refreshRemote: false });
   const now = new Date().toISOString();
-  if (isPreviewDemoMode()) {
+  if (await inDemoMode()) {
     const active = store.aiSuggestions.filter(s => !s.dismissed && !s.applied);
     if (active.length >= 3) return store;
     const existing = new Set(store.aiSuggestions.map(s => s.title));
@@ -1143,7 +1155,7 @@ export async function applyAISuggestion(id: string): Promise<{ storefront: Store
   const sug = store.aiSuggestions.find(s => s.id === id);
   if (!sug) throw new StoreSaveError('This suggestion is no longer available. Refresh suggestions.');
   if (!sug.action) {
-    if (isPreviewDemoMode()) {
+    if (await inDemoMode()) {
       sug.applied = true;
       return { storefront: await saveStorefront(store) };
     }
@@ -1154,7 +1166,7 @@ export async function applyAISuggestion(id: string): Promise<{ storefront: Store
   if (!applySuggestionToStore(store, sug.action)) {
     throw new StoreSaveError('Your store has no hero section to update. Add one in Sections first.');
   }
-  if (!isPreviewDemoMode()) {
+  if (!(await inDemoMode())) {
     try {
       await api.store.save(storefrontApiPayload(store));
     } catch (error) {
