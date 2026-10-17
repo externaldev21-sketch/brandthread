@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { ActionButton, ActionGroup, Badge, Chips, ConfirmAction, DataTable, ErrorLine, PageTitle, Pager, StatCards } from "../ui";
 import { useModerationQuery, useModerationResolve, when } from "../api";
 
@@ -30,7 +31,7 @@ export default function ModerationPage() {
 
   return (
     <>
-      <PageTitle title="Moderation" />
+      <PageTitle title="Moderation" action={<Link href="/admin/held" className="text-sm underline">Held content queue</Link>} />
       {data && <StatCards items={[
         { label: "Open reports", value: String(data.summary.open) },
         { label: "Held by filter", value: String(data.summary.heldByFilter) },
