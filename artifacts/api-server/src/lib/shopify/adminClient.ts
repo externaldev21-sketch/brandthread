@@ -75,6 +75,10 @@ export class ShopifyAdminClient {
     });
   }
 
+  async listWebhooks(): Promise<{ webhooks: Array<{ id: number; topic: string; address: string }> }> {
+    return this.request("/webhooks.json?limit=250");
+  }
+
   async createWebhook(topic: string, address: string): Promise<{ webhook: { id: number } }> {
     return this.request("/webhooks.json", {
       method: "POST",

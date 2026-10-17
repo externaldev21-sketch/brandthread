@@ -4,34 +4,10 @@ import { validateEnv } from "./lib/env";
 import { logger } from "./lib/logger";
 import { flushMonitoring } from "./lib/monitoring";
 import { flushAnalytics } from "./lib/analytics";
-import { startAbandonedCartJob } from "./jobs/abandonedCartRecovery";
-import { startTrendingJob }       from "./jobs/computeTrending";
-import { startSellerRankingJob }  from "./jobs/computeSellerRanking";
-import { startTeamInviteReminderJob } from "./jobs/teamInviteReminder";
-import { startScheduledDropBroadcastJob } from "./jobs/scheduledDropBroadcasts";
-import { startProductLaunchJob } from "./jobs/productLaunches";
-import { startSellerTrialReminderJob } from "./jobs/sellerTrialReminder";
-import { startDisputeEvidenceReminderJob } from "./jobs/disputeEvidenceReminder";
-import { startDesignStudioObjectCleanupJob } from "./jobs/designStudioObjectCleanup";
-import { startMoneySweepJob } from "./jobs/moneySweep";
-import { startAffiliatePayoutsJob } from "./jobs/affiliatePayouts";
-import { startDeliveryDeadlinesJob } from "./jobs/deliveryDeadlines";
-import { startStoryCleanupJob } from "./jobs/storyCleanup";
-import { startAnalyticsRetentionJob } from "./jobs/analyticsRetention";
-import { startAccountPurgeJob } from "./jobs/accountPurge";
-import { startDataExportJob } from "./jobs/dataExportJob";
-import { startPushReceiptCleanupJob } from "./jobs/pushReceiptCleanup";
-import { startNotificationBatchFlushJob } from "./jobs/notificationBatchFlush";
-import { startLiveRecordingFinalizeJob } from "./jobs/liveRecordingFinalize";
-import { startLiveViewersPresenceJob } from "./jobs/liveViewersPresence";
-import { startThreadCashExpiryJob } from "./jobs/threadCashExpiry";
-import { startScheduledLiveReminderJob } from "./jobs/scheduledLiveReminders";
-import { startEmailCampaignJob } from "./jobs/emailCampaigns";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
+import { backgroundJobsEnabled, startPerInstanceJobs, startSingletonJobsWithLeadership } from "./jobs/runner";
 import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
-import { startCommunityPushJob } from "./lib/communityPush";
-import { startScheduledPostPublisherJob } from "./jobs/scheduledPostPublisher";
 import { pool } from "@workspace/db";
 import { closeRedis } from "./lib/redis";
 
@@ -50,6 +26,8 @@ const port = Number(rawPort);
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
+
+let stopSingletonJobs: () => void = () => {};
 
 const server = app.listen(port, (err) => {
   if (err) {
@@ -72,32 +50,15 @@ const server = app.listen(port, (err) => {
     logger.error({ err }, "ensureWebhookEvents startup call failed"),
   );
 
-  // Background jobs
-  startAbandonedCartJob();
-  startTrendingJob();
-  startSellerRankingJob();
-  startTeamInviteReminderJob();
-  startScheduledDropBroadcastJob();
-  startProductLaunchJob();
-  startSellerTrialReminderJob();
-  startDisputeEvidenceReminderJob();
-  startDesignStudioObjectCleanupJob();
-  startMoneySweepJob();
-  startAffiliatePayoutsJob();
-  startDeliveryDeadlinesJob();
-  startStoryCleanupJob();
-  startAnalyticsRetentionJob();
-  startAccountPurgeJob();
-  startDataExportJob();
-  startPushReceiptCleanupJob();
-  startNotificationBatchFlushJob();
-  startLiveRecordingFinalizeJob();
-  startLiveViewersPresenceJob();
-  startThreadCashExpiryJob();
-  startScheduledLiveReminderJob();
-  startEmailCampaignJob();
-  startCommunityPushJob();
-  startScheduledPostPublisherJob();
+  // Background jobs. Singleton jobs run in exactly one process (Postgres
+  // advisory-lock leader); BACKGROUND_JOBS=off leaves them to the worker
+  // (src/worker.ts). See jobs/runner.ts.
+  startPerInstanceJobs();
+  if (backgroundJobsEnabled()) {
+    stopSingletonJobs = startSingletonJobsWithLeadership();
+  } else {
+    logger.info("BACKGROUND_JOBS=off: singleton jobs are left to the worker process");
+  }
 });
 
 // ─── Graceful shutdown ──────────────────────────────────────────────────────
@@ -115,6 +76,7 @@ let shuttingDown = false;
 function shutdown(signal: NodeJS.Signals): void {
   if (shuttingDown) return;
   shuttingDown = true;
+  stopSingletonJobs();
   logger.info({ signal }, "Shutdown signal received, draining connections");
 
   const forceExitTimer = setTimeout(() => {

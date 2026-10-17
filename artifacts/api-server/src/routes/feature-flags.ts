@@ -12,6 +12,18 @@ type FeatureFlagRow = {
 const router = Router();
 const KEY_PATTERN = /^[a-z][A-Za-z0-9_]{1,63}$/;
 
+/**
+ * Flags seeded as placeholders whose feature does not exist yet. Turning one
+ * on would report success while nothing happens, so enabling is refused with
+ * a clear reason until the feature is built (then remove it from this map).
+ */
+export const UNIMPLEMENTED_FLAGS: Readonly<Record<string, string>> = {
+  // Migration 091: deliberately left unbuilt; the agent is guaranteed never to
+  // move money (routes/__tests__/brandthread-agent-no-money.test.ts).
+  brandthreadAgentWelcomeBonus:
+    "The Brandthread Agent welcome bonus isn't built yet, so this flag can't be turned on.",
+};
+
 router.get("/", async (_req, res, next) => {
   try {
     const result = await pool.query<FeatureFlagRow>(
@@ -41,6 +53,10 @@ router.put("/:key", requireAuth, requireModerator, async (req, res, next) => {
       code: "INVALID_FEATURE_FLAG",
       message: "Provide a valid feature key and a boolean enabled value.",
     });
+    return;
+  }
+  if (enabled && Object.prototype.hasOwnProperty.call(UNIMPLEMENTED_FLAGS, key)) {
+    res.status(409).json({ code: "FEATURE_NOT_IMPLEMENTED", message: UNIMPLEMENTED_FLAGS[key] });
     return;
   }
 

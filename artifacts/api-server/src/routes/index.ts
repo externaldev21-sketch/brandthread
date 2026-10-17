@@ -47,7 +47,7 @@ import buyerRouter from "./buyer";
 import checkoutIntentRouter from "./checkout-intent";
 import guestCheckoutRouter from "./guest-checkout";
 import connectRouter, { connectRedirectRouter } from "./connect";
-import subscriptionRouter from "./subscription";
+import subscriptionRouter, { subscriptionRedirectRouter } from "./subscription";
 import webhooksRouter from "./webhooks";
 import reviewsRouter from "./reviews";
 import productQaRouter from "./product-qa";
@@ -158,7 +158,7 @@ import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
 import shopifyRouter from "./shopify";
 import sharePreviewRouter from "./share-preview";
 import affiliatePublicRouter from "./affiliate-public";
-import affiliateCreatorRouter from "./affiliate-creator";
+import affiliateCreatorRouter, { affiliatePayoutRedirectRouter } from "./affiliate-creator";
 import sellerAffiliateRouter from "./seller-affiliate";
 import growthRouter from "./growth";
 import sellerPushBroadcastsRouter from "./seller-push-broadcasts";
@@ -293,6 +293,7 @@ router.use("/brandthread-agent",         aiSafetyGuard("brandthread-agent", { mo
 router.use("/seller/connect/onboard",    connectRedirectRouter);
 router.use("/seller/affiliate",          tc, sellerAffiliateRouter); // affiliate / creator program (seller side)
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
+router.use("/seller/subscription",       subscriptionRedirectRouter); // Stripe Checkout/Portal landing pages: no auth
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/verification",       tc, sellerVerificationRouter);
 router.use("/seller/push-broadcasts",    tc, sellerPushBroadcastsRouter);
@@ -321,6 +322,7 @@ router.use("/social",                    followRequestsRouter);
 router.use("/places",                    placesRouter); // public reads (optional viewer); POST requires auth
 router.use("/social",                    storyStickersRouter);
 router.use("/referrals",                 referralsRouter);
+router.use("/affiliate/payout-account",  affiliatePayoutRedirectRouter); // Stripe onboarding return/refresh: no auth
 router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc
 router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc
 router.use("/shipping-rates",            tc, shippingRatesRouter);

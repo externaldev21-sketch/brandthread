@@ -20,7 +20,10 @@ let labelId = "";
 let server: Server;
 let base = "";
 
+const WEBHOOK_SECRET = `shippo-test-secret-${suffix}`;
+
 beforeAll(async () => {
+  vi.stubEnv("SHIPPO_WEBHOOK_SECRET", WEBHOOK_SECRET);
   const [order] = await db.insert(orders).values({
     ownerId: sellerId,
     buyerId,
@@ -80,10 +83,10 @@ function transitPayload(status: string) {
   };
 }
 
-async function post(body: unknown) {
+async function post(body: unknown, secret: string | null = WEBHOOK_SECRET) {
   const response = await fetch(`${base}/api/webhooks/shippo`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(secret ? { "x-shippo-webhook-secret": secret } : {}) },
     body: JSON.stringify(body),
   });
   const text = await response.text();
@@ -91,6 +94,25 @@ async function post(body: unknown) {
 }
 
 describe("POST /api/webhooks/shippo", () => {
+  it("rejects a forged delivery without the shared secret", async () => {
+    const forged = await post(transitPayload("DELIVERED"), null);
+    expect(forged.status).toBe(401);
+    const wrong = await post(transitPayload("DELIVERED"), "not-the-secret");
+    expect(wrong.status).toBe(401);
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+    expect(order.status).toBe("processing");
+  });
+
+  it("fails closed when SHIPPO_WEBHOOK_SECRET is not set", async () => {
+    vi.stubEnv("SHIPPO_WEBHOOK_SECRET", "");
+    try {
+      const res = await post(transitPayload("DELIVERED"), null);
+      expect(res.status).toBe(503);
+    } finally {
+      vi.stubEnv("SHIPPO_WEBHOOK_SECRET", WEBHOOK_SECRET);
+    }
+  });
+
   it("moves the order to shipped/in_transit and is idempotent on duplicate delivery", async () => {
     const first = await post(transitPayload("TRANSIT"));
     expect(first.status).toBe(200);
