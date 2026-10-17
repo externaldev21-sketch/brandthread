@@ -1,6 +1,6 @@
 import { Router } from "express";
 import crypto from "node:crypto";
-import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions, shopifyOrderLinks } from "@workspace/db";
+import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions, shopifyOrderLinks, orderTrackingEvents } from "@workspace/db";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
 import { executeOrderRelease, requestOrderRelease } from "../lib/money/escrow";
 import { withItemProductIds } from "../lib/orderItemProducts";
@@ -19,6 +19,7 @@ import { withRiskView } from "../lib/risk/orderRisk";
 import { shipItems } from "../lib/delivery/deliveryState";
 import { notifyBuyerPreparing } from "../lib/delivery/notifications";
 import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
+import { carrierTrackingUrl } from "../lib/delivery/buyerView";
 
 const router = Router();
 router.use(requireAuth);
@@ -369,7 +370,23 @@ router.get("/:id", async (req, res) => {
     fulfilledByPartner: shopifyLink.status === "sent" && Boolean(order.trackingNumber),
   } : null;
 
-  res.json({ ...withRiskView(order), items, customer, shopifyFulfillment });
+  // Carrier scan history (Shippo webhook/poll, lib/delivery/trackingSync.ts)
+  // so the seller's "View Tracking" can show real status, not just a number.
+  const trackingEvents = order.trackingNumber
+    ? (await db.select({
+      id: orderTrackingEvents.id,
+      trackingNumber: orderTrackingEvents.trackingNumber,
+      status: orderTrackingEvents.status,
+      description: orderTrackingEvents.description,
+      location: orderTrackingEvents.location,
+      occurredAt: orderTrackingEvents.occurredAt,
+    }).from(orderTrackingEvents).where(eq(orderTrackingEvents.orderId, order.id))
+      .orderBy(desc(orderTrackingEvents.occurredAt)).limit(50))
+      .map((e) => ({ ...e, occurredAt: e.occurredAt.toISOString() }))
+    : [];
+  const trackingUrl = order.trackingNumber ? carrierTrackingUrl(order.carrier, order.trackingNumber) : null;
+
+  res.json({ ...withRiskView(order), items, customer, shopifyFulfillment, trackingEvents, trackingUrl });
 });
 
 // Recognized cancellation reasons — kept in sync with mobile orderTypes.ts
