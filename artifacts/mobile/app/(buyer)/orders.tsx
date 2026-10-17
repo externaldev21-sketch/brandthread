@@ -30,6 +30,8 @@ import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import { useReorderFlow } from '@/components/orders/ReorderFlow';
 import { canReorderStatus } from '@/lib/reorderSummary';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { getBuyerReturns } from '@/services/buyerReturnsService';
+import { returnReasonLabel, statusLabel as returnStatusLabel, type ReturnView } from '@/lib/returns';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -87,7 +89,9 @@ function applyFilter(orders: BuyerOrderView[], filter: BuyerFilterKey): BuyerOrd
     case 'active':    return orders.filter(o => ['new', 'processing', 'ready_to_ship'].includes(o.status));
     case 'shipped':   return orders.filter(o => o.status === 'shipped');
     case 'delivered': return orders.filter(o => o.status === 'delivered');
-    case 'returns':   return orders.filter(o => o.hasReturnRequest);
+    // The Returns tab renders the buyer's return requests from
+    // GET /api/returns/buyer (see BuyerReturnCard), not order rows.
+    case 'returns':   return [];
     case 'pre-order': return orders.filter(o => o.isPreOrder);
     default:          return orders;
   }
@@ -97,7 +101,7 @@ function applyFilter(orders: BuyerOrderView[], filter: BuyerFilterKey): BuyerOrd
 // Visual, tracker-forward card: seller + order meta up top, a live compact
 // status tracker as the centerpiece, then item preview / total / actions.
 
-const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReorder, reordering }: { order: BuyerOrderView; onOpen: (orderId: string) => void; onReorder?: (orderId: string) => void; reordering?: boolean }) {
+const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onTrack, onReorder, reordering }: { order: BuyerOrderView; onOpen: (orderId: string) => void; onTrack: (orderId: string) => void; onReorder?: (orderId: string) => void; reordering?: boolean }) {
   const onPress = () => onOpen(order.id);
   const { theme } = useAppTheme();
   const styles = useMemo(() => cardStyles(theme), [theme]);
@@ -222,7 +226,9 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
           <TouchableOpacity
              style={[styles.actionBtn, styles.actionBtnSecondary, { backgroundColor: theme.secondaryDim, borderColor: theme.secondary }]}
             activeOpacity={0.8}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
+            accessibilityRole="button"
+            accessibilityLabel="Track shipment"
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onTrack(order.id); }}
           >
             <Feather name="map-pin" size={12} color={theme.secondary} />
             <Text style={[styles.actionBtnText, { color: theme.secondary }]}>Track Shipment</Text>
@@ -241,6 +247,52 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
             <Text style={[styles.actionBtnText, { color: theme.accentLight }]}>{reordering ? 'Adding…' : 'Reorder'}</Text>
           </TouchableOpacity>
         )}
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+// ─── Return card (Returns tab) ───────────────────────────────────────────────
+// One row per return request from GET /api/returns/buyer; opens the shared
+// return status screen (app/return-detail.tsx).
+
+const BuyerReturnCard = React.memo(function BuyerReturnCard({ item, onOpen }: { item: ReturnView; onOpen: (returnId: string) => void }) {
+  const { theme } = useAppTheme();
+  const styles = useMemo(() => cardStyles(theme), [theme]);
+  const firstItem = item.items[0];
+  const refund = item.refundAmountCents != null ? formatCents(item.refundAmountCents) : null;
+  return (
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.82}
+      onPress={() => onOpen(item.id)}
+      accessibilityRole="button"
+      accessibilityLabel={`Return for order ${item.orderNumber}, ${returnStatusLabel(item.status)}`}
+    >
+      <View style={styles.cardTopRow}>
+        <View style={[styles.avatarCircle, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
+          <Feather name="rotate-ccw" size={ICON.sm} color={theme.accentLight} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.sellerName}>{item.sellerName}</Text>
+          <Text style={styles.orderMeta}>{item.orderNumber ? `${item.orderNumber} · ` : ''}{fmtDate(item.createdAt)}</Text>
+        </View>
+        <StatusBadge label={returnStatusLabel(item.status).toUpperCase()} variant="neutral" small />
+      </View>
+      <View style={{ marginTop: SP.sm }}>
+        <Text style={styles.itemText} numberOfLines={1}>{returnReasonLabel(item.reason)}</Text>
+        {firstItem && (
+          <Text style={styles.moreText} numberOfLines={1}>
+            {firstItem.productName}{firstItem.variantTitle ? ` (${firstItem.variantTitle})` : ''} × {firstItem.quantity}
+            {item.items.length > 1 ? ` + ${item.items.length - 1} more` : ''}
+          </Text>
+        )}
+        {item.status === 'denied' && !!item.sellerResponse && (
+          <Text style={styles.moreText} numberOfLines={2}>{item.sellerResponse}</Text>
+        )}
+      </View>
+      <View style={styles.statusRow}>
+        <Text style={styles.totalText}>{refund ? `Refund ${refund}` : formatCents(item.orderTotalCents)}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -296,6 +348,15 @@ export default function BuyerOrdersScreen() {
     if (isPreviewOrderId(orderId) || isPreviewCommerceId(orderId)) return;
     router.push(('/buyer-order-detail?id=' + orderId) as never);
   }, [router]);
+  // Track Shipment opens the order's tracking screen (carrier, number,
+  // status, scan history, carrier link), not the order details page.
+  const openTracking = useCallback((orderId: string) => {
+    if (isPreviewOrderId(orderId) || isPreviewCommerceId(orderId)) return;
+    router.push(('/buyer-order-tracking?id=' + encodeURIComponent(orderId)) as never);
+  }, [router]);
+  const openReturn = useCallback((returnId: string) => {
+    router.push(('/return-detail?returnId=' + encodeURIComponent(returnId)) as never);
+  }, [router]);
   const { userId } = useAuth();
   const buyerPreview = isBuyerDevPreview() && !userId;
   const { reorder, busyOrderId, element: reorderElement } = useReorderFlow({ aboveTabBar: true });
@@ -306,6 +367,12 @@ export default function BuyerOrdersScreen() {
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<BuyerFilterKey>('all');
+  // Returns tab: the buyer's real return requests (GET /api/returns/buyer).
+  const [returns, setReturns] = useState<ReturnView[]>([]);
+  const [returnsOwnerId, setReturnsOwnerId] = useState<string | null | undefined>(userId);
+  const [returnsLoading, setReturnsLoading] = useState(false);
+  const [returnsError, setReturnsError] = useState(false);
+  const returnsGenerationRef = useRef(0);
   // Track whether the very first load has completed so re-focuses and
   // polling intervals don't flash the full-screen spinner.
   const hasLoadedRef = useRef(false);
@@ -363,6 +430,46 @@ export default function BuyerOrdersScreen() {
     hasLoadedRef.current = true;
   }, [buyerPreview, userId]);
 
+  const loadReturns = useCallback(async () => {
+    const generation = ++returnsGenerationRef.current;
+    if (!userId) {
+      // Signed-out preview: no synthetic returns.
+      setReturns([]);
+      setReturnsOwnerId(userId);
+      setReturnsError(false);
+      setReturnsLoading(false);
+      return;
+    }
+    setReturnsLoading(true);
+    setReturnsError(false);
+    try {
+      const rows = await getBuyerReturns();
+      if (returnsGenerationRef.current !== generation) return;
+      setReturns(rows);
+      setReturnsOwnerId(userId);
+    } catch {
+      if (returnsGenerationRef.current !== generation) return;
+      // Keep the last loaded rows for this account; never show an error as "no returns".
+      setReturnsOwnerId(userId);
+      setReturnsError(true);
+    } finally {
+      if (returnsGenerationRef.current === generation) setReturnsLoading(false);
+    }
+  }, [userId]);
+
+  React.useEffect(() => {
+    returnsGenerationRef.current += 1;
+    setReturns([]);
+    setReturnsOwnerId(userId);
+    setReturnsError(false);
+    setReturnsLoading(false);
+  }, [userId]);
+
+  // Load when the Returns tab is opened (and again whenever the screen refocuses on it).
+  useFocusEffect(useCallback(() => {
+    if (filter === 'returns') void loadReturns();
+  }, [filter, loadReturns]));
+
   const retry = useCallback(() => {
     if (refreshing) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -408,6 +515,8 @@ export default function BuyerOrdersScreen() {
   const visibleOrders = visibleOrdersForBuyer(orders, ordersOwnerId, userId);
   const filtered = applyFilter(visibleOrders, filter);
   const visibleLoading = loading || !ownsRenderedOrders;
+  const showingReturns = filter === 'returns';
+  const visibleReturns = returnsOwnerId === userId ? returns : [];
 
   return (
     <BrandthreadScreen noSafeBottom noSafeTop>
@@ -438,7 +547,51 @@ export default function BuyerOrdersScreen() {
         )}
       />
 
-      {visibleLoading ? (
+      {showingReturns ? (
+        (returnsLoading || returnsOwnerId !== userId) && visibleReturns.length === 0 ? (
+          <View style={{ paddingHorizontal: centeredPadding, paddingTop: SP.sm }}>
+            <BuyerOrdersListSkeleton />
+          </View>
+        ) : visibleReturns.length === 0 ? (
+          returnsError ? (
+            <EmptyState
+              icon="alert-triangle"
+              title="Couldn't load your returns."
+              description="Check your connection and try again."
+              action={{ label: 'Try again', icon: 'refresh-cw', onPress: () => { void loadReturns(); } }}
+              style={{ flex: 1 }}
+            />
+          ) : (
+            <EmptyState
+              icon="rotate-ccw"
+              title="No returns"
+              description="Return requests you start from a delivered order will show up here with their status."
+              style={{ flex: 1 }}
+            />
+          )
+        ) : (
+          <>
+            {returnsError && (
+              <View style={screenStyles.loadErrorRow}>
+                <RetryRow label="Couldn't refresh — showing your last loaded returns" onRetry={() => { void loadReturns(); }} />
+              </View>
+            )}
+            <FlashList
+              data={visibleReturns}
+              keyExtractor={r => r.id}
+              showsVerticalScrollIndicator={false}
+              refreshControl={<RefreshControl refreshing={returnsLoading} onRefresh={() => { void loadReturns(); }} tintColor={theme.accent} />}
+              contentContainerStyle={{
+                paddingHorizontal: centeredPadding,
+                paddingTop: SP.sm,
+                paddingBottom: barInset + SP.md,
+              }}
+              ItemSeparatorComponent={OrderCardGap}
+              renderItem={({ item }) => <BuyerReturnCard item={item} onOpen={openReturn} />}
+            />
+          </>
+        )
+      ) : visibleLoading ? (
         <View style={{ paddingHorizontal: centeredPadding, paddingTop: SP.sm }}>
           <BuyerOrdersListSkeleton />
         </View>
@@ -490,7 +643,7 @@ export default function BuyerOrdersScreen() {
               }}
               extraData={busyOrderId}
               ItemSeparatorComponent={OrderCardGap}
-              renderItem={({ item }) => <BuyerOrderCard order={item} onOpen={openOrder} onReorder={reorder} reordering={busyOrderId === item.id} />}
+              renderItem={({ item }) => <BuyerOrderCard order={item} onOpen={openOrder} onTrack={openTracking} onReorder={reorder} reordering={busyOrderId === item.id} />}
             />
           )}
         </>
