@@ -44,6 +44,7 @@ import profileMediaRouter from "./profile-media";
 import profileCoverRouter from "./profile-cover";
 import avatarVideoRouter from "./avatar-video";
 import buyerRouter from "./buyer";
+import buyerActivityRouter from "./buyer-activity";
 import checkoutIntentRouter from "./checkout-intent";
 import guestCheckoutRouter from "./guest-checkout";
 import connectRouter, { connectRedirectRouter } from "./connect";
@@ -282,6 +283,7 @@ router.use("/buyer/cart",                cartDbRouter);
 // One-page checkout (one PaymentIntent per cart). Before /buyer so its card-data guard runs first.
 router.use("/buyer/checkout/payment-intent", checkoutIntentRouter);
 router.use("/buyer/notifications",       notificationsFeedRouter);
+router.use("/buyer/activity",            buyerActivityRouter); // Your Activity: my likes + comments
 router.use("/notifications",             notificationEventsRouter);
 router.use("/buyer",                     buyerRouter);
 router.use("/conversations",             conversationsRouter);

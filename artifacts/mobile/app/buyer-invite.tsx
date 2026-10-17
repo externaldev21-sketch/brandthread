@@ -23,6 +23,7 @@ import { isPreviewDemoMode } from '@/lib/devPreview';
 import { PrimaryButton, PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { CenteredToast } from '@/components/social/CenteredToast';
+import { RetryRow } from '@/components/ui/RetryRow';
 import {
   REFERRAL_HEADLINE, REFERRAL_STEPS, REFERRAL_SUBHEAD, referralStatusLabel,
 } from '@/lib/referralCopy';
@@ -62,6 +63,9 @@ const DEMO_STATS: Stats = {
   ],
 };
 
+/** Shown (and toasted) when share/copy can't work because the code didn't load. */
+export const INVITE_UNAVAILABLE = 'Sharing is unavailable until your invite code loads. Tap retry above.';
+
 export default function BuyerInviteScreen() {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
@@ -71,6 +75,11 @@ export default function BuyerInviteScreen() {
   const [invite, setInvite] = useState<InviteData | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  // The code and the stats load independently: a failed code shows an error
+  // with retry (never a "------" placeholder that silently does nothing),
+  // and a failed stats call never reads as "0 friends joined".
+  const [inviteError, setInviteError] = useState(false);
+  const [statsError, setStatsError] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -83,38 +92,49 @@ export default function BuyerInviteScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try {
-      const [inv, st] = await Promise.all([api.referrals.code(), api.referrals.stats()]);
-      setInvite(inv as InviteData);
-      setStats(st as Stats);
-    } catch {
-      if (isPreviewDemoMode()) {
-        setInvite(DEMO_INVITE);
-        setStats(DEMO_STATS);
-      }
-    } finally {
-      setLoading(false);
+    const [inv, st] = await Promise.allSettled([api.referrals.code(), api.referrals.stats()]);
+    const demo = isPreviewDemoMode();
+    if (inv.status === 'fulfilled' && (inv.value as InviteData | null)?.code) {
+      setInvite(inv.value as InviteData);
+      setInviteError(false);
+    } else if (demo) {
+      setInvite(DEMO_INVITE);
+      setInviteError(false);
+    } else {
+      setInvite(null);
+      setInviteError(true);
     }
+    if (st.status === 'fulfilled' && st.value) {
+      setStats(st.value as Stats);
+      setStatsError(false);
+    } else if (demo) {
+      setStats(DEMO_STATS);
+      setStatsError(false);
+    } else {
+      setStats(null);
+      setStatsError(true);
+    }
+    setLoading(false);
   }, [api]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   async function copyCode() {
-    if (!invite) return;
+    if (!invite) { showToast(INVITE_UNAVAILABLE); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(invite.code);
     showToast('Code copied');
   }
 
   async function copyLink() {
-    if (!invite) return;
+    if (!invite) { showToast(INVITE_UNAVAILABLE); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(invite.link);
     showToast('Link copied');
   }
 
   async function shareInvite() {
-    if (!invite) return;
+    if (!invite) { showToast(INVITE_UNAVAILABLE); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await Share.share({ message: invite.shareText, url: invite.link });
@@ -146,21 +166,34 @@ export default function BuyerInviteScreen() {
 
           <View style={styles.codeCard}>
             <Text style={styles.codeLabel}>Your invite code</Text>
-            <PressableScale style={styles.codeRow} onPress={copyCode} accessibilityLabel="Copy invite code">
-              <Text style={styles.codeText}>{invite?.code ?? '------'}</Text>
-              <View style={styles.copyPill}>
-                <Feather name="copy" size={14} color={theme.text} />
-                <Text style={styles.copyPillText}>Copy</Text>
-              </View>
-            </PressableScale>
+            {invite ? (
+              <PressableScale style={styles.codeRow} onPress={copyCode} accessibilityLabel="Copy invite code">
+                <Text style={styles.codeText}>{invite.code}</Text>
+                <View style={styles.copyPill}>
+                  <Feather name="copy" size={14} color={theme.text} />
+                  <Text style={styles.copyPillText}>Copy</Text>
+                </View>
+              </PressableScale>
+            ) : (
+              <RetryRow
+                label="Couldn't load your invite code"
+                onRetry={() => { void load(); }}
+                style={{ alignSelf: 'stretch' }}
+                testID="invite-code-retry"
+              />
+            )}
           </View>
 
           <PrimaryButton
             label="Share invite link"
             icon="share-2"
             onPress={shareInvite}
-            style={{ marginHorizontal: SP.md, marginTop: SP.md }}
+            disabled={!invite}
+            style={{ marginHorizontal: SP.md, marginTop: SP.md, opacity: invite ? 1 : 0.5 }}
           />
+          {inviteError && (
+            <Text style={styles.unavailableNote}>{INVITE_UNAVAILABLE}</Text>
+          )}
 
           <View style={styles.steps}>
             {REFERRAL_STEPS.map((step, i) => (
@@ -174,6 +207,13 @@ export default function BuyerInviteScreen() {
             ))}
           </View>
 
+          {statsError ? (
+            <RetryRow
+              label="Couldn't load your invite stats"
+              onRetry={() => { void load(); }}
+              style={{ marginHorizontal: SP.md, marginTop: SP.lg }}
+            />
+          ) : (
           <View style={styles.tiles}>
             <View style={styles.tile}>
               <Text style={styles.tileValue}>{stats?.total ?? 0}</Text>
@@ -188,6 +228,7 @@ export default function BuyerInviteScreen() {
               <Text style={styles.tileLabel}>Earned</Text>
             </View>
           </View>
+          )}
 
           {(stats?.referrals ?? []).length > 0 && (
             <View style={styles.joinedCard}>
@@ -281,5 +322,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   joinedName: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   joinedStatus: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
   joinedDate: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.subtle },
+  unavailableNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', marginHorizontal: SP.md, marginTop: SP.sm },
   moreJoined: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center' },
 });

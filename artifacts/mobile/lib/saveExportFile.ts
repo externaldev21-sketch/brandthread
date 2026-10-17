@@ -31,7 +31,7 @@ function toBytes(file: ExportFile): Uint8Array | string {
 }
 
 /** Returns true when the file was handed to the share sheet / browser. */
-export async function saveExportFile(file: ExportFile): Promise<boolean> {
+export async function saveExportFile(file: ExportFile, dialogTitle = 'Export analytics'): Promise<boolean> {
   const content = toBytes(file);
   if (Platform.OS === 'web') {
     const blob = new Blob([content as BlobPart], { type: file.mimeType });
@@ -50,6 +50,6 @@ export async function saveExportFile(file: ExportFile): Promise<boolean> {
   f.create();
   f.write(content);
   if (!(await Sharing.isAvailableAsync())) return false;
-  await Sharing.shareAsync(f.uri, { mimeType: file.mimeType, dialogTitle: 'Export analytics' });
+  await Sharing.shareAsync(f.uri, { mimeType: file.mimeType, dialogTitle });
   return true;
 }

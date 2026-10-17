@@ -18,8 +18,10 @@ type Item = { label: string; sub?: string; icon?: keyof typeof Feather.glyphMap;
 type Config = { title: string; intro?: string; items: (s: BuyerSettingsState, router?: ReturnType<typeof useRouter>) => Item[] };
 
 const CONFIG: Record<string, Config> = {
-  activity: { title: 'Your activity', intro: 'Review and manage the things you do on Brandthread.', items: () => [
-    { label: 'Likes', icon: 'heart' }, { label: 'Comments', icon: 'message-square' }, { label: 'Story replies', icon: 'corner-up-left' }, { label: 'Search history', icon: 'search' }, { label: 'Links you visited', icon: 'link' }, { label: 'Recently deleted', icon: 'trash-2' }, { label: 'Time spent', icon: 'clock', value: 'Daily average' },
+  // Item 110: rows open the real Your Activity / search history screens.
+  // Time spent was listed here but is not tracked, so it is not promised.
+  activity: { title: 'Your activity', intro: 'Review and manage the things you do on Brandthread.', items: (_s, router) => [
+    { label: 'Likes', icon: 'heart', action: () => router?.push('/buyer-your-activity' as never) }, { label: 'Comments', icon: 'message-square', action: () => router?.push('/buyer-your-activity' as never) }, { label: 'Story replies', icon: 'corner-up-left' }, { label: 'Search history', icon: 'search', action: () => router?.push('/buyer-search-history' as never) }, { label: 'Links you visited', icon: 'link' }, { label: 'Recently deleted', icon: 'trash-2' },
   ]},
   archive: { title: 'Archive', items: () => [{ label: 'Posts archive', icon: 'grid' }, { label: 'Stories archive', icon: 'clock' }, { label: 'Live archive', icon: 'video' }] },
   qr: { title: 'QR code', intro: 'Your unique profile code. Share it so people can find you on Brandthread.', items: (_s, router) => [{ label: 'Share QR code', icon: 'share-2', action: () => router?.push('/buyer-qr-code' as never) }] },
