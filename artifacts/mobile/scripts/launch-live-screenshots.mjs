@@ -60,7 +60,7 @@ async function visible(page, testId, timeout = 8000) {
 }
 
 async function open(browser, origin, images, role, target, { demo = false, configured = true, summary = null, adult = false } = {}) {
-  const device = { viewport: VIEWPORT, scale: 2, isMobile: true, userAgent: UA };
+  const device = { viewport: VIEWPORT, scale: 1, isMobile: true, userAgent: UA };
   const { context, page, activity } = await openContext(browser, { device, role, origin, images });
   page.on('pageerror', (e) => problems.push(`[pageerror ${target}] ${e.message.slice(0, 160)}`));
   await context.grantPermissions(['camera', 'microphone']).catch(() => {});
