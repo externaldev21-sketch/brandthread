@@ -27,7 +27,8 @@ describe('seller-inbox.tsx: search', () => {
     // Message requests now get their own Requests tab (item 76 — every
     // role pair can land a seller in Requests, not just buyer<->buyer), so
     // the main Inbox list also excludes c.isRequest alongside c.isArchived.
-    expect(src).toContain('if (c.isArchived || c.isRequest || pendingDeleteIds.has(c.id)) return false;');
+    expect(src).toContain('if (c.isRequest || pendingDeleteIds.has(c.id)) return false;');
+    expect(src).toContain('if (showArchived ? !c.isArchived : c.isArchived) return false;');
   });
 });
 
@@ -45,7 +46,14 @@ describe('seller-inbox.tsx: swipe actions', () => {
   });
 
   it('reuses services/socialService.ts mutations rather than a parallel implementation', () => {
-    expect(src).toContain("import { markConversationRead, archiveConversation, muteUser, setConversationPinned } from '@/services/socialService';");
+    expect(src).toContain("markConversationRead, archiveConversation, deleteConversationForMe, muteConversation, setConversationPinned,");
+    expect(src).toContain("} from '@/services/socialService';");
+  });
+
+  it('swipe Mute is the real per-chat mute (not a person-level mute), and Delete is delete-for-me', () => {
+    expect(src).not.toContain('muteUser');
+    expect(src).toContain('await muteConversation(c.id, nextMuted ? -1 : null);');
+    expect(src).toContain('await deleteConversationForMe(c.id);');
   });
 
   it('a seeded preview conversation updates local state only, never hitting the network', () => {
@@ -57,8 +65,9 @@ describe('seller-inbox.tsx: swipe actions', () => {
     expect(src).toContain('.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)),');
   });
 
-  it('long-pressing a row still offers Archive (matches the buyer inbox’s long-press menu)', () => {
+  it('long-pressing a row offers Archive, or Unarchive for an archived chat', () => {
     expect(src).toContain("showActionSheet('Options', undefined, [");
-    expect(src).toContain("{ text: 'Archive', onPress: () => swipeArchiveConversation(c), style: 'destructive' },");
+    expect(src).toContain("{ text: 'Archive', onPress: () => setArchived(c, true), style: 'destructive' },");
+    expect(src).toContain("{ text: 'Unarchive', onPress: () => setArchived(c, false) }");
   });
 });

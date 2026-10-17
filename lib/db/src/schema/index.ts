@@ -1066,6 +1066,16 @@ export const conversationParticipants = pgTable('conversation_participants', {
   // independent. Polled, same as agentTypingUntil on `conversations` (no
   // websocket layer exists for DMs yet).
   typingUntil:    timestamp('typing_until', { withTimezone: true }),
+  // Inbox long-press/filter > Archive (migration 315): null = in the main
+  // inbox, a timestamp = when this viewer archived it. Per-membership, like
+  // pinnedAt — archiving only moves the viewer's own copy. A new incoming
+  // message clears it for the recipient (Instagram-style auto-unarchive).
+  archivedAt:     timestamp('archived_at'),
+  // Inbox swipe > Delete (migration 315): "delete for me". The conversation
+  // disappears from this viewer's inbox and every message up to this moment
+  // is hidden for them only; the other side keeps the full thread. A newer
+  // message brings the conversation back with only the messages after it.
+  hiddenAt:       timestamp('hidden_at'),
   joinedAt:       timestamp('joined_at').defaultNow().notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.conversationId, table.userId] }),
@@ -1136,6 +1146,18 @@ export const messageReactions = pgTable('message_reactions', {
 }, (table) => ({
   messageUserUnique: unique('message_reactions_message_user_unique').on(table.messageId, table.userId),
   messageIdx:        index('message_reactions_message_idx').on(table.messageId),
+}));
+
+// ─── Message "Delete for me" ──────────────────────────────────────────────────
+// One row per (message, viewer) the viewer removed from their own copy of the
+// thread (migration 315). The message itself is untouched for everyone else.
+export const messageHidden = pgTable('message_hidden', {
+  messageId: uuid('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
+  userId:    text('user_id').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  pk:      primaryKey({ columns: [table.messageId, table.userId] }),
+  userIdx: index('message_hidden_user_idx').on(table.userId),
 }));
 
 // ─── Brandthread Agent welcome conversation (idempotency ledger) ──────────────
