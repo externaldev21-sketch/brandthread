@@ -420,10 +420,16 @@ export interface StoreAISuggestion {
   problem: string;
   recommendation: string;
   previewChange?: string;
+  /** Server-generated suggestions carry a real action (see storeAiActions.ts). */
+  action?: StoreAISuggestionAction;
   dismissed: boolean;
   applied: boolean;
   createdAt: string;
 }
+
+export type StoreAISuggestionAction =
+  | { type: 'set_store_name' | 'set_seo_title' | 'set_seo_description' | 'set_hero_heading' | 'set_hero_description'; value: string }
+  | { type: 'open_screen'; screen: 'collections' | 'pages' | 'navigation' | 'products' | 'sections' | 'policies' | 'seo' | 'theme' | 'settings' };
 
 export interface StoreVersion {
   id: string;
@@ -474,7 +480,13 @@ export interface Storefront {
   publishStatus: StorePublishStatus;
   publishedAt?: string;
   sharePreviewRevokedAt?: string | null;
+  /** The storefront row's slug from GET /api/store — the only slug the live
+   *  site route (GET /api/store/site/:slug) resolves. Refreshed from the server on every remote read. */
+  serverSlug?: string | null;
   generatedFrom?: StoreGenerationAnswers;
+  /** Which builder lists (collections / pages / menus) have been reconciled
+   *  with the server at least once — see storeService loadBuilderList. */
+  builderSync?: Partial<Record<'collections' | 'pages' | 'menus', boolean>>;
   aiSuggestions: StoreAISuggestion[];
   versions: StoreVersion[];
   undoStack: StoreUndoEntry[];

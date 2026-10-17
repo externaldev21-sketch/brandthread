@@ -9,6 +9,11 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { getWebOrigin } from "../lib/webOrigin";
 import crypto from "crypto";
 import { ATTRIBUTION_SCRIPT, buildPixelInjection, requestOptsOutOfTracking } from "../lib/growth/pixels";
+import { renderBuilderHtml, safePublicBuilderData } from "../lib/storefrontBuilderPublic";
+import {
+  customDomainRoutingEnabled, hashStorePassword, sanitizeStoreSettingsInput,
+  toOwnerStorefront, toPublicStorefront, validateStorePassword, validateStoreSlug,
+} from "../lib/storeSettingsSecurity";
 
 const router = Router();
 
@@ -281,6 +286,8 @@ async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boolean; s
   const branding = (sf.branding as any) ?? {};
   const seo      = (sf.seo     as any) ?? {};
   const sections: any[] = Array.isArray(sf.sections) ? sf.sections : [];
+  // Published Store Builder collections / pages / menus (never break the page).
+  const builder = renderBuilderHtml(await safePublicBuilderData(ownerId, sf));
 
   // CSS values — validated to hex colors and safe font names only
   const primary   = safeCssColor(theme.primaryColor,   THREAD_THEME_LIGHT.primaryColor);
@@ -514,6 +521,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:22px c
 .social-links-row{display:flex;flex-wrap:wrap;gap:20px;margin-top:16px;}
 .social-links-row a{color:${txt};text-decoration:none;text-transform:uppercase;font-size:.72rem;letter-spacing:.1em;border-bottom:1px solid currentColor;}
 footer{padding:64px 24px;text-align:center;opacity:.6;font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;}
+.footer-links{margin-bottom:16px;}.footer-links a{color:${txt};text-decoration:none;margin:0 10px;}
 .cart-bar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 24px;background:${txt};color:${bg};font-size:.75rem;letter-spacing:.05em;}
 .cart-bar button{background:${bg};color:${txt};border:0;padding:8px 18px;text-transform:uppercase;font-size:.68rem;letter-spacing:.1em;cursor:pointer;}
 .checkout-overlay{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px;}
@@ -532,14 +540,16 @@ footer{padding:64px 24px;text-align:center;opacity:.6;font-size:.68rem;text-tran
 ${bannerText ? `<div class="preview-banner">${bannerText}</div>` : ""}
 <nav>
   <span class="logo">${title}</span>
-  <div class="nav-links"><a href="#">Shop</a><a href="#">Collections</a><a href="#">About</a><a href="#">Contact</a></div>
+  <div class="nav-links">${builder.navLinks ?? `<a href="#">Shop</a><a href="#">Collections</a><a href="#">About</a><a href="#">Contact</a>`}</div>
 </nav>
 ${hasVisibleSectionContent ? sectionHtml : sections.length > 0 ? fallbackSectionHtml : `<section class="story">
   <p class="eyebrow">Thread Theme by Brandthread</p>
   <h1>${title}</h1>
   <p>${tagline || "Your storefront is ready. Publish to go live."}</p>
 </section>`}
-<footer>© ${year} ${title}. Powered by Brandthread.</footer>
+${builder.collectionsHtml}
+${builder.pagesHtml}
+<footer>${builder.footerLinks ? `<p class="footer-links">${builder.footerLinks}</p>` : ""}© ${year} ${title}. Powered by Brandthread.</footer>
 
 <div id="bt-cart-bar" class="cart-bar" style="display:none">
   <span id="bt-cart-count">0 items</span>
@@ -800,7 +810,7 @@ router.get("/site/:slug", async (req, res): Promise<void> => {
 router.use(requireAuth);
 
 // ─── Helper — get or create storefront for a seller ──────────────────────────
-async function getOrCreateStorefront(ownerId: string) {
+export async function getOrCreateStorefront(ownerId: string) {
   const existing = await db
     .select()
     .from(storefronts)
@@ -831,9 +841,11 @@ router.get("/", async (req, res) => {
   const sf = await getOrCreateStorefront(ownerId);
   // Keep the revocation watermark explicit in the response so clients can
   // refresh preview-link status whenever the seller returns to the screen.
+  // toOwnerStorefront strips the store password hash (exposes hasStorePassword).
   res.json({
-    ...sf,
+    ...toOwnerStorefront(sf),
     sharePreviewRevokedAt: sf.sharePreviewRevokedAt?.toISOString() ?? null,
+    customDomainRoutingEnabled: customDomainRoutingEnabled(),
   });
 });
 
@@ -884,7 +896,10 @@ router.put("/", async (req, res): Promise<void> => {
     if (key in req.body) {
       update[key] = key === "theme"
         ? normalizeThreadTheme(req.body[key])
-        : req.body[key];
+        : key === "storeSettings"
+          // The store password is set only via PUT /api/store/password (hashed).
+          ? sanitizeStoreSettingsInput(req.body[key])
+          : req.body[key];
     }
   }
 
@@ -894,7 +909,60 @@ router.put("/", async (req, res): Promise<void> => {
     .where(eq(storefronts.id, sf.id))
     .returning();
 
-  res.json(updated);
+  res.json(toOwnerStorefront(updated));
+});
+
+// PUT /api/store/password — set or clear the storefront access password.
+// Body: { password: string | null }. Stored only as a salted scrypt hash.
+router.put("/password", async (req, res): Promise<void> => {
+  const ownerId = (req as any).clerkUserId as string;
+  const raw = req.body?.password;
+  let hash: string | null = null;
+  if (raw !== null && raw !== undefined && raw !== "") {
+    const err = validateStorePassword(raw);
+    if (err) { res.status(400).json({ error: err }); return; }
+    hash = await hashStorePassword(raw);
+  }
+  const sf = await getOrCreateStorefront(ownerId);
+  await db
+    .update(storefronts)
+    .set({ storePasswordHash: hash, updatedAt: new Date() })
+    .where(eq(storefronts.id, sf.id));
+  res.json({ ok: true, hasStorePassword: hash !== null });
+});
+
+// PUT /api/store/slug — change the storefront's public URL slug.
+// Body: { slug }. 400 invalid/reserved, 409 taken by another store.
+router.put("/slug", async (req, res): Promise<void> => {
+  const ownerId = (req as any).clerkUserId as string;
+  const result = validateStoreSlug(req.body?.slug);
+  if (!result.ok) { res.status(400).json({ error: result.error }); return; }
+  const sf = await getOrCreateStorefront(ownerId);
+  if (sf.slug === result.slug) { res.json({ slug: sf.slug }); return; }
+  const [taken] = await db
+    .select({ id: storefronts.id })
+    .from(storefronts)
+    .where(eq(storefronts.slug, result.slug))
+    .limit(1);
+  if (taken && taken.id !== sf.id) {
+    res.status(409).json({ error: "That store URL is already taken. Try another." });
+    return;
+  }
+  try {
+    const [updated] = await db
+      .update(storefronts)
+      .set({ slug: result.slug, updatedAt: new Date() })
+      .where(eq(storefronts.id, sf.id))
+      .returning({ slug: storefronts.slug });
+    res.json({ slug: updated.slug });
+  } catch (e: any) {
+    // Unique-violation race with another seller claiming the same slug.
+    if (e?.code === "23505" || e?.cause?.code === "23505") {
+      res.status(409).json({ error: "That store URL is already taken. Try another." });
+      return;
+    }
+    throw e;
+  }
 });
 
 // POST /api/store/publish — publish the storefront
@@ -908,7 +976,7 @@ router.post("/publish", async (req, res) => {
     .where(eq(storefronts.id, sf.id))
     .returning();
 
-  res.json(updated);
+  res.json(toOwnerStorefront(updated));
 });
 
 // POST /api/store/unpublish — unpublish the storefront
@@ -922,7 +990,7 @@ router.post("/unpublish", async (req, res) => {
     .where(eq(storefronts.id, sf.id))
     .returning();
 
-  res.json(updated);
+  res.json(toOwnerStorefront(updated));
 });
 
 // GET /api/store/versions — list saved versions
@@ -957,7 +1025,7 @@ router.post("/versions", async (req, res) => {
     .values({
       storefrontId: sf.id,
       label,
-      snapshot: (snapshot ?? sf) as Record<string, unknown>,
+      snapshot: (snapshot ?? toOwnerStorefront(sf)) as Record<string, unknown>,
       createdBy: ownerId,
     })
     .returning();
@@ -1035,7 +1103,7 @@ router.post("/versions/:id/restore", async (req, res): Promise<void> => {
     .where(eq(storefronts.id, sf.id))
     .returning();
 
-  res.json(restored);
+  res.json(toOwnerStorefront(restored));
 });
 
 // GET /api/store/domains — list custom domains
@@ -1107,7 +1175,9 @@ router.post("/domains/:id/verify", async (req, res): Promise<void> => {
     .where(and(eq(storefrontCustomDomains.id, id), eq(storefrontCustomDomains.storefrontId, sf.id)))
     .returning();
 
-  res.json(updated);
+  // DNS ownership is verified for real, but routing the domain to the store
+  // and issuing SSL need a hosting integration (CUSTOM_DOMAIN_ROUTING_ENABLED).
+  res.json({ ...updated, routingEnabled: customDomainRoutingEnabled() });
 });
 
 // DELETE /api/store/domains/:id — remove a custom domain
@@ -1217,7 +1287,9 @@ router.get("/public/:slug", async (req, res): Promise<void> => {
     .where(eq(storefronts.slug, slug))
     .limit(1);
   if (!sf || sf.status !== "published") { res.status(404).json({ error: "Store not found" }); return; }
-  res.json(sf);
+  // Never leak the password hash, preview-link state or private settings.
+  // Builder collections/pages/navigation: published items only, products resolved.
+  res.json({ ...toPublicStorefront(sf), ...(await safePublicBuilderData(sf.ownerId, sf)) });
 });
 
 export default router;

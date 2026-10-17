@@ -80,11 +80,10 @@ export default function StoreNavScreen() {
 
   async function loadMenus() {
     try {
-      const result = await getMenus();
+      const result = await getMenus({ onLocal: local => { if (local.length) setMenus(local); } });
       setMenus(result);
-      if (result.length > 0 && !activeMenuId) {
-        setActiveMenuId(result[0].id);
-      }
+      // Server menus can carry different ids than this device's cached ones.
+      setActiveMenuId(prev => (prev && result.some(m => m.id === prev)) ? prev : (result[0]?.id ?? null));
     } catch {
       setMenus([]);
     }
@@ -160,10 +159,11 @@ export default function StoreNavScreen() {
     try {
       await updateMenu(activeMenu.id, updatedItems);
       await loadMenus();
-    } catch {
-      Alert.alert('Error', 'Failed to save menu item.');
+      setModalVisible(false);
+    } catch (e) {
+      // Keep the sheet open so the edit isn't lost; nothing was saved.
+      Alert.alert("Couldn't save menu item", e instanceof Error ? e.message : 'Please try again.');
     }
-    setModalVisible(false);
   }
 
   async function handleToggleVisible(itemId: string) {
@@ -174,7 +174,9 @@ export default function StoreNavScreen() {
     try {
       await updateMenu(activeMenu.id, updatedItems);
       await loadMenus();
-    } catch {}
+    } catch (e) {
+      Alert.alert("Couldn't update menu", e instanceof Error ? e.message : 'Please try again.');
+    }
   }
 
   async function handleRemoveItem(itemId: string) {
@@ -190,8 +192,8 @@ export default function StoreNavScreen() {
             try {
               await updateMenu(activeMenu.id, updatedItems);
               await loadMenus();
-            } catch {
-              Alert.alert('Error', 'Failed to remove item.');
+            } catch (e) {
+              Alert.alert("Couldn't remove item", e instanceof Error ? e.message : 'Please try again.');
             }
           },
         },
@@ -221,7 +223,9 @@ export default function StoreNavScreen() {
     try {
       await updateMenu(activeMenu.id, updatedItems);
       await loadMenus();
-    } catch {}
+    } catch (e) {
+      Alert.alert("Couldn't reorder menu", e instanceof Error ? e.message : 'Please try again.');
+    }
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────

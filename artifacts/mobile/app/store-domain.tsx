@@ -15,7 +15,10 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, SectionHeader, StatusBadge } from '@/components/BrandthreadUI';
-import { getStorefront, updateDomain } from '@/services/storeService';
+import { cacheStorefrontLocally } from '@/services/storeService';
+import { validateSlugInput } from '@/services/storeSettingsSync';
+import { mapApiCustomDomain, verifiedDomainMessage } from '@/services/storeDomainStatus';
+import { apiErrorMessage } from '@/lib/safety';
 import { useApi } from '@/lib/api';
 import { StoreDomain } from '@/services/storeTypes';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
@@ -36,6 +39,9 @@ export default function StoreDomainScreen() {
   const [subdomainInput, setSubdomainInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [verifying, setVerifying] = useState<string | null>(null);
+  const [currentSlug, setCurrentSlug] = useState('');
+  const [routingEnabled, setRoutingEnabled] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const leaveSetupDestination = () => {
     // Pop to the exact screen underneath (dashboard / setup checklist / tab);
@@ -44,31 +50,35 @@ export default function StoreDomainScreen() {
   };
 
   const load = useCallback(async () => {
-    const s = await getStorefront();
-    const localDomains = s.domains;
-
-    // Merge: local BT subdomain + real API custom domains
-    const btDomain = localDomains.find(d => d.type === 'brandthread');
-    if (btDomain) setSubdomainInput(btDomain.subdomain ?? s.settings.storeUrl ?? '');
-
+    // Server state only: the Brandthread address is storefronts.slug and the
+    // custom domains come from /api/store/domains.
     try {
-      const apiDomains = await (api as any).store.domains() as any[];
-      const customFromApi: MergedDomain[] = (apiDomains ?? []).map((d: any) => ({
-        id:                 d.id,
-        type:               'custom' as const,
-        customDomain:       d.domain,
-        verificationStatus: d.verified ? 'verified' : 'pending',
-        sslStatus:          d.verified ? 'active' : 'pending',
-        isPrimary:          false,
-        dnsToken:           d.verifyToken,
-      }));
-      setDomains([...(btDomain ? [btDomain] : []), ...customFromApi]);
+      const [store, apiDomains] = await Promise.all([
+        api.store.get(),
+        api.store.domains(),
+      ]);
+      const slug: string = store?.slug ?? '';
+      const routing = store?.customDomainRoutingEnabled === true;
+      setCurrentSlug(slug);
+      setSubdomainInput(slug);
+      setRoutingEnabled(routing);
+      const btDomain: MergedDomain = {
+        id: 'brandthread',
+        type: 'brandthread',
+        subdomain: slug,
+        verificationStatus: slug ? 'verified' : 'not_started',
+        sslStatus: 'not_issued',
+        isPrimary: true,
+      };
+      const customFromApi: MergedDomain[] = (apiDomains ?? []).map((d: any) => mapApiCustomDomain(d, routing));
+      setDomains([btDomain, ...customFromApi]);
+      setLoadError(null);
       await completeSetupTaskWhen(
         'connect_domain',
         customFromApi.some(domain => domain.verificationStatus === 'verified'),
       );
-    } catch {
-      setDomains(localDomains);
+    } catch (e) {
+      setLoadError(apiErrorMessage(e, "Couldn't load your domains. Check your connection and try again."));
     }
   }, [api]);
 
@@ -79,13 +89,18 @@ export default function StoreDomainScreen() {
 
   const handleSaveSubdomain = async () => {
     if (!btDomain) return;
+    const wanted = subdomainInput.trim().toLowerCase();
+    const invalid = validateSlugInput(wanted);
+    if (invalid) { Alert.alert('Not saved', invalid); return; }
+    if (wanted === currentSlug) { Alert.alert('No changes', 'That is already your store address.'); return; }
     setSaving(true);
     try {
-      await updateDomain(btDomain.id, { subdomain: subdomainInput, verificationStatus: 'verified' });
+      const { slug } = await api.store.setSlug(wanted);
+      await cacheStorefrontLocally(s => { s.settings.storeUrl = slug; }).catch(() => {});
       await load();
-      Alert.alert('Saved', 'Subdomain updated.');
-    } catch {
-      Alert.alert('Error', 'Failed to update subdomain.');
+      Alert.alert('Saved', `Your store address is now ${slug}.`);
+    } catch (e) {
+      Alert.alert('Not saved', apiErrorMessage(e, "Couldn't update your store address. Try again."));
     } finally {
       setSaving(false);
     }
@@ -114,7 +129,8 @@ export default function StoreDomainScreen() {
       }
       await completeSetupTaskWhen('connect_domain', verifiedDomain?.verified === true);
       await load();
-      Alert.alert('Verified ✓', 'Your domain is verified and SSL is being issued.');
+      const msg = verifiedDomainMessage(verifiedDomain?.routingEnabled === true);
+      Alert.alert(msg.title, msg.body);
     } catch {
       Alert.alert('Not verified yet', 'DNS changes can take up to 48 hours to propagate. Check your registrar and try again.');
     } finally {
@@ -148,6 +164,8 @@ export default function StoreDomainScreen() {
       <ScreenHeader title="Domains" onBack={leaveSetupDestination} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={dm.scroll}>
+
+        {loadError ? <Text style={[dm.noteText, { marginHorizontal: SP.md, color: theme.error }]}>{loadError}</Text> : null}
 
         {/* Brandthread Subdomain */}
         <SectionHeader title="BRANDTHREAD SUBDOMAIN" style={dm.sh} />
@@ -185,11 +203,13 @@ export default function StoreDomainScreen() {
             </View>
             <View style={dm.badgeRow}>
               {verificationBadge(cd.verificationStatus)}
-              <StatusBadge
-                label={cd.sslStatus === 'active' ? 'SSL Active' : 'SSL Pending'}
-                variant={cd.sslStatus === 'active' ? 'success' : 'warning'}
-                small
-              />
+              {routingEnabled ? (
+                <StatusBadge
+                  label={cd.sslStatus === 'active' ? 'SSL Active' : 'SSL Pending'}
+                  variant={cd.sslStatus === 'active' ? 'success' : 'warning'}
+                  small
+                />
+              ) : null}
             </View>
 
             {cd.verificationStatus === 'pending' && (
@@ -205,10 +225,12 @@ export default function StoreDomainScreen() {
                     <Text style={[dm.dnsHost, { color: CYAN, flexWrap: 'wrap', flex: 1 }]}>{cd.dnsToken}</Text>
                   </View>
                 ) : null}
-                <View style={dm.dnsRow}>
-                  <Text style={dm.dnsType}>CNAME</Text>
-                  <Text style={dm.dnsHost}>www → cname.brandthread.app</Text>
-                </View>
+                {routingEnabled ? (
+                  <View style={dm.dnsRow}>
+                    <Text style={dm.dnsType}>CNAME</Text>
+                    <Text style={dm.dnsHost}>www → cname.brandthread.app</Text>
+                  </View>
+                ) : null}
                 <Text style={dm.dnsNote}>DNS changes can take up to 48 hours to propagate.</Text>
                 <SecondaryButton
                   label={verifying === cd.id ? 'Checking...' : 'Verify DNS'}
@@ -224,8 +246,10 @@ export default function StoreDomainScreen() {
               <BrandthreadCard style={[dm.dnsCard, { borderColor: SUCCESS, backgroundColor: SUCCESS_DIM }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
                   <Feather name="check-circle" size={ICON.sm} color={SUCCESS} />
-                  <Text style={{ color: SUCCESS, fontFamily: FONT.semibold, fontSize: FS.sm }}>
-                    Domain is live at https://{cd.customDomain}
+                  <Text style={{ color: SUCCESS, fontFamily: FONT.semibold, fontSize: FS.sm, flex: 1 }}>
+                    {routingEnabled
+                      ? `Domain is live at https://${cd.customDomain}`
+                      : "DNS verified. Custom domain routing isn't available yet, so this domain doesn't load your store."}
                   </Text>
                 </View>
               </BrandthreadCard>

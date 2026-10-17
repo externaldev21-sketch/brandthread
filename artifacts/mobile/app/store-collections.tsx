@@ -94,6 +94,7 @@ interface FormState {
   scheduledAt: string;
   seoExpanded: boolean;
   coverImage?: string;
+  productIds: string[];
 }
 
 function defaultForm(): FormState {
@@ -110,6 +111,7 @@ function defaultForm(): FormState {
     status: 'draft',
     scheduledAt: '',
     seoExpanded: false,
+    productIds: [],
   };
 }
 
@@ -126,8 +128,28 @@ export default function StoreCollectionsScreen() {
   const [saving, setSaving] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
   const [collectionsFailed, setCollectionsFailed] = useState(false);
+  // The seller's own products, for picking what a manual collection contains.
+  const [myProducts, setMyProducts] = useState<{ id: string; name: string; status: string }[] | null>(null);
+  const [productsFailed, setProductsFailed] = useState(false);
   const pull = usePullToRefresh(() => loadCollections());
   const api = useApi();
+
+  async function loadMyProducts() {
+    try {
+      const rows = await api.products.list() as any[];
+      setMyProducts((Array.isArray(rows) ? rows : []).map(r => ({ id: String(r.id), name: String(r.name ?? ''), status: String(r.status ?? '') })));
+      setProductsFailed(false);
+    } catch {
+      setProductsFailed(true);
+    }
+  }
+
+  function toggleProduct(id: string) {
+    setForm(prev => ({
+      ...prev,
+      productIds: prev.productIds.includes(id) ? prev.productIds.filter(x => x !== id) : [...prev.productIds, id],
+    }));
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -137,7 +159,7 @@ export default function StoreCollectionsScreen() {
 
   async function loadCollections() {
     try {
-      const cols = await getCollections();
+      const cols = await getCollections({ onLocal: local => { if (local.length) setCollections(local); } });
       setCollections(cols);
       setCollectionsFailed(false);
     } catch {
@@ -150,6 +172,7 @@ export default function StoreCollectionsScreen() {
     setSelectedCollection(null);
     setForm(defaultForm());
     setMode('new');
+    void loadMyProducts();
   }
 
   function openEdit(col: StoreCollection) {
@@ -167,8 +190,11 @@ export default function StoreCollectionsScreen() {
       status: col.status,
       scheduledAt: col.scheduledAt ?? '',
       seoExpanded: false,
+      coverImage: col.coverImageUri,
+      productIds: [...(col.productIds ?? [])],
     });
     setMode('edit');
+    void loadMyProducts();
   }
 
   function handleDelete(col: StoreCollection) {
@@ -182,8 +208,8 @@ export default function StoreCollectionsScreen() {
             try {
               await deleteCollection(col.id);
               await loadCollections();
-            } catch {
-              Alert.alert('Error', 'Failed to delete collection.');
+            } catch (e) {
+              Alert.alert("Couldn't delete collection", e instanceof Error ? e.message : 'Please try again.');
             }
           },
         },
@@ -210,6 +236,8 @@ export default function StoreCollectionsScreen() {
         handle: form.handle || toHandle(form.name),
         status: form.status,
         scheduledAt: form.status === 'scheduled' ? form.scheduledAt : undefined,
+        coverImageUri: form.coverImage,
+        productIds: form.type === 'manual' ? form.productIds : (selectedCollection?.productIds ?? []),
       };
       if (mode === 'edit' && selectedCollection) {
         await updateCollection(selectedCollection.id, data);
@@ -218,8 +246,9 @@ export default function StoreCollectionsScreen() {
       }
       await loadCollections();
       setMode('list');
-    } catch {
-      Alert.alert('Error', 'Failed to save collection.');
+    } catch (e) {
+      // Nothing was saved — say why instead of pretending.
+      Alert.alert("Couldn't save collection", e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setSaving(false);
     }
@@ -414,6 +443,34 @@ export default function StoreCollectionsScreen() {
             <Text style={styles.uploadBtnText}>{form.coverImage ? 'Change cover' : 'Upload Cover'}</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Products (Manual) — real products from this seller's catalog */}
+        {form.type === 'manual' && (
+          <View style={styles.formSection}>
+            <Text style={styles.fieldLabel}>Products ({form.productIds.length})</Text>
+            {myProducts === null && !productsFailed ? (
+              <ActivityIndicator color={PURPLE} />
+            ) : productsFailed ? (
+              <TouchableOpacity onPress={() => { void loadMyProducts(); }}>
+                <Text style={styles.subLabel}>Couldn't load your products. Tap to retry.</Text>
+              </TouchableOpacity>
+            ) : myProducts && myProducts.length === 0 ? (
+              <Text style={styles.subLabel}>Add products first — they'll show up here to pick from.</Text>
+            ) : (
+              <View style={styles.chipRow}>
+                {(myProducts ?? []).map((p) => (
+                  <FilterChip
+                    key={p.id}
+                    label={p.status && p.status !== 'active' ? `${p.name} (${p.status})` : p.name}
+                    active={form.productIds.includes(p.id)}
+                    onPress={() => toggleProduct(p.id)}
+                  />
+                ))}
+              </View>
+            )}
+            <Text style={styles.subLabel}>Only active products appear on your live store.</Text>
+          </View>
+        )}
 
         {/* 5. Product Order (Manual) */}
         {form.type === 'manual' && (

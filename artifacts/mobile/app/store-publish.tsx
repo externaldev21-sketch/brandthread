@@ -9,7 +9,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { useApi } from '@/lib/api';
+import { useApi, API_BASE_URL } from '@/lib/api';
+import { buildStorefrontSiteUrl, displayUrl } from '@/lib/storefrontUrl';
 import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
@@ -17,6 +18,7 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBa
 import { getStorefront, validateStore, publishStore, unpublishStore, StoreValidationResult } from '@/services/storeService';
 import { Storefront } from '@/services/storeTypes';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
+import { apiErrorMessage } from '@/lib/safety';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 
 const ERROR_ROUTES: Record<string, string> = {
@@ -113,10 +115,9 @@ export default function StorePublishScreen() {
 
   const handlePublish = () => {
     if (!store) return;
-    const storeUrl = store.settings.storeUrl || 'yourstore';
     Alert.alert(
       'Publish your store?',
-      `Your store will be live at https://${storeUrl}.brandthread.app`,
+      siteUrl ? `Your store will be live at ${displayUrl(siteUrl)}` : 'Your store will be visible to buyers.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -129,8 +130,10 @@ export default function StorePublishScreen() {
                 setPublished(true);
                 await doValidate();
               } else {
-                Alert.alert('Cannot publish', result.message);
+                Alert.alert("Couldn't publish your store", result.message);
               }
+            } catch {
+              Alert.alert("Couldn't publish your store", 'Check your connection and try again.');
             } finally {
               setPublishing(false);
             }
@@ -148,16 +151,22 @@ export default function StorePublishScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Unpublish', style: 'destructive', onPress: async () => {
-            await unpublishStore();
-            setPublished(false);
-            await doValidate();
+            try {
+              await unpublishStore();
+              setPublished(false);
+              await doValidate();
+            } catch (error) {
+              Alert.alert("Couldn't unpublish your store", apiErrorMessage(error, 'Check your connection and try again.'));
+            }
           },
         },
       ],
     );
   };
 
-  const storeUrl = store?.settings.storeUrl || 'yourstore';
+  // The live site is served by the API at /api/store/site/:slug for the
+  // server's storefront slug (lib/storefrontUrl.ts) — not a subdomain.
+  const siteUrl = buildStorefrontSiteUrl(store?.serverSlug, API_BASE_URL);
 
   return (
     <View style={pub.root}>
@@ -274,9 +283,17 @@ export default function StorePublishScreen() {
                 <Feather name="check-circle" size={ICON.xxl} color={SUCCESS} />
               </View>
               <Text style={pub.successTitle}>Your store is live!</Text>
-              <Text style={pub.successUrl}>https://{storeUrl}.brandthread.app</Text>
+              {siteUrl ? <Text style={pub.successUrl}>{displayUrl(siteUrl)}</Text> : null}
               <View style={pub.successActions}>
-                <SecondaryButton label="View store" onPress={() => Linking.openURL(`https://${storeUrl}.brandthread.app`).catch(() => Alert.alert("Couldn't open your store", 'Try again.'))} icon="external-link" style={{ flex: 1 }} />
+                <SecondaryButton
+                  label="View store"
+                  onPress={() => {
+                    if (!siteUrl) { Alert.alert("Couldn't open your store", "We couldn't load your store link. Check your connection and try again."); return; }
+                    Linking.openURL(siteUrl).catch(() => Alert.alert("Couldn't open your store", 'Try again.'));
+                  }}
+                  icon="external-link"
+                  style={{ flex: 1 }}
+                />
                 <PrimaryButton
                   label={isSellerSetupOrigin(params.from) ? 'Done' : 'Continue Editing'}
                   onPress={leaveSetupDestination}
@@ -289,7 +306,7 @@ export default function StorePublishScreen() {
           <GradientCard colors={theme.primaryGradient} style={pub.card} glow>
             <Text style={[pub.publishReadyTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Ready to go live.</Text>
             <Text style={[pub.publishStoreName, { color: `${theme.onAccent}CC` }]}>{store?.settings.storeName || 'Your Store'}</Text>
-              <Text style={[pub.publishUrl, { color: `${theme.onAccent}B3` }]}>https://{storeUrl}.brandthread.app</Text>
+              {siteUrl ? <Text style={[pub.publishUrl, { color: `${theme.onAccent}B3` }]}>{displayUrl(siteUrl)}</Text> : null}
             <PrimaryButton
               label={publishing ? 'Publishing...' : 'Publish Store →'}
               onPress={handlePublish}

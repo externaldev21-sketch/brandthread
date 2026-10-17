@@ -1,9 +1,12 @@
 import { Router } from "express";
-import { db, storefronts } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, storefronts, products } from "@workspace/db";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import OpenAI from "openai";
 import { requireAuth } from "../middlewares/requireAuth";
+import { rateLimit } from "../middlewares/rateLimit";
 import { generateText } from "@workspace/integrations-openai-ai-server/text";
+import { AiUnavailableError, aiConfigured, completeJson } from "../lib/aiHelpers/provider";
+import { SUGGESTIONS_SYSTEM_PROMPT, buildStoreContext, parseSuggestions } from "../lib/storeSuggestions";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -199,6 +202,49 @@ Match the visual style, tone, and target audience of the brand.`;
   const raw = await generateText(SYSTEM, prompt);
   const config = parseStoreJson(raw);
   res.json({ config });
+});
+
+// POST /api/store/ai/suggestions — "Improve Store" suggestions generated from
+// the seller's real storefront + catalog. Each suggestion carries an action
+// the app can actually perform (a concrete text change saved via PUT
+// /api/store, or a screen to open). No canned fallback: when AI isn't
+// configured this is a 503 the app shows as "AI suggestions unavailable".
+router.post("/suggestions", rateLimit("expensive"), async (req, res): Promise<void> => {
+  if (!aiConfigured()) {
+    res.status(503).json({ error: "AI suggestions are unavailable right now.", code: "ai_unavailable" });
+    return;
+  }
+  const ownerId = (req as any).clerkUserId as string;
+  const [sf] = await db.select().from(storefronts).where(eq(storefronts.ownerId, ownerId)).limit(1);
+  const rows = await db
+    .select({ name: products.name, images: products.images })
+    .from(products)
+    .where(and(eq(products.ownerId, ownerId), eq(products.status, "active"), isNull(products.deletedAt)))
+    .orderBy(desc(products.createdAt))
+    .limit(200);
+  const context = buildStoreContext(sf, {
+    activeProductCount: rows.length,
+    sampleProductNames: rows.slice(0, 10).map((r) => r.name),
+    productsWithoutImages: rows.filter((r) => !Array.isArray(r.images) || r.images.length === 0).length,
+  });
+
+  let raw: unknown;
+  try {
+    raw = await completeJson({ system: SUGGESTIONS_SYSTEM_PROMPT, data: context, maxTokens: 1500 });
+  } catch (err) {
+    if (err instanceof AiUnavailableError) {
+      res.status(503).json({ error: "AI suggestions are unavailable right now.", code: "ai_unavailable" });
+      return;
+    }
+    res.status(502).json({ error: "The AI could not generate suggestions. Try again.", code: "ai_failed" });
+    return;
+  }
+  const suggestions = parseSuggestions(raw);
+  if (suggestions.length === 0) {
+    res.status(502).json({ error: "The AI did not return usable suggestions. Try again.", code: "ai_failed" });
+    return;
+  }
+  res.json({ suggestions });
 });
 
 // Return a clear 413 when the client sends an oversized payload (image not

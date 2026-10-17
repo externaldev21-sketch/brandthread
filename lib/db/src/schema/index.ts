@@ -1935,6 +1935,11 @@ export const storefronts = pgTable('storefronts', {
   brandAssets:    json('brand_assets').$type<Record<string, unknown>>().notNull().default({}),
   setupChecklist: json('setup_checklist').$type<Record<string, unknown>>().notNull().default({}),
   onboarding:     json('onboarding').$type<Record<string, unknown>>().notNull().default({}),
+  // Migration 272: store policies (seller-settings route) and the salted
+  // scrypt hash of the optional storefront password (never the plaintext;
+  // never returned to clients — GET /api/store exposes hasStorePassword).
+  policies:          json('policies').$type<unknown[]>().notNull().default([]),
+  storePasswordHash: text('store_password_hash'),
   publishedAt:          timestamp('published_at'),
   sharePreviewRevokedAt: timestamp('share_preview_revoked_at', { withTimezone: true }),
   // SHA-256 fingerprint of the one currently valid public preview token.

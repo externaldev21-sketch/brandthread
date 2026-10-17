@@ -130,6 +130,8 @@ router.get("/", async (req, res) => {
       variantCount: sql<number>`count(${productVariants.id})::int`,
       totalStock: sql<number>`coalesce(sum(${productVariants.stock}),0)::int`,
       lowStockCount: sql<number>`count(case when ${productVariants.stock} <= ${productVariants.lowStockThreshold} then 1 end)::int`,
+      // Lets the seller app's Products tab show a real price for each row.
+      minPriceCents: sql<number | null>`min(${productVariants.priceCents})::int`,
     })
     .from(products)
     .leftJoin(productVariants, eq(productVariants.productId, products.id))
