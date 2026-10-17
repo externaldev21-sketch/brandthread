@@ -114,6 +114,9 @@ import {
 } from '@/services/activityService';
 import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
 import { radius } from '@/constants/radii';
+import { ActivityTrendingBrands } from '@/components/activity/ActivityTrendingBrands';
+import { useActivityTrendingBrands } from '@/hooks/useActivityTrendingBrands';
+import { activityFooterParts, showsInlineTrending } from '@/lib/activityTrending';
 
 /** Within this many points of the top, live arrivals come straight in (item 84). */
 const LIVE_TOP_SLOP = 48;
@@ -562,7 +565,12 @@ function SuggestedForYouSection({ people, followStates, styles, onFollow, onDism
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function ActivityCenterScreen() {
+/**
+ * `isTab`: opened from the buyer tab bar's Activity slot (app/(buyer)/activity.tsx),
+ * a top-level tab — no back arrow (audit #52). The root /activity-center
+ * route is pushed (seller bell) and keeps its back arrow.
+ */
+export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolean } = {}) {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   // The floating tab bar (and its shared frosted-glass zone — see
@@ -579,6 +587,8 @@ export default function ActivityCenterScreen() {
   const { role } = useRole();
   const api = useApi();
   const { user } = useUser();
+  // Inline "Trending brands" under the activity (replaces "Find people to follow").
+  const { brands: trendingBrands, reload: reloadTrending } = useActivityTrendingBrands(user?.id);
   // "Story mentions" rail above the feed (Activity is the same screen for
   // buyers and sellers: the buyer tab re-exports it, sellers reach it at the
   // root route). Hidden when nobody has tagged me.
@@ -839,6 +849,7 @@ export default function ActivityCenterScreen() {
   useFocusEffect(useCallback(() => {
     void loadFirstPage(loadedOnce.current ? 'focus' : 'initial');
     void loadSuggested();
+    void reloadTrending();
     loadedOnce.current = true;
 
     const lastKnown = { current: '' };
@@ -852,7 +863,7 @@ export default function ActivityCenterScreen() {
       // Dots are per visit: next time, only what's still unread gets one.
       setDotIds(new Set());
     };
-  }, [loadFirstPage, loadSuggested]));
+  }, [loadFirstPage, loadSuggested, reloadTrending]));
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || status !== 'ready') return;
@@ -1248,13 +1259,20 @@ export default function ActivityCenterScreen() {
       ? "Brandthread couldn't load your activity right now. Try again shortly."
       : "Your activity couldn't load. Check your connection and try again.";
 
+  // Activity rows first (newest at top), then — as part of the same scroll —
+  // the paging spinner, Trending brands once the last page is in, and
+  // Suggested for you. See lib/activityTrending.ts activityFooterParts.
+  const footerParts = activityFooterParts({
+    loadingMore, hasMore, trendingCount: trendingBrands.length, suggestedCount: suggested.length, chip,
+  });
   const listFooter = (
     <>
-      {loadingMore && (
+      {footerParts.includes('loadingMore') && (
         <View style={styles.footer}>
           <ActivityIndicator color={theme.muted} />
         </View>
       )}
+      {footerParts.includes('trending') && <ActivityTrendingBrands brands={trendingBrands} />}
       <SuggestedForYouSection
         people={suggested}
         followStates={suggestedFollowState}
@@ -1264,6 +1282,9 @@ export default function ActivityCenterScreen() {
       />
     </>
   );
+  // All / Follows with nothing in them: a small quiet line, not a big empty
+  // state, so Trending brands sits near the top right under it.
+  const quietEmpty = showsInlineTrending(chip);
 
   return (
     <View style={styles.container}>
@@ -1272,6 +1293,7 @@ export default function ActivityCenterScreen() {
       <View onLayout={handleHeaderLayout}>
         <ScreenHeader
           title="Activity"
+          showBack={!isTab}
           actions={hasUnread ? [{
             icon: 'check-circle',
             onPress: () => { void handleMarkAll(); },
@@ -1311,28 +1333,29 @@ export default function ActivityCenterScreen() {
           refreshControl={(
             <ThemedRefreshControl
               refreshing={refreshing}
-              onRefresh={() => { void loadFirstPage('refresh'); }}
+              onRefresh={() => { void loadFirstPage('refresh'); void reloadTrending(); }}
             />
           )}
           ListHeaderComponent={chip === 'all' ? (
             <StoryMentionsRail items={storyMentions} onOpen={openStoryMention} onSeeAll={openAllStoryMentions} />
           ) : null}
-          ListEmptyComponent={(
+          ListEmptyComponent={quietEmpty ? (
+            <View style={styles.quietEmpty} testID={`activity-empty-${chip}`}>
+              <Text style={styles.quietEmptyTitle} accessibilityRole="header" numberOfLines={1}>{chipEmpty.title}</Text>
+              <Text style={styles.quietEmptyMessage} numberOfLines={2}>{chipEmpty.message}</Text>
+            </View>
+          ) : (
             <View style={styles.stateWrap}>
               {/* A filter with nothing in it says so specifically, per role,
                   with one next step where there's a real one (item 85). */}
-              {chip === 'all' ? (
-                <EmptyState {...emptyStateProps} illustration="bell" />
-              ) : (
-                <EmptyState {...emptyStateProps} />
-              )}
+              <EmptyState {...emptyStateProps} />
             </View>
           )}
           ListFooterComponent={listFooter}
           contentContainerStyle={[
             styles.listContent,
             { paddingBottom: screenPadding.bottom + SP.xl },
-            sections.length === 0 && styles.listContentEmpty,
+            sections.length === 0 && !quietEmpty && styles.listContentEmpty,
           ]}
           showsVerticalScrollIndicator={false}
           initialNumToRender={12}
@@ -1398,6 +1421,25 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   listContentEmpty: {
     flexGrow: 1,
   },
+  // All / Follows empty: one quiet line near the top, Trending brands below.
+  quietEmpty: {
+    paddingHorizontal: SP.md,
+    paddingTop: SP.sm,
+    paddingBottom: SP.md,
+    gap: 2,
+  },
+  quietEmptyTitle: {
+    color: theme.text,
+    fontFamily: FONT.semibold,
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  quietEmptyMessage: {
+    color: theme.muted,
+    fontFamily: FONT.regular,
+    fontSize: 13,
+    lineHeight: 18,
+  },
   // Explicit height on the wrapper (not just the ScrollView's own style) so
   // this row always reserves real vertical space in the screen's flex
   // column, however the horizontal ScrollView itself sizes on a given
@@ -1408,6 +1450,11 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   chipRow: {
     height: 36 + SP.sm,
     position: 'relative',
+    // Audit #54: pulls the filter row up under the title. The shared header
+    // keeps a 16pt bottom pad (plus its min height) that, with the chips,
+    // put the end of the header block ~60pt below the title; this trims the
+    // gap to ~15pt without changing ScreenHeader for every other screen.
+    marginTop: -SP.sm - SP.xs,
   },
   chipScrollContent: {
     paddingHorizontal: SP.md,

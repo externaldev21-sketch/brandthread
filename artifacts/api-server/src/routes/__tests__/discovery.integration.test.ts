@@ -22,6 +22,12 @@ beforeAll(async () => {
   const { default: discoveryRouter } = await import("../discovery");
   const app = express();
   app.use(express.json());
+  // Stand-in for the Clerk middleware: optionalViewerId reads req.clerkUserId.
+  app.use((req, _res, next) => {
+    const viewer = req.header("x-test-viewer");
+    if (viewer) (req as any).clerkUserId = viewer;
+    next();
+  });
   app.use("/api/public", discoveryRouter);
   await new Promise<void>((resolve) => {
     server = app.listen(0, "127.0.0.1", () => resolve());
@@ -120,5 +126,24 @@ describe("GET /api/public/trending/brands", () => {
     expect(a?.name).toBe("Disc Brand A");
     expect(a?.followerCount).toBe(2);
     expect(body.brands.some((b) => b.id === sellerB)).toBe(false);
+  });
+
+  it("exclude=following drops brands the viewer follows and the viewer's own store", async () => {
+    const brandIds = async (viewer: string | null, query: string) => {
+      const res = await fetch(`${base}/api/public/trending/brands?limit=50${query}`, {
+        headers: viewer ? { "x-test-viewer": viewer } : {},
+      });
+      expect(res.status).toBe(200);
+      return ((await res.json()) as { brands: Array<{ id: string }> }).brands.map((b) => b.id);
+    };
+    // fan1 follows sellerA: listed normally, dropped with exclude=following.
+    expect(await brandIds(fan1, "")).toContain(sellerA);
+    expect(await brandIds(fan1, "&exclude=following")).not.toContain(sellerA);
+    // A seller never sees their own store with exclude=following.
+    expect(await brandIds(sellerA, "&exclude=following")).not.toContain(sellerA);
+    // Someone who doesn't follow sellerA still sees it.
+    expect(await brandIds(`disc-stranger-${suffix}`, "&exclude=following")).toContain(sellerA);
+    // Signed out, the flag is ignored (nothing to exclude against).
+    expect(await brandIds(null, "&exclude=following")).toContain(sellerA);
   });
 });

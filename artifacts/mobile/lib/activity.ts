@@ -364,20 +364,23 @@ export function matchesFilter(item: Pick<ActivityItem, 'category' | 'type'>, fil
  * Same set for buyers and sellers: the feed is per account, not per role,
  * so every category below can show up in either mode.
  */
-export type ActivityChip = 'all' | 'follows' | 'likes' | 'comments' | 'orders' | 'thread_cash';
+export type ActivityChip = 'all' | 'follows' | 'likes' | 'comments' | 'mentions' | 'orders' | 'thread_cash';
 
 export const ACTIVITY_CHIPS: readonly { key: ActivityChip; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'follows', label: 'Follows' },
   { key: 'likes', label: 'Likes' },
   { key: 'comments', label: 'Comments' },
+  // Its own tab, like Instagram / X / TikTok (audit #53), not folded into Comments.
+  { key: 'mentions', label: 'Mentions' },
   { key: 'orders', label: 'Orders' },
   { key: 'thread_cash', label: 'Thread Cash' },
 ];
 
 const FOLLOW_TYPES = new Set(['new_follower']);
 const LIKE_TYPES = new Set(['post_like', 'story_like', 'comment_like']);
-const COMMENT_TYPES = new Set(['post_comment', 'comment_reply', 'mention', 'story_mention']);
+const COMMENT_TYPES = new Set(['post_comment', 'comment_reply']);
+const MENTION_TYPES = new Set(['mention', 'story_mention']);
 const THREAD_CASH_TYPES = new Set(['thread_cash_received', 'referral_joined', 'referral_reward']);
 
 /** Which chip an item belongs to; 'other' rows (reposts, drops…) show under All only. */
@@ -386,6 +389,7 @@ export function activityCategory(item: Pick<ActivityItem, 'category' | 'type'>):
   if (FOLLOW_TYPES.has(item.type)) return 'follows';
   if (LIKE_TYPES.has(item.type)) return 'likes';
   if (COMMENT_TYPES.has(item.type)) return 'comments';
+  if (MENTION_TYPES.has(item.type)) return 'mentions';
   if (THREAD_CASH_TYPES.has(item.type)) return 'thread_cash';
   return 'other';
 }
@@ -419,14 +423,16 @@ export interface ActivityChipEmpty {
  */
 export function activityChipEmpty(chip: ActivityChip, role: 'buyer' | 'seller' | null = 'buyer'): ActivityChipEmpty {
   const seller = role === 'seller';
-  const findPeople = { label: 'Find people to follow', href: '/buyer-search' };
   const shareStore = { label: 'Share your store', href: '/share-store' };
   switch (chip) {
     case 'follows': return seller
       ? { icon: 'user-plus', title: 'No followers yet', message: "When someone follows your store, you'll see it here.", action: shareStore }
-      : { icon: 'user-plus', title: 'No followers yet', message: "When someone follows you, you'll see it here.", action: findPeople };
+      // No "Find people to follow" link: Activity shows the trending brands
+      // themselves right under this line (lib/activityTrending.ts).
+      : { icon: 'user-plus', title: 'No followers yet', message: "When someone follows you, you'll see it here." };
     case 'likes': return { icon: 'heart', title: 'No likes yet', message: "When someone likes your posts or stories, you'll see it here." };
-    case 'comments': return { icon: 'message-circle', title: 'No comments yet', message: 'Comments, replies and mentions of you will show up here.' };
+    case 'comments': return { icon: 'message-circle', title: 'No comments yet', message: 'Comments and replies on your posts will show up here.' };
+    case 'mentions': return { icon: 'at-sign', title: 'No mentions yet', message: 'When someone mentions you in a comment or a story, you\'ll see it here.' };
     case 'orders': return seller
       ? { icon: 'package', title: 'No orders yet', message: 'When someone buys from your store, new orders and payout updates will show up here.', action: shareStore }
       : { icon: 'package', title: 'No order updates yet', message: 'Shipping and delivery updates for your orders will show up here.', action: { label: 'Start shopping', href: '/(buyer)/discover' } };
@@ -439,7 +445,7 @@ export function activityChipEmpty(chip: ActivityChip, role: 'buyer' | 'seller' |
     };
     default: return seller
       ? { icon: 'activity', title: 'No activity yet', message: 'New followers, likes and comments on your posts, and order updates will show up here.', action: shareStore }
-      : { icon: 'activity', title: 'No activity yet', message: 'When people follow you, like or comment on your posts, or send you Thread Cash, it will show up here.', action: findPeople };
+      : { icon: 'activity', title: 'No activity yet', message: 'When people follow you, like or comment on your posts, or send you Thread Cash, it will show up here.' };
   }
 }
 

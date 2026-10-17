@@ -390,8 +390,8 @@ describe('classification and routing', () => {
 describe('filter chips', () => {
   const of = (type: string, category = 'social') => item({ type, category });
 
-  it('offers exactly All / Follows / Likes / Comments / Orders / Thread Cash, in that order', () => {
-    expect(ACTIVITY_CHIPS.map((c) => c.label)).toEqual(['All', 'Follows', 'Likes', 'Comments', 'Orders', 'Thread Cash']);
+  it('offers exactly All / Follows / Likes / Comments / Mentions / Orders / Thread Cash, in that order', () => {
+    expect(ACTIVITY_CHIPS.map((c) => c.label)).toEqual(['All', 'Follows', 'Likes', 'Comments', 'Mentions', 'Orders', 'Thread Cash']);
   });
 
   it('puts each notification type under one chip', () => {
@@ -400,8 +400,8 @@ describe('filter chips', () => {
     expect(activityCategory(of('story_like'))).toBe('likes');
     expect(activityCategory(of('post_comment'))).toBe('comments');
     expect(activityCategory(of('comment_reply'))).toBe('comments');
-    expect(activityCategory(of('mention'))).toBe('comments');
-    expect(activityCategory(of('story_mention'))).toBe('comments');
+    expect(activityCategory(of('mention'))).toBe('mentions');
+    expect(activityCategory(of('story_mention'))).toBe('mentions');
     expect(activityCategory(of('story_reshare'))).toBe('other');
     expect(activityCategory(of('thread_cash_received'))).toBe('thread_cash');
     expect(activityCategory(of('order_shipped', 'orders'))).toBe('orders');
@@ -417,6 +417,9 @@ describe('filter chips', () => {
     expect(matchesActivityChip(of('thread_cash_received'), 'all')).toBe(true);
     expect(matchesActivityChip(of('order_shipped', 'orders'), 'orders')).toBe(true);
     expect(matchesActivityChip(of('post_like'), 'comments')).toBe(false);
+    expect(matchesActivityChip(of('mention'), 'all')).toBe(true);
+    expect(matchesActivityChip(of('mention'), 'mentions')).toBe(true);
+    expect(matchesActivityChip(of('mention'), 'comments')).toBe(false);
   });
 
   it('has a specific empty message for every chip', () => {
@@ -437,7 +440,14 @@ describe('filter chips', () => {
   });
 
   it('offers one next step only where there is a real one', () => {
-    expect(activityChipEmpty('all').action).toEqual({ label: 'Find people to follow', href: '/buyer-search' });
+    // Activity shows trending brands inline instead of a "Find people to follow" link.
+    expect(activityChipEmpty('all').action).toBeUndefined();
+    expect(activityChipEmpty('follows').action).toBeUndefined();
+    for (const chip of ACTIVITY_CHIPS) {
+      for (const role of ['buyer', 'seller'] as const) {
+        expect(activityChipEmpty(chip.key, role).action?.label).not.toBe('Find people to follow');
+      }
+    }
     expect(activityChipEmpty('follows', 'seller').action).toEqual({ label: 'Share your store', href: '/share-store' });
     expect(activityChipEmpty('orders').action?.href).toBe('/(buyer)/discover');
     expect(activityChipEmpty('orders', 'seller').action?.href).toBe('/share-store');
@@ -445,6 +455,7 @@ describe('filter chips', () => {
     for (const role of ['buyer', 'seller'] as const) {
       expect(activityChipEmpty('likes', role).action).toBeUndefined();
       expect(activityChipEmpty('comments', role).action).toBeUndefined();
+      expect(activityChipEmpty('mentions', role).action).toBeUndefined();
     }
   });
 });
