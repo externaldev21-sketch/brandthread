@@ -56,6 +56,19 @@ describe('OtpCodeInput', () => {
     expect(onComplete).toHaveBeenCalledWith('123456');
   });
 
+  it('fires again for a pasted code after the parent cleared a wrong one', () => {
+    const onChangeText = vi.fn();
+    const onComplete = vi.fn();
+    render({ value: '', onChangeText, onComplete });
+    type('111111');
+    act(() => { tree.update(<OtpCodeInput value="111111" onChangeText={onChangeText} onComplete={onComplete} />); });
+    // Parent rejects the code and clears it itself (no change event).
+    act(() => { tree.update(<OtpCodeInput value="" onChangeText={onChangeText} onComplete={onComplete} />); });
+    type('000000');
+    expect(onComplete).toHaveBeenCalledTimes(2);
+    expect(onComplete).toHaveBeenLastCalledWith('000000');
+  });
+
   it('does not fire onComplete for a partial code', () => {
     const onChangeText = vi.fn();
     const onComplete = vi.fn();

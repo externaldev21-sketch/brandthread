@@ -1,286 +1,171 @@
 /**
- * Explicit, typed onboarding step machine for buyer and seller flows.
+ * Typed first-run step machine (v9, "launch onboarding").
  *
- * This is the single source of truth for:
- *  - step ordering per flow (including the v7 Welcome + Brands-to-follow steps)
- *  - which steps may be skipped
- *  - draft-version migration (old in-flight AsyncStorage drafts -> current step)
+ * One flow for everyone, buyer-or-seller is asked last (like Depop, where you
+ * start selling from an account you already have):
  *
- * `app/onboarding.tsx` renders steps driven by these definitions instead of
- * hand-maintained, duplicated index objects. Keeping this logic in a plain
- * module (no React Native imports) makes it directly unit-testable.
+ *   Before the account exists (no progress bar):
+ *     WELCOME    TikTok "Sign up for TikTok": email / Apple / Google, Log in
+ *     BIRTHDAY   TikTok "When's your birthday?" (age gate, kept in memory only)
+ *     EMAIL      Depop "Sign up or login": one email field
+ *     CODE       6-digit email code (Clerk email_code)
+ *     DETAILS    Only when this Clerk instance requires more (password / name)
+ *
+ *   After (progress bar, Depop):
+ *     USERNAME       Depop "Choose your username", live availability
+ *     PHOTO     *    Instagram "Add a profile picture"
+ *     INTEREST  *    Depop "Interest" (Menswear / Mens & Womenswear / Womenswear)
+ *     BRANDS    *    Depop "Show these brands in search"
+ *     SIZES     *    Depop "Sizes"
+ *     NOTIFICATIONS* Cash App "Turn on notifications"
+ *     ROLE           Etsy-style radio rows: Shop / Sell
+ *     STORE          (sellers) Depop "Start selling" step: store name
+ *     STAGE          (sellers) TikTok "Choose a category" radio list
+ *   (* = skippable)
+ *
+ * Plain module, no React Native imports, so it is unit-testable.
  */
 
 export type Flow = 'buyer' | 'seller';
 
-export type BuyerStepId =
+export type StepId =
   | 'WELCOME'
-  | 'ACCOUNT_TYPE'
-  | 'AUTH'
-  | 'NAME'
-  | 'STYLE'
-  | 'SIZES'
+  | 'BIRTHDAY'
+  | 'EMAIL'
+  | 'CODE'
+  | 'DETAILS'
+  | 'USERNAME'
+  | 'PHOTO'
+  | 'INTEREST'
   | 'BRANDS'
-  | 'LOADING'
+  | 'SIZES'
   | 'NOTIFICATIONS'
-  | 'SUCCESS';
+  | 'ROLE'
+  | 'STORE'
+  | 'STAGE';
 
-export type SellerStepId =
-  | 'WELCOME'
-  | 'ACCOUNT_TYPE'
-  | 'AUTH'
-  | 'NAME'
-  | 'BRAND_NAME'
-  | 'BRAND_STAGE'
-  | 'GOALS'
-  | 'PLAN'
-  | 'LOADING'
-  | 'NOTIFICATIONS'
-  | 'SUCCESS';
-
-export interface StepDef<Id extends string> {
-  id: Id;
+export interface StepDef {
+  id: StepId;
   /** Whether the user can advance past this step without completing it. */
   skippable: boolean;
 }
 
-// ─── Step order (v8) ──────────────────────────────────────────────────────
-// BOTH:   0=Welcome  1=AccountType  2=Auth  3=Name
-// BUYER:  4=Style  5=Sizes  6=Brands  7=Loading  8=Notifications  9=Success
-// SELLER: 4=BrandName  5=BrandStage  6=Goals  7=Plan  8=Loading  9=Notifications  10=Success
-export const BUYER_FLOW_STEPS: StepDef<BuyerStepId>[] = [
-  { id: 'WELCOME', skippable: false },
-  { id: 'ACCOUNT_TYPE', skippable: false },
-  { id: 'AUTH', skippable: false },
-  { id: 'NAME', skippable: false },
-  { id: 'STYLE', skippable: true },
-  { id: 'SIZES', skippable: true },
+/** Steps before a Clerk session exists. Order is decided by the auth method. */
+export const AUTH_STEPS: readonly StepId[] = ['WELCOME', 'BIRTHDAY', 'EMAIL', 'CODE', 'DETAILS'];
+
+const PROFILE_STEPS: StepDef[] = [
+  { id: 'USERNAME', skippable: false },
+  { id: 'PHOTO', skippable: true },
+  { id: 'INTEREST', skippable: true },
   { id: 'BRANDS', skippable: true },
-  { id: 'LOADING', skippable: false },
+  { id: 'SIZES', skippable: true },
   { id: 'NOTIFICATIONS', skippable: true },
-  { id: 'SUCCESS', skippable: false },
+  { id: 'ROLE', skippable: false },
 ];
 
-export const SELLER_FLOW_STEPS: StepDef<SellerStepId>[] = [
-  { id: 'WELCOME', skippable: false },
-  { id: 'ACCOUNT_TYPE', skippable: false },
-  { id: 'AUTH', skippable: false },
-  { id: 'NAME', skippable: false },
-  { id: 'BRAND_NAME', skippable: false },
-  { id: 'BRAND_STAGE', skippable: true },
-  { id: 'GOALS', skippable: true },
-  { id: 'PLAN', skippable: true },
-  { id: 'LOADING', skippable: false },
-  { id: 'NOTIFICATIONS', skippable: true },
-  { id: 'SUCCESS', skippable: false },
+const SELLER_TAIL: StepDef[] = [
+  { id: 'STORE', skippable: false },
+  { id: 'STAGE', skippable: false },
 ];
 
-function stepIndexMap<Id extends string>(steps: StepDef<Id>[]): Record<Id, number> {
-  return Object.fromEntries(steps.map((s, i) => [s.id, i])) as Record<Id, number>;
+/** The signed-in part of the flow for a given role choice (null = not chosen yet). */
+export function profileStepsFor(role: Flow | null): StepDef[] {
+  return role === 'seller' ? [...PROFILE_STEPS, ...SELLER_TAIL] : PROFILE_STEPS;
 }
 
-export const BUYER_STEP_INDEX = stepIndexMap(BUYER_FLOW_STEPS);
-export const SELLER_STEP_INDEX = stepIndexMap(SELLER_FLOW_STEPS);
-
-export function stepsFor(flow: Flow): StepDef<string>[] {
-  return flow === 'buyer' ? BUYER_FLOW_STEPS : SELLER_FLOW_STEPS;
+export function isAuthStep(id: StepId): boolean {
+  return AUTH_STEPS.includes(id);
 }
 
-export function totalStepsFor(flow: Flow): number {
-  return stepsFor(flow).length;
+export function isStepSkippable(id: StepId): boolean {
+  return [...PROFILE_STEPS, ...SELLER_TAIL].find((s) => s.id === id)?.skippable ?? false;
 }
 
-export function clampStep(flow: Flow, stepIndex: number): number {
-  return Math.max(0, Math.min(stepIndex, totalStepsFor(flow) - 1));
+/** The first signed-in step. */
+export const FIRST_PROFILE_STEP: StepId = 'USERNAME';
+
+/** Next signed-in step, or null when the flow is finished. */
+export function nextProfileStep(id: StepId, role: Flow | null): StepId | null {
+  const steps = profileStepsFor(role);
+  const i = steps.findIndex((s) => s.id === id);
+  if (i < 0) return FIRST_PROFILE_STEP;
+  return steps[i + 1]?.id ?? null;
 }
 
-export function isStepSkippable(flow: Flow, stepIndex: number): boolean {
-  return stepsFor(flow)[stepIndex]?.skippable ?? false;
-}
-
-/** One step forward, clamped to the last step of the flow. */
-export function nextStepIndex(flow: Flow, stepIndex: number): number {
-  return clampStep(flow, stepIndex + 1);
-}
-
-/** One step back, clamped to the first step of the flow (Welcome). */
-export function prevStepIndex(flow: Flow, stepIndex: number): number {
-  return clampStep(flow, stepIndex - 1);
-}
-
-export function canGoBack(stepIndex: number): boolean {
-  return stepIndex > 0;
-}
-
-// ─── Draft persistence & migration ──────────────────────────────────────────
-
-/**
- * Draft schema version written alongside each user's serialized onboarding
- * answers. Bump this whenever the step order changes, and add a branch below
- * that translates the old step index into the current (v7) layout so an
- * in-flight user resuming mid-onboarding lands back on an equivalent step
- * instead of restarting from scratch.
- */
-export const DRAFT_VERSION = 8;
-
-// v7 order (Welcome + Brands, no Sizes step): the *source* indices for the
-// v7 -> v8 migration. Frozen — never reference the live index maps here.
-const V7_BUYER_STEP_INDEX = {
-  WELCOME: 0, ACCOUNT_TYPE: 1, AUTH: 2, NAME: 3, STYLE: 4, BRANDS: 5, LOADING: 6, NOTIFICATIONS: 7, SUCCESS: 8,
-} as const;
-const V7_SELLER_STEP_INDEX = {
-  WELCOME: 0, ACCOUNT_TYPE: 1, AUTH: 2, NAME: 3, BRAND_NAME: 4, BRAND_STAGE: 5, GOALS: 6, PLAN: 7,
-  LOADING: 8, NOTIFICATIONS: 9, SUCCESS: 10,
-} as const;
-
-// v6 order (no Welcome step, no Brands-to-follow step): kept here only so the
-// migration table below can name its *source* indices clearly.
-const V6_BUYER_STEP_INDEX = {
-  ACCOUNT_TYPE: 0, AUTH: 1, NAME: 2, STYLE: 3, LOADING: 4, NOTIFICATIONS: 5, SUCCESS: 6,
-} as const;
-const V6_SELLER_STEP_INDEX = {
-  ACCOUNT_TYPE: 0, AUTH: 1, NAME: 2, BRAND_NAME: 3, BRAND_STAGE: 4, GOALS: 5, PLAN: 6,
-  LOADING: 7, NOTIFICATIONS: 8, SUCCESS: 9,
-} as const;
-
-/** Translate a v6-shaped step index (no Welcome/Brands steps) into v7. */
-function v6ToV7(flow: Flow, v6Step: number): number {
-  if (flow === 'buyer') {
-    const map: Record<number, number> = {
-      [V6_BUYER_STEP_INDEX.ACCOUNT_TYPE]: V7_BUYER_STEP_INDEX.ACCOUNT_TYPE,
-      [V6_BUYER_STEP_INDEX.AUTH]: V7_BUYER_STEP_INDEX.AUTH,
-      [V6_BUYER_STEP_INDEX.NAME]: V7_BUYER_STEP_INDEX.NAME,
-      [V6_BUYER_STEP_INDEX.STYLE]: V7_BUYER_STEP_INDEX.STYLE,
-      [V6_BUYER_STEP_INDEX.LOADING]: V7_BUYER_STEP_INDEX.LOADING,
-      [V6_BUYER_STEP_INDEX.NOTIFICATIONS]: V7_BUYER_STEP_INDEX.NOTIFICATIONS,
-      [V6_BUYER_STEP_INDEX.SUCCESS]: V7_BUYER_STEP_INDEX.SUCCESS,
-    };
-    return map[v6Step] ?? V7_BUYER_STEP_INDEX.ACCOUNT_TYPE;
-  }
-  const map: Record<number, number> = {
-    [V6_SELLER_STEP_INDEX.ACCOUNT_TYPE]: V7_SELLER_STEP_INDEX.ACCOUNT_TYPE,
-    [V6_SELLER_STEP_INDEX.AUTH]: V7_SELLER_STEP_INDEX.AUTH,
-    [V6_SELLER_STEP_INDEX.NAME]: V7_SELLER_STEP_INDEX.NAME,
-    [V6_SELLER_STEP_INDEX.BRAND_NAME]: V7_SELLER_STEP_INDEX.BRAND_NAME,
-    [V6_SELLER_STEP_INDEX.BRAND_STAGE]: V7_SELLER_STEP_INDEX.BRAND_STAGE,
-    [V6_SELLER_STEP_INDEX.GOALS]: V7_SELLER_STEP_INDEX.GOALS,
-    [V6_SELLER_STEP_INDEX.PLAN]: V7_SELLER_STEP_INDEX.PLAN,
-    [V6_SELLER_STEP_INDEX.LOADING]: V7_SELLER_STEP_INDEX.LOADING,
-    [V6_SELLER_STEP_INDEX.NOTIFICATIONS]: V7_SELLER_STEP_INDEX.NOTIFICATIONS,
-    [V6_SELLER_STEP_INDEX.SUCCESS]: V7_SELLER_STEP_INDEX.SUCCESS,
-  };
-  return map[v6Step] ?? V7_SELLER_STEP_INDEX.ACCOUNT_TYPE;
+/** Previous signed-in step, or null on the first one (there is no going back into sign-up). */
+export function prevProfileStep(id: StepId, role: Flow | null): StepId | null {
+  const steps = profileStepsFor(role);
+  const i = steps.findIndex((s) => s.id === id);
+  return i > 0 ? steps[i - 1].id : null;
 }
 
 /**
- * Translate a pre-v6 step index into the v6 layout. This is a straight port
- * of the step tables that shipped with v6's `restoreDraftStep`, unchanged —
- * only the *names* of the target constants changed (V6_* instead of the
- * flow's live STEP_INDEX, since "live" now means v7).
+ * Progress bar fill (0..1) for a signed-in step. The first step already shows
+ * a sliver (Depop starts part-filled); the last step reads full.
  */
-function restoreLegacyStepToV6(flow: Flow, step: number, version?: number): number {
-  if (version === 6) return step;
-
-  if (version === 5) {
-    if (flow === 'buyer') {
-      // v5: 0=Auth, 1=AccountType, 2=Name, 3=Style, 4=Loading, 5=Notifications, 6=Success
-      const v5ToBuyer: Record<number, number> = {
-        0: V6_BUYER_STEP_INDEX.AUTH,
-        1: V6_BUYER_STEP_INDEX.ACCOUNT_TYPE,
-        2: V6_BUYER_STEP_INDEX.NAME,
-        3: V6_BUYER_STEP_INDEX.STYLE,
-        4: V6_BUYER_STEP_INDEX.LOADING,
-        5: V6_BUYER_STEP_INDEX.NOTIFICATIONS,
-        6: V6_BUYER_STEP_INDEX.SUCCESS,
-      };
-      return v5ToBuyer[step] ?? V6_BUYER_STEP_INDEX.ACCOUNT_TYPE;
-    }
-    const v5ToSeller: Record<number, number> = {
-      0: V6_SELLER_STEP_INDEX.AUTH,
-      1: V6_SELLER_STEP_INDEX.ACCOUNT_TYPE,
-      2: V6_SELLER_STEP_INDEX.NAME,
-      3: V6_SELLER_STEP_INDEX.BRAND_NAME,
-      4: V6_SELLER_STEP_INDEX.BRAND_STAGE,
-      5: V6_SELLER_STEP_INDEX.GOALS,
-      6: V6_SELLER_STEP_INDEX.PLAN,
-      7: V6_SELLER_STEP_INDEX.LOADING,
-      8: V6_SELLER_STEP_INDEX.NOTIFICATIONS,
-      9: V6_SELLER_STEP_INDEX.SUCCESS,
-    };
-    return v5ToSeller[step] ?? V6_SELLER_STEP_INDEX.ACCOUNT_TYPE;
-  }
-
-  if (version === 4) {
-    const previousStep = flow === 'buyer'
-      ? [V6_BUYER_STEP_INDEX.AUTH, V6_BUYER_STEP_INDEX.ACCOUNT_TYPE, V6_BUYER_STEP_INDEX.NAME, V6_BUYER_STEP_INDEX.STYLE, V6_BUYER_STEP_INDEX.LOADING, V6_BUYER_STEP_INDEX.NOTIFICATIONS, V6_BUYER_STEP_INDEX.SUCCESS]
-      : [V6_SELLER_STEP_INDEX.AUTH, V6_SELLER_STEP_INDEX.ACCOUNT_TYPE, V6_SELLER_STEP_INDEX.NAME, V6_SELLER_STEP_INDEX.BRAND_NAME, V6_SELLER_STEP_INDEX.BRAND_STAGE, V6_SELLER_STEP_INDEX.GOALS, V6_SELLER_STEP_INDEX.LOADING, V6_SELLER_STEP_INDEX.NOTIFICATIONS, V6_SELLER_STEP_INDEX.SUCCESS];
-    return previousStep[step] ?? (flow === 'buyer' ? V6_BUYER_STEP_INDEX.ACCOUNT_TYPE : V6_SELLER_STEP_INDEX.ACCOUNT_TYPE);
-  }
-
-  if (version === 3) {
-    const previousStep = flow === 'buyer'
-      ? [V6_BUYER_STEP_INDEX.AUTH, V6_BUYER_STEP_INDEX.NAME, V6_BUYER_STEP_INDEX.STYLE, V6_BUYER_STEP_INDEX.LOADING, V6_BUYER_STEP_INDEX.NOTIFICATIONS, V6_BUYER_STEP_INDEX.SUCCESS]
-      : [V6_SELLER_STEP_INDEX.AUTH, V6_SELLER_STEP_INDEX.NAME, V6_SELLER_STEP_INDEX.BRAND_NAME, V6_SELLER_STEP_INDEX.BRAND_STAGE, V6_SELLER_STEP_INDEX.GOALS, V6_SELLER_STEP_INDEX.LOADING, V6_SELLER_STEP_INDEX.NOTIFICATIONS, V6_SELLER_STEP_INDEX.SUCCESS];
-    return previousStep[step] ?? (flow === 'buyer' ? V6_BUYER_STEP_INDEX.ACCOUNT_TYPE : V6_SELLER_STEP_INDEX.ACCOUNT_TYPE);
-  }
-
-  if (flow === 'buyer') {
-    // Previous buyer order: Name, Style, Auth, Loading, Notifications, Success.
-    const previousBuyerStep: Record<number, number> = {
-      0: V6_BUYER_STEP_INDEX.NAME,
-      1: V6_BUYER_STEP_INDEX.STYLE,
-      2: V6_BUYER_STEP_INDEX.AUTH,
-      3: V6_BUYER_STEP_INDEX.LOADING,
-      4: V6_BUYER_STEP_INDEX.NOTIFICATIONS,
-      5: V6_BUYER_STEP_INDEX.SUCCESS,
-    };
-    return previousBuyerStep[step] ?? V6_BUYER_STEP_INDEX.ACCOUNT_TYPE;
-  }
-
-  if (version === 2) {
-    // Version 2 seller order: Name, BrandName, Auth, Stage, Goals, Loading, Notifications, Success.
-    const previousSellerStep: Record<number, number> = {
-      0: V6_SELLER_STEP_INDEX.NAME,
-      1: V6_SELLER_STEP_INDEX.BRAND_NAME,
-      2: V6_SELLER_STEP_INDEX.AUTH,
-      3: V6_SELLER_STEP_INDEX.BRAND_STAGE,
-      4: V6_SELLER_STEP_INDEX.GOALS,
-      5: V6_SELLER_STEP_INDEX.LOADING,
-      6: V6_SELLER_STEP_INDEX.NOTIFICATIONS,
-      7: V6_SELLER_STEP_INDEX.SUCCESS,
-    };
-    return previousSellerStep[step] ?? V6_SELLER_STEP_INDEX.ACCOUNT_TYPE;
-  }
-
-  // Version 1 seller order included a product-model step and put Auth at 5.
-  const previousLegacySellerStep: Record<number, number> = {
-    0: V6_SELLER_STEP_INDEX.NAME,
-    1: V6_SELLER_STEP_INDEX.BRAND_NAME,
-    2: V6_SELLER_STEP_INDEX.BRAND_STAGE,
-    3: V6_SELLER_STEP_INDEX.GOALS,
-    4: V6_SELLER_STEP_INDEX.GOALS,
-    5: V6_SELLER_STEP_INDEX.AUTH,
-    6: V6_SELLER_STEP_INDEX.LOADING,
-    7: V6_SELLER_STEP_INDEX.NOTIFICATIONS,
-    8: V6_SELLER_STEP_INDEX.SUCCESS,
-  };
-  return previousLegacySellerStep[step] ?? V6_SELLER_STEP_INDEX.ACCOUNT_TYPE;
+export function progressFor(id: StepId, role: Flow | null): number | undefined {
+  const steps = profileStepsFor(role);
+  const i = steps.findIndex((s) => s.id === id);
+  if (i < 0) return undefined;
+  return (i + 1) / steps.length;
 }
 
-/** v7 -> v8: the buyer flow gained a Sizes step after Style; every buyer step from Brands on shifts by one. */
-function v7ToV8(flow: Flow, v7Step: number): number {
-  if (flow === 'seller') return v7Step;
-  return v7Step >= V7_BUYER_STEP_INDEX.BRANDS ? v7Step + 1 : v7Step;
+// ─── Draft persistence ──────────────────────────────────────────────────────
+
+/**
+ * v9 stores the step by id, not index, so future reorders don't need index
+ * migration tables. Drafts from v8 and earlier used a different flow (role was
+ * picked before sign-up) — their answers don't map onto these screens, so a
+ * signed-in user resuming one starts again at Username.
+ */
+export const DRAFT_VERSION = 9;
+
+export function restoreDraftStep(raw: { version?: unknown; step?: unknown } | null | undefined, signedIn: boolean): StepId {
+  if (!signedIn) return 'WELCOME';
+  if (raw && raw.version === DRAFT_VERSION && typeof raw.step === 'string') {
+    const id = raw.step as StepId;
+    if ([...PROFILE_STEPS, ...SELLER_TAIL].some((s) => s.id === id)) return id;
+  }
+  return FIRST_PROFILE_STEP;
+}
+
+// ─── Usernames ──────────────────────────────────────────────────────────────
+
+export const USERNAME_RE = /^[a-z0-9_]{3,30}$/;
+
+/** Lowercase, spaces → underscores, drop anything else the server rejects. */
+export function normalizeUsernameInput(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').slice(0, 30);
+}
+
+/** Inline format error for a typed username ('' when fine or empty). */
+export function usernameFormatError(username: string): string {
+  if (!username) return '';
+  if (username.length < 3) return 'Username must be at least 3 characters.';
+  if (!USERNAME_RE.test(username)) return 'Use letters, numbers and underscores only.';
+  return '';
 }
 
 /**
- * Translate a persisted (flow, step, version) draft into the current (v8)
- * step index for that flow. Unknown/undefined versions are treated as the
- * oldest legacy shape, matching the historical behaviour of this function.
+ * Whatnot-style suggestions from what we already know (name, email). Pure and
+ * deterministic; the screen only shows the ones the server confirms are free.
  */
-export function restoreDraftStep(flow: Flow, step: number, version?: number): number {
-  if (version === DRAFT_VERSION) return clampStep(flow, step);
-  if (version === 7) return clampStep(flow, v7ToV8(flow, step));
-  const v6Step = restoreLegacyStepToV6(flow, step, version);
-  return clampStep(flow, v7ToV8(flow, v6ToV7(flow, v6Step)));
+export function usernameSuggestions(seed: { firstName?: string | null; lastName?: string | null; email?: string | null }, digits: string): string[] {
+  const first = normalizeUsernameInput(seed.firstName ?? '').replace(/_/g, '');
+  const last = normalizeUsernameInput(seed.lastName ?? '').replace(/_/g, '');
+  const local = normalizeUsernameInput((seed.email ?? '').split('@')[0] ?? '');
+  const raw = [
+    first && last ? `${first}${last}` : '',
+    first && last ? `${first}_${last}` : '',
+    local,
+    first && last ? `${first}${last}${digits}` : '',
+    local ? `${local}${digits}` : '',
+    first ? `${first}${digits}` : '',
+  ];
+  const out: string[] = [];
+  for (const candidate of raw) {
+    const c = candidate.slice(0, 30);
+    if (USERNAME_RE.test(c) && !out.includes(c)) out.push(c);
+  }
+  return out;
 }

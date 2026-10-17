@@ -34,8 +34,10 @@ import { startCommunityPushJob } from "./lib/communityPush";
 import { startScheduledPostPublisherJob } from "./jobs/scheduledPostPublisher";
 import { pool } from "@workspace/db";
 import { closeRedis } from "./lib/redis";
+import { probeClerkSecretKey } from "./lib/clerkKeyStatus";
 
 validateEnv();
+void probeClerkSecretKey();
 
 const rawPort = process.env["PORT"];
 

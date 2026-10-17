@@ -5,10 +5,19 @@ import { users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { getEffectiveEntitlement } from "../lib/nativeEntitlements";
 import { PLAN_CATALOGUE, type SellerPlanId } from "../lib/planCatalogue";
+import { CLERK_KEY_INVALID_CODE, markClerkKeyInvalid, responseShowsClerkKeyInvalid } from "../lib/clerkKeyStatus";
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const { userId } = getAuth(req);
   if (!userId) {
+    // A rejected Clerk secret key makes every session read as signed out;
+    // say so explicitly so the app can show why (dev banner) instead of a
+    // silent sign-out.
+    if (responseShowsClerkKeyInvalid(res)) {
+      markClerkKeyInvalid(`auth ${req.method} ${req.path}`);
+      res.status(401).json({ error: "Unauthorized", code: CLERK_KEY_INVALID_CODE });
+      return;
+    }
     res.status(401).json({ error: "Unauthorized" });
     return;
   }

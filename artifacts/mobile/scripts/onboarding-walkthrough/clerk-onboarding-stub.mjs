@@ -172,7 +172,17 @@ export function clerkOnboardingStubScript() {
     protectCheck: null,
     canBeDiscarded: false,
 
-    async create(params) { return signUpResource.password(params); },
+    async create(params) {
+      // Email first, no password (Depop-style): same identifier check as
+      // password(); the instance in this stub requires nothing else.
+      const emailAddress = (params?.emailAddress || '').trim().toLowerCase();
+      if (usedEmails.has(emailAddress)) {
+        return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.') };
+      }
+      signUpState = { ...freshSignUpState(), emailAddress, firstName: params?.firstName ?? null, lastName: params?.lastName ?? null };
+      notifySignUp();
+      return { error: null };
+    },
     async update(params) {
       if (params?.username != null) signUpState.username = params.username;
       if (params?.firstName != null) signUpState.firstName = params.firstName;
@@ -295,7 +305,17 @@ export function clerkOnboardingStubScript() {
   // build a new snapshot object when the sign-up state actually changes
   // (inside notifySignUp), never on every read.
   let signUpSnapshot = { errors: STATIC_EMPTY_ERRORS, fetchStatus: 'idle', signUp: signUpResource };
-  const STATIC_SIGN_IN_SNAPSHOT = { errors: STATIC_EMPTY_ERRORS, fetchStatus: 'idle', signIn: null };
+  // Log-in by email code is not exercised by the walkthrough; this only keeps
+  // useSignIn() well-formed and answers honestly if it is reached.
+  const signInResource = {
+    status: 'needs_identifier',
+    emailCode: {
+      async sendCode() { return { error: fakeError('not_supported', 'Log-in is not available in this preview build.') }; },
+      async verifyCode() { return { error: fakeError('not_supported', 'Log-in is not available in this preview build.') }; },
+    },
+    async finalize() { return { error: fakeError('not_supported', 'Log-in is not available in this preview build.') }; },
+  };
+  const STATIC_SIGN_IN_SNAPSHOT = { errors: STATIC_EMPTY_ERRORS, fetchStatus: 'idle', signIn: signInResource };
   const STATIC_WAITLIST_SNAPSHOT = { errors: STATIC_EMPTY_ERRORS, fetchStatus: 'idle', waitlist: null };
 
   // Restore a session persisted by a previous load (see persistSession()

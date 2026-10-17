@@ -112,7 +112,14 @@ export function createFakeOnboardingApi() {
       return { status: 200, body: { ok: true } };
     }
     if (p === '/auth/username/check' && get) {
-      return { status: 200, body: { available: true } };
+      // 'taken' lets the walkthrough show the live "already taken" state.
+      return { status: 200, body: query.get?.('username') === 'taken' ? { available: false, error: 'Username is already taken.' } : { available: true } };
+    }
+    if (p === '/seller/profile/avatar/upload' && method === 'POST') {
+      return { status: 200, body: { profileImageUrl: `data:image/png;base64,${TINY_PNG_BASE64}` } };
+    }
+    if (p === '/social/follow' && method === 'POST') {
+      return { status: 200, body: { isFollowing: true, followersCount: 1 } };
     }
     if (p === '/onboarding-sample/logo' && method === 'POST') {
       return { status: 200, body: { b64_json: TINY_PNG_BASE64 } };
@@ -124,8 +131,10 @@ export function createFakeOnboardingApi() {
       return { status: 200, body: { ok: true, inviterId: 'seller_stub' } };
     }
     if (p === '/public/brands/discover' && get) {
-      // Empty is a valid, gracefully-handled state for BrandsToFollowStep.
-      return { status: 200, body: [] };
+      // QA fixtures only (this fake backend never ships): labelled as such so
+      // nobody mistakes the screenshots for real catalogue data.
+      const names = ['Fixture Brand A', 'Fixture Brand B', 'Fixture Brand C', 'Fixture Studio', 'Fixture Atelier', 'Fixture Label'];
+      return { status: 200, body: { brands: names.map((name, i) => ({ id: `b${i}`, sellerId: `seller_fixture_${i}`, name, brandType: null, logoUrl: null, verified: false })) } };
     }
     if (p === '/config/features' && get) {
       return { status: 200, body: { flags: { aiPhotoShoot: true, outfitSwap: true, boosts: true, manufacturerHub: true }, updatedAt: null } };

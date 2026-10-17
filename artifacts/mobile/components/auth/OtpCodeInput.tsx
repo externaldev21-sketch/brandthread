@@ -8,7 +8,7 @@
  * need. `textContentType`/`autoComplete` opt into SMS/email autofill
  * suggestions on iOS/Android/web.
  */
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT } from '@/lib/theme';
@@ -33,6 +33,12 @@ export function OtpCodeInput({
   const { theme } = useAppTheme();
   const inputRef = useRef<TextInput>(null);
   const firedCompleteRef = useRef(false);
+
+  // A parent that clears the code itself (e.g. after a wrong code) must
+  // re-arm onComplete, or a pasted second code would never submit.
+  useEffect(() => {
+    if (value.length < length) firedCompleteRef.current = false;
+  }, [value, length]);
 
   function handleChangeText(next: string) {
     const digits = next.replace(/[^0-9]/g, '').slice(0, length);

@@ -1,123 +1,74 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { BUYER_STEP_INDEX, SELLER_STEP_INDEX, DRAFT_VERSION } from "../lib/onboardingFlow";
 
-const source = readFileSync(path.resolve(__dirname, "./onboarding.tsx"), "utf8");
+const read = (file: string) => readFileSync(path.resolve(__dirname, file), "utf8");
+const onboarding = read("./onboarding.tsx");
+const kit = read("../components/onboarding/launch/kit.tsx");
+const welcome = read("../components/onboarding/launch/WelcomeScreen.tsx");
+const auth = read("../components/onboarding/launch/AuthScreens.tsx");
+const profile = read("../components/onboarding/launch/ProfileScreens.tsx");
 
-describe("onboarding questionnaire defaults", () => {
-  it("preselects editable preference choices without pre-filling identity fields", () => {
-    expect(source).toContain("useState<string[]>(DEFAULT_BUYER_INTERESTS)");
-    expect(source).toContain("useState('idea')");
-    expect(source).toContain("useState<string[]>(DEFAULT_SELLER_GOALS)");
-    expect(source).toContain("selectedPlanId",);
-    expect(source).toContain("setStyleArr((prev) => prev.includes(item)");
-    expect(source).toContain("setGoals((prev) => prev.includes(g)");
-    expect(source).toContain('useState(\'\')');
-    expect(source).toContain("selectedThemeId,");
-    expect(source).toContain("isAppThemeId(draft.selectedThemeId)");
+describe("launch onboarding: every screen names its Mobbin reference", () => {
+  it.each([
+    ["WelcomeScreen", welcome, ["46bf3222-f4bb-4584-9906-e4df964b3fe0"]],
+    ["AuthScreens", auth, ["d07ea40f-5774-4111-95bc-bfe13af206f5", "ebfae96e-26ae-4997-babf-d5e7b08bb8c4"]],
+    ["ProfileScreens", profile, [
+      "c63b35d5-9f0b-43da-9c09-91fcc98b5ec6",
+      "00469017-3d7b-441c-ae32-825a8340020d",
+      "6caedb01-2f8f-406d-ba8a-39c5bc264367",
+      "43f24fc1-b3bb-48f3-a8cf-4ad31162ffab",
+      "7aa47a58-559f-466b-9679-73e50dae9c31",
+      "be5cd190-352d-4597-a544-31cb00eeea3a",
+      "e37bf6b7-2dc6-4117-ba2b-fb6a77eb4e96",
+    ]],
+  ])("%s", (_name, src, ids) => {
+    for (const id of ids as string[]) expect(src).toMatch(new RegExp(`https://mobbin\\.com/(screens|flows)/${id}`));
   });
 });
 
-describe("seller pre-plan experience", () => {
-  it("uses all theme presets and a server-backed one-sample request", () => {
-    expect(source).toContain("APP_THEME_PRESETS.map");
-    expect(source).toContain("Saved when your seller workspace is created.");
-    expect(source).toContain("api.logo.onboardingSample");
-    expect(source).toContain("onboarding-generate-sample");
-    expect(source).toContain("Your real AI sample is ready.");
-    expect(source).toContain("Retry");
-    expect(source).toContain("Skip sample · Continue to plans");
-    expect(source).toContain('accessibilityRole="radio"');
-    expect(source).toContain("accessibilityState={{ selected }}");
-    expect(source).toContain("await selectTheme(selectedThemeId)");
-  });
-});
-
-describe("v7 step order: Welcome opener, then AccountType, then path-specific auth", () => {
-  it("Welcome is step 0, AccountType step 1, Auth step 2 for both flows", () => {
-    expect(BUYER_STEP_INDEX.WELCOME).toBe(0);
-    expect(BUYER_STEP_INDEX.ACCOUNT_TYPE).toBe(1);
-    expect(BUYER_STEP_INDEX.AUTH).toBe(2);
-    expect(SELLER_STEP_INDEX.WELCOME).toBe(0);
-    expect(SELLER_STEP_INDEX.ACCOUNT_TYPE).toBe(1);
-    expect(SELLER_STEP_INDEX.AUTH).toBe(2);
+describe("launch onboarding: requirements", () => {
+  it("shows a progress bar after sign-up (Depop) and none before", () => {
+    expect(kit).toContain('accessibilityRole="progressbar"');
+    expect(onboarding).toContain("const progress = progressFor(step, role);");
   });
 
-  it("renders the cinematic Welcome opener before AccountType", () => {
-    expect(source).toContain("import { WelcomeStep } from '@/components/onboarding/WelcomeStep'");
-    expect(source).toContain("step === BUYER_STEP_INDEX.WELCOME");
-    expect(source).toContain("onGetStarted={() => transitionTo(BUYER_STEP_INDEX.ACCOUNT_TYPE, 1)}");
+  it("pins actions above the keyboard on every screen", () => {
+    expect(kit).toContain("<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}");
+    expect(kit).toContain('keyboardShouldPersistTaps="handled"');
   });
 
-  it("buyer flow inserts a Brands-to-follow step after Style, before Loading", () => {
-    expect(BUYER_STEP_INDEX.STYLE).toBeLessThan(BUYER_STEP_INDEX.BRANDS);
-    expect(BUYER_STEP_INDEX.BRANDS).toBeLessThan(BUYER_STEP_INDEX.LOADING);
-    expect(source).toContain("step === BUYER_STEP_INDEX.BRANDS");
-    expect(source).toContain("<BrandsToFollowStep");
+  it("checks username availability live and shows real errors inline", () => {
+    expect(profile).toContain("api.auth.checkUsername(username)");
+    expect(profile).toContain('testID="onboarding-username-error"');
+    expect(profile).toContain("is available");
   });
 
-  it("buyer flows through AccountType → BuyerAuth → Name → Style", () => {
-    // The AccountTypeStep is rendered at step 0
-    expect(source).toContain("step === BUYER_STEP_INDEX.ACCOUNT_TYPE");
-    // BuyerAuthStep is rendered at step 1
-    expect(source).toContain("step === BUYER_STEP_INDEX.AUTH");
-    expect(source).toContain("function BuyerAuthStep");
-    expect(source).toContain("step === BUYER_STEP_INDEX.NAME");
-    expect(source).toContain("step === BUYER_STEP_INDEX.STYLE");
+  it("offers Skip on every optional step", () => {
+    for (const id of ["onboarding-photo-skip", "onboarding-interest-skip", "onboarding-sizes-skip", "onboarding-notifications-skip"]) {
+      expect(profile).toContain(id);
+    }
+    expect(profile).toContain("testPrefix=\"onboarding-brands\"");
   });
 
-  it("seller flows through AccountType → SellerAuth → Name → BrandName", () => {
-    // Buyer and seller now share the runtime-themed auth form.
-    expect(source).toContain("function SharedAuthStep");
-    expect(source).toContain("allowSignedInAccountCreation");
-    expect(source).toContain("step === SELLER_STEP_INDEX.AUTH");
-    expect(source).toContain("step === SELLER_STEP_INDEX.NAME");
-    expect(source).toContain("step === SELLER_STEP_INDEX.BRAND_NAME");
+  it("uses the system font and theme colors only (no Inter, no hex text colors in the kit)", () => {
+    for (const src of [kit, welcome, auth, profile]) {
+      expect(src).not.toContain("Inter_");
+      expect(src).not.toContain("LinearGradient");
+    }
   });
 
-  it("draft version is 8 and onboarding.tsx defers migration to lib/onboardingFlow.ts", () => {
-    expect(DRAFT_VERSION).toBe(8);
-    expect(source).toContain("restoreDraftStep(draft.flow, draft.step ?? 0, draft.version)");
-    expect(source).toContain("from '@/lib/onboardingFlow'");
+  it("asks buyer-or-seller last; the role is not picked before the account exists", () => {
+    expect(onboarding.indexOf("case 'ROLE':")).toBeGreaterThan(onboarding.indexOf("case 'NOTIFICATIONS':"));
+    expect(welcome).not.toContain("account-type");
   });
 
-  it("seller auth has confirm password validation", () => {
-    expect(source).toContain("Confirm password");
-    expect(source).toContain("passwordsMatch");
-    expect(source).toContain("Passwords do not match");
+  it("loads real brands only (no demo list)", () => {
+    expect(profile).toContain("discoverBrands(60)");
+    expect(profile).not.toMatch(/demoBrands|DEMO_BRANDS/);
   });
 
-  it("buyer auth 'Use email' reveals the email form", () => {
-    expect(source).toContain("'email-form'");
-    expect(source).toContain("Use email");
-    expect(source).toContain("chooseHeadline");
-  });
-
-  it("buyer success routes to thread-explainer, seller to tabs", () => {
-    expect(source).toContain("router.replace('/thread-explainer'");
-    expect(source).toContain("router.replace('/(tabs)/'");
-  });
-
-  it("style interests carry emoji and solid-fill selected chip with checkmark", () => {
-    expect(source).toContain("STYLE_INTERESTS_WITH_EMOJI");
-    expect(source).toContain("emoji: '🏙️'");
-    expect(source).toContain("function StyleChip");
-    // Solid fill: accentDim background on selected state
-    expect(source).toContain("backgroundColor: theme.accentDim");
-    // Checkmark icon when selected
-    expect(source).toContain('name="check"');
-  });
-
-  it("seller name step is pre-filled from auth form first/last name", () => {
-    expect(source).toContain("onFirstNamePrefill");
-    expect(source).toContain("onLastNamePrefill");
-    expect(source).toContain("onFirstNamePrefill(fn)");
-    expect(source).toContain("onLastNamePrefill(ln)");
-  });
-
-  it("combined name is written to profile with first and last name", () => {
-    // Name is composed as 'firstName lastName'
-    expect(source).toContain("[firstName.trim(), lastName.trim()].filter(Boolean).join(' ')");
+  it("shows the dev-only Clerk key banner on the first screen", () => {
+    expect(onboarding).toContain("devBanner={<ClerkKeyBanner />}");
   });
 });

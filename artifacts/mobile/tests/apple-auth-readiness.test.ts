@@ -21,12 +21,13 @@ const authRouteSource = readFileSync(
 
 describe("Apple auth end-to-end code contract", () => {
   it("starts onboarding with Apple, activates only a completed session, then asks for role", () => {
-    expect(onboardingSource).toContain("strategy: APPLE_OAUTH_STRATEGY");
+    expect(onboardingSource).toContain("strategy: provider === 'apple' ? APPLE_OAUTH_STRATEGY : 'oauth_google'");
     expect(onboardingSource).toContain("if (result?.createdSessionId && result?.setActive)");
     expect(onboardingSource).toContain("if (isOAuthFlowComplete(result))");
-    // After v6 restructure: AccountType is step 0, so after OAuth the user
-    // goes to NAME step (no longer ACCOUNT_TYPE). AccountType still exists.
-    expect(onboardingSource).toContain("BUYER_STEP_INDEX.ACCOUNT_TYPE");
+    // Launch flow: after OAuth the user picks a username; Shop / Sell is the
+    // last profile step (ROLE).
+    expect(onboardingSource).toContain("go(FIRST_PROFILE_STEP);");
+    expect(onboardingSource).toContain("case 'ROLE':");
   });
 
   it("syncs buyer and seller profiles before binding completion to the Clerk user", () => {
@@ -45,7 +46,9 @@ describe("Apple auth end-to-end code contract", () => {
     );
     const sellerBrandWrite = onboardingSource.indexOf("await api.auth.onboarding({");
     expect(sellerCompletion).toBeGreaterThan(sellerBrandWrite);
-    expect(onboardingSource).toContain("[ONBOARDING_OWNER_KEY, profile.clerkId]");
+    expect(onboardingSource).toContain("await markComplete(profile.clerkId, 'buyer');");
+    expect(onboardingSource).toContain("await markComplete(profile.clerkId, 'seller');");
+    expect(onboardingSource).toContain("[ONBOARDING_OWNER_KEY, clerkId]");
     // v6: buyers go to thread-explainer first, sellers still go to /(tabs)/
     expect(onboardingSource).toContain("router.replace('/thread-explainer'");
     expect(onboardingSource).toContain("router.replace('/(tabs)/'");

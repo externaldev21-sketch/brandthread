@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { aiSafetyGuard } from "../middlewares/aiSafetyGuard";
 import healthRouter from "./health";
+import clerkStatusRouter from "./clerk-status";
 import { responseCache, invalidateResponseCache } from "../middlewares/responseCache";
 import authRouter from "./auth";
 import ageRouter from "./age";
@@ -168,6 +169,7 @@ const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use("/public",          clerkStatusRouter); // GET /clerk-status (non-production only)
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
