@@ -837,21 +837,52 @@ router.get("/", async (req, res) => {
   });
 });
 
+const BUILDER_ARRAY_FIELDS = ["collections", "pages", "navigation"] as const;
+const BUILDER_OBJECT_FIELDS = ["storeSettings", "brandAssets", "setupChecklist", "onboarding"] as const;
+const BUILDER_MAX_JSON_BYTES = 256 * 1024;
+
+/** Shape guard for the Store Builder JSON columns. Returns an error message or null. */
+export function validateBuilderFields(body: Record<string, unknown>): string | null {
+  for (const key of BUILDER_ARRAY_FIELDS) {
+    if (key in body && !Array.isArray(body[key])) return `${key} must be an array`;
+  }
+  for (const key of BUILDER_OBJECT_FIELDS) {
+    if (key in body) {
+      const v = body[key];
+      if (!v || typeof v !== "object" || Array.isArray(v)) return `${key} must be an object`;
+    }
+  }
+  for (const key of [...BUILDER_ARRAY_FIELDS, ...BUILDER_OBJECT_FIELDS]) {
+    if (key in body && JSON.stringify(body[key]).length > BUILDER_MAX_JSON_BYTES) {
+      return `${key} is too large`;
+    }
+  }
+  return null;
+}
+
 // PUT /api/store — save the storefront
-router.put("/", async (req, res) => {
+router.put("/", async (req, res): Promise<void> => {
   const ownerId = (req as any).clerkUserId as string;
   const sf = await getOrCreateStorefront(ownerId);
 
   const allowedFields = [
     "title", "subtitle", "description", "theme", "branding",
     "sections", "seo", "socialLinks", "analyticsCode",
+    // Store Builder state (migration 270)
+    "collections", "pages", "navigation", "storeSettings",
+    "brandAssets", "setupChecklist", "onboarding",
   ];
+  const builderShapeError = validateBuilderFields(req.body ?? {});
+  if (builderShapeError) {
+    res.status(400).json({ error: builderShapeError });
+    return;
+  }
+  // Keys are Drizzle's camelCase column keys — `.set()` silently drops
+  // snake_case keys, which is how socialLinks/analyticsCode used to vanish.
   const update: Record<string, unknown> = { updatedAt: new Date() };
   for (const key of allowedFields) {
     if (key in req.body) {
-      // camelCase → snake_case mapping for DB columns
-      const dbKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
-      update[dbKey] = key === "theme"
+      update[key] = key === "theme"
         ? normalizeThreadTheme(req.body[key])
         : req.body[key];
     }
