@@ -148,6 +148,8 @@ export default function ShippingScreen() {
   const [presetSheetVisible, setPresetSheetVisible] = useState(false);
   const [presetForm, setPresetForm] = useState({ id: null as string | null, name: '', weightOz: '', lengthIn: '', widthIn: '', heightIn: '' });
   const [presetSaving, setPresetSaving] = useState(false);
+  // Real load failure for saved packages (shown instead of a fake "No saved packages yet").
+  const [presetsError, setPresetsError] = useState<string | null>(null);
 
   const [zoneSheetVisible, setZoneSheetVisible] = useState(false);
   const [zoneForm, setZoneForm] = useState<ZoneForm>(emptyZoneForm('country'));
@@ -164,7 +166,9 @@ export default function ShippingScreen() {
     Promise.all([
       api.shippingZones.list().catch(() => []),
       api.shippingZones.getSettings().catch(() => ({ shipFromCountry: 'US' })),
-      api.packagePresets.list().catch(() => ({ presets: [] })),
+      api.packagePresets.list()
+        .then(res => { setPresetsError(null); return res; })
+        .catch((err: any) => { setPresetsError(err?.message ?? 'Could not load saved packages.'); return { presets: [] }; }),
       api.shippingRates.list().catch(() => []),
     ]).then(([zoneRows, settings, presetRes, rateRows]) => {
       setZones(Array.isArray(zoneRows) ? zoneRows : []);
@@ -399,14 +403,15 @@ export default function ShippingScreen() {
       const res = presetForm.id
         ? await api.packagePresets.update(presetForm.id, body)
         : await api.packagePresets.create(body);
-      const preset: PackagePreset = res?.preset;
+      const preset: PackagePreset | undefined = res?.preset;
+      if (!preset?.id) throw new Error('The server did not return the saved package.');
       setPresets(prev => {
         const exists = prev.some(p => p.id === preset.id);
         return exists ? prev.map(p => (p.id === preset.id ? preset : p)) : [...prev, preset];
       });
       setPresetSheetVisible(false);
-    } catch {
-      Alert.alert('Couldn’t save this package', 'Check your connection and try again.');
+    } catch (err: any) {
+      Alert.alert('Couldn’t save this package', err?.message ?? 'Check your connection and try again.');
     } finally {
       setPresetSaving(false);
     }
@@ -420,8 +425,8 @@ export default function ShippingScreen() {
           try {
             await api.packagePresets.remove(preset.id);
             setPresets(prev => prev.filter(p => p.id !== preset.id));
-          } catch {
-            Alert.alert('Couldn’t delete', 'Check your connection and try again.');
+          } catch (err: any) {
+            Alert.alert('Couldn’t delete', err?.message ?? 'Check your connection and try again.');
           }
         },
       },
@@ -716,8 +721,10 @@ export default function ShippingScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 24 }]}>
         {presets.length === 0 ? (
           <View style={styles.emptySection}>
-            <Feather name="package" size={20} color={colors.mutedForeground} />
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No saved packages yet</Text>
+            <Feather name={presetsError ? 'alert-circle' : 'package'} size={20} color={presetsError ? colors.destructive : colors.mutedForeground} />
+            <Text style={[styles.emptyText, { color: presetsError ? colors.destructive : colors.mutedForeground }]}>
+              {presetsError ? `Couldn’t load saved packages. ${presetsError}` : 'No saved packages yet'}
+            </Text>
           </View>
         ) : (
           presets.map((preset, i) => (

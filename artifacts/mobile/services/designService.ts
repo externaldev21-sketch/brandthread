@@ -1494,7 +1494,7 @@ export async function generateDesignFromText(req: AIGenerationRequest): Promise<
     req.textContent ? `Include text: "${req.textContent}"` : '',
   ].filter(Boolean).join('. ');
   const referenceImage = req.referenceUri ? await imageUriToDataUrl(req.referenceUri) : undefined;
-  const imageUris = await generateN('/mockup/generate', {
+  const imageUris = await generateN('/api/mockup/generate', {
     prompt,
     mode: 'text_to_design',
     ...(referenceImage ? { referenceImage } : {}),
@@ -1512,7 +1512,7 @@ export async function generateSketchToDesign(req: {
   const count = req.count ?? 4;
   const prompt = `Convert this sketch to a garment design. Style: ${req.style}${req.colorPalette ? `. Colors: ${req.colorPalette}` : ''}.`;
   const referenceImage = await imageUriToDataUrl(req.sketchUri);
-  const imageUris = await generateN('/mockup/generate', {
+  const imageUris = await generateN('/api/mockup/generate', {
     prompt,
     referenceImage,
     mode: 'sketch_to_design',
@@ -1542,7 +1542,7 @@ export async function generateMockupToModel(req: {
   const data = await serviceRequest<{
     results: Array<{ refIndex: number; b64_json: string }>;
     errors?: Array<{ refIndex: number; error: string; retryable: boolean }>;
-  }>('/photography/mockup-to-model', {
+  }>('/api/photography/mockup-to-model', {
     method: 'POST',
     body: JSON.stringify({
       mockup,
@@ -1570,7 +1570,7 @@ export async function retryMockupToModelRef(req: {
   const mockup = await imageUriToDataUrl(req.mockupUri);
   const reference = await imageUriToDataUrl(req.referenceUri);
   const data = await serviceRequest<{ refIndex: number; b64_json: string }>(
-    '/photography/mockup-to-model/retry',
+    '/api/photography/mockup-to-model/retry',
     {
       method: 'POST',
       body: JSON.stringify({
@@ -1605,7 +1605,7 @@ export async function generatePhotoshoot(req: {
     : [];
   if (productImageUris.length === 0) throw new Error('This product does not have any photos to use.');
   const referenceImages = await Promise.all(productImageUris.map(imageUriToDataUrl));
-  const imageUris = await generateN('/photography/generate', {
+  const imageUris = await generateN('/api/photography/generate', {
     images: referenceImages,
     prompt,
     mode: 'photoshoot',
@@ -1646,7 +1646,7 @@ export async function generatePhotoshootShot(req: {
     req.lightingStyle ? `Lighting: ${req.lightingStyle}.` : '',
     'Use the uploaded creative reference photos (if any) to match scene, model, pose, and lighting — preserve the product exactly (logo, print, color, fabric texture unchanged).',
   ].filter(Boolean).join(' ');
-  return callGenerateAPI('/photography/generate', { images, prompt: describedPrompt, mode: 'photoshoot' });
+  return callGenerateAPI('/api/photography/generate', { images, prompt: describedPrompt, mode: 'photoshoot' });
 }
 
 // applyPromptEdit — accepts an object (used by design-prompt-edit.tsx)
@@ -1659,7 +1659,7 @@ export async function applyPromptEdit(req: {
 }): Promise<AIGenerationResult> {
   const prompt = `Edit garment design: ${req.prompt}. ${req.preserveProduct ? 'Keep product shape.' : ''} ${req.preserveLogo ? 'Keep the original logo and artwork unless explicitly changed.' : ''} ${req.preserveGarmentColor ? 'Keep original colors.' : ''}`.trim();
   const referenceImage = await imageUriToDataUrl(req.imageUri);
-  const imageUris = await generateN('/mockup/generate', {
+  const imageUris = await generateN('/api/mockup/generate', {
     prompt,
     referenceImage,
     mode: 'prompt_edit',
@@ -1670,7 +1670,7 @@ export async function applyPromptEdit(req: {
 // removeBackgroundFromImage — returns a string URI (used by design-bg-removal.tsx)
 export async function removeBackgroundFromImage(imageUri: string): Promise<string> {
   const image = await imageUriToDataUrl(imageUri);
-  return callGenerateAPI('/bg-removal/remove', { image });
+  return callGenerateAPI('/api/bg-removal/remove', { image });
 }
 
 // replaceBackground — accepts an object (used by design-bg-replace.tsx)
@@ -1685,7 +1685,7 @@ export async function replaceBackground(req: {
   const backgroundImage = req.backgroundImageUri
     ? await imageUriToDataUrl(req.backgroundImageUri)
     : undefined;
-  const resultUri = await callGenerateAPI('/bg-removal/replace', {
+  const resultUri = await callGenerateAPI('/api/bg-removal/replace', {
     image,
     ...(backgroundImage ? { backgroundImage } : {}),
     bgType: req.bgType,

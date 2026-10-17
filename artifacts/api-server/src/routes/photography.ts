@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -12,6 +12,12 @@ import {
   ImageQualityUnavailableError,
   type ImageOperation,
 } from "@workspace/integrations-openai-ai-server/image";
+import type { AiTool } from "../lib/aiImageProviders/config";
+import {
+  AiProviderNotConfiguredError,
+  resolveToolGenerator,
+  type ToolGenerator,
+} from "../lib/aiImageProviders/routing";
 
 const router = Router();
 router.use(requireAuth);
@@ -53,6 +59,27 @@ function decodeDataUrl(input: string): Buffer | null {
     return hasValidSignature ? buffer : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Env-selected image provider for a tool (see lib/aiImageProviders/config.ts).
+ * `generator: null` means the default OpenAI path below runs unchanged. When a
+ * non-default provider is selected without its key, answers 503 with an
+ * actionable message and returns `ok: false`.
+ */
+function resolveGeneratorOrRespond(
+  tool: AiTool,
+  res: Response,
+): { ok: true; generator: ToolGenerator | null } | { ok: false } {
+  try {
+    return { ok: true, generator: resolveToolGenerator(tool) };
+  } catch (err) {
+    if (err instanceof AiProviderNotConfiguredError) {
+      res.status(503).json({ error: err.message, code: err.code, retryable: false });
+      return { ok: false };
+    }
+    throw err;
   }
 }
 
@@ -98,6 +125,10 @@ router.post("/generate", async (req, res) => {
     decoded.push(buffer);
   }
 
+  const resolved = resolveGeneratorOrRespond("ai-photoshoot", res);
+  if (!resolved.ok) return;
+  const { generator } = resolved;
+
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "product-photo-"));
   const tmpFiles: string[] = [];
 
@@ -119,7 +150,10 @@ router.post("/generate", async (req, res) => {
       prompt: editPrompt,
       brief: safeDescription,
       references: decoded,
-      generate: (retryPrompt) => editImages(tmpFiles, retryPrompt),
+      generate: (retryPrompt) =>
+        generator
+          ? generator({ productImages: tmpFiles, referenceImages: [], prompt: retryPrompt }).then((r) => r.imageBuffer)
+          : editImages(tmpFiles, retryPrompt),
     });
     res.json({ b64_json: buffer.toString("base64") });
   } catch (err) {
@@ -199,6 +233,10 @@ router.post("/mockup-to-model", async (req, res) => {
     refBuffers.push(buffer);
   }
 
+  const resolved = resolveGeneratorOrRespond("mockup-to-model", res);
+  if (!resolved.ok) return;
+  const { generator } = resolved;
+
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "mockup-to-model-"));
 
   try {
@@ -238,7 +276,10 @@ router.post("/mockup-to-model", async (req, res) => {
               prompt: editPrompt,
               brief: safeDescription,
               references: [mockupBuffer, refBuffer],
-              generate: (retryPrompt) => editImages([mockupFile, refFile], retryPrompt),
+              generate: (retryPrompt) =>
+                generator
+                  ? generator({ productImages: [mockupFile], referenceImages: [refFile], prompt: retryPrompt }).then((r) => r.imageBuffer)
+                  : editImages([mockupFile, refFile], retryPrompt),
             });
             results.push({ refIndex, b64_json: buffer.toString("base64") });
           } catch (err) {
@@ -338,6 +379,10 @@ router.post("/mockup-to-model/retry", async (req, res) => {
       ? prompt.trim().slice(0, 500)
       : "";
 
+  const resolved = resolveGeneratorOrRespond("mockup-to-model", res);
+  if (!resolved.ok) return;
+  const { generator } = resolved;
+
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "mockup-to-model-retry-"));
   try {
     const mockupFile = path.join(tmpDir, `${randomUUID()}-mockup.png`);
@@ -355,7 +400,10 @@ router.post("/mockup-to-model/retry", async (req, res) => {
       prompt: editPrompt,
       brief: safeDescription,
       references: [mockupBuffer, refBuffer],
-      generate: (retryPrompt) => editImages([mockupFile, refFile], retryPrompt),
+      generate: (retryPrompt) =>
+        generator
+          ? generator({ productImages: [mockupFile], referenceImages: [refFile], prompt: retryPrompt }).then((r) => r.imageBuffer)
+          : editImages([mockupFile, refFile], retryPrompt),
     });
     res.json({ refIndex, b64_json: buffer.toString("base64") });
   } catch (err) {

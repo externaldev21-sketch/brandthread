@@ -35,6 +35,8 @@ export interface IpCase {
     status: string;
     ownerId: string;
     images: string[];
+    /** Signed, browser-loadable URL for images[0]; null when there is none. */
+    snapshotImageUrl?: string | null;
     updatedAt: string;
   } | null;
 }

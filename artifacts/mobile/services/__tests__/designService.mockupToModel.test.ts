@@ -179,7 +179,7 @@ describe('generateMockupToModel', () => {
 
     expect(mockServiceRequest).toHaveBeenCalledTimes(1);
     const [path, options] = mockServiceRequest.mock.calls[0] as [string, any];
-    expect(path).toContain('mockup-to-model');
+    expect(path).toBe('/api/photography/mockup-to-model');
     expect(options.method).toBe('POST');
 
     const body = JSON.parse(options.body);
@@ -270,7 +270,7 @@ describe('retryMockupToModelRef', () => {
 
     expect(mockServiceRequest).toHaveBeenCalledTimes(1);
     const [path, options] = mockServiceRequest.mock.calls[0] as [string, any];
-    expect(path).toContain('mockup-to-model/retry');
+    expect(path).toBe('/api/photography/mockup-to-model/retry');
     expect(options.method).toBe('POST');
 
     const body = JSON.parse(options.body);

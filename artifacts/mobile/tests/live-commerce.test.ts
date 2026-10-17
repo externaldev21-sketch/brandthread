@@ -4,6 +4,7 @@ vi.mock('@/lib/serviceConfig', () => ({ serviceRequest: vi.fn() }));
 
 import {
   combineSchedule, describeLiveCode, pinnedProductIdFromRow, scheduleDayOptions, scheduleTimeOptions,
+  toScheduleProductOptions,
 } from '@/lib/live/liveCommerce';
 import {
   clearLiveCheckoutContext, getLiveCheckoutContext, setLiveCheckoutContext,
@@ -83,5 +84,37 @@ describe('schedule pickers', () => {
   it('combines a day and slot in local time', () => {
     const d = combineSchedule(new Date(2026, 9, 1), { hour: 19, minute: 30 });
     expect([d.getHours(), d.getMinutes(), d.getDate()]).toEqual([19, 30, 1]);
+  });
+});
+
+describe('toScheduleProductOptions (Schedule Live product picker)', () => {
+  it('reads the bare array GET /api/products returns (previously always empty)', () => {
+    const rows = [
+      { id: 'p1', name: 'Tee', status: 'active', priceCents: 2500, variantCount: 2 },
+      { id: 'p2', name: 'Hat', status: 'draft', priceCents: null },
+    ];
+    expect(toScheduleProductOptions(rows)).toEqual([
+      { id: 'p1', name: 'Tee', priceCents: 2500 },
+      { id: 'p2', name: 'Hat', priceCents: null },
+    ]);
+  });
+  it('still accepts wrapped shapes and other price fields', () => {
+    expect(toScheduleProductOptions({ products: [{ id: 'a', title: 'Bag', variants: [{ priceCents: 900 }, { priceCents: 700 }] }] }))
+      .toEqual([{ id: 'a', name: 'Bag', priceCents: 700 }]);
+    expect(toScheduleProductOptions({ items: [{ id: 'b', name: 'Cap', pricing: { priceCents: 1200 } }] }))
+      .toEqual([{ id: 'b', name: 'Cap', priceCents: 1200 }]);
+    expect(toScheduleProductOptions({ data: [{ id: 'c', name: 'Sock', price: '4.50' }] }))
+      .toEqual([{ id: 'c', name: 'Sock', priceCents: 450 }]);
+  });
+  it('drops archived, duplicate and malformed rows; tolerates junk input', () => {
+    expect(toScheduleProductOptions([
+      { id: 'x', name: 'Old', status: 'archived', priceCents: 100 },
+      { id: 'y', name: 'Keep', priceCents: 100 },
+      { id: 'y', name: 'Dup', priceCents: 100 },
+      { name: 'No id' },
+      null,
+    ])).toEqual([{ id: 'y', name: 'Keep', priceCents: 100 }]);
+    expect(toScheduleProductOptions(null)).toEqual([]);
+    expect(toScheduleProductOptions({ error: 'nope' })).toEqual([]);
   });
 });

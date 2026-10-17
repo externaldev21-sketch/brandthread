@@ -2,7 +2,7 @@
  * Real-time transport for buyer-live.tsx / seller-live.tsx.
  *
  * Replaces the old `setInterval(poll, 3000)` loop with a real WebSocket
- * connection to the api-server's `/ws/live` room for this stream (see
+ * connection to the api-server's `/api/ws/live` room for this stream (see
  * artifacts/api-server/src/ws/liveHub.ts). On connect (and every
  * reconnect), the caller is told to do a one-shot HTTP backfill (the
  * existing GET stream/comments endpoints) to catch anything missed while
@@ -64,10 +64,10 @@ const BASE_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
 const FALLBACK_AFTER_ATTEMPTS = 5;
 
-function wsUrlFor(streamId: string, token: string, asHost: boolean): string {
+export function wsUrlFor(streamId: string, token: string, asHost: boolean): string {
   const base = API_BASE_URL.replace(/^http/, 'ws');
   const role = asHost ? '&role=host' : '';
-  return `${base}/ws/live?streamId=${encodeURIComponent(streamId)}&token=${encodeURIComponent(token)}${role}`;
+  return `${base}/api/ws/live?streamId=${encodeURIComponent(streamId)}&token=${encodeURIComponent(token)}${role}`;
 }
 
 export function useLiveSocket({ streamId, enabled, onEvent, onConnected, onFallback, asHost = false }: UseLiveSocketOptions): void {

@@ -79,3 +79,26 @@ export function validateNotice(body: NoticeInput): { ok: true; channel: "app" | 
   if (signature.length < 2) return { ok: false, error: "An electronic signature (full name) is required" };
   return { ok: true, channel, signature };
 }
+
+/**
+ * Display URL for the listing snapshot shown in moderator case review.
+ * Product images are stored as private object-storage paths (/objects/...),
+ * which a browser <img> cannot load directly, so they are signed into a
+ * short-lived GET URL. Absolute http(s) URLs pass through. Anything else, or a
+ * signing failure, yields null so the portal shows its "no image" placeholder
+ * instead of a broken image.
+ */
+export async function resolveSnapshotImageUrl(
+  images: unknown,
+  sign: (objectPath: string) => Promise<string>,
+): Promise<string | null> {
+  const first = Array.isArray(images) ? images.find((i): i is string => typeof i === "string" && i.trim() !== "") : undefined;
+  if (!first) return null;
+  if (/^https?:\/\//i.test(first)) return first;
+  if (!first.startsWith("/objects/")) return null;
+  try {
+    return await sign(first);
+  } catch {
+    return null;
+  }
+}

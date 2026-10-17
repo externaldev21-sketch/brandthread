@@ -3,7 +3,7 @@
  *
  * Same shape as the live-stream hub (one `ws` server on the existing HTTP
  * server's 'upgrade' event), but rooms are communities. The app subscribes at
- * `/ws/community?communityId=<id>&token=<clerk jwt>` only while a chat is
+ * `/api/ws/community?communityId=<id>&token=<clerk jwt>` only while a chat is
  * open. Membership is verified on connect — a non-member / banned user never
  * joins a room — and `kickFromCommunity` closes a member's sockets the moment
  * they leave, are removed or banned.
@@ -24,6 +24,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { db, communityMembers, communities } from "@workspace/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { verifyWsToken } from "./auth";
+import { matchesWsPath } from "./paths";
 import { logger } from "../lib/logger";
 
 const WS_PATH = "/ws/community";
@@ -82,7 +83,7 @@ export function closeCommunityRoom(communityId: string): void {
 function parseUpgradeUrl(req: IncomingMessage): URL | null {
   try {
     const url = new URL(req.url ?? "", "http://internal");
-    return url.pathname === WS_PATH ? url : null;
+    return matchesWsPath(url.pathname, WS_PATH) ? url : null;
   } catch {
     return null;
   }

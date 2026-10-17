@@ -25,6 +25,8 @@ export const DEEP_LINK_PATHS = [
   "/place/*",
   "/onboarding*",
   "/team-invite*",
+  "/invite/*",
+  "/live/*",
 ];
 
 function appleAppId(): string | null {

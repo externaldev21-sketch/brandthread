@@ -14,6 +14,7 @@ import { useAuth } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
+import { RetryRow } from '@/components/ui/RetryRow';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -21,7 +22,8 @@ import { formatCents } from '@/lib/money';
 import { formatUpcomingTime } from '@/lib/live/liveOrdering';
 import {
   cancelScheduledLive, combineSchedule, createScheduledLive, fetchMyScheduledLives,
-  scheduleDayOptions, scheduleTimeOptions, type ScheduledLive,
+  scheduleDayOptions, scheduleTimeOptions, toScheduleProductOptions,
+  type ScheduledLive, type ScheduleProductOption,
 } from '@/lib/live/liveCommerce';
 
 export default function SellerScheduleLiveScreen() {
@@ -39,8 +41,10 @@ export default function SellerScheduleLiveScreen() {
   const [dayKey, setDayKey] = useState(days[0].key);
   const [timeKey, setTimeKey] = useState<string | null>(null);
   const [showProducts, setShowProducts] = useState(false);
-  const [catalog, setCatalog] = useState<any[]>([]);
-  const [picked, setPicked] = useState<any[]>([]);
+  const [catalog, setCatalog] = useState<ScheduleProductOption[] | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState(false);
+  const [picked, setPicked] = useState<ScheduleProductOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [mine, setMine] = useState<ScheduledLive[]>([]);
@@ -54,10 +58,22 @@ export default function SellerScheduleLiveScreen() {
 
   useEffect(() => { void loadMine(); }, [loadMine]);
 
+  const loadCatalog = useCallback(async () => {
+    setCatalogLoading(true);
+    setCatalogError(false);
+    try {
+      setCatalog(toScheduleProductOptions(await api.products.list()));
+    } catch {
+      setCatalogError(true);
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, [api]);
+
   useEffect(() => {
-    if (!signedIn || !showProducts || catalog.length > 0) return;
-    api.products?.list?.().then((r: any) => setCatalog(r?.products ?? [])).catch(() => {});
-  }, [signedIn, showProducts, catalog.length, api]);
+    if (!signedIn || !showProducts || catalog !== null || catalogLoading || catalogError) return;
+    void loadCatalog();
+  }, [signedIn, showProducts, catalog, catalogLoading, catalogError, loadCatalog]);
 
   const day = days.find(d => d.key === dayKey) ?? days[0];
   const time = times.find(t => t.key === timeKey) ?? null;
@@ -90,7 +106,7 @@ export default function SellerScheduleLiveScreen() {
     await loadMine();
   }
 
-  function toggleProduct(p: any) {
+  function toggleProduct(p: ScheduleProductOption) {
     setPicked(prev => prev.some(x => x.id === p.id) ? prev.filter(x => x.id !== p.id) : [...prev, p]);
   }
 
@@ -163,7 +179,11 @@ export default function SellerScheduleLiveScreen() {
         </Pressable>
         {showProducts && (
           <View style={[styles.list, { borderColor: theme.border }]}>
-            {catalog.length === 0 ? (
+            {catalogLoading ? (
+              <ActivityIndicator color={theme.text} style={{ padding: SP.md }} />
+            ) : catalogError ? (
+              <RetryRow label="Couldn't load your products" onRetry={() => { void loadCatalog(); }} style={{ margin: SP.sm }} />
+            ) : !signedIn || !catalog || catalog.length === 0 ? (
               <Text style={[styles.note, { color: theme.muted, padding: SP.md }]}>No products in your store yet.</Text>
             ) : catalog.map(p => {
               const on = picked.some(x => x.id === p.id);
@@ -177,7 +197,9 @@ export default function SellerScheduleLiveScreen() {
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.rowText, { color: theme.text }]}>{p.name}</Text>
-                    <Text style={[styles.note, { color: theme.muted }]}>{formatCents(p.priceCents ?? 0)}</Text>
+                    {p.priceCents !== null ? (
+                      <Text style={[styles.note, { color: theme.muted }]}>{formatCents(p.priceCents)}</Text>
+                    ) : null}
                   </View>
                   <View style={[styles.check, { borderColor: on ? theme.text : theme.border, backgroundColor: on ? theme.text : 'transparent' }]}>
                     {on && <Feather name="check" size={13} color={theme.background} />}

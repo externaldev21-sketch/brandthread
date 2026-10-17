@@ -4,7 +4,8 @@
  * One `ws` WebSocketServer attached to the SAME underlying HTTP server the
  * Express app already listens on (via the server's 'upgrade' event, see
  * attachLiveWebSocket) — not a second port. Clients connect to
- * `/ws/live?streamId=<id>&token=<clerk jwt>` and join a per-stream "room";
+ * `/api/ws/live?streamId=<id>&token=<clerk jwt>` (bare `/ws/live` still
+ * accepted, see ./paths.ts) and join a per-stream "room";
  * routes/live.ts broadcasts into a room on new comment / product-tag change,
  * and jobs/liveViewersPresence.ts broadcasts recomputed viewer counts.
  */
@@ -13,6 +14,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { verifyWsToken } from "./auth";
+import { matchesWsPath } from "./paths";
 import { logger } from "../lib/logger";
 import { loadRestriction } from "../lib/liveModerationState";
 
@@ -86,7 +88,7 @@ async function removeViewer(streamId: string, userId: string): Promise<void> {
 function originIsUpgradeForLivePath(req: IncomingMessage): URL | null {
   try {
     const url = new URL(req.url ?? "", "http://internal");
-    if (url.pathname !== WS_PATH) return null;
+    if (!matchesWsPath(url.pathname, WS_PATH)) return null;
     return url;
   } catch {
     return null;
