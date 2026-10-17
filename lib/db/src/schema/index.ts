@@ -292,7 +292,7 @@ export const products = pgTable('products', {
   sizeChartImageUrl:     text('size_chart_image_url'),
   // Sell-an-item attributes (department, subcategory, brand, condition,
   // colours, material, parcel size, who pays shipping). Shape and limits:
-  // api-server lib/listingDetails.ts. Migration 261.
+  // api-server lib/listingDetails.ts. Migration 640.
   listingDetails:        jsonb('listing_details').$type<Record<string, unknown> | null>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
