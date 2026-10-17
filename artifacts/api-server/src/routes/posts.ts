@@ -49,6 +49,7 @@ import {
   optionalViewerId,
   publishingRestriction,
 } from "../lib/safety";
+import { ensureVideoPoster } from "../lib/videoPoster";
 
 const router = Router();
 
@@ -947,6 +948,11 @@ router.post("/", requireAuth, async (req, res) => {
   // not fail the post itself.
   await syncPostHashtags(post.id, post.hashtags ?? [], post.createdAt)
     .catch((err) => req.log.error({ err, postId: post.id }, "Could not index post hashtags"));
+  // A video saved without a poster would render as a blank grid tile; make
+  // one in the background (lib/videoPoster.ts, never blocks the response).
+  if (post.mediaType === "video" && !post.thumbnailUrl) {
+    void ensureVideoPoster(post, { origin: `${req.protocol}://${req.get("host")}` });
+  }
   if (!captionHeld && screenHeld && heldVerdict) {
     await recordHeldMedia({
       targetType: post.mediaType === "video" ? "video" : "post",

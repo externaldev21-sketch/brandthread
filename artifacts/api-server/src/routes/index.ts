@@ -38,6 +38,7 @@ import publicRouter from "./public";
 import accountDeletionPublicRouter from "./account-deletion-public";
 import discoveryRouter from "./discovery";
 import featuredPublicRouter from "./featured-public";
+import discoverPublicRouter from "./discover-public";
 import adminRouter from "./admin";
 import { auditModerationActions } from "../lib/admin/moderationAudit";
 import profileMediaRouter from "./profile-media";
@@ -174,6 +175,7 @@ router.use("/public/affiliate", affiliatePublicRouter); // creator link click tr
 router.use("/public",          emailMarketingPublicRouter); // /stores/:slug/subscribe, /email/unsubscribe/:token
 router.use("/access",          accessRouter); // invite-only launch: validate/waitlist public, status/redeem authed
 router.use("/public/featured", featuredPublicRouter); // admin-curated Discover picks
+router.use("/public/discover", discoverPublicRouter); // buyer Discover grid (cursor-paged, every item has an image)
 // Shared response cache for the public read paths that dominate traffic. A no-op
 // unless REDIS_URL is set. Registered before the routers so a hit never reaches
 // them. See docs/scale/CACHE.md for keys, TTLs and invalidation.
