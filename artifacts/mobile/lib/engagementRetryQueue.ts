@@ -109,7 +109,8 @@ export async function processEngagementRetryQueue(): Promise<void> {
     const primary = executor;
     const fallback = fallbackExecutor;
     const remaining: QueuedEngagementAction[] = [];
-    for (const action of queue) {
+    const snapshot = [...queue];
+    for (const action of snapshot) {
       try {
         if (primary) {
           await primary(action);
@@ -125,7 +126,11 @@ export async function processEngagementRetryQueue(): Promise<void> {
         // buyer with a rollback long after they moved on.
       }
     }
-    queue = remaining;
+    // Keep anything enqueued while this pass was awaiting the network (a
+    // newer entry for the same kind+target replaces the leftover one).
+    const added = queue.filter((action) => !snapshot.includes(action));
+    const addedIds = new Set(added.map((action) => action.id));
+    queue = [...remaining.filter((action) => !addedIds.has(action.id)), ...added];
     await persist();
   } finally {
     processing = false;

@@ -90,7 +90,10 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "evidenceUrls must be an array of strings" });
   }
   const evidence = (body.evidenceUrls as string[] | undefined) ?? [];
-  if (evidence.length > MAX_EVIDENCE || evidence.some((url) => !url.startsWith(evidencePrefix(buyerId)))) {
+  // POST /api/returns/evidence stores under the teamContext-resolved id, which
+  // differs from the buyer's own id only for a buyer who is also store staff.
+  const prefixes = [...new Set([evidencePrefix(buyerId), evidencePrefix((req as any).clerkUserId as string)])];
+  if (evidence.length > MAX_EVIDENCE || evidence.some((url) => !prefixes.some((prefix) => url.startsWith(prefix)))) {
     return res.status(400).json({ error: "Attach up to 5 photos uploaded with this report." });
   }
 

@@ -15,13 +15,13 @@
 import { attachQuoteData } from "../lib/quotedPosts";
 import { Router } from "express";
 import { db, posts, interactions, users, liveStreams, postTaggedProducts, products, productVariants, feedNotInterested } from "@workspace/db";
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "@workspace/api-zod";
 import { requireAuth, requireModerator } from "../middlewares/requireAuth";
 import { validateRequest } from "../middlewares/validateRequest";
 import { rateLimit } from "../middlewares/rateLimit";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
-import { mutedUserIds } from "../lib/safety";
+import { authorInGoodStanding, mutedUserIds, notBlockedWith } from "../lib/safety";
 import { getForYouFeed, applyEventToProfile, type ForYouResultItem } from "../lib/ranking/forYou";
 import { getRankingConfig, saveRankingConfig, DEFAULT_RANKING_CONFIG } from "../lib/ranking/config";
 import { hidePostFromForYou, unhidePostFromForYou } from "../lib/ranking/signals";
@@ -295,7 +295,15 @@ router.get("/not-interested", requireAuth, async (req, res) => {
       .from(feedNotInterested)
       .innerJoin(posts, eq(posts.id, feedNotInterested.postId))
       .leftJoin(users, eq(users.clerkId, posts.userId))
-      .where(eq(feedNotInterested.userId, userId))
+      .where(and(
+        eq(feedNotInterested.userId, userId),
+        // Only posts the viewer could still see: not deleted/archived, not
+        // removed by moderation, author in good standing and not blocked.
+        sql`${posts.postStatus} NOT IN ('deleted', 'archived')`,
+        eq(posts.moderationStatus, "visible"),
+        authorInGoodStanding(posts.userId),
+        notBlockedWith(userId, posts.userId),
+      ))
       .orderBy(desc(feedNotInterested.createdAt))
       .limit(limit)
       .offset(offset);

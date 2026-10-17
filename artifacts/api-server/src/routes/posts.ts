@@ -40,6 +40,7 @@ import { locationsByPlaceId, resolvePostLocation, withLocation } from "../lib/pl
 import { decodeCursor, encodeCursor } from "../lib/cursor";
 import { mergeHashtags, syncPostHashtags } from "../lib/hashtags";
 import { notifyPostTagsIfLive, syncPostUserTags } from "../lib/postUserTags";
+import { ownerAllows } from "../lib/privacySettings";
 import { attachQuoteData, postCardImage } from "../lib/quotedPosts";
 import {
   authorInGoodStanding,
@@ -1758,6 +1759,10 @@ router.get("/:id", async (req, res) => {
       )) : [];
       const mutual = !!viewerId && edges.some((e) => e.followerId === viewerId) && edges.some((e) => e.followerId === post.userId);
       if (!mutual) return res.status(404).json({ error: "Post not found" });
+      // Settings → Privacy → "Who can see your posts" (same rule as /api/social/posts/:id).
+      if (!(await ownerAllows("whoCanSeePosts", post.userId, viewerId!))) {
+        return res.status(404).json({ error: "Post not found" });
+      }
     }
   }
 

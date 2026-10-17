@@ -16,7 +16,7 @@ import type { AddressInfo } from "node:net";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import {
   activityMutes, db, feedNotInterested, follows, interactions, notificationsFeed, orderProblemReports, orders,
-  posts, savedItems, users,
+  postUserTags, posts, savedItems, users,
 } from "@workspace/db";
 
 const pushes = vi.hoisted(() => ({ sent: [] as Array<{ userId: string; category?: string }> }));
@@ -83,6 +83,8 @@ beforeAll(async () => {
     ]);
   const app = express();
   app.use(express.json());
+  // Optional-auth routes (GET /api/posts/:id) read the viewer without requireAuth.
+  app.use((req: any, _res, next) => { req.clerkUserId = req.header("x-test-user-id"); next(); });
   app.use("/api/social", social);
   app.use("/api/feed", feed);
   app.use("/api/posts", postsRouter);
@@ -95,6 +97,7 @@ beforeAll(async () => {
 afterAll(async () => {
   server?.close();
   await db.delete(orderProblemReports).where(inArray(orderProblemReports.buyerId, userIds));
+  await db.delete(postUserTags).where(inArray(postUserTags.taggedUserId, userIds));
   await db.execute(sql`DELETE FROM support_tickets WHERE clerk_id = ANY(${userIds})`).catch(() => undefined);
   await db.delete(notificationsFeed).where(inArray(notificationsFeed.userId, userIds));
   await db.delete(activityMutes).where(inArray(activityMutes.userId, userIds));
@@ -260,5 +263,55 @@ describe("order problem reports (74)", () => {
     const created = await call("POST", "/api/order-problems", me, { type: "other", description: "General issue" });
     expect(created.status).toBe(201);
     expect(created.body.orderId).toBeNull();
+  });
+});
+
+describe("review follow-ups", () => {
+  it("Hidden posts never lists a post that was deleted since", async () => {
+    const [gone] = await db.insert(posts).values({
+      userId: friend, mediaUrl: `https://cdn.test/${suffix}/gone.jpg`, mediaType: "photo", caption: "gone", postStatus: "deleted",
+    }).returning({ id: posts.id });
+    await db.insert(feedNotInterested).values({ userId: me, postId: gone.id, sellerId: friend });
+    const hidden = await call("GET", "/api/feed/not-interested", me);
+    expect(hidden.body.items.map((i: any) => i.postId)).not.toContain(gone.id);
+    await db.delete(feedNotInterested).where(eq(feedNotInterested.userId, me));
+  });
+
+  it("unmuting one alias keeps the shared push mute of another muted alias", async () => {
+    await call("POST", "/api/buyer/notifications/mute-category", me, { category: "payout" });
+    await call("POST", "/api/buyer/notifications/mute-category", me, { category: "finance" });
+    await call("POST", "/api/buyer/notifications/mute-category", me, { category: "finance", muted: false });
+    const keys = (await db.select({ k: activityMutes.muteKey }).from(activityMutes).where(eq(activityMutes.userId, me))).map((r) => r.k).sort();
+    expect(keys).toEqual(["category:payout", "push:payout"]);
+    await call("POST", "/api/buyer/notifications/mute-category", me, { category: "payout", muted: false });
+    expect(await db.select().from(activityMutes).where(eq(activityMutes.userId, me))).toEqual([]);
+  });
+
+  it("GET /api/posts/:id honours the author's \"Who can see your posts\"", async () => {
+    const [own] = await db.insert(posts).values({
+      userId: friend, mediaUrl: `https://cdn.test/${suffix}/p.jpg`, mediaType: "photo", caption: "P",
+      postStatus: "published", surface: "profile",
+    } as any).returning({ id: posts.id });
+    expect((await call("GET", `/api/posts/${own.id}`, me)).status).toBe(200);
+    await db.update(users).set({ privacySettings: { whoCanSeePosts: "only_me" } } as any).where(eq(users.clerkId, friend));
+    expect((await call("GET", `/api/posts/${own.id}`, me)).status).toBe(404);
+    expect((await call("GET", `/api/posts/${own.id}`, friend)).status).toBe(200);
+    await db.update(users).set({ privacySettings: {} } as any).where(eq(users.clerkId, friend));
+  });
+
+  it("\"tagged you\" is sent once per person, even after they clear it", async () => {
+    const { syncPostUserTags, notifyPostTagsIfLive } = await import("../../lib/postUserTags");
+    const [tagged] = await db.insert(posts).values({
+      userId: friend, mediaUrl: `https://cdn.test/${suffix}/t.jpg`, mediaType: "photo",
+      caption: `fit with @${me.replace(/-/g, "_")}`, postStatus: "published",
+    }).returning({ id: posts.id, caption: posts.caption });
+    expect(await syncPostUserTags(tagged.id, friend, tagged.caption)).toEqual([me]);
+    await notifyPostTagsIfLive(tagged.id);
+    const tagRows = () => db.select().from(notificationsFeed)
+      .where(and(eq(notificationsFeed.userId, me), eq(notificationsFeed.type, "post_tag"), eq(notificationsFeed.targetId, tagged.id)));
+    expect(await tagRows()).toHaveLength(1);
+    await db.delete(notificationsFeed).where(eq(notificationsFeed.userId, me));
+    await notifyPostTagsIfLive(tagged.id);
+    expect(await tagRows()).toHaveLength(0);
   });
 });

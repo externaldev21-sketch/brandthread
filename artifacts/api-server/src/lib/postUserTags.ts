@@ -10,10 +10,11 @@
  *
  * "Tagged you" is only sent once the post is live (published + not held by
  * moderation); drafts, scheduled and held posts are notified when they go
- * live (see notifyPostTagsIfLive callers). notifyPostTag is idempotent per
- * (person, post), so calling it again for already-notified people is safe.
+ * live (see notifyPostTagsIfLive callers). Each tag row records when its
+ * alert went out (notified_at), so later edits, archive/restore or the person
+ * clearing their notifications never re-send it.
  */
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db, posts, postUserTags } from "@workspace/db";
 import { resolveCommentMentions } from "./commentMentions";
 import { notifyPostTag } from "./activityEvents";
@@ -48,8 +49,10 @@ export async function notifyPostTagsIfLive(postId: string): Promise<void> {
       userId: posts.userId, postStatus: posts.postStatus, moderationStatus: posts.moderationStatus,
     }).from(posts).where(eq(posts.id, postId)).limit(1);
     if (!post || post.postStatus !== "published" || post.moderationStatus !== "visible") return;
-    const tags = await db.select({ taggedUserId: postUserTags.taggedUserId })
-      .from(postUserTags).where(eq(postUserTags.postId, postId));
+    // Claim un-notified tags first so concurrent publishes can't double-send.
+    const tags = await db.update(postUserTags).set({ notifiedAt: new Date() })
+      .where(and(eq(postUserTags.postId, postId), isNull(postUserTags.notifiedAt)))
+      .returning({ taggedUserId: postUserTags.taggedUserId });
     for (const tag of tags) {
       await notifyPostTag({ postId, taggerId: post.userId, taggedUserId: tag.taggedUserId });
     }

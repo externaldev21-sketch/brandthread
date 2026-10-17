@@ -1906,7 +1906,7 @@ export async function unmuteUser(userId: string): Promise<void> {
 
 /**
  * People I restricted: their comments on my posts are only visible to them
- * (and I'm not notified); their new messages wait in my requests. Server-backed,
+ * (and I'm not notified); a new chat they start with me waits in my requests (existing chats stay where they are). Server-backed,
  * with the local list as a mirror (used when the server can't be reached).
  */
 export async function getRestrictedUsers(k: SocialKeys = K()): Promise<RestrictRecord[]> {
@@ -2104,9 +2104,11 @@ function mergeServerPrivacy(base: PrivacySettings, remote: ServerPrivacyResponse
  * lives on /api/social/contacts and is loaded by the screen itself.
  */
 export async function getPrivacySettings(k: SocialKeys = K()): Promise<PrivacySettings> {
-  const cached = { ...DEFAULT_PRIVACY_SETTINGS, ...(await load<Partial<PrivacySettings>>(k.privacy, {})) };
+  const stored = await load<Partial<PrivacySettings>>(k.privacy, {});
+  const cached = { ...DEFAULT_PRIVACY_SETTINGS, ...stored };
   if (!canSyncSocialServer()) return cached;
   try {
+    await uploadLegacyPrivacyOnce(k, stored);
     const remote = await serviceRequest<ServerPrivacyResponse>('/api/auth/privacy');
     const next = mergeServerPrivacy(cached, remote);
     if (_socialUserId === k.userId) await save(k.privacy, next);
@@ -2114,6 +2116,29 @@ export async function getPrivacySettings(k: SocialKeys = K()): Promise<PrivacySe
   } catch {
     return cached;
   }
+}
+/**
+ * Before these settings were server-backed they lived only on the phone. The
+ * first sync uploads whatever this device had stored, so an update doesn't
+ * silently reset someone's choices to the server defaults. Best effort: a
+ * 4xx (e.g. a value the server no longer accepts) counts as done.
+ */
+async function uploadLegacyPrivacyOnce(k: SocialKeys, stored: Partial<PrivacySettings>): Promise<void> {
+  const flagKey = `${k.privacy}:server-synced:v1`;
+  if (await load<boolean>(flagKey, false)) return;
+  const settings: Partial<Pick<PrivacySettings, ServerPrivacyKey>> = {};
+  for (const key of SERVER_PRIVACY_KEYS) {
+    if (stored[key] !== undefined) (settings as any)[key] = stored[key];
+  }
+  if (Object.keys(settings).length > 0) {
+    try {
+      await serviceRequest('/api/auth/privacy', { method: 'PATCH', body: JSON.stringify({ settings }) }, false);
+    } catch (error) {
+      const status = (error as { status?: number } | null)?.status;
+      if (!(typeof status === 'number' && status >= 400 && status < 500)) return; // retry next load
+    }
+  }
+  await save(flagKey, true);
 }
 /** Save privacy-screen settings to the server (throws on failure), then refresh the cache. */
 export async function updatePrivacySettings(updates: Partial<PrivacySettings>): Promise<PrivacySettings> {

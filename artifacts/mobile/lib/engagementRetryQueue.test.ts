@@ -77,4 +77,25 @@ describe('engagement retry queue', () => {
     expect(pending).toHaveLength(1);
     expect(pending[0].payload).toEqual({ value: 'remove' });
   });
+
+  it('keeps an action enqueued while a pass is still awaiting the network', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const seen: string[] = [];
+    // No executor yet, so the first entry waits for the explicit pass below.
+    await enqueueEngagementRetry({ kind: 'like', targetId: 'slow', payload: { value: 'add' } });
+    setEngagementRetryExecutor(async (action) => {
+      seen.push(action.id);
+      if (action.targetId === 'slow') await gate;
+    });
+    const pass = processEngagementRetryQueue();
+    await enqueueEngagementRetry({ kind: 'like', targetId: 'new-post', payload: { value: 'add' } });
+    release();
+    await pass;
+    // The like queued mid-pass survived and is replayed by the next pass.
+    expect(getQueuedEngagementActions().map((a) => a.targetId)).toEqual(['new-post']);
+    await processEngagementRetryQueue();
+    expect(seen).toContain('like:new-post');
+    expect(getQueuedEngagementActions()).toEqual([]);
+  });
 });

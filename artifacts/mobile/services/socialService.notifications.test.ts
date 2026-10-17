@@ -27,8 +27,8 @@ vi.mock("@/lib/devPreview", () => ({
 }));
 
 import {
-  clearAllReadNotifications, initSocialService, markNotificationUnread, muteNotificationCategory,
-  removeSavedItem, saveItem,
+  clearAllReadNotifications, getPrivacySettings, initSocialService, markNotificationUnread, muteNotificationCategory,
+  removeSavedItem, saveItem, socialKeysForUser,
 } from "./socialService";
 
 function calls() {
@@ -83,5 +83,18 @@ describe("socialService notifications + saves (real account)", () => {
   it("86: unsave calls DELETE /api/buyer/saved/:id", async () => {
     await removeSavedItem("p1");
     expect(calls()[0]).toMatchObject({ path: "/api/buyer/saved/p1", method: "DELETE" });
+  });
+
+  it("99: uploads phone-only privacy choices once instead of resetting them to defaults", async () => {
+    storage.set(socialKeysForUser("user_real_123").privacy, JSON.stringify({ searchable: false, whoCanSeeFriendsList: "only_me" }));
+    serviceRequest.mockImplementation(async (_path: string, options?: RequestInit) => (
+      options?.method === "PATCH" ? { ok: true } : { settings: { searchable: false, whoCanSeeFriendsList: "only_me" } }
+    ));
+    const first = await getPrivacySettings();
+    expect(first.searchable).toBe(false);
+    await getPrivacySettings();
+    const patches = calls().filter((c) => c.method === "PATCH");
+    expect(patches).toHaveLength(1);
+    expect(patches[0]).toMatchObject({ path: "/api/auth/privacy", body: { settings: { searchable: false, whoCanSeeFriendsList: "only_me" } } });
   });
 });

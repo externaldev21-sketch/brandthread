@@ -770,7 +770,9 @@ router.get("/profile/:userId/tagged", async (req, res) => {
       };
     });
 
-  const postItems = rows.map((r) => ({
+  // Each tagging author's own "Who can see your posts" applies too.
+  const allowedAuthors = await ownersAllowing("whoCanSeePosts", [...new Set(rows.map((r) => r.userId))], myId);
+  const postItems = rows.filter((r) => r.userId === myId || allowedAuthors.has(r.userId)).map((r) => ({
     id: r.id,
     authorId: r.userId,
     authorName: r.authorName ?? null,

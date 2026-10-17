@@ -1482,6 +1482,8 @@ export const postUserTags = pgTable('post_user_tags', {
   postId:       uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
   taggedUserId: text('tagged_user_id').notNull(), // Clerk user ID of the tagged account
   createdAt:    timestamp('created_at').defaultNow().notNull(),
+  // When "tagged you" was sent (once per person per post, migration 318).
+  notifiedAt:   timestamp('notified_at'),
 }, (table) => ({
   taggedIdx: index('post_user_tags_tagged_idx').on(table.taggedUserId, table.createdAt),
   uniq: uniqueIndex('post_user_tags_unique').on(table.postId, table.taggedUserId),

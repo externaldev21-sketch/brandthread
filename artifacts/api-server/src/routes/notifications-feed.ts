@@ -348,7 +348,19 @@ buyerRouter.post("/mute-category", async (req, res) => {
       .onConflictDoNothing();
   } else {
     await db.delete(activityMutes)
-      .where(and(eq(activityMutes.userId, userId), inArray(activityMutes.muteKey, keys)));
+      .where(and(eq(activityMutes.userId, userId), eq(activityMutes.muteKey, `category:${category}`)));
+    // Aliases share one push key (e.g. "payout"/"finance" → push:payout): keep
+    // it while another muted category still maps to it.
+    const pushKey = keys.find((key) => key.startsWith("push:"));
+    if (pushKey) {
+      const stillMuted = await db.select({ muteKey: activityMutes.muteKey }).from(activityMutes)
+        .where(and(eq(activityMutes.userId, userId), sql`${activityMutes.muteKey} LIKE 'category:%'`));
+      const shared = stillMuted.some((row) => categoryMuteKeys(row.muteKey.slice("category:".length)).includes(pushKey));
+      if (!shared) {
+        await db.delete(activityMutes)
+          .where(and(eq(activityMutes.userId, userId), eq(activityMutes.muteKey, pushKey)));
+      }
+    }
   }
   await db.update(notificationsFeed).set({ isMuted: muted })
     .where(and(eq(notificationsFeed.userId, userId), eq(notificationsFeed.category, category)));
