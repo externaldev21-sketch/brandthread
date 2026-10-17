@@ -12,8 +12,8 @@ import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { useApi, type Freelancer } from '@/lib/api';
-import { serviceLabel, serviceIcon, formatHourlyRate, formatPrice, ratingLabel, apiErrorMessage, apiErrorCode } from '@/lib/freelancer';
+import { useApi, type Freelancer, type FreelancerReview } from '@/lib/api';
+import { serviceLabel, serviceIcon, formatHourlyRate, formatPrice, ratingLabel, reviewCountLabel, apiErrorMessage, apiErrorCode } from '@/lib/freelancer';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -46,6 +46,8 @@ export default function FreelancerProfileScreen() {
   const [priceText, setPriceText] = useState('');
   const [hiring, setHiring] = useState(false);
 
+  const [reviews, setReviews] = useState<FreelancerReview[]>([]);
+
   const isOwn = !!freelancer && !!me && freelancer.id === me.id;
 
   const load = useCallback(async () => {
@@ -58,6 +60,8 @@ export default function FreelancerProfileScreen() {
       ]);
       setFreelancer(f);
       setMe(meRes.freelancer);
+      // Reviews are a secondary section — a failure here never hides the profile.
+      api.freelancers.reviews(f.id).then((r) => setReviews(r.reviews ?? [])).catch(() => setReviews([]));
       if (meRes.freelancer && meRes.freelancer.id === f.id) {
         const status = await api.freelancerConnect.status().catch(() => null);
         setConnect(status ? { connected: status.connected, status: status.status } : null);
@@ -217,7 +221,7 @@ export default function FreelancerProfileScreen() {
                 {rating && <Feather name="star" size={13} color={theme.warning} />}
                 <Text style={styles.statValue}>{rating ?? 'New'}</Text>
               </View>
-              <Text style={styles.statLabel}>Rating</Text>
+              <Text style={styles.statLabel}>{reviewCountLabel(freelancer.reviewCount)}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
@@ -277,6 +281,24 @@ export default function FreelancerProfileScreen() {
                 <Feather name="external-link" size={14} color={theme.secondary} />
                 <Text style={styles.linkText} numberOfLines={1}>{u.replace(/^https?:\/\//, '')}</Text>
               </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Reviews from hirers of completed jobs */}
+        {reviews.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Reviews</Text>
+            {reviews.slice(0, 10).map((r) => (
+              <View key={r.id} style={styles.linkRow}>
+                <Feather name="star" size={13} color={theme.warning} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.linkText}>
+                    {ratingLabel(r.ratingTenths)} · {r.reviewerName}
+                  </Text>
+                  {!!r.comment && <Text style={styles.bio}>{r.comment}</Text>}
+                </View>
+              </View>
             ))}
           </View>
         )}

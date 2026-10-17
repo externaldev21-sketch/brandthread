@@ -1,20 +1,22 @@
 /**
  * Freelancer jobs — tabbed view.
- * "Hiring": jobs I created as a hirer (status + cancel + payment check).
+ * "Hiring": jobs I created as a hirer (status + cancel + payment check, and
+ *   a 1–5 star rating once a job is completed — POST /freelancer-jobs/:id/review).
  * "My Gigs": jobs where I'm the freelancer (accept / start / complete).
  */
 import React, { useCallback, useRef, useState } from 'react';
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, RefreshControl,
+  ActivityIndicator, Alert, RefreshControl, Modal, TextInput,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi, type FreelancerJob } from '@/lib/api';
-import { serviceLabel, formatPrice, apiErrorMessage } from '@/lib/freelancer';
+import { serviceLabel, formatPrice, apiErrorMessage, ratingLabel, tenthsToStars, RATING_STARS } from '@/lib/freelancer';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
   SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM,
@@ -35,12 +37,17 @@ export default function FreelancerJobsScreen() {
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [data, setData] = useState<JobsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<'hiring' | 'gigs'>('hiring');
   const [busyId, setBusyId] = useState<string | null>(null);
   const defaultedTab = useRef(false);
+  const [rateJob, setRateJob] = useState<FreelancerJob | null>(null);
+  const [rateStars, setRateStars] = useState(0);
+  const [rateComment, setRateComment] = useState('');
+  const [rateSaving, setRateSaving] = useState(false);
   const loadGeneration = useRef(0);
   const statusMeta: Record<string, { label: string; color: string; bg: string }> = {
     ...STATUS_META,
@@ -136,6 +143,33 @@ export default function FreelancerJobsScreen() {
     );
   };
 
+  const openRating = (job: FreelancerJob) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setRateJob(job);
+    setRateStars(tenthsToStars(job.review?.ratingTenths));
+    setRateComment(job.review?.comment ?? '');
+  };
+
+  const submitRating = async () => {
+    if (!rateJob) return;
+    if (rateStars < 1) {
+      Alert.alert('Pick a rating', 'Tap a star from 1 to 5.');
+      return;
+    }
+    setRateSaving(true);
+    try {
+      await api.freelancerJobs.review(rateJob.id, { rating: rateStars, comment: rateComment.trim() || undefined });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setRateJob(null);
+      await load();
+    } catch (e) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Rating not saved', apiErrorMessage(e));
+    } finally {
+      setRateSaving(false);
+    }
+  };
+
   const confirmCancel = (job: FreelancerJob, role: 'hirer' | 'freelancer') => {
     const refundNote =
       job.paymentStatus === 'paid'
@@ -226,6 +260,17 @@ export default function FreelancerJobsScreen() {
                 job.status === 'in_progress') && (
                 <ActionBtn label="Cancel Job" onPress={() => confirmCancel(job, role)} />
               )}
+            {role === 'hirer' && job.status === 'completed' && (
+              job.review ? (
+                <>
+                  <Feather name="star" size={13} color={colors.warning} />
+                  <Text style={styles.ratedText}>You rated {ratingLabel(job.review.ratingTenths)}</Text>
+                  <ActionBtn label="Edit rating" onPress={() => openRating(job)} />
+                </>
+              ) : (
+                <ActionBtn label="Rate freelancer" primary onPress={() => openRating(job)} />
+              )
+            )}
           </View>
         )}
       </View>
@@ -291,6 +336,47 @@ export default function FreelancerJobsScreen() {
           jobs.map((j) => renderJob(j, tab === 'gigs' ? 'freelancer' : 'hirer'))
         )}
       </ScrollView>
+
+      <Modal visible={!!rateJob} transparent animationType="fade" onRequestClose={() => setRateJob(null)}>
+        <View style={[styles.rateOverlay, { backgroundColor: `${colors.background}CC`, paddingTop: insets.top + SP.lg, paddingBottom: insets.bottom + SP.lg }]}>
+          <View style={styles.rateCard}>
+            <Text style={styles.rateTitle}>Rate {rateJob?.freelancerName ?? 'this freelancer'}</Text>
+            <Text style={styles.jobSub} numberOfLines={1}>{rateJob?.title}</Text>
+            <View style={styles.starsRow}>
+              {RATING_STARS.map((n) => (
+                <TouchableOpacity
+                  key={n}
+                  onPress={() => { Haptics.selectionAsync(); setRateStars(n); }}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${n} star${n > 1 ? 's' : ''}`}
+                >
+                  <Feather name="star" size={30} color={n <= rateStars ? colors.warning : SUBTLE} />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={styles.rateInput}
+              value={rateComment}
+              onChangeText={setRateComment}
+              placeholder="What was it like working together? (optional)"
+              placeholderTextColor={SUBTLE}
+              multiline
+              maxLength={1000}
+            />
+            <View style={[styles.actionsRow, { justifyContent: 'flex-end' }]}>
+              {rateSaving ? (
+                <ActivityIndicator color={colors.primary} size="small" />
+              ) : (
+                <>
+                  <ActionBtn label="Cancel" onPress={() => setRateJob(null)} />
+                  <ActionBtn label="Submit rating" primary onPress={submitRating} />
+                </>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -359,4 +445,17 @@ const styles = StyleSheet.create({
   actionBtnPrimary: {},
   actionBtnText: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
   waitingText: { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.regular, fontStyle: 'italic' },
+  ratedText: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium },
+  rateOverlay: { flex: 1, justifyContent: 'center', padding: SP.lg },
+  rateCard: {
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md,
+    padding: SP.md + 4,
+  },
+  rateTitle: { color: FG, fontSize: FS.base, fontFamily: FONT.semibold },
+  starsRow: { flexDirection: 'row', gap: SP.sm + 2, marginTop: SP.md, marginBottom: SP.md },
+  rateInput: {
+    minHeight: 72, color: FG, fontSize: FS.sm, fontFamily: FONT.regular,
+    backgroundColor: BG, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm,
+    padding: SP.sm + 2, textAlignVertical: 'top',
+  },
 });
