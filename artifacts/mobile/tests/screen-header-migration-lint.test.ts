@@ -70,7 +70,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/(tabs)/profile.tsx',
   'app/(tabs)/studio.tsx',
   'app/account-type.tsx',
-  'app/add-product.tsx',
   'app/app-icon.tsx',
   'app/app-theme.tsx',
   'app/ai-assistant.tsx',
