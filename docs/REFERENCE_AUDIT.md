@@ -16,6 +16,7 @@ Every screen gets a side-by-side image under `docs/screenshots/claude/launch-ref
   - The API server was not running locally. A plain "Couldn't load" state is therefore not counted as a finding unless the same screen also fails in demo mode.
 - **Route sweep:** all 358 static routes were loaded once and triaged for "reachable but unfinished" screens (section E).
 - **Reference images:** these are the Mobbin MCP's inline previews, which are low-res. Full-res `image_url` downloads are blocked by the same network policy. Every reference is linked to its `mobbin_url` so it can be opened at full size.
+- **Approved apps:** every screen's primary reference comes from the approved apps (TikTok, Instagram, Depop, Vinted, Vestiaire, GOAT, Whatnot, Etsy, Shopify/Shop, X, Cash App, Revolut). A few onboarding entries in section E add a second frame from another app (Substack, Realtor.com, Hypelist, Pinterest, Oura, Zocdoc, Beli) only where no approved app had a matching step on Mobbin. Treat those as layout hints; the approved-app frame is the one to copy.
 - **Seller menu trigger:** on this code the left tab-bar button opens the Studio menu on **tap**. Swiping it does nothing. The launch rule says never to change that trigger, glow or tab bar look, so section C audits the menu's **content** only.
 
 ## Owned by other sessions (not duplicated here)
@@ -131,6 +132,20 @@ These are bugs, not taste. Each one is detailed in its section.
 | D | Switch to buyer / Sign out / Invite friends | [Instagram: Log out alert](https://mobbin.com/screens/f3f4faa3-961a-4634-9a2f-5ba985ccf800) |
 | D | Discounts / Marketing | [Shopify: form sections](https://mobbin.com/screens/f8f0f9a9-62e3-4729-9eb8-ae750918e069) |
 | D | Analytics sub-pages / Promote / Reviews | [Shopify: row lists](https://mobbin.com/screens/f736b711-925d-41d8-8750-a7ca6298ca42) |
+| E | Welcome (`/onboarding`, step 0 `WELCOME`; also served at `/account-type` and `/thread-explainer`, which redirect here when signed out) | [Depop: Welcome](https://mobbin.com/screens/aeb6b5b3-ab09-4fdb-8a87-54de341e2049)<br>[Hypelist: Welcome back](https://mobbin.com/screens/d96461fe-6ec6-4fe1-b002-3ae3373b9e19) |
+| E | Sign in (`/sign-in`) | [Instagram: Log in](https://mobbin.com/screens/f58993f9-06e7-4cea-a346-bd439ac0d6af)<br>[Depop: Sign up or login (email-first)](https://mobbin.com/screens/f6be3377-6f07-4518-ac80-e1f4fdb31c8b) |
+| E | Buyer or seller (`/onboarding`, step 1 `ACCOUNT_TYPE`) | [Substack: What brings you here?](https://mobbin.com/screens/fbb0f72a-66db-4e8b-beb0-dd79ddf29a11)<br>[Realtor.com: How can we help you](https://mobbin.com/screens/6e8e9a21-16e1-451c-8501-1c922357003b) |
+| E | Create your account (`/onboarding`, step 2 `AUTH`, `SharedAuthStep`) | [Depop: Sign up or login (email-first)](https://mobbin.com/screens/f6be3377-6f07-4518-ac80-e1f4fdb31c8b)<br>[Depop: Welcome with OAuth](https://mobbin.com/screens/aeb6b5b3-ab09-4fdb-8a87-54de341e2049) |
+| E | What should we call you? (`/onboarding`, step 3 `NAME`) | [Depop: single-field step](https://mobbin.com/screens/f6be3377-6f07-4518-ac80-e1f4fdb31c8b) |
+| E | What do you want to see? (`/onboarding`, buyer step 4 `STYLE`) | [Whatnot: Let's find you something to shop for](https://mobbin.com/screens/6c141413-f738-43dd-9357-bea357bcf256)<br>[Depop: Show these brands in search](https://mobbin.com/screens/d4d76cbf-174b-4f5a-9c7a-df5521f6d0b1)<br>[Pinterest: interests grid](https://mobbin.com/screens/acb4ba2c-6b67-4302-b41e-81c9baaebaa3) |
+| E | What sizes do you wear? (`/onboarding`, buyer step 5 `SIZES`) | [Depop: Sizes](https://mobbin.com/screens/b1033b65-657a-46ab-892e-ce3fc8b85e3b) |
+| E | Follow a few brands (`/onboarding`, buyer step 6 `BRANDS`) | [X: Suggested for you](https://mobbin.com/screens/aebb416e-f4cb-4cb4-80da-2b1e31de6825) |
+| E | Never miss what matters (`/onboarding`, buyer step 8 / seller step 9 `NOTIFICATIONS`) | [Beli: Stay connected](https://mobbin.com/screens/441290e3-2ea8-4b7a-8017-40aefe806713)<br>[Zocdoc: Turn on notifications](https://mobbin.com/screens/624436bd-5176-4fb7-99af-161f59d3ac99) |
+| E | Welcome to Brandthread (`/onboarding`, buyer step 9 / seller step 10 `SUCCESS`) | [TikTok: lands directly in the feed](https://mobbin.com/screens/7d1897a6-1e73-49f3-8310-69af88c3e2d9) |
+| E | Seller: Brand name + Brand stage (`/onboarding`, seller steps 4–5) | [Shopify: I am running my store as… (radio list)](https://mobbin.com/screens/c6e64236-9325-4812-b08f-e083aa084093)<br>[Depop: Start selling, Step 2 of 5](https://mobbin.com/screens/f1309ebc-8e30-48ea-8d56-0b72b1692c1e) |
+| E | Seller: Goals + "Make it feel like yours" (`/onboarding`, seller steps 6–7) | [Depop: Start selling, Step 2 of 5](https://mobbin.com/screens/f1309ebc-8e30-48ea-8d56-0b72b1692c1e)<br>[Depop: brand chips](https://mobbin.com/screens/d4d76cbf-174b-4f5a-9c7a-df5521f6d0b1) |
+| E | Seller: Plan recommendation (`/onboarding`, seller step 7 after sample) | [Revolut: Select plan](https://mobbin.com/screens/1af3056a-424f-4d82-8f48-b5797a1e3171)<br>[Oura: Select a membership](https://mobbin.com/screens/a69e0bbf-3dee-43cc-90fb-d0b7d97c4ccc) |
+| E | Invite code (`/access-code`) | [Depop: single field + Continue](https://mobbin.com/screens/f6be3377-6f07-4518-ac80-e1f4fdb31c8b) |
 
 
 ---
