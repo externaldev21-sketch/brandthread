@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import licenses from '../content/open-source-licenses.json';
-// @ts-expect-error -- plain .mjs build script without type declarations
 import { buildLicenseEntries, isShippedDependency, normalizeLicense } from './generate-licenses.mjs';
 
 describe('generate-licenses', () => {

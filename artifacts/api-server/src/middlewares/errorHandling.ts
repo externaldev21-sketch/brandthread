@@ -1,6 +1,8 @@
 import type { ErrorRequestHandler, Request, RequestHandler } from "express";
 import { getAuth } from "@clerk/express";
 import { ApiError, requestIdFor, toApiErrorEnvelope } from "../lib/apiError";
+import { isClerkKeyInvalidError } from "../lib/clerkKeys";
+import { logClerkKeyInvalid } from "../lib/clerkKeyReporting";
 
 /**
  * Best-effort caller id for error logs. Clerk's middleware isn't mounted on
@@ -57,6 +59,8 @@ export const apiErrorHandler: ErrorRequestHandler = (err, req, res, _next) => {
       : parseFailure
         ? "INVALID_JSON"
         : "INTERNAL_ERROR";
+
+  if (isClerkKeyInvalidError(err)) logClerkKeyInvalid(`${req.method} ${req.path}`);
 
   req.log.error(
     {
