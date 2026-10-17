@@ -17,7 +17,7 @@ import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RADII, radius } from '@/constants/radii';
 import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
-import { useApi } from '@/lib/api';
+import { useApi, type OrderProblemReport } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { useFeeSchedule } from '@/hooks/useFeeSchedule';
 import { quoteFromSchedule } from '@/lib/feeSchedule';
@@ -1815,19 +1815,57 @@ function ReturnsTab({ returns, loadError, router }: {
 // TAB: DISPUTES
 // ═══════════════════════════════════════════════════════
 
+/** Buyer "Report a problem" submissions on this order (GET /api/order-problems/order/:id). */
+function useOrderProblemReports(orderId: string): OrderProblemReport[] {
+  const api = useApi();
+  const [reports, setReports] = useState<OrderProblemReport[]>([]);
+  useEffect(() => {
+    if (isGeneratedSellerOrderId(orderId)) return;
+    let cancelled = false;
+    api.orderProblems.forOrder(orderId)
+      .then(rows => { if (!cancelled) setReports(Array.isArray(rows) ? rows : []); })
+      .catch(() => { /* the disputes list below still renders */ });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
+  return reports;
+}
+
 function DisputesTab({ order, router }: { order: Order; router: ReturnType<typeof useRouter> }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
+  const problemReports = useOrderProblemReports(order.id);
+  const problemSection = problemReports.length > 0 ? (
+    <>
+      <SectionHeader title="Reported by buyer" />
+      {problemReports.map(r => (
+        <BrandthreadCard key={r.id} style={s.disputeCard}>
+          <View style={s.disputeHeader}>
+            <StatusBadge label={r.status.replace(/_/g, ' ').toUpperCase()} variant={r.status === 'resolved' || r.status === 'closed' ? 'success' : 'warning'} />
+            <Text style={s.disputeType}>{r.typeLabel}</Text>
+          </View>
+          <Text style={s.disputeClaim}>{r.description}</Text>
+          <Text style={s.disputeEvCount}>
+            {fmt(r.submittedAt)} · {r.evidenceUrls.length} photo{r.evidenceUrls.length !== 1 ? 's' : ''}{r.contactedSeller ? ' · Says they contacted you' : ''}
+          </Text>
+        </BrandthreadCard>
+      ))}
+    </>
+  ) : null;
   if (order.disputes.length === 0) {
     return (
       <View style={s.tabContent}>
-        <EmptyState icon="shield" title="No Disputes" description="No disputes have been opened for this order." />
+        {problemSection}
+        {problemReports.length === 0 && (
+          <EmptyState icon="shield" title="No Disputes" description="No disputes have been opened for this order." />
+        )}
       </View>
     );
   }
 
   return (
     <View style={s.tabContent}>
+      {problemSection}
       {order.disputes.map(d => {
         const daysUntilDeadline = d.evidenceDeadline
           ? Math.ceil((new Date(d.evidenceDeadline).getTime() - Date.now()) / 86400000)

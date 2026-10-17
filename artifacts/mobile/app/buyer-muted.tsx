@@ -45,9 +45,14 @@ export default function MutedAccountsScreen() {
         onPress: async () => {
           hapticDestructiveConfirm();
           setUnmuting(user.id);
-          await unmuteUser(user.mutedUserId);
-          setUnmuting(null);
-          load();
+          try {
+            await unmuteUser(user.mutedUserId);
+            load();
+          } catch {
+            Alert.alert("Couldn't unmute", 'Try again.');
+          } finally {
+            setUnmuting(null);
+          }
         },
       },
     ]);

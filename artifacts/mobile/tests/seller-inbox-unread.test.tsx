@@ -122,8 +122,9 @@ vi.mock('@/lib/previewInbox', () => ({
 
 vi.mock('@/services/socialService', () => ({
   markConversationRead: vi.fn().mockResolvedValue(undefined),
-  archiveConversation: vi.fn().mockResolvedValue(undefined),
-  muteUser: vi.fn().mockResolvedValue(undefined),
+  archiveConversation: vi.fn().mockResolvedValue(true),
+  deleteConversationForMe: vi.fn().mockResolvedValue(undefined),
+  muteConversation: vi.fn().mockResolvedValue(null),
   setConversationPinned: vi.fn().mockResolvedValue(true),
 }));
 

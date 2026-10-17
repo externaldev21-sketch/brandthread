@@ -61,6 +61,11 @@ export const users = pgTable('users', {
   dmPrivacy:      text('dm_privacy').notNull().default('requests'),
   // Private account (buyers only): new followers need approval (follow_requests).
   isPrivate:      boolean('is_private').notNull().default(false),
+  // Account privacy choices from the Privacy screen (who can follow, see posts,
+  // see friends list, reply to stories, mention; activity status, read
+  // receipts, searchable). Only keys the person changed are stored; missing
+  // keys fall back to the server defaults in api-server lib/privacySettings.ts.
+  privacySettings: jsonb('privacy_settings').$type<Record<string, unknown>>().notNull().default({}),
   // Buyer onboarding style picks (cold start for the For You ranking pipeline).
   buyerStyleInterests: jsonb('buyer_style_interests').$type<string[]>().notNull().default([]),
   // Brand onboarding fields (seller side)
@@ -984,6 +989,29 @@ export const blocks = pgTable('blocks', {
   blockedIdx: index('blocks_blocked_id_idx').on(t.blockedId),
 }));
 
+// ─── Person mutes (one-way: the muter stops seeing the muted person's content) ─
+
+export const userMutes = pgTable('user_mutes', {
+  muterId:     text('muter_id').notNull(),
+  mutedId:     text('muted_id').notNull(),
+  mutePosts:   boolean('mute_posts').notNull().default(true),
+  muteStories: boolean('mute_stories').notNull().default(true),
+  createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.muterId, t.mutedId] }),
+}));
+
+// ─── Restrictions (restricted person's comments on my posts are only visible to them) ─
+
+export const userRestrictions = pgTable('user_restrictions', {
+  restrictorId: text('restrictor_id').notNull(),
+  restrictedId: text('restricted_id').notNull(),
+  createdAt:    timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.restrictorId, t.restrictedId] }),
+  restrictedIdx: index('user_restrictions_restricted_id_idx').on(t.restrictedId),
+}));
+
 // ─── Conversations & Messages (buyer ↔ seller DM) ────────────────────────────
 
 export const conversations = pgTable('conversations', {
@@ -1066,6 +1094,16 @@ export const conversationParticipants = pgTable('conversation_participants', {
   // independent. Polled, same as agentTypingUntil on `conversations` (no
   // websocket layer exists for DMs yet).
   typingUntil:    timestamp('typing_until', { withTimezone: true }),
+  // Inbox long-press/filter > Archive (migration 315): null = in the main
+  // inbox, a timestamp = when this viewer archived it. Per-membership, like
+  // pinnedAt — archiving only moves the viewer's own copy. A new incoming
+  // message clears it for the recipient (Instagram-style auto-unarchive).
+  archivedAt:     timestamp('archived_at'),
+  // Inbox swipe > Delete (migration 315): "delete for me". The conversation
+  // disappears from this viewer's inbox and every message up to this moment
+  // is hidden for them only; the other side keeps the full thread. A newer
+  // message brings the conversation back with only the messages after it.
+  hiddenAt:       timestamp('hidden_at'),
   joinedAt:       timestamp('joined_at').defaultNow().notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.conversationId, table.userId] }),
@@ -1136,6 +1174,18 @@ export const messageReactions = pgTable('message_reactions', {
 }, (table) => ({
   messageUserUnique: unique('message_reactions_message_user_unique').on(table.messageId, table.userId),
   messageIdx:        index('message_reactions_message_idx').on(table.messageId),
+}));
+
+// ─── Message "Delete for me" ──────────────────────────────────────────────────
+// One row per (message, viewer) the viewer removed from their own copy of the
+// thread (migration 315). The message itself is untouched for everyone else.
+export const messageHidden = pgTable('message_hidden', {
+  messageId: uuid('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
+  userId:    text('user_id').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  pk:      primaryKey({ columns: [table.messageId, table.userId] }),
+  userIdx: index('message_hidden_user_idx').on(table.userId),
 }));
 
 // ─── Brandthread Agent welcome conversation (idempotency ledger) ──────────────
@@ -1432,6 +1482,8 @@ export const postUserTags = pgTable('post_user_tags', {
   postId:       uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
   taggedUserId: text('tagged_user_id').notNull(), // Clerk user ID of the tagged account
   createdAt:    timestamp('created_at').defaultNow().notNull(),
+  // When "tagged you" was sent (once per person per post, migration 318).
+  notifiedAt:   timestamp('notified_at'),
 }, (table) => ({
   taggedIdx: index('post_user_tags_tagged_idx').on(table.taggedUserId, table.createdAt),
   uniq: uniqueIndex('post_user_tags_unique').on(table.postId, table.taggedUserId),
@@ -2629,3 +2681,4 @@ export * from './comments';
 export * from './hashtags';
 export * from './captions';
 export * from './places';
+export * from './orderProblems';

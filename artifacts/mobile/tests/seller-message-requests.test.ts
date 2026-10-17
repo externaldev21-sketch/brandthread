@@ -39,7 +39,9 @@ describe('app/seller-inbox.tsx: Requests tab', () => {
   });
 
   it('excludes requests from the main Inbox list', () => {
-    expect(inboxSrc).toContain('if (c.isArchived || c.isRequest || pendingDeleteIds.has(c.id)) return false;');
+    expect(inboxSrc).toContain('if (c.isRequest || pendingDeleteIds.has(c.id)) return false;');
+    // Archived chats live behind "Archived chats" (item 93), not in the main list.
+    expect(inboxSrc).toContain('if (showArchived ? !c.isArchived : c.isArchived) return false;');
   });
 
   it('does not optimistically mark a request read on open — the sender should not see a read receipt before acceptance', () => {

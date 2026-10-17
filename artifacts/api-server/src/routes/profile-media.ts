@@ -141,7 +141,7 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
     db.select({ postId: interactions.postId, n: count() }).from(interactions)
       .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "view")))
       .groupBy(interactions.postId),
-    visibleCommentCounts(postIds),
+    visibleCommentCounts(postIds, viewerId),
     viewerId
       ? db.select({ postId: interactions.postId }).from(interactions)
           .where(and(

@@ -3,7 +3,7 @@
  * Sends push messages via the Expo Push Service (no APNs/FCM credentials needed in dev).
  * In production, upgrade to direct APNs/FCM for higher throughput.
  */
-import { db, notificationBatchQueue, notificationDeliveries, notificationEvents, pushTokens, users } from "@workspace/db";
+import { activityMutes, db, notificationBatchQueue, notificationDeliveries, notificationEvents, pushTokens, users } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
 import { logger } from "./logger";
 import { withRetry } from "./retry";
@@ -91,6 +91,11 @@ const PUSH_CATEGORY_BY_FEED_CATEGORY: Readonly<Record<string, PushEventCategory>
  * makes it visible during development and CI; production keeps the feed
  * notification but logs the problem rather than inventing a preference key.
  */
+/** Like normalizePushEventCategory, but returns undefined instead of throwing. */
+export function pushCategoryForFeedCategory(feedCategory: string): PushEventCategory | undefined {
+  return PUSH_CATEGORY_BY_FEED_CATEGORY[feedCategory.trim().toLowerCase()];
+}
+
 export function normalizePushEventCategory(
   feedCategory: string,
 ): PushEventCategory | undefined {
@@ -266,6 +271,13 @@ export async function sendPushToUser(
     if (category) {
       const key = preferenceKey(recipient?.accountType ?? null, category);
       if (key && recipient?.preferences?.[key] === false) return false;
+      // "Mute <category> alerts" from the Activity menu (activity_mutes `push:` key).
+      const [categoryMute] = await db
+        .select({ muteKey: activityMutes.muteKey })
+        .from(activityMutes)
+        .where(and(eq(activityMutes.userId, userId), eq(activityMutes.muteKey, `push:${category}`)))
+        .limit(1);
+      if (categoryMute) return false;
     }
     const tokens = await db
       .select({ token: pushTokens.token })

@@ -47,6 +47,7 @@ import { ClerkLoadErrorBoundary } from '@/components/ClerkLoadErrorBoundary';
 import AppIntroSplash from '@/components/splash/AppIntroSplash';
 import * as Notifications from 'expo-notifications';
 import { configureServices } from '@/lib/serviceConfig';
+import { startEngagementRetryFallback } from '@/lib/engagementRetryFallback';
 import {
   clearApiCache,
   configureApi,
@@ -1050,6 +1051,12 @@ function ServiceConfigurer() {
     if (isLoaded && !isSignedIn) dismissNetworkNotice();
   }, [isLoaded, isSignedIn]);
 
+  // Replays likes etc. queued offline from any screen, not only the feed.
+  useEffect(() => {
+    if (!isSignedIn) return;
+    return startEngagementRetryFallback();
+  }, [isSignedIn]);
+
   // Scope social and cart AsyncStorage keys by Clerk user ID so two accounts
   // on the same device never share data — even without a full sign-out cycle.
   // Clears the OLD user's cache first (before resetting the service userId) so
@@ -1560,6 +1567,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="live-feed"       options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
 
         <Stack.Screen name="buyer-muted"               options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-hidden-posts"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-restricted"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-addresses"       options={{ headerShown: false, animation: 'ios_from_right' }} />

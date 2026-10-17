@@ -18,6 +18,7 @@ vi.mock("@workspace/db", () => {
     clerkId: "clerkId",
   };
   const pushTokensTable = { token: "token", userId: "userId", isActive: "isActive" };
+  const activityMutesTable = { userId: "userId", muteKey: "muteKey" };
   const db = {
     select: (fields: Record<string, unknown>) => ({
       from: (table: unknown) => ({
@@ -27,6 +28,8 @@ vi.mock("@workspace/db", () => {
             const err = new Error('column "promo_push_opt_in" does not exist');
             return { then: (_res: unknown, rej: (e: Error) => void) => rej(err), limit: async () => { throw err; } };
           }
+          // No "Mute <category> alerts" key for this recipient.
+          if (table === activityMutesTable) return Object.assign(Promise.resolve([]), { limit: async () => [] });
           const isTokens = table === pushTokensTable;
           if (isTokens) state.tokenQueries += 1;
           const result = isTokens ? [] : state.recipient ? [state.recipient] : [];
@@ -40,6 +43,7 @@ vi.mock("@workspace/db", () => {
     db,
     users: usersTable,
     pushTokens: pushTokensTable,
+    activityMutes: activityMutesTable,
     notificationDeliveries: {},
     notificationBatchQueue: {},
     notificationEvents: {},

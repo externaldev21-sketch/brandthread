@@ -21,8 +21,9 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getConversations, markConversationRead, archiveConversation,
+  deleteConversationForMe, muteConversation,
   subscribeSocial,
-  searchProfiles, createOrGetConversation, muteUser, MY_USER_ID,
+  searchProfiles, createOrGetConversation, MY_USER_ID,
   getFriendSuggestions, cacheStoriesForViewer, setConversationPinned,
   getNotesForTray, postNote,
 } from '@/services/socialService';
@@ -36,6 +37,10 @@ import { ConversationPreview } from '@/components/inbox/ConversationPreview';
 import { CommunityInboxRow } from '@/components/community-inbox/CommunityInboxRow';
 import { openInboxComposeMenu } from '@/components/community-inbox/InboxComposeMenu';
 import { mergeInboxRows, communityMatchesQuery, type InboxMergedRow } from '@/lib/communities/inboxModel';
+import {
+  INBOX_FILTERS, inboxFilterLabel, conversationMatchesInboxFilter, communityMatchesInboxFilter,
+  isConversationMuted, type InboxFilter,
+} from '@/lib/inboxFilter';
 import { useInboxCommunities } from '@/lib/communities/useCommunityInbox';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 import { getLiveDirectory } from '@/lib/live/useLiveDirectory';
@@ -51,7 +56,7 @@ import {
 } from '@/lib/requestActions';
 import { subscribePendingConversationDeletes, DELETE_GRACE_MS } from '@/lib/pendingRequestDeletes';
 import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
-import { BLOCK_EXPLAINER } from '@/lib/safety';
+import { BLOCK_EXPLAINER, apiErrorMessage } from '@/lib/safety';
 import {
   isPreviewStoriesEnabled, getPreviewStoryTrayRows, getPreviewStoryFor,
   markPreviewStorySeen, PREVIEW_MY_STORY,
@@ -78,7 +83,7 @@ const NO_RIPPLE = false;
 type InboxTab = 'inbox' | 'requests';
 
 function InboxPillRow({
-  value, onChange, requestsCount, theme, gutter, onFilterPress,
+  value, onChange, requestsCount, theme, gutter, onFilterPress, filterLabel,
 }: {
   value: InboxTab;
   onChange: (tab: InboxTab) => void;
@@ -86,6 +91,8 @@ function InboxPillRow({
   theme: ReturnType<typeof useAppTheme>['theme'];
   gutter: number;
   onFilterPress: () => void;
+  /** Set while a filter other than "All messages" is applied. */
+  filterLabel?: string;
 }) {
   const pills: { key: InboxTab; label: string; count?: number }[] = [
     { key: 'inbox', label: 'Inbox' },
@@ -94,11 +101,16 @@ function InboxPillRow({
   return (
     <View style={[pillS.row, { paddingHorizontal: gutter }]}>
       <PressableScale
-        style={[pillS.iconPill, { borderColor: theme.border }]}
+        style={[
+          pillS.iconPill,
+          filterLabel
+            ? { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }
+            : { borderColor: theme.border },
+        ]}
         onPress={onFilterPress}
         rippleEnabled={NO_RIPPLE}
         accessibilityRole="button"
-        accessibilityLabel="Filter messages"
+        accessibilityLabel={filterLabel ? `Filter messages, showing ${filterLabel}` : 'Filter messages'}
         testID="inbox-filter-pill"
       >
         <Feather name="sliders" size={15} color={theme.text} />
@@ -338,6 +350,9 @@ export default function InboxScreen() {
   }, [isSearchBarOpen, searchHeaderFade]);
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<InboxTab>('inbox');
+  // Header filter button (item 96) — client-side over the loaded list. The
+  // "Archived" filter is also where archived chats are viewed/unarchived.
+  const [inboxFilter, setInboxFilter] = useState<InboxFilter>('all');
   const [typingConvId, setTypingConvId] = useState<string | null>(null);
   const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -587,13 +602,15 @@ export default function InboxScreen() {
 
   const messagesSearchLower = messagesSearchQuery.trim().toLowerCase();
 
-  // The primary list: ordinary (non-request, non-archived) conversations,
-  // optionally filtered by the search bar, pinned threads (e.g. the official
+  // The primary list: ordinary (non-request, non-archived) conversations —
+  // or only archived ones under the Archived filter — narrowed by the
+  // header filter and the search bar, pinned threads (e.g. the official
   // Brandthread Agent welcome thread — see the isPinned comment on
   // Conversation in services/socialTypes.ts) always sorted first.
   const filteredConvs = conversations
     .filter(conv => {
-      if (conv.isArchived || conv.isRequest || pendingDeleteIds.has(conv.id)) return false;
+      if (pendingDeleteIds.has(conv.id)) return false;
+      if (!conversationMatchesInboxFilter(conv, inboxFilter)) return false;
       if (messagesSearchLower) {
         const participant = getParticipant(conv);
         const haystack = [
@@ -610,7 +627,8 @@ export default function InboxScreen() {
   const { communities: joinedCommunities, toggleMute: toggleCommunityMute } = useInboxCommunities();
   const inboxRows = mergeInboxRows(
     filteredConvs,
-    joinedCommunities.filter(c => communityMatchesQuery(c, messagesSearchLower)),
+    joinedCommunities.filter(c =>
+      communityMatchesInboxFilter(c, inboxFilter) && communityMatchesQuery(c, messagesSearchLower)),
     { getKey: c => c.id, getTs: c => c.lastMessageTs, isPinned: c => !!c.isPinned },
   );
 
@@ -775,56 +793,81 @@ export default function InboxScreen() {
     // the row long-press menu completely dead in the web preview. See
     // components/ui/ActionSheet.tsx's header comment.
     showActionSheet('Options', undefined, [
-      { text: 'Archive', onPress: () => swipeArchiveConversation(conv), style: 'destructive' },
+      conv.isArchived
+        ? { text: 'Unarchive', onPress: () => setConversationArchivedFromInbox(conv, false) }
+        : { text: 'Archive', onPress: () => setConversationArchivedFromInbox(conv, true), style: 'destructive' },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
 
-  async function swipeArchiveConversation(conv: Conversation) {
-    // archiveConversation() re-fetches the real conversation list first — a
-    // seeded preview conversation has no real backend record, so that would
-    // 401 with no signed-in user. Just update local state there instead.
-    if (isPreviewConversationId(conv.id)) {
-      setConversations(prev => prev.map(item =>
-        item.id === conv.id ? { ...item, isArchived: true } : item
-      ));
-      showSnackbar('Conversation archived');
-      return;
-    }
+  // Archive / Unarchive (item 93): per-viewer and persisted server-side, so
+  // the chat no longer reappears on the next refetch. Optimistic, rolled
+  // back with a real error if the request fails. Archived chats live under
+  // the header filter's "Archived" option; a new message unarchives them.
+  async function setConversationArchivedFromInbox(conv: Conversation, archived: boolean) {
+    const done = archived ? 'Chat archived — find it under Filter › Archived' : 'Chat moved back to your inbox';
+    setConversations(prev => prev.map(item =>
+      item.id === conv.id ? { ...item, isArchived: archived } : item
+    ));
+    // A seeded preview conversation has no real backend record — local only.
+    if (isPreviewConversationId(conv.id)) { showSnackbar(done); return; }
     try {
-      await archiveConversation(conv.id);
+      await archiveConversation(conv.id, archived);
+      showSnackbar(done);
+    } catch (e) {
       setConversations(prev => prev.map(item =>
-        item.id === conv.id ? { ...item, isArchived: true } : item
+        item.id === conv.id ? { ...item, isArchived: conv.isArchived } : item
       ));
-      showSnackbar('Conversation archived');
-    } catch {
-      Alert.alert('Couldn’t archive', 'Please try again.');
+      Alert.alert(archived ? 'Couldn’t archive' : 'Couldn’t unarchive', apiErrorMessage(e, 'Please try again.'));
     }
   }
 
-  // Swipe actions on a Messages-tab row: delete removes it from the inbox
-  // (there is no true delete-conversation endpoint, so this archives it,
-  // matching the existing long-press "Archive" behavior), mute silences the
-  // other participant (reusing the existing user-mute feature), and mark
-  // read clears the unread badge without opening the thread.
+  // Swipe actions on a Messages-tab row: Delete deletes the chat for the
+  // viewer only (the other person keeps it; a new message from them brings
+  // it back), Mute is the real per-chat mute that suppresses this chat's
+  // notifications, and mark read clears the unread badge without opening it.
   async function swipeDeleteConversation(conv: Conversation) {
-    await swipeArchiveConversation(conv);
+    const participant = getParticipant(conv);
+    const confirmed = await confirmDestructiveActionSheet({
+      title: 'Delete chat?',
+      message: `This deletes the chat and its messages for you only. ${participant?.name ?? 'The other person'} will still see them.`,
+      confirmLabel: 'Delete for me',
+    });
+    if (!confirmed) return;
+    hapticDestructiveConfirm();
+    setConversations(prev => prev.filter(item => item.id !== conv.id));
+    if (isPreviewConversationId(conv.id)) { showSnackbar('Chat deleted for you'); return; }
+    try {
+      await deleteConversationForMe(conv.id);
+      showSnackbar('Chat deleted for you');
+    } catch (e) {
+      setConversations(prev => (prev.some(item => item.id === conv.id) ? prev : [...prev, conv]));
+      Alert.alert('Couldn’t delete chat', apiErrorMessage(e, 'Please try again.'));
+    }
   }
 
+  // Swipe > Mute / Unmute (item 95): the same chat mute as Chat details >
+  // Mute (PATCH /api/conversations/:id/mute), "until I turn it back on".
+  // Optimistic, rolled back with a real error on failure.
   async function swipeMuteConversation(conv: Conversation) {
-    const participant = getParticipant(conv);
-    if (!participant) return;
+    const nextMuted = !isConversationMuted(conv);
+    const optimisticUntil = nextMuted ? '9999-12-31T00:00:00.000Z' : undefined;
+    setConversations(prev => prev.map(item =>
+      item.id === conv.id ? { ...item, mutedUntil: optimisticUntil, isMuted: nextMuted } : item
+    ));
+    const done = nextMuted ? 'Chat muted — you won’t get notifications for it' : 'Chat unmuted';
+    if (isPreviewConversationId(conv.id)) { showSnackbar(done); return; }
     try {
-      await muteUser({
-        userId: participant.userId,
-        name: participant.name,
-        handle: participant.handle,
-        initials: participant.initials,
-        color: participant.color,
-      });
-      showSnackbar(`Muted ${participant.name}`);
-    } catch {
-      Alert.alert('Couldn’t mute', 'Please try again.');
+      const until = await muteConversation(conv.id, nextMuted ? -1 : null);
+      setConversations(prev => prev.map(item =>
+        item.id === conv.id ? { ...item, mutedUntil: until ?? undefined, isMuted: !!until } : item
+      ));
+      showSnackbar(done);
+    } catch (e) {
+      setConversations(prev => prev.map(item =>
+        item.id === conv.id ? { ...item, mutedUntil: conv.mutedUntil, isMuted: conv.isMuted } : item
+      ));
+      Alert.alert(nextMuted ? 'Couldn’t mute' : 'Couldn’t unmute', apiErrorMessage(e, 'Please try again.'));
     }
   }
 
@@ -1067,13 +1110,17 @@ export default function InboxScreen() {
     dismissSuggestedPerson(person.userId).catch(() => {});
   }
 
+  // Header filter button (item 96): the shared ActionSheet (Alert.alert is
+  // a no-op on web), applied client-side by conversationMatchesInboxFilter.
   function openFilterMenu() {
-    // Alert.alert() is a silent no-op on web (react-native-web has no
-    // native dialog to defer to), so it left this button dead in the web
-    // preview — no dialog, no honest "not available" state, nothing. Use
-    // the screen's existing snackbar (already the pattern for every other
-    // inbox affordance above) so the tap always gives real feedback.
-    showSnackbar('Message filters — coming soon');
+    const archivedCount = conversations.filter(c => c.isArchived && !c.isRequest).length;
+    showActionSheet('Filter messages', `Showing: ${inboxFilterLabel(inboxFilter)}`, [
+      ...INBOX_FILTERS.map(f => ({
+        text: f.key === 'archived' && archivedCount > 0 ? `${f.label} (${archivedCount})` : f.label,
+        onPress: () => { setInboxFilter(f.key); setActiveTab('inbox'); },
+      })),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────────
@@ -1117,14 +1164,25 @@ export default function InboxScreen() {
           ? `Unpin conversation with ${participant.name}`
           : `Pin conversation with ${participant.name}`,
       }]),
+      ...(conv.isArchived ? [{
+        key: 'unarchive',
+        label: 'Unarchive',
+        icon: 'inbox' as const,
+        color: theme.cardElevated,
+        textColor: theme.muted,
+        onPress: () => setConversationArchivedFromInbox(conv, false),
+        accessibilityLabel: `Unarchive conversation with ${participant.name}`,
+      }] : []),
       {
         key: 'mute',
-        label: 'Mute',
-        icon: 'bell-off',
+        label: isConversationMuted(conv) ? 'Unmute' : 'Mute',
+        icon: isConversationMuted(conv) ? 'bell' : 'bell-off',
         color: theme.cardElevated,
         textColor: theme.muted,
         onPress: () => swipeMuteConversation(conv),
-        accessibilityLabel: `Mute ${participant.name}`,
+        accessibilityLabel: isConversationMuted(conv)
+          ? `Unmute conversation with ${participant.name}`
+          : `Mute conversation with ${participant.name}`,
       },
       {
         key: 'delete',
@@ -1133,7 +1191,7 @@ export default function InboxScreen() {
         color: theme.cardElevated,
         textColor: theme.error,
         onPress: () => swipeDeleteConversation(conv),
-        accessibilityLabel: `Delete conversation with ${participant.name}`,
+        accessibilityLabel: `Delete conversation with ${participant.name} for you`,
       },
     ];
 
@@ -1344,6 +1402,16 @@ export default function InboxScreen() {
     // Only reached for the search-no-matches and load-error cases — the
     // true zero-conversations empty state is the hand-rolled Threads-style
     // treatment below (renderInboxEmptyState).
+    if (inboxFilter !== 'all' && !messagesSearchLower && !loadError) {
+      return (
+        <EmptyState
+          icon="sliders"
+          title={inboxFilter === 'archived' ? 'No archived chats' : 'Nothing here'}
+          description={`No chats match the ${inboxFilterLabel(inboxFilter)} filter.`}
+          action={{ label: 'Show all messages', onPress: () => setInboxFilter('all') }}
+        />
+      );
+    }
     if (messagesSearchLower && !loadError) {
       return (
         <EmptyState
@@ -1714,6 +1782,7 @@ export default function InboxScreen() {
           theme={theme}
           gutter={gutter}
           onFilterPress={openFilterMenu}
+          filterLabel={inboxFilter !== 'all' ? inboxFilterLabel(inboxFilter) : undefined}
         />
       )}
 
@@ -1732,8 +1801,8 @@ export default function InboxScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
         >
           <View style={{ paddingHorizontal: gutter }}>
-            {messagesSearchLower || loadError ? renderEmptyState() : renderInboxEmptyState()}
-            {!messagesSearchLower && !loadError && renderSuggestedSection()}
+            {messagesSearchLower || loadError || inboxFilter !== 'all' ? renderEmptyState() : renderInboxEmptyState()}
+            {!messagesSearchLower && !loadError && inboxFilter === 'all' && renderSuggestedSection()}
           </View>
         </ScrollView>
       ) : (
@@ -1749,7 +1818,7 @@ export default function InboxScreen() {
             keyboardDismissMode="on-drag"
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            ListFooterComponent={!messagesSearchLower ? renderSuggestedSection : undefined}
+            ListFooterComponent={!messagesSearchLower && inboxFilter === 'all' ? renderSuggestedSection : undefined}
           />
         </View>
       )}

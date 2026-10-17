@@ -9,7 +9,7 @@
 import type { Request } from "express";
 import { getAuth } from "@clerk/express";
 import { and, eq, inArray, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
-import { blocks, db, mutedWords, reports, users } from "@workspace/db";
+import { blocks, db, mutedWords, reports, userMutes, userRestrictions, users } from "@workspace/db";
 import type { ModerationCategory } from "./contentModerator";
 
 /** Signed-in viewer on routes that also serve signed-out visitors. */
@@ -56,6 +56,82 @@ export async function blockedUserIds(viewerId: string | null | undefined): Promi
   const ids = new Set<string>();
   for (const row of rows) ids.add(row.blockerId === viewerId ? row.blockedId : row.blockerId);
   return ids;
+}
+
+/**
+ * Person mutes are one-way: the muter stops seeing the muted person's posts
+ * (and comments) and/or stories; nothing changes for the muted person and
+ * they are never told. A viewer's own content is never hidden from them.
+ */
+export type MuteKind = "posts" | "stories";
+
+/**
+ * SQL predicate: `viewerId` has not muted the user in `authorColumn` for this
+ * kind of content. Undefined for signed-out viewers (for drizzle's `and(...)`).
+ */
+export function notMutedBy(viewerId: string | null | undefined, authorColumn: SQLWrapper, kind: MuteKind = "posts"): SQL | undefined {
+  if (!viewerId) return undefined;
+  const flag = kind === "stories" ? sql`um.mute_stories` : sql`um.mute_posts`;
+  return sql`NOT EXISTS (
+    SELECT 1 FROM user_mutes um
+    WHERE um.muter_id = ${viewerId} AND um.muted_id = ${authorColumn} AND ${flag}
+  )`;
+}
+
+/** Everyone `viewerId` has muted for this kind of content (never includes the viewer). */
+export async function mutedUserIds(viewerId: string | null | undefined, kind: MuteKind = "posts"): Promise<Set<string>> {
+  if (!viewerId) return new Set();
+  const rows = await db
+    .select({ mutedId: userMutes.mutedId })
+    .from(userMutes)
+    .where(and(
+      eq(userMutes.muterId, viewerId),
+      kind === "stories" ? eq(userMutes.muteStories, true) : eq(userMutes.mutePosts, true),
+    ));
+  return new Set(rows.map((row) => row.mutedId).filter((id) => id !== viewerId));
+}
+
+/**
+ * Restrict: a restricted person's comments on the restrictor's posts are only
+ * visible to the restricted person (they aren't told). Returns, for each post
+ * owner in `ownerIds`, the set of people that owner has restricted.
+ */
+export async function restrictedByOwners(ownerIds: string[]): Promise<Map<string, Set<string>>> {
+  const unique = [...new Set(ownerIds.filter(Boolean))];
+  const out = new Map<string, Set<string>>();
+  if (unique.length === 0) return out;
+  const rows = await db
+    .select({ restrictorId: userRestrictions.restrictorId, restrictedId: userRestrictions.restrictedId })
+    .from(userRestrictions)
+    .where(inArray(userRestrictions.restrictorId, unique));
+  for (const row of rows) {
+    if (!out.has(row.restrictorId)) out.set(row.restrictorId, new Set());
+    out.get(row.restrictorId)!.add(row.restrictedId);
+  }
+  return out;
+}
+
+export async function isRestrictedBy(restrictorId: string, userId: string): Promise<boolean> {
+  if (!restrictorId || !userId || restrictorId === userId) return false;
+  const [row] = await db
+    .select({ id: userRestrictions.restrictedId })
+    .from(userRestrictions)
+    .where(and(eq(userRestrictions.restrictorId, restrictorId), eq(userRestrictions.restrictedId, userId)))
+    .limit(1);
+  return !!row;
+}
+
+/**
+ * SQL predicate for comment rows: hide a comment written by someone the post
+ * owner restricted, unless the viewer is that comment's author.
+ */
+export function restrictedCommentVisible(
+  viewerId: string | null | undefined, commentAuthorColumn: SQLWrapper, postOwnerColumn: SQLWrapper,
+): SQL {
+  return sql`(${viewerId ? sql`${commentAuthorColumn} = ${viewerId} OR ` : sql``}NOT EXISTS (
+    SELECT 1 FROM user_restrictions ur
+    WHERE ur.restrictor_id = ${postOwnerColumn} AND ur.restricted_id = ${commentAuthorColumn}
+  ))`;
 }
 
 export type BlockRelation = "none" | "blocked_by_me" | "blocked_me" | "mutual";

@@ -40,7 +40,8 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
-import { isBuyerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { withDemoFallback } from '@/lib/search/demoFallback';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { ProductTile } from '@/components/search/ProductTile';
 import { ShopByCategoryRail } from '@/components/discover/DiscoverShopRails';
@@ -170,6 +171,10 @@ export default function BuyerSearchScreen() {
   const { isSignedIn } = useAuth();
   const inputRef = useRef<TextInput>(null);
   const previewMode = isBuyerDevPreview();
+  // Bundled sample accounts/posts/products only ever back the explicit
+  // ?bt_preview=buyer&demo=1 preview — never the live app, where a sample
+  // result would open "Product not found".
+  const demoMode = previewMode && isPreviewDemoMode();
 
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -247,13 +252,13 @@ export default function BuyerSearchScreen() {
     if (productRes.status === 'fulfilled' && productRes.value.facets) setFacets(productRes.value.facets);
     else if (productRes.status !== 'fulfilled') setFacets(null);
     let peopleResult = peopleRes.status === 'fulfilled' ? (peopleRes.value as unknown as SearchPerson[]) : [];
-    if (peopleResult.length === 0 && previewMode) {
+    if (peopleResult.length === 0 && demoMode) {
       const q = term.toLowerCase();
       peopleResult = PREVIEW_ACCOUNTS.filter((p) => p.name.toLowerCase().includes(q) || p.handle.toLowerCase().includes(q));
     }
     setPeople(peopleResult);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewMode, filters]);
+  }, [previewMode, demoMode, filters]);
 
   useEffect(() => {
     const q = query.trim();
@@ -275,12 +280,13 @@ export default function BuyerSearchScreen() {
   const productResultsRaw = useMemo(() => results.filter((r): r is ProductResult => r.kind === 'product'), [results]);
   const brandResultsRaw = useMemo(() => results.filter((r): r is BrandResult => r.kind === 'brand'), [results]);
   const videoResultsRaw = useMemo(() => results.filter((r): r is VideoResult => r.kind === 'video'), [results]);
-  // Blend in bundled preview posts/products when the live API has nothing
-  // for this query — matched against name/author/brand, not just caption.
-  const videoResults = videoResultsRaw.length > 0 ? videoResultsRaw
-    : (trimmedQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], trimmedQuery)) : []);
-  const productResults = productResultsRaw.length > 0 ? productResultsRaw
-    : (trimmedQuery.length > 0 && activeFilterCount === 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
+  // Demo preview only: blend in bundled preview posts/products when there is
+  // nothing for this query — matched against name/author/brand, not just
+  // caption. Live searches show the real (possibly empty) results.
+  const videoResults = withDemoFallback(videoResultsRaw, demoMode, () =>
+    trimmedQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], trimmedQuery)) : []);
+  const productResults = withDemoFallback(productResultsRaw, demoMode, () =>
+    trimmedQuery.length > 0 && activeFilterCount === 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
   const brandRows: SearchBrandRow[] = brandResultsRaw.map((b) => ({ id: b.id, name: b.name, handle: (b as any).handle ?? '', color: b.color, initials: b.initials }));
   // Server-side hashtag search first (real post counts), then tags derived
   // from the matched captions for anything the index does not know yet.

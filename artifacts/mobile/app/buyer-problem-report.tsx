@@ -10,6 +10,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useUser } from '@clerk/expo';
+import { apiErrorMessage } from '@/lib/safety';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -38,6 +40,7 @@ export default function BuyerProblemReportScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useUser();
 
   const [order, setOrder] = useState<BuyerOrderView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,11 +88,13 @@ export default function BuyerProblemReportScreen() {
         description: description.trim(),
         evidenceUris: evidencePhotos,
         contactedSeller,
+        contactEmail: user?.primaryEmailAddress?.emailAddress ?? undefined,
+        contactName: user?.fullName || user?.username || undefined,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSubmitted(true);
-    } catch {
-      Alert.alert('Error', 'Could not submit your report. Please try again.');
+    } catch (error) {
+      Alert.alert('Could not submit your report', apiErrorMessage(error, 'Please check your connection and try again.'));
     }
     setSubmitting(false);
   }
@@ -103,7 +108,7 @@ export default function BuyerProblemReportScreen() {
       <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
         <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
         <Text style={s.successTitle}>Report submitted</Text>
-        <Text style={s.successSub}>Your problem report has been received. Our team will review it and reach out if needed.</Text>
+        <Text style={s.successSub}>{isGeneralReport ? 'Your problem report has been received. Our team will review it and reach out if needed.' : 'Your report was sent to the seller and our support team. We\'ll reach out if we need more details.'}</Text>
         <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={s.doneBtn} />
       </View>
     );

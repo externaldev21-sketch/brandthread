@@ -14,13 +14,14 @@
  */
 import { attachQuoteData } from "../lib/quotedPosts";
 import { Router } from "express";
-import { db, posts, interactions, users, liveStreams, postTaggedProducts, products, productVariants } from "@workspace/db";
-import { eq, inArray, sql } from "drizzle-orm";
+import { db, posts, interactions, users, liveStreams, postTaggedProducts, products, productVariants, feedNotInterested } from "@workspace/db";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "@workspace/api-zod";
 import { requireAuth, requireModerator } from "../middlewares/requireAuth";
 import { validateRequest } from "../middlewares/validateRequest";
 import { rateLimit } from "../middlewares/rateLimit";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
+import { authorInGoodStanding, mutedUserIds, notBlockedWith } from "../lib/safety";
 import { getForYouFeed, applyEventToProfile, type ForYouResultItem } from "../lib/ranking/forYou";
 import { getRankingConfig, saveRankingConfig, DEFAULT_RANKING_CONFIG } from "../lib/ranking/config";
 import { hidePostFromForYou, unhidePostFromForYou } from "../lib/ranking/signals";
@@ -123,7 +124,10 @@ router.get("/for-you", requireAuth, async (req, res) => {
   const { limit, offset } = page.data;
 
   try {
-    const ranked = await getForYouFeed(userId);
+    // The ranking is cached for a short TTL, so a person muted since it was
+    // built is dropped here too (candidate generation also excludes them).
+    const [rankedAll, muted] = await Promise.all([getForYouFeed(userId), mutedUserIds(userId, "posts")]);
+    const ranked = muted.size === 0 ? rankedAll : rankedAll.filter((i) => i.isLive || !muted.has(i.sellerId));
     const slice = ranked.slice(offset, offset + limit);
     setPaginationHeaders(res, page.data, slice.length, ranked.length);
 
@@ -265,6 +269,51 @@ router.get("/for-you", requireAuth, async (req, res) => {
   } catch (err) {
     req.log.error({ err, userId }, "Failed to build For You feed");
     res.status(500).json({ error: "Failed to load feed" });
+  }
+});
+
+// ─── GET /api/feed/not-interested ─────────────────────────────────────────────
+// The viewer's own "Not interested" hides, newest first, so they can be undone
+// from Settings → Hidden posts. Deleted posts cascade out of the table.
+router.get("/not-interested", requireAuth, async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "50"), 10) || 50, 1), 100);
+  const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
+  try {
+    const rows = await db
+      .select({
+        postId: feedNotInterested.postId,
+        hiddenAt: feedNotInterested.createdAt,
+        caption: posts.caption,
+        mediaType: posts.mediaType,
+        mediaUrl: posts.mediaUrl,
+        thumbnailUrl: posts.thumbnailUrl,
+        authorId: posts.userId,
+        authorName: sql<string | null>`coalesce(${users.displayName}, ${users.name})`,
+        authorUsername: users.username,
+      })
+      .from(feedNotInterested)
+      .innerJoin(posts, eq(posts.id, feedNotInterested.postId))
+      .leftJoin(users, eq(users.clerkId, posts.userId))
+      .where(and(
+        eq(feedNotInterested.userId, userId),
+        // Only posts the viewer could still see: not deleted/archived, not
+        // removed by moderation, author in good standing and not blocked.
+        sql`${posts.postStatus} NOT IN ('deleted', 'archived')`,
+        eq(posts.moderationStatus, "visible"),
+        authorInGoodStanding(posts.userId),
+        notBlockedWith(userId, posts.userId),
+      ))
+      .orderBy(desc(feedNotInterested.createdAt))
+      .limit(limit)
+      .offset(offset);
+    res.json({
+      items: rows.map((row) => ({ ...row, hiddenAt: row.hiddenAt.toISOString() })),
+      nextOffset: rows.length === limit ? offset + limit : null,
+    });
+  } catch (err) {
+    req.log.error({ err, userId }, "Failed to list not-interested posts");
+    res.status(500).json({ error: "Failed to load hidden posts" });
   }
 });
 

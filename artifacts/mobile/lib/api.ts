@@ -8,7 +8,7 @@ import { prepareImageForUpload } from '@/lib/imageUploadPrep';
 import { useAuth } from '@clerk/expo';
 import type { LaunchChecklistResponse } from '@/lib/launchChecklist';
 import type {
-  AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
+  AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment, ThreadComment,
   ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
 } from './safetyTypes';
 import { useMemo, useRef } from 'react';
@@ -46,6 +46,19 @@ export interface ServerHighlight {
   position: number; itemCount: number;
   items: Array<{ id: string; storyId: string | null; media: any[]; visibility: string; thumbnailUrl: string | null; storyCreatedAt: number | null; position: number }>;
   createdAt: number; updatedAt: number;
+}
+/** A buyer problem report on an order (POST/GET /api/order-problems). */
+export interface OrderProblemReport {
+  id: string; orderId: string | null; orderNumber: string | null;
+  type: string; typeLabel: string; description: string; evidenceUrls: string[];
+  contactedSeller: boolean; escalatedToSupport: boolean;
+  status: 'open' | 'under_review' | 'resolved' | 'closed'; submittedAt: string;
+}
+/** A post hidden with "Not interested" (GET /api/feed/not-interested). */
+export interface HiddenFeedPost {
+  postId: string; hiddenAt: string; caption: string | null; mediaType: string | null;
+  mediaUrl: string | null; thumbnailUrl: string | null;
+  authorId: string; authorName: string | null; authorUsername: string | null;
 }
 /** A story of mine that can be added to a highlight (live or archived). */
 export interface HighlightPickerStory {
@@ -2728,6 +2741,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     comments: {
       list: (postId: string, before?: string) =>
         freshGet<CommentThread>(`/api/posts/${encodeURIComponent(postId)}/comments${before ? `?before=${encodeURIComponent(before)}` : ''}`),
+      /** Next page of replies under one root comment (the thread inlines only the first 50). */
+      replies: (postId: string, commentId: string, after?: string | null) =>
+        freshGet<{ replies: ThreadComment[]; repliesNextCursor: string | null }>(
+          `/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/replies${after ? `?after=${encodeURIComponent(after)}` : ''}`,
+        ),
       create: (postId: string, body: string, parentId?: string | null) =>
         post<CreatedComment>(`/api/posts/${encodeURIComponent(postId)}/comments`, { body, ...(parentId ? { parentId } : {}) }),
       remove: (postId: string, commentId: string) =>
@@ -3040,10 +3058,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     privacy: {
       /** Get current server-side privacy preferences */
       get: () =>
-        get<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; canBePrivate?: boolean }>('/api/auth/privacy'),
-      /** Update server-side privacy preferences */
-      update: (settings: { dmPrivacy?: 'requests' | 'followers_only'; isPrivate?: boolean }) =>
-        patch<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean }>('/api/auth/privacy', settings),
+        get<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; canBePrivate?: boolean; settings?: Record<string, unknown> }>('/api/auth/privacy'),
+      /** Update server-side privacy preferences (`settings` = Privacy-screen keys; socialService.updatePrivacySettings sends them). */
+      update: (settings: { dmPrivacy?: 'requests' | 'followers_only'; isPrivate?: boolean; settings?: Record<string, unknown> }) =>
+        patch<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; settings?: Record<string, unknown> }>('/api/auth/privacy', settings),
     },
     /** Private-account follow requests (incoming) and the Close Friends list. */
     followRequests: {
@@ -3270,6 +3288,20 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       get:          (id: string) => get<any>(`/api/returns/${id}`),
       updateStatus: (id: string, data: { status: string; sellerResponse?: string; refundAmountCents?: number }) =>
         patch<any>(`/api/returns/${id}/status`, data),
+    },
+    /** Buyer "Report a problem" — saved server-side; seller + support see it. */
+    orderProblems: {
+      create: (data: {
+        orderId?: string;
+        type: string;
+        description: string;
+        evidenceUrls?: string[];
+        contactedSeller?: boolean;
+        email?: string;
+        name?: string;
+      }) => post<OrderProblemReport>('/api/order-problems', data),
+      mine: () => get<OrderProblemReport[]>('/api/order-problems/mine'),
+      forOrder: (orderId: string) => get<OrderProblemReport[]>(`/api/order-problems/order/${encodeURIComponent(orderId)}`),
     },
     /** Shipping rates — seller-configured rates */
     shippingRates: {
@@ -4066,6 +4098,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         params.set('offset', String(opts.offset ?? 0));
         return get<{ items: any[]; nextOffset: number | null }>(`/api/feed/for-you?${params.toString()}`);
       },
+      /** Posts the viewer marked "Not interested" (Settings → Hidden posts). */
+      notInterested: (opts: { limit?: number; offset?: number } = {}) =>
+        get<{ items: HiddenFeedPost[]; nextOffset: number | null }>(
+          `/api/feed/not-interested?limit=${opts.limit ?? 50}&offset=${opts.offset ?? 0}`,
+        ),
+      /** Undoes a "Not interested" hide so the post can appear in feeds again. */
+      undoNotInterested: (postId: string) =>
+        del<{ ok: boolean; removed: boolean }>(`/api/feed/not-interested/${encodeURIComponent(postId)}`),
     },
     /**
      * Public "For You" ranked Discover feed — no auth required (an Authorization
