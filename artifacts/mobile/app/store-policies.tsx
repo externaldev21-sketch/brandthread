@@ -160,7 +160,7 @@ export default function StorePoliciesScreen() {
     return (
       <View style={[s.root, { backgroundColor: 'transparent' }]}>
         <View style={[s.header, { borderBottomColor: BORDER, height: 56 + headerTopInset, paddingTop: headerTopInset }]}>
-          <TouchableOpacity onPress={closeEdit} style={s.backBtn} hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}><Feather name="x" size={21} color={FG} /></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={closeEdit} style={s.backBtn} hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}><Feather name="x" size={21} color={FG} /></TouchableOpacity>
           <Text style={[s.headerTitle, { color: FG }]} numberOfLines={1} ellipsizeMode="tail">{policyMeta.label}</Text>
           <Button label="Save" variant="primary" size="compact" loading={saving} onPress={handleSave} />
         </View>

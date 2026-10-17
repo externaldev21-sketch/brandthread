@@ -74,7 +74,7 @@ function TaskCard({
         ]}
       >
         {/* Left: check circle */}
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={task.completed ? 'Completed' : 'Mark as done'}
           onPress={task.completed ? undefined : handleComplete}
           style={[ts.check, task.completed && ts.checkDone]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

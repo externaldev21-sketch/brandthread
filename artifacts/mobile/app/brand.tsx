@@ -225,7 +225,7 @@ export default function BrandScreen() {
               {logoImages.map((b64, i) => {
                 const isSelected = selectedLogo === i;
                 return (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Logo option ${i + 1}`}
                     key={i}
                     activeOpacity={0.85}
                     onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedLogo(i); }}

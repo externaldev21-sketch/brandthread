@@ -234,7 +234,7 @@ export default function UsersScreen() {
         title={title}
         rightElement={
           <View style={styles.headerActions}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="More options"
               onPress={() => {
                 haptic();
                 Alert.alert(title, undefined, [

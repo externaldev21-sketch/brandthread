@@ -232,7 +232,7 @@ export default function ProductSizeChartScreen() {
           {columns.map((col, idx) => (
             <View key={idx} style={s.chip}>
               <Text style={s.chipText}>{col}</Text>
-              <TouchableOpacity onPress={() => removeColumn(idx)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove" onPress={() => removeColumn(idx)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                 <Feather name="x" size={12} color={theme.muted} />
               </TouchableOpacity>
             </View>
@@ -247,7 +247,7 @@ export default function ProductSizeChartScreen() {
             placeholderTextColor={theme.subtle}
             onSubmitEditing={addColumn}
           />
-          <TouchableOpacity style={s.addBtn} onPress={addColumn} activeOpacity={0.8}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add column" style={s.addBtn} onPress={addColumn} activeOpacity={0.8}>
             <Feather name="plus" size={ICON.sm} color={theme.accentLight} />
           </TouchableOpacity>
         </View>
@@ -294,7 +294,7 @@ export default function ProductSizeChartScreen() {
                     </View>
                   ))}
                   <View style={[t.cell, t.actionCell]}>
-                    <TouchableOpacity onPress={() => removeRow(ri)}>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete" onPress={() => removeRow(ri)}>
                       <Feather name="trash-2" size={14} color={theme.error} />
                     </TouchableOpacity>
                   </View>
@@ -314,7 +314,7 @@ export default function ProductSizeChartScreen() {
             placeholderTextColor={theme.subtle}
             onSubmitEditing={addRow}
           />
-          <TouchableOpacity style={s.addBtn} onPress={addRow} activeOpacity={0.8}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add row" style={s.addBtn} onPress={addRow} activeOpacity={0.8}>
             <Feather name="plus" size={ICON.sm} color={theme.accentLight} />
           </TouchableOpacity>
         </View>

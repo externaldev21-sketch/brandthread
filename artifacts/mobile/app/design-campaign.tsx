@@ -117,14 +117,14 @@ function MediaThumb({
       {isVideo && (
         <View style={mt.videoBadge}><Feather name="play" size={10} color="#fff" /></View>
       )}
-      <TouchableOpacity style={mt.removeBtn} onPress={onRemove} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} testID={`media-remove-${index}`}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove" style={mt.removeBtn} onPress={onRemove} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} testID={`media-remove-${index}`}>
         <Feather name="x" size={12} color="#fff" />
       </TouchableOpacity>
       <View style={mt.reorderRow}>
-        <TouchableOpacity style={[mt.reorderBtn, !canMoveLeft && { opacity: 0.3 }]} onPress={onMoveLeft} disabled={!canMoveLeft}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Move left" style={[mt.reorderBtn, !canMoveLeft && { opacity: 0.3 }]} onPress={onMoveLeft} disabled={!canMoveLeft}>
           <Feather name="chevron-left" size={11} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity style={[mt.reorderBtn, !canMoveRight && { opacity: 0.3 }]} onPress={onMoveRight} disabled={!canMoveRight}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Move right" style={[mt.reorderBtn, !canMoveRight && { opacity: 0.3 }]} onPress={onMoveRight} disabled={!canMoveRight}>
           <Feather name="chevron-right" size={11} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -790,7 +790,7 @@ export default function CreateAdScreen() {
                 />
               ))}
               {mediaKind === 'photos' && localPaths.length < MAX_PHOTOS && (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add photos"
                   style={[mt.wrap, { alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed', backgroundColor: colors.elevated, borderColor: colors.border }]}
                   onPress={() => pickMedia('photos')}
                   testID="add-more-photos-btn"

@@ -304,7 +304,7 @@ export default function DesignBgReplaceScreen({
           <View style={s.ph}>
             <View style={s.swatchGrid}>
               {COLOR_SWATCHES.map((sw) => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Color ${sw.hex}`}
                   key={sw.hex}
                   onPress={() => { setSelectedSwatchHex(sw.hex); setCustomColor(sw.hex); }}
                   style={[s.swatch, { backgroundColor: sw.hex }, selectedSwatchHex === sw.hex && s.swatchSelected]}

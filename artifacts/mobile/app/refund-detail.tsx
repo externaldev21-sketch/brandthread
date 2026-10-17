@@ -37,14 +37,14 @@ const REFUND_TYPES: { key: RefundType; label: string }[] = [
 function QtySelector({ value, max, onChange }: { value: number; max: number; onChange: (v: number) => void }) {
   return (
     <View style={qtyS.root}>
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease quantity"
         style={qtyS.btn}
         onPress={() => onChange(Math.max(0, value - 1))}
       >
         <Feather name="minus" size={ICON.xs} color={value === 0 ? SUBTLE : FG} />
       </TouchableOpacity>
       <Text style={qtyS.val}>{value}</Text>
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase quantity"
         style={qtyS.btn}
         onPress={() => onChange(Math.min(max, value + 1))}
       >

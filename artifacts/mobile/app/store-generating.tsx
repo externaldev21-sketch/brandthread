@@ -149,7 +149,7 @@ export default function StoreGeneratingScreen() {
         style={StyleSheet.absoluteFill}
       />
       {/* Back button — lets users cancel generation */}
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back"
         onPress={() => goBackOr(router)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         activeOpacity={0.75}

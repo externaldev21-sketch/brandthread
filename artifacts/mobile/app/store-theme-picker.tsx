@@ -201,7 +201,7 @@ export default function StoreThemePicker() {
                 {previewingTheme.bestFor}
               </Text>
             </View>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close preview"
               onPress={() => setPreviewingThemeId(null)}
               style={styles.closeBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

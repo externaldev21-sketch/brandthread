@@ -1493,7 +1493,7 @@ export default function AddProductScreen() {
                   {COLOR_PRESETS.map(c => {
                     const selected = opt.values.some(v => v.value === c.name);
                     return (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={c.name}
                         key={c.name}
                         onPress={() => {
                           const updated = [...localOptions];
@@ -1541,7 +1541,7 @@ export default function AddProductScreen() {
                 placeholder="Add value..."
                 placeholderTextColor={SUBTLE}
               />
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add value"
                 style={s.customValueAdd}
                 onPress={() => {
                   if (!opt.customInput.trim()) return;
@@ -1647,7 +1647,7 @@ export default function AddProductScreen() {
               <BrandthreadCard key={v.id} style={[s.variantRow, bulkEditMode && selected && { borderColor: BORDER_ACTIVE }]}>
                 <View style={s.variantTitleRow}>
                   {bulkEditMode && (
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Select variant"
                       onPress={() => setSelectedVariantIds(prev => {
                         const next = new Set(prev);
                         if (next.has(v.id)) next.delete(v.id); else next.add(v.id);
@@ -1688,7 +1688,7 @@ export default function AddProductScreen() {
                     keyboardType="numeric"
                     returnKeyType="done"
                   />
-                  <TouchableOpacity onPress={() => updateUnsavedState(setLocalVariants, prev => prev.filter(x => x.id !== v.id))} style={{ padding: 4 }}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete variant" onPress={() => updateUnsavedState(setLocalVariants, prev => prev.filter(x => x.id !== v.id))} style={{ padding: 4 }}>
                     <Feather name="trash-2" size={14} color={RED} />
                   </TouchableOpacity>
                 </View>

@@ -380,7 +380,7 @@ export default function ProductVariantsScreen() {
                           </Pressable>
                           <TextInput style={st.stockPill} value={stockText} keyboardType="number-pad" selectTextOnFocus
                             onChangeText={(t) => setEdit(v.id, { stock: t.replace(/[^0-9]/g, '') })} accessibilityLabel={`Stock for ${label}`} />
-                          <Pressable hitSlop={8} onPress={() => setExpanded(open ? null : v.id)}>
+                          <Pressable accessibilityRole="button" accessibilityLabel={open ? 'Collapse variant' : 'Expand variant'} hitSlop={8} onPress={() => setExpanded(open ? null : v.id)}>
                             <Feather name={open ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={colors.mutedForeground} />
                           </Pressable>
                         </View>

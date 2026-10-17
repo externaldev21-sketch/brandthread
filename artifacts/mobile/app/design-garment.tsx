@@ -312,7 +312,7 @@ export default function DesignGarmentScreen() {
           <Text style={gs.sectionLabel}>Garment Color</Text>
           <View style={gs.colorGrid}>
             {GARMENT_SWATCH_COLORS.map(({ label, hex }) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={label}
                 key={hex}
                 style={[gs.colorSwatch, { backgroundColor: hex }, garmentColor === hex && gs.colorSwatchActive]}
                 onPress={() => { Haptics.selectionAsync(); setGarmentColor(hex); }}

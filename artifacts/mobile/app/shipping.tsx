@@ -555,7 +555,7 @@ export default function ShippingScreen() {
                 placeholderTextColor={colors.mutedForeground}
                 style={[styles.countryInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
               />
-              <TouchableOpacity onPress={saveShipFrom} disabled={savingShipFrom} style={[styles.smallBtn, { backgroundColor: colors.primary }]}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Save" onPress={saveShipFrom} disabled={savingShipFrom} style={[styles.smallBtn, { backgroundColor: colors.primary }]}>
                 {savingShipFrom ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Feather name="check" size={14} color={colors.primaryForeground} />}
               </TouchableOpacity>
             </View>
@@ -728,10 +728,10 @@ export default function ShippingScreen() {
                   {preset.lengthIn}″ × {preset.widthIn}″ × {preset.heightIn}″ · {preset.weightOz} oz
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => openEditPreset(preset)} style={styles.presetIconBtn}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Edit" onPress={() => openEditPreset(preset)} style={styles.presetIconBtn}>
                 <Feather name="edit-2" size={14} color={colors.mutedForeground} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDeletePreset(preset)} style={styles.presetIconBtn}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete" onPress={() => handleDeletePreset(preset)} style={styles.presetIconBtn}>
                 <Feather name="trash-2" size={14} color={colors.destructive} />
               </TouchableOpacity>
             </View>
@@ -851,7 +851,7 @@ export default function ShippingScreen() {
                       style={[styles.tierInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
                     />
                   </View>
-                  <TouchableOpacity onPress={() => removeTier(i)} disabled={zoneForm.weightTiers.length <= 1} style={styles.tierRemoveBtn}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove" onPress={() => removeTier(i)} disabled={zoneForm.weightTiers.length <= 1} style={styles.tierRemoveBtn}>
                     <Feather name="x" size={16} color={zoneForm.weightTiers.length <= 1 ? colors.border : colors.destructive} />
                   </TouchableOpacity>
                 </View>

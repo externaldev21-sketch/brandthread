@@ -504,7 +504,7 @@ export default function QuoteRequestScreen() {
               placeholder="e.g. Black, Navy Blue..."
               style={{ flex: 1 }}
             />
-            <TouchableOpacity onPress={addColorway} style={[sc.addBtn, { backgroundColor: colors.primary }]}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add colorway" onPress={addColorway} style={[sc.addBtn, { backgroundColor: colors.primary }]}>
               <Feather name="plus" size={ICON.sm} color={colors.primaryForeground} />
             </TouchableOpacity>
           </View>

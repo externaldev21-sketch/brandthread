@@ -70,10 +70,10 @@ export default function RolesScreen() {
             <Text style={[styles.allPillText, { color: colors.foreground }]}>All</Text>
           </View>
           <View style={{ flex: 1 }} />
-          <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Search" onPress={haptic} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
             <Feather name="search" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Filters" onPress={haptic} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
             <Feather name="sliders" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
