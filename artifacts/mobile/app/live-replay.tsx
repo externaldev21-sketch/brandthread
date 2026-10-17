@@ -3,7 +3,8 @@
  *
  * Reference: Whatnot / TikTok LIVE replay (vertical video with transport
  * controls, title + date underneath), reskinned to the app's theme under the
- * shared ScreenHeader. The owner additionally gets Hide/Show and Delete.
+ * shared ScreenHeader. The owner additionally gets Hide/Show and Delete;
+ * everyone else gets the ••• menu with Report replay and Block (Guideline 1.2).
  * Plays only the server-confirmed `replayUrl`; a replay that is hidden,
  * deleted or never finished uploading is a plain "not available" state.
  */
@@ -21,6 +22,8 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi, type LiveReplay } from '@/lib/api';
 import { formatReplayDate, formatReplayDuration } from '@/lib/liveReplayFormat';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useReportSheet } from '@/components/safety/ReportSheet';
+import { confirmBlock } from '@/lib/safety';
 import { FONT, FS, SP } from '@/lib/theme';
 
 function ReplayVideo({ uri }: { uri: string }) {
@@ -44,17 +47,20 @@ export default function LiveReplayScreen() {
   const [error, setError] = useState<'missing' | 'network' | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  const { openReport } = useReportSheet();
 
   useEffect(() => {
     if (!streamId) { setLoading(false); setError('missing'); return undefined; }
     let cancelled = false;
     setLoading(true);
+    setError(null);
     api.liveReplays.get(streamId)
       .then(r => { if (!cancelled) setReplay(r.replay); })
       .catch((e: any) => { if (!cancelled) setError(/not found|404/i.test(String(e?.message ?? '')) ? 'missing' : 'network'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [api, streamId]);
+  }, [api, streamId, attempt]);
 
   const styles = useMemo(() => StyleSheet.create({
     root: { flex: 1, backgroundColor: theme.background },
@@ -99,13 +105,35 @@ export default function LiveReplayScreen() {
     ]);
   }, [api, replay, router]);
 
+  const openMore = useCallback(() => {
+    if (!replay) return;
+    showActionSheet(undefined, undefined, [
+      {
+        text: 'Report replay',
+        style: 'destructive',
+        onPress: () => openReport({ targetType: 'live', targetId: replay.streamId, label: 'this replay', ownerId: replay.sellerId }),
+      },
+      {
+        text: 'Block host',
+        onPress: () => {
+          void confirmBlock({ userId: replay.sellerId, name: 'this host' }, api.social.block)
+            .then((blocked) => { if (blocked) goBackOr(router); });
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [api, openReport, replay, router]);
+
   const duration = formatReplayDuration(replay?.durationSeconds);
   const date = formatReplayDate(replay?.endedAt ?? replay?.startedAt);
   const hidden = replay?.visibility === 'hidden';
 
   return (
     <View style={styles.root} testID="live-replay-screen">
-      <ScreenHeader title="Replay" />
+      <ScreenHeader
+        title="Replay"
+        actions={replay && !replay.isOwner ? [{ icon: 'more-horizontal', onPress: openMore, accessibilityLabel: 'More options' }] : undefined}
+      />
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={theme.muted} /></View>
       ) : !replay ? (
@@ -113,6 +141,7 @@ export default function LiveReplayScreen() {
           icon="video-off"
           title={error === 'network' ? "Couldn't load this replay" : 'Replay not available'}
           description={error === 'network' ? 'Check your connection and try again.' : 'It may have been removed by the host.'}
+          action={error === 'network' ? { label: 'Try again', onPress: () => setAttempt(n => n + 1) } : undefined}
         />
       ) : (
         <>

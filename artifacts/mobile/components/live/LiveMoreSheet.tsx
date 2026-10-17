@@ -67,11 +67,14 @@ function ToggleRow({
 }
 
 export function LiveMoreSheet({
-  visible, onClose, onReport, onNotInterested, onCopyLink, captionsOn, onToggleCaptions, dataSaverOn, onToggleDataSaver,
+  visible, onClose, onReport, onBlock, blockLabel = 'Block', onNotInterested, onCopyLink, captionsOn, onToggleCaptions, dataSaverOn, onToggleDataSaver,
 }: {
   visible: boolean;
   onClose: () => void;
   onReport: () => void;
+  /** Omitted when there is no real host to block (preview rooms). */
+  onBlock?: () => void;
+  blockLabel?: string;
   onNotInterested: () => void;
   onCopyLink: () => void;
   captionsOn: boolean;
@@ -87,6 +90,7 @@ export function LiveMoreSheet({
       <SheetRise style={[styles.sheet, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.md }]} testID="live-more-sheet">
         <View style={[styles.handle, { backgroundColor: theme.border }]} />
         <Row icon="flag" label="Report" onPress={() => { onClose(); onReport(); }} theme={theme} />
+        {onBlock ? <Row icon="slash" label={blockLabel} onPress={() => { onClose(); onBlock(); }} theme={theme} /> : null}
         <Row icon="eye-off" label="Not interested" onPress={() => { onClose(); onNotInterested(); }} theme={theme} />
         <Row icon="link" label="Copy link" onPress={() => { onClose(); onCopyLink(); }} theme={theme} />
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
