@@ -3,8 +3,6 @@
  * hands it to the share sheet on native / downloads it on web, instead of
  * pasting the CSV text into the share message.
  */
-import { saveExportFile } from '@/lib/saveExportFile';
-
 export type CsvCell = string | number | null | undefined;
 
 export function escapeCsvCell(value: CsvCell): string {
@@ -28,6 +26,9 @@ export function csvFilename(prefix: string, now: Date = new Date()): string {
  * still written to the cache directory). Throws on write failure.
  */
 export async function exportCsvFile(prefix: string, csv: string, dialogTitle: string): Promise<boolean> {
+  // Loaded on demand so screens importing this don't pull the native
+  // file-system/sharing modules in at startup.
+  const { saveExportFile } = await import('@/lib/saveExportFile');
   // BOM so Excel opens UTF-8 names (accents, emoji) correctly.
   return saveExportFile(
     { filename: csvFilename(prefix), mimeType: 'text/csv', encoding: 'utf8', data: '﻿' + csv },
