@@ -1681,6 +1681,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="locations"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="languages"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="metafields"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="metafield-definitions" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="mobile-app-builder" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="orders"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="checkout"           options={{ headerShown: false, animation: 'ios_from_right' }} />

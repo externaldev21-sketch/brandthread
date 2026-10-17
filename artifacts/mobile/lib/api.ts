@@ -909,6 +909,8 @@ export interface Freelancer {
   isActive: boolean;
   totalJobsCompleted: number;
   avgRatingTenths: number | null;
+  /** Reviews behind avgRatingTenths (0 = unrated). */
+  reviewCount?: number;
   /** Freelancer has begun Connect onboarding — hireable. */
   hasConnectedAccount: boolean;
   /** Connect account fully verified (charges + payouts enabled). */
@@ -939,6 +941,19 @@ export interface FreelancerJob {
   hirerName?: string;
   hirerAvatarUrl?: string | null;
   serviceType?: string;
+  /** The hirer's rating of this job (hirer views only), null until rated. */
+  review?: { ratingTenths: number; comment: string } | null;
+}
+
+export type FreelancerSort = 'rating' | 'jobs' | 'rate_asc' | 'rate_desc' | 'newest';
+
+export interface FreelancerReview {
+  id: string;
+  ratingTenths: number;
+  comment: string;
+  createdAt: string;
+  reviewerName: string;
+  reviewerAvatarUrl: string | null;
 }
 
 export interface LocalUserProfile {
@@ -2490,6 +2505,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       metafieldCounts:      () => get<{ counts: Record<string, number> }>('/api/seller/metafields'),
       metafieldsByResource: (resource: string) => get<any>(`/api/seller/metafields/${encodeURIComponent(resource)}`),
       createMetafield:      (body: Record<string, any>) => post<any>('/api/seller/metafields', body),
+      updateMetafield:      (id: string, body: Record<string, any>) => patch<any>(`/api/seller/metafields/${encodeURIComponent(id)}`, body),
       deleteMetafield:      (id: string) => del<any>(`/api/seller/metafields/${encodeURIComponent(id)}`),
       // ─ Settings (language, preferences) ──────────────────────────────────
       getSettings:          () => get<{ settings: Record<string, any> }>('/api/seller/settings'),
@@ -3698,8 +3714,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Freelancer marketplace (Community tab). */
     freelancers: {
-      list: (filters?: { serviceType?: string; minRate?: number; maxRate?: number; available?: boolean }) => {
+      list: (filters?: { serviceType?: string; minRate?: number; maxRate?: number; available?: boolean; sort?: FreelancerSort }) => {
         const params = new URLSearchParams();
+        if (filters?.sort)            params.set('sort', filters.sort);
         if (filters?.serviceType)     params.set('serviceType', filters.serviceType);
         if (filters?.minRate != null) params.set('minRate', String(filters.minRate));
         if (filters?.maxRate != null) params.set('maxRate', String(filters.maxRate));
@@ -3708,6 +3725,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         return get<{ freelancers: Freelancer[] }>(`/api/freelancers${qs ? `?${qs}` : ''}`);
       },
       get:        (id: string) => get<{ freelancer: Freelancer }>(`/api/freelancers/${encodeURIComponent(id)}`),
+      reviews:    (id: string) => get<{ reviews: FreelancerReview[] }>(`/api/freelancers/${encodeURIComponent(id)}/reviews`),
       me:         () => get<{ freelancer: Freelancer | null }>('/api/freelancers/me'),
       apply:      (body: { serviceType: string; hourlyRateCents: number; bio?: string; skillTags?: string[]; portfolioUrls?: string[] }) =>
         post<{ freelancer: Freelancer }>('/api/freelancers/apply', body),
@@ -4125,6 +4143,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       complete:    (id: string) => patch<{ job: FreelancerJob; payout: { amountCents: number; transferId: string | null } }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/complete`, {}),
       cancel:      (id: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/cancel`, {}),
       syncPayment: (id: string) => post<{ job: FreelancerJob; paymentStatus: string }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/sync-payment`, {}),
+      /** Hirer rates the freelancer on a completed job (1–5 stars, half stars ok). Re-posting edits. */
+      review:      (id: string, body: { rating: number; comment?: string }) =>
+        post<{ review: { ratingTenths: number; comment: string }; freelancer: { id: string; avgRatingTenths: number; reviewCount: number } }>(
+          `/api/freelancer-jobs/${encodeURIComponent(id)}/review`, body),
     },
     /** Age gate: the DOB is sent once, reduced to a band server-side, and never stored. */
     ageGate: {
