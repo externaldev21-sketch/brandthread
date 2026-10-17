@@ -3319,7 +3319,7 @@ export default function DesignCanvasScreen() {
         </View>
 
         <View style={styles.topGroup}>
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Edit"
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Brush"
             style={[styles.topBtn, activeTopTool === 'brush' && styles.topBtnActive]}
             onPress={() => { selectTool('brush'); openSheet('brushLib'); }}
             onLongPress={() => openSheet('brushLib')}
