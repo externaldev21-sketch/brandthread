@@ -40,6 +40,7 @@ import { locationsByPlaceId, resolvePostLocation, withLocation } from "../lib/pl
 import { decodeCursor, encodeCursor } from "../lib/cursor";
 import { mergeHashtags, syncPostHashtags } from "../lib/hashtags";
 import { attachQuoteData, postCardImage } from "../lib/quotedPosts";
+import { measurePostMedia, postDimsPayload } from "../lib/mediaDimensions";
 import {
   authorInGoodStanding,
   enqueueAutoFilterReport,
@@ -49,6 +50,7 @@ import {
   optionalViewerId,
   publishingRestriction,
 } from "../lib/safety";
+import { postDimsColumns } from "../lib/postDimsColumns";
 
 const router = Router();
 
@@ -408,6 +410,8 @@ router.get("/feed", requireAuth, async (req, res) => {
         mediaUrls:   posts.mediaUrls,
         mediaType:   posts.mediaType,
         aspectRatio: posts.aspectRatio,
+        slides: posts.slides,
+        ...postDimsColumns,
         surface: posts.surface,
         caption:     posts.caption,
         hashtags:    posts.hashtags,
@@ -549,6 +553,8 @@ router.get("/feed", requireAuth, async (req, res) => {
       mediaUrls: p.mediaUrls,
       mediaType: p.mediaType,
       aspectRatio: p.aspectRatio,
+      slides: p.slides,
+      ...postDimsPayload(p),
       surface: p.surface,
       caption:   p.caption,
       location:  p.placeId ? feedLocations.get(p.placeId) ?? null : null,
@@ -911,16 +917,34 @@ router.post("/", requireAuth, async (req, res) => {
   const heldVerdict = mediaVerdict && isFlagged(mediaVerdict) ? mediaVerdict : textVerdict;
   const postHeld = captionHeld || screenHeld;
 
+  const insertMediaUrls = slideRecords.length > 0
+    ? slideRecords.map((sl) => sl.url)
+    : mediaPath ? [mediaUrl] : (resolvedMediaPaths.length > 0 ? [] : (mediaUrls ?? (mediaUrl ? [mediaUrl] : [])));
+  const insertMediaPaths = slideRecords.length > 0 ? slideRecords.map((sl) => sl.path) : resolvedMediaPaths;
+  // Pixel sizes, measured server-side from the stored objects (never trusted
+  // from the client) so every feed lays the post out at its final size.
+  const dims = await measurePostMedia({
+    mediaUrl, thumbnailUrl, mediaUrls: insertMediaUrls, mediaPaths: insertMediaPaths, slides: slideRecords,
+  }).catch((err) => {
+    req.log.warn({ err }, "Could not measure post media; the backfill will retry");
+    return null;
+  });
+
   const [post] = await db.insert(posts).values({
     placeId: locationResult.placeId ?? null,
     userId:    clerkId,
     mediaUrl,
     thumbnailUrl: thumbnailUrl ?? null,
-    mediaUrls: slideRecords.length > 0
-      ? slideRecords.map((sl) => sl.url)
-      : mediaPath ? [mediaUrl] : (resolvedMediaPaths.length > 0 ? [] : (mediaUrls ?? (mediaUrl ? [mediaUrl] : []))),
-    mediaPaths: slideRecords.length > 0 ? slideRecords.map((sl) => sl.path) : resolvedMediaPaths,
-    slides: slideRecords,
+    mediaUrls: insertMediaUrls,
+    mediaPaths: insertMediaPaths,
+    slides: (dims?.slides as SlideRecord[] | undefined) ?? slideRecords,
+    ...(dims ? {
+      mediaWidth: dims.mediaWidth,
+      mediaHeight: dims.mediaHeight,
+      thumbnailWidth: dims.thumbnailWidth,
+      thumbnailHeight: dims.thumbnailHeight,
+      mediaDimensions: dims.mediaDimensions,
+    } : {}),
     slideOverlays: safeSlideOverlays as any,
     mediaType: slideRecords.length > 0 ? (singleVideo ? "video" : "slideshow") : ((mediaType as any) ?? "photo"),
     aspectRatio: slideRecords.length > 0 && surface === "profile" ? "3:4" : (aspectRatio ?? "9:16"),
@@ -1312,6 +1336,29 @@ router.patch("/:id", requireAuth, async (req, res) => {
     !Array.isArray(taggedProductIds) || taggedProductIds.some((productId) => typeof productId !== "string")
   )) {
     return res.status(400).json({ error: "taggedProductIds must be an array of strings" });
+  }
+
+  if (
+    updates.mediaUrl !== undefined || updates.mediaUrls !== undefined ||
+    updates.mediaPaths !== undefined || updates.thumbnailUrl !== undefined
+  ) {
+    // Media changed: re-measure so the stored pixel sizes stay true.
+    const dims = await measurePostMedia({
+      mediaUrl: updates.mediaUrl ?? existing.mediaUrl,
+      thumbnailUrl: updates.thumbnailUrl !== undefined ? updates.thumbnailUrl : existing.thumbnailUrl,
+      mediaUrls: updates.mediaUrls ?? existing.mediaUrls,
+      mediaPaths: updates.mediaPaths ?? existing.mediaPaths,
+      slides: existing.slides,
+    }).catch(() => null);
+    if (dims) {
+      Object.assign(updates, {
+        mediaWidth: dims.mediaWidth,
+        mediaHeight: dims.mediaHeight,
+        thumbnailWidth: dims.thumbnailWidth,
+        thumbnailHeight: dims.thumbnailHeight,
+        mediaDimensions: dims.mediaDimensions,
+      });
+    }
   }
 
   try {

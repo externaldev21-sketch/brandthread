@@ -1,22 +1,26 @@
 /**
  * One shared client-side step that every image upload goes through
- * (lib/api.ts `uploadImage`, lib/uploadWithProgress.ts):
+ * (lib/api.ts `uploadImage`, lib/uploadWithProgress.ts).
  *
- *  - downscale so the long edge is at most MAX_UPLOAD_EDGE (never upscale,
- *    aspect ratio preserved),
- *  - re-encode JPEG at ~0.8 (PNG stays PNG so cut-out transparency survives,
- *    WebP stays WebP),
- *  - drop EXIF/GPS: expo-image-manipulator decodes to pixels and writes a new
- *    file, which carries no metadata on iOS, Android or web.
+ * Full quality first: the server does the single optimized encode
+ * (api-server lib/productImageResize — 2160 wide, q90, EXIF/GPS stripped), so
+ * this step leaves a normal phone photo's bytes exactly as picked. It only
+ * re-encodes when it has to:
+ *  - HEIC/HEIF (the server can't decode it) → JPEG at quality 1;
+ *  - a giant original (48 MP, long edge > MAX_UPLOAD_EDGE) → downscaled to
+ *    MAX_UPLOAD_EDGE at quality 1, still well above what the server keeps.
+ * It never upscales and never lowers quality below 1.
  *
  * It fails open. Anything unexpected (no dimensions, unsupported type, native
  * error) returns the original image untouched so an upload is never blocked
- * by this optimisation. The server resizes and validates again regardless.
+ * by this step. The server resizes and validates again regardless.
  */
 import { getImageDimensions } from '@/lib/imageDimensions';
 
-export const MAX_UPLOAD_EDGE = 2048;
-export const UPLOAD_QUALITY = 0.8;
+/** Twice the server's 2160 stored width: headroom, but a 48 MP original isn't sent raw. */
+export const MAX_UPLOAD_EDGE = 4096;
+/** Only used when a re-encode is unavoidable (HEIC → JPEG, giant originals). */
+export const UPLOAD_QUALITY = 1;
 
 export type UploadImage = { uri: string; mimeType?: string | null };
 export type OutputFormat = 'jpeg' | 'png' | 'webp';
@@ -48,6 +52,31 @@ export function outputFormatFor(mime: string | null | undefined, uri = ''): Outp
   return 'jpeg';
 }
 
+function isHeic(mime: string | null | undefined, uri = ''): boolean {
+  const m = (mime ?? '').toLowerCase();
+  if (m === 'image/heic' || m === 'image/heif') return true;
+  const ext = uri.split('?')[0].split('.').pop()?.toLowerCase();
+  return ext === 'heic' || ext === 'heif';
+}
+
+/**
+ * Whether the picked file must be re-encoded on device before upload. A
+ * JPEG/PNG/WebP within MAX_UPLOAD_EDGE is sent byte-for-byte as picked.
+ */
+export function uploadPlan(
+  mime: string | null | undefined,
+  uri: string,
+  width: number,
+  height: number,
+): { reencode: false } | { reencode: true; resize: { width: number; height: number } | null } {
+  if (!outputFormatFor(mime, uri)) return { reencode: false };
+  const target = fitWithin(width, height);
+  const resize = target.width !== width || target.height !== height ? target : null;
+  if (resize) return { reencode: true, resize };
+  if (isHeic(mime, uri)) return { reencode: true, resize: null };
+  return { reencode: false };
+}
+
 const MIME_BY_FORMAT: Record<OutputFormat, string> = {
   jpeg: 'image/jpeg',
   png: 'image/png',
@@ -58,8 +87,15 @@ export async function prepareImageForUpload<T extends UploadImage>(image: T): Pr
   try {
     const format = outputFormatFor(image.mimeType, image.uri);
     if (!format) return image;
-    const { width, height } = await getImageDimensions(image.uri);
-    const target = fitWithin(width, height);
+    let width = 0;
+    let height = 0;
+    try {
+      ({ width, height } = await getImageDimensions(image.uri));
+    } catch {
+      if (!isHeic(image.mimeType, image.uri)) return image;
+    }
+    const plan = uploadPlan(image.mimeType, image.uri, width, height);
+    if (!plan.reencode) return image;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const ImageManipulator = require('expo-image-manipulator') as typeof import('expo-image-manipulator');
     const saveFormat = format === 'png'
@@ -67,10 +103,9 @@ export async function prepareImageForUpload<T extends UploadImage>(image: T): Pr
       : format === 'webp'
         ? ImageManipulator.SaveFormat.WEBP
         : ImageManipulator.SaveFormat.JPEG;
-    const resized = target.width !== width || target.height !== height;
     const result = await ImageManipulator.manipulateAsync(
       image.uri,
-      resized ? [{ resize: { width: target.width, height: target.height } }] : [],
+      plan.resize ? [{ resize: plan.resize }] : [],
       { compress: UPLOAD_QUALITY, format: saveFormat },
     );
     if (!result?.uri) return image;

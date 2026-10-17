@@ -40,6 +40,8 @@ import {
 import { matchesMutedWords } from "../lib/contentModerator";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
 import { parsePagination } from "../lib/pagination";
+import { postDimsPayload } from "../lib/mediaDimensions";
+import { postDimsColumns } from "../lib/postDimsColumns";
 
 const router = Router();
 
@@ -56,6 +58,7 @@ const videoRowSelection = {
   aspectRatio:  posts.aspectRatio,
   surface:      posts.surface,
   slides:       posts.slides,
+  ...postDimsColumns,
   caption:      posts.caption,
   hashtags:     posts.hashtags,
   styleTags:    posts.styleTags,
@@ -82,7 +85,15 @@ type VideoRow = {
   mediaType: string;
   aspectRatio: string;
   surface: string;
-  slides: Array<{ kind: 'photo' | 'video'; path: string; url: string; thumbnailPath: string; thumbnailUrl: string; duration?: number }>;
+  slides: Array<{
+    kind: 'photo' | 'video'; path: string; url: string; thumbnailPath: string; thumbnailUrl: string; duration?: number;
+    width?: number; height?: number; thumbnailWidth?: number; thumbnailHeight?: number;
+  }>;
+  mediaWidth?: number | null;
+  mediaHeight?: number | null;
+  thumbnailWidth?: number | null;
+  thumbnailHeight?: number | null;
+  mediaDimensions?: Array<{ width: number; height: number } | null>;
   caption: string | null;
   hashtags: string[];
   styleTags: string[];
@@ -175,6 +186,7 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
     aspectRatio:  row.aspectRatio,
     surface:      row.surface,
     slides:       row.slides ?? [],
+    ...postDimsPayload(row),
     caption:      row.caption,
     hashtags:     row.hashtags,
     styleTags:    row.styleTags,

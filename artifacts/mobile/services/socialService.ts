@@ -4,6 +4,7 @@
  * API-backed social data with user-scoped local preferences and drafts.
  */
 
+import { isPosInt, mapMediaDims } from '@/lib/mediaFrame';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { fetchSponsoredSlots } from '@/services/sponsoredService';
@@ -550,6 +551,12 @@ export interface SellerThreadPost {
   mediaUris:         string[];
   thumbnailUri?:     string;
   aspectRatio:       '9:16' | '3:4' | '1:1';
+  /**
+   * Server-measured pixel size per `mediaUris` entry (null = unknown) and of
+   * the poster, so media renders at its final size on the first frame.
+   */
+  mediaDims?:        Array<{ width: number; height: number } | null>;
+  posterDims?:       { width: number; height: number } | null;
   contentType:       string;
   postStatus:        'draft' | 'scheduled' | 'published' | 'archived' | 'deleted';
   isDraft:           boolean;
@@ -634,6 +641,7 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
     mediaUris:       apiMediaUris,
     thumbnailUri:    p.thumbnailUrl ?? p.thumbnailUri ?? undefined,
     aspectRatio:     p.aspectRatio ?? '9:16',
+    ...mapMediaDims(p, apiMediaUris),
     contentType:     p.mediaType ?? p.contentType ?? 'video',
     postStatus:      status,
     isDraft:         status === 'draft',
@@ -874,7 +882,13 @@ export function mapSlides(raw: unknown): PostSlide[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const out = raw.flatMap((r: any) => (
     r && (r.kind === 'photo' || r.kind === 'video') && typeof r.url === 'string'
-      ? [{ kind: r.kind, url: r.url, thumbnailUrl: typeof r.thumbnailUrl === 'string' ? r.thumbnailUrl : undefined, duration: typeof r.duration === 'number' ? r.duration : undefined } as PostSlide]
+      ? [{
+        kind: r.kind, url: r.url,
+        thumbnailUrl: typeof r.thumbnailUrl === 'string' ? r.thumbnailUrl : undefined,
+        duration: typeof r.duration === 'number' ? r.duration : undefined,
+        ...(isPosInt(r.width) && isPosInt(r.height) ? { width: r.width, height: r.height } : {}),
+        ...(isPosInt(r.thumbnailWidth) && isPosInt(r.thumbnailHeight) ? { thumbnailWidth: r.thumbnailWidth, thumbnailHeight: r.thumbnailHeight } : {}),
+      } as PostSlide]
       : []
   ));
   return out.length > 0 ? out : undefined;
@@ -882,6 +896,7 @@ export function mapSlides(raw: unknown): PostSlide[] | undefined {
 
 export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
   const now = iso();
+  const apiMediaUris: string[] = Array.isArray(p.mediaUrls) && p.mediaUrls.length > 0 ? p.mediaUrls : (p.mediaUrl ? [p.mediaUrl] : []);
   const authorName     = p.seller?.brandName ?? p.seller?.displayName ?? 'Seller';
   const authorHandle   = '@' + (typeof p.seller?.username === 'string' && p.seller.username
     ? p.seller.username
@@ -902,9 +917,10 @@ export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadP
     caption:           p.caption   ?? '',
     hashtags:          p.hashtags ?? [],
     styleTags:         p.styleTags ?? [],
-    mediaUris:         Array.isArray(p.mediaUrls) && p.mediaUrls.length > 0 ? p.mediaUrls : (p.mediaUrl ? [p.mediaUrl] : []),
+    mediaUris:         apiMediaUris,
     thumbnailUri:      p.thumbnailUrl ?? p.thumbnailUri ?? undefined,
     aspectRatio:       (p.aspectRatio ?? '9:16') as SellerThreadPost['aspectRatio'],
+    ...mapMediaDims(p, apiMediaUris),
     slides:            mapSlides(p.slides),
     surface:           p.surface === 'profile' ? 'profile' : 'thread',
     contentType:       (p.mediaType ?? 'video') as SellerThreadPost['contentType'],

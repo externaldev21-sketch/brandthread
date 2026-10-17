@@ -11,7 +11,9 @@ import sharp from "sharp";
 import {
   IMAGE_VARIANT_WIDTHS,
   MAX_STORED_IMAGE_EDGE,
+  MAX_STORED_IMAGE_WIDTH,
   fitLongEdge,
+  fitStoredImage,
   normalizeUploadedImage,
   resizeImageBuffer,
   snapVariantWidth,
@@ -23,21 +25,40 @@ const solid = (width: number, height: number, channels: 3 | 4 = 3) => ({
 
 describe("fitLongEdge", () => {
   it("scales the long edge down and preserves aspect ratio", () => {
-    expect(fitLongEdge(4096, 2048)).toEqual({ width: 2048, height: 1024 });
-    expect(fitLongEdge(3000, 6000)).toEqual({ width: 1024, height: 2048 });
-    const out = fitLongEdge(4032, 3024);
-    expect(out.width / out.height).toBeCloseTo(4032 / 3024, 2);
+    expect(fitLongEdge(4096, 2048, 2048)).toEqual({ width: 2048, height: 1024 });
+    expect(fitLongEdge(3000, 6000, 2048)).toEqual({ width: 1024, height: 2048 });
+    const out = fitLongEdge(8064, 6048);
+    expect(out.width / out.height).toBeCloseTo(8064 / 6048, 2);
     expect(Math.max(out.width, out.height)).toBe(MAX_STORED_IMAGE_EDGE);
   });
 
   it("never upscales", () => {
     expect(fitLongEdge(800, 600)).toEqual({ width: 800, height: 600 });
-    expect(fitLongEdge(2048, 2048)).toEqual({ width: 2048, height: 2048 });
+    expect(fitLongEdge(2048, 2048, 2048)).toEqual({ width: 2048, height: 2048 });
   });
 
   it("never returns a zero side and ignores invalid input", () => {
-    expect(fitLongEdge(10000, 1)).toEqual({ width: 2048, height: 1 });
+    expect(fitLongEdge(10000, 1, 2048)).toEqual({ width: 2048, height: 1 });
     expect(fitLongEdge(0, 0)).toEqual({ width: 0, height: 0 });
+  });
+});
+
+describe("fitStoredImage (full-quality feed box)", () => {
+  it("keeps a 12 MP iPhone photo at 2160 wide in either orientation", () => {
+    expect(fitStoredImage(4032, 3024)).toEqual({ width: 2160, height: 1620 });
+    expect(fitStoredImage(3024, 4032)).toEqual({ width: 2160, height: 2880 });
+    expect(MAX_STORED_IMAGE_WIDTH).toBe(2160);
+  });
+
+  it("is always at least 1080 wide when the source is", () => {
+    for (const [w, h] of [[1080, 1920], [1170, 2532], [1290, 2796], [4032, 3024], [3024, 4032], [8064, 6048]]) {
+      expect(fitStoredImage(w, h).width).toBeGreaterThanOrEqual(1080);
+    }
+  });
+
+  it("caps very tall images on the long edge and never upscales", () => {
+    expect(fitStoredImage(2000, 8000)).toEqual({ width: 960, height: 3840 });
+    expect(fitStoredImage(736, 981)).toEqual({ width: 736, height: 981 });
   });
 });
 
@@ -55,19 +76,19 @@ describe("resizeImageBuffer / normalizeUploadedImage", () => {
   let big: Buffer;
   let withExif: Buffer;
   beforeAll(async () => {
-    big = await sharp(solid(3000, 1500)).jpeg({ quality: 95 }).toBuffer();
+    big = await sharp(solid(3000, 1500)).jpeg({ quality: 100, chromaSubsampling: "4:4:4" }).toBuffer();
     withExif = await sharp(solid(400, 300))
       .withExif({ IFD0: { Copyright: "secret", Make: "TestCam" }, IFD3: { GPSLatitudeRef: "N", GPSLatitude: "40/1 0/1 0/1" } })
       .jpeg({ quality: 100 })
       .toBuffer();
   });
 
-  it("caps the long edge at 2048, keeps aspect ratio and shrinks the file", async () => {
+  it("caps the width at 2160, keeps aspect ratio and shrinks the file", async () => {
     const { buffer, contentType } = await normalizeUploadedImage(big, "image/jpeg");
     const meta = await sharp(buffer).metadata();
     expect(contentType).toBe("image/jpeg");
-    expect(meta.width).toBe(2048);
-    expect(meta.height).toBe(1024);
+    expect(meta.width).toBe(2160);
+    expect(meta.height).toBe(1080);
     expect(buffer.length).toBeLessThan(big.length);
   });
 
@@ -94,7 +115,7 @@ describe("resizeImageBuffer / normalizeUploadedImage", () => {
     const meta = await sharp(buffer).metadata();
     expect(contentType).toBe("image/png");
     expect(meta.hasAlpha).toBe(true);
-    expect(meta.width).toBe(2048);
+    expect(meta.width).toBe(2160);
   });
 
   it("applies EXIF orientation before stripping it", async () => {

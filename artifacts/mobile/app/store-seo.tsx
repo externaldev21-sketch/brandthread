@@ -119,7 +119,7 @@ export default function StoreSEOScreen() {
             onPress={async () => {
               const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
               if (!perm.granted) { Alert.alert('Permission required', 'Allow access to your photo library.'); return; }
-              const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85, aspect: [1.91, 1], allowsEditing: true });
+              const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 1, aspect: [1.91, 1], allowsEditing: true });
               if (result.canceled || !result.assets[0]) return;
               setSocialImageUploading(true);
               try {

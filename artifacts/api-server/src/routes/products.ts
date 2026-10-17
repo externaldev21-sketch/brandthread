@@ -19,7 +19,8 @@ const router = Router();
 const objectStorage = new ObjectStorageService();
 
 const PRODUCT_IMAGE_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
-const MAX_PRODUCT_IMAGE_BYTES = 8 * 1024 * 1024;
+// Full-res originals from the app (no client re-encode); the server encodes once.
+const MAX_PRODUCT_IMAGE_BYTES = 20 * 1024 * 1024;
 
 function hasValidImageSignature(bytes: Buffer, contentType: string): boolean {
   if (contentType === "image/jpeg" || contentType === "image/jpg") {

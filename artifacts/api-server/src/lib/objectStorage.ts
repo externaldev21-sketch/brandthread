@@ -155,7 +155,7 @@ export class ObjectStorageService {
     contents: Buffer,
     contentType: string,
     objectPath = `/objects/uploads/${randomUUID()}`,
-    options: { cacheControl?: string } = {},
+    options: { cacheControl?: string; metadata?: Record<string, string> } = {},
   ): Promise<string> {
     const privateObjectDir = this.getPrivateObjectDir();
     if (!objectPath.startsWith('/objects/')) {
@@ -168,7 +168,11 @@ export class ObjectStorageService {
     await file.save(contents, {
       resumable: false,
       contentType,
-      metadata: { cacheControl: options.cacheControl ?? 'private, max-age=0' },
+      metadata: {
+        cacheControl: options.cacheControl ?? 'private, max-age=0',
+        // Custom metadata (e.g. pixel dimensions from lib/mediaDimensions).
+        ...(options.metadata ? { metadata: options.metadata } : {}),
+      },
     });
     return objectPath;
   }

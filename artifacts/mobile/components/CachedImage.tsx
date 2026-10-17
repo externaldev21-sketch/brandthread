@@ -14,6 +14,10 @@ const DEFAULT_BLURHASH = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj';
  *
  * When EXPO_PUBLIC_CDN_BASE_URL is set, storage URLs are served through that
  * CDN (lib/cdnUrl.ts); unset, `source` is passed through untouched.
+ *
+ * Pass `placeholder={null}` (with `transition={0}`) for media laid out from
+ * known dimensions — feed pages, carousels — so already-seen media paints
+ * straight from cache with no blurhash flash or fade.
  */
 export function CachedImage({
   source,
@@ -37,7 +41,7 @@ export function CachedImage({
       contentFit={contentFit}
       cachePolicy={cachePolicy}
       transition={transition}
-      placeholder={placeholder ?? { blurhash: DEFAULT_BLURHASH }}
+      placeholder={placeholder === undefined ? { blurhash: DEFAULT_BLURHASH } : placeholder}
     />
   );
 }

@@ -592,7 +592,7 @@ export default function SampleDetailScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 0.85,
+      quality: 0.9,
       allowsMultipleSelection: false,
       allowsEditing: false,
     });

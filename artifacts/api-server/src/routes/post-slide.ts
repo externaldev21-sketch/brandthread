@@ -26,8 +26,8 @@ import {
   validateOverlaysArray,
   type ValidatedOverlay,
 } from "../lib/slideValidation";
-import { normalizeUploadedImage } from "../lib/productImageResize";
 import { MAX_SLIDES_BY_SURFACE, isPostSurface } from "../lib/postLimits";
+import { dimsMetadata } from "../lib/mediaDimensions";
 
 const router = Router();
 const storage = new ObjectStorageService();
@@ -35,17 +35,21 @@ const exec = promisify(execFile);
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const MAX_SLIDE_BYTES = 20 * 1024 * 1024;  // 20 MB per slide
-const MAX_TOTAL_BYTES = 80 * 1024 * 1024;  // 80 MB total
+// Full-resolution phone photos (a 24/48 MP iPhone JPEG at quality 1 can pass
+// 20 MB) must fit without the client shrinking them first.
+export const MAX_SLIDE_BYTES = 40 * 1024 * 1024;  // 40 MB per slide
+const MAX_TOTAL_BYTES = 400 * 1024 * 1024;  // 400 MB total
 const SLIDE_PREVIEW_TTL_SECONDS = 60 * 60; // 1 hour signed URL
 
-// Output canvases per post aspect ratio (the client pre-crops each slide to the
-// chosen ratio; compose fills the canvas, cropping any rounding slack).
-const SLIDE_CANVAS: Record<string, { w: number; h: number }> = {
-  "9:16": { w: 720, h: 1280 },
-  "3:4": { w: 810, h: 1080 },
-  "1:1": { w: 1080, h: 1080 },
-};
+import {
+  LEGACY_SLIDE_WIDTH,
+  SLIDE_CANVAS,
+  SLIDE_THUMB_WIDTH,
+  encodeSlide,
+  renderSlideBase,
+} from "../lib/slideRender";
+
+export { SLIDE_CANVAS, SLIDE_THUMB_WIDTH, encodeSlide, renderSlideBase };
 
 const OBJECT_PATH_RE = /^\/objects\/uploads\/[A-Za-z0-9._/-]+$/;
 
@@ -116,6 +120,7 @@ function buildImageDrawtext(
   fontPath: string,
   SLIDE_W: number,
   SLIDE_H: number,
+  fontScale = 1,
 ): string {
   const hexRaw   = overlay.color.replace("#", "");
   const ffColor  = `0x${hexRaw}`;
@@ -135,11 +140,11 @@ function buildImageDrawtext(
   return [
     `textfile='${safeTextFile}'`,
     `fontfile='${safeFont}'`,
-    `fontsize=${Math.round(overlay.fontSize)}`,
+    `fontsize=${Math.max(1, Math.round(overlay.fontSize * fontScale))}`,
     `fontcolor=${ffColor}`,
     `box=${boxEnabled}`,
     `boxcolor=${boxColor}`,
-    `boxborderw=8`,
+    `boxborderw=${Math.max(1, Math.round(8 * fontScale))}`,
     `x=${xExpr}`,
     `y=${yExpr}`,
     `line_spacing=2`,
@@ -172,10 +177,13 @@ router.post(
 
     let objectPath: string | null = null;
     try {
-      const stored = await normalizeUploadedImage(bytes, contentType);
-      objectPath = await storage.createObjectEntityFromBuffer(stored.buffer, stored.contentType);
+      // Stored exactly as sent: this object is a private, short-lived compose
+      // source (deleted once the slideshow/carousel renders), so re-encoding it
+      // here would only add a second lossy generation before the real encode.
+      // EXIF/GPS never reaches a viewer — the rendered output carries none.
+      objectPath = await storage.createObjectEntityFromBuffer(bytes, contentType);
       await storage.trySetObjectEntityAclPolicy(objectPath, { owner: clerkId, visibility: "private" });
-      return res.status(201).json({ objectPath, contentType: stored.contentType, size: stored.buffer.length });
+      return res.status(201).json({ objectPath, contentType, size: bytes.length });
     } catch (err) {
       if (objectPath) await storage.deleteObjectEntity(objectPath).catch(() => {});
       req.log.error({ err, clerkId }, "Could not upload photo slide");
@@ -197,9 +205,10 @@ router.post("/compose-slideshow", requireAuth, async (req, res) => {
   const body = req.body as { slides?: unknown; aspectRatio?: unknown; surface?: unknown; coverIndex?: unknown };
   const rawSlides = body.slides;
   const canvas = SLIDE_CANVAS[String(body.aspectRatio ?? "9:16")];
-  if (!canvas) return res.status(400).json({ error: "aspectRatio must be 9:16, 3:4, or 1:1" });
+  if (!canvas) return res.status(400).json({ error: "aspectRatio must be 9:16, 4:5, 3:4, or 1:1" });
   const SLIDE_W = canvas.w;
   const SLIDE_H = canvas.h;
+  const fontScale = SLIDE_W / (LEGACY_SLIDE_WIDTH[String(body.aspectRatio ?? "9:16")] ?? SLIDE_W);
   const [acct] = await db.select({ accountType: users.accountType })
     .from(users).where(eq(users.clerkId, clerkId)).limit(1);
   // Buyers can only ever compose profile POSTs; sellers choose the destination.
@@ -268,21 +277,18 @@ router.post("/compose-slideshow", requireAuth, async (req, res) => {
     const regularFont = await discoverFont("regular");
     const boldFont    = await discoverFont("bold");
 
-    // Phase 2: render each slide with FFmpeg
+    // Phase 2: render each slide — sharp orients + fills the canvas (lanczos),
+    // ffmpeg draws any text on the lossless frame, sharp does the one JPEG encode.
+    const coverIndex = Number.isInteger(body.coverIndex) && Number(body.coverIndex) >= 0 && Number(body.coverIndex) < slideInputs.length
+      ? Number(body.coverIndex) : 0;
+    let coverThumb: Buffer | null = null;
     for (let si = 0; si < slideInputs.length; si++) {
       const { overlays } = slideInputs[si];
-      const inputPath  = inputPaths[si];
-      const outputPath = join(dir, `rendered_${si}.jpg`);
+      const basePath = join(dir, `base_${si}.png`);
+      await fs.writeFile(basePath, await renderSlideBase(inputPaths[si], canvas));
+      let framePath = basePath;
 
-      if (overlays.length === 0) {
-        // No overlays — just resize/pad to portrait canvas
-        await exec("ffmpeg", [
-          "-y", "-i", inputPath,
-          "-vf", `scale=${SLIDE_W}:${SLIDE_H}:force_original_aspect_ratio=increase,crop=${SLIDE_W}:${SLIDE_H},setsar=1`,
-          "-frames:v", "1", "-q:v", "3", outputPath,
-        ], { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 });
-      } else {
-        // Build chained drawtext filter
+      if (overlays.length > 0) {
         const drawtextParts: string[] = [];
         for (let oi = 0; oi < overlays.length; oi++) {
           const ov = overlays[oi];
@@ -290,37 +296,30 @@ router.post("/compose-slideshow", requireAuth, async (req, res) => {
           const fontPath = bold ? boldFont : regularFont;
           const textFile = await writeTextFile(dir, `${si}_${ov.id}`, ov.text);
           textFiles.push(textFile);
-          drawtextParts.push(`drawtext=${buildImageDrawtext(ov, textFile, fontPath, SLIDE_W, SLIDE_H)}`);
+          drawtextParts.push(`drawtext=${buildImageDrawtext(ov, textFile, fontPath, SLIDE_W, SLIDE_H, fontScale)}`);
         }
-        const overlayFilter = drawtextParts.join(",");
-        const baseFilter = `scale=${SLIDE_W}:${SLIDE_H}:force_original_aspect_ratio=increase,crop=${SLIDE_W}:${SLIDE_H},setsar=1`;
-
+        framePath = join(dir, `text_${si}.png`);
         await exec("ffmpeg", [
-          "-y", "-i", inputPath,
-          "-vf", `${baseFilter},${overlayFilter}`,
-          "-frames:v", "1", "-q:v", "3", outputPath,
+          "-y", "-i", basePath,
+          "-vf", drawtextParts.join(","),
+          "-frames:v", "1", "-pix_fmt", "rgb24", framePath,
         ], { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 });
       }
 
-      // Upload rendered slide
-      const renderedBytes = await fs.readFile(outputPath);
-      const objectPath = await storage.createObjectEntityFromBuffer(renderedBytes, "image/jpeg");
+      const { slide, thumb } = await encodeSlide(await fs.readFile(framePath), canvas);
+      if (si === coverIndex) coverThumb = thumb;
+      const objectPath = await storage.createObjectEntityFromBuffer(slide, "image/jpeg", undefined, {
+        metadata: dimsMetadata({ width: canvas.w, height: canvas.h }),
+      });
       await storage.trySetObjectEntityAclPolicy(objectPath, { owner: clerkId, visibility: "private" });
       outputObjects.push(objectPath);
     }
 
-    // Phase 3: thumbnail = first rendered slide (already portrait JPEG)
-    const coverIndex = Number.isInteger(body.coverIndex) && Number(body.coverIndex) >= 0 && Number(body.coverIndex) < slideInputs.length
-      ? Number(body.coverIndex) : 0;
-    const thumbSrcPath = join(dir, `rendered_${coverIndex}.jpg`);
-    const thumbPath    = join(dir, "thumbnail.jpg");
-    await exec("ffmpeg", [
-      "-y", "-i", thumbSrcPath,
-      "-vf", `scale=360:${Math.round((360 * SLIDE_H) / SLIDE_W)}:force_original_aspect_ratio=increase,crop=360:${Math.round((360 * SLIDE_H) / SLIDE_W)}`,
-      "-frames:v", "1", "-q:v", "4", thumbPath,
-    ], { timeout: 30_000, maxBuffer: 2 * 1024 * 1024 });
-    const thumbBytes = await fs.readFile(thumbPath);
-    thumbnailObject = await storage.createObjectEntityFromBuffer(thumbBytes, "image/jpeg");
+    // Phase 3: thumbnail = the cover slide at grid size
+    const thumbDims = { width: SLIDE_THUMB_WIDTH, height: Math.round((SLIDE_THUMB_WIDTH * canvas.h) / canvas.w) };
+    thumbnailObject = await storage.createObjectEntityFromBuffer(coverThumb!, "image/jpeg", undefined, {
+      metadata: dimsMetadata(thumbDims),
+    });
     await storage.trySetObjectEntityAclPolicy(thumbnailObject, { owner: clerkId, visibility: "private" });
 
     // Phase 4: generate signed preview URLs
@@ -345,6 +344,11 @@ router.post("/compose-slideshow", requireAuth, async (req, res) => {
       thumbnailPath: thumbnailObject,
       thumbnailUrl,
       slideCount: outputObjects.length,
+      // Every slide is rendered at exactly the canvas size.
+      width: canvas.w,
+      height: canvas.h,
+      thumbnailWidth: thumbDims.width,
+      thumbnailHeight: thumbDims.height,
     });
   } catch (err) {
     // Clean up any output objects created before the failure

@@ -33,6 +33,7 @@ import { MEDIA_REJECTED_MESSAGE, screenVideo } from "../lib/mediaModeration";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
+import { AVATAR_VIDEO_EDGE, AVATAR_VIDEO_MAXRATE, renderSilentRendition } from "../lib/mediaQuality";
 import {
   AVATAR_VIDEO_MAX_UPLOAD_BYTES,
   avatarVideoDurationError,
@@ -69,15 +70,10 @@ export const ffmpegAvatarVideoProcessor: AvatarVideoProcessor = {
     // sensible avatar size — no audio track at all (always muted),
     // faststart so playback begins while it streams.
     const cropExpr = "crop='min(iw,ih)':'min(iw,ih)'";
-    await exec("ffmpeg", [
-      "-y", "-i", input,
-      "-vf", `${cropExpr},scale=480:480,fps=30`,
-      "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p",
-      "-movflags", "+faststart", output,
-    ], { timeout: 120_000, maxBuffer: 8 * 1024 * 1024 });
-    await exec("ffmpeg", [
-      "-y", "-ss", "0.1", "-i", output, "-frames:v", "1", "-q:v", "3", poster,
-    ], { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 });
+    await renderSilentRendition({
+      input, output, poster, posterOffset: 0.1, maxrate: AVATAR_VIDEO_MAXRATE,
+      scale: `${cropExpr},scale=${AVATAR_VIDEO_EDGE}:${AVATAR_VIDEO_EDGE}:flags=lanczos`,
+    });
   },
 };
 

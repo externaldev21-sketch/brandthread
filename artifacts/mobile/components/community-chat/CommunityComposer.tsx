@@ -103,7 +103,7 @@ export function CommunityComposer({ onSend, uploadPhoto, replyTo, onCancelReply,
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       selectionLimit: room,
-      quality: 0.85,
+      quality: 0.9,
       base64: true,
     });
     if (result.canceled || !result.assets.length || !aliveRef.current) return;

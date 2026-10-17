@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { UploadProgressPill } from '@/components/feed/UploadProgressPill';
 import {
@@ -97,6 +97,7 @@ import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
 import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
+import { fitForPage, resolveAspect, slideFrame, type SlideFit } from '@/lib/mediaFrame';
 import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 import { a11yHidden } from '@/lib/a11yHidden';
@@ -325,6 +326,13 @@ interface SpotlightItem {
   initials: string;
   verified: boolean;
   mediaUris: string[];
+  /**
+   * Width/height of each `mediaUris` entry and of the poster, resolved from
+   * the server-stored pixel sizes (lib/mediaFrame) when the item is built, so
+   * every page lays its media out at the final size on the first frame.
+   */
+  mediaAspects?: number[];
+  posterAspect?: number;
   videoSource?: VideoSource;
   videoPosterUri?: string;
   videoPosterSource?: ImageSourcePropType;
@@ -1052,6 +1060,8 @@ type VideoVisualProps = {
   chromeTop?: number;
   /** Width / height of the page the clip is shown in. */
   pageAspect?: number;
+  /** Width / height of the clip itself, from the post's stored pixel size. */
+  mediaAspect?: number;
   /** Playback rate — 2 while the right side of the video is pressed and held. */
   rate?: number;
   /** Page pixel size — needed to clip the sharp frame above the tab bar. */
@@ -1136,8 +1146,9 @@ function PosterOnlyVisual({
   pageHeight,
   bottomStripHeight = 0,
   posterPriority,
+  mediaAspect,
 }: VideoVisualProps) {
-  const videoAspect = 9 / 16;
+  const videoAspect = mediaAspect ?? 9 / 16;
   // Full-bleed frame (the whole page); `bottomStripHeight` only narrows the
   // cover/contain crop tolerance below, so a clip still only ever crops its
   // sides, never its top/head.
@@ -1162,7 +1173,7 @@ function PosterOnlyVisual({
           />
         )}
         {posterImage ? (
-          <CachedImage source={posterImage} style={StyleSheet.absoluteFill} contentFit={fit} priority={posterPriority} />
+          <CachedImage source={posterImage} style={StyleSheet.absoluteFill} contentFit={fit} priority={posterPriority} transition={0} placeholder={null} />
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: fallbackColor ?? '#0a0a0a' }]} pointerEvents="none" />
         )}
@@ -1190,6 +1201,7 @@ function LiveVideoVisual({
   bottomStripHeight = 0,
   posterPriority,
   onFirstFramePainted,
+  mediaAspect,
 }: VideoVisualProps) {
   const player = useVideoPlayer(source, p => {
     p.loop = true;
@@ -1221,7 +1233,9 @@ function LiveVideoVisual({
   // Fill the page when that crops little (a vertical clip on a phone or a
   // portrait iPad); otherwise letterbox so a vertical clip on a landscape
   // iPad, or a wide clip on a phone, is never cropped to a sliver.
-  const [videoAspect, setVideoAspect] = useState(9 / 16);
+  // Starts at the stored size, so poster and player are laid out final on
+  // frame one; the track size is only used when the post has none stored.
+  const [videoAspect, setVideoAspect] = useState(mediaAspect ?? 9 / 16);
   const [progress, setProgress] = useState(0);
   const showPoster = Boolean(posterSource || posterUri) && !(hasStarted && readyToPlay);
   const showFallbackCover = !showPoster && !(hasStarted && readyToPlay);
@@ -1244,10 +1258,10 @@ function LiveVideoVisual({
     if (player.status === 'readyToPlay') setReadyToPlay(true);
     const trackSubscription = player.addListener('videoTrackChange', ({ videoTrack }) => {
       const size = videoTrack?.size;
-      if (size && size.width > 0 && size.height > 0) setVideoAspect(size.width / size.height);
+      if (mediaAspect == null && size && size.width > 0 && size.height > 0) setVideoAspect(size.width / size.height);
     });
     return () => { subscription.remove(); statusSubscription.remove(); trackSubscription.remove(); };
-  }, [player]);
+  }, [player, mediaAspect]);
   const firstFramePaintedRef = React.useRef(false);
   const reportFirstFramePainted = React.useCallback(() => {
     if (firstFramePaintedRef.current) return;
@@ -1326,6 +1340,8 @@ function LiveVideoVisual({
             style={StyleSheet.absoluteFill}
             contentFit={fit}
             priority={posterPriority}
+            transition={0}
+            placeholder={null}
             onLoad={reportFirstFramePainted}
           />
         )}
@@ -1360,8 +1376,26 @@ function LiveVideoVisual({
   );
 }
 
-function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange, onFirstImagePainted }: { uris: string[]; pageWidth: number; pageHeight: number; onPageChange?: (index: number) => void; onFirstImagePainted?: () => void }) {
+/**
+ * How a photo slide sits on the page; the first-frame overlay reads this too.
+ * Thread photos are never cropped (tests/buyer-thread-chrome), so the slide
+ * box is the photo's own letterboxed rect and the image fills it exactly.
+ */
+const PHOTO_SLIDE_FIT: SlideFit = 'contain';
+
+/**
+ * Photo / slideshow page. Each slide's box comes from its stored pixel size
+ * (`aspects`, lib/mediaFrame) — never from an image onLoad — and paints with
+ * no placeholder and no fade, so a cached slideshow reappears instantly at
+ * the same size. The next two slides are prefetched into memory+disk.
+ */
+function PhotoVisual({ uris, aspects, pageWidth, pageHeight, onPageChange, onFirstImagePainted }: { uris: string[]; aspects?: number[]; pageWidth: number; pageHeight: number; onPageChange?: (index: number) => void; onFirstImagePainted?: () => void }) {
   const pages = uris.length > 0 ? uris : [''];
+  const prefetchFrom = useCallback((index: number) => {
+    const next = [pages[index + 1], pages[index + 2]].filter((u): u is string => !!u);
+    if (next.length > 0) ExpoImage.prefetch(next, 'memory-disk').catch(() => {});
+  }, [pages]);
+  useEffect(() => { prefetchFrom(0); }, [prefetchFrom]);
   return (
     <FlatList
       data={pages}
@@ -1373,17 +1407,21 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange, onFirstImagePa
       directionalLockEnabled
       nestedScrollEnabled
       onMomentumScrollEnd={(e) => {
-        if (!onPageChange || pageWidth <= 0) return;
-        const index = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
-        onPageChange(Math.max(0, Math.min(pages.length - 1, index)));
+        if (pageWidth <= 0) return;
+        const index = Math.max(0, Math.min(pages.length - 1, Math.round(e.nativeEvent.contentOffset.x / pageWidth)));
+        prefetchFrom(index);
+        onPageChange?.(index);
       }}
       renderItem={({ item: uri, index }) => (
         <View style={{ width: pageWidth, height: pageHeight }}>
           {uri ? (
             <CachedImage
               source={{ uri }}
-              style={StyleSheet.absoluteFill}
+              style={slideFrame(PHOTO_SLIDE_FIT, aspects?.[index] ?? 9 / 16, pageWidth, pageHeight).style}
               contentFit="contain"
+              transition={0}
+              placeholder={null}
+              recyclingKey={`${uri}-${index}`}
               onLoad={index === 0 ? onFirstImagePainted : undefined}
             />
           ) : (
@@ -1685,13 +1723,14 @@ function SpotlightPageImpl({
                   ? bottomClearance + CAPTION_BOTTOM_GAP + captionBlockHeight + 8
                   : undefined}
                 pageAspect={pageHeight > 0 ? pageWidth / pageHeight : undefined}
+                mediaAspect={item.mediaAspects?.[0]}
                 pageWidth={pageWidth}
                 pageHeight={pageHeight}
                 bottomStripHeight={immersive && hasTabBar ? (videoFrameInset ?? bottomClearance) : 0}
                 onFirstFramePainted={isFirstItem ? onFirstFramePainted : undefined}
               />
             )
-            : <PhotoVisual uris={item.mediaUris} pageWidth={pageWidth} pageHeight={pageHeight} onPageChange={setPhotoPageIndex} onFirstImagePainted={isFirstItem ? onFirstFramePainted : undefined} />}
+            : <PhotoVisual uris={item.mediaUris} aspects={item.mediaAspects} pageWidth={pageWidth} pageHeight={pageHeight} onPageChange={setPhotoPageIndex} onFirstImagePainted={isFirstItem ? onFirstFramePainted : undefined} />}
           {item.contentType !== 'video' && item.mediaUris.length > 1 && (
             <View style={styles.mediaDots} pointerEvents="none">
               {item.mediaUris.slice(0, 5).map((_, index) => <View key={index} style={[styles.mediaDot, index === photoPageIndex && styles.mediaDotActive]} />)}
@@ -1913,6 +1952,12 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     initials: post.authorInitials,
     verified: false,
     mediaUris: post.mediaUris,
+    mediaAspects: post.mediaUris.map((_, i) => resolveAspect(post.mediaDims?.[i], {
+      postId: post.id, what: `media[${i}]`, ratio: post.aspectRatio,
+    })),
+    posterAspect: resolveAspect(post.posterDims ?? post.mediaDims?.[0], {
+      postId: post.id, what: 'poster', ratio: post.aspectRatio,
+    }),
     videoSource: post.contentType === 'video' ? post.mediaUris[0] : undefined,
     videoPosterUri: post.thumbnailUri,
     contentType: post.contentType === 'video' || post.contentType === 'slideshow' ? post.contentType : 'photo',
@@ -2360,6 +2405,21 @@ export default function FeedScreen({
   // the real count and bump only if it went up (an add happened) — never on
   // first load, a plain refocus, or a removal.
   const screenFocused = useIsFocused();
+  const pendingViewport = useRef<{ width: number; height: number } | null>(null);
+  // Coming back to Threads must show the exact page (and slide) that was on
+  // screen when the user left. On web a hidden tab scene loses its scroll
+  // offset, so the list would reopen on page 0 — re-pin it before paint.
+  const activeIndexRef = useRef(0);
+  useLayoutEffect(() => {
+    if (!screenFocused || !viewportReady || activeIndexRef.current === 0) return;
+    feedListRef.current?.scrollToOffset({ offset: activeIndexRef.current * pageHeight, animated: false });
+  }, [screenFocused]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const pending = pendingViewport.current;
+    if (!screenFocused || !pending) return;
+    pendingViewport.current = null;
+    setViewportSize((cur) => (cur.width === pending.width && cur.height === pending.height ? cur : pending));
+  }, [screenFocused]);
   useEffect(() => {
     if (userId) {
       setGuestMutedPhrases([]);
@@ -2582,12 +2642,20 @@ export default function FeedScreen({
   // preview poster (today's only real first-paint case in dev) when the
   // resolved item has no poster of its own to show yet.
   const firstContentItem = displayItems[buyerOffset] as SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem | undefined;
+  const firstSpotlight = firstContentItem && !isLiveStreamItem(firstContentItem) && !isJustDroppedItem(firstContentItem)
+    ? firstContentItem as SpotlightItem
+    : null;
+  // A slideshow's overlay is the exact first slide PhotoVisual opens on
+  // (full-res — not the grid thumbnail), so the handoff is pixel-identical;
+  // videos use their poster.
+  const overlaySlideIndex = 0;
   const overlayPosterSource: ImageSourcePropType | null = useMemo(() => {
-    if (firstContentItem && !isLiveStreamItem(firstContentItem) && !isJustDroppedItem(firstContentItem)) {
-      const spotlight = firstContentItem as SpotlightItem;
-      const fromItem = spotlight.videoPosterSource
-        ?? (spotlight.videoPosterUri ? { uri: spotlight.videoPosterUri } : undefined)
-        ?? (spotlight.contentType !== 'video' && spotlight.mediaUris?.[0] ? { uri: spotlight.mediaUris[0] } : undefined);
+    if (firstSpotlight) {
+      const spotlight = firstSpotlight;
+      const fromItem = spotlight.contentType !== 'video' && spotlight.mediaUris?.[overlaySlideIndex]
+        ? { uri: spotlight.mediaUris[overlaySlideIndex] }
+        : spotlight.videoPosterSource
+          ?? (spotlight.videoPosterUri ? { uri: spotlight.videoPosterUri } : undefined);
       if (fromItem) return fromItem;
     }
     // Nothing resolved yet (a real account's first load, no cache, data
@@ -2600,7 +2668,7 @@ export default function FeedScreen({
     const previewEligible = __DEV__ && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you';
     if (!previewEligible) return null;
     return FASHION_PREVIEW_POSTER_SOURCES[0] ?? (FASHION_PREVIEW_POSTER_URIS[0] ? { uri: FASHION_PREVIEW_POSTER_URIS[0] } : null);
-  }, [firstContentItem, isCreatorFeed, buyerMode, showFashionPreview, feedTab]);
+  }, [firstSpotlight, overlaySlideIndex, isCreatorFeed, buyerMode, showFashionPreview, feedTab]);
 
   // First-paint overlay lifecycle: visible the instant this screen mounts
   // (no dependency on the FlatList mounting, cell measurement, or the video
@@ -2610,6 +2678,15 @@ export default function FeedScreen({
   // PhotoVisual above). `overlayFading` drives a short crossfade rather than
   // an instant pop so the handoff to the real content is never a visible
   // flash either way.
+  const overlayGeometry = useMemo(() => {
+    if (!firstSpotlight) return { style: StyleSheet.absoluteFill, fit: 'cover' as const };
+    if (firstSpotlight.contentType !== 'video') {
+      const aspect = firstSpotlight.mediaAspects?.[overlaySlideIndex] ?? 9 / 16;
+      const frame = slideFrame(PHOTO_SLIDE_FIT, aspect, pageWidth, pageHeight);
+      return { style: frame.style, fit: frame.contentFit };
+    }
+    return { style: StyleSheet.absoluteFill, fit: fitForPage(firstSpotlight.posterAspect ?? 9 / 16, pageWidth, pageHeight) };
+  }, [firstSpotlight, overlaySlideIndex, pageWidth, pageHeight]);
   const [overlayDismissed, setOverlayDismissed] = useState(false);
   const overlayOpacity = useRef(new Animated.Value(1)).current;
   const handleOverlayPosterLoaded = useCallback(() => {
@@ -2929,6 +3006,7 @@ export default function FeedScreen({
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index != null) {
+      activeIndexRef.current = viewableItems[0].index;
       setActiveIndex(viewableItems[0].index);
     }
   }).current;
@@ -2938,13 +3016,20 @@ export default function FeedScreen({
   // are already buffering ahead of time via the FlatList's windowSize, but
   // the poster (what actually covers the screen until playback starts) was
   // only ever requested once its own cell mounted.
+  // Next 3 posts: the poster AND the first image a slideshow will show, into
+  // memory+disk, so coming back to (or swiping onto) an item paints the cached
+  // bitmap on frame one — no placeholder, no fade.
   useEffect(() => {
-    for (let i = activeIndex + 1; i <= activeIndex + 2; i++) {
+    const uris: string[] = [];
+    for (let i = activeIndex + 1; i <= activeIndex + 3; i++) {
       const next = displayItems[i];
       if (!next || !('contentType' in next)) continue;
-      const uri = next.videoPosterUri ?? (next.contentType !== 'video' ? next.mediaUris[0] : undefined);
-      if (uri) ExpoImage.prefetch(uri).catch(() => {});
+      if (next.videoPosterUri) uris.push(next.videoPosterUri);
+      if (next.contentType !== 'video' && next.mediaUris.length > 0) {
+        uris.push(next.mediaUris[0]);
+      }
     }
+    if (uris.length > 0) ExpoImage.prefetch(uris, 'memory-disk').catch(() => {});
   }, [activeIndex, displayItems]);
 
   // Keep the videos after the mounted neighbour buffering + disk-cached
@@ -2975,14 +3060,17 @@ export default function FeedScreen({
     <View
       style={[styles.container, { backgroundColor: palette.background ?? BG }]}
       onLayout={({ nativeEvent }) => {
-        const measuredWidth = Math.round(nativeEvent.layout.width);
-        const measuredHeight = Math.round(nativeEvent.layout.height);
-        if (
-          measuredWidth > 0 &&
-          measuredHeight > 0 &&
-          (measuredWidth !== viewportSize.width || measuredHeight !== viewportSize.height)
-        ) {
-          setViewportSize({ width: measuredWidth, height: measuredHeight });
+        const measured = { width: Math.round(nativeEvent.layout.width), height: Math.round(nativeEvent.layout.height) };
+        if (measured.width <= 0 || measured.height <= 0) return;
+        // While another tab/screen is on top this screen is frozen; a size
+        // measured then (keyboard, a pushed card) is held and only applied if
+        // it is still the size when Threads is shown again — otherwise the
+        // list re-keyed to a transient size and every page painted at the
+        // wrong size before snapping back.
+        if (!screenFocused && viewportReady) { pendingViewport.current = measured; return; }
+        pendingViewport.current = null;
+        if (measured.width !== viewportSize.width || measured.height !== viewportSize.height) {
+          setViewportSize(measured);
         }
       }}
     >
@@ -3006,15 +3094,23 @@ export default function FeedScreen({
           pointerEvents="none"
           style={[StyleSheet.absoluteFill, { zIndex: 6, opacity: overlayOpacity }]}
         >
-          <CachedImage
-            source={overlayPosterSource}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            transition={0}
-            priority="high"
-            onLoad={handleOverlayPosterLoaded}
-            {...a11yHidden(true, 'no')}
-          />
+          {/* Same geometry as the first cell will paint (stored pixel size →
+              lib/mediaFrame), so the crossfade never changes the media's size:
+              a slideshow sits in its letterboxed box on black exactly like
+              PhotoVisual, a video uses the player's cover/contain choice. */}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}>
+            <CachedImage
+              source={overlayPosterSource}
+              style={overlayGeometry.style}
+              contentFit={overlayGeometry.fit}
+              transition={0}
+              placeholder={null}
+              recyclingKey={firstSpotlight?.id}
+              priority="high"
+              onLoad={handleOverlayPosterLoaded}
+              {...a11yHidden(true, 'no')}
+            />
+          </View>
         </Animated.View>
       )}
       {/*
