@@ -95,6 +95,8 @@ import {
   ExpressPay, PaymentController, StripePaymentProvider, stripePaymentAvailable,
 } from '@/components/checkout/StripePayment';
 import type { ConfirmOutcome, PaymentControllerApi } from '@/components/checkout/stripePaymentTypes';
+import { CheckoutNotLive } from '@/components/checkout/CheckoutNotLive';
+import { useCheckoutLive } from '@/lib/checkoutLive';
 import { FONT, FS, SP } from '@/lib/theme';
 import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
@@ -125,7 +127,7 @@ function wait(ms: number) {
 export default function BuyerCheckoutScreen() {
   const ck = useCheckoutColors();
   const styles = useMemo(() => makeStyles(ck), [ck]);
-  const { source } = useLocalSearchParams<{ source?: string }>();
+  const { source, wallet } = useLocalSearchParams<{ source?: string; wallet?: string }>();
   const router = useRouter();
   const pathname = usePathname();
   const { back } = useThreadPull();
@@ -137,6 +139,9 @@ export default function BuyerCheckoutScreen() {
   const { isSignedIn } = useAuth();
   const threadCashCheckoutEnabled = useFeatureFlag('threadCashCheckoutDiscount');
   const hostedFallbackFlag = useFeatureFlag('hostedCheckoutFallback');
+  // Stripe set up on the server AND in the app? Otherwise "Checkout isn't
+  // live yet" — never a charge, never a faked order (lib/checkoutLive.ts).
+  const checkoutLive = useCheckoutLive();
 
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [contact, setContact] = useState<Partial<CheckoutContact>>({ orderUpdates: 'email', marketingConsent: false });
@@ -973,11 +978,25 @@ export default function BuyerCheckoutScreen() {
   const ctaLabel = canRetryPayment ? `Try again · ${formatCents(totals.totalCents)}` : `Pay ${formatCents(totals.totalCents)}`;
   const onCta = () => void (canRetryPayment ? retryPayment() : handlePlaceOrder());
 
+  if (!isConfirmation && checkoutLive.status === 'checking') return <CheckoutSkeleton />;
+  if (!isConfirmation && checkoutLive.status === 'off') {
+    return (
+      <View style={styles.root}>
+        {header('Checkout', leaveCheckout, 'Close checkout')}
+        <CheckoutNotLive
+          onBackToBag={() => router.replace('/(buyer)/cart' as never)}
+          onKeepShopping={() => router.replace('/(buyer)/discover' as never)}
+        />
+      </View>
+    );
+  }
+
   if (isConfirmation) {
     const paidCents = Object.values(current.paidGroups ?? {}).reduce((sum, group) => sum + (group.amountTotalCents ?? 0), 0);
     return (
       <View style={styles.root}>
-        {header('Order confirmation', () => router.replace('/(buyer)/discover' as never), 'Close')}
+        {/* Depop / GOAT: the thank-you screen carries no title, just Close. */}
+        {header('', () => router.replace('/(buyer)/discover' as never), 'Close')}
         <ScrollView
           contentContainerStyle={{ padding: GUTTER }}
           bounces={false}
@@ -1004,7 +1023,13 @@ export default function BuyerCheckoutScreen() {
     );
   }
 
-  const expressVisible = inApp ? walletAvailable : true;
+  // Only a real Apple Pay / Google Pay button, and only once the server has
+  // that wallet switched on (APPLE_PAY_ENABLED / GOOGLE_PAY_ENABLED). The
+  // generic "Express checkout" button on web was a second Pay button.
+  const walletAllowed = Platform.OS === 'ios' ? checkoutLive.applePay
+    : Platform.OS === 'android' ? checkoutLive.googlePay
+      : checkoutLive.applePay || checkoutLive.googlePay;
+  const expressVisible = walletAllowed && (inApp ? walletAvailable : Platform.OS !== 'web');
 
   const page = (
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -1033,7 +1058,7 @@ export default function BuyerCheckoutScreen() {
           ) : null}
 
           <ExpressSection visible={expressVisible}>
-            {inApp ? (
+            {!walletAllowed ? null : inApp ? (
               <ExpressPay
                 amountCents={totals.totalCents}
                 subtotalCents={totals.subtotalCents}
@@ -1043,6 +1068,7 @@ export default function BuyerCheckoutScreen() {
                 onOutcome={expressOutcome}
                 onAvailability={setWalletAvailable}
                 disabled={placing || !cardReadyForWallet(current)}
+                autoStart={wallet === '1'}
               />
             ) : (
               <HostedExpressButton onPress={onCta} disabled={!ready} loading={placing} />

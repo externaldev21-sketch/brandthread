@@ -12,7 +12,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
   View, Text, ScrollView, StyleSheet,
-  ActivityIndicator, Alert, TextInput, TouchableOpacity,
+  ActivityIndicator, Alert, TextInput, TouchableOpacity, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header, StickyFooter } from '@/components/layout';
@@ -35,6 +35,8 @@ import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
 // Same flat-black language as the one-page checkout: sections on pure black,
 // uppercase labels, 1px hairlines. No card containers.
 import { CheckoutSection } from '@/components/checkout/CheckoutPrimitives';
+import { StripePaymentProvider, WalletShortcut } from '@/components/checkout/StripePayment';
+import { useCheckoutLive } from '@/lib/checkoutLive';
 import { isPreviewCheckoutGroup } from '@/lib/previewCheckout';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { useApi } from '@/hooks/useApi';
@@ -657,6 +659,10 @@ export default function CartScreen() {
   const [validating, setValidating] = useState(false);
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [pointsInput, setPointsInput] = useState('');
+  // Wallet button only where that wallet is switched on server-side
+  // (lib/checkoutLive.ts); never on web, where the sheet needs checkout's own tap.
+  const checkoutLive = useCheckoutLive();
+  const walletAllowed = Platform.OS === 'ios' ? checkoutLive.applePay : Platform.OS === 'android' ? checkoutLive.googlePay : false;
   const [redeemingPoints, setRedeemingPoints] = useState(false);
   const [loyaltyRedemption, setLoyaltyRedemption] = useState<CheckoutLoyaltyRedemption | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -922,7 +928,7 @@ export default function CartScreen() {
    * order/payment APIs (isBuyNow=true just scopes which items build the
    * session; it never changes how payment itself works).
    */
-  async function startCheckout(items: CartItem[], opts: { onBusy?: (busy: boolean) => void } = {}) {
+  async function startCheckout(items: CartItem[], opts: { onBusy?: (busy: boolean) => void; wallet?: boolean } = {}) {
     const setBusy = opts.onBusy ?? setValidating;
     if (items.length === 0) return;
     setBusy(true);
@@ -981,7 +987,7 @@ export default function CartScreen() {
       // from ever forcing the buyer to purchase (or clear out) more than
       // they chose; buyer-checkout.tsx removes only these items on success.
       await createCheckoutSession(cart, true, items, loyaltyToApply, threadCashToApply);
-      push(('/thread-checkout?source=cart') as never);
+      push((opts.wallet ? '/thread-checkout?source=cart&wallet=1' : '/thread-checkout?source=cart') as never);
     } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.');
     }
@@ -1284,6 +1290,20 @@ export default function CartScreen() {
                   )}
                 </TouchableOpacity>
               </View>
+              {/* Etsy's cart: the official Apple Pay / Google Pay button under
+                  the total, only when that wallet is switched on server-side
+                  and works on this device. It opens checkout with the sheet
+                  already up. */}
+              {walletAllowed ? (
+                <StripePaymentProvider amountCents={selectedDisplayedTotal}>
+                  <View style={s.walletRow}>
+                    <WalletShortcut
+                      onPress={() => void startCheckout(selectedItems, { wallet: true })}
+                      disabled={selectedItems.length === 0 || validating}
+                    />
+                  </View>
+                </StripePaymentProvider>
+              ) : null}
             </StickyFooter>
           )}
         </>
@@ -1346,6 +1366,7 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   // Nike Bag / TikTok Shop checkout-bar reference, forced white/black
   // regardless of theme so it reads as the one fixed "pay" affordance.
   checkoutBarRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  walletRow: { flexDirection: 'row', marginTop: SP.sm },
   checkoutSummaryLabel: { ...TYPE_SCALE.footnote, color: theme.muted },
   checkoutSummaryAmount: { ...TYPE_SCALE.headline, ...TABULAR_NUMS, color: theme.text },
   checkoutPill: {

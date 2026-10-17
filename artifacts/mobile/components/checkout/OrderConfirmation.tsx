@@ -1,9 +1,11 @@
 /**
- * Order confirmation — redesigned 1:1 on the Shopify Shop app's
- * order-confirmed screen (reskinned monochrome/Inter): a centered success
- * check, a left-aligned "Order confirmed" heading + order number(s),
- * hairline-divided detail rows (no gradient cards), 3:4 item thumbnails,
- * a brand avatar per seller, and an optional "More from {Brand}" carousel.
+ * Order confirmation — Depop's "Thank you!" screen (mobbin.com/flows/
+ * 3e64944f-1bac-404b-bbed-118e33e94a68) with GOAT's pinned "Discover more"
+ * (mobbin.com/flows/92a0951d-9af9-455d-8a9b-18d905b43b9f), reskinned
+ * monochrome: "Thank you for your order!", the email the confirmation went
+ * to, Message seller / View order side by side, then estimated delivery,
+ * ships to, total, the items, and "More from {Brand}". No confetti and no
+ * animated check — neither reference has one.
  *
  * This file exports two pieces used together by app/buyer-checkout.tsx:
  *  - `OrderConfirmation` — the scrollable content, rendered inside the
@@ -25,14 +27,13 @@ import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { Button, SuccessCheck } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { Avatar } from '@/components/ui/Avatar';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/hooks/useApi';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { countRealOrders, maybeRequestStoreReview } from '@/lib/storeReviewPrompt';
-import { hasPlayedOrderConfetti, markOrderConfettiPlayed } from '@/lib/orderConfetti';
 import { formatCents } from '@/lib/money';
 import type { CheckoutSession } from '@/services/cartTypes';
 import { FONT, FS, SP } from '@/lib/theme';
@@ -40,7 +41,6 @@ import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { Hairline } from './CheckoutPrimitives';
 import { groupDeliveryWindow } from './OrderSummarySection';
-import { OrderConfetti } from './OrderConfetti';
 
 export interface VerifiedOrderRef {
   id: string;
@@ -176,8 +176,6 @@ export function OrderConfirmation({
   const singleSeller = session.deliveryGroups.length === 1 ? firstGroup : null;
   const brandAvatarUri = firstGroup?.items[0]?.sellerAvatarUri;
 
-  const [confettiPlay, setConfettiPlay] = useState(false);
-
   useEffect(() => {
     // A completed purchase is a meaningful, server-backed moment — exactly
     // when contextualPushPermission.ts wants to ask, never on first launch.
@@ -197,21 +195,6 @@ export function OrderConfirmation({
     }, 4000);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [firstVerified?.id, userId, api]);
-
-  useEffect(() => {
-    // Only the real "order confirmed" moment — never while still
-    // finalizing with the seller, and never a second time for the same
-    // session (reopening this screen, e.g. navigating back to it, must not
-    // replay the celebration).
-    if (finalizing) return;
-    let alive = true;
-    hasPlayedOrderConfetti(session.id).then((already) => {
-      if (!alive || already) return;
-      setConfettiPlay(true);
-      void markOrderConfettiPlayed(session.id);
-    });
-    return () => { alive = false; };
-  }, [finalizing, session.id]);
 
   function openOrder() {
     // ONLY navigate with a verified server order ID — never the display number.
@@ -237,35 +220,39 @@ export function OrderConfirmation({
 
   return (
     <View testID="checkout-confirmation">
-      <OrderConfetti play={confettiPlay} />
-
-      <View style={styles.hero}>
-        {finalizing ? (
-          <View style={[styles.pending, { borderColor: theme.border }]}>
-            <Feather name="clock" size={32} color={theme.text} />
-          </View>
-        ) : (
-          <SuccessCheck variant="draw" size={64} haptic={false} testID="checkout-success-check" />
-        )}
-      </View>
-
       <View style={styles.titleBlock}>
-        <Text style={[styles.eyebrow, { color: theme.muted }]}>{finalizing ? 'Payment received' : 'Order confirmed'}</Text>
-        {!finalizing ? (
-          <View style={styles.orderNumbers}>
-            {verifiedOrders.length > 0 ? verifiedOrders.map(order => (
-              <Text key={order.id} style={[styles.orderNumber, { color: theme.text }]} testID="checkout-order-number">
-                {verifiedOrders.length > 1 ? `Order ${order.number}` : order.number}
-              </Text>
-            )) : (
-              <Text style={[styles.orderNumberPending, { color: theme.muted }]}>Assigned once payment is confirmed</Text>
-            )}
-          </View>
-        ) : (
-          <Text style={[styles.body, { color: theme.muted }]}>
-            We’re finalizing your order with the seller. This can take a moment after payment.
+        <Text style={[styles.thanks, { color: theme.text }]} accessibilityRole="header">
+          {finalizing ? 'Payment received' : 'Thank you for your order!'}
+        </Text>
+        <Text style={[styles.body, { color: theme.muted }]}>
+          {finalizing
+            ? 'We’re finalizing your order with the seller. This can take a moment after payment.'
+            : session.contact?.email
+              ? `We’ve sent your order confirmation to ${session.contact.email}.`
+              : 'You’ll find this order in your orders.'}
+        </Text>
+        {!finalizing && verifiedOrders.length > 0 ? (
+          <Text style={[styles.orderNumberLine, { color: theme.muted }, TABULAR_NUMS]} testID="checkout-order-number">
+            {verifiedOrders.map(order => `Order ${order.number}`).join(' · ')}
           </Text>
-        )}
+        ) : null}
+        {firstGroup ? (
+          <View style={styles.heroActions}>
+            <View style={{ flex: 1 }}>
+              <Button label="Message" accessibilityLabel="Message seller" variant="secondary" onPress={messageSeller} fullWidth testID="checkout-message-seller" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                label="View order"
+                variant="primary"
+                onPress={openOrder}
+                disabled={!firstVerified?.id || finalizing}
+                fullWidth
+                testID="checkout-view-receipt"
+              />
+            </View>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.section}>
@@ -344,60 +331,18 @@ export function OrderConfirmation({
         </View>
       ) : null}
 
-      {firstGroup ? (
-        <View style={styles.section}>
-          <PressableScale
-            onPress={messageSeller}
-            style={styles.helpRow}
-            accessibilityRole="button"
-            accessibilityLabel={`Message ${firstGroup.sellerName}`}
-            rippleEnabled={false}
-          >
-            <Feather name="message-circle" size={18} color={theme.text} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.itemName, { color: theme.text }]}>Message {firstGroup.sellerName}</Text>
-              <Text style={[styles.rowSub, { color: theme.muted }]}>Questions about sizing, shipping or your order</Text>
-            </View>
-            <Feather name="chevron-right" size={18} color={theme.muted} />
-          </PressableScale>
+      {!isSignedIn ? (
+        <View style={styles.section} testID="order-confirmation-links">
+          <Hairline style={styles.linkHairline} />
+          <LinkRow
+            icon="user-plus"
+            label="Create an account to track orders faster"
+            onPress={() => router.replace('/sign-in' as never)}
+            subtle
+            testID="checkout-create-account"
+          />
         </View>
       ) : null}
-
-      {/* Secondary actions live in the scroll content as text rows; only
-          Track order is pinned (OrderConfirmationActions). */}
-      <View style={styles.section} testID="order-confirmation-links">
-        {firstVerified?.id && !finalizing ? (
-          <>
-            <Hairline style={styles.linkHairline} />
-            <LinkRow
-              icon="file-text"
-              label="View receipt"
-              hint="Opens this order's details and receipt"
-              onPress={openOrder}
-              testID="checkout-view-receipt"
-            />
-          </>
-        ) : null}
-        <Hairline style={styles.linkHairline} />
-        <LinkRow
-          icon="compass"
-          label="Continue shopping"
-          onPress={() => router.replace('/(buyer)/discover' as never)}
-          testID="checkout-continue-shopping"
-        />
-        {!isSignedIn ? (
-          <>
-            <Hairline style={styles.linkHairline} />
-            <LinkRow
-              icon="user-plus"
-              label="Create an account to track orders faster"
-              onPress={() => router.replace('/sign-in' as never)}
-              subtle
-              testID="checkout-create-account"
-            />
-          </>
-        ) : null}
-      </View>
 
       {!finalizing && singleSeller ? (
         <SellerProductsCarousel sellerId={singleSeller.sellerId} sellerName={singleSeller.sellerName} />
@@ -427,12 +372,6 @@ export function OrderConfirmationActions({
   const { theme } = useAppTheme();
   const firstVerified = verifiedOrders[0] ?? null;
 
-  function trackOrder() {
-    // ONLY navigate with a verified server order ID — never the display number.
-    if (!firstVerified?.id) return;
-    router.push(('/buyer-order-detail?id=' + encodeURIComponent(firstVerified.id)) as never);
-  }
-
   const bottomPad = Math.max(insets.bottom, SP.sm) + SP.sm;
 
   return (
@@ -441,13 +380,11 @@ export function OrderConfirmationActions({
         <Button label="Check order status" variant="primary" loading={refreshing} onPress={onRefresh} fullWidth />
       ) : (
         <Button
-          label="Track order"
-          icon="package"
+          label="Continue shopping"
           variant="primary"
-          disabled={!firstVerified?.id}
-          onPress={trackOrder}
+          onPress={() => router.replace('/(buyer)/discover' as never)}
           fullWidth
-          testID="checkout-track-order"
+          testID="checkout-continue-shopping"
         />
       )}
     </View>
@@ -455,9 +392,10 @@ export function OrderConfirmationActions({
 }
 
 const styles = StyleSheet.create({
-  hero: { alignItems: 'center', paddingTop: SP.sm, paddingBottom: SP.md },
-  pending: { width: 64, height: 64, borderRadius: 32, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  titleBlock: { paddingBottom: SP.md },
+  titleBlock: { paddingTop: SP.md, paddingBottom: SP.lg },
+  thanks: { fontFamily: FONT.bold, fontSize: FS.xxl, letterSpacing: -0.6 },
+  orderNumberLine: { fontFamily: FONT.medium, fontSize: FS.sm, marginTop: SP.sm },
+  heroActions: { flexDirection: 'row', gap: SP.sm, marginTop: SP.lg },
   eyebrow: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.2, textTransform: 'uppercase' },
   orderNumbers: { marginTop: 4, gap: 2 },
   orderNumber: { fontFamily: FONT.bold, fontSize: FS.xxl, letterSpacing: -0.6 },

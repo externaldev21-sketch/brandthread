@@ -45,6 +45,7 @@ import profileCoverRouter from "./profile-cover";
 import avatarVideoRouter from "./avatar-video";
 import buyerRouter from "./buyer";
 import checkoutIntentRouter from "./checkout-intent";
+import checkoutConfigRouter from "./checkout-config";
 import guestCheckoutRouter from "./guest-checkout";
 import connectRouter, { connectRedirectRouter } from "./connect";
 import subscriptionRouter from "./subscription";
@@ -188,6 +189,7 @@ router.use("/products", (req, res, next) => {
   }
   next();
 });
+router.use("/public",          checkoutConfigRouter); // GET /checkout-config (no auth)
 router.use("/public",          publicRouter);
 router.use("/public",          sharePreviewRouter); // /posts/:id/share-preview, /stores/:slug/share-preview (OG data)
 router.use("/public",          discoveryRouter); // /categories, /trending/products, /trending/brands

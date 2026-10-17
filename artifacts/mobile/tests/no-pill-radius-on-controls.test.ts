@@ -34,6 +34,7 @@ const ALLOWLIST: Record<string, string> = {
   'components/discover/DiscoverSearchHeader.tsx::searchBar': 'tappable search field — an input, not a button',
   'components/BrandthreadUI.tsx::root': 'Skeleton/Badge/Label roots that share a generic "root" key with a pressable card',
   'app/manufacturer-hub.tsx::root': 'progress/status pill that shares a generic "root" key with a pressable card',
+  'app/buyer-product-detail.tsx::shareChrome': 'round photo-chrome share button, same circle as the IconButton back/save/bag beside it (FontAwesome glyph, so not an IconButton)',
 };
 
 const PRESSABLE_TAG = /^(Pressable|TouchableOpacity|TouchableHighlight|TouchableWithoutFeedback|PressableScale|AnimatedPressable|Button|Chip|GradientButton|PrimaryButton|FollowButton)$/;

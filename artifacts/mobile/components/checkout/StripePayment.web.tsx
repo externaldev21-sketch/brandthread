@@ -315,3 +315,8 @@ function ElementsExpressPay({ amountCents, shippingCents, quote, createIntent, o
     </View>
   );
 }
+
+/** Web: no bag wallet shortcut — the browser's wallet sheet needs the tap to happen on checkout's own button. */
+export function WalletShortcut(_props: { onPress: () => void; disabled?: boolean }) {
+  return null;
+}

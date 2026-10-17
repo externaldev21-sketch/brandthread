@@ -199,7 +199,7 @@ function walletFromContact(contact: ShippingContact | undefined, billing?: { nam
   };
 }
 
-export function ExpressPay({ amountCents, subtotalCents, shippingCents, quote, createIntent, onOutcome, onAvailability, disabled }: ExpressPayProps) {
+export function ExpressPay({ amountCents, subtotalCents, shippingCents, quote, createIntent, onOutcome, onAvailability, disabled, autoStart }: ExpressPayProps) {
   const stripe = sdk();
   const [supported, setSupported] = useState(false);
   const priced = useRef<CartQuote | null>(null);
@@ -295,6 +295,15 @@ export function ExpressPay({ amountCents, subtotalCents, shippingCents, quote, c
     onOutcome(await confirm(stripe, clientSecret, { paymentMethodId: result.paymentMethod.id }), wallet);
   }, [stripe, cartItems, amountCents, createIntent, onOutcome]);
 
+  // The bag's Apple Pay button → checkout?wallet=1: present the sheet once,
+  // as soon as the wallet is supported and the cart can be paid.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoStart || autoStarted.current || !supported || disabled) return;
+    autoStarted.current = true;
+    void pay();
+  }, [autoStart, supported, disabled, pay]);
+
   if (!stripe || !supported) return null;
   const { PlatformPayButton, PlatformPay } = stripe;
   return (
@@ -309,6 +318,44 @@ export function ExpressPay({ amountCents, subtotalCents, shippingCents, quote, c
         style={styles.wallet}
         accessibilityLabel={Platform.OS === 'ios' ? 'Buy with Apple Pay' : 'Buy with Google Pay'}
         testID="checkout-express-pay"
+      />
+    </View>
+  );
+}
+
+// ─── Bag shortcut ────────────────────────────────────────────────────────────
+
+/**
+ * The bag's "Buy with Apple Pay" / Google Pay button (Etsy's cart:
+ * mobbin.com/flows/584ed156-da45-4233-8269-f808f7731c17). The official
+ * button, shown only where the wallet really works; the press hands off to
+ * checkout, which presents the sheet right away (ExpressPay autoStart) —
+ * the address-based re-pricing and the intent live there.
+ */
+export function WalletShortcut({ onPress, disabled }: { onPress: () => void; disabled?: boolean }) {
+  const stripe = sdk();
+  const [supported, setSupported] = useState(false);
+  useEffect(() => {
+    let active = true;
+    if (!stripe) return;
+    void stripe.isPlatformPaySupported({ googlePay: { testEnv: __DEV__ } })
+      .then(value => { if (active) setSupported(value); })
+      .catch(() => { if (active) setSupported(false); });
+    return () => { active = false; };
+  }, [stripe]);
+  if (!stripe || !supported) return null;
+  const { PlatformPayButton, PlatformPay } = stripe;
+  return (
+    <View style={{ flex: 1, opacity: disabled ? 0.4 : 1 }} pointerEvents={disabled ? 'none' : 'auto'}>
+      <PlatformPayButton
+        type={PlatformPay.ButtonType.Buy}
+        appearance={PlatformPay.ButtonStyle.White}
+        borderRadius={999}
+        onPress={onPress}
+        disabled={disabled}
+        style={styles.wallet}
+        accessibilityLabel={Platform.OS === 'ios' ? 'Buy with Apple Pay' : 'Buy with Google Pay'}
+        testID="bag-wallet-pay"
       />
     </View>
   );

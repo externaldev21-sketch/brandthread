@@ -596,6 +596,23 @@ async function fetchShippingRateDetails(
   };
 }
 
+/**
+ * The product page's shipping line: the seller's real rate and processing
+ * time for this subtotal, or null when the seller has no rate (the row then
+ * hides — never a made-up "Free shipping").
+ */
+export async function getShippingEstimate(
+  sellerId: string,
+  subtotalCents: number,
+): Promise<{ amountCents: number; processingDays: number | null } | null> {
+  try {
+    const rate = await fetchShippingRateDetails(sellerId, subtotalCents);
+    return { amountCents: rate.amountCents, processingDays: rate.processingDays };
+  } catch {
+    return null;
+  }
+}
+
 // ─── Cart validation ──────────────────────────────────────────────────────────
 
 export async function validateCart(items: CartItem[], discountCodes: string[] = [], liveStreamId?: string | null): Promise<CartValidationResult> {

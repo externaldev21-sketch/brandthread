@@ -7,11 +7,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl,
-  Animated, Dimensions, PanResponder, Easing, AccessibilityInfo,
+  Animated, Dimensions, PanResponder, Easing, AccessibilityInfo, Platform, Share,
 } from 'react-native';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { formatCents } from '@/lib/money';
@@ -22,12 +22,15 @@ import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
   addToCart, createBuyNowSession, replaceCartItemVariant,
-  getCart,
+  getCart, getShippingEstimate,
 } from '@/services/cartService';
+import { deliveryWindowLabel } from '@/lib/checkoutPayment';
 import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribution } from '@/services/cartTypes';
 import { useApi } from '@/hooks/useApi';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import { reportHref } from '@/lib/safety';
+import { buildProductUrl } from '@/lib/shareLinks';
+import { shareLinkWithFallback } from '@/lib/shareProfile';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import { useAuth } from '@clerk/expo';
 import { useSignInGate } from '@/hooks/useSignInGate';
@@ -91,14 +94,6 @@ function useThemeAliases(): ThemeAliases {
     ORANGE: theme.warning, ORANGE_DIM: `${theme.warning}26`, GOLD: theme.accent,
   };
 }
-import {
-  ClaimedRemainingLabel,
-  TimeRemainingLabel,
-  UrgencyBar,
-  DemandBadge,
-  URGENCY_UNITS_THRESHOLD,
-  HIGH_DEMAND_THRESHOLD,
-} from '@/components/CommerceSignal';
 
 function useChrome() {
   const colors = useColors();
@@ -336,10 +331,6 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
           scrollEventThrottle={16}
         />
         <View style={galleryStyles.galleryShade} pointerEvents="none" />
-        <View style={galleryStyles.galleryMeta} pointerEvents="none">
-          <Feather name="maximize-2" size={13} color={ON_DARK} />
-          <Text style={galleryStyles.galleryMetaText}>Pinch to zoom</Text>
-        </View>
         {images.length > 1 && (
           <View style={galleryStyles.dots} pointerEvents="none">
             {images.map((_, index) => {
@@ -359,37 +350,15 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
         )}
       </View>
 
-      {/* Thumbnail rail — tap a thumbnail to jump the main gallery to it */}
-      {images.length > 1 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={galleryStyles.thumbRail}
-        >
-          {images.map((uri, index) => (
-            <TouchableOpacity
-              key={`${uri}-${index}`}
-              onPress={() => {
-                listRef.current?.scrollToIndex({ index, animated: true });
-                setActiveIndex(index);
-              }}
-              style={[galleryStyles.thumb, index === activeIndex && { borderColor: accentColor }]}
-              accessibilityRole="button"
-              accessibilityLabel={`View photo ${index + 1} of ${images.length}`}
-              accessibilityState={{ selected: index === activeIndex }}
-            >
-              <CachedImage source={{ uri }} style={galleryStyles.thumbImage} contentFit="cover" />
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
     </View>
   );
 }
 
 // ─── Option Picker ────────────────────────────────────────────────────────────
 
-function OptionPicker({ product, option, selections, onSelect, recommendedLabel }: {
+function OptionPicker({ product, option, selections, onSelect, recommendedLabel, onSizeGuide }: {
+  /** Opens the seller's size guide; the link sits on the label row (Vestiaire "Size Guide"). */
+  onSizeGuide?: () => void;
   /** Size chip to mark (never select) from the buyer's saved sizes. */
   recommendedLabel?: string | null;
   product: BuyerProduct;
@@ -409,6 +378,18 @@ function OptionPicker({ product, option, selections, onSelect, recommendedLabel 
             {option.values.find(v => v.id === selections[option.id])?.label}
           </Text>
         )}
+        {onSizeGuide ? (
+          <TouchableOpacity
+            onPress={onSizeGuide}
+            style={{ marginLeft: 'auto' }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Size guide"
+            testID="product-size-guide-link"
+          >
+            <Text style={[op.optionName, { textDecorationLine: 'underline', fontFamily: FONT.regular }]}>Size guide</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
       <View style={op.chips}>
         {option.values.map(val => {
@@ -537,7 +518,6 @@ export default function BuyerProductDetailScreen() {
   // Deliberate-choice confirmation sheet (View bag / Keep shopping) —
   // separate from `addedToCart` above, which only drives the transient
   // checkmark on the sticky action bar's icon button.
-  const [showAddedSheet, setShowAddedSheet] = useState(false);
   const [sellerPaymentReady, setSellerPaymentReady] = useState<boolean | null>(null);
   const [sellerPaymentReason, setSellerPaymentReason] = useState<string | null>(null);
   const [sellerVacationMessage, setSellerVacationMessage] = useState<string | null>(null);
@@ -545,7 +525,6 @@ export default function BuyerProductDetailScreen() {
   // Track whether options were touched at least once (for required-option feedback)
   const [optionsTouched, setOptionsTouched] = useState(false);
   // Track added-to-bag confirmation to show a banner (auto-clears after 2s)
-  const addedBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Waitlist & pre-order reservation state
   const [launching, setLaunching] = useState(false);
@@ -553,7 +532,6 @@ export default function BuyerProductDetailScreen() {
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [reserved,        setReserved]        = useState(false);
   const [reserveLoading,  setReserveLoading]  = useState(false);
-  const [sizeChartOpen,   setSizeChartOpen]   = useState(false);
   const [sizeGuideOpen,   setSizeGuideOpen]   = useState(false);
 
   // Add to cart → the product photo flies to the bag icon, which bumps and
@@ -576,14 +554,6 @@ export default function BuyerProductDetailScreen() {
     }).catch(() => {});
     return () => { active = false; };
   }, []);
-
-  // ── Buyer demand signals ─────────────────────────────────────────────────
-  // Populated from server-supplied fields on publicProducts.get() response only.
-  // Values are never fabricated — zero means the server did not supply them.
-  const [demandClaimedUnits,   setDemandClaimedUnits]   = useState<number>(0);
-  const [demandRemainingUnits, setDemandRemainingUnits] = useState<number>(0);
-  const [demandCount,          setDemandCount]          = useState<number | null>(null);
-  const [demandEndsAt,         setDemandEndsAt]         = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -611,14 +581,6 @@ export default function BuyerProductDetailScreen() {
                     ? row.sellerVacationMessage ?? 'This seller is currently away and is not accepting purchases.'
                     : null,
                 );
-              }
-              // Populate demand signals from server-supplied fields only.
-              // Never fabricate these values.
-              if (!cancelled) {
-                setDemandClaimedUnits(typeof row.claimedUnits  === 'number' ? row.claimedUnits  : 0);
-                setDemandRemainingUnits(typeof row.remainingUnits === 'number' ? row.remainingUnits : 0);
-                setDemandCount(typeof row.demandCount === 'number' ? row.demandCount : null);
-                setDemandEndsAt(row.endsAt ?? null);
               }
               // Adapt the product and check payment readiness together as soon
               // as the product supplies the seller ID. A payment-status failure
@@ -785,6 +747,8 @@ export default function BuyerProductDetailScreen() {
   const variantPrice = variant?.priceCents ?? product.priceCents;
   const variantCompare = variant?.compareAtPriceCents ?? product.compareAtPriceCents;
   const hasDiscount = variantCompare && variantCompare > variantPrice;
+  const sizeChartTable = (product as { sizeChart?: SizeChart | null }).sizeChart ?? null;
+  const hasSizeGuide = !!product.sizeChartImageUrl || !!sizeChartTable?.columns?.length;
   const savingsAmt = hasDiscount ? variantCompare! - variantPrice : 0;
   const allSelected = product.options.length > 0 && Object.keys(selections).length === product.options.length;
   const inStock = variant ? variant.isAvailable && variant.inventoryQuantity > 0 : true;
@@ -860,12 +824,10 @@ export default function BuyerProductDetailScreen() {
       setCartCount(result.cart.items.reduce((sum, item) => sum + item.quantity, 0));
       await flyToCart();
       bumpCart();
-      setShowAddedSheet(true);
+      // Vestiaire / Etsy: no interstitial sheet — the bag badge bumps and
+      // "Add to bag" becomes "View in bag" (mobbin.com/flows/
+      // 377d2e85-4d54-44d9-974d-01e38acff28b).
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Auto-clear the icon-button checkmark after 2.5s; the sheet itself
-      // stays open until the buyer taps View bag or Keep shopping.
-      if (addedBannerTimerRef.current) clearTimeout(addedBannerTimerRef.current);
-      addedBannerTimerRef.current = setTimeout(() => setAddedToCart(false), 2500);
     } else {
       Alert.alert('Cannot Add to Cart', result.message ?? 'Please try again.');
     }
@@ -915,13 +877,36 @@ export default function BuyerProductDetailScreen() {
     }) as never);
   }
 
+  // Share: the same arrow and the same system share sheet / copy-link
+  // fallback as the feed rail (RightActionRail) and profile share.
+  function handleShare() {
+    if (!product) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const url = buildProductUrl(product.id);
+    const message = `${product.name} on Brandthread`;
+    if (!url) {
+      if (Platform.OS !== 'web') void Share.share({ message }).catch(() => {});
+      return;
+    }
+    void shareLinkWithFallback({
+      url,
+      message,
+      platformOS: Platform.OS,
+      nativeShare: (content) => Share.share(content),
+      webNavigator: typeof navigator !== 'undefined' ? (navigator as never) : null,
+    }).then((result) => {
+      if (result === 'copied') Alert.alert('Link copied');
+    }).catch(() => {});
+  }
+
   async function handleBuyNow() {
     if (sellerVacationMessage) {
       Alert.alert('Seller is away', sellerVacationMessage);
       return;
     }
     if (!allSelected) {
-      Alert.alert('Select Options', 'Please select all options before continuing.');
+      setOptionsTouched(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
     if (!variant) return;
@@ -995,6 +980,22 @@ export default function BuyerProductDetailScreen() {
               style={s.mediaChromeBtn}
             />
           </View>
+          {/* Share — left of the save heart (Etsy / Vestiaire product page
+              header: back on the left; share, save, bag on the right). */}
+          <View style={[s.cartBtnWrap, { top: headerTopInset + SP.sm, right: SP.md + insets.right + (44 + SP.sm) * 2 }]}>
+            <TouchableOpacity
+              onPress={handleShare}
+              accessibilityRole="button"
+              accessibilityLabel="Share product"
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+              testID="product-share"
+            >
+              {/* Same round photo chrome as the back / bag buttons. */}
+              <View style={s.shareChrome}>
+                <FontAwesome name="share" size={17} color="#FFFFFF" /* theme-exempt: photo chrome */ />
+              </View>
+            </TouchableOpacity>
+          </View>
           {/* Save heart — sits left of the cart button on the same chrome row
               (tap saves, long-press files into a collection). */}
           <SaveHeart
@@ -1032,60 +1033,33 @@ export default function BuyerProductDetailScreen() {
         </View>
 
         <ResponsiveContainer style={s.body}>
-          {/* Badges */}
-          <View style={s.badgeRow}>
-            {product.isPreOrder && (
-              <View style={s.preOrderBadge}>
-                <Feather name="clock" size={12} color={CYAN} />
-                <Text style={s.preOrderBadgeText}>PRE-ORDER</Text>
-              </View>
-            )}
-            {hasDiscount && (
-              <View style={s.saleBadge}>
-                <Text style={s.saleBadgeText}>SALE</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Page order (item: preview buy flow) follows real marketplace
-              product pages (SSENSE / Farfetch / Depop on Mobbin): photos →
-              title → price → sizes → the purchase bar (sticky) → seller →
-              About this piece → returns → purchase protection (once) →
-              you might also like → report links, small, at the very end. */}
-          <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
-          {/* Price */}
+          {/* Page order follows Etsy's listing page (mobbin.com/screens/
+              ff53baaa-c992-4a3f-b930-adac8bb00cf6): price → title → "Sold
+              by" → est. delivery → options → the purchase bar (sticky) →
+              seller → description → policies → you may also like → report,
+              small, at the very end. */}
           <View style={s.priceRow}>
             <Text style={[s.price, hasDiscount ? s.priceSale : undefined]}>{formatCents(variantPrice)}</Text>
             {hasDiscount && <Text style={s.comparePrice}>{fmtPrice(variantCompare!)}</Text>}
             {hasDiscount && <Text style={s.savings}>Save {fmtPrice(savingsAmt)}</Text>}
           </View>
+          <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
+          <TouchableOpacity
+            onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)}
+            accessibilityRole="link"
+            accessibilityLabel={`Sold by ${product.sellerName}`}
+            hitSlop={{ top: 6, bottom: 6 }}
+            style={s.soldByRow}
+            testID="product-sold-by"
+          >
+            <Text style={s.soldByText}>Sold by <Text style={s.soldByName}>{product.sellerName}</Text></Text>
+          </TouchableOpacity>
+
+          <ShippingEstimateRow product={product} subtotalCents={variantPrice * qty} />
 
           <LaunchCountdown productId={product.id} onLaunchingChange={setLaunching} />
 
           <StockCounter productId={product.id} />
-          {/* ── Buyer demand signals (server-supplied values only) ── */}
-          {(demandClaimedUnits > 0 || demandRemainingUnits > 0 || !!demandEndsAt ||
-            (demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD)) && (
-            <View style={{ marginBottom: SP.md, gap: 6 }}>
-              {demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD && (
-                <DemandBadge demandCount={demandCount} accent={theme.accent} />
-              )}
-              <ClaimedRemainingLabel
-                claimedUnits={demandClaimedUnits}
-                remainingUnits={demandRemainingUnits}
-                urgent={demandRemainingUnits > 0 && demandRemainingUnits <= URGENCY_UNITS_THRESHOLD}
-                accent={theme.accent}
-              />
-              {!!demandEndsAt && (
-                <TimeRemainingLabel endsAt={demandEndsAt} accent={theme.accent} />
-              )}
-              <UrgencyBar
-                claimedUnits={demandClaimedUnits}
-                remainingUnits={demandRemainingUnits}
-                accentColor={theme.accent}
-              />
-            </View>
-          )}
 
            {paymentUnavailable && (
              <View style={s.paymentWarningBanner} accessibilityRole="alert">
@@ -1142,6 +1116,9 @@ export default function BuyerProductDetailScreen() {
               <View key={option.id}>
                 {option.name.toLowerCase() === 'size' && <SizeRecommendationBadge model={sizeBadgeModel} />}
                 <OptionPicker
+                  onSizeGuide={option.name.toLowerCase() === 'size' && hasSizeGuide
+                    ? () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeGuideOpen(true); }
+                    : undefined}
                   recommendedLabel={option.name.toLowerCase() === 'size' && sizeBadgeModel?.kind === 'recommend' ? sizeBadgeModel.size : null}
                   product={product}
                   option={option}
@@ -1159,24 +1136,6 @@ export default function BuyerProductDetailScreen() {
               </View>
             );
           })}
-
-          {/* "Size guide" text link — only when the seller uploaded a size
-              chart photo, right under the size chips (mobbin.com/screens/
-              0c16f080-0cb8-487a-8928-6a7631cb205c). No placeholder link
-              when absent. */}
-          {!!product.sizeChartImageUrl && (
-            <TouchableOpacity
-              style={s.sizeGuideLink}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeGuideOpen(true); }}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Size guide"
-              testID="product-size-guide-link"
-            >
-              <Feather name="maximize" size={13} color={PURPLE_LIGHT} />
-              <Text style={[s.sizeGuideLinkText, { color: PURPLE_LIGHT }]}>Size guide</Text>
-            </TouchableOpacity>
-          )}
 
           {/* Stock status */}
           {allSelected && variant && (
@@ -1235,47 +1194,39 @@ export default function BuyerProductDetailScreen() {
             </View>
           )}
 
-          {/* Size Chart — expandable table */}
-          {!!(product as any).sizeChart && (
-            <>
-              <TouchableOpacity
-                style={[sz.toggle, { borderTopColor: theme.border }]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeChartOpen(o => !o); }}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Size chart"
-                accessibilityState={{ expanded: sizeChartOpen }}
-              >
-                <Text style={[sz.label, { color: theme.text }]}>Size Chart</Text>
-                <Feather name={sizeChartOpen ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
-              </TouchableOpacity>
-              {sizeChartOpen && <SizeChartViewer chart={(product as any).sizeChart} />}
-            </>
-          )}
-
-
           <View style={s.divider} />
+          {/* Seller — Depop's "Sold by" block (mobbin.com/flows/
+              c76a3a77-0de3-489e-921a-5633d26a63bc): avatar row, then Visit
+              shop / Message seller as two equal buttons. */}
           <TouchableOpacity style={s.sellerCard} onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`} testID="product-seller-link">
-            <Avatar name={product.sellerName} size={40} />
+            <Avatar name={product.sellerName} uri={product.sellerAvatarUri} size={48} />
             <View style={{ flex: 1 }}>
+              <Text style={s.sellerHandle} numberOfLines={1}>Sold by</Text>
               <Text style={s.sellerName} numberOfLines={1}>{product.sellerName}</Text>
-              {!!product.sellerHandle && <Text style={s.sellerHandle} numberOfLines={1}>{product.sellerHandle}</Text>}
-            </View>
-            <View style={s.sellerViewStore}>
-              <Text style={s.sellerViewStoreText}>View store</Text>
-              <Feather name="chevron-right" size={14} color={MUTED} />
             </View>
           </TouchableOpacity>
-          <Button
-            label="Message seller"
-            icon="message-circle"
-            onPress={handleMessageSeller}
-            variant="secondary"
-            size="small"
-            accessibilityHint="Opens a chat with the seller about this product"
-            style={{ alignSelf: 'flex-start', marginBottom: SP.md }}
-            testID="product-message-seller"
-          />
+          <View style={s.sellerActions}>
+            <View style={s.halfBtn}>
+              <Button
+                label="Visit shop"
+                onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)}
+                variant="secondary"
+                fullWidth
+                testID="product-visit-shop"
+              />
+            </View>
+            <View style={s.halfBtn}>
+              <Button
+                label="Message"
+                accessibilityLabel="Message seller"
+                onPress={handleMessageSeller}
+                variant="secondary"
+                accessibilityHint="Opens a chat with the seller about this product"
+                fullWidth
+                testID="product-message-seller"
+              />
+            </View>
+          </View>
 
           {/* About this piece — the product's own description (hidden when empty). */}
           {product.description?.trim() ? (
@@ -1371,47 +1322,10 @@ export default function BuyerProductDetailScreen() {
         );
       })() : null}
 
-      {/* Added-to-bag confirmation — a deliberate choice (UNIQLO-style), not
-          an auto-dismissing toast: the buyer picks View bag or Keep shopping. */}
-      <BottomSheet visible={showAddedSheet} onClose={() => setShowAddedSheet(false)}>
-        <View style={s.addedSheetContent}>
-          {/* Monochrome brand accent, not a green checkmark — the shared
-              success-moment primitive (components/ui/SuccessCheck.tsx). */}
-          <SuccessCheck size={56} iconSize={26} />
-          <Text style={s.addedSheetTitle}>Added to your bag</Text>
-          <View style={s.addedSheetProductRow}>
-            {product.imageUris[0] ? (
-              <CachedImage source={{ uri: product.imageUris[0] }} style={s.addedSheetImage} contentFit="cover" />
-            ) : (
-              <View style={[s.addedSheetImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED }]}>
-                <Feather name="image" size={18} color={SUBTLE} />
-              </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={s.addedSheetProductName} numberOfLines={1}>{product.name}</Text>
-              <Text style={s.addedSheetProductMeta}>
-                {formatCents(variantPrice)}{qty > 1 ? ` · Qty ${qty}` : ''}
-              </Text>
-            </View>
-          </View>
-          <Button
-            label="View bag"
-            onPress={() => { setShowAddedSheet(false); router.push('/(buyer)/cart' as never); }}
-            fullWidth
-          />
-          <Button
-            label="Keep shopping"
-            variant="secondary"
-            onPress={() => setShowAddedSheet(false)}
-            fullWidth
-            style={{ marginTop: SP.sm }}
-          />
-        </View>
-      </BottomSheet>
-
       <SizeGuideSheet
         visible={sizeGuideOpen}
         imageUri={product.sizeChartImageUrl ?? null}
+        chart={sizeChartTable}
         onClose={() => setSizeGuideOpen(false)}
       />
 
@@ -1428,30 +1342,36 @@ export default function BuyerProductDetailScreen() {
         accessibilityRole="toolbar"
         accessibilityLabel="Product purchase actions"
       >
-        {/* Real "Add to cart" + "Buy now" pair (it was an unlabeled bag icon). */}
+        {/* Etsy's pair (mobbin.com/screens/ff53baaa-c992-4a3f-b930-adac8bb00cf6):
+            filled "Add to bag" (→ "View in bag" once added) and outlined
+            "Buy now". Make an offer is left out: Brandthread has no offers.
+            Each half sits in a flex:1 View with a fullWidth Button (the
+            Button's own style is on its inner view, where flex collapses). */}
+        <View style={s.halfBtn}>
         {addedToCart ? (
           <Button
-            label="In your bag"
-            icon="check"
-            variant="secondary"
+            label="View in bag"
+            variant="primary"
             onPress={() => router.push('/(buyer)/cart' as never)}
-            accessibilityLabel="In your bag. View cart"
-            style={s.buyNowBtn}
+            accessibilityLabel="View in bag"
+            fullWidth
             testID="product-view-cart"
           />
         ) : (
           <Button
-            label="Add to cart"
-            variant="secondary"
+            label="Add to bag"
+            variant="primary"
             onPress={handleAddToCart}
             loading={addingToCart}
             disabled={addingToCart || launching || (allSelected && !inStock)}
-            accessibilityLabel={!allSelected ? 'Add to cart. Select a size first' : !inStock ? 'Out of stock' : 'Add to cart'}
-            style={s.buyNowBtn}
+            accessibilityLabel={!allSelected ? 'Add to bag. Select a size first' : !inStock ? 'Out of stock' : 'Add to bag'}
+            fullWidth
             testID="product-add-to-cart"
           />
         )}
+        </View>
 
+        <View style={s.halfBtn}>
         {product.isPreOrder ? (
           <Button
             label={reserved ? 'Reserved ✓' : 'Reserve (No Charge)'}
@@ -1460,24 +1380,25 @@ export default function BuyerProductDetailScreen() {
             loading={reserveLoading}
             disabled={reserveLoading || reserved || launching}
             accessibilityHint={reserved ? undefined : 'Reserves this pre-order at no charge'}
-            style={s.buyNowBtn}
+            fullWidth
           />
         ) : (
           <Button
             label={
               paymentUnavailable ? 'Payments unavailable'
-                : !allSelected ? 'Select options'
-                : !inStock ? 'Sold Out'
+                : allSelected && !inStock ? 'Sold out'
                 : 'Buy now'
             }
-            icon={!inStock && allSelected && !paymentUnavailable ? 'clock' : undefined}
             onPress={handleBuyNow}
-            variant="primary"
+            variant="secondary"
             loading={buyingNow}
-            disabled={buyingNow || launching || !inStock || !allSelected || paymentUnavailable}
-            style={s.buyNowBtn}
+            disabled={buyingNow || launching || (allSelected && !inStock) || paymentUnavailable}
+            accessibilityLabel={!allSelected ? 'Buy now. Select a size first' : undefined}
+            fullWidth
+            testID="product-buy-now"
           />
         )}
+        </View>
       </View>
       </StickyFooter>
       <FirstRunTip
@@ -1486,6 +1407,48 @@ export default function BuyerProductDetailScreen() {
         contentReady={!loading}
         spotlight={{ target: actionBarRect, ...BUYER_PRODUCT_DETAIL_SPOTLIGHT }}
       />
+    </View>
+  );
+}
+
+// ─── Shipping estimate ───────────────────────────────────────────────────────
+
+/**
+ * Etsy's "Est. delivery" row under the title (mobbin.com/screens/
+ * ff53baaa-c992-4a3f-b930-adac8bb00cf6): two label/value columns between
+ * hairlines. Uses the seller's real rate (GET /api/shipping-rates/calculate);
+ * renders nothing until it answers or when the seller has no rate.
+ */
+function ShippingEstimateRow({ product, subtotalCents }: { product: BuyerProduct; subtotalCents: number }) {
+  const { BORDER, FG, MUTED } = useThemeAliases();
+  const [estimate, setEstimate] = useState<{ amountCents: number; processingDays: number | null } | null>(null);
+  useEffect(() => {
+    let active = true;
+    if (!product.sellerId || subtotalCents <= 0) return;
+    void getShippingEstimate(product.sellerId, subtotalCents).then(next => { if (active) setEstimate(next); });
+    return () => { active = false; };
+  }, [product.sellerId, subtotalCents]);
+  if (!estimate) return null;
+  // "Ships in 2 business days" → label "Ships in", value "2 business days",
+  // so the value fits its half of the row at 390pt.
+  const window = deliveryWindowLabel({ processingDays: estimate.processingDays, isPreOrder: product.isPreOrder });
+  const shipsIn = /^Ships in (.+)$/.exec(window);
+  const cell = { flex: 1, gap: 2 } as const;
+  const label = { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm } as const;
+  const value = { color: FG, fontFamily: FONT.semibold, fontSize: FS.md } as const;
+  return (
+    <View
+      style={{ flexDirection: 'row', paddingVertical: SP.md, marginBottom: SP.md, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: BORDER }}
+      testID="product-shipping-estimate"
+    >
+      <View style={cell}>
+        <Text style={label}>Shipping</Text>
+        <Text style={value}>{estimate.amountCents > 0 ? formatCents(estimate.amountCents) : 'Free'}</Text>
+      </View>
+      <View style={[cell, { borderLeftWidth: StyleSheet.hairlineWidth, borderColor: BORDER, paddingLeft: SP.md }]}>
+        <Text style={label}>{shipsIn ? 'Ships in' : 'Delivery'}</Text>
+        <Text style={value} numberOfLines={1}>{shipsIn ? shipsIn[1] : window}</Text>
+      </View>
     </View>
   );
 }
@@ -1540,7 +1503,9 @@ function SizeChartViewer({ chart }: { chart: SizeChart }) {
 // a translucent Glass blur over the chart photo itself would work against
 // the one thing this sheet exists to show clearly.
 
-function SizeGuideSheet({ visible, imageUri, onClose }: { visible: boolean; imageUri: string | null; onClose: () => void }) {
+// One "Size guide" sheet for both kinds of chart the seller can add: their
+// photo (pinch to zoom) or the structured table.
+function SizeGuideSheet({ visible, imageUri, chart, onClose }: { visible: boolean; imageUri: string | null; chart?: SizeChart | null; onClose: () => void }) {
   const { theme, FG, MUTED } = useThemeAliases();
   const scale = useRef(new Animated.Value(1)).current;
   const currentScale = useRef(1);
@@ -1581,7 +1546,7 @@ function SizeGuideSheet({ visible, imageUri, onClose }: { visible: boolean; imag
     },
   })).current;
 
-  if (!imageUri) return null;
+  if (!imageUri && !chart?.columns?.length) return null;
 
   return (
     <BottomSheet visible={visible} onClose={() => { resetZoom(); onClose(); }} testID="size-guide-sheet">
@@ -1589,15 +1554,20 @@ function SizeGuideSheet({ visible, imageUri, onClose }: { visible: boolean; imag
         <Text style={[sgs.title, { color: FG }]}>Size guide</Text>
         <IconButton name="x" size={20} variant="plain" onPress={() => { resetZoom(); onClose(); }} accessibilityLabel="Close size guide" />
       </View>
-      <View style={[sgs.imageWrap, { backgroundColor: theme.surface }]} {...responder.panHandlers}>
-        <Animated.Image
-          source={{ uri: imageUri }}
-          resizeMode="contain"
-          style={[StyleSheet.absoluteFill, { transform: [{ scale }] }]}
-          accessibilityLabel="Size guide photo. Pinch with two fingers to zoom."
-        />
-      </View>
-      <Text style={[sgs.hint, { color: MUTED }]}>Pinch to zoom</Text>
+      {imageUri ? (
+        <View style={[sgs.imageWrap, { backgroundColor: theme.surface }]} {...responder.panHandlers}>
+          <Animated.Image
+            source={{ uri: imageUri }}
+            resizeMode="contain"
+            style={[StyleSheet.absoluteFill, { transform: [{ scale }] }]}
+            accessibilityLabel="Size guide photo. Pinch with two fingers to zoom."
+          />
+        </View>
+      ) : chart ? (
+        <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: SP.md }}>
+          <SizeChartViewer chart={chart} />
+        </ScrollView>
+      ) : null}
     </BottomSheet>
   );
 }
@@ -1881,6 +1851,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   cartBadgeText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: 11, lineHeight: 13 },
   cartFlyItem: { position: 'absolute', overflow: 'hidden', zIndex: 50, backgroundColor: CARD },
   mediaChromeBtn: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill },
+  sellerActions: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md },
+  soldByRow: { alignSelf: 'flex-start', marginTop: -SP.xs, marginBottom: SP.md },
+  soldByText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
+  soldByName: { color: FG, fontFamily: FONT.semibold, textDecorationLine: 'underline' },
+  // Same round chrome as the IconButton back / save / bag circles beside it.
+  shareChrome: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill },
   body: { paddingVertical: SP.md },
   badgeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CYAN_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
@@ -1899,7 +1875,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   addedSheetProductMeta: { ...TYPE.caption, color: MUTED, marginTop: 2 },
   sellerCard: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm,
-    padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD,
+    paddingVertical: SP.xs,
   },
   sellerName: { ...TYPE.bodyMedium, color: FG, flexShrink: 1 },
   sellerHandle: { ...TYPE.caption, color: MUTED, flexShrink: 1 },
@@ -1927,7 +1903,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   vacationTitle: { color: ORANGE, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: 3 },
   vacationText: { color: FG, fontFamily: FONT.medium, fontSize: FS.meta, lineHeight: 18 },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs },
   price: { ...TYPE.heading, fontFamily: FONT.bold, color: FG },
   priceSale: { color: SUCCESS },
   comparePrice: { fontSize: FS.base, fontFamily: FONT.regular, color: SUBTLE, textDecorationLine: 'line-through' },
@@ -1958,7 +1934,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM,
     alignItems: 'center', justifyContent: 'center',
   },
-  buyNowBtn: { flex: 1 },
+  halfBtn: { flex: 1 },
   reviewsHeader: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   reviewRow: { marginBottom: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   reviewStars: { fontSize: FS.sm, fontFamily: FONT.regular, color: GOLD, marginBottom: 2 },
