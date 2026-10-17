@@ -53,6 +53,7 @@ import { PollSticker, QuestionSticker, ProductSticker, CountdownSticker, STICKER
 import { PollComposer, QuestionComposer, CountdownPicker } from '@/components/social/StoryStickerComposer';
 import { MentionStickerView, ReshareCard, RESHARE_CARD_WIDTH, RESHARE_CARD_HEIGHT } from '@/components/StoryMentionSticker';
 import { InlineSlider } from '@/components/InlineSlider';
+import { LocationPicker } from '@/components/social/LocationPicker';
 import {
   MAX_MENTIONS_PER_STORY, MENTION_MIN_SCALE, activeMentionQuery, clampMentionOpacity, clampOverlayPosition, clampOverlayScale,
   insertMention, nextMentionStyle, tapSlop, taggedPeople, withAt,
@@ -61,6 +62,10 @@ import { RESHARE_CARD_RADIUS, RESHARE_FALLBACK_COLORS, reshareGradientFromBackgr
 import type { MentionPerson } from '@/services/socialTypes';
 import { radius } from '@/constants/radii';
 import { getMediaLibrary } from '@/lib/mediaLibraryCompat';
+import {
+  STORY_CAMERA_SETTINGS_KEY, DEFAULT_STORY_CAMERA_SETTINGS, parseStoryCameraSettings, toggleStoryCameraSetting,
+  type StoryCameraSettings,
+} from '@/lib/storyCameraSettings';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
@@ -509,6 +514,14 @@ export default function StoryComposer() {
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const [facing, setFacing] = useState<'front' | 'back'>('back');
   const [flash, setFlash] = useState<'off' | 'on'>('off');
+  // Gear icon → real camera settings (grid lines, mirror front camera) and a
+  // link to story privacy. Remembered per device (convenience only).
+  const [cameraSettings, setCameraSettings] = useState<StoryCameraSettings>(DEFAULT_STORY_CAMERA_SETTINGS);
+  useEffect(() => {
+    AsyncStorage.getItem(STORY_CAMERA_SETTINGS_KEY)
+      .then((raw) => setCameraSettings(parseStoryCameraSettings(raw)))
+      .catch(() => {});
+  }, []);
   const [mode, setMode] = useState<CaptureMode>('story');
   // Underline that slides to sit beneath the active mode label (Instagram/
   // TikTok's own capture-mode switch), instead of the active/inactive style
@@ -642,6 +655,10 @@ export default function StoryComposer() {
   const [countdownPickerOpen, setCountdownPickerOpen] = useState(false);
   const [taggableProducts, setTaggableProducts] = useState<Product[]>([]);
   const [shopModalOpen, setShopModalOpen] = useState(false);
+  // Location sticker → real place search (/api/places; Google Places when the
+  // server has GOOGLE_PLACES_API_KEY, otherwise previously-used places + a
+  // free-text custom location).
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const [shopUrlDraft, setShopUrlDraft] = useState('');
   const [closeFriendsOnly, setCloseFriendsOnly] = useState(false);
   const [captionDraft, setCaptionDraft] = useState('');
@@ -1105,6 +1122,25 @@ export default function StoryComposer() {
 
   const closeAll = () => goBackOr(router);
 
+  const toggleCameraSetting = (key: keyof StoryCameraSettings) => {
+    hapticToggle();
+    setCameraSettings((prev) => {
+      const next = toggleStoryCameraSetting(prev, key);
+      AsyncStorage.setItem(STORY_CAMERA_SETTINGS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  };
+
+  const openCameraSettings = () => {
+    hapticLight();
+    Alert.alert('Camera settings', undefined, [
+      { text: cameraSettings.gridLines ? 'Hide grid lines' : 'Show grid lines', onPress: () => toggleCameraSetting('gridLines') },
+      { text: cameraSettings.mirrorFront ? 'Don’t mirror front camera' : 'Mirror front camera', onPress: () => toggleCameraSetting('mirrorFront') },
+      { text: 'Story privacy settings', onPress: () => router.push('/buyer-privacy-settings' as never) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   // ── CAMERA STEP ───────────────────────────────────────────────────────────
 
   if (step === 'camera') {
@@ -1117,7 +1153,24 @@ export default function StoryComposer() {
       <View style={[styles.root, { backgroundColor: '#000' }]}>
         <StatusBar style="light" />
         {hasPermission ? (
-          <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} flash={flash} mode={isRecording ? 'video' : 'picture'} />
+          <>
+            <CameraView
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              facing={facing}
+              flash={flash}
+              mirror={facing === 'front' && cameraSettings.mirrorFront}
+              mode={isRecording ? 'video' : 'picture'}
+            />
+            {cameraSettings.gridLines ? (
+              <View style={StyleSheet.absoluteFill} pointerEvents="none" testID="story-camera-grid-lines">
+                <View style={[styles.camGuideV, { left: '33.33%' }]} />
+                <View style={[styles.camGuideV, { left: '66.66%' }]} />
+                <View style={[styles.camGuideH, { top: '33.33%' }]} />
+                <View style={[styles.camGuideH, { top: '66.66%' }]} />
+              </View>
+            ) : null}
+          </>
         ) : (
           <View style={[styles.root, styles.webFallback]}>
             <Feather name="camera-off" size={40} color={ON_DARK} />
@@ -1156,8 +1209,8 @@ export default function StoryComposer() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.camIconBtn}
-            onPress={() => Alert.alert('Story settings', 'Audience, replies and close friends can be adjusted after you capture.')}
-            accessibilityLabel="Story settings"
+            onPress={openCameraSettings}
+            accessibilityLabel="Camera settings"
             accessibilityRole="button"
           >
             <Feather name="settings" size={22} color={ON_DARK} />
@@ -1588,6 +1641,19 @@ export default function StoryComposer() {
 
   // ── EDIT STEP ─────────────────────────────────────────────────────────────
 
+  // "…" — only tools that actually work here (it used to say "coming soon").
+  const openMoreTools = () => {
+    hapticLight();
+    const tools: { text: string; onPress: () => void; style?: 'destructive' }[] = [];
+    if (media?.kind === 'photo' && !isReshare) tools.push({ text: 'Crop', onPress: () => setCropPending(true) });
+    tools.push({ text: 'Mention someone', onPress: () => setMentionPickerOpen(true) });
+    if (strokes.length > 0) {
+      tools.push({ text: 'Undo last drawing', onPress: () => setStrokes((prev) => prev.slice(0, -1)) });
+      tools.push({ text: 'Clear drawing', style: 'destructive', onPress: () => setStrokes([]) });
+    }
+    Alert.alert('More tools', undefined, [...tools, { text: 'Cancel', style: 'cancel' }]);
+  };
+
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
@@ -1676,7 +1742,7 @@ export default function StoryComposer() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.camIconBtn}
-            onPress={() => Alert.alert('More tools', 'Additional tools are coming soon.')}
+            onPress={openMoreTools}
             accessibilityLabel="More tools"
             accessibilityRole="button"
           >
@@ -1947,7 +2013,7 @@ export default function StoryComposer() {
               <View style={styles.textAccessoryDivider} />
               <TouchableOpacity
                 style={styles.textAccessoryItem}
-                onPress={() => { addOverlay({ type: 'location', locationLabel: 'Add location' }); setTextToolOpen(false); }}
+                onPress={() => { setTextToolOpen(false); setLocationPickerOpen(true); }}
                 accessibilityRole="button"
                 accessibilityLabel="Add location"
               >
@@ -2050,7 +2116,7 @@ export default function StoryComposer() {
             <Text style={styles.sheetTitle}>Stickers</Text>
             <View style={styles.stickerGrid}>
               <StickerTile icon="at-sign" label="Mention" onPress={() => { setStickerSheetOpen(false); setMentionPickerOpen(true); }} />
-              <StickerTile icon="map-pin" label="Location" onPress={() => { addOverlay({ type: 'location', locationLabel: 'Add location' }); setStickerSheetOpen(false); }} />
+              <StickerTile icon="map-pin" label="Location" onPress={() => { setStickerSheetOpen(false); setLocationPickerOpen(true); }} />
               <StickerTile icon="clock" label="Time" onPress={() => { addOverlay({ type: 'time', text: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }); setStickerSheetOpen(false); }} />
               <StickerTile icon="bar-chart-2" label="Poll" onPress={() => { setStickerSheetOpen(false); setPollComposerOpen(true); }} />
               <StickerTile icon="help-circle" label="Question" onPress={() => { setStickerSheetOpen(false); setQuestionComposerOpen(true); }} />
@@ -2179,6 +2245,27 @@ export default function StoryComposer() {
       </Modal>
 
       {/* ── Shop-link modal (sellers) ── */}
+      <Modal visible={locationPickerOpen} transparent animationType="fade" onRequestClose={() => setLocationPickerOpen(false)}>
+        <ModalSafeArea>
+          <View style={styles.overlayModalBackdrop}>
+            <View style={[styles.overlayModalCard, { backgroundColor: theme.background }]} testID="story-location-picker">
+              <Text style={[styles.sheetTitle, { color: theme.text }]}>Add location</Text>
+              <LocationPicker
+                autoFocus
+                onSelect={(place) => {
+                  addOverlay({ type: 'location', locationLabel: place.name, locationPlaceId: place.id });
+                  setLocationPickerOpen(false);
+                }}
+              />
+              <View style={styles.overlayModalActions}>
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setLocationPickerOpen(false)} accessibilityRole="button">
+                  <Text style={[styles.modalCancelText, { color: theme.text }]}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </ModalSafeArea>
+      </Modal>
       <Modal visible={shopModalOpen} transparent animationType="fade" onRequestClose={() => setShopModalOpen(false)}>
         <ModalSafeArea>
           <View style={styles.overlayModalBackdrop}>
@@ -2299,6 +2386,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SP.md,
   },
+  camGuideV: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.45)' },
+  camGuideH: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.45)' },
   camIconBtn: {
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: 'rgba(0,0,0,0.45)',
