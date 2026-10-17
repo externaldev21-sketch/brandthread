@@ -5,6 +5,7 @@ import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, pr
 export * from './manufacturers';
 export * from './sizeCharts';
 export * from './freelancers';
+export * from './metafields';
 export * from './subscriptionEntitlements';
 export * from './sellerStoreShares';
 export * from './billingDunning';
@@ -453,6 +454,8 @@ export const ipCases = pgTable('ip_cases', {
   counterNoticeStatus: text('counter_notice_status').notNull().default('none'),
   counterNoticeStatement: text('counter_notice_statement'),
   counterNoticeReceivedAt: timestamp('counter_notice_received_at', { withTimezone: true }),
+  // Structured seller counter-notice (migration 280); see api-server lib/ipCounterNotice.ts.
+  counterNoticeDetails: jsonb('counter_notice_details').$type<Record<string, unknown>>(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
@@ -3051,6 +3054,7 @@ export const adClicks = pgTable('ad_clicks', {
   viewerCreatedIdx:   index('ad_clicks_viewer_created_idx').on(table.viewerId, table.createdAt),
 }));
 export * from './sellerPaymentSettings';
+export * from './sellerSettings';
 export * from './sellerMessaging';
 export * from './aiCredits';
 export * from './liveModeration';

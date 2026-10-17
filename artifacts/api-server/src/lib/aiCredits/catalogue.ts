@@ -128,6 +128,7 @@ export const AI_TOOL_RULES: AiToolRule[] = [
   text(/^\/ai-helpers\/caption$/,                 "ai_caption",   "Caption and hashtags"),
   text(/^\/ai-helpers\/product-description$/,     "ai_product_description", "Product description"),
   text(/^\/ai-helpers\/size-chart$/,              "ai_size_chart", "Size chart"),
+  text(/^\/ai-helpers\/brand-names$/,             "ai_brand_names", "Brand name ideas"),
 
   // ── Image generation ──────────────────────────────────────────────────────
   gen(/^\/bg-removal\/remove$/,                   "bg_remove",    "Remove background"),

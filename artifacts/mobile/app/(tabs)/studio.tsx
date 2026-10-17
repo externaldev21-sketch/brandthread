@@ -43,8 +43,16 @@ function cardWidth(screenWidth: number, cols: number): number {
 
 // ─── Tool definitions ─────────────────────────────────────────────────────────
 
+/** Extra AI tools reachable from Studio. Both call the Growth-gated
+ *  /api/mockup/generate route (sketch_to_design / prompt_edit), so they share
+ *  the Growth upsell with the canonical tools. */
+const EXTRA_AI_TOOL_IDS = ['upload-sketch', 'prompt-edit'] as const;
+
 /** Tool IDs that require a Growth (or higher) subscription to use. */
-const GROWTH_REQUIRED_TOOLS = new Set<string>(GROWTH_STUDIO_TOOLS.map((tool) => tool.id));
+const GROWTH_REQUIRED_TOOLS = new Set<string>([
+  ...GROWTH_STUDIO_TOOLS.map((tool) => tool.id),
+  ...EXTRA_AI_TOOL_IDS,
+]);
 
 interface StudioTool extends GrowthTool {
   route: string;
@@ -91,11 +99,36 @@ const STANDARD_STUDIO_TOOLS: StudioTool[] = [
   },
 ];
 
+const EXTRA_AI_TOOLS: StudioTool[] = [
+  {
+    id: 'upload-sketch',
+    title: 'Upload Sketch',
+    desc: 'Turn a hand-drawn sketch into clean designs.',
+    icon: 'pen-tool',
+    accent: '',
+    accentDim: '',
+    route: '/design-upload-sketch',
+  },
+  {
+    id: 'prompt-edit',
+    title: 'Edit with Prompt',
+    desc: 'Describe a change and AI edits your image.',
+    icon: 'message-square',
+    accent: '',
+    accentDim: '',
+    route: '/design-prompt-edit',
+  },
+];
+
 const STUDIO_TOOLS: StudioTool[] = [
   ...GROWTH_STUDIO_TOOL_CARDS.slice(0, 1),
   ...STANDARD_STUDIO_TOOLS,
   ...GROWTH_STUDIO_TOOL_CARDS.slice(1),
+  ...EXTRA_AI_TOOLS,
 ];
+
+/** Cards without a fixed accent follow the live theme accent. */
+const THEME_ACCENT_TOOLS = new Set<string>(['ai-design', 'create-content', ...EXTRA_AI_TOOL_IDS]);
 
 const TEMPLATES = [
   { label: 'T-Shirt',      colors: ['#0EA5E9', '#1D4ED8'] as [string,string] },
@@ -218,7 +251,7 @@ export default function StudioScreen() {
         {/* ── START CREATING GRID ── */}
         <View style={s.sectionHeader}>
           <Text style={s.sectionTitle}>Start creating</Text>
-          <TouchableOpacity onPress={() => router.push('/design' as never)} activeOpacity={0.7}>
+          <TouchableOpacity onPress={() => router.push('/design-project' as never)} activeOpacity={0.7}>
             <Text style={s.sectionAction}>New project →</Text>
           </TouchableOpacity>
         </View>
@@ -232,8 +265,8 @@ export default function StudioScreen() {
               !planError &&
               GROWTH_REQUIRED_TOOLS.has(tool.id) &&
               !hasPlan('growth');
-            const toolAccent = tool.id === 'ai-design' || tool.id === 'create-content' ? theme.accentLight : tool.accent;
-            const toolAccentDim = tool.id === 'ai-design' || tool.id === 'create-content' ? theme.accentDim : tool.accentDim;
+            const toolAccent = THEME_ACCENT_TOOLS.has(tool.id) ? theme.accentLight : tool.accent;
+            const toolAccentDim = THEME_ACCENT_TOOLS.has(tool.id) ? theme.accentDim : tool.accentDim;
             return (
               <TouchableOpacity
                 key={tool.id}

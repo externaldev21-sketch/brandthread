@@ -1,6 +1,11 @@
 /**
- * Brandthread — Metafields and Metaobjects
- * Shows real counts of custom field definitions per resource type.
+ * Brandthread — Metafields
+ * Shows real counts of custom field definitions per resource type; each row
+ * opens metafield-definitions.tsx to add / edit / delete that resource's
+ * fields. Reached from the Products tab "…" menu.
+ *
+ * Metaobjects have no backend yet, so that section stays hidden
+ * (METAOBJECTS_AVAILABLE) instead of showing a button that does nothing.
  */
 import React, { useState, useCallback } from 'react';
 import { Redirect } from 'expo-router';
@@ -10,6 +15,8 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useApi } from '@/lib/api';
+import { SectionError } from '@/components/InlineFeedback';
+import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 const DEFINITIONS: { key: string; icon: IconName; label: string }[] = [
@@ -30,11 +37,9 @@ const DEFINITIONS: { key: string; icon: IconName; label: string }[] = [
   { key: 'shop',              icon: 'home',     label: 'Shop' },
 ];
 
-/**
- * Not linked from anywhere in the app and not finished (its rows and "Add definition" have no editor behind them), so release
- * builds send a deep link here to the home screen. Development builds still
- * open it for work on the feature.
- */
+// No metaobject API exists yet (needs-Dev) — keep the section out of the UI.
+const METAOBJECTS_AVAILABLE = false;
+
 export default function MetafieldsScreen() {
   if (!__DEV__) return <Redirect href={'/' as never} />;
   return <MetafieldsScreenContent />;
@@ -43,16 +48,20 @@ export default function MetafieldsScreen() {
 function MetafieldsScreenContent() {
   const colors = useColors();
   const api = useApi();
+  const router = useRouter();
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await api.seller.metafieldCounts() as any;
       setCounts(data.counts ?? {});
     } catch {
       setCounts({});
+      setError('Could not load your custom fields.');
     } finally {
       setLoading(false);
     }
@@ -76,6 +85,8 @@ function MetafieldsScreenContent() {
 
           {loading ? (
             <View style={s.loadingRow}><ActivityIndicator size="small" color={colors.primary} /></View>
+          ) : error ? (
+            <SectionError message={error} onRetry={() => { void load(); }} />
           ) : (
             <View style={[s.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {DEFINITIONS.map((def, i) => {
@@ -83,8 +94,13 @@ function MetafieldsScreenContent() {
                 return (
                   <TouchableOpacity
                     key={def.key}
-                    onPress={() => {}}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      router.push(`/metafield-definitions?resource=${encodeURIComponent(def.key)}&label=${encodeURIComponent(def.label)}` as never);
+                    }}
                     activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${def.label} custom fields`}
                     style={[s.row, i !== DEFINITIONS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
                   >
                     <Icon name={def.icon} size={17} color={colors.foreground} style={s.rowIcon} />
@@ -104,7 +120,8 @@ function MetafieldsScreenContent() {
           )}
         </View>
 
-        {/* Metaobjects section */}
+        {/* Metaobjects section — hidden until a metaobject API exists */}
+        {METAOBJECTS_AVAILABLE && (<>
         <View style={[s.divider, { backgroundColor: colors.secondary }]} />
         <View style={s.section}>
           <View style={s.rowStart}>
@@ -123,6 +140,7 @@ function MetafieldsScreenContent() {
             <Text style={[s.addMetaBtnText, { color: colors.primary }]}>Add definition</Text>
           </TouchableOpacity>
         </View>
+        </>)}
       </ScrollView>
     </View>
   );

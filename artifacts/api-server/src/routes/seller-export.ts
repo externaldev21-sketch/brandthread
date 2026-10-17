@@ -7,6 +7,7 @@ import { db, products, orders, customers } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
+import { DEFAULT_CUSTOMER_PRIVACY, loadCustomerPrivacy, maskExportRows } from "../lib/customerPrivacySettings";
 
 const router = Router();
 router.use(requireAuth);
@@ -64,6 +65,20 @@ router.post("/", requireRole("owner"), async (req, res) => {
       .from(customers)
       .where(eq(customers.ownerId, ownerId))
       .orderBy(desc(customers.createdAt));
+  }
+
+  // Customer privacy → "Hide contact details in exports".
+  let privacy = DEFAULT_CUSTOMER_PRIVACY;
+  try {
+    privacy = await loadCustomerPrivacy(ownerId);
+  } catch (err) {
+    req.log.error({ err }, "Failed to load customer privacy settings for export");
+    res.status(500).json({ error: "Couldn't load your customer privacy settings. Try again." });
+    return;
+  }
+  if (privacy.maskContactInExports) {
+    if (result.customers) result.customers = maskExportRows("customers", result.customers as Record<string, unknown>[]);
+    if (result.orders) result.orders = maskExportRows("orders", result.orders as Record<string, unknown>[]);
   }
 
   const ts = Date.now();

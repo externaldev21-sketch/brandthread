@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform, Alert, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform, Image, Alert, ActivityIndicator } from 'react-native';
 
 import { CachedImage } from '@/components/CachedImage';
 
@@ -31,6 +31,8 @@ import { FS, FONT } from '@/lib/theme';
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 
 import { radius } from '@/constants/radii';
+import { ApiError } from '@/lib/networkNotice';
+import { createBrandAsset } from '@/services/designService';
 
 import { minHitSlop } from '@/lib/hitSlop';
 
@@ -87,22 +89,32 @@ export default function BrandScreen() {
   const [suggestedNames, setSuggestedNames] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const api = useApi();
-  // The brand card shows the seller's own brand, not a sample one.
-  const [brand, setBrand] = useState<{ name: string; category: string } | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<{ name: string; logoUrl: string | null; subtitle: string | null } | null>(null);
+  const [domain, setDomain] = useState<{ name: string; verified: boolean } | null | undefined>(undefined);
+
+  // Real seller data for the header and the domain card.
   useEffect(() => {
-    let active = true;
+    let cancelled = false;
     api.seller.getProfile()
       .then((p) => {
-        if (!active) return;
-        setBrand({ name: (p.brandName || p.displayName || '').trim(), category: (p.category ?? '').trim() });
+        if (cancelled) return;
+        setProfile({
+          name: p.brandName || p.displayName || (p.username ? `@${p.username}` : 'Your brand'),
+          logoUrl: p.logoUrl || p.profileImageUrl || null,
+          subtitle: [p.category, p.location].filter(Boolean).join(' · ') || null,
+        });
       })
-      .catch(() => { /* card keeps its neutral state */ });
-    return () => { active = false; };
+      .catch(() => { if (!cancelled) setProfile({ name: 'Your brand', logoUrl: null, subtitle: null }); });
+    api.store.domains()
+      .then((rows: any[]) => {
+        if (cancelled) return;
+        const first = Array.isArray(rows) ? rows.find((d) => d.verified) ?? rows[0] : null;
+        setDomain(first ? { name: String(first.domain), verified: !!first.verified } : null);
+      })
+      .catch(() => { if (!cancelled) setDomain(null); });
+    return () => { cancelled = true; };
   }, [api]);
-  const brandName = brand?.name ?? '';
-  const brandInitials = brandName
-    ? brandName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('')
-    : '';
   const [logoStyle, setLogoStyle] = useState('Minimalist');
   const [logoGenerating, setLogoGenerating] = useState(false);
   const [logoImages, setLogoImages] = useState<string[]>([]); // base64 strings
@@ -118,6 +130,8 @@ export default function BrandScreen() {
     setSavingLogo(true);
     try {
       await api.seller.uploadLogo({ uri: `data:image/png;base64,${b64}`, mimeType: 'image/png' });
+      await createBrandAsset({ name: `${profile?.name ?? 'Brand'} logo`, type: 'logo', uri: `data:image/png;base64,${b64}`, tags: ['ai-generated', 'logo'] });
+      setProfile(prev => prev ? { ...prev, logoUrl: `data:image/png;base64,${b64}` } : prev);
       Alert.alert('Logo saved', 'It’s now your store logo.');
     } catch (error) {
       Alert.alert('Couldn’t save logo', apiErrorMessage(error, 'Check your connection and try again.'));
@@ -163,12 +177,49 @@ export default function BrandScreen() {
     setChecklist(prev => prev.map((v, idx) => idx === i ? !v : v));
   }
 
-  function handleGenerateNames() {
+  async function handleGenerateNames() {
+    const description = nameInput.trim();
+    if (description.length < 2) {
+      setNameError('Describe your brand in a few words first.');
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsGenerating(true);
-    setTimeout(() => {
-      setSuggestedNames(generateBrandNames(5));
+    setNameError(null);
+    try {
+      const { names } = await api.aiHelpers.brandNames({ description, style: logoStyle });
+      setSuggestedNames(names);
+    } catch (err) {
+      setNameError(
+        err instanceof ApiError && (err.status === 503 || err.code === 'ai_unavailable')
+          ? 'AI name ideas aren’t available right now. Try again later.'
+          : apiErrorMessage(err, 'Couldn’t get name ideas. Try again.'),
+      );
+    } finally {
       setIsGenerating(false);
-    }, 400);
+    }
+  }
+
+  async function handleUseLogo() {
+    if (selectedLogo === null || !logoImages[selectedLogo]) return;
+    setSavingLogo(true);
+    try {
+      await createBrandAsset({
+        name: `${profile?.name ?? 'Brand'} logo`,
+        type: 'logo',
+        uri: `data:image/png;base64,${logoImages[selectedLogo]}`,
+        tags: ['ai-generated', 'logo'],
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Logo saved', 'Saved to Brand Assets. To show it on your store, upload it as your store logo.', [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Store branding', onPress: () => router.push('/store-setup-brand' as never) },
+      ]);
+    } catch {
+      Alert.alert('Save failed', 'Could not save this logo. Please try again.');
+    } finally {
+      setSavingLogo(false);
+    }
   }
 
   return (
@@ -182,18 +233,20 @@ export default function BrandScreen() {
 
       {/* Brand Profile */}
       <LinearGradient colors={theme.heroGradient} style={[styles.profileCard, { borderColor: theme.accent }]}>
-        <View style={[styles.logoCircle, { borderColor: colors.primary }]}>
-          {brandInitials ? (
-            <Text style={[styles.logoText, { color: colors.primary }]}>{brandInitials}</Text>
+        <View style={[styles.logoCircle, { borderColor: colors.primary, overflow: 'hidden' }]}>
+          {profile?.logoUrl ? (
+            <Image source={{ uri: profile.logoUrl }} style={{ width: '100%', height: '100%' }} />
           ) : (
-            <Icon name="feather" size={18} color={colors.primary} />
+            <Text style={[styles.logoText, { color: colors.primary }]}>
+              {(profile?.name ?? '').replace(/^@/, '').slice(0, 2).toUpperCase() || '—'}
+            </Text>
           )}
         </View>
-        <View>
-          <Text style={[styles.brandName, { color: colors.primary }]}>{brandName || 'Your brand'}</Text>
-          {brand?.category ? (
-            <Text style={[styles.brandStyle, { color: theme.accentLight }]}>{brand.category}</Text>
-          ) : null}
+        <View style={{ flexShrink: 1 }}>
+          <Text style={[styles.brandName, { color: colors.primary }]} numberOfLines={1}>{profile?.name ?? ' '}</Text>
+          {!!profile?.subtitle && (
+            <Text style={[styles.brandStyle, { color: theme.accentLight }]} numberOfLines={1}>{profile.subtitle}</Text>
+          )}
         </View>
         <View style={[styles.completeBadge, { backgroundColor: theme.accentDim }]}>
           <Text style={[styles.completeText, { color: colors.primary }]}>{completionPct}%</Text>
@@ -211,7 +264,7 @@ export default function BrandScreen() {
         </View>
         <TextInput returnKeyType="done"
           style={[styles.input, { backgroundColor: colors.secondary, color: colors.foreground, borderColor: colors.border }]}
-          placeholder="Describe your brand..."
+          placeholder="Describe your brand (e.g. minimal black tees for runners)"
           placeholderTextColor={colors.mutedForeground}
           value={nameInput}
           onChangeText={setNameInput}
@@ -228,6 +281,9 @@ export default function BrandScreen() {
             {isGenerating ? 'Generating…' : 'Generate Names'}
           </Text>
         </TouchableOpacity>
+        {!!nameError && (
+          <Text style={[styles.brandStyle, { color: colors.destructive, marginTop: 10 }]}>{nameError}</Text>
+        )}
         <View style={styles.suggestions}>
           {suggestedNames.map((name) => (
             <TouchableOpacity
@@ -370,14 +426,23 @@ export default function BrandScreen() {
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Domain & Trademark</Text>
         </View>
         <View style={[styles.domainRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-          <Text style={[styles.domainText, { color: colors.mutedForeground }]} numberOfLines={1}>{suggestedDomain(nameInput)}</Text>
-          {/* No availability lookup exists, so this is only ever a suggestion. */}
-          <View style={[styles.availBadge, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
-            <Text style={[styles.availText, { color: colors.mutedForeground }]}>Suggested</Text>
-          </View>
+          <Text style={[styles.domainText, { color: colors.mutedForeground }]} numberOfLines={1}>
+            {domain === undefined ? 'Checking…' : domain ? domain.name : 'No custom domain connected yet'}
+          </Text>
+          {!!domain && (
+            <View style={[styles.availBadge, { backgroundColor: theme.accentDim }]}>
+              <Text style={[styles.availText, { color: domain.verified ? colors.success : colors.warning }]}>
+                {domain.verified ? 'Connected' : 'Pending DNS'}
+              </Text>
+            </View>
+          )}
         </View>
-        <TouchableOpacity style={[styles.connectBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8} hitSlop={BUTTON_HIT_SLOP} accessibilityRole="button">
-          <Text style={[styles.connectText, { color: colors.primaryForeground }]}>Connect Domain</Text>
+        <TouchableOpacity
+          style={[styles.connectBtn, { backgroundColor: colors.primary }]}
+          activeOpacity={0.8}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/store-domain' as never); }}
+        >
+          <Text style={[styles.connectText, { color: colors.primaryForeground }]}>{domain ? 'Manage Domain' : 'Connect Domain'}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

@@ -4617,6 +4617,19 @@ export default function DesignCanvasScreen() {
                   icon: 'eye' as const, disabled: false,
                   action: () => { closeSheet(); router.push((`/design-mockup-preview?projectId=${project?.id ?? ''}`) as never); },
                 },
+                {
+                  label: 'More formats & sizes',
+                  sub: 'PDF, transparent PNG, project file, preset sizes',
+                  icon: 'sliders' as const, disabled: exporting || !project,
+                  // Persist pending edits first: the export screen renders the saved project.
+                  action: () => { closeSheet(); void coordinatedSave().catch(() => {}).then(() => router.push((`/design-export?projectId=${project?.id ?? ''}`) as never)); },
+                },
+                {
+                  label: 'Version history',
+                  sub: 'Preview or restore saved versions',
+                  icon: 'clock' as const, disabled: !project,
+                  action: () => { closeSheet(); void coordinatedSave().catch(() => {}).then(() => router.push((`/design-versions?projectId=${project?.id ?? ''}`) as never)); },
+                },
               ];
               return items.map(item => (
                 <TouchableOpacity

@@ -1,7 +1,7 @@
-/** Seller view of one giveaway: entries, share link, end / draw, winners, redraw, shipped. */
-import React, { useCallback, useEffect, useState } from 'react';
+/** Seller view of one giveaway: entries, share link, edit, end / draw, winners, redraw, shipped. */
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
@@ -12,10 +12,12 @@ import { ListRow } from '@/components/ui/ListRow';
 import { SectionHeader } from '@/components/SectionHeader';
 import { FONT, FS, SP } from '@/lib/theme';
 import { formatDay, phaseLabel, timeLeft } from '@/lib/sellerEngagement';
+import { canEditGiveaway } from '@/lib/giveawayEditForm';
 
 export default function SellerGiveawayDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const api = useApi();
+  const router = useRouter();
   const c = useColors();
   const insets = useSafeAreaInsets();
   const [g, setG] = useState<any>(null);
@@ -29,7 +31,8 @@ export default function SellerGiveawayDetail() {
   const load = useCallback(async () => {
     try { setG(await api.sellerGiveaways.get(String(id))); setFailed(false); } catch { setFailed(true); }
   }, [api, id]);
-  useEffect(() => { load(); }, [load]);
+  // Reload on focus so returning from "Edit giveaway" shows the saved values.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   async function run(key: string, fn: () => Promise<any>) {
     setBusy(key); setError(null);
@@ -61,6 +64,10 @@ export default function SellerGiveawayDetail() {
         <View style={{ height: SP.sm }} />
         <View style={{ marginBottom: SP.md }}><Button label="Share giveaway" icon="share-2" variant="secondary" fullWidth onPress={() => { Share.share({ message: `${g.title} — ${g.shareUrl}` }).catch(() => {}); }} /></View>
 
+        {canEditGiveaway(g) ? (
+          <Button label="Edit giveaway" icon="edit-2" variant="secondary" fullWidth testID="giveaway-edit"
+            onPress={() => router.push(`/seller-giveaway-create?id=${encodeURIComponent(g.id)}` as never)} />
+        ) : null}
         {g.phase === 'live' ? <View style={{ marginTop: SP.md }}><Button label="End now" variant="secondary" fullWidth loading={busy === 'end'} onPress={() => run('end', () => api.sellerGiveaways.end(g.id))} /></View> : null}
         {g.phase === 'ended' ? <View style={{ marginTop: SP.md }}><Button label={`Draw ${g.winnerCount === 1 ? 'winner' : `${g.winnerCount} winners`}`} fullWidth loading={busy === 'draw'} disabled={g.entries.eligible === 0} onPress={() => run('draw', () => api.sellerGiveaways.draw(g.id))} /></View> : null}
         {g.phase === 'ended' && g.entries.eligible === 0 ? <Text style={[styles.note, { color: c.mutedForeground, marginTop: 8 }]}>No one is eligible yet, so there is nothing to draw from.</Text> : null}

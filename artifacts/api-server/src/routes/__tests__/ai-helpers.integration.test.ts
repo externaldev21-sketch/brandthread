@@ -179,6 +179,31 @@ describe("text helpers are never debited (real gate mounted)", () => {
   });
 });
 
+describe("brand names", () => {
+  it("returns up to five de-duplicated, length-capped names from the provider", async () => {
+    state.aiReply = () => ({ names: ["Night Loom", "Night Loom", "Ash and Ember", "A".repeat(60), "", "Field Notes", "Saltline", "Grainhaus"] });
+    const r = await call("/brand-names", { description: "minimal black tees for night runners", style: "Minimalist" });
+    expect(r.status).toBe(200);
+    expect(r.headers.get("x-ai-credits-charged")).toBeNull();
+    expect(r.json.names.length).toBeGreaterThan(0);
+    expect(r.json.names.length).toBeLessThanOrEqual(5);
+    for (const n of r.json.names) expect(n.length).toBeLessThanOrEqual(24);
+    expect(new Set(r.json.names).size).toBe(r.json.names.length);
+    // The seller's description reaches the model only as data.
+    expect(JSON.stringify(state.aiCalls[0].messages)).toContain("night runners");
+  });
+
+  it("fails honestly when the model returns nothing usable or AI is off", async () => {
+    state.aiReply = () => ({ names: [] });
+    expect((await call("/brand-names", { description: "streetwear" })).status).toBe(502);
+    expect((await call("/brand-names", { description: "" })).status).toBe(400);
+    delete process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    const off = await call("/brand-names", { description: "streetwear" });
+    expect(off.status).toBe(503);
+    expect(off.json.code).toBe("ai_unavailable");
+  });
+});
+
 describe("caption", () => {
   it("sends user text as data and never as instructions", async () => {
     state.aiReply = captionReply;

@@ -17,6 +17,7 @@ import dropsRouter from "./drops";
 import analyticsRouter from "./analytics";
 import widgetSummaryRouter from "./widgetSummary";
 import analyticsInsightsRouter from "./analytics-insights";
+import analyticsReportsRouter from "./analytics-reports";
 import integrationsRouter from "./integrations";
 import logoRouter, { onboardingSampleRouter } from "./logo";
 import mockupRouter from "./mockup";
@@ -366,6 +367,7 @@ router.use("/customers",       tc, customersRouter);
 router.use("/drops",           tc, featureGate("drops", { only: [{ method: "POST", path: "/" }] }), dropsRouter); // new drops: Growth+
 router.use("/analytics/insights", tc, analyticsInsightsRouter);
 router.use("/analytics/widget-summary", tc, widgetSummaryRouter); // iOS seller widgets (nativeSurfaces flag)
+router.use("/analytics/reports", tc, analyticsReportsRouter);
 router.use("/analytics",       tc, analyticsRouter);
 router.use("/integrations",    tc, integrationsRouter);
 router.use("/shopify",         tc, shopifyRouter);

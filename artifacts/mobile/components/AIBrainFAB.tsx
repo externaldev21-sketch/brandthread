@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { AIScreenContext } from '@/services/aiTypes';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getAISettings, subscribeAISettings } from '@/services/aiService';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,14 @@ export default function AIBrainFAB({
   const { theme } = useAppTheme();
 
   const [expanded, setExpanded] = useState(false);
+  // AI Settings → "Enable AI assistant" off removes this entry point.
+  const [aiEnabled, setAiEnabled] = useState(true);
+  useEffect(() => {
+    let active = true;
+    getAISettings().then((s) => { if (active) setAiEnabled(s.enabled); });
+    const unsubscribe = subscribeAISettings((s) => setAiEnabled(s.enabled));
+    return () => { active = false; unsubscribe(); };
+  }, []);
   const slideX  = useRef(new Animated.Value(COLLAPSED_TX)).current; // starts collapsed
   const opacity = useRef(new Animated.Value(1)).current;
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -141,6 +150,7 @@ export default function AIBrainFAB({
 
   // ── Don't render on web ────────────────────────────────────────────────────
   if (Platform.OS === 'web') return null;
+  if (!aiEnabled) return null;
 
   // Slightly lower than the old 16px base — now 8px above safe area / offset.
   const bottom = 8 + insets.bottom + bottomOffset;

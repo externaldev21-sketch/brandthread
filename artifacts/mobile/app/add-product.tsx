@@ -2075,6 +2075,19 @@ export default function AddProductScreen() {
     );
   }
 
+  /** Measurement-table editor (product-size-chart.tsx) — only for a saved
+   *  product, since it writes products.sizeChart directly. */
+  function renderSizeChartTable() {
+    if (!editProductId) return null;
+    const name = draftData.name ? `&productName=${encodeURIComponent(draftData.name)}` : '';
+    return (
+      <TouchableOpacity style={s.plusRow} onPress={() => router.push(`/product-size-chart?productId=${editProductId}${name}` as never)} accessibilityRole="button" testID="add-product-size-chart-table">
+        <Feather name="grid" size={15} color={theme.accentLight} />
+        <Text style={s.plusRowText}>Edit size chart table</Text>
+      </TouchableOpacity>
+    );
+  }
+
   /** AI size chart entry — only for a saved product, since the chart is written to it directly. */
   function renderSizeChartAi() {
     if (!editProductId) return null;
@@ -2674,6 +2687,7 @@ export default function AddProductScreen() {
             hint={draftData.sizeChartImageUrl ? 'Added' : 'Optional'}
           >
             {renderSizeChart()}
+            {renderSizeChartTable()}
             {renderSizeChartAi()}
           </CollapsibleSection>
 

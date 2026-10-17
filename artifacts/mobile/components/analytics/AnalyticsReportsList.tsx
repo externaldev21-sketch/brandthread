@@ -24,6 +24,10 @@ export const ANALYTICS_REPORTS: { label: string; icon: IconName; href: string; b
   { label: 'Export', icon: 'download', href: '/analytics-reports?report=export', badge: 'PRO' },
   { label: 'Advanced analytics', icon: 'trending-up', href: '/analytics-reports?report=advanced', badge: 'GROWTH' },
   { label: 'Customer cohorts and lifetime value', icon: 'users', href: '/analytics-reports?report=cohorts', badge: 'GROWTH' },
+  { label: 'Store performance', icon: 'shopping-bag', href: '/analytics-store' },
+  { label: 'Profit', icon: 'dollar-sign', href: '/analytics-profit' },
+  { label: 'Marketing', icon: 'trending-up', href: '/analytics-marketing' },
+  { label: 'Production', icon: 'layers', href: '/analytics-production' },
 ];
 
 /** Entry points to the seller reports; appended to the Analytics tab. */

@@ -83,6 +83,8 @@ export default function FulfillBatchScreen() {
   const [quotes, setQuotes] = useState<QuotedOrder[]>([]);
   const [notice, setNotice] = useState<'no_box' | 'no_ship_from' | null>(null);
   const quoteTotal = quotes.reduce((sum, q) => sum + q.rate.priceCents, 0);
+  // Orders that couldn't be loaded are listed, never silently dropped.
+  const [loadFailures, setLoadFailures] = useState<Array<{ id: string; message: string }>>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,6 +99,7 @@ export default function FulfillBatchScreen() {
       setLoading(true);
       const loaded: Order[] = [];
       const rawById: Record<string, any> = {};
+      const failures: Array<{ id: string; message: string }> = [];
       for (const id of ids) {
         try {
           // Seller web preview demo orders never reach the API.
@@ -104,14 +107,15 @@ export default function FulfillBatchScreen() {
           if (raw) {
             loaded.push(adaptApiOrder(raw));
             rawById[id] = raw;
-          }
-        } catch {
-          // Skipped orders surface in the results list once an action runs.
+          } else failures.push({ id, message: 'Order not found' });
+        } catch (err: any) {
+          failures.push({ id, message: err?.message ? String(err.message).replace(/^API \d{3}:\s*/, '') : 'Could not load this order' });
         }
       }
       if (!cancelled) {
         setOrders(loaded);
         setRaws(rawById);
+        setLoadFailures(failures);
         setLoading(false);
       }
     })();
@@ -312,6 +316,20 @@ export default function FulfillBatchScreen() {
                 </View>
               );
             })}
+            {loadFailures.length > 0 && (
+              <>
+                <SectionHeader title={`Couldn't load ${loadFailures.length} order${loadFailures.length === 1 ? '' : 's'}`} />
+                {loadFailures.map(f => (
+                  <BrandthreadCard key={f.id} style={s.resultRow}>
+                    <Icon name="alert-circle" size={ICON.md} color={ERROR} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.orderNumber}>{f.id.slice(0, 8)}</Text>
+                      <Text style={s.mutedText}>{f.message} — not included below.</Text>
+                    </View>
+                  </BrandthreadCard>
+                ))}
+              </>
+            )}
 
             <View style={s.actionRow}>
               <View style={s.half}>

@@ -14,6 +14,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import type { CaptionTrack } from '@/lib/captions';
+import { captionsUnavailableCopy, isCaptionsUnavailableError, type CaptionsUnavailableCopy } from '@/lib/captionsAvailability';
 import { RADII } from '@/constants/radii';
 import { FONT, FS, SP } from '@/lib/theme';
 
@@ -36,6 +37,7 @@ export default function PostCaptionsEditScreen() {
   const [texts, setTexts] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unavailableCopy, setUnavailableCopy] = useState<CaptionsUnavailableCopy>(() => captionsUnavailableCopy(null));
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const applyTrack = useCallback((next: CaptionTrack) => {
@@ -53,7 +55,12 @@ export default function PostCaptionsEditScreen() {
       if (res.tracks.some((t) => t.status === 'pending')) { setPhase('pending'); return; }
       setPhase(res.tracks.some((t) => t.status === 'failed') ? 'failed' : 'none');
     } catch (e: any) {
-      setPhase(e?.status === 503 || e?.code === 'CAPTIONS_UNAVAILABLE' ? 'unavailable' : 'none');
+      if (isCaptionsUnavailableError(e)) {
+        setUnavailableCopy(captionsUnavailableCopy(e));
+        setPhase('unavailable');
+      } else {
+        setPhase('none');
+      }
     }
   }, [api, postId, applyTrack]);
 
@@ -72,7 +79,12 @@ export default function PostCaptionsEditScreen() {
     setPhase('pending');
     try {
       await api.posts.generateCaptions(postId, phase === 'failed');
-    } catch {
+    } catch (e: any) {
+      if (isCaptionsUnavailableError(e)) {
+        setUnavailableCopy(captionsUnavailableCopy(e));
+        setPhase('unavailable');
+        return;
+      }
       setPhase('failed');
       setError('Could not start captions. Try again.');
     }
@@ -135,8 +147,8 @@ export default function PostCaptionsEditScreen() {
           </>
         ) : phase === 'unavailable' ? (
           <View style={styles.center}>
-            <Text style={[styles.title, { color: theme.text }]}>Captions are not available</Text>
-            <Text style={[styles.message, { color: theme.muted }]}>Auto captions are not turned on for your account yet.</Text>
+            <Text style={[styles.title, { color: theme.text }]}>{unavailableCopy.title}</Text>
+            <Text style={[styles.message, { color: theme.muted }]}>{unavailableCopy.message}</Text>
           </View>
         ) : (
           <View style={styles.center}>

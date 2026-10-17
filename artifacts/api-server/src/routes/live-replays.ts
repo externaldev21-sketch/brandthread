@@ -32,6 +32,7 @@ import {
   type ReplayRow,
 } from "../lib/liveReplayAccess";
 import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
+import { isReplayRecordingConfigured } from "../lib/liveAvailability";
 
 const router = Router();
 
@@ -75,7 +76,7 @@ router.get("/by-seller/:sellerId", async (req, res) => {
 
     const isOwner = !!viewerId && viewerId === sellerId;
     if (!isOwner && viewerId && (await isBlockedEitherWay(viewerId, sellerId))) {
-      return res.json({ replays: [], total: 0 });
+      return res.json({ replays: [], total: 0, recordingEnabled: isReplayRecordingConfigured() });
     }
 
     const rows = await db.execute(sql`
@@ -103,6 +104,9 @@ router.get("/by-seller/:sellerId", async (req, res) => {
     return res.json({
       replays: page.map((row) => shapeReplay(row, viewerId)),
       hasMore: all.length > limit,
+      // False while Agora Cloud Recording env is missing: no live is being
+      // recorded, so an empty shelf means "replays not enabled", not "none yet".
+      recordingEnabled: isReplayRecordingConfigured(),
     });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });

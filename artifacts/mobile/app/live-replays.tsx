@@ -37,6 +37,8 @@ import { FONT, FS, SP } from '@/lib/theme';
 
 import { haptics, haptic } from '@/lib/haptics';
 
+import { hapticLight } from '@/lib/haptics';
+import { REPLAYS_NOT_ENABLED_BODY, REPLAYS_NOT_ENABLED_TITLE } from '@/lib/live/liveAvailability';
 
 const COLUMNS = 3;
 const GAP = 1;
@@ -53,6 +55,8 @@ export default function LiveReplaysScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [notice, setNotice] = useState('');
+  // false when the server isn't recording lives (Agora Cloud Recording unset).
+  const [recordingEnabled, setRecordingEnabled] = useState(true);
 
   const load = useCallback(async () => {
     if (!sellerId) { setLoading(false); return; }
@@ -61,6 +65,7 @@ export default function LiveReplaysScreen() {
     try {
       const res = await api.liveReplays.bySeller(sellerId);
       setReplays(res.replays);
+      setRecordingEnabled(res.recordingEnabled !== false);
     } catch {
       setError(true);
     } finally {
@@ -130,7 +135,11 @@ export default function LiveReplaysScreen() {
           action={{ label: 'Try again', onPress: () => { void load(); } }}
         />
       ) : replays.length === 0 ? (
-        <EmptyState icon="video" title="No replays yet" description="Saved live streams will show up here." />
+        recordingEnabled ? (
+          <EmptyState icon="video" title="No replays yet" description="Saved live streams will show up here." />
+        ) : (
+          <EmptyState icon="video-off" title={REPLAYS_NOT_ENABLED_TITLE} description={REPLAYS_NOT_ENABLED_BODY} />
+        )
       ) : (
         <FlatList
           data={replays}

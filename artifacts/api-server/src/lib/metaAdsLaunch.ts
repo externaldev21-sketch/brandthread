@@ -29,7 +29,7 @@ const storage = new ObjectStorageService();
 
 type MetaCampaignRow = typeof metaCampaigns.$inferSelect;
 
-const OBJECTIVE_TO_OPTIMIZATION_GOAL: Record<string, string> = {
+export const OBJECTIVE_TO_OPTIMIZATION_GOAL: Record<string, string> = {
   sales: "OFFSITE_CONVERSIONS",
   traffic: "LINK_CLICKS",
   awareness: "REACH",
@@ -193,7 +193,7 @@ export async function launchCampaign(
   }
 }
 
-function buildTargeting(campaign: MetaCampaignRow): Record<string, unknown> {
+export function buildTargeting(campaign: Pick<MetaCampaignRow, "targetingSpec">): Record<string, unknown> {
   const spec = (campaign.targetingSpec ?? {}) as {
     countries?: string[];
     ageMin?: number;

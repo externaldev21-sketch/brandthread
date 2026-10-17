@@ -1,203 +1,214 @@
 /**
  * Brandthread Design Studio — Upload Sketch
- * Route: /design-upload-sketch
+ * Route: /design-upload-sketch  (Studio tab → "Upload Sketch")
+ *
+ * Pick a sketch (optionally cropped in the system picker), choose a style,
+ * and generate 4 cleaned designs through the real AI endpoint
+ * (POST /api/mockup/generate, mode "sketch_to_design", Growth plan). Each of
+ * the 4 results is its own request, so progress is real: tiles fill in as
+ * they finish, and a failed tile shows the server's reason with Retry.
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, Image, Animated, useWindowDimensions,
+  StyleSheet, Alert, Image, Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Icon } from '@/components/ui/Icon';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 import {
   BrandthreadScreen, BrandthreadHeader, GradientCard,
 } from '@/components/BrandthreadUI';
 import {
-  BG, SURFACE, CARD, CARD_ELEVATED,
-  BORDER, BORDER_ACTIVE,
+  SURFACE, CARD,
+  BORDER,
   FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, ICON, TEXT_SECONDARY,
+  FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { AI_STYLES, AIStyleKind } from '@/services/designTypes';
-import { ScreenHeader } from '@/components/ScreenHeader';
-import {
-  generateSketchToDesign, GenerateDesignResult,
-} from '@/services/designService';
+import { generateSketchToDesign, createBrandAsset } from '@/services/designService';
+import { AiResultsGrid } from '@/components/ai-tools/AiResultsGrid';
+import { AiResultViewer } from '@/components/ai-tools/AiResultViewer';
+import type { AiResultSlot } from '@/components/ai-tools/AiResultTypes';
+import { saveImageToCameraRoll, saveAllToCameraRoll, shareImage } from '@/lib/aiToolMedia';
+import { aiToolErrorMessage } from '@/lib/aiToolErrors';
 
-type Step = 'upload' | 'process' | 'style' | 'results';
+const { width: SW } = Dimensions.get('window');
+const COL_W = (SW - SP.lg * 2 - SP.sm) / 2;
+const RESULT_COUNT = 4;
 
-const PROCESS_STEPS = [
-  'Cleaning background…',
-  'Increasing contrast…',
-  'Vectorizing…',
-];
+type Step = 'upload' | 'style' | 'results';
+
+const CONTRAST_HINT = 'The sketch lines are faint: boost the contrast and clean up the line work.';
 
 export default function UploadSketchScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
-  // Live window width so the 2-up cards re-fit on iPad rotation / split view.
-  const { width: SW } = useWindowDimensions();
-  const s = createStyles(theme, (SW - SP.lg * 2 - SP.sm) / 2);
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
+  const s = createStyles(theme);
   const router = useRouter();
   const [step, setStep] = useState<Step>('upload');
   const [sketchUri, setSketchUri] = useState<string | null>(null);
-  const [cropEnabled, setCropEnabled] = useState(false);
   const [contrastEnabled, setContrastEnabled] = useState(false);
   const [style, setStyle] = useState<AIStyleKind>('streetwear');
   const [colorPalette, setColorPalette] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [results, setResults] = useState<GenerateDesignResult | null>(null);
+  const [slots, setSlots] = useState<AiResultSlot[]>([]);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [savingId, setSavingId] = useState<number | null>(null);
+  const [libraryId, setLibraryId] = useState<number | null>(null);
 
-  // Processing animation state
-  const [processStep, setProcessStep] = useState(0);
-  const progressAnim = useRef(new Animated.Value(0)).current;
-  const stepAnims = useRef(PROCESS_STEPS.map(() => new Animated.Value(0))).current;
+  const doneSlots = slots.filter(sl => sl.status === 'done' && sl.imageUri);
+  const generatingCount = slots.filter(sl => sl.status === 'generating').length;
+  const failedCount = slots.filter(sl => sl.status === 'failed').length;
 
-  async function pickSketch() {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.9,
-    });
-    if (!res.canceled && res.assets[0]) {
-      setSketchUri(res.assets[0].uri);
+  async function pickSketch(crop = false) {
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.9,
+        allowsEditing: crop,
+      });
+      if (!res.canceled && res.assets[0]) setSketchUri(res.assets[0].uri);
+    } catch {
+      Alert.alert('Couldn’t open your photos', 'Check photo access for Brandthread in Settings and try again.');
     }
   }
 
-  function startProcessing() {
-    setStep('process');
-    // Animate progress bar
-    Animated.timing(progressAnim, {
-      toValue: 1,
-      duration: 3000,
-      useNativeDriver: false,
-    }).start();
-    // Fade in each step label
-    PROCESS_STEPS.forEach((_, i) => {
-      setTimeout(() => {
-        setProcessStep(i);
-        Animated.timing(stepAnims[i], {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }).start();
-      }, i * 900);
-    });
-    // Go to style after animation
-    setTimeout(() => setStep('style'), 3200);
+  function palettePrompt(): string {
+    return [colorPalette.trim(), contrastEnabled ? CONTRAST_HINT : ''].filter(Boolean).join('. ');
   }
 
-  async function handleGenerate() {
+  async function runSlot(id: number) {
     if (!sketchUri) return;
-    setIsGenerating(true);
+    setSlots(prev => prev.map(sl => sl.id === id ? { ...sl, status: 'generating', error: undefined } : sl));
     try {
-      const result = await generateSketchToDesign({
-        sketchUri,
-        style,
-        colorPalette,
-        count: 4,
-      });
-      setResults(result);
-      setStep('results');
+      const result = await generateSketchToDesign({ sketchUri, style, colorPalette: palettePrompt(), count: 1 });
+      const imageUri = result.imageUris[0];
+      if (!imageUri) throw new Error('The AI returned no image. Try again.');
+      setSlots(prev => prev.map(sl => sl.id === id ? { ...sl, status: 'done', imageUri } : sl));
+    } catch (err) {
+      setSlots(prev => prev.map(sl => sl.id === id
+        ? { ...sl, status: 'failed', error: aiToolErrorMessage(err, 'Generation failed. Try again.') }
+        : sl));
+    }
+  }
+
+  function handleGenerate() {
+    if (!sketchUri) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    const fresh: AiResultSlot[] = Array.from({ length: RESULT_COUNT }, (_, i) => ({
+      id: i, status: 'generating', sourceUri: sketchUri, label: `Design ${i + 1}`,
+    }));
+    setSlots(fresh);
+    setStep('results');
+    fresh.forEach(sl => { void runSlot(sl.id); });
+  }
+
+  async function handleSaveToLibrary(id: number, imageUri: string) {
+    setLibraryId(id);
+    try {
+      await createBrandAsset({ name: `Sketch design ${id + 1}`, type: 'graphic', uri: imageUri, tags: ['ai-generated', 'sketch-to-design'] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Alert.alert('Saved', 'Saved to Brand Assets. Insert it into any design from the assets panel.');
     } catch {
-      Alert.alert('Generation failed', 'Please try again.');
+      Alert.alert('Save failed', 'Could not save to Brand Assets. Please try again.');
     } finally {
-      setIsGenerating(false);
+      setLibraryId(null);
+    }
+  }
+
+  async function handleDownload(id: number, imageUri: string) {
+    setSavingId(id);
+    const result = await saveImageToCameraRoll(imageUri, 'sketch-design');
+    setSavingId(null);
+    if (result.ok) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } else {
+      Alert.alert(
+        result.reason === 'permission' ? 'Permission required' : result.reason === 'unavailable' ? 'Unavailable' : 'Download failed',
+        result.reason === 'permission'
+          ? 'Allow photo library access to save this image.'
+          : result.reason === 'unavailable'
+            ? 'Saving to Photos is unavailable in this app build.'
+            : 'Could not save this image. Please try again.',
+      );
+    }
+  }
+
+  async function handleSaveAll() {
+    const uris = doneSlots.map(sl => sl.imageUri!);
+    if (uris.length === 0) return;
+    const { succeeded, failed, unavailable } = await saveAllToCameraRoll(uris, 'sketch-design');
+    if (failed === 0) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Alert.alert('Saved', `${succeeded} design${succeeded === 1 ? '' : 's'} saved.`);
+    } else {
+      Alert.alert(unavailable ? 'Photos unavailable' : 'Some saves failed',
+        unavailable ? 'Saving to Photos is unavailable in this app build.' : `${succeeded} of ${uris.length} designs saved.`);
     }
   }
 
   function reset() {
     setStep('upload');
     setSketchUri(null);
-    setResults(null);
-    setProcessStep(0);
-    progressAnim.setValue(0);
-    stepAnims.forEach(a => a.setValue(0));
+    setSlots([]);
+    setViewerIndex(null);
   }
 
-  const progressWidth = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
-
   // ─── Results ─────────────────────────────────────────────────────────────────
-  if (step === 'results' && results) {
+  if (step === 'results') {
+    const status = generatingCount > 0
+      ? `Generating ${RESULT_COUNT - generatingCount} of ${RESULT_COUNT} done…`
+      : failedCount > 0
+        ? `${doneSlots.length} of ${RESULT_COUNT} ready · ${failedCount} failed`
+        : `Style: ${style}`;
     return (
-      <BrandthreadScreen noSafeTop>
-        <ScreenHeader title="Cleaned designs" onBack={() => setStep('style')} />
+      <BrandthreadScreen>
+        <BrandthreadHeader title="Cleaned designs" onBack={() => setStep('style')} />
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={s.content}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={s.sectionLabel}>Style: {results.style}</Text>
-          <View style={s.grid}>
-            {results.imageUris.map((uri, idx) => (
-              <View key={uri} style={s.resultCard}>
-                <Image source={{ uri }} style={s.resultGradient} resizeMode="cover" />
-                <View style={s.resultActions}>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Saved to project')}>
-                    <Icon name="folder-plus" size={ICON.sm} color={PURPLE} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Add to garment')}>
-                    <Icon name="layers" size={ICON.sm} color={CYAN} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Create product')}>
-                    <Icon name="package" size={ICON.sm} color={FG} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Export')}>
-                    <Icon name="download" size={ICON.sm} color={FG} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </View>
+          <Text style={s.sectionLabel}>{status}</Text>
+          <AiResultsGrid
+            slots={slots}
+            onOpen={(id) => setViewerIndex(doneSlots.findIndex(d => d.id === id))}
+            onRetry={(id) => { void runSlot(id); }}
+            onSaveToLibrary={handleSaveToLibrary}
+            onDownload={handleDownload}
+            savingId={savingId}
+            libraryId={libraryId}
+          />
           <View style={s.footerRow}>
             <TouchableOpacity style={s.footerBtn} onPress={reset}>
-              <Icon name="refresh-cw" size={ICON.sm} color={FG} />
-              <Text style={s.footerBtnText}>Try again</Text>
+              <Feather name="refresh-cw" size={ICON.sm} color={FG} />
+              <Text style={s.footerBtnText}>New sketch</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[s.footerBtn, { borderColor: PURPLE }]} onPress={() => Alert.alert('All saved')}>
-              <Icon name="save" size={ICON.sm} color={PURPLE} />
+            <TouchableOpacity
+              style={[s.footerBtn, { borderColor: PURPLE, opacity: doneSlots.length === 0 ? 0.5 : 1 }]}
+              onPress={handleSaveAll}
+              disabled={doneSlots.length === 0}
+            >
+              <Feather name="download" size={ICON.sm} color={PURPLE} />
               <Text style={[s.footerBtnText, { color: PURPLE }]}>Save all</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
-      </BrandthreadScreen>
-    );
-  }
-
-  // ─── Processing ───────────────────────────────────────────────────────────────
-  if (step === 'process') {
-    return (
-      <BrandthreadScreen>
-        <BrandthreadHeader title="Processing sketch" />
-        <View style={s.processCenter}>
-          <View style={s.processCard}>
-            <Text style={s.processTitle}>Preparing your sketch</Text>
-            <View style={s.progressBarTrack}>
-              <Animated.View style={[s.progressBarFill, { width: progressWidth }]} />
-            </View>
-            {PROCESS_STEPS.map((label, i) => (
-              <Animated.View
-                key={label}
-                style={[s.processStepRow, { opacity: stepAnims[i] }]}
-              >
-                <Icon
-                  name={i <= processStep ? 'check-circle' : 'circle'}
-                  size={ICON.sm}
-                  color={i <= processStep ? CYAN : SUBTLE}
-                />
-                <Text style={[s.processStepText, i <= processStep && { color: FG }]}>
-                  {label}
-                </Text>
-              </Animated.View>
-            ))}
-          </View>
-        </View>
+        <AiResultViewer
+          visible={viewerIndex !== null && viewerIndex >= 0}
+          items={doneSlots}
+          index={Math.max(0, viewerIndex ?? 0)}
+          onIndexChange={setViewerIndex}
+          onClose={() => setViewerIndex(null)}
+          actions={[
+            { icon: 'bookmark', label: 'Library', onPress: (item) => handleSaveToLibrary(item.id, item.imageUri!), loading: (item) => libraryId === item.id },
+            { icon: 'download', label: 'Save', onPress: (item) => handleDownload(item.id, item.imageUri!), loading: (item) => savingId === item.id },
+            { icon: 'share', label: 'Share', onPress: (item) => shareImage(item.imageUri!, 'sketch-design') },
+          ]}
+        />
       </BrandthreadScreen>
     );
   }
@@ -205,14 +216,8 @@ export default function UploadSketchScreen() {
   // ─── Style selection ──────────────────────────────────────────────────────────
   if (step === 'style') {
     return (
-      <BrandthreadScreen noSafeTop>
-        {isGenerating && (
-          <View style={s.loadingOverlay}>
-            <ActivityIndicator size="large" color={PURPLE} />
-            <Text style={s.loadingText}>Generating designs…</Text>
-          </View>
-        )}
-        <ScreenHeader title="Choose style" onBack={() => setStep('upload')} />
+      <BrandthreadScreen>
+        <BrandthreadHeader title="Choose style" onBack={() => setStep('upload')} />
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={s.content}
@@ -255,8 +260,8 @@ export default function UploadSketchScreen() {
 
           <GradientCard colors={theme.primaryGradient} style={[s.generateCard, { shadowColor: theme.shadowColor }]} onPress={handleGenerate}>
             <View style={s.generateInner}>
-              <Icon name="zap" size={ICON.md} color={theme.onAccent} />
-              <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate cleaned design</Text>
+              <Feather name="zap" size={ICON.md} color={theme.onAccent} />
+              <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate {RESULT_COUNT} cleaned designs</Text>
             </View>
           </GradientCard>
         </ScrollView>
@@ -266,23 +271,27 @@ export default function UploadSketchScreen() {
 
   // ─── Upload step ──────────────────────────────────────────────────────────────
   return (
-    <BrandthreadScreen noSafeTop>
-      <ScreenHeader title="Upload sketch" onBack={() => goBackOr(router)} />
+    <BrandthreadScreen>
+      <BrandthreadHeader title="Upload Sketch" onBack={() => goBackOr(router)} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
       >
-        <TouchableOpacity style={s.uploadZone} onPress={pickSketch}>
+        <Text style={s.uploadHint}>
+          Upload a hand-drawn sketch or rough design. AI turns it into clean, print-ready artwork.
+        </Text>
+
+        <TouchableOpacity style={s.uploadZone} onPress={() => pickSketch(false)}>
           {sketchUri ? (
             <Image source={{ uri: sketchUri }} style={s.uploadThumb} />
           ) : (
             <>
               <View style={s.uploadIconCircle}>
-                <Icon name="upload" size={ICON.xl} color={PURPLE} />
+                <Feather name="upload" size={ICON.xl} color={PURPLE} />
               </View>
               <Text style={s.uploadZoneTitle}>Upload sketch</Text>
-              <Text style={s.uploadZoneSub}>JPG, PNG up to 20MB</Text>
+              <Text style={s.uploadZoneSub}>JPG, PNG or WEBP up to 8MB</Text>
             </>
           )}
         </TouchableOpacity>
@@ -291,40 +300,54 @@ export default function UploadSketchScreen() {
           <>
             <Text style={s.label}>Options</Text>
             <View style={s.toggleRow}>
-              <TouchableOpacity
-                style={[s.toggle, cropEnabled && s.toggleActive]}
-                onPress={() => setCropEnabled(!cropEnabled)}
-              >
-                <Icon name="crop" size={ICON.sm} color={cropEnabled ? PURPLE_LIGHT : MUTED} />
-                <Text style={[s.toggleText, cropEnabled && { color: PURPLE_LIGHT }]}>Crop</Text>
+              <TouchableOpacity style={s.toggle} onPress={() => pickSketch(true)}>
+                <Feather name="crop" size={ICON.sm} color={MUTED} />
+                <Text style={s.toggleText}>Crop</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.toggle, contrastEnabled && s.toggleActive]}
                 onPress={() => setContrastEnabled(!contrastEnabled)}
               >
-                <Icon name="sun" size={ICON.sm} color={contrastEnabled ? CYAN : MUTED} />
-                <Text style={[s.toggleText, contrastEnabled && { color: CYAN }]}>Increase contrast</Text>
+                <Feather name="sun" size={ICON.sm} color={contrastEnabled ? CYAN : MUTED} />
+                <Text style={[s.toggleText, contrastEnabled && { color: CYAN }]}>Faint lines</Text>
               </TouchableOpacity>
             </View>
 
-            <GradientCard colors={theme.primaryGradient} style={[s.generateCard, { shadowColor: theme.shadowColor }]} onPress={startProcessing}>
+            <GradientCard colors={theme.primaryGradient} style={[s.generateCard, { shadowColor: theme.shadowColor }]} onPress={() => setStep('style')}>
               <View style={s.generateInner}>
-                <Icon name="arrow-right" size={ICON.md} color={theme.onAccent} />
-                <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Process sketch</Text>
+                <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
+                <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Choose style</Text>
               </View>
             </GradientCard>
           </>
         )}
 
+        {!sketchUri && (
+          <View style={s.emptyHints}>
+            {['Hand-drawn logos', 'Rough illustrations', 'Typography sketches', 'Pattern drafts'].map(hint => (
+              <View key={hint} style={s.hintChip}>
+                <Feather name="check" size={ICON.xs} color={CYAN} />
+                <Text style={s.hintChipText}>{hint}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </BrandthreadScreen>
   );
 }
 
-const createStyles = (theme: ReturnType<typeof useAppTheme>['theme'], COL_W: number) => {
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
   return StyleSheet.create({
   content: { padding: SP.lg, paddingBottom: SP.xxl },
+  uploadHint: {
+    fontFamily: FONT.regular,
+    fontSize: FS.sm,
+    color: MUTED,
+    marginBottom: SP.lg,
+    lineHeight: 20,
+  },
   uploadZone: {
     borderWidth: 2,
     borderColor: BORDER,
@@ -413,6 +436,21 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme'], COL_W: num
     fontFamily: FONT.bold,
     fontSize: FS.md,
     color: '#fff',
+  },
+  emptyHints: {
+    marginTop: SP.xl,
+    gap: SP.sm,
+  },
+  hintChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    paddingVertical: SP.xs,
+  },
+  hintChipText: {
+    fontFamily: FONT.regular,
+    fontSize: FS.sm,
+    color: MUTED,
   },
   // Processing
   processCenter: {
@@ -554,7 +592,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme'], COL_W: num
   resultLabel: {
     fontFamily: FONT.medium,
     fontSize: FS.sm,
-    color: TEXT_SECONDARY,
+    color: 'rgba(255,255,255,0.7)',
   },
   resultActions: {
     flexDirection: 'row',

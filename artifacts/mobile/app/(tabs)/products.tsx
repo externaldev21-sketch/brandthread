@@ -55,6 +55,7 @@ import { Product, ProductFilter } from '@/services/productTypes';
 
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { apiErrorMessage } from '@/lib/safety';
+import { buildCsv, exportCsvFile } from '@/lib/csvExport';
 import { FormInput } from '@/components/BrandthreadUI';
 import { SheetRise } from '@/components/motion/SheetRise';
 
@@ -762,19 +763,26 @@ export default function ProductsScreen() {
   }
 
   async function handleExportProducts() {
-    const escapeCsv = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
-    const rows = products.map(product => [
-      product.name,
-      product.status,
-      product.variants.length,
-      formatCents(product.pricing.priceCents),
-      product.inventory.totalStock,
-    ].map(escapeCsv).join(','));
-    const csv = [
-      'Product,Status,Variants,Price,Inventory',
-      ...rows,
-    ].join('\n');
-    await Share.share({ title: 'Products Export', message: csv });
+    if (products.length === 0) {
+      Alert.alert('Nothing to export', 'There are no products to export yet.');
+      return;
+    }
+    const csv = buildCsv(
+      ['Product', 'Status', 'Variants', 'Price', 'Inventory'],
+      products.map(product => [
+        product.name,
+        product.status,
+        product.variants.length,
+        formatCents(product.pricing.priceCents),
+        product.inventory.totalStock,
+      ]),
+    );
+    try {
+      const shared = await exportCsvFile('products', csv, 'Export products');
+      if (!shared) Alert.alert('Export saved', 'Sharing is not available on this device.');
+    } catch {
+      Alert.alert('Export failed', 'Could not export products. Please try again.');
+    }
   }
 
   // Sorted products
@@ -962,6 +970,9 @@ export default function ProductsScreen() {
               { label: 'Scheduled launches', icon: 'calendar', onPress: () => router.push('/product-launches' as never) },
               { label: 'Waitlist demand', icon: 'users', onPress: () => router.push('/waitlist-demand' as never) },
               { label: 'Size charts', icon: 'maximize-2', onPress: () => router.push('/size-chart-templates' as never) },
+              { label: 'Bundles', icon: 'package', onPress: () => router.push('/product-bundles' as never) },
+              { label: 'Drops', icon: 'clock', onPress: () => router.push('/seller-drops' as never) },
+              { label: 'Custom fields (metafields)', icon: 'list', onPress: () => router.push('/metafields' as never) },
             ]),
             accessibilityLabel: 'More product actions',
           },

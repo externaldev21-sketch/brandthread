@@ -157,6 +157,48 @@ router.post("/caption", requireAi, rateLimit("expensive"), async (req, res): Pro
   }
 });
 
+// ─── POST /brand-names ────────────────────────────────────────────────────────
+
+const brandNamesBody = z
+  .object({
+    description: clean(300).min(2, "Describe your brand in a few words"),
+    style: clean(40).optional(),
+  })
+  .strict();
+
+const BRAND_NAMES_SYSTEM = [
+  "You suggest names for a new fashion or streetwear brand.",
+  "Return JSON: {\"names\": [five different brand name ideas]}.",
+  "Each name is 1 to 3 words, at most 24 characters, easy to say and spell, and fits the description and style given.",
+  "Never reuse a well-known existing brand or trademark, and never include offensive words.",
+].join("\n");
+
+router.post("/brand-names", requireAi, rateLimit("expensive"), async (req, res): Promise<void> => {
+  const parsed = brandNamesBody.safeParse(req.body);
+  if (!parsed.success) return invalid(res, parsed.error);
+  const b = parsed.data;
+  if (evaluateContent(b.description, "public").action === "reject") {
+    res.status(422).json({ error: "That text can't be used. Edit it and try again.", code: "CONTENT_REJECTED" });
+    return;
+  }
+  try {
+    const out = (await completeJson({
+      system: BRAND_NAMES_SYSTEM,
+      data: { description: b.description, style: b.style ?? null },
+      maxTokens: 300,
+    })) as { names?: unknown };
+    const names = [...new Set(
+      (Array.isArray(out.names) ? out.names : [])
+        .map((n) => safeText(n, 24))
+        .filter((n): n is string => Boolean(n) && isPublicSafe(n as string)),
+    )].slice(0, 5);
+    if (names.length === 0) throw new AiProviderError("No brand names returned");
+    res.json({ names });
+  } catch (err) {
+    handleFailure(req, res, err);
+  }
+});
+
 // ─── POST /product-description ────────────────────────────────────────────────
 
 const productDescriptionBody = z

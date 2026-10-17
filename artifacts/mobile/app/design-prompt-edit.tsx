@@ -1,8 +1,13 @@
 /**
  * Brandthread Design Studio — Edit with Prompt
- * Route: /design-prompt-edit
+ * Route: /design-prompt-edit  (Studio tab → "Edit with Prompt")
+ *
+ * Sends the chosen image + prompt to the real AI endpoint
+ * (POST /api/mockup/generate, mode "prompt_edit", Growth plan) via
+ * designService.applyPromptEdit. Source images come from the device or the
+ * seller's Brand Assets; results are saved to Photos / Brand Assets for real.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -11,7 +16,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Icon } from '@/components/ui/Icon';
+import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -19,14 +24,11 @@ import {
   FONT, FS, SP, RADIUS, ICON, OVERLAY, COMP,
 } from '@/lib/theme';
 import {
-  BrandthreadScreen, BrandthreadCard,
+  BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
-import { applyPromptEdit, getProjects } from '@/services/designService';
-import { recentProjectSources, type RecentProjectSource } from '@/lib/designProjectSource';
-import { showActionSheet } from '@/components/ui/ActionSheet';
-import { ScreenHeader } from '@/components/ScreenHeader';
-import { minHitSlop } from '@/lib/hitSlop';
-import { Button } from '@/components/ui';
+import { applyPromptEdit, createBrandAsset, getBrandAssets } from '@/services/designService';
+import { saveImageToCameraRoll, shareImage } from '@/lib/aiToolMedia';
+import { aiToolErrorMessage } from '@/lib/aiToolErrors';
 import type { AIGenerationResult } from '@/services/designTypes';
 import { radius } from '@/constants/radii';
 
@@ -38,12 +40,6 @@ const EXAMPLE_PROMPTS = [
   'Make image look like a campaign photo',
   'Put the model in a studio',
 ];
-
-// Example chips draw 34pt tall; hitSlop pads them to 44pt vertically (the
-// 8pt gaps between chips are left alone).
-// (+1: hitSlop is measured from inside the chip's 1pt border.)
-const EXAMPLE_CHIP_HIT_SLOP = minHitSlop({ height: 34 - 2 });
-const EXAMPLE_CHIP_SLOP_Y = EXAMPLE_CHIP_HIT_SLOP.top ?? 0;
 
 export default function DesignPromptEditScreen() {
   const { theme } = useAppTheme();
@@ -65,17 +61,6 @@ export default function DesignPromptEditScreen() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<AIGenerationResult | null>(null);
   const [showComparison, setShowComparison] = useState(false);
-  // The seller's own design projects that carry a real image — the "Recent
-  // projects" option is hidden when there are none.
-  const [recentProjects, setRecentProjects] = useState<RecentProjectSource[]>([]);
-
-  useEffect(() => {
-    let active = true;
-    getProjects()
-      .then(projects => { if (active) setRecentProjects(recentProjectSources(projects)); })
-      .catch(() => { if (active) setRecentProjects([]); });
-    return () => { active = false; };
-  }, []);
 
   async function pickImage() {
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -87,18 +72,61 @@ export default function DesignPromptEditScreen() {
     }
   }
 
-  function chooseFromRecent() {
-    showActionSheet(
-      'Recent projects',
-      'Choose a project to edit',
-      [
-        ...recentProjects.map((p) => ({
-          text: p.name,
-          onPress: () => setImageUri(p.uri),
-        })),
-        { text: 'Cancel', style: 'cancel' as const },
-      ],
-    );
+  async function chooseFromBrandAssets() {
+    let images: { id: string; name: string; uri: string }[] = [];
+    try {
+      const assets = await getBrandAssets();
+      images = assets
+        .filter((a) => !!a.uri && !a.uri.startsWith('mock://'))
+        .slice(-8)
+        .reverse()
+        .map((a) => ({ id: a.id, name: a.name || 'Untitled asset', uri: a.uri! }));
+    } catch {
+      Alert.alert('Couldn’t load Brand Assets', 'Upload an image from your device instead.');
+      return;
+    }
+    if (images.length === 0) {
+      Alert.alert('No saved images yet', 'Images you save to Brand Assets show up here. Upload one from your device for now.');
+      return;
+    }
+    Alert.alert('Brand Assets', 'Choose an image to edit', [
+      ...images.map((a) => ({ text: a.name, onPress: () => { setImageUri(a.uri); setResult(null); } })),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
+  }
+
+  async function saveResultToPhotos() {
+    const uri = result?.imageUris[0];
+    if (!uri) return;
+    const saved = await saveImageToCameraRoll(uri, 'prompt-edit');
+    if (saved.ok) {
+      Alert.alert('Saved', 'The edited image was saved.');
+    } else {
+      Alert.alert(
+        saved.reason === 'permission' ? 'Permission required' : saved.reason === 'unavailable' ? 'Unavailable' : 'Save failed',
+        saved.reason === 'permission'
+          ? 'Allow photo library access to save this image.'
+          : saved.reason === 'unavailable'
+            ? 'Saving to Photos is unavailable in this app build.'
+            : 'Could not save this image. Please try again.',
+      );
+    }
+  }
+
+  async function saveResultToBrandAssets() {
+    const uri = result?.imageUris[0];
+    if (!uri) return;
+    try {
+      await createBrandAsset({
+        name: prompt.trim().slice(0, 40) || 'Prompt edit',
+        type: 'graphic',
+        uri,
+        tags: ['ai-generated', 'prompt-edit'],
+      });
+      Alert.alert('Saved', 'Added to Brand Assets.');
+    } catch {
+      Alert.alert('Save failed', 'Could not save to Brand Assets. Please try again.');
+    }
   }
 
   async function handleGenerate() {
@@ -120,16 +148,16 @@ export default function DesignPromptEditScreen() {
         preserveGarmentColor,
       });
       setResult(res);
-    } catch {
-      Alert.alert('Error', 'Generation failed. Please try again.');
+    } catch (err) {
+      Alert.alert('Edit failed', aiToolErrorMessage(err, 'Generation failed. Please try again.'));
     } finally {
       setIsGenerating(false);
     }
   }
 
   return (
-    <BrandthreadScreen noSafeTop>
-      <ScreenHeader title="Edit with prompt" onBack={() => goBackOr(router)} />
+    <BrandthreadScreen>
+      <BrandthreadHeader title="Edit with Prompt" onBack={() => goBackOr(router)} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
@@ -142,23 +170,19 @@ export default function DesignPromptEditScreen() {
             <Image source={{ uri: imageUri }} style={s.preview} resizeMode="cover" />
           ) : imageUri ? (
             <LinearGradient colors={theme.glowGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.mockPreview}>
-              <Icon name="image" size={ICON.xl} color={PURPLE_LIGHT} />
+              <Feather name="image" size={ICON.xl} color={PURPLE_LIGHT} />
               <Text style={s.mockLabel}>Project image loaded</Text>
             </LinearGradient>
           ) : (
             <View style={s.uploadZone}>
-              <Icon name="upload-cloud" size={ICON.xxl} color={theme.muted} />
+              <Feather name="upload-cloud" size={ICON.xxl} color={theme.muted} />
               <Text style={s.uploadTitle}>Upload or choose image</Text>
-              <Text style={s.uploadSub}>JPG, PNG, WEBP up to 20MB</Text>
+              <Text style={s.uploadSub}>JPG, PNG, WEBP up to 8MB</Text>
             </View>
           )}
           <View style={s.uploadActions}>
-            <View style={s.uploadBtn}>
-              <Button label={imageUri ? 'Change' : 'Upload'} onPress={pickImage} icon="upload" size="small" fullWidth style={s.uploadBtnInner} />
-            </View>
-            {recentProjects.length > 0 && <View style={s.uploadBtn}>
-              <Button label="Recent" accessibilityLabel="Recent projects" onPress={chooseFromRecent} icon="folder" variant="secondary" size="small" fullWidth style={s.uploadBtnInner} />
-            </View>}
+            <PrimaryButton label={imageUri ? 'Change image' : 'Upload image'} onPress={pickImage} icon="upload" style={s.uploadBtn} />
+            <SecondaryButton label="Brand Assets" onPress={() => { void chooseFromBrandAssets(); }} icon="folder" style={s.uploadBtn} />
           </View>
         </BrandthreadCard>
 
@@ -174,14 +198,11 @@ export default function DesignPromptEditScreen() {
             style={s.promptInput}
           />
           <Text style={s.chipsLabel}>Quick examples</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipsScrollView} contentContainerStyle={s.chipsScroll}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsScroll}>
             {EXAMPLE_PROMPTS.map((ex) => (
               <TouchableOpacity
                 key={ex}
                 onPress={() => setPrompt(ex)}
-                hitSlop={EXAMPLE_CHIP_HIT_SLOP}
-                accessibilityRole="button"
-                accessibilityState={{ selected: prompt === ex }}
                 style={[s.chip, prompt === ex && s.chipActive]}
                 activeOpacity={0.8}
               >
@@ -203,9 +224,12 @@ export default function DesignPromptEditScreen() {
 
         {/* Generate Button */}
         <View style={s.ph}>
-          <View style={s.generateBtn}>
-            <Button label="Generate edit" icon="zap" onPress={handleGenerate} fullWidth />
-          </View>
+          <GradientCard colors={theme.primaryGradient} onPress={handleGenerate} glow style={[s.generateBtn, { shadowColor: theme.shadowColor }]}>
+            <View style={s.generateInner}>
+              <Feather name="zap" size={ICON.md} color={theme.onAccent} />
+              <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate edit</Text>
+            </View>
+          </GradientCard>
         </View>
 
         {/* Results */}
@@ -227,10 +251,10 @@ export default function DesignPromptEditScreen() {
               style={s.compToggle}
             />
             <View style={s.resultActions}>
-              <PrimaryButton label="Save result" onPress={() => Alert.alert('Saved', 'Result saved to your gallery.')} icon="save" style={s.actionBtn} />
+              <PrimaryButton label="Save result" onPress={() => { void saveResultToPhotos(); }} icon="save" style={s.actionBtn} />
               <SecondaryButton label="Try again" onPress={handleGenerate} icon="refresh-cw" style={s.actionBtn} />
-              <SecondaryButton label="Save to Brand Assets" onPress={() => Alert.alert('Saved', 'Added to Brand Assets.')} icon="bookmark" style={s.actionBtn} />
-              <SecondaryButton label="Add to product" onPress={() => Alert.alert('Add to Product', 'Choose a product to attach this image to.')} icon="package" style={s.actionBtn} />
+              <SecondaryButton label="Save to Brand Assets" onPress={() => { void saveResultToBrandAssets(); }} icon="bookmark" style={s.actionBtn} />
+              <SecondaryButton label="Share" onPress={() => { const u = result.imageUris[0]; if (u) void shareImage(u, 'prompt-edit'); }} icon="share" style={s.actionBtn} />
             </View>
           </View>
         )}
@@ -265,7 +289,7 @@ function ToggleRow({ label, description, value, onChange }: {
         <Text style={s.toggleLabel}>{label}</Text>
         <Text style={s.toggleDesc}>{description}</Text>
       </View>
-      <HapticSwitch value={value} onValueChange={onChange} accessibilityLabel={label} accessibilityHint={description} />
+      <HapticSwitch value={value} onValueChange={onChange} />
     </View>
   );
 }
@@ -277,7 +301,7 @@ function ComparisonPanel({ label, accent, uri }: { label: string; accent: string
       {uri ? (
         <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (
-        <Icon name="image" size={ICON.lg} color={accent} />
+        <Feather name="image" size={ICON.lg} color={accent} />
       )}
       <Text style={[s.compLabel, { color: accent }]}>{label}</Text>
     </View>
@@ -296,17 +320,12 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   uploadSub:              { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
   uploadActions:          { flexDirection: 'row', gap: SP.sm, padding: SP.md },
   uploadBtn:              { flex: 1 },
-  uploadBtnInner:         { paddingHorizontal: SP.md },
   preview:                { width: '100%', height: 200 },
   mockPreview:            { alignItems: 'center', justifyContent: 'center', height: 200, gap: SP.sm },
   mockLabel:              { fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT },
   promptInput:            { marginBottom: SP.sm },
   chipsLabel:             { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: SP.sm },
-  // The scroller clips its content, so it carries EXAMPLE_CHIP_SLOP_Y of
-  // vertical padding (cancelled by an equal negative margin — no visual or
-  // layout change) to leave room for the chips' hitSlop.
-  chipsScrollView:        { marginVertical: -EXAMPLE_CHIP_SLOP_Y },
-  chipsScroll:            { gap: SP.sm, paddingRight: SP.md, paddingVertical: EXAMPLE_CHIP_SLOP_Y },
+  chipsScroll:            { gap: SP.sm, paddingRight: SP.md },
   chip:                   { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: radius.sm, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
   chipActive:             { backgroundColor: PURPLE_DIM, borderColor: theme.accent },
   chipText:               { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
@@ -318,6 +337,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   toggleDesc:             { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
   divider:                { height: 1, backgroundColor: theme.borderSubtle, marginVertical: SP.xs },
   generateBtn:            { marginTop: SP.md },
+  generateInner:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingVertical: SP.md },
+  generateText:           { fontSize: FS.md, fontFamily: FONT.bold, color: theme.onAccent },
   resultsSection:         { marginTop: SP.lg },
   comparison:             { flexDirection: 'row', gap: SP.sm, marginHorizontal: SP.md },
   compPanel:              { flex: 1, height: 200, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', gap: SP.sm, borderWidth: 1, borderColor: theme.border },

@@ -4,6 +4,7 @@
  *
  * Routes:
  *  POST   /api/live/start               seller starts a stream (host token)
+ *  GET    /api/live/status              { streaming, replays } availability (env-gated)
  *  GET    /api/live/active              list active streams (for feed mixing)
  *  GET    /api/live/feed                LIVE pager list: followed first, then viewers
  *
@@ -49,6 +50,9 @@ import { notifyFollowersSellerIsLive } from "../lib/liveGoLiveNotify";
 import { endLiveStream } from "../lib/liveEnd";
 import { MAX_LIVE_HOURS } from "../jobs/liveStaleStreams";
 import { cappedUnknown, jsonList, looseBody, validateBody } from "../middlewares/bodySchemas";
+import {
+  LIVE_NOT_CONFIGURED_CODE, LIVE_NOT_CONFIGURED_MESSAGE, isLiveStreamingConfigured, liveAvailability,
+} from "../lib/liveAvailability";
 
 const router = Router();
 
@@ -139,8 +143,8 @@ router.post("/start", requireAuth, hostPlan, validateBody(startLiveBody), async 
   const appId   = process.env.AGORA_APP_ID ?? "";
   const appCert = process.env.AGORA_APP_CERTIFICATE ?? "";
 
-  if (!appId) {
-    return res.status(503).json({ error: "AGORA_APP_ID not configured" });
+  if (!isLiveStreamingConfigured()) {
+    return res.status(503).json({ error: LIVE_NOT_CONFIGURED_MESSAGE, code: LIVE_NOT_CONFIGURED_CODE });
   }
 
   let resolvedTags;
@@ -214,6 +218,14 @@ router.post("/start", requireAuth, hostPlan, validateBody(startLiveBody), async 
     agoraAppId: appId,
     token,          // "" means no-cert dev mode — Agora console must have auth disabled
   });
+});
+
+// ─── GET /api/live/status ─────────────────────────────────────────────────────
+// Lets the Go Live screen show "not set up yet" before the seller sets up a
+// stream, and say honestly whether this live will be saved as a replay.
+// Booleans + stable codes only; never env values or names.
+router.get("/status", (_req, res) => {
+  res.json(liveAvailability());
 });
 
 // ─── GET /api/live/active ─────────────────────────────────────────────────────

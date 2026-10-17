@@ -180,6 +180,7 @@
     { "match": "/finance", "owner": "sellerCommerce" },
     { "match": "/taxes-duties", "owner": "sellerCommerce" },
     { "match": "/metafields", "owner": "sellerCommerce" },
+    { "match": "/metafield-definitions", "owner": "sellerCommerce" },
     { "match": "/dispute-detail", "owner": "sellerCommerce" },
     { "match": "/refund-detail", "owner": "sellerCommerce" },
     { "match": "/return-detail", "owner": "sellerCommerce" },

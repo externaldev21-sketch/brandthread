@@ -624,6 +624,7 @@ router.get("/post-clicks", async (req, res) => {
         i.post_id,
         p.caption,
         p.media_url,
+        p.thumbnail_url,
         COUNT(*)::int AS click_count,
         COUNT(DISTINCT i.user_id)::int AS unique_clickers,
         MAX(i.created_at) AS last_clicked_at
@@ -631,7 +632,7 @@ router.get("/post-clicks", async (req, res) => {
       JOIN posts p ON p.id = i.post_id::uuid
       WHERE p.user_id = ${ownerId}
         AND i.type = 'shop_click'
-      GROUP BY i.post_id, p.caption, p.media_url
+      GROUP BY i.post_id, p.caption, p.media_url, p.thumbnail_url
       ORDER BY click_count DESC
       LIMIT 20
     `);

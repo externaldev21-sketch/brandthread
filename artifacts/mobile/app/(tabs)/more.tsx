@@ -85,6 +85,7 @@ const STUDIO_ITEMS: NavItem[] = [
   { icon: 'scissors', label: 'Background Removal', desc: 'Clean image backgrounds', accent: 'secondary', route: '/design-bg-removal' },
   { icon: 'trending-up', label: 'Campaign Generator', desc: 'Create campaign assets', accent: 'muted', route: '/design-campaign' },
   { icon: 'layers', label: 'Brand Assets', desc: 'Logos, colors and graphics', accent: 'secondary', route: '/design-brand-assets' },
+  { icon: 'aperture', label: 'Brand Creation', desc: 'AI name ideas, logos and setup checklist', accent: 'accentLight', route: '/brand' },
   { icon: 'facebook', label: 'Meta Ads', desc: 'Run Facebook & Instagram ads', accent: 'accent', route: '/meta-ads-manage' },
 ];
 
@@ -93,7 +94,8 @@ const OPERATIONS_ITEMS: NavItem[] = [
   // FIX ↑ previously had no route — now wired to shipping.tsx
   { icon: 'tool', label: 'Manufacturer Hub', desc: 'Find and manage manufacturers', accent: 'accent', badge: true, route: '/manufacturer-hub' },
   { icon: 'users',   label: 'Customers',        desc: 'Browse your customer list',      accent: 'accentLight', route: '/customers' },
-  // ↑ the real customer list (customers.tsx), not the customer-accounts placeholder
+  // FIX ↑ wired to the real customer list (customers.tsx → GET /api/customers);
+  //      customer-accounts.tsx is only a "not configurable" settings stub.
 ];
 
 const GROWTH_ITEMS: NavItem[] = [

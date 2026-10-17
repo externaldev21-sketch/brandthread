@@ -1,6 +1,6 @@
 import { Router } from "express";
 import crypto from "node:crypto";
-import { db, orders, orderItems, orderRefunds, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions, shopifyOrderLinks } from "@workspace/db";
+import { db, orders, orderItems, orderRefunds, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions, shopifyOrderLinks, orderTrackingEvents } from "@workspace/db";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
 import { finishListPage, parseListPage } from "../lib/pagination";
 import { executeOrderRelease, requestOrderRelease } from "../lib/money/escrow";
@@ -31,6 +31,7 @@ import { formatRefundAmount, parseSellerRefundRequest, sellerRefundBlockedReason
 import { notifyOrderLiveActivity } from "../lib/liveActivityPush";
 import { generateOrderNumberIn } from "../lib/orderNumber";
 import { giftResponse } from "../lib/giftOptions";
+import { carrierTrackingUrl } from "../lib/delivery/buyerView";
 
 const router = Router();
 router.use(requireAuth);
@@ -466,7 +467,23 @@ router.get("/:id", async (req, res) => {
     if (live) sourceLive = { streamId: live.id, title: live.title, startedAt: new Date(live.started_at).toISOString() };
   }
 
-  res.json({ ...withRiskView(order), items, customer, shopifyFulfillment, sourceLive, ...giftResponse(order) });
+  // Carrier scan history (Shippo webhook/poll, lib/delivery/trackingSync.ts)
+  // so the seller's "View Tracking" can show real status, not just a number.
+  const trackingEvents = order.trackingNumber
+    ? (await db.select({
+      id: orderTrackingEvents.id,
+      trackingNumber: orderTrackingEvents.trackingNumber,
+      status: orderTrackingEvents.status,
+      description: orderTrackingEvents.description,
+      location: orderTrackingEvents.location,
+      occurredAt: orderTrackingEvents.occurredAt,
+    }).from(orderTrackingEvents).where(eq(orderTrackingEvents.orderId, order.id))
+      .orderBy(desc(orderTrackingEvents.occurredAt)).limit(50))
+      .map((e) => ({ ...e, occurredAt: e.occurredAt.toISOString() }))
+    : [];
+  const trackingUrl = order.trackingNumber ? carrierTrackingUrl(order.carrier, order.trackingNumber) : null;
+
+  res.json({ ...withRiskView(order), items, customer, shopifyFulfillment, trackingEvents, trackingUrl, sourceLive, ...giftResponse(order) });
 });
 
 // Recognized cancellation reasons — kept in sync with mobile orderTypes.ts

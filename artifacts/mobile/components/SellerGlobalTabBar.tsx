@@ -101,7 +101,7 @@ const TABS: {
     icon: 'profile',
     matchSegments: [
       'profile', 'settings', 'seller-settings', 'edit-profile',
-      'billing', 'users', 'roles', 'security', 'general-settings',
+      'billing', 'users', 'roles', 'security', 'team-activity', 'general-settings',
       'push-notifications', 'biometric-unlock', 'app-icon', 'app-theme', 'appearance', 'plan-details',
       'payouts', 'subscription', 'seller-data-export', 'account-switcher',
       'login-methods', 'account-type-settings', 'seller-verification',

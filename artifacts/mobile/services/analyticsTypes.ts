@@ -252,6 +252,8 @@ export interface ContentAnalytics {
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
+// Metrics the platform doesn't record are left undefined (never estimated) so
+// the screen can hide them.
 
 export interface StoreFunnelStep {
   label:         string;
@@ -274,12 +276,12 @@ export interface StoreAnalytics {
   uniqueVisitors:   AnalyticsMetric;
   sessions:         AnalyticsMetric;
   productPageViews: AnalyticsMetric;
-  addToCartRate:    AnalyticsMetric;
-  checkoutStartRate: AnalyticsMetric;
-  purchaseConversion: AnalyticsMetric;
-  avgSessionDuration: AnalyticsMetric;
+  addToCartRate?:    AnalyticsMetric;
+  checkoutStartRate?: AnalyticsMetric;
+  purchaseConversion?: AnalyticsMetric;
+  avgSessionDuration?: AnalyticsMetric;
   returningVisitors: AnalyticsMetric;
-  mobileTrafficPct: AnalyticsMetric;
+  mobileTrafficPct?: AnalyticsMetric;
   funnel:           StoreFunnelStep[];
   sections:         StoreSectionAnalytics[];
   visitorsChart:    AnalyticsPoint[];
@@ -293,50 +295,44 @@ export interface CampaignAnalytics {
   type:             'email' | 'sms' | 'push' | 'automation';
   recipients:       number;
   delivered:        number;
-  opens:            number;
-  clicks:           number;
-  orders:           number;
-  revenueCents:     number;
-  conversionRate:   number;
-  unsubscribes:     number;
-  revenuePerRecipientCents: number;
-  sentAt:           string;
+  /** null when the channel doesn't report it (e.g. push opens per broadcast). */
+  opens:            number | null;
+  clicks:           number | null;
+  sentAt:           string | null;
 }
 
 export interface InfluencerAnalytics {
   influencerId:  string;
   name:          string;
-  views:         number;
   clicks:        number;
   orders:        number;
   revenueCents:  number;
   commissionCents: number;
-  returnOnCost:  number;
-  discountUsage: number;
+  /** revenue ÷ commission; null when no commission was accrued. */
+  returnOnCost:  number | null;
 }
 
-export interface ReferralAnalytics {
-  shares:           number;
-  clicks:           number;
-  referredCustomers: number;
-  orders:           number;
-  revenueCents:     number;
-  rewardsIssuedCents: number;
-  topAdvocates:     Array<{ name: string; referrals: number; revenueCents: number }>;
+export interface MarketingChannelRevenue {
+  key:          string;
+  label:        string;
+  revenueCents: number;
+}
+
+/** Aggregate push results (GET /api/analytics/notifications). */
+export interface PushNotificationResults {
+  queued:         number;
+  sent:           number;
+  providerErrors: number;
+  received:       number;
+  opened:         number;
+  tapped:         number;
 }
 
 export interface MarketingAnalytics {
   marketingRevenue:       AnalyticsMetric;
-  emailRevenue:           AnalyticsMetric;
-  smsRevenue:             AnalyticsMetric;
-  discountRevenue:        AnalyticsMetric;
-  automationRevenue:      AnalyticsMetric;
-  influencerRevenue:      AnalyticsMetric;
-  referralRevenue:        AnalyticsMetric;
-  abandonedCheckoutRecovered: AnalyticsMetric;
+  channels:               MarketingChannelRevenue[];
   campaigns:              CampaignAnalytics[];
   influencers:            InfluencerAnalytics[];
-  referral:               ReferralAnalytics;
 }
 
 // ── Inventory ─────────────────────────────────────────────────────────────────
@@ -375,25 +371,19 @@ export interface ManufacturerAnalyticsRow {
   name:               string;
   productsProduced:   number;
   totalUnits:         number;
-  totalSpend:         number;
-  avgUnitCost:        number;
-  avgLeadTimeDays:    number;
-  delayRate:          number;
-  qualityIssueRate:   number;
-  sampleApprovalRate: number;
+  totalSpendCents:    number;
+  avgUnitCostCents:   number | null;
+  avgLeadTimeDays:    number | null;
 }
 
 export interface ProductionAnalytics {
   activeJobs:             AnalyticsMetric;
   unitsInProduction:      AnalyticsMetric;
   productionValue:        AnalyticsMetric;
-  avgLeadTimeDays:        AnalyticsMetric;
-  avgSampleTimeDays:      AnalyticsMetric;
-  onTimeCompletionRate:   AnalyticsMetric;
-  delayedJobs:            AnalyticsMetric;
-  qcFailureRate:          AnalyticsMetric;
-  avgManufacturerResponse: AnalyticsMetric;
-  avgUnitCost:            AnalyticsMetric;
+  totalSpend:             AnalyticsMetric;
+  avgLeadTimeDays?:       AnalyticsMetric;
+  avgSampleTimeDays?:     AnalyticsMetric;
+  avgUnitCost?:           AnalyticsMetric;
   manufacturers:          ManufacturerAnalyticsRow[];
 }
 
@@ -401,7 +391,8 @@ export interface ProductionAnalytics {
 
 export interface ProfitLineItem {
   label:      string;
-  amount:     number;
+  /** Integer cents (always positive; isDeduction says which way it counts). */
+  amountCents: number;
   isEstimate: boolean;
   isDeduction: boolean;
 }
@@ -409,35 +400,21 @@ export interface ProfitLineItem {
 export interface ProfitAnalytics {
   grossRevenue:      AnalyticsMetric;
   netRevenue:        AnalyticsMetric;
-  productCost:       AnalyticsMetric;
-  manufacturerCost:  AnalyticsMetric;
-  packagingCost:     AnalyticsMetric;
-  shippingCost:      AnalyticsMetric;
-  platformFees:      AnalyticsMetric;
-  paymentFees:       AnalyticsMetric;
-  refunds:           AnalyticsMetric;
-  marketingCost:     AnalyticsMetric;
-  influencerCost:    AnalyticsMetric;
   estimatedProfit:   AnalyticsMetric;
-  profitMargin:      AnalyticsMetric;
+  profitMargin?:     AnalyticsMetric;
   lineItems:         ProfitLineItem[];
-  profitChart:       AnalyticsPoint[];
-  marginChart:       AnalyticsPoint[];
+  /** Daily net revenue (sales minus refunds and fees). */
+  netRevenueChart:   AnalyticsPoint[];
 }
 
 // ── Payout ────────────────────────────────────────────────────────────────────
+// Mirrors GET /api/finance/balance (the seller's live Stripe balance).
 
 export interface PayoutAnalytics {
   availableBalance:       AnalyticsMetric;
   pendingBalance:         AnalyticsMetric;
-  heldFunds:              AnalyticsMetric;
-  nextPayoutAmount:       AnalyticsMetric;
-  nextPayoutDate:         string;
-  totalPaidOut:           AnalyticsMetric;
-  manufacturerAllocation: AnalyticsMetric;
-  shippingAllocation:     AnalyticsMetric;
-  disputeHolds:           AnalyticsMetric;
-  refundImpact:           AnalyticsMetric;
+  nextPayoutAmount?:      AnalyticsMetric;
+  nextPayoutDate?:        string;
 }
 
 // ── Attribution ───────────────────────────────────────────────────────────────

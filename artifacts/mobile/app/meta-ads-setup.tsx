@@ -43,8 +43,10 @@ import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
 
 import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 
-import { BUDGET_STEPS, BUDGET_MIN_CENTS, BUDGET_MAX_CENTS, formatBudgetCents, META_OBJECTIVE_OPTIONS, META_CTA_OPTIONS, formatReachRange } from '@/services/metaAdsService';
-
+import {
+  BUDGET_STEPS, BUDGET_MIN_CENTS, BUDGET_MAX_CENTS, formatBudgetCents,
+  META_OBJECTIVE_OPTIONS, META_CTA_OPTIONS, describeMetaReachEstimate,
+} from '@/services/metaAdsService';
 import { InlineSlider } from '@/components/InlineSlider';
 
 import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
@@ -52,7 +54,7 @@ import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
 import { adDestinationUrl } from '@/lib/adDestination';
 
 import type {
-  MetaAdObjective, MetaAdPromoteKind, MetaCampaign, MetaTargetingResult,
+  MetaAdObjective, MetaAdPromoteKind, MetaCampaign, MetaReachEstimate, MetaTargetingResult,
 } from '@/lib/api';
 import { radius } from '@/constants/radii';
 
@@ -124,7 +126,8 @@ export default function MetaAdsSetupScreen() {
   const [placeInstagram, setPlaceInstagram] = useState(true);
 
   // Reach / preview / launch
-  const [estimatedReach, setEstimatedReach] = useState<{ low: number; high: number } | null>(null);
+  // Meta's own delivery estimate for the saved draft (never a local formula).
+  const [reachEstimate, setReachEstimate] = useState<MetaReachEstimate | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
@@ -299,6 +302,15 @@ export default function MetaAdsSetupScreen() {
     interests.map((i) => i.id).join('|'),
   ]);
 
+  async function refreshReachEstimate(id: string) {
+    try {
+      const res = await api.metaAds.reachEstimate(id);
+      setReachEstimate(res.estimate);
+    } catch {
+      setReachEstimate({ available: false, reason: "Couldn't reach Meta for a reach estimate. It will retry when you change the ad." });
+    }
+  }
+
   async function saveDraft(): Promise<string | null> {
     if (!requiredValid) return null;
     setSaving(true);
@@ -307,12 +319,13 @@ export default function MetaAdsSetupScreen() {
       if (!campaignId) {
         const res = await api.metaAds.createCampaign(body);
         setCampaignId(res.campaign.id);
-        setEstimatedReach(res.estimatedReach);
         void refreshPreview(res.campaign.id);
+        void refreshReachEstimate(res.campaign.id);
         return res.campaign.id;
       }
       await api.metaAds.updateCampaign(campaignId, body);
       void refreshPreview(campaignId);
+      void refreshReachEstimate(campaignId);
       return campaignId;
     } catch {
       // Silent — this is a background autosave; the Launch button surfaces
@@ -511,12 +524,19 @@ export default function MetaAdsSetupScreen() {
             </View>
             <InlineSlider value={budgetCents} min={BUDGET_MIN_CENTS} max={BUDGET_MAX_CENTS} steps={BUDGET_STEPS} onChange={setBudgetCents} accessibilityLabel="Budget" accentColor={theme.accentLight} trackColor={colors.border} />
           </View>
-          {estimatedReach && (
-            <View style={[s.reachCard, { backgroundColor: colors.success + '14', borderColor: colors.success }]}>
-              <Icon name="trending-up" size={16} color={colors.success} />
-              <Text style={[s.helper, { color: colors.foreground }]}>Estimated reach: {formatReachRange(estimatedReach.low, estimatedReach.high)}</Text>
-            </View>
-          )}
+          {reachEstimate && (() => {
+            const reach = describeMetaReachEstimate(reachEstimate);
+            const tone = reachEstimate.available ? colors.success : colors.mutedForeground;
+            return (
+              <View style={[s.reachCard, { backgroundColor: tone + '14', borderColor: tone }]}>
+                <Icon name={reachEstimate.available ? 'trending-up' : 'info'} size={16} color={tone} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.helper, { color: colors.foreground }]}>{reach.headline}</Text>
+                  {!!reach.detail && <Text style={[s.helper, { color: colors.subtle }]}>{reach.detail}</Text>}
+                </View>
+              </View>
+            );
+          })()}
         </Section>
 
         {/* Schedule */}
