@@ -2589,6 +2589,7 @@ export const adCampaigns = pgTable('ad_campaigns', {
   csStatusIdx:       index('ad_campaigns_cs_status_idx').on(table.stripeCheckoutSessionId, table.status),
 }));
 export * from './sellerPaymentSettings';
+export * from './sellerSettings';
 export * from './sellerMessaging';
 export * from './aiCredits';
 export * from './liveModeration';

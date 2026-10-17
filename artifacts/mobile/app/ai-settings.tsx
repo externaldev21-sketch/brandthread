@@ -200,14 +200,23 @@ export default function AiSettingsScreen() {
   const [settings, setSettings] = useState<AISettings | null>(null);
 
   useEffect(() => {
-    getAISettings().then(setSettings);
+    getAISettings({ fresh: true }).then(setSettings);
   }, []);
 
+  // Saved to the account on the server (GET/PUT /api/ai/settings). The toggle
+  // flips immediately; if the save fails it flips back and says so, so a
+  // setting is never shown as saved when it isn't.
   const update = (fn: (s: AISettings) => AISettings) => {
     if (!settings) return;
+    const previous = settings;
     const updated = fn(settings);
     setSettings(updated);
-    saveAISettings(updated);
+    saveAISettings(updated)
+      .then(setSettings)
+      .catch(() => {
+        setSettings(previous);
+        Alert.alert('Couldn’t save', 'Your AI setting wasn’t saved. Check your connection and try again.');
+      });
   };
 
   const handleClearHistory = () => {

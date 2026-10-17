@@ -27,6 +27,7 @@ import {
 import { getEnabledMemorySummary } from './aiBrandMemory';
 import { addAuditEntry } from './aiAuditLog';
 import { getPreviewAiReply } from '../lib/previewAiBrain';
+import { serviceRequest } from '@/lib/serviceConfig';
 
 // ─── ID helper ────────────────────────────────────────────────────────────────
 
@@ -63,18 +64,103 @@ let _currentSession: AISession | null = null;
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
-export async function getAISettings(): Promise<AISettings> {
+// AI Settings live on the server (GET/PUT /api/ai/settings, stored per
+// account) so they follow the seller across devices and the server can
+// enforce them (assistant off, data sources, brand memory, suggestions).
+// AsyncStorage is only a last-known-good cache for offline / preview use.
+
+type SettingsListener = (settings: AISettings) => void;
+const _settingsListeners = new Set<SettingsListener>();
+
+/** Merge stored/server values over the defaults, keeping nested dataSources complete. */
+export function mergeAISettings(raw: unknown): AISettings {
+  const obj = raw && typeof raw === 'object' ? raw as Partial<AISettings> : {};
+  return {
+    ...DEFAULT_AI_SETTINGS,
+    ...obj,
+    dataSources: { ...DEFAULT_AI_SETTINGS.dataSources, ...(obj.dataSources ?? {}) },
+  };
+}
+
+async function readCachedSettings(): Promise<AISettings> {
   try {
     const raw = await AsyncStorage.getItem(SETTINGS_KEY);
-    if (!raw) return { ...DEFAULT_AI_SETTINGS };
-    return { ...DEFAULT_AI_SETTINGS, ...JSON.parse(raw) };
+    return raw ? mergeAISettings(JSON.parse(raw)) : { ...DEFAULT_AI_SETTINGS, dataSources: { ...DEFAULT_AI_SETTINGS.dataSources } };
   } catch {
-    return { ...DEFAULT_AI_SETTINGS };
+    return mergeAISettings(null);
   }
 }
 
-export async function saveAISettings(settings: AISettings): Promise<void> {
-  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+// Chat turns read settings several times; reuse a fresh server copy briefly.
+const SETTINGS_MEMO_MS = 30_000;
+let _memoSettings: { value: AISettings; at: number } | null = null;
+
+async function writeCachedSettings(settings: AISettings): Promise<void> {
+  _memoSettings = { value: settings, at: Date.now() };
+  try { await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* cache only */ }
+  _settingsListeners.forEach((fn) => fn(settings));
+}
+
+/** Notified whenever AI Settings change in this app session. Returns an unsubscribe. */
+export function subscribeAISettings(fn: SettingsListener): () => void {
+  _settingsListeners.add(fn);
+  return () => { _settingsListeners.delete(fn); };
+}
+
+export async function getAISettings(options: { fresh?: boolean } = {}): Promise<AISettings> {
+  if (!options.fresh && _memoSettings && Date.now() - _memoSettings.at < SETTINGS_MEMO_MS) {
+    return _memoSettings.value;
+  }
+  if (!isSellerDevPreview()) {
+    try {
+      const res = await serviceRequest<{ settings: AISettings }>('/api/ai/settings', {}, false);
+      const settings = mergeAISettings(res?.settings);
+      await writeCachedSettings(settings);
+      return settings;
+    } catch { /* offline / signed out — fall back to the last saved copy */ }
+  }
+  return readCachedSettings();
+}
+
+/**
+ * Persists to the server first; the local cache is only updated once the
+ * server accepted it, so the screen never shows a toggle as saved when it
+ * wasn't. Throws on failure. In the signed-out seller preview there is no
+ * account, so the choice is kept on this device only.
+ */
+export async function saveAISettings(settings: AISettings): Promise<AISettings> {
+  if (isSellerDevPreview()) {
+    await writeCachedSettings(settings);
+    return settings;
+  }
+  const res = await serviceRequest<{ settings: AISettings }>('/api/ai/settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  }, false);
+  const saved = mergeAISettings(res?.settings ?? settings);
+  await writeCachedSettings(saved);
+  return saved;
+}
+
+/** Which AI Settings confirmation (if any) applies before applying an action card. */
+export function confirmationFor(
+  card: Pick<AIActionCard, 'type' | 'title' | 'description' | 'isDestructive' | 'requiresConfirmation'>,
+  settings: Pick<AISettings, 'confirmSensitiveActions' | 'confirmDestructiveActions' | 'confirmPublishing' | 'confirmSending'>,
+): { title: string; message: string; destructive: boolean } | null {
+  const text = `${card.title} ${card.description ?? ''}`.toLowerCase();
+  if (card.isDestructive && settings.confirmDestructiveActions) {
+    return { title: 'Apply action', message: `Are you sure you want to apply "${card.title}"? This action is irreversible.`, destructive: true };
+  }
+  if ((card.type === 'schedule' || /\b(publish|go live|make (it )?live)\b/.test(text)) && settings.confirmPublishing) {
+    return { title: 'Publish?', message: `"${card.title}" will make this visible to buyers.`, destructive: false };
+  }
+  if (/\b(send|email|message|notify|push)\b/.test(text) && settings.confirmSending) {
+    return { title: 'Send?', message: `"${card.title}" will send to your customers or followers.`, destructive: false };
+  }
+  if (card.requiresConfirmation && settings.confirmSensitiveActions) {
+    return { title: 'Apply action', message: `Apply "${card.title}"?`, destructive: false };
+  }
+  return null;
 }
 
 // ─── Session repair ───────────────────────────────────────────────────────────
@@ -192,6 +278,8 @@ export async function clearSession(
 
 // ─── API call ─────────────────────────────────────────────────────────────────
 
+export const AI_TURNED_OFF_MESSAGE = 'Brandthread AI is turned off. Turn it back on in AI Settings.';
+
 /**
  * Call the real AI endpoint.
  * Throws on abort (AbortError).
@@ -230,6 +318,9 @@ async function callAI(
     }
     if (res.status === 429) {
       throw new Error('Rate limit reached — please wait a moment and try again.');
+    }
+    if (res.status === 409) {
+      throw new Error(AI_TURNED_OFF_MESSAGE);
     }
     if (res.status === 503 || res.status === 502) {
       throw new Error('AI service is temporarily unavailable. Please try again shortly.');
@@ -319,6 +410,8 @@ function callAIStream(
           reject(new Error('Authentication error. Please sign in again.'));
         } else if (xhr.status === 429) {
           reject(new Error('Rate limit reached — please wait a moment and try again.'));
+        } else if (xhr.status === 409) {
+          reject(new Error(AI_TURNED_OFF_MESSAGE));
         } else if (xhr.status === 0) {
           reject(Object.assign(new Error('Request aborted'), { name: 'AbortError' }));
         } else if (xhr.status >= 500 || xhr.status === 502 || xhr.status === 503) {
@@ -380,7 +473,9 @@ async function buildChatRequest(session: AISession, userText: string): Promise<A
     .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
   history.push({ role: 'user', content: userText });
 
-  const brandMemory = await getEnabledMemorySummary();
+  // AI Settings → Brand Memory off: never send it (the server drops it too).
+  const settings = await getAISettings();
+  const brandMemory = settings.brandMemoryEnabled ? await getEnabledMemorySummary() : {};
 
   return {
     messages: history,
@@ -614,6 +709,10 @@ export async function getAISuggestions(
   userId?: string | null,
 ): Promise<AISuggestion[]> {
   const storageKey = suggestionsKey(userId);
+
+  // AI Settings → assistant or "Dashboard suggestions" off: show none.
+  const settings = await getAISettings();
+  if (!settings.enabled || !settings.suggestionsEnabled) return [];
 
   const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
   // Try real API suggestions first
