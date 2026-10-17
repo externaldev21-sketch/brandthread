@@ -3231,6 +3231,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       list: () => get<{ giveaways: any[] }>('/api/seller/giveaways'),
       get: (id: string) => get<any>(`/api/seller/giveaways/${encodeURIComponent(id)}`),
       create: (body: unknown) => post<any>('/api/seller/giveaways', body),
+      update: (id: string, body: unknown) => patch<any>(`/api/seller/giveaways/${encodeURIComponent(id)}`, body),
       rulesTemplate: (query: string) => get<{ rulesText: string }>(`/api/seller/giveaways/rules-template?${query}`),
       end: (id: string) => post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/end`, {}),
       cancel: (id: string) => post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/cancel`, {}),
