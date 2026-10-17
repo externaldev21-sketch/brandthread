@@ -22,6 +22,7 @@ import {
   AnalyticsSkeleton, Card, CardDivider, HeaderPillButton,
   ProgressBar, SectionTitle, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
+import { metricTiles } from '@/lib/analyticsMetricTiles';
 
 function FunnelStepRow({ step, isLast }: { step: StoreFunnelStep; isLast: boolean }) {
   const colors = useColors();
@@ -103,7 +104,7 @@ export default function AnalyticsStoreScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
-      {!data ? (
+      {!data || (data.visitors.value === 0 && data.sessions.value === 0) ? (
         <EmptyState
           icon="bar-chart-2"
           title="No store visits yet"
@@ -116,26 +117,26 @@ export default function AnalyticsStoreScreen() {
           <SectionTitle>Traffic</SectionTitle>
           <StatTileRow
             scroll
-            items={[
-              { key: 'visitors', label: data.visitors.label, value: data.visitors.formatted, changePct: data.visitors.changePct },
-              { key: 'unique', label: data.uniqueVisitors.label, value: data.uniqueVisitors.formatted, changePct: data.uniqueVisitors.changePct },
-              { key: 'sessions', label: data.sessions.label, value: data.sessions.formatted, changePct: data.sessions.changePct },
-              { key: 'views', label: data.productPageViews.label, value: data.productPageViews.formatted, changePct: data.productPageViews.changePct },
-              { key: 'returning', label: data.returningVisitors.label, value: data.returningVisitors.formatted, changePct: data.returningVisitors.changePct },
-              { key: 'mobile', label: data.mobileTrafficPct.label, value: data.mobileTrafficPct.formatted, changePct: data.mobileTrafficPct.changePct },
-            ]}
+            items={metricTiles([
+              ['visitors', data.visitors],
+              ['unique', data.uniqueVisitors],
+              ['sessions', data.sessions],
+              ['views', data.productPageViews],
+              ['returning', data.returningVisitors],
+              ['mobile', data.mobileTrafficPct],
+            ])}
           />
 
           {/* Conversion KPIs */}
           <SectionTitle>Conversion</SectionTitle>
           <StatTileRow
             scroll
-            items={[
-              { key: 'atc', label: data.addToCartRate.label, value: data.addToCartRate.formatted, changePct: data.addToCartRate.changePct },
-              { key: 'checkout', label: data.checkoutStartRate.label, value: data.checkoutStartRate.formatted, changePct: data.checkoutStartRate.changePct },
-              { key: 'purchase', label: data.purchaseConversion.label, value: data.purchaseConversion.formatted, changePct: data.purchaseConversion.changePct },
-              { key: 'duration', label: data.avgSessionDuration.label, value: data.avgSessionDuration.formatted, changePct: data.avgSessionDuration.changePct },
-            ]}
+            items={metricTiles([
+              ['atc', data.addToCartRate],
+              ['checkout', data.checkoutStartRate],
+              ['purchase', data.purchaseConversion],
+              ['duration', data.avgSessionDuration],
+            ])}
           />
 
           {/* Funnel */}
@@ -149,9 +150,9 @@ export default function AnalyticsStoreScreen() {
             ))}
           </Card>
 
-          {/* Store sections */}
-          <SectionTitle>Store Section Performance</SectionTitle>
-          <Card>
+          {/* Store sections — only when section-level tracking returns rows */}
+          {data.sections.length > 0 && <SectionTitle>Store Section Performance</SectionTitle>}
+          {data.sections.length > 0 && <Card>
             {data.sections.map((sec, i) => (
               <View key={sec.sectionKey}>
                 {i > 0 && <CardDivider />}
@@ -178,7 +179,7 @@ export default function AnalyticsStoreScreen() {
                 </TouchableOpacity>
               </View>
             ))}
-          </Card>
+          </Card>}
         </>
       )}
 

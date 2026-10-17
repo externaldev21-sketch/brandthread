@@ -865,6 +865,20 @@ export interface MetaCampaign {
   updatedAt: string;
 }
 
+/** GET /api/meta-ads/campaigns/:id/reach-estimate — Meta's own delivery estimate. */
+export type MetaReachEstimate =
+  | {
+      available: true;
+      source: 'meta';
+      /** People Meta estimates the ad reaches per day at dailySpendCents. */
+      dailyReach: number;
+      dailySpendCents: number;
+      audienceSizeLower: number | null;
+      audienceSizeUpper: number | null;
+      currency: string | null;
+    }
+  | { available: false; reason: string };
+
 export interface MetaCampaignInsights {
   spendCents: number;
   impressions: number;
@@ -3922,9 +3936,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Interest/audience search for targeting (e.g. type='adinterest'). */
       targetingSearch: (q: string, type: string = 'adinterest') =>
         get<{ results: MetaTargetingResult[] }>(`/api/meta-ads/targeting-search?q=${encodeURIComponent(q)}&type=${encodeURIComponent(type)}`),
-      /** Create a campaign draft. Returns the draft plus an estimated reach range. */
+      /** Create a campaign draft. Reach comes from reachEstimate(), never a budget formula. */
       createCampaign: (body: MetaCampaignDraftInput) =>
-        post<{ campaign: MetaCampaign; estimatedReach: { low: number; high: number } }>('/api/meta-ads/campaigns', body),
+        post<{ campaign: MetaCampaign }>('/api/meta-ads/campaigns', body),
+      /** Meta's own reach estimate for a saved draft; { available: false, reason } when Meta can't give one. */
+      reachEstimate: (id: string) =>
+        get<{ estimate: MetaReachEstimate }>(`/api/meta-ads/campaigns/${encodeURIComponent(id)}/reach-estimate`),
       /** Update the editable subset of a draft (or a rejected campaign being fixed). */
       updateCampaign: (id: string, body: Partial<MetaCampaignDraftInput>) =>
         patch<{ campaign: MetaCampaign }>(`/api/meta-ads/campaigns/${encodeURIComponent(id)}`, body),

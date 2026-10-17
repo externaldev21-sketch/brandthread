@@ -35,7 +35,7 @@ import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
@@ -61,7 +61,12 @@ import {
   clearSession,
   applyAction,
   undoAction,
+  getAISettings,
+  subscribeAISettings,
+  confirmationFor,
+  AI_TURNED_OFF_MESSAGE,
 } from '@/services/aiService';
+import { DEFAULT_AI_SETTINGS, type AISettings } from '@/services/aiTypes';
 import { getStoreContext } from '@/lib/api';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import {
@@ -83,6 +88,7 @@ function humanizeAiError(rawMessage?: string): string {
   if (/rate limit reached/i.test(msg)) {
     return "You're sending fast — try again in a minute.";
   }
+  if (msg === AI_TURNED_OFF_MESSAGE) return msg;
   // Covers "AI service is not configured…", "AI request failed (…)." and any other
   // network / provider / unavailable error.
   return "Couldn't reach Brandthread AI. Tap Retry.";
@@ -434,6 +440,17 @@ export default function AiBrainScreen() {
 
   const flatListRef = useRef<FlatList<AIMessage>>(null);
 
+  // AI Settings (server-persisted). "Enable AI assistant" off → this screen
+  // shows a turned-off state instead of the composer; confirmations gate
+  // applying action cards.
+  const [aiSettings, setAiSettings] = useState<AISettings>(DEFAULT_AI_SETTINGS);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    getAISettings({ fresh: true }).then((next) => { if (active) setAiSettings(next); });
+    return () => { active = false; };
+  }, []));
+  useEffect(() => subscribeAISettings(setAiSettings), []);
+
   // Track the last user/store context so we can reload on switch.
   const lastUserIdRef = useRef<string | null | undefined>(undefined);
   const lastStoreContextRef = useRef<string | null>(null);
@@ -466,6 +483,10 @@ export default function AiBrainScreen() {
     async (override?: string) => {
       const text = (override ?? inputText).trim();
       if (!text || isGenerating || !session) return;
+      if (!aiSettings.enabled) {
+        setErrorMsg(AI_TURNED_OFF_MESSAGE);
+        return;
+      }
 
       // Dev/web preview (checked first, before anything Clerk-related):
       // real production Clerk is never reachable from a preview host (see
@@ -563,7 +584,7 @@ export default function AiBrainScreen() {
         setStreamingText('');
       }
     },
-    [inputText, isGenerating, session, getToken, userId, storeContext, isAuthLoaded, isSignedIn],
+    [inputText, isGenerating, session, getToken, userId, storeContext, isAuthLoaded, isSignedIn, aiSettings.enabled],
   );
 
   // ─── Pill tap (sends immediately, matching the reference apps) ──────────────
@@ -649,20 +670,22 @@ export default function AiBrainScreen() {
         setSession({ ...updated });
       };
 
-      if (msg.actionCard.isDestructive) {
+      // AI Settings → Confirmations decide whether a dialog comes first.
+      const confirm = confirmationFor(msg.actionCard, aiSettings);
+      if (confirm) {
         Alert.alert(
-          'Apply action',
-          `Are you sure you want to apply "${msg.actionCard.title}"? This action is irreversible.`,
+          confirm.title,
+          confirm.message,
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Apply', style: 'destructive', onPress: doApply },
+            { text: 'Apply', style: confirm.destructive ? 'destructive' : 'default', onPress: doApply },
           ],
         );
       } else {
         doApply();
       }
     },
-    [session, userId, storeContext],
+    [session, userId, storeContext, aiSettings],
   );
 
   const handleDismiss = useCallback(
@@ -734,7 +757,7 @@ export default function AiBrainScreen() {
   );
 
   const label = contextLabel(parsedContext);
-  const canSend = inputText.trim().length > 0 && !isGenerating;
+  const canSend = inputText.trim().length > 0 && !isGenerating && aiSettings.enabled;
 
   return (
     <View style={styles.root}>
@@ -826,6 +849,23 @@ export default function AiBrainScreen() {
               }
             />
 
+            {/* ── Assistant turned off in AI Settings ─────────────────────── */}
+            {!aiSettings.enabled && (
+              <View style={styles.errorBanner} testID="ai-disabled-banner">
+                <Feather name="power" size={14} color={colors.destructive} style={{ marginRight: 6 }} />
+                <Text style={styles.errorBannerText} numberOfLines={2}>Brandthread AI is turned off.</Text>
+                <TouchableOpacity
+                  onPress={() => router.push('/ai-settings' as any)}
+                  style={styles.retryBannerBtn}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open AI settings"
+                >
+                  <Text style={styles.retryBannerText}>AI Settings</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* ── Input row ───────────────────────────────────────────────── */}
             <Composer
               testID="ai-composer"
@@ -838,7 +878,9 @@ export default function AiBrainScreen() {
               enterToSend={false}
               accessibilityLabel="Message Brandthread AI"
               placeholder={
-                isAuthLoaded || isSellerDevPreview() || isBuyerDevPreview()
+                !aiSettings.enabled
+                  ? 'Brandthread AI is turned off'
+                  : isAuthLoaded || isSellerDevPreview() || isBuyerDevPreview()
                   ? 'Ask anything about your brand…'
                   : 'Preparing your session…'
               }

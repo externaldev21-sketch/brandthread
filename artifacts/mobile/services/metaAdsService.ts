@@ -11,7 +11,7 @@
  * namespace).
  */
 
-import type { MetaAdObjective, MetaCampaignStatus } from '@/lib/api';
+import type { MetaAdObjective, MetaCampaignStatus, MetaReachEstimate } from '@/lib/api';
 import { BUDGET_STEPS, BUDGET_MIN_CENTS, BUDGET_MAX_CENTS } from '@/services/adCampaignService';
 
 // Re-export the shared whole-dollar budget step list / bounds — Meta Ads uses
@@ -95,9 +95,23 @@ export function buildMetaAdsReturnUrl(webOrigin?: string): string {
   return 'brandthread://meta-ads-connect';
 }
 
-// ─── Reach estimate formatting (server is the source of truth; this only
-// formats the {low, high} range the server returns from createCampaign) ────
+// ─── Reach estimate formatting (Meta's delivery estimate is the only source;
+// the app never computes a reach number itself) ────────────────────────────
 
 export function formatReachRange(low: number, high: number): string {
   return `${low.toLocaleString()}–${high.toLocaleString()} people`;
+}
+
+/** Lines shown under the budget slider for a GET .../reach-estimate result. */
+export function describeMetaReachEstimate(estimate: MetaReachEstimate): { headline: string; detail: string | null } {
+  if (!estimate.available) {
+    return { headline: 'Reach estimate unavailable', detail: estimate.reason };
+  }
+  const audience = estimate.audienceSizeLower !== null && estimate.audienceSizeUpper !== null
+    ? `Audience size: ${formatReachRange(estimate.audienceSizeLower, estimate.audienceSizeUpper)}. `
+    : '';
+  return {
+    headline: `Meta estimates ~${estimate.dailyReach.toLocaleString()} people reached per day`,
+    detail: `${audience}Estimate from Meta, not a guarantee.`,
+  };
 }

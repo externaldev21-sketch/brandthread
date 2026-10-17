@@ -70,8 +70,9 @@ const OPERATIONS_ITEMS: NavItem[] = [
   { icon: 'truck', label: 'Shipping', desc: 'Rates, zones and carriers', accent: 'warning', route: '/shipping' },
   // FIX ↑ previously had no route — now wired to shipping.tsx
   { icon: 'tool', label: 'Manufacturer Hub', desc: 'Find and manage manufacturers', accent: 'accent', badge: true, route: '/manufacturer-hub' },
-  { icon: 'users',   label: 'Customers',        desc: 'Browse your customer list',      accent: 'accentLight', route: '/customer-accounts' },
-  // FIX ↑ previously had no route — now wired to customer-accounts.tsx
+  { icon: 'users',   label: 'Customers',        desc: 'Browse your customer list',      accent: 'accentLight', route: '/customers' },
+  // FIX ↑ wired to the real customer list (customers.tsx → GET /api/customers);
+  //      customer-accounts.tsx is only a "not configurable" settings stub.
 ];
 
 const GROWTH_ITEMS: NavItem[] = [
@@ -96,7 +97,7 @@ const MONEY_ITEMS: NavItem[] = [
 const ACCOUNT_ITEMS: NavItem[] = [
   { icon: 'users', label: 'Team', desc: 'Invite collaborators', accent: 'accentLight', route: '/team' },
   // FIX ↑ previously had no route — now wired to team.tsx
-  { icon: 'link', label: 'Integrations', desc: 'Connect third-party services', accent: 'accent', route: '/integrations/klaviyo' },
+  { icon: 'link', label: 'Integrations', desc: 'Connect third-party services', accent: 'accent', route: '/integrations' },
   { icon: 'bell', label: 'Notifications', desc: 'Push and email preferences', accent: 'warning', route: '/notifications-settings' },
   { icon: 'settings', label: 'Settings', desc: 'App and account settings', accent: 'muted', route: '/settings' },
   { icon: 'help-circle', label: 'Help & Support', desc: 'Guides, FAQs and contact us', accent: 'secondary', route: '/help' },

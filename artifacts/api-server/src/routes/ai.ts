@@ -17,6 +17,9 @@ import { db, products, productVariants, orders, posts, storefronts } from "@work
 import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
 import { buildSellerSnapshot, type SellerSnapshot } from "../lib/sellerSnapshot";
 import { helpDocsForPrompt, matchHelpDocs, type HelpDoc } from "../lib/aiHelpDocs";
+import {
+  applyDataSourceSettings, loadAISettings, loadAISettingsOrDefault, saveAISettings, type AISettings,
+} from "../lib/aiSettings";
 import type { Logger } from "pino";
 
 const router = Router();
@@ -31,9 +34,10 @@ const CHAT_MODEL           = "gpt-5.4-mini";
 // ─── System prompt builder ─────────────────────────────────────────────────────
 
 function buildSystemPrompt(
-  snapshot: SellerSnapshot,
+  snapshot: Record<string, unknown> & { snapshotAt: string },
   context: Record<string, unknown>,
   brandMemory?: Record<string, string>,
+  excludedSources: string[] = [],
 ): string {
   const screen = (context?.screen as string) ?? "general";
 
@@ -62,6 +66,9 @@ function buildSystemPrompt(
 
   // Compact JSON snapshot — null values are preserved to signal unavailability
   const snapshotJson = JSON.stringify(snapshot, null, 0);
+  const exclusionNote = excludedSources.length > 0
+    ? `\n\nThe seller has turned off these data sources in AI Settings: ${excludedSources.join(", ")}. Snapshot sections marked "excluded_by_seller_ai_settings" are withheld on purpose — say that data is turned off in AI Settings rather than unavailable, and never guess it.`
+    : "";
 
   return [
     "You are Brandthread AI — an intelligent business assistant embedded in the Brandthread seller platform.",
@@ -77,7 +84,7 @@ function buildSystemPrompt(
     "7. If asked about data outside the snapshot scope (e.g. competitor data, future projections), say so clearly.",
     "8. Revenue figures in the snapshot are gross paid order totals only — always note this when discussing revenue.",
     "",
-    `Current screen context: ${screenNote}${brandSection}`,
+    `Current screen context: ${screenNote}${brandSection}${exclusionNote}`,
     "",
     `Verified account snapshot (snapshotAt: ${snapshot.snapshotAt}):`,
     "```json",
@@ -140,6 +147,56 @@ function validateAndSanitizeMessages(
   return { messages: safe.slice(-MAX_MESSAGES) };
 }
 
+// ─── AI Settings enforcement ───────────────────────────────────────────────────
+
+const AI_DISABLED_ERROR = "Brandthread AI is turned off. Turn it back on in AI Settings.";
+
+/**
+ * Applies the seller's persisted AI Settings to one chat turn: brand memory
+ * is dropped when Brand Memory is off, and snapshot sections for switched-off
+ * data sources are withheld from the model.
+ */
+function scopedSystemPrompt(
+  settings: AISettings,
+  snapshot: SellerSnapshot,
+  context: Record<string, unknown>,
+  brandMemory?: Record<string, string>,
+): string {
+  const scoped = applyDataSourceSettings(snapshot, settings.dataSources);
+  return buildSystemPrompt(
+    scoped.snapshot as Record<string, unknown> & { snapshotAt: string },
+    context,
+    settings.brandMemoryEnabled ? brandMemory : undefined,
+    scoped.excluded,
+  );
+}
+
+// ─── GET/PUT /api/ai/settings ──────────────────────────────────────────────────
+
+router.get("/settings", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = (req as Request & { clerkUserId?: string }).clerkUserId!;
+  try {
+    res.json({ settings: await loadAISettings(userId) });
+  } catch (err) {
+    (req as Request & { log?: Logger }).log?.error({ err }, "ai.settings.load_error");
+    res.status(500).json({ error: "Couldn't load AI settings." });
+  }
+});
+
+router.put("/settings", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = (req as Request & { clerkUserId?: string }).clerkUserId!;
+  if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+    res.status(400).json({ error: "settings object is required." });
+    return;
+  }
+  try {
+    res.json({ settings: await saveAISettings(userId, req.body) });
+  } catch (err) {
+    (req as Request & { log?: Logger }).log?.error({ err }, "ai.settings.save_error");
+    res.status(500).json({ error: "Couldn't save AI settings." });
+  }
+});
+
 // ─── POST /api/ai/chat ─────────────────────────────────────────────────────────
 
 router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -164,6 +221,12 @@ router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<v
     return;
   }
   const safeMessages = validation.messages!;
+
+  const aiSettings = await loadAISettingsOrDefault(userId);
+  if (!aiSettings.enabled) {
+    res.status(409).json({ error: AI_DISABLED_ERROR, code: "AI_DISABLED" });
+    return;
+  }
 
   // Build a fresh, permission-scoped snapshot from the verified user identity.
   // This is the only source of account data — client-provided IDs are ignored.
@@ -193,7 +256,7 @@ router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<v
     };
   }
 
-  const systemPrompt = buildSystemPrompt(snapshot, context ?? {}, brandMemory);
+  const systemPrompt = scopedSystemPrompt(aiSettings, snapshot, context ?? {}, brandMemory);
 
   try {
     const completion = await openai.chat.completions.create({
@@ -271,6 +334,12 @@ router.post("/chat/stream", requireAuth, async (req: Request, res: Response): Pr
   const lastUserMessage = [...safeMessages].reverse().find(m => m.role === "user")?.content ?? "";
   const sources: HelpDoc[] = matchHelpDocs(lastUserMessage);
 
+  const aiSettings = await loadAISettingsOrDefault(userId);
+  if (!aiSettings.enabled) {
+    res.status(409).json({ error: AI_DISABLED_ERROR, code: "AI_DISABLED" });
+    return;
+  }
+
   let snapshot: SellerSnapshot;
   try {
     snapshot = await buildSellerSnapshot(userId);
@@ -280,7 +349,7 @@ router.post("/chat/stream", requireAuth, async (req: Request, res: Response): Pr
     return;
   }
 
-  const systemPrompt = buildSystemPrompt(snapshot, context ?? {}, brandMemory);
+  const systemPrompt = scopedSystemPrompt(aiSettings, snapshot, context ?? {}, brandMemory);
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -409,6 +478,13 @@ router.get("/suggestions", requireAuth, async (req: Request, res: Response): Pro
     actionLabel: string; actionRoute: string; category: string; priority: string;
   }> = [];
 
+  // AI or "Dashboard suggestions" turned off in AI Settings → no suggestions.
+  const aiSettings = await loadAISettingsOrDefault(ownerId);
+  if (!aiSettings.enabled || !aiSettings.suggestionsEnabled) {
+    res.json({ suggestions: [], disabled: true });
+    return;
+  }
+
   try {
     // ── Low inventory variants ───────────────────────────────────────────────
     const lowStock = await db
@@ -436,8 +512,9 @@ router.get("/suggestions", requireAuth, async (req: Request, res: Response): Pro
         title:          isOut ? `${v.productName}${label ? ` (${label})` : ""} is out of stock` : `Low stock: ${v.productName}${label ? ` (${label})` : ""}`,
         reason:         isOut
           ? `This variant has 0 units left. Buyers who visit the product page will see it as sold out.`
-          : `Only ${v.stock} units remaining (threshold: ${v.lowStockThreshold ?? 5}). At current velocity, stock may deplete within days.`,
-        expectedImpact: isOut ? "Prevents ongoing missed revenue from visitors" : `Reordering now prevents ~${(v.stock ?? 0) * 2} lost sales`,
+          : `Only ${v.stock} units remaining (your low-stock threshold is ${v.lowStockThreshold ?? 5}).`,
+        // Advice only — no invented "lost sales" or sales-velocity figures.
+        expectedImpact: isOut ? "Restocking lets buyers order this variant again" : "Restocking before it sells out keeps this variant available",
         actionLabel:    "View inventory",
         actionRoute:    "/inventory",
         category:       "inventory",
@@ -486,8 +563,8 @@ router.get("/suggestions", requireAuth, async (req: Request, res: Response): Pro
       suggestions.push({
         id:             "sug_caption_missing",
         title:          `${noCaptionPosts.length} recent post${noCaptionPosts.length > 1 ? "s" : ""} with no caption`,
-        reason:         "Posts without captions get significantly less engagement. A well-written caption can increase saves and profile visits.",
-        expectedImpact: "Captioned posts typically see 2–3× more engagement",
+        reason:         "A caption tells buyers what they're looking at and gives the post words to be found by in search.",
+        expectedImpact: "Add a short caption that names the product",
         actionLabel:    "Create content",
         actionRoute:    "/create-post",
         category:       "content",
@@ -501,7 +578,7 @@ router.get("/suggestions", requireAuth, async (req: Request, res: Response): Pro
         id:             "sug_no_content",
         title:          "Start posting to grow your audience",
         reason:         "You haven't posted any content yet. Thread posts are your primary discovery channel on Brandthread.",
-        expectedImpact: "Sellers with 5+ posts see 3× more profile visits",
+        expectedImpact: "Post regularly so buyers have something to discover",
         actionLabel:    "Create first post",
         actionRoute:    "/create-post",
         category:       "content",
