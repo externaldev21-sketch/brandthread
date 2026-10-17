@@ -167,11 +167,11 @@ async function run() {
       await page.getByLabel(/close/i).first().click().catch(() => {});
       await page.waitForTimeout(800);
 
-      // C. Add elsewhere (Cart → Saved for later → "Move to cart"), then come
+      // C. Add elsewhere (Cart → Saved for later → "Move to bag"), then come
       //    back to the feed with the browser back — real in-app navigation.
       await page.locator(BUTTON).filter({ visible: true }).first().click();
       await page.getByText(/Saved for later/i).first().waitFor({ timeout: 15_000 });
-      await page.getByText(/^Move to cart$/).first().click();
+      await page.getByText(/^Move to bag$/).first().click();
       await page.waitForTimeout(1200);
       await page.screenshot({ path: path.join(OUT, '03-cart-moved-saved-item-to-cart.jpg'), type: 'jpeg', quality: 82 });
       from = await mark(page);

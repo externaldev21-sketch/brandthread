@@ -1383,15 +1383,49 @@ router.get("/orders", async (req, res) => {
         threadCashAppliedCents:  orders.threadCashAppliedCents,
         cancellationReason:      orders.cancellationReason,
         createdAt:               orders.createdAt,
+        // The seller's brand mark, same source as the buyer brand rails
+        // (profile photo, then avatar). The order card falls back to it when
+        // a line item has no photo.
+        sellerProfileImageUrl:   users.profileImageUrl,
+        sellerAvatarUrl:         users.avatarUrl,
         ...deliveryColumns,
       })
       .from(orders)
       .leftJoin(users, eq(users.clerkId, orders.ownerId))
       .where(eq(orders.buyerId, buyerId))
       .orderBy(desc(orders.createdAt));
+    // Line items for the order cards (name, variant, quantity, and the
+    // product's first photo), loaded for every order in one query.
+    const orderIds = rows.map((row) => row.id);
+    const itemRows = orderIds.length === 0 ? [] : await db
+      .select({
+        orderId:       orderItems.orderId,
+        productId:     productVariants.productId,
+        productName:   orderItems.productName,
+        variantLabel:  orderItems.variantLabel,
+        quantity:      orderItems.quantity,
+        priceCents:    orderItems.priceCents,
+        productImages: products.images,
+      })
+      .from(orderItems)
+      .leftJoin(productVariants, eq(productVariants.id, orderItems.variantId))
+      .leftJoin(products, eq(products.id, productVariants.productId))
+      .where(inArray(orderItems.orderId, orderIds));
+    const itemsByOrder = new Map<string, Array<Omit<typeof itemRows[number], "orderId" | "productImages"> & { imageUrl: string | null }>>();
+    for (const { orderId, productImages, ...item } of itemRows) {
+      const images = Array.isArray(productImages) ? productImages.filter((image): image is string => typeof image === "string") : [];
+      const list = itemsByOrder.get(orderId) ?? [];
+      list.push({ ...item, imageUrl: images[0] ?? null });
+      itemsByOrder.set(orderId, list);
+    }
     // The list carries the timeline and guarantee but not the scan history
     // (events are loaded with the order detail).
-    res.json(rows.map((row) => ({ ...row, delivery: buildBuyerDelivery(row) })));
+    res.json(rows.map(({ sellerProfileImageUrl, sellerAvatarUrl, ...row }) => ({
+      ...row,
+      sellerLogoUrl: sellerProfileImageUrl ?? sellerAvatarUrl ?? null,
+      items: itemsByOrder.get(row.id) ?? [],
+      delivery: buildBuyerDelivery(row),
+    })));
   } catch (err) {
     req.log.error({ err }, "Failed to fetch buyer orders");
     res.status(500).json({ error: "Failed to fetch orders" });

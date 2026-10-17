@@ -633,6 +633,7 @@ export function mapApiBuyerOrder(o: any): BuyerOrderView {
     sellerId:          o.ownerId          ?? '',
     sellerName:        o.sellerDisplayName ?? o.sellerName ?? 'Seller',
     sellerHandle:      o.sellerHandle     ?? `@seller`,
+    sellerLogoUri:     o.sellerLogoUrl    ?? undefined,
     status:            mapBuyerOrderStatus(o.status ?? 'pending'),
     paymentStatus:     o.stripePaymentIntentId ? 'paid' : 'pending',
     fulfillmentStatus: mapBuyerFulfillmentStatus(o.status ?? 'pending'),
