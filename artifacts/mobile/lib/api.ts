@@ -4,6 +4,7 @@
  * Every request attaches the Clerk Bearer token supplied by getToken().
  */
 import type { SizeChartData, SizeChartPreset, SizeChartTemplateSummary, SizeChartTemplateDetail } from '@/lib/sizeChartTypes';
+import type { LiveAvailabilityStatus, LiveShowSummary } from '@/lib/live/liveAvailability';
 import { prepareImageForUpload } from '@/lib/imageUploadPrep';
 import { useAuth } from '@clerk/expo';
 import type { LaunchChecklistResponse } from '@/lib/launchChecklist';
@@ -3620,6 +3621,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     live: {
       start:          (data: { title: string; description?: string; productTags?: any[]; thumbnailUrl?: string; scheduledLiveId?: string }) =>
         post<any>('/api/live/start', data),
+      /** Env-gated availability: streaming (Agora app) and replays (Cloud Recording). */
+      status:         () => get<LiveAvailabilityStatus>('/api/live/status'),
       active:         () => get<{ streams: any[] }>('/api/live/active'),
       get:            (id: string) => get<{ stream: any }>(`/api/live/${encodeURIComponent(id)}`),
       join:           (id: string) => trackAfter(post<any>(`/api/live/${encodeURIComponent(id)}/join`, {}), [['live_joined']]),
@@ -3627,6 +3630,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** HTTP presence fallback — only used when the WebSocket can't connect (see lib/live/useLiveSocket.ts). */
       heartbeat:      (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/heartbeat`, {}),
       end:            (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/end`, {}),
+      /** Host-only post-show numbers (duration, peak/total viewers, comments, products). */
+      summary:        (id: string) => get<{ summary: LiveShowSummary }>(`/api/live/${encodeURIComponent(id)}/summary`),
       updateProducts: (id: string, productTags: any[]) =>
         patch<any>(`/api/live/${encodeURIComponent(id)}/products`, { productTags }),
       comment:        (id: string, data: { message: string; displayName?: string; avatarUrl?: string }) =>

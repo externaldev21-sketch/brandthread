@@ -12,7 +12,7 @@ describe('live_tips flag (client)', () => {
   it('the live viewer only wires the gift button and sheet when the flag is ON', () => {
     const src = read('app/live.tsx');
     expect(src).toMatch(/useFeatureFlag\('live_tips'\)/);
-    expect(src).toMatch(/onGift=\{liveTipsEnabled \? \(\) => gift\(item\) : undefined\}/);
+    expect(src).toMatch(/onGift=\{liveTipsEnabled \? \(\) => gift\(options\) : undefined\}/);
     expect(src).toMatch(/liveTipsEnabled && giftFor/);
   });
 });

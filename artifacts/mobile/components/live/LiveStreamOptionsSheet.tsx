@@ -1,11 +1,11 @@
 /**
- * "Live stream options" sheet — the comment bar's ⋯ button on the real LIVE
- * pager (app/live.tsx): Report live stream / Block host / Cancel.
+ * Whatnot's "More" sheet for a show — the rail's ••• on the LIVE viewer
+ * (app/live.tsx): Sound (preview clips), Send Thread Cash (when the
+ * `live_tips` flag is on), Report live stream, Block host, Cancel.
  *
  * Not `Alert.alert`: react-native-web's `Alert.alert` is a no-op
  * (node_modules/react-native-web/dist/exports/Alert — `static alert() {}`),
- * so the equivalent menu in app/buyer-live.tsx (the real-time RTC viewer)
- * silently does nothing on web. Built on the same Modal + SheetRise +
+ * so an Alert-based menu silently does nothing on web. Built on the same Modal + SheetRise +
  * useAppTheme() pattern as components/live/LiveMoreSheet.tsx instead, so
  * report/block actually work in the web preview too, not just native.
  */
@@ -19,11 +19,15 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { hapticLight } from '@/lib/haptics';
 
 export function LiveStreamOptionsSheet({
-  visible, hostName, onClose, onReport, onBlock,
+  visible, hostName, onClose, onReport, onBlock, sound, onGift, reportLabel = 'Report live stream',
 }: {
+  /** "Report message" when opened from a chat message. */
+  reportLabel?: string;
   visible: boolean;
   hostName: string;
   onClose: () => void;
+  sound?: { muted: boolean; onToggle: () => void };
+  onGift?: () => void;
   onReport: () => void;
   onBlock: () => void;
 }) {
@@ -35,14 +39,36 @@ export function LiveStreamOptionsSheet({
       <SheetRise style={[styles.sheet, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.md }]} testID="live-stream-options-sheet">
         <View style={[styles.handle, { backgroundColor: theme.border }]} />
         <Text style={[styles.title, { color: theme.muted }]}>{hostName}</Text>
+        {sound && (
+          <Pressable
+            onPress={() => { hapticLight(); onClose(); sound.onToggle(); }}
+            style={styles.row}
+            accessibilityRole="button"
+            testID="live-options-sound"
+          >
+            <Feather name={sound.muted ? 'volume-2' : 'volume-x'} size={19} color={theme.text} style={styles.rowIcon} />
+            <Text style={[styles.rowLabel, { color: theme.text }]}>{sound.muted ? 'Turn sound on' : 'Mute sound'}</Text>
+          </Pressable>
+        )}
+        {onGift && (
+          <Pressable
+            onPress={() => { hapticLight(); onClose(); onGift(); }}
+            style={styles.row}
+            accessibilityRole="button"
+            testID="live-options-gift"
+          >
+            <Feather name="gift" size={19} color={theme.text} style={styles.rowIcon} />
+            <Text style={[styles.rowLabel, { color: theme.text }]}>Send Thread Cash to {hostName}</Text>
+          </Pressable>
+        )}
         <Pressable
           onPress={() => { hapticLight(); onClose(); onReport(); }}
           style={styles.row}
           accessibilityRole="button"
-          accessibilityLabel="Report live stream"
+          accessibilityLabel={reportLabel}
         >
           <Feather name="flag" size={19} color={theme.text} style={styles.rowIcon} />
-          <Text style={[styles.rowLabel, { color: theme.text }]}>Report live stream</Text>
+          <Text style={[styles.rowLabel, { color: theme.text }]}>{reportLabel}</Text>
         </Pressable>
         <Pressable
           onPress={() => { hapticLight(); onClose(); onBlock(); }}

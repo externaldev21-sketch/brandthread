@@ -66,16 +66,11 @@ function hasHardcodedGrey(source: string): boolean {
 // then delete its line here in the same change.
 const HARDCODED_GREY_ALLOWLIST = new Set([
   'app/(tabs)/feed.tsx',
-  'app/buyer-live.tsx',
   'app/buyer-post-comments.tsx',
   'app/buyer-search.tsx',
   'app/design-bg-replace.tsx',
-  'app/live-feed.tsx',
-  'app/seller-go-live.tsx',
-  'app/seller-live.tsx',
   'app/store-editor.tsx',
   'components/buyer-feed/ShopSideTab.tsx',
-  'components/live/LiveOverlays.tsx',
   'components/profile/ProfileStoryAvatar.tsx',
   'components/search/PersonRow.tsx',
   'components/thread-cash/ThreadCashStreakRow.tsx',

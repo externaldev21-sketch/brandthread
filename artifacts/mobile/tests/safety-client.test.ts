@@ -60,8 +60,8 @@ describe('safety entry points', () => {
   it('lets people report every kind of content', () => {
     expect(read('app/buyer-story-viewer.tsx')).toContain("targetType: 'story'");
     expect(read('app/buyer-product-detail.tsx')).toContain("targetType: 'product'");
-    expect(read('app/buyer-live.tsx')).toContain("targetType: 'live'");
-    expect(read('app/buyer-live.tsx')).toContain("targetType: 'live_comment'");
+    expect(read('app/live.tsx')).toContain("targetType: 'live'");
+    expect(read('app/live.tsx')).toContain("targetType: 'live_comment'");
     expect(read('app/buyer-post-comments.tsx')).toContain("targetType: 'comment'");
     expect(read('components/safety/DmSafety.tsx')).toContain("targetType: 'message'");
     expect(read('app/seller-profile.tsx')).toContain("targetType: 'profile'");

@@ -4,7 +4,7 @@
  * streams that end while the pager is open.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { LiveChatMessage, LiveStream, LiveStreamProvider, SuggestedCreator, UpcomingLive } from './types';
+import type { LiveChatMessage, LiveRtcCredentials, LiveStream, LiveStreamProvider, SuggestedCreator, UpcomingLive } from './types';
 import { appendChat, initialStreamIndex, nextIndexAfterRemoval } from './liveOrdering';
 import { getLiveDirectory } from './useLiveDirectory';
 
@@ -13,6 +13,8 @@ export interface LiveRuntime {
   likeCount: number;
   pinnedProductId: string | null;
   chat: LiveChatMessage[];
+  /** Agora audience credentials once joined (real shows only). */
+  rtc?: LiveRtcCredentials | null;
 }
 
 /** How long an ended page takes to animate out before it is removed. */
@@ -137,7 +139,7 @@ export function useLivePager(
       setRuntime(prev => {
         const cur = prev[activeId];
         if (!cur) return prev;
-        return { ...prev, [activeId]: { ...cur, chat: appendChat(cur.chat, res.recentChat) } };
+        return { ...prev, [activeId]: { ...cur, chat: appendChat(cur.chat, res.recentChat), rtc: res.rtc ?? null } };
       });
     }).catch(() => {});
     const unsubscribe = provider.subscribe(activeId, event => {

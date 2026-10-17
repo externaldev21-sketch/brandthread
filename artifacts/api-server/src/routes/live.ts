@@ -4,6 +4,7 @@
  *
  * Routes:
  *  POST   /api/live/start               seller starts a stream (host token)
+ *  GET    /api/live/status              { streaming, replays } availability (env-gated)
  *  GET    /api/live/active              list active streams (for feed mixing)
  *  GET    /api/live/feed                LIVE pager list: followed first, then viewers
  *
@@ -41,6 +42,9 @@ import { markScheduledLiveStarted } from "../lib/scheduledLives";
 import { broadcastToRoom } from "../ws/liveHub";
 import { canJoinStream, checkCommentAllowed } from "../lib/liveModeration";
 import { loadEffectiveSettings, loadLastCommentAt, loadRestriction } from "../lib/liveModerationState";
+import {
+  LIVE_NOT_CONFIGURED_CODE, LIVE_NOT_CONFIGURED_MESSAGE, isLiveStreamingConfigured, liveAvailability,
+} from "../lib/liveAvailability";
 
 const router = Router();
 
@@ -96,8 +100,8 @@ router.post("/start", requireAuth, hostPlan, async (req, res) => {
   const appId   = process.env.AGORA_APP_ID ?? "";
   const appCert = process.env.AGORA_APP_CERTIFICATE ?? "";
 
-  if (!appId) {
-    return res.status(503).json({ error: "AGORA_APP_ID not configured" });
+  if (!isLiveStreamingConfigured()) {
+    return res.status(503).json({ error: LIVE_NOT_CONFIGURED_MESSAGE, code: LIVE_NOT_CONFIGURED_CODE });
   }
 
   // Only one live stream per seller at a time
@@ -162,6 +166,14 @@ router.post("/start", requireAuth, hostPlan, async (req, res) => {
     agoraAppId: appId,
     token,          // "" means no-cert dev mode — Agora console must have auth disabled
   });
+});
+
+// ─── GET /api/live/status ─────────────────────────────────────────────────────
+// Lets the Go Live screen show "not set up yet" before the seller sets up a
+// stream, and say honestly whether this live will be saved as a replay.
+// Booleans + stable codes only; never env values or names.
+router.get("/status", (_req, res) => {
+  res.json(liveAvailability());
 });
 
 // ─── GET /api/live/active ─────────────────────────────────────────────────────
@@ -306,6 +318,9 @@ router.post("/:id/join", requireAuth, async (req, res) => {
       agoraUid: viewerUid,
       agoraAppId: appId,
       token,
+      // The broadcaster's uid, so a viewer renders the host's video and not
+      // a co-host's when several publishers share the channel.
+      hostAgoraUid: typeof stream.agora_uid === "number" ? stream.agora_uid : null,
     });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
@@ -390,6 +405,45 @@ router.post("/:id/end", requireAuth, hostPlan, async (req, res) => {
     }
 
     return res.json({ ok: true, replayPostId, replayStatus });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── GET /api/live/:id/summary ───────────────────────────────────────────────
+// Host-only post-show numbers for the "Show ended" screen. Every figure is
+// read from rows the show itself wrote: duration from started_at/ended_at,
+// peak from the presence job, total viewers from live_viewers (presence rows
+// live for an hour after last_seen, so this is exact right after the show),
+// comments from live_comments and products from the tags the host pinned.
+router.get("/:id/summary", requireAuth, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  try {
+    const rows = await db.execute(sql`
+      SELECT s.id, s.title, s.status, s.started_at, s.ended_at,
+             s.peak_viewer_count, s.product_tags,
+             (SELECT count(*)::int FROM live_viewers v WHERE v.stream_id = s.id) AS total_viewers,
+             (SELECT count(*)::int FROM live_comments c WHERE c.stream_id = s.id) AS comment_count
+      FROM live_streams s
+      WHERE s.id = ${req.params.id}::uuid AND s.seller_id = ${sellerId}
+    `);
+    const row = rows.rows[0] as any;
+    if (!row) return res.status(404).json({ error: "Not found or not your stream" });
+    const startedAt = new Date(row.started_at).getTime();
+    const endedAt = row.ended_at ? new Date(row.ended_at).getTime() : Date.now();
+    const tags = Array.isArray(row.product_tags) ? row.product_tags : [];
+    return res.json({
+      summary: {
+        id: row.id,
+        title: row.title,
+        status: row.status,
+        durationSeconds: Math.max(0, Math.round((endedAt - startedAt) / 1000)),
+        peakViewers: Number(row.peak_viewer_count ?? 0),
+        totalViewers: Number(row.total_viewers ?? 0),
+        comments: Number(row.comment_count ?? 0),
+        productsShown: tags.length,
+      },
+    });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }

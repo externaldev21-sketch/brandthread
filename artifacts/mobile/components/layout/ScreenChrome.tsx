@@ -42,7 +42,7 @@ const IMMERSIVE_TOP_ROOT_SEGMENTS = new Set([
   // Camera / creation
   'camera-capture', 'create-post', 'buyer-story-create', 'design-canvas',
   // Live
-  'live', 'live-feed', 'buyer-live', 'seller-live', 'seller-go-live',
+  'live', 'live-feed', 'buyer-live', 'seller-live', 'seller-go-live', 'seller-live-summary',
   // Full-screen media viewers
   'buyer-story-viewer', 'story-mention-viewer', 'buyer-post-viewer', 'profile-videos',
 ]);

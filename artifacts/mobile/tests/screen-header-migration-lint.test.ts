@@ -102,7 +102,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/forgot-password.tsx',
   'app/index.tsx',
   'app/ip-report.tsx',
-  'app/live-feed.tsx',
   'app/live.tsx',
   'app/login-activity.tsx',
   'app/manufacturer-profile.tsx',
@@ -125,8 +124,9 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/return-request.tsx',
   'app/seller-conversation.tsx',
   'app/seller-drop-preview.tsx',
-  'app/seller-go-live.tsx',
   'app/seller-live.tsx',
+  // Full-screen post-show summary over black (X's broadcast summary has no nav header).
+  'app/seller-live-summary.tsx',
   'app/seller-profile.tsx',
   'app/settings.tsx',
   'app/shipping-delivery.tsx',
