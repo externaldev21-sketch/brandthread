@@ -290,6 +290,10 @@ export const products = pgTable('products', {
   // A photo of the seller's own size chart — distinct from the structured
   // table data above. Optional; shown to buyers as a "Size guide" link.
   sizeChartImageUrl:     text('size_chart_image_url'),
+  // Sell-an-item attributes (department, subcategory, brand, condition,
+  // colours, material, parcel size, who pays shipping). Shape and limits:
+  // api-server lib/listingDetails.ts. Migration 261.
+  listingDetails:        jsonb('listing_details').$type<Record<string, unknown> | null>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

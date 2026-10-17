@@ -64,10 +64,10 @@ describe('seller setup destination navigation', () => {
     const addProduct = read('app/add-product.tsx');
     const createPost = read('app/create-post.tsx');
 
-    // "Product published!" moved from a native Alert to the shared
-    // SuccessSheet (components/ui/SuccessSheet.tsx) — its secondary action
-    // still returns to the seller-setup origin via leaveProductFlow.
-    expect(addProduct).toContain("secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}");
+    // Closing Sell an item returns to the seller-setup origin; after posting,
+    // the "Listed!" screen pops itself and the form (back to that origin).
+    expect(addProduct).toContain('leaveSetupFlow(router, params.from);');
+    expect(read('app/listing/success.tsx')).toContain('router.dismiss(2)');
     expect(createPost).toContain('leaveSetupFlow(router, params.from);');
     expect(createPost).toContain('onDiscard={leave}');
   });
@@ -76,7 +76,7 @@ describe('seller setup destination navigation', () => {
     const completionSignals = [
       ['app/seller-verification.tsx', "data?.verificationStatus === 'verified'", "completeSetupTaskWhen('verify_account'"],
       ['app/payouts.tsx', 'normalized?.connected && normalized.chargesEnabled && normalized.payoutsEnabled', "'connect_payments'"],
-      ['app/add-product.tsx', '() => api.products.create(serverCreatePayload)', "'first_product'"],
+      ['lib/listing/publishListing.ts', '() => api.products.create(serverCreatePayload)', "'first_product'"],
       ['app/shipping.tsx', '() => api.shippingZones.create(payload)', "'shipping_rates'"],
       ['app/store-builder.tsx', "() => applyTheme(THREAD_THEME_ID, 'light')", "'customize_store'"],
       ['app/store-domain.tsx', "verificationStatus === 'verified'", "'connect_domain'"],

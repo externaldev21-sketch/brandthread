@@ -14,6 +14,7 @@ import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
 import { afterStockChange } from "../lib/stockRules";
 import { normalizeUploadedImage } from "../lib/productImageResize";
+import { parseListingDetails } from "../lib/listingDetails";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -151,9 +152,15 @@ router.post("/", requireRole("manager"), async (req, res) => {
     isPreOrder, preOrderClosingDate, preOrderEstShipDate, dropId,
     // A photo of the seller's own size chart.
     sizeChartImageUrl,
+    // Sell-an-item attributes (brand, condition, colours, parcel size…).
+    listingDetails: rawListingDetails,
   } = req.body;
   if (!name || typeof name !== "string" || name.trim() === "") {
     res.status(400).json({ error: "name required" }); return;
+  }
+  const listingDetails = rawListingDetails === undefined ? undefined : parseListingDetails(rawListingDetails);
+  if (listingDetails && "error" in listingDetails) {
+    res.status(400).json({ error: listingDetails.error }); return;
   }
   {
     // A pre-order must carry the ship date the seller promises the buyer.
@@ -230,6 +237,7 @@ router.post("/", requireRole("manager"), async (req, res) => {
         ...(preOrderEstShipDate ? { preOrderEstShipDate: new Date(preOrderEstShipDate) } : {}),
         ...(dropId !== undefined && { dropId: dropId ?? null }),
         ...(sizeChartImageUrl !== undefined && { sizeChartImageUrl: sizeChartImageUrl ?? null }),
+        ...(listingDetails && { listingDetails: listingDetails.value }),
       })
       .returning();
 
@@ -291,7 +299,13 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
     // Product-level strike-through price applied to every variant that costs
     // less than it (null clears). Per-variant control: PATCH /:id/variants/:variantId.
     compareAtPriceCents,
+    // Sell-an-item attributes (null clears).
+    listingDetails: rawListingDetails,
   } = req.body;
+  const listingDetails = rawListingDetails === undefined ? undefined : parseListingDetails(rawListingDetails);
+  if (listingDetails && "error" in listingDetails) {
+    res.status(400).json({ error: listingDetails.error }); return;
+  }
   if (compareAtPriceCents !== undefined && compareAtPriceCents !== null &&
       (!Number.isInteger(compareAtPriceCents) || compareAtPriceCents <= 0)) {
     res.status(400).json({ error: "compareAtPriceCents must be a positive integer or null" }); return;
@@ -328,6 +342,7 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       // Size chart (pass null to clear)
       ...(sizeChart              !== undefined && { sizeChart: sizeChart ?? null }),
       ...(sizeChartImageUrl      !== undefined && { sizeChartImageUrl: sizeChartImageUrl ?? null }),
+      ...(listingDetails         && { listingDetails: listingDetails.value }),
       updatedAt: new Date(),
   };
 

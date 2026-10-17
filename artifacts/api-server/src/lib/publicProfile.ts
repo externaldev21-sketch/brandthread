@@ -85,6 +85,8 @@ export function toPublicProduct(p: Row, variants: Row[]): Row {
     dropId: p.dropId ?? null,
     sizeChart: p.sizeChart ?? null,
     sizeChartImageUrl: p.sizeChartImageUrl ?? null,
+    // Brand, condition, colours, parcel size… from Sell an item.
+    listingDetails: p.listingDetails ?? null,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
     variants: variants.map(toPublicVariant),
