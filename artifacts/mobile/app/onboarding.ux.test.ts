@@ -92,6 +92,44 @@ describe("account creation order and safety", () => {
   it("buyer lands directly on the feed, seller on the dashboard", () => {
     expect(source).toContain("router.replace('/(buyer)/'");
     expect(source).toContain("thread_explainer_seen:${userId}");
-    expect(source).toContain("router.replace('/(tabs)/'");
+    expect(source).toContain("router.replace({ pathname: '/plans', params: { fromOnboarding: 'true' } }");
+  });
+  it("buyer auth 'Use email' reveals the email form", () => {
+    expect(source).toContain("'email-form'");
+    expect(source).toContain("Use email");
+    expect(source).toContain("chooseHeadline");
+  });
+
+  it("buyer success routes to thread-explainer, seller to the real subscribe screen", () => {
+    expect(source).toContain("router.replace('/(buyer)/'");
+    // The plan step only records a choice; finishing hands off to /plans
+    // (Stripe Checkout / store purchase), whose "Not now" goes to the tabs.
+    expect(source).toContain("router.replace({ pathname: '/plans', params: { fromOnboarding: 'true' } }");
+    const plans = readFileSync(path.resolve(__dirname, "./plans.tsx"), "utf8");
+    expect(plans).toContain("const isOnboarding = fromOnboarding === 'true';");
+    expect(plans).toContain("'onboarding_selected_plan'");
+    expect(plans).toContain("router.replace('/(tabs)/'");
+  });
+
+  it("style interests carry emoji and solid-fill selected chip with checkmark", () => {
+    expect(source).toContain("STYLE_INTERESTS_WITH_EMOJI");
+    expect(source).toContain("emoji: '🏙️'");
+    expect(source).toContain("function StyleChip");
+    // Solid fill: accentDim background on selected state
+    expect(source).toContain("backgroundColor: theme.accentDim");
+    // Checkmark icon when selected
+    expect(source).toContain('name="check"');
+  });
+
+  it("seller name step is pre-filled from auth form first/last name", () => {
+    expect(source).toContain("onFirstNamePrefill");
+    expect(source).toContain("onLastNamePrefill");
+    expect(source).toContain("onFirstNamePrefill(fn)");
+    expect(source).toContain("onLastNamePrefill(ln)");
+  });
+
+  it("combined name is written to profile with first and last name", () => {
+    // Name is composed as 'firstName lastName'
+    expect(source).toContain("[firstName.trim(), lastName.trim()].filter(Boolean).join(' ')");
   });
 });

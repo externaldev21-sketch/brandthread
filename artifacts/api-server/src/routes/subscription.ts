@@ -38,6 +38,14 @@ import {
 } from "../lib/sellerTrial";
 
 const router = Router();
+
+/**
+ * Unauthenticated Stripe redirect targets (Checkout success/cancel and the
+ * Billing Portal "return" button). A browser lands here with no app session,
+ * so these are mounted in routes/index.ts ahead of the authenticated router.
+ */
+export const subscriptionRedirectRouter = Router();
+
 router.use(requireAuth);
 router.use(teamContext());
 
@@ -108,6 +116,11 @@ async function ensureCustomer(stripe: any, clerkUserId: string): Promise<string>
     .where(eq(users.clerkId, clerkUserId));
 
   return customer.id;
+}
+
+/** The API is served under /api at the web origin (never /api-server). */
+export function subscriptionReturnBase(): string {
+  return `${getWebOrigin("https://localhost:3000")}/api`;
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
@@ -457,7 +470,7 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
       return;
     }
 
-    const returnBase = `${getWebOrigin("https://localhost:3000")}/api-server`;
+    const returnBase = subscriptionReturnBase();
 
     // Check for an existing active or trialing subscription so we don't create a duplicate.
     const [user] = await db
@@ -627,7 +640,7 @@ router.post("/portal", requireRole("owner"), async (req, res) => {
       return;
     }
 
-    const returnUrl = `${getWebOrigin("https://localhost:3000")}/api-server/seller/subscription/portal/return`;
+    const returnUrl = `${subscriptionReturnBase()}/seller/subscription/portal/return`;
 
     const session = await stripe.billingPortal.sessions.create({
       customer:   user.stripeCustomerId,
@@ -645,41 +658,39 @@ router.post("/portal", requireRole("owner"), async (req, res) => {
 
 // ─── Post-Stripe redirect landing pages (plain HTML, no auth) ─────────────────
 
-router.use(
-  "/return",
-  (req: any, res: any, next: any) => {
-    // These are Stripe redirects — no Clerk token, skip auth middleware
-    (router as any)._requireAuthSkipped = true;
-    next();
-  },
-);
+const APP_SUBSCRIPTION_DEEP_LINK = "brandthread://subscription";
 
-router.get("/return", (req, res) => {
-  const status = (req.query.status as string) ?? "success";
-  const plan   = isSellerPlanId(req.query.plan) ? PLAN_CATALOGUE[req.query.plan].label : "";
-  const trial  = req.query.trial !== "0";
-  const title  = status !== "success" ? "Checkout cancelled" : trial ? "✓ Trial started" : "✓ Plan started";
-  const body   = status !== "success"
-    ? "Your checkout was cancelled. Close this window and return to the app."
-    : trial
-      ? `Your <strong>${plan}</strong> plan trial is now active. You won't be charged until your ${TRIAL_DAYS}-day trial ends. Close this window and return to the app.`
-      : `Your <strong>${plan}</strong> plan is now active. Close this window and return to the app.`;
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}
 
-  res.setHeader("Content-Type", "text/html");
-  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Brandthread</title>
+function landingPage(title: string, body: string, deepLink: string): string {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Brandthread</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;text-align:center;padding:60px 24px;background:#07070F;color:#F0EEFF;}
-  h1{font-size:1.8rem;margin-bottom:12px;}p{color:#A0A0B8;font-size:1rem;line-height:1.6;}</style></head>
-  <body><h1>${title}</h1><p>${body}</p></body></html>`);
+  <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;text-align:center;padding:60px 24px;background:#000;color:#fff;}
+  h1{font-size:1.8rem;margin-bottom:12px;}p{color:#C0C0C0;font-size:1rem;line-height:1.6;}
+  a{display:inline-block;margin-top:20px;padding:12px 22px;border-radius:999px;background:#fff;color:#000;text-decoration:none;font-weight:600;}</style></head>
+  <body><h1>${title}</h1><p>${body}</p><a href="${deepLink}">Return to Brandthread</a></body></html>`;
+}
+
+subscriptionRedirectRouter.get("/return", (req, res) => {
+  const status = req.query.status === "cancel" ? "cancel" : "success";
+  const plan = isSellerPlanId(req.query.plan) ? PLAN_CATALOGUE[req.query.plan].name : "";
+  const title = status === "success" ? "✓ Subscription started" : "Checkout cancelled";
+  const body = status === "success"
+    ? `Your ${plan ? `<strong>${escapeHtml(plan)}</strong>` : "plan"} is now active. If your plan includes a free trial you won't be charged until it ends. Return to the app to continue.`
+    : "Your checkout was cancelled and you have not been charged. Return to the app to continue.";
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(landingPage(title, body, `${APP_SUBSCRIPTION_DEEP_LINK}?checkout=${status}`));
 });
 
-router.get("/portal/return", (_req, res) => {
-  res.setHeader("Content-Type", "text/html");
-  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Brandthread</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;text-align:center;padding:60px 24px;background:#07070F;color:#F0EEFF;}
-  h1{font-size:1.8rem;margin-bottom:12px;}p{color:#A0A0B8;font-size:1rem;}</style></head>
-  <body><h1>Billing updated</h1><p>Your billing changes have been saved. Close this window and return to the app.</p></body></html>`);
+subscriptionRedirectRouter.get("/portal/return", (_req, res) => {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(landingPage(
+    "Billing updated",
+    "Your billing changes have been saved. Return to the app to continue.",
+    `${APP_SUBSCRIPTION_DEEP_LINK}?portal=returned`,
+  ));
 });
 
 export default router;

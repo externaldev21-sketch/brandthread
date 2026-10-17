@@ -33,6 +33,29 @@ affiliateConnectRedirectRouter.get("/refresh", (req, res) => {
 });
 
 const router = Router();
+
+/**
+ * Unauthenticated Stripe redirect targets for creator payout onboarding (the
+ * browser arrives with no app session). Mounted in routes/index.ts at
+ * /affiliate/payout-account, ahead of the authenticated creator router. Both
+ * send the creator back to the Creator Program screen, which reloads its
+ * payout status on focus; on refresh it can mint a fresh link.
+ */
+export const affiliatePayoutRedirectRouter = Router();
+const CREATOR_PROGRAM_DEEP_LINK = "brandthread://creator-program";
+affiliatePayoutRedirectRouter.get("/return", (_req, res) => {
+  res.redirect(302, `${CREATOR_PROGRAM_DEEP_LINK}?payouts=returned`);
+});
+affiliatePayoutRedirectRouter.get("/refresh", (_req, res) => {
+  res.redirect(302, `${CREATOR_PROGRAM_DEEP_LINK}?payouts=refresh`);
+});
+
+/** Return/refresh URLs Stripe uses for creator onboarding — served under /api. */
+export function affiliatePayoutReturnUrls() {
+  const base = `${getWebOrigin("https://localhost:3000")}/api/affiliate/payout-account`;
+  return { refreshUrl: `${base}/refresh`, returnUrl: `${base}/return` };
+}
+
 router.use(requireAuth);
 
 const me = (req: any) => req.clerkUserId as string;
@@ -274,11 +297,11 @@ router.post("/payout-account/onboard", async (req, res) => {
       await db.update(users).set({ stripeAccountId: accountId, stripeAccountStatus: "pending", updatedAt: new Date() })
         .where(and(eq(users.clerkId, creatorId), sql`${users.stripeAccountId} IS NULL`));
     }
-    const origin = getWebOrigin("https://localhost:3000");
+    const urls = affiliatePayoutReturnUrls();
     const link = await client.accountLinks.create({
       account: accountId,
-      refresh_url: `${origin}${CREATOR_CONNECT_REFRESH_PATH}`,
-      return_url: `${origin}${CREATOR_CONNECT_RETURN_PATH}`,
+      refresh_url: urls.refreshUrl,
+      return_url: urls.returnUrl,
       type: "account_onboarding",
     });
     res.json({ url: link.url });

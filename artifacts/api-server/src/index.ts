@@ -46,6 +46,7 @@ import { startPayoutReviewJob } from "./jobs/payoutReview";
 import { startModerationAlertsJob } from "./jobs/moderationAlerts";
 import { startAdminReportsJob } from "./jobs/adminReports";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
+import { backgroundJobsEnabled, startPerInstanceJobs, startSingletonJobsWithLeadership } from "./jobs/runner";
 import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
 import { attachCallWebSocket } from "./ws/callHub";
@@ -76,6 +77,8 @@ const port = Number(rawPort);
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
+
+let stopSingletonJobs: () => void = () => {};
 
 const server = app.listen(port, (err) => {
   if (err) {
@@ -113,51 +116,15 @@ const server = app.listen(port, (err) => {
     logger.warn({ missing: missingAppLinks }, "Universal links are off: /.well-known files are empty until these env vars are set");
   }
 
-  // Background jobs share the Postgres advisory-lock runner.
-  startAbandonedCartJob();
-  startTrendingJob();
-  startSellerRankingJob();
-  startTeamInviteReminderJob();
-  startScheduledDropBroadcastJob();
-  startDropEarlyAccessPushJob();
-  startProductLaunchJob();
-  startProductDrawJob();
-  startSellerTrialReminderJob();
-  startSellerLifecycleJobs(); // activation nudges + Monday seller summary
-  startDisputeEvidenceReminderJob();
-  startDesignStudioObjectCleanupJob();
-  startMoneySweepJob();
-  startPlatformBalanceJob();
-  startPlanProductSyncJob();
-  startAffiliatePayoutsJob();
-  startAdCampaignLifecycleJob();
-  startSellerReferralsJob();
-  startDeliveryDeadlinesJob();
-  startStoryCleanupJob();
-  startSellerWinbackJob(); // one "your store is saved" after a plan ends
-  startAnalyticsRetentionJob();
-  startAccountPurgeJob();
-  startDataExportJob();
-  startPushReceiptCleanupJob();
-  startWeeklyDigestJob();
-  startOrderAnniversaryJob();
-  startNotificationBatchFlushJob();
-  startSmsDeferredSendJob();
-  startLiveRecordingFinalizeJob();
-  startLiveViewersPresenceJob();
-  startLiveAuctionSettleJob();
-  startThreadCashExpiryJob();
-  startScheduledLiveReminderJob();
-  startEmailCampaignJob();
-  startOrderPostAttributionJob();
-  startReviewRequestJob();
-  startAdminReportsJob();
-  startCommunityPushJob();
-  startScheduledPostPublisherJob();
-  startPayoutReviewJob();
-  startModerationAlertsJob();
-  startFreelancerAutoReleaseJob();
-  startReportEscalationJob();
+  // Background jobs. Singleton jobs run in exactly one process (Postgres
+  // advisory-lock leader); BACKGROUND_JOBS=off leaves them to the worker
+  // (src/worker.ts). See jobs/runner.ts.
+  startPerInstanceJobs();
+  if (backgroundJobsEnabled()) {
+    stopSingletonJobs = startSingletonJobsWithLeadership();
+  } else {
+    logger.info("BACKGROUND_JOBS=off: singleton jobs are left to the worker process");
+  }
 });
 
 // ─── Graceful shutdown ──────────────────────────────────────────────────────
@@ -175,6 +142,7 @@ let shuttingDown = false;
 function shutdown(signal: NodeJS.Signals): void {
   if (shuttingDown) return;
   shuttingDown = true;
+  stopSingletonJobs();
   logger.info({ signal }, "Shutdown signal received, draining connections");
 
   const forceExitTimer = setTimeout(() => {

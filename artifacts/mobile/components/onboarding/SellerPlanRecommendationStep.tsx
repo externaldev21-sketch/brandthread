@@ -24,6 +24,8 @@ export function SellerPlanRecommendationStep({
   const { theme } = useAppTheme();
   const { packages } = useRevenueCat();
   const recommendation = recommendSellerPlan(brandStage, goals);
+  // Same rule as the plans screen: only promise a trial the store really offers.
+  const hasRealTrialOffer = Platform.OS === 'web' || packages.some((pkg) => !!pkg.product.introPrice);
 
   return (
     <ScrollView contentContainerStyle={styles.root} showsVerticalScrollIndicator={false}>
@@ -31,9 +33,11 @@ export function SellerPlanRecommendationStep({
       <Text style={styles.title}>We recommend {SELLER_PLANS.find((plan) => plan.id === recommendation.planId)?.name}</Text>
       <Text style={styles.reason}>{recommendation.reason}</Text>
       <Text style={styles.guidance}>This is guidance, not a gate. Pick any plan, and change it before subscribing.</Text>
-      <View style={[styles.trialBadge, { borderColor: theme.accent }]}>
-        <Text style={[styles.trialBadgeText, { color: theme.accentLight }]}>{`${SELLER_TRIAL_DAYS}-day free trial`}</Text>
-      </View>
+      {hasRealTrialOffer && (
+        <View style={[styles.trialBadge, { borderColor: theme.accent }]}>
+          <Text style={[styles.trialBadgeText, { color: theme.accentLight }]}>{`${SELLER_TRIAL_DAYS}-day free trial`}</Text>
+        </View>
+      )}
 
       <View style={styles.planRow}>
         {SELLER_PLANS.map((plan) => {
@@ -82,7 +86,7 @@ export function SellerPlanRecommendationStep({
           Continue with {SELLER_PLANS.find((plan) => plan.id === selectedPlanId)?.name}
         </Text>
       </TouchableOpacity>
-      <Text style={styles.chargeNote}>No charge is made on this step.</Text>
+      <Text style={styles.chargeNote}>No charge is made on this step. You'll confirm your plan right after setup.</Text>
     </ScrollView>
   );
 }

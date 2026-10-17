@@ -61,7 +61,7 @@ import connectRouter, { connectRedirectRouter } from "./connect";
 import {
   buyerPostPurchaseRouter, checkoutProfileRouter, sellerConversionTrackingRouter, sellerPostPurchaseOfferRouter,
 } from "./checkout-extras";
-import subscriptionRouter from "./subscription";
+import subscriptionRouter, { subscriptionRedirectRouter } from "./subscription";
 import subscriptionRetentionRouter from "./subscription-retention";
 import webhooksRouter from "./webhooks";
 import reviewsRouter from "./reviews";
@@ -222,7 +222,7 @@ import sitemapRouter from "./sitemap";
 import seoPublicRouter from "./seo-public";
 import wellKnownRouter from "./wellKnown";
 import affiliatePublicRouter from "./affiliate-public";
-import affiliateCreatorRouter, { affiliateConnectRedirectRouter } from "./affiliate-creator";
+import affiliateCreatorRouter, { affiliateConnectRedirectRouter, affiliatePayoutRedirectRouter } from "./affiliate-creator";
 import sellerAffiliateRouter from "./seller-affiliate";
 import growthRouter from "./growth";
 import storeBlocksRouter from "./storeBlocks";
@@ -447,6 +447,7 @@ router.use("/brandthread-agent",         requireAiConsent(), aiSafetyGuard("bran
 router.use("/seller/connect/onboard",    connectRedirectRouter);
 router.use("/seller/affiliate",          tc, sellerAffiliateRouter); // affiliate / creator program (seller side)
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
+router.use("/seller/subscription",       subscriptionRedirectRouter); // Stripe Checkout/Portal landing pages: no auth
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/subscription-retention", subscriptionRetentionRouter); // pause instead of cancel (Stripe plans)
 router.use("/seller/verification",       tc, sellerVerificationRouter);
@@ -498,6 +499,7 @@ router.use("/social",                    storyStickersRouter);
 router.use("/affiliate/connect",         affiliateConnectRedirectRouter); // Stripe return/refresh for creators (no session, BT-323)
 router.use("/referrals",                 referralsRouter);
 router.use("/seller-referrals",          sellerReferralsRouter); // brand → brand free month (BT-313, off unless SELLER_REFERRAL_ENABLED=true)
+router.use("/affiliate/payout-account",  affiliatePayoutRedirectRouter); // Stripe onboarding return/refresh: no auth
 router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc
 router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc
 router.use("/shipping-rates",            tc, shippingRatesRouter);

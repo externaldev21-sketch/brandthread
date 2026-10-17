@@ -2,12 +2,16 @@
  * Resend delivery-event webhook for seller campaigns (Svix-signed).
  * POST /api/webhooks/resend-marketing — requires RESEND_WEBHOOK_SECRET; without it the
  * endpoint answers 503 and the app reports delivery/open/click tracking as unavailable.
- * Only what Resend reports is recorded. Hard bounces and complaints suppress the address.
+ * Only what Resend reports is recorded. Hard bounces and complaints suppress the address:
+ * the campaign subscriber row, and the account-wide email_suppressions list that
+ * transactional email (lib/brandthreadEmail.ts) checks — Resend sends every event
+ * for the account here, not just campaign ones.
  */
 import { Router } from "express";
 import crypto from "node:crypto";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { suppressEmails } from "../lib/emailSuppression";
 
 const router = Router();
 const TOLERANCE_SECONDS = 5 * 60;
@@ -41,7 +45,7 @@ router.post("/", async (req, res): Promise<void> => {
   });
   if (!ok) { res.status(400).json({ error: "Invalid signature" }); return; }
 
-  let event: { type?: string; data?: { email_id?: string; bounce?: { type?: string } } };
+  let event: { type?: string; data?: { email_id?: string; to?: string[] | string; bounce?: { type?: string } } };
   try { event = JSON.parse(body); } catch { res.status(400).json({ error: "Invalid body" }); return; }
   const messageId = event.data?.email_id;
   if (!messageId || !event.type) { res.json({ ok: true }); return; }
@@ -60,15 +64,22 @@ router.post("/", async (req, res): Promise<void> => {
       await db.execute(sql`UPDATE email_campaign_sends SET bounced_at = COALESCE(bounced_at, now()) WHERE provider_message_id = ${messageId}`);
       if (event.data?.bounce?.type !== "Transient") {
         await suppress(messageId, "bounced");
+        await suppressEmails(recipients(event.data), "bounced");
       }
       break;
     }
     case "email.complained":
       await suppress(messageId, "complained");
+      await suppressEmails(recipients(event.data), "complained");
       break;
   }
   res.json({ ok: true });
 });
+
+function recipients(data: { to?: string[] | string } | undefined): string[] {
+  const to = data?.to;
+  return Array.isArray(to) ? to.filter((t): t is string => typeof t === "string") : typeof to === "string" ? [to] : [];
+}
 
 async function suppress(messageId: string, status: "bounced" | "complained"): Promise<void> {
   await db.execute(sql`

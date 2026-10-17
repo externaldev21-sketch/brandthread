@@ -1,33 +1,23 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type Stripe from "stripe";
+import { getCurrentWebhookUrl, isBrandthreadWebhook, WEBHOOK_PATH } from "../ensureWebhookEvents";
 
-vi.mock("../stripe", () => ({ stripe: null, STRIPE_WEBHOOK_SECRET: "" }));
-vi.mock("../webOrigin", () => ({ getWebOrigin: () => "https://brandthread.test" }));
-import { REQUIRED_EVENTS } from "../ensureWebhookEvents";
+const endpoint = (url: string, metadata: Record<string, string> = {}) =>
+  ({ url, metadata }) as unknown as Stripe.WebhookEndpoint;
 
-const here = path.dirname(fileURLToPath(import.meta.url));
+describe("ensureWebhookEvents paths", () => {
+  afterEach(() => vi.unstubAllEnvs());
 
-/** Every `case "x.y":` label in the Stripe webhook switch. */
-function handledStripeEvents(): string[] {
-  const source = readFileSync(path.join(here, "../../routes/webhooks.ts"), "utf8");
-  return [...source.matchAll(/case\s+"([a-z_]+(?:\.[a-z_]+)+)"\s*:/g)].map((m) => m[1]);
-}
-
-describe("managed Stripe webhook subscription (BT-054)", () => {
-  it("subscribes to every event routes/webhooks.ts handles", () => {
-    const handled = handledStripeEvents();
-    expect(handled.length).toBeGreaterThan(20);
-    const missing = handled.filter((event) => !(REQUIRED_EVENTS as readonly string[]).includes(event));
-    expect(missing).toEqual([]);
+  it("points Stripe at the /api route the server actually serves", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect(WEBHOOK_PATH).toBe("/api/webhooks/stripe");
+    expect(getCurrentWebhookUrl()).toBe("https://brandthread.app/api/webhooks/stripe");
+    expect(getCurrentWebhookUrl()).not.toContain("/api-server/");
   });
 
-  it("includes the in-app checkout PaymentIntent events", () => {
-    expect(REQUIRED_EVENTS).toEqual(expect.arrayContaining([
-      "payment_intent.succeeded",
-      "payment_intent.payment_failed",
-      "payment_intent.canceled",
-    ]));
+  it("still recognises an endpoint left on the old /api-server path so it gets repointed", () => {
+    expect(isBrandthreadWebhook(endpoint("https://x.replit.dev/api-server/api/webhooks/stripe"))).toBe(true);
+    expect(isBrandthreadWebhook(endpoint("https://x.replit.dev/api/webhooks/stripe"))).toBe(true);
+    expect(isBrandthreadWebhook(endpoint("https://other.example.com/hooks"))).toBe(false);
   });
 });

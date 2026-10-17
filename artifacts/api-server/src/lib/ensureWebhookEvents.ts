@@ -66,18 +66,22 @@ export const REQUIRED_EVENTS = [
   "payout.canceled",
 ] as const;
 
-const WEBHOOK_PATH = "/api-server/api/webhooks/stripe";
-const LEGACY_WEBHOOK_PATH = "/api/webhooks/stripe";
+// The API artifact is served at the host root under /api (see
+// .replit-artifact/artifact.toml). An earlier version pointed Stripe at
+// /api-server/api/..., which the router never serves; that path is still
+// recognised below so an endpoint stuck on it is found and repointed.
+export const WEBHOOK_PATH = "/api/webhooks/stripe";
+const LEGACY_WEBHOOK_PATHS = ["/api-server/api/webhooks/stripe"];
 const MANAGED_METADATA = {
   application: "brandthread",
   managedBy: "api-server",
 };
 
-function getCurrentWebhookUrl(): string | null {
+export function getCurrentWebhookUrl(): string | null {
   return `${getWebOrigin()}${WEBHOOK_PATH}`;
 }
 
-function isBrandthreadWebhook(endpoint: Stripe.WebhookEndpoint): boolean {
+export function isBrandthreadWebhook(endpoint: Stripe.WebhookEndpoint): boolean {
   if (
     endpoint.metadata?.application === MANAGED_METADATA.application &&
     endpoint.metadata?.managedBy === MANAGED_METADATA.managedBy
@@ -91,7 +95,7 @@ function isBrandthreadWebhook(endpoint: Stripe.WebhookEndpoint): boolean {
     // events, own signing secret) is configured by hand and left alone.
     if (url.searchParams.has("connect")) return false;
     const path = url.pathname;
-    return path.endsWith(WEBHOOK_PATH) || path.endsWith(LEGACY_WEBHOOK_PATH);
+    return path.endsWith(WEBHOOK_PATH) || LEGACY_WEBHOOK_PATHS.some((legacy) => path.endsWith(legacy));
   } catch {
     return false;
   }

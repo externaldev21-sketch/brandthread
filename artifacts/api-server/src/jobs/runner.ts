@@ -1,230 +1,253 @@
 /**
- * Shared scheduler for in-process background jobs.
+ * Background job runner.
  *
- * Every API replica starts the same set of interval jobs. Without
- * coordination each replica runs each job concurrently, so sweeps, payouts,
- * reminders and notifications would race each other. This runner wraps
- * every tick with:
+ * Every job below used to start inside each web-server process. With two
+ * copies of the server (autoscale, or a deploy overlap) each job ran twice:
+ * duplicate refunds checks, payout releases, broadcasts and reminders. And on
+ * autoscale the jobs only ran while a request kept an instance awake.
  *
- *  1. An in-process overlap guard: a tick that fires while the previous run of
- *     the same job is still going is skipped (no pile-up of slow runs).
- *  2. A Postgres advisory lock so only one replica runs a given job at a time.
- *     The tick opens a transaction on a connection from a small DEDICATED pool
- *     (never the app pool, so a long job doesn't eat request capacity) and
- *     takes `pg_try_advisory_xact_lock(hashtext('job:<name>'))`. Replicas that
- *     don't get it skip the tick. The transaction stays open (idle, holding no
- *     snapshot or row locks) while the job runs on the normal app pool, and
- *     ends in `finally`, which releases the lock. A transaction-scoped lock is
- *     used rather than a session lock so this also works when DATABASE_URL is
- *     a transaction-mode pooler (PgBouncer, Neon/Supabase pooled URLs — see
- *     docs/scale/DATABASE.md), where a session lock could be taken on one
- *     server connection and leak forever. If the lock connection dies,
- *     Postgres ends the transaction and frees the lock.
- *  3. Error logging: a failing tick is logged with `{ err, job }` at error
- *     level (lib/monitoring forwards that to Sentry) and never stops the
- *     interval.
- *
- * Kill switches (jobs run by default):
- *   BACKGROUND_JOBS_ENABLED=false   disables every scheduled job on this process
- *   DISABLED_JOBS=a,b               disables the named jobs only
- * Tuning:
- *   JOB_LOCK_POOL_MAX               lock connections per process (default 12; one per job that is running right now)
+ * Now:
+ *  - Singleton jobs only run in the one process that holds a Postgres
+ *    advisory lock (leader election). Other copies stay followers and retry,
+ *    so if the leader dies the next copy takes over within LEADER_RETRY_MS.
+ *  - BACKGROUND_JOBS=off stops a web process from competing for the lock.
+ *    Pair it with the always-on worker entry (src/worker.ts, `pnpm start:worker`)
+ *    so jobs keep running when no one is using the app.
+ *  - Per-instance jobs (live viewer counts broadcast over this process's
+ *    WebSockets, community push that skips users connected to this process)
+ *    keep running in every web process; they already claim work atomically.
  */
-import pg from "pg";
-import { logger as defaultLogger } from "../lib/logger";
+import type { PoolClient } from "pg";
+export * from "./perJobRunner";
+import { pool } from "@workspace/db";
+import { logger } from "../lib/logger";
+import { startAbandonedCartJob } from "./abandonedCartRecovery";
+import { startTrendingJob } from "./computeTrending";
+import { startSellerRankingJob } from "./computeSellerRanking";
+import { startTeamInviteReminderJob } from "./teamInviteReminder";
+import { startScheduledDropBroadcastJob } from "./scheduledDropBroadcasts";
+import { startProductLaunchJob } from "./productLaunches";
+import { startSellerTrialReminderJob } from "./sellerTrialReminder";
+import { startDisputeEvidenceReminderJob } from "./disputeEvidenceReminder";
+import { startDesignStudioObjectCleanupJob } from "./designStudioObjectCleanup";
+import { startMoneySweepJob } from "./moneySweep";
+import { startAffiliatePayoutsJob } from "./affiliatePayouts";
+import { startDeliveryDeadlinesJob } from "./deliveryDeadlines";
+import { startStoryCleanupJob } from "./storyCleanup";
+import { startAnalyticsRetentionJob } from "./analyticsRetention";
+import { startAccountPurgeJob } from "./accountPurge";
+import { startDataExportJob } from "./dataExportJob";
+import { startPushReceiptCleanupJob } from "./pushReceiptCleanup";
+import { startNotificationBatchFlushJob } from "./notificationBatchFlush";
+import { startLiveRecordingFinalizeJob } from "./liveRecordingFinalize";
+import { startLiveViewersPresenceJob } from "./liveViewersPresence";
+import { startThreadCashExpiryJob } from "./threadCashExpiry";
+import { startScheduledLiveReminderJob } from "./scheduledLiveReminders";
+import { startEmailCampaignJob } from "./emailCampaigns";
+import { startScheduledPostPublisherJob } from "./scheduledPostPublisher";
+import { startCommunityPushJob } from "../lib/communityPush";
+import { startDropEarlyAccessPushJob } from "./dropEarlyAccessPush";
+import { startProductDrawJob } from "./productDraws";
+import { startSellerLifecycleJobs } from "./sellerLifecycle";
+import { startPlatformBalanceJob } from "./platformBalance";
+import { startPlanProductSyncJob } from "./planProductSync";
+import { startAdCampaignLifecycleJob } from "./adCampaignLifecycle";
+import { startSellerReferralsJob } from "./sellerReferrals";
+import { startSellerWinbackJob } from "./sellerWinback";
+import { startWeeklyDigestJob } from "./weeklyDigest";
+import { startOrderAnniversaryJob } from "./orderAnniversary";
+import { startSmsDeferredSendJob } from "./smsDeferredSend";
+import { startLiveAuctionSettleJob } from "./liveAuctionSettle";
+import { startOrderPostAttributionJob } from "./orderPostAttribution";
+import { startReviewRequestJob } from "./reviewRequest";
+import { startAdminReportsJob } from "./adminReports";
+import { startPayoutReviewJob } from "./payoutReview";
+import { startModerationAlertsJob } from "./moderationAlerts";
+import { startFreelancerAutoReleaseJob } from "./freelancerAutoRelease";
+import { startReportEscalationJob } from "./reportEscalation";
 
-export type JobResult = "ran" | "failed" | "skipped_overlap" | "skipped_locked" | "skipped_lock_error";
+/** Jobs that must run in exactly one process across the whole deployment. */
+export const SINGLETON_JOBS: ReadonlyArray<readonly [string, () => void]> = [
+  ["dropEarlyAccessPush", startDropEarlyAccessPushJob],
+  ["productDraws", startProductDrawJob],
+  ["sellerLifecycle", startSellerLifecycleJobs],
+  ["platformBalance", startPlatformBalanceJob],
+  ["planProductSync", startPlanProductSyncJob],
+  ["adCampaignLifecycle", startAdCampaignLifecycleJob],
+  ["sellerReferrals", startSellerReferralsJob],
+  ["sellerWinback", startSellerWinbackJob],
+  ["weeklyDigest", startWeeklyDigestJob],
+  ["orderAnniversary", startOrderAnniversaryJob],
+  ["smsDeferredSend", startSmsDeferredSendJob],
+  ["liveAuctionSettle", startLiveAuctionSettleJob],
+  ["orderPostAttribution", startOrderPostAttributionJob],
+  ["reviewRequest", startReviewRequestJob],
+  ["adminReports", startAdminReportsJob],
+  ["payoutReview", startPayoutReviewJob],
+  ["moderationAlerts", startModerationAlertsJob],
+  ["freelancerAutoRelease", startFreelancerAutoReleaseJob],
+  ["reportEscalation", startReportEscalationJob],
+  ["abandonedCart", startAbandonedCartJob],
+  ["trending", startTrendingJob],
+  ["sellerRanking", startSellerRankingJob],
+  ["teamInviteReminder", startTeamInviteReminderJob],
+  ["scheduledDropBroadcast", startScheduledDropBroadcastJob],
+  ["productLaunch", startProductLaunchJob],
+  ["sellerTrialReminder", startSellerTrialReminderJob],
+  ["disputeEvidenceReminder", startDisputeEvidenceReminderJob],
+  ["designStudioObjectCleanup", startDesignStudioObjectCleanupJob],
+  ["moneySweep", startMoneySweepJob],
+  ["affiliatePayouts", startAffiliatePayoutsJob],
+  ["deliveryDeadlines", startDeliveryDeadlinesJob],
+  ["storyCleanup", startStoryCleanupJob],
+  ["analyticsRetention", startAnalyticsRetentionJob],
+  ["accountPurge", startAccountPurgeJob],
+  ["dataExport", startDataExportJob],
+  ["pushReceiptCleanup", startPushReceiptCleanupJob],
+  ["notificationBatchFlush", startNotificationBatchFlushJob],
+  ["liveRecordingFinalize", startLiveRecordingFinalizeJob],
+  ["threadCashExpiry", startThreadCashExpiryJob],
+  ["scheduledLiveReminder", startScheduledLiveReminderJob],
+  ["emailCampaign", startEmailCampaignJob],
+  ["scheduledPostPublisher", startScheduledPostPublisherJob],
+];
 
-export interface ScheduleOptions {
-  intervalMs: number;
-  /** Delay before the first run. Omitted = first run after `intervalMs`. 0 = run right away. */
-  initialDelayMs?: number;
-  /**
-   * false = no cross-replica lock (overlap guard + error logging only). Only
-   * for jobs whose effect is per-process, e.g. broadcasting to this replica's
-   * own WebSocket clients.
-   */
-  distributed?: boolean;
+/** Jobs tied to this process's own WebSocket connections: run in every web process. */
+export const PER_INSTANCE_JOBS: ReadonlyArray<readonly [string, () => void]> = [
+  ["liveViewersPresence", startLiveViewersPresenceJob],
+  ["communityPush", startCommunityPushJob],
+];
+
+/** Stable key for pg_try_advisory_lock; any constant bigint shared by all copies works. */
+export const JOBS_LEADER_LOCK_KEY = 727_001_001;
+const LEADER_RETRY_MS = Number(process.env.JOBS_LEADER_RETRY_MS) || 30_000;
+const LEADER_HEARTBEAT_MS = 30_000;
+
+/** "off" keeps a web process out of singleton jobs (a separate worker runs them). */
+export function backgroundJobsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const value = (env.BACKGROUND_JOBS ?? "on").trim().toLowerCase();
+  return !["off", "false", "0", "no", "disabled"].includes(value);
 }
 
-export interface ScheduledJob {
-  stop(): void;
+export interface LeaderLock {
+  /** Resolves true when this process now holds the lock. */
+  tryAcquire(): Promise<boolean>;
+  /** Resolves false when the lock holder connection is gone. */
+  stillHeld(): Promise<boolean>;
 }
 
-type Log = Pick<typeof defaultLogger, "info" | "warn" | "error" | "debug">;
-
-/** A checked-out lock connection (the subset of pg.PoolClient the runner uses). */
-export interface LockClient {
-  query(text: string, values?: unknown[]): Promise<{ rows: Array<Record<string, unknown>> }>;
-  /** Pass an error to discard the connection instead of returning it to the pool. */
-  release(err?: Error | boolean): void;
-}
-
-export interface LockPool {
-  connect(): Promise<LockClient>;
-  end(): Promise<void>;
-}
-
-export interface JobRunnerOptions {
-  /** Dedicated pool for lock transactions. Defaults to a small pg.Pool on DATABASE_URL, created lazily. */
-  pool?: LockPool;
-  log?: Log;
-  env?: NodeJS.ProcessEnv;
-}
-
-const OFF_VALUES = new Set(["0", "false", "off", "no"]);
-
-export function jobsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  const raw = env.BACKGROUND_JOBS_ENABLED?.trim().toLowerCase();
-  return !raw || !OFF_VALUES.has(raw);
-}
-
-export function disabledJobs(env: NodeJS.ProcessEnv = process.env): Set<string> {
-  return new Set((env.DISABLED_JOBS ?? "").split(",").map((s) => s.trim()).filter(Boolean));
-}
-
-function createDefaultPool(env: NodeJS.ProcessEnv, log: Log): LockPool {
-  const max = Number(env.JOB_LOCK_POOL_MAX);
-  const pool = new pg.Pool({
-    connectionString: env.DATABASE_URL,
-    max: Number.isInteger(max) && max > 0 ? max : 12,
-    // Bounds both opening a connection and waiting for a free one.
-    connectionTimeoutMillis: 30_000,
-    idleTimeoutMillis: 60_000,
-    keepAlive: true,
-    application_name: "api-job-locks",
-  });
-  pool.on("error", (err) => log.warn({ err, job: "runner" }, "Idle job lock connection error"));
-  return pool as unknown as LockPool;
-}
-
-export function createJobRunner(opts: JobRunnerOptions = {}) {
-  const log = opts.log ?? defaultLogger;
-  const env = opts.env ?? process.env;
-  let pool: LockPool | null = opts.pool ?? null;
-  const getPool = () => (pool ??= createDefaultPool(env, log));
-  const inFlight = new Set<string>();
-  const timers = new Set<NodeJS.Timeout>();
-
-  /** Opens a transaction and tries the job's lock. Returns the client holding it, or null when another instance has it. */
-  async function acquire(name: string): Promise<LockClient | null> {
-    const client = await getPool().connect();
-    try {
-      await client.query("BEGIN");
-      // The transaction sits idle while the job runs; don't let a server-wide
-      // idle-in-transaction timeout end it (and drop the lock) mid-job.
-      await client.query("SET LOCAL idle_in_transaction_session_timeout = 0");
-      const res = await client.query("SELECT pg_try_advisory_xact_lock(hashtext($1)) AS locked", [`job:${name}`]);
-      if (res.rows[0]?.locked === true) return client;
-      await client.query("ROLLBACK");
-      client.release();
-      return null;
-    } catch (err) {
-      client.release(err instanceof Error ? err : true);
-      throw err;
-    }
-  }
-
-  async function releaseLock(name: string, client: LockClient): Promise<void> {
-    try {
-      await client.query("COMMIT");
-      client.release();
-    } catch (err) {
-      // Discarding the connection ends the transaction server-side, which frees the lock.
-      log.warn({ err, job: name }, "Background job lock release failed; discarding lock connection");
-      client.release(err instanceof Error ? err : true);
-    }
-  }
-
-  /** Runs one tick of `name` under the overlap guard and (by default) the cross-instance lock. */
-  async function runOnce(
-    name: string,
-    fn: () => unknown,
-    { distributed = true }: { distributed?: boolean } = {},
-  ): Promise<JobResult> {
-    if (inFlight.has(name)) {
-      log.debug({ job: name }, "Background job still running; tick skipped");
-      return "skipped_overlap";
-    }
-    inFlight.add(name);
-    try {
-      let lock: LockClient | null = null;
-      if (distributed) {
-        try {
-          lock = await acquire(name);
-        } catch (err) {
-          // Fail closed: without the lock we can't know no other replica is
-          // running it. The next tick retries. Warn, not error: during a DB
-          // outage every job would otherwise page on every tick.
-          log.warn({ err, job: name }, "Background job lock unavailable; tick skipped");
-          return "skipped_lock_error";
-        }
-        if (!lock) {
-          log.debug({ job: name }, "Background job running on another instance; tick skipped");
-          return "skipped_locked";
-        }
-      }
-
-      const started = Date.now();
+/** Session-level advisory lock held on one dedicated pool connection. */
+export function postgresLeaderLock(key = JOBS_LEADER_LOCK_KEY): LeaderLock {
+  let client: PoolClient | null = null;
+  const drop = () => {
+    try { client?.release(true); } catch { /* already gone */ }
+    client = null;
+  };
+  return {
+    async tryAcquire() {
       try {
-        await fn();
-        log.debug({ job: name, durationMs: Date.now() - started }, "Background job run finished");
-        return "ran";
+        const connected: PoolClient = await pool.connect();
+        client = connected;
+        connected.on("error", (err: Error) => {
+          logger.error({ err }, "Background jobs leader connection error");
+          drop();
+        });
+        const res = await connected.query<{ locked: boolean }>("SELECT pg_try_advisory_lock($1) AS locked", [key]);
+        if (res.rows[0]?.locked) return true;
+        drop();
+        return false;
       } catch (err) {
-        log.error({ err, job: name, durationMs: Date.now() - started }, "Background job failed");
-        return "failed";
-      } finally {
-        if (lock) await releaseLock(name, lock);
+        logger.warn({ err }, "Background jobs leader lock attempt failed");
+        drop();
+        return false;
       }
-    } finally {
-      inFlight.delete(name);
-    }
-  }
-
-  /** Schedules `fn` every `intervalMs` through `runOnce`. A tick never throws. */
-  function schedule(name: string, fn: () => unknown, options: ScheduleOptions): ScheduledJob {
-    const { intervalMs, initialDelayMs, distributed = true } = options;
-    if (!jobsEnabled(env) || disabledJobs(env).has(name)) {
-      log.warn({ job: name }, "Background job disabled by env; not scheduled");
-      return { stop() {} };
-    }
-    const tick = () => { void runOnce(name, fn, { distributed }).catch(() => {}); };
-    const own: NodeJS.Timeout[] = [];
-    if (initialDelayMs !== undefined) own.push(setTimeout(tick, initialDelayMs));
-    own.push(setInterval(tick, intervalMs));
-    for (const t of own) { t.unref?.(); timers.add(t); }
-    log.info({ job: name, intervalMs, initialDelayMs, distributed }, "Background job scheduled");
-    return {
-      stop() {
-        for (const t of own) { clearTimeout(t); clearInterval(t); timers.delete(t); }
-      },
-    };
-  }
-
-  /** Stops all timers and closes the lock pool (shutdown / tests). */
-  async function close(): Promise<void> {
-    for (const t of timers) { clearTimeout(t); clearInterval(t); }
-    timers.clear();
-    const p = pool;
-    pool = opts.pool ?? null;
-    // Don't let a still-running job hold up shutdown: pool.end() waits for
-    // checked-out clients. Exiting drops the connection, which frees the lock.
-    if (p) {
-      await Promise.race([
-        p.end().catch(() => {}),
-        new Promise<void>((resolve) => { setTimeout(resolve, 2_000).unref?.(); }),
-      ]);
-    }
-  }
-
-  return { runOnce, schedule, close, isRunning: (name: string) => inFlight.has(name) };
+    },
+    async stillHeld() {
+      if (!client) return false;
+      try {
+        await client.query("SELECT 1");
+        return true;
+      } catch {
+        drop();
+        return false;
+      }
+    },
+  };
 }
 
-export type JobRunner = ReturnType<typeof createJobRunner>;
+export interface RunnerOptions {
+  lock?: LeaderLock;
+  singletonJobs?: ReadonlyArray<readonly [string, () => void]>;
+  retryMs?: number;
+  heartbeatMs?: number;
+  /** Called if leadership is lost after jobs started; default asks the process to restart. */
+  onLeadershipLost?: () => void;
+}
 
-/** Process-wide runner used by every start*Job function. */
-export const jobRunner: JobRunner = createJobRunner();
+/**
+ * Competes for leadership and starts the singleton jobs once this process
+ * wins. Returns a stop function (used by tests and shutdown).
+ */
+export function startSingletonJobsWithLeadership(opts: RunnerOptions = {}): () => void {
+  const lock = opts.lock ?? postgresLeaderLock();
+  const jobs = opts.singletonJobs ?? SINGLETON_JOBS;
+  const retryMs = opts.retryMs ?? LEADER_RETRY_MS;
+  const heartbeatMs = opts.heartbeatMs ?? LEADER_HEARTBEAT_MS;
+  const onLost = opts.onLeadershipLost ?? (() => {
+    // Interval timers can't be safely torn down mid-run, so restart cleanly;
+    // the restarted process rejoins as a follower.
+    logger.error("Background jobs leadership lost; restarting so only one copy runs jobs");
+    process.kill(process.pid, "SIGTERM");
+  });
 
-export function scheduleJob(name: string, fn: () => unknown, options: ScheduleOptions): ScheduledJob {
-  return jobRunner.schedule(name, fn, options);
+  let stopped = false;
+  let timer: NodeJS.Timeout | null = null;
+  const schedule = (fn: () => void, ms: number) => {
+    if (stopped) return;
+    timer = setTimeout(fn, ms);
+    timer.unref?.();
+  };
+
+  const heartbeat = async () => {
+    if (stopped) return;
+    if (await lock.stillHeld()) return schedule(() => void heartbeat(), heartbeatMs);
+    // Try to take the lock straight back (e.g. a dropped connection); only one
+    // process can, so keep running if we win.
+    if (await lock.tryAcquire()) return schedule(() => void heartbeat(), heartbeatMs);
+    if (!stopped) onLost();
+  };
+
+  const attempt = async () => {
+    if (stopped) return;
+    if (!(await lock.tryAcquire())) {
+      logger.info({ retryMs }, "Background jobs: another process is the leader; standing by");
+      return schedule(() => void attempt(), retryMs);
+    }
+    if (stopped) return;
+    logger.info({ jobs: jobs.length }, "Background jobs: this process is the leader; starting jobs");
+    for (const [name, start] of jobs) {
+      try {
+        start();
+      } catch (err) {
+        logger.error({ err, job: name }, "Background job failed to start");
+      }
+    }
+    schedule(() => void heartbeat(), heartbeatMs);
+  };
+
+  void attempt();
+  return () => {
+    stopped = true;
+    if (timer) clearTimeout(timer);
+  };
+}
+
+export function startPerInstanceJobs(): void {
+  for (const [name, start] of PER_INSTANCE_JOBS) {
+    try {
+      start();
+    } catch (err) {
+      logger.error({ err, job: name }, "Background job failed to start");
+    }
+  }
 }

@@ -45,9 +45,9 @@ describe("Apple auth end-to-end code contract", () => {
     const sellerBrandWrite = onboardingSource.indexOf("await api.auth.onboarding({");
     expect(sellerCompletion).toBeGreaterThan(sellerBrandWrite);
     expect(onboardingSource).toContain("[ONBOARDING_OWNER_KEY, profile.clerkId]");
-    // v6: buyers go to thread-explainer first, sellers still go to /(tabs)/
+    // Buyers retain their direct entry; sellers continue to real plan checkout.
     expect(onboardingSource).toContain("router.replace('/(buyer)/' as never)");
-    expect(onboardingSource).toContain("router.replace('/(tabs)/'");
+    expect(onboardingSource).toContain("router.replace({ pathname: '/plans', params: { fromOnboarding: 'true' } }");
   });
 
   it("returns an existing Apple identity to its stored role without creating another local user", () => {

@@ -7,15 +7,13 @@
  * delivery is claimed once in `shippo_webhook_events`, so a retried or
  * duplicate delivery from the carrier is a no-op.
  *
- * Authenticity: Shippo has no per-request signature this repo can verify yet.
- * When SHIPPO_WEBHOOK_SECRET is set, the delivery must carry it (the
- * `x-shippo-webhook-secret` header, or `?secret=` on the webhook URL registered
- * in the Shippo dashboard — Shippo can't add custom headers), compared in
- * constant time, or it is rejected with 401. When it is NOT set, the payload is
- * treated only as a hint that "something changed for this tracking number": the
- * handler re-reads the status from Shippo's API (GET /tracks, the same call the
- * hourly poll makes) and applies that instead, so a forged "delivered" can never
- * mark an order delivered, start a payout clock or trigger a return refund.
+ * Authentication: a shared secret (SHIPPO_WEBHOOK_SECRET) passed as the
+ * `?secret=` query param on the webhook URL registered in the Shippo
+ * dashboard, or the `x-shippo-webhook-secret` header, compared in constant
+ * time. The endpoint FAILS CLOSED: with no secret configured every delivery is
+ * rejected (503), because a forged "delivered" event would start the seller's
+ * payout clock. Tracking still advances through the hourly poll
+ * (lib/delivery/trackingSync.ts) until the secret is provisioned.
  */
 import { Router } from "express";
 import crypto from "node:crypto";
@@ -38,9 +36,12 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 type Credential = "verified" | "invalid" | "not_configured";
+export function shippoWebhookConfigured(): boolean {
+  return Boolean(process.env.SHIPPO_WEBHOOK_SECRET?.trim());
+}
 
 function checkSharedSecret(req: any): Credential {
-  const configured = process.env.SHIPPO_WEBHOOK_SECRET;
+  const configured = process.env.SHIPPO_WEBHOOK_SECRET?.trim();
   if (!configured) return "not_configured";
   const provided = (req.headers["x-shippo-webhook-secret"] as string | undefined) ?? (req.query.secret as string | undefined);
   return typeof provided === "string" && timingSafeEqual(provided, configured) ? "verified" : "invalid";
@@ -71,6 +72,10 @@ function labelIdFromMetadata(metadata: unknown): string | null {
 
 router.post("/", async (req, res) => {
   const credential = checkSharedSecret(req);
+  if (!shippoWebhookConfigured()) {
+    logger.warn("Shippo webhook rejected: SHIPPO_WEBHOOK_SECRET is not set (tracking falls back to the hourly poll)");
+    return void res.status(503).json({ error: "Shippo webhook is not configured on this server" });
+  }
   if (credential === "invalid") {
     return void res.status(401).json({ error: "Invalid webhook credential" });
   }

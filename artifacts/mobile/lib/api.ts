@@ -4663,6 +4663,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         return get<any>(`/api/finance/transactions${q.toString() ? `?${q}` : ''}`);
       },
       statementCsvUrl: () => '/api/finance/statement.csv',
+      /** The CSV itself, fetched with the seller's session (opening the URL in a browser has no auth). */
+      statementCsv: () => getText('/api/finance/statement.csv'),
       /** Fee schedule (no auth). Derived server-side from lib/money/fees.ts. */
       feeSchedule: () => get<any>('/api/public/fee-schedule'),
       payout: (data: { idempotencyKey: string; amount: number; currency: string; method?: 'standard' | 'instant' }) =>
