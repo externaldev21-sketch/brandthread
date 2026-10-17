@@ -11,9 +11,11 @@ import {
   Share,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome, Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import * as ExpoLinking from 'expo-linking';
@@ -21,9 +23,10 @@ import * as ExpoLinking from 'expo-linking';
 import {
   createOrGetConversation,
   getAcceptedFriends,
+  getConversations,
   sendMessage,
 } from '@/services/socialService';
-import type { Friendship } from '@/services/socialTypes';
+import type { Conversation, Friendship } from '@/services/socialTypes';
 import { FONT, FS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SheetRise } from '@/components/motion/SheetRise';
@@ -33,6 +36,7 @@ import { buildPostUrl } from '@/lib/shareLinks';
 import { quotePostHref } from '@/lib/quotePost';
 import { useRouter } from 'expo-router';
 import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
+import { buildSendToTargets, isDarkColor, SHARE_ROW_INSET, SHARE_TILE_DARK, shareTileWidth, type SendToTarget } from '@/lib/shareSheetGrid';
 
 interface ThreadShareSheetProps {
   visible: boolean;
@@ -44,8 +48,13 @@ interface ThreadShareSheetProps {
   isVideo: boolean;
   onClose: () => void;
   onReport: () => void;
-  onNotInterested: () => void;
+  /** Kept for callers; "Not interested" now lives in the long-press menu only. */
+  onNotInterested?: () => void;
   onFeedback: (message: string, kind?: 'info' | 'error') => void;
+  /** Whether the viewer has already reposted this post. */
+  reposted?: boolean;
+  /** Repost tile, always first in the "Send to" row when the parent supplies it. */
+  onRepost?: () => Promise<void> | void;
 }
 
 type BusyAction = string | null;
@@ -60,15 +69,16 @@ export function ThreadShareSheet({
   isVideo,
   onClose,
   onReport,
-  onNotInterested,
   onFeedback,
+  reposted = false,
+  onRepost,
 }: ThreadShareSheetProps) {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const api = useApi();
   const router = useRouter();
-  const [friends, setFriends] = useState<Friendship[]>([]);
+  const [friends, setFriends] = useState<SendToTarget[]>([]);
   const [busy, setBusy] = useState<BusyAction>(null);
   const [savingProgress, setSavingProgress] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -98,13 +108,14 @@ export function ThreadShareSheet({
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
-    void getAcceptedFriends()
-      .then(rows => {
-        if (!cancelled) setFriends(rows.slice(0, 4));
-      })
-      .catch(() => {
-        if (!cancelled) setFriends([]);
-      });
+    // Friends are local and show at once; recent chats (a network call that
+    // can wait on sign-in) merge in front when they arrive. Either source
+    // failing just leaves it out of the row.
+    let conversations: Conversation[] = [];
+    let accepted: Friendship[] = [];
+    const update = () => { if (!cancelled) setFriends(buildSendToTargets(conversations, accepted)); };
+    void getAcceptedFriends().then(rows => { accepted = rows; update(); }).catch(() => {});
+    void getConversations().then(rows => { conversations = rows; update(); }).catch(() => {});
     return () => { cancelled = true; };
   }, [visible]);
 
@@ -122,9 +133,10 @@ export function ThreadShareSheet({
     }
   }
 
-  async function sendToFriend(friend: Friendship) {
+  async function sendToFriend(friend: SendToTarget) {
     await runAction(`friend:${friend.userId}`, async () => {
-      const conversation = await createOrGetConversation({
+      // A recent chat already has a conversation: send straight into it.
+      const conversation = friend.conversationId ? { id: friend.conversationId } : await createOrGetConversation({
         type: 'buyer_to_buyer',
         participant: {
           userId: friend.userId,
@@ -176,6 +188,36 @@ export function ThreadShareSheet({
   async function openMore() {
     await runAction('more', async () => {
       await Share.share({ message: shareText, url: postUrl });
+      onClose();
+      recordShare();
+    });
+  }
+
+  async function toggleRepost() {
+    if (!onRepost) return;
+    await runAction('repost', async () => {
+      await onRepost();
+      onClose();
+    });
+  }
+
+  // WhatsApp has a public text URL scheme; without the app installed the
+  // system share sheet takes over.
+  async function openWhatsApp() {
+    const url = `whatsapp://send?text=${encodeURIComponent(shareText)}`;
+    await runAction('whatsapp', async () => {
+      if (await Linking.canOpenURL(url).catch(() => false)) await Linking.openURL(url);
+      else await Share.share({ message: shareText, url: postUrl });
+      onClose();
+      recordShare();
+    });
+  }
+
+  // Instagram and Snapchat offer no public "share this link" URL, so these
+  // hand off through the system share sheet, where the app appears when installed.
+  async function shareViaSystem(name: string, message = shareText) {
+    await runAction(name, async () => {
+      await Share.share({ message, url: postUrl });
       onClose();
       recordShare();
     });
@@ -271,62 +313,72 @@ export function ThreadShareSheet({
             </Pressable>
           </View>
 
-          <View style={styles.section}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.actionRow}
-            >
-              {friends.map(friend => (
-                <ShareAction
-                  key={friend.userId}
-                  label={friend.name.split(' ')[0]}
-                  busy={busy === `friend:${friend.userId}`}
-                  onPress={() => void sendToFriend(friend)}
-                  avatar={{ initials: friend.initials, color: friend.color }}
-                />
-              ))}
+          {/* Every row sits on the same 5-column grid (tile = 1/5 of the
+              width, no gap), so columns line up between rows. Rows longer
+              than five scroll sideways like TikTok's. */}
+          <ShareRow testID="thread-share-row-people">
+            {onRepost ? (
               <ShareAction
-                label="More friends"
-                icon="search"
+                label={reposted ? 'Reposted' : 'Repost'}
+                icon="repeat"
+                busy={busy === 'repost'}
+                highlighted={reposted}
+                onPress={() => void toggleRepost()}
+              />
+            ) : null}
+            {friends.map(friend => (
+              <ShareAction
+                key={friend.userId}
+                label={friend.name.split(' ')[0]}
+                busy={busy === `friend:${friend.userId}`}
+                onPress={() => void sendToFriend(friend)}
+                avatar={{ initials: friend.initials, color: friend.color }}
+              />
+            ))}
+            <ShareAction
+              label="Find friends"
+              icon="users"
+              onPress={() => {
+                onClose();
+                void Linking.openURL(ExpoLinking.createURL('/(buyer)/friends'));
+              }}
+            />
+            <ShareAction
+              label="Invite"
+              icon="user-plus"
+              busy={busy === 'invite'}
+              onPress={() => void shareViaSystem('invite', `Join me on Brandthread\n${postUrl}`)}
+            />
+          </ShareRow>
+
+          <View style={styles.divider} />
+          <ShareRow testID="thread-share-row-apps">
+            <ShareAction label="Copy link" icon="link-2" busy={busy === 'copy'} onPress={() => void copyLink()} />
+            <ShareAction label="Messages" platform="messages" busy={busy === 'sms'} onPress={() => void openExternal('sms')} />
+            <ShareAction label="WhatsApp" platform="whatsapp" busy={busy === 'whatsapp'} onPress={() => void openWhatsApp()} />
+            <ShareAction label="Instagram" platform="instagram" busy={busy === 'instagram'} onPress={() => void shareViaSystem('instagram')} />
+            <ShareAction label="Snapchat" platform="snapchat" busy={busy === 'snapchat'} onPress={() => void shareViaSystem('snapchat')} />
+            <ShareAction label="Email" icon="mail" busy={busy === 'email'} onPress={() => void openExternal('email')} />
+            <ShareAction label="More" icon="more-horizontal" busy={busy === 'more'} onPress={() => void openMore()} />
+          </ShareRow>
+
+          <View style={styles.divider} />
+          <ShareRow testID="thread-share-row-actions">
+            <ShareAction label="Report" icon="flag" onPress={() => { onClose(); onReport(); }} />
+            {isVideo && mediaUri ? (
+              <ShareAction label="Save video" icon="download" onPress={() => void saveVideo()} />
+            ) : null}
+            {isUUID(postId) ? (
+              <ShareAction
+                label="Quote"
+                icon="edit-3"
                 onPress={() => {
                   onClose();
-                  void Linking.openURL(ExpoLinking.createURL('/(buyer)/friends'));
+                  router.push(quotePostHref({ postId, author: creator, caption, thumb: isVideo ? undefined : mediaUri, mediaType: isVideo ? 'video' : 'photo' }) as never);
                 }}
               />
-            </ScrollView>
-          </View>
-
-          <View style={styles.divider} />
-          <View style={styles.section}>
-            <View style={styles.actionRow}>
-              <ShareAction label="Copy link" icon="link-2" busy={busy === 'copy'} onPress={() => void copyLink()} />
-              <ShareAction label="Messages" icon="message-circle" busy={busy === 'sms'} onPress={() => void openExternal('sms')} />
-              <ShareAction label="Email" icon="mail" busy={busy === 'email'} onPress={() => void openExternal('email')} />
-              <ShareAction label="More" icon="more-horizontal" busy={busy === 'more'} onPress={() => void openMore()} />
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-          <View style={styles.section}>
-            <View style={styles.actionRow}>
-              <ShareAction label="Report" icon="flag" onPress={() => { onClose(); onReport(); }} muted />
-              <ShareAction label="Not interested" icon="slash" onPress={() => { onClose(); onNotInterested(); }} muted />
-              {isVideo && mediaUri ? (
-                <ShareAction label="Save video" icon="download" onPress={() => void saveVideo()} muted />
-              ) : null}
-              {isUUID(postId) ? (
-                <ShareAction
-                  label="Quote"
-                  icon="edit-3"
-                  onPress={() => {
-                    onClose();
-                    router.push(quotePostHref({ postId, author: creator, caption, thumb: isVideo ? undefined : mediaUri, mediaType: isVideo ? 'video' : 'photo' }) as never);
-                  }}
-                />
-              ) : null}
-            </View>
-          </View>
+            ) : null}
+          </ShareRow>
         </SheetRise>
       </Modal>
 
@@ -352,40 +404,87 @@ export function ThreadShareSheet({
   );
 }
 
+function ShareRow({ children, testID }: { children: React.ReactNode; testID?: string }) {
+  const { theme } = useAppTheme();
+  const styles = React.useMemo(() => makeStyles(theme), [theme]);
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.actionRow}
+      style={styles.section}
+      testID={testID}
+    >
+      {children}
+    </ScrollView>
+  );
+}
+
+type SharePlatform = 'messages' | 'whatsapp' | 'instagram' | 'snapchat';
+
+/** Real platform marks (vector-icons glyphs) on each app's own colour. */
+function PlatformMark({ platform }: { platform: SharePlatform }) {
+  const { theme } = useAppTheme();
+  const glyph = theme.text;
+  switch (platform) {
+    case 'messages':
+      return <View style={[platformStyles.fill, { backgroundColor: '#34C759' }]}><Ionicons name="chatbubble" size={24} color={glyph} /></View>;
+    case 'whatsapp':
+      return <View style={[platformStyles.fill, { backgroundColor: '#25D366' }]}><FontAwesome name="whatsapp" size={28} color={glyph} /></View>;
+    case 'instagram':
+      return (
+        <LinearGradient colors={['#FEDA75', '#FA7E1E', '#D62976', '#962FBF', '#4F5BD5']} start={{ x: 0, y: 1 }} end={{ x: 1, y: 0 }} style={platformStyles.fill}>
+          <FontAwesome name="instagram" size={26} color={glyph} />
+        </LinearGradient>
+      );
+    case 'snapchat':
+      return <View style={[platformStyles.fill, { backgroundColor: '#FFFC00' }]}><FontAwesome name="snapchat-ghost" size={24} color={theme.background} /></View>;
+  }
+}
+
+const platformStyles = StyleSheet.create({
+  fill: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+});
+
 function ShareAction({
   label,
   icon,
+  platform,
   onPress,
   busy,
-  muted,
+  highlighted,
   avatar,
 }: {
   label: string;
   icon?: React.ComponentProps<typeof Feather>['name'];
+  platform?: SharePlatform;
   onPress: () => void;
   busy?: boolean;
-  muted?: boolean;
+  highlighted?: boolean;
   avatar?: { initials: string; color: string };
 }) {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
+  const { width } = useWindowDimensions();
   return (
     <Pressable
-      style={styles.action}
+      style={[styles.action, { width: shareTileWidth(width) }]}
       onPress={onPress}
       disabled={busy}
       accessibilityRole="button"
       accessibilityLabel={label}
       testID={`thread-share-${label.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      <View style={[styles.actionCircle, muted && styles.actionCircleMuted, avatar && { backgroundColor: avatar.color }]}>
-         {busy ? <ActivityIndicator color={theme.onAccent} /> : avatar ? (
+      <View style={[styles.actionCircle, highlighted && { backgroundColor: theme.text }, avatar && { backgroundColor: avatar.color }]}>
+        {busy ? <ActivityIndicator color={theme.text} /> : avatar ? (
           <Text style={styles.avatarText}>{avatar.initials}</Text>
+        ) : platform ? (
+          <PlatformMark platform={platform} />
         ) : (
-           <Feather name={icon ?? 'send'} size={22} color={theme.text} />
+          <Feather name={icon ?? 'send'} size={22} color={highlighted ? theme.background : theme.text} />
         )}
       </View>
-      <Text style={styles.actionLabel} numberOfLines={2}>{label}</Text>
+      <Text style={styles.actionLabel} numberOfLines={1}>{label}</Text>
     </Pressable>
   );
 }
@@ -407,12 +506,11 @@ const makeStyles = (theme: { background: string; card: string; border: string; t
   headerSpacer: { width: 34 },
   title: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
   close: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface },
-  section: { paddingHorizontal: 14, paddingVertical: 14 },
-  actionRow: { flexDirection: 'row', gap: 12 },
-  action: { width: 66, alignItems: 'center', gap: 7 },
-  actionCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border },
-  actionCircleMuted: { backgroundColor: theme.background },
-  actionLabel: { minHeight: 30, color: theme.muted, fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 13, textAlign: 'center' },
+  section: { flexGrow: 0, paddingVertical: 12 },
+  actionRow: { flexDirection: 'row', paddingHorizontal: SHARE_ROW_INSET },
+  action: { alignItems: 'center', gap: 7 },
+  actionCircle: { width: 52, height: 52, borderRadius: 26, overflow: 'hidden', backgroundColor: isDarkColor(theme.card) ? SHARE_TILE_DARK : theme.surface, alignItems: 'center', justifyContent: 'center' },
+  actionLabel: { color: theme.muted, fontFamily: FONT.medium, fontSize: FS.meta, lineHeight: 15, textAlign: 'center', paddingHorizontal: 2 },
   avatarText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.sm },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: theme.border },
   progressWrap: { position: 'absolute', left: 0, right: 0, zIndex: 10000, backgroundColor: theme.background, paddingTop: 8 },

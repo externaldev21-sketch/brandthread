@@ -50,7 +50,7 @@ describe('quote UI structure', () => {
   it('share sheet adds a Quote item only for real (uuid) posts and keeps existing items', () => {
     const src = read('components/ThreadShareSheet.tsx');
     expect(src).toMatch(/isUUID\(postId\) \? \(\s*<ShareAction\s+label="Quote"/);
-    for (const label of ['Copy link', 'Messages', 'Email', 'More', 'Report', 'Not interested', 'Save video']) {
+    for (const label of ['Copy link', 'Messages', 'Email', 'More', 'Report', 'Save video']) {
       expect(src).toContain(`label="${label}"`);
     }
   });

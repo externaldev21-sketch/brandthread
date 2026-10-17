@@ -74,6 +74,8 @@ export const CREATE_CANVAS = {
 
 export const ON_DARK = '#FFFFFF';                        // on gradient/colored bg
 export const ON_DARK_MUTED = '#C0C0C0';   // secondary text on gradient/colored bg — solid, not alpha
+// Share-sheet tile circles on a black sheet (Dev's audit #34: black-on-black read as holes).
+export const SHARE_TILE_FILL = '#2A2A2A';
 
 // ─── Primary Emphasis ─────────────────────────────────────────────────────────
 export const ACCENT        = '#FFFFFF';

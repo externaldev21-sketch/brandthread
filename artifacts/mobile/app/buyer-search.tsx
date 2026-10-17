@@ -47,6 +47,7 @@ import { ShopByCategoryRail } from '@/components/discover/DiscoverShopRails';
 import { useDiscoveryShelves } from '@/hooks/useDiscoveryShelves';
 import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
 import { BrandRow, type SearchBrandRow } from '@/components/search/BrandRow';
+import { Chip } from '@/components/ui/Chip';
 import { TagRow, type SearchTag } from '@/components/search/TagRow';
 import { TrendingTags } from '@/components/search/TrendingTags';
 import { hashtagHref, normalizeTag } from '@/lib/hashtagText';
@@ -151,6 +152,9 @@ function deriveTags(videos: VideoResult[], query: string): SearchTag[] {
     .map(([tag, postCount]) => ({ tag, postCount }))
     .sort((a, b) => b.postCount - a.postCount);
 }
+
+/** One-tap category searches under the search bar (audit #23). Each runs a normal search. */
+export const SEARCH_CATEGORY_CHIPS = ['Streetwear', 'Vintage', 'Y2K', 'Accessories', 'Sneakers', 'Denim', 'Outerwear', 'Luxury'] as const;
 
 export default function BuyerSearchScreen() {
   const router = useRouter();
@@ -699,7 +703,13 @@ export default function BuyerSearchScreen() {
           )}
         </View>
         {showCancel ? (
-          <TouchableOpacity onPress={handleCancel} accessibilityRole="button" testID="buyer-search-cancel" style={styles.headerSideButton}>
+          <TouchableOpacity
+            onPress={handleCancel}
+            accessibilityRole="button"
+            testID="buyer-search-cancel"
+            style={[styles.headerSideButton, styles.cancelButton]}
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+          >
             <Text style={[styles.headerSideButtonText, { color: fg }]}>Cancel</Text>
           </TouchableOpacity>
         ) : (
@@ -714,6 +724,27 @@ export default function BuyerSearchScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      {trimmedQuery.length === 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          style={styles.categoryChipsScroll}
+          contentContainerStyle={styles.categoryChips}
+          testID="buyer-search-category-chips"
+        >
+          {SEARCH_CATEGORY_CHIPS.map((label) => (
+            <Chip
+              key={label}
+              label={label}
+              selected={false}
+              onPress={() => { hapticSelection(); submitTerm(label); }}
+              testID={`buyer-search-chip-${label.toLowerCase()}`}
+            />
+          ))}
+        </ScrollView>
+      ) : null}
 
       {trimmedQuery.length === 0 && !fieldFocused ? (
         <DiscoverGrid
@@ -819,6 +850,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   fieldFocused: { backgroundColor: 'rgba(255,255,255,0.10)' },
   fieldInput: { flex: 1, ...TYPE_SCALE.body, padding: 0 },
   headerSideButton: { minWidth: 24, alignItems: 'flex-end' },
+  // 44pt tall tap target with side padding for the text-only Cancel (audit #24).
+  // Negative margin keeps the header row height unchanged.
+  cancelButton: { minHeight: 44, marginVertical: -4, paddingHorizontal: SPACING.xs, justifyContent: 'center' },
+  categoryChipsScroll: { flexGrow: 0, flexShrink: 0 },
+  categoryChips: { flexDirection: 'row', gap: SPACING.xs, paddingHorizontal: SCREEN_GUTTER, paddingBottom: SPACING.sm },
   headerSideButtonText: { ...TYPE_SCALE.body, fontFamily: FONT.semibold },
   sectionHeaderRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

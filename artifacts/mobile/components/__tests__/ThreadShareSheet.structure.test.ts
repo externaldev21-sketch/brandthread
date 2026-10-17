@@ -14,17 +14,24 @@ describe('Thread video sharing flow', () => {
 
   it('provides real recipient, external share, moderation, and download actions', () => {
     for (const label of [
-      'More friends',
+      'Find friends',
+      'Invite',
       'Copy link',
       'Messages',
+      'WhatsApp',
+      'Instagram',
+      'Snapchat',
       'Email',
       'More',
       'Report',
-      'Not interested',
       'Save video',
     ]) {
       expect(source).toContain(`label="${label}"`);
     }
+    // One "More" only, and Not interested / Why this video live in the long-press menu.
+    expect(source.match(/label="More"/g)).toHaveLength(1);
+    expect(source).not.toContain('label="Not interested"');
+    expect(source).not.toContain('Why this video');
     expect(source).toContain('createOrGetConversation');
     expect(source).toContain('sendMessage(');
     expect(source).toContain('actionInFlightRef.current');

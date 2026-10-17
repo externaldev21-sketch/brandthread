@@ -43,7 +43,6 @@ import { RADII } from '@/constants/radii';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { InlineSpinner, InlineError } from '@/components/InlineFeedback';
-import { EmptyState } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { useApi } from '@/lib/api';
@@ -1192,12 +1191,10 @@ export default function BuyerPostCommentsScreen() {
           ListEmptyComponent={
             !loading && !fetchError
               ? (
-                <EmptyState
-                  icon="message-circle"
-                  title={meta.commentsDisabled ? 'Comments are off' : 'Start the conversation'}
-                  description={meta.commentsDisabled ? 'The creator turned off comments for this post.' : 'Be the first to comment.'}
-                  compact
-                />
+                // One quiet line (X-style), not a headline block.
+                <Text style={s.emptyLine} testID="comments-empty-line">
+                  {meta.commentsDisabled ? 'Comments are turned off for this post.' : 'No comments yet. Start the conversation.'}
+                </Text>
               )
               : null
           }
@@ -1259,21 +1256,32 @@ export default function BuyerPostCommentsScreen() {
             </View>
           ) : null}
 
-          {composerLocked ? (
+          {composerLocked && (isPreviewPost || meta.commentsDisabled) ? (
             <View style={s.lockedComposer}>
               {isPreviewPost ? (
                 <Text style={s.lockedText}>Comments aren’t available on this post.</Text>
               ) : meta.commentsDisabled ? (
                 <Text style={s.lockedText}>Comments are turned off for this post.</Text>
-              ) : (
-                <PressableScale onPress={() => { hapticLight(); router.push('/sign-in' as never); }} accessibilityRole="button">
-                  <Text style={s.lockedText}>
-                    <Text style={{ color: theme.text, fontFamily: FONT.semibold }}>Sign in</Text> to join the conversation.
-                  </Text>
-                </PressableScale>
-              )}
+              ) : null}
             </View>
-          ) : (
+          ) : null}
+          {composerLocked && !isPreviewPost && !meta.commentsDisabled ? (
+            // Signed out: the composer row itself (avatar + input pill), so
+            // the prompt reads as part of the sheet, not a strip under it.
+            <PressableScale
+              style={s.signedOutRow}
+              onPress={() => { hapticLight(); router.push('/sign-in' as never); }}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in to join the conversation"
+              testID="comments-signed-out-composer"
+            >
+              <Avatar initials="" size={32} ring={false} backgroundColor="#2a2a2a" />
+              <View style={[s.signedOutPill, { borderColor: BORDER, backgroundColor: theme.background }]}>
+                <Text style={s.signedOutPlaceholder} numberOfLines={1}>Sign in to join the conversation</Text>
+                <Text style={[s.signedOutAction, { color: theme.text }]}>Sign in</Text>
+              </View>
+            </PressableScale>
+          ) : composerLocked ? null : (
             <>
               {/* @mention suggestions: only while the text ends in an active
                   "@token"; reads the same mention-search API the story editor
@@ -1515,6 +1523,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   replyingName: { fontFamily: FONT.semibold },
   lockedComposer: { minHeight: 56, alignItems: 'center', justifyContent: 'center', paddingVertical: SP.sm },
   lockedText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
+  signedOutRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 4 },
+  signedOutPill: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', minHeight: 40, borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth, paddingLeft: 14, paddingRight: 14, gap: 8,
+  },
+  signedOutPlaceholder: { flex: 1, color: MUTED, fontFamily: FONT.regular, fontSize: FS.base },
+  signedOutAction: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  emptyLine: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', paddingTop: 32, paddingHorizontal: SP.lg },
   // Bare emoji evenly spaced across the full width — no chip circle, no
   // background — sitting directly above the composer.
   emojiRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, paddingBottom: 10 },
