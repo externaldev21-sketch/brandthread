@@ -32,6 +32,8 @@ function CaseDetailView({ caseData }: { caseData: IpCase }) {
     type: 'request_info' | 'dismiss' | 'hide' | 'remove' | null;
   }>({ isOpen: false, type: null });
   const [notes, setNotes] = useState('');
+  // A signed snapshot URL can expire or 404; fall back to the placeholder tile.
+  const [brokenSnapshot, setBrokenSnapshot] = useState<string | null>(null);
 
   const handleAction = async () => {
     if (!actionModal.type) return;
@@ -249,11 +251,10 @@ function CaseDetailView({ caseData }: { caseData: IpCase }) {
                     <div className="pt-4 border-t border-slate-800">
                       <div className="text-xs text-slate-500 mb-3">Current listing context</div>
                       <div className="flex gap-4">
-                        {caseData.listingContext.images?.[0] ? (
+                        {caseData.listingContext.snapshotImageUrl && brokenSnapshot !== caseData.listingContext.snapshotImageUrl ? (
                           <img 
-                            src={caseData.listingContext.images[0].startsWith('/objects/')
-                              ? `/api/storage${caseData.listingContext.images[0]}`
-                              : caseData.listingContext.images[0]} 
+                            src={caseData.listingContext.snapshotImageUrl}
+                            onError={() => setBrokenSnapshot(caseData.listingContext?.snapshotImageUrl ?? null)}
                             alt="Listing snapshot" 
                             className="w-20 h-20 object-cover rounded bg-slate-800 border border-slate-700"
                             data-testid="img-listing-snapshot"

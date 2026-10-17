@@ -6,9 +6,9 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { isSellerDevPreview } from '@/lib/devPreview';
 import { resolveAccountKey } from '@/lib/accountStorage';
-import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import { serviceRequest } from '@/lib/serviceConfig';
 import {
   BrandMemory, BrandMemoryField, BrandMemorySummary, DEFAULT_BRAND_MEMORY,
 } from './aiTypes';
@@ -68,39 +68,67 @@ export async function clearBrandMemory(): Promise<BrandMemory> {
 
 // ─── Rebuild from real DB data (via API) ─────────────────────────────────────
 
-export async function rebuildBrandMemory(authToken?: string | null): Promise<BrandMemory> {
+const REBUILD_FIELD_KEYS: Partial<Record<string, keyof BrandMemory>> = {
+  brandDescription:  'brandDescription',
+  brandVoice:        'brandVoice',
+  targetAudience:    'targetAudience',
+  pricePosition:     'pricePosition',
+  visualStyle:       'visualStyle',
+  marketingTone:     'marketingTone',
+  preferredWords:    'preferredWords',
+  productCategories: 'productCategories',
+};
+
+// Sample brand text — only ever used in the explicit `?bt_preview=…&demo=1`
+// preview dataset. Real accounts never receive it.
+const DEMO_BRAND_VALUES: Partial<Record<keyof BrandMemory, string>> = {
+  brandDescription:  'Premium streetwear brand focused on elevated basics and limited drops.',
+  brandVoice:        'Confident, concise, luxury-adjacent. Never corporate.',
+  targetAudience:    'Style-conscious 18–34 year olds who value quality over hype.',
+  pricePosition:     'Mid-to-high. $50–$250 range. Compete on quality and brand story.',
+  visualStyle:       'Dark, minimal, high-contrast. Studio photography. No lifestyle clutter.',
+  marketingTone:     'Direct and premium. No exclamation marks. No emojis in copy.',
+  productCategories: 'Hoodies, tees, joggers, outerwear, accessories.',
+};
+
+/**
+ * Derive brand memory from the seller's real products/posts/store via
+ * POST /api/ai/brand-memory/rebuild. Failures throw (with the server's
+ * message when it sent one) so the screen can show a real error — no sample
+ * text is substituted. Sample text is only used in `demo=1` preview mode.
+ */
+export async function rebuildBrandMemory(): Promise<BrandMemory> {
   const memory = await getBrandMemory();
 
-  // Derives brand voice from the seller's actual products/posts/store. On any
-  // failure this throws (the caller shows "Could not rebuild") — it never
-  // fills the seller's brand memory with made-up demo values.
-  const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
-  if (!API_BASE || !authToken) throw new Error('Sign in to rebuild brand memory.');
-  const res = await fetchWithTimeout(`${API_BASE}/api/ai/brand-memory/rebuild`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${authToken}`,
-    },
-    body: JSON.stringify({}),
-  }, 90_000);
-  if (!res.ok) throw new Error(`Brand memory rebuild failed (${res.status})`);
-  const { fields } = await res.json() as { fields: Record<string, string> };
-  const keyMap: Partial<Record<string, keyof BrandMemory>> = {
-    brandDescription:  'brandDescription',
-    brandVoice:        'brandVoice',
-    targetAudience:    'targetAudience',
-    pricePosition:     'pricePosition',
-    visualStyle:       'visualStyle',
-    marketingTone:     'marketingTone',
-    preferredWords:    'preferredWords',
-    productCategories: 'productCategories',
-  };
-  for (const [apiKey, value] of Object.entries(fields ?? {})) {
-    const memKey = keyMap[apiKey];
-    if (memKey && value?.trim()) {
-      memory[memKey] = { ...memory[memKey], value: value.trim(), enabled: true };
+  if (isPreviewDemoMode()) {
+    for (const [k, v] of Object.entries(DEMO_BRAND_VALUES)) {
+      const key = k as keyof BrandMemory;
+      if (!memory[key].value && v) {
+        memory[key] = { ...memory[key], value: v, enabled: true };
+      }
     }
+    await saveBrandMemory(memory);
+    return memory;
+  }
+
+  const data = await serviceRequest<{ fields?: Record<string, unknown> }>(
+    '/api/ai/brand-memory/rebuild',
+    { method: 'POST', body: JSON.stringify({}) },
+  );
+  const fields = data?.fields;
+  if (!fields || typeof fields !== 'object') {
+    throw new Error('Brand memory could not be derived from your data. Try again.');
+  }
+  let applied = 0;
+  for (const [apiKey, value] of Object.entries(fields)) {
+    const memKey = REBUILD_FIELD_KEYS[apiKey];
+    if (memKey && typeof value === 'string' && value.trim()) {
+      memory[memKey] = { ...memory[memKey], value: value.trim(), enabled: true };
+      applied += 1;
+    }
+  }
+  if (applied === 0) {
+    throw new Error('Brand memory could not be derived from your data. Try again.');
   }
   await saveBrandMemory(memory);
   return memory;

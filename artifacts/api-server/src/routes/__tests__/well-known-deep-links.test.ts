@@ -33,6 +33,13 @@ describe("apple-app-site-association", () => {
     expect(DEEP_LINK_PATHS).toEqual(paths);
   });
 
+  it("claims referral invites and shared live streams so they open the app", async () => {
+    const r = await aasa({ APPLE_TEAM_ID: "ABCDE12345" });
+    const paths: string[] = r.body.applinks.details[0].paths;
+    expect(paths).toContain("/invite/*");
+    expect(paths).toContain("/live/*");
+  });
+
   it("stays validly shaped with no team id configured", async () => {
     const r = await aasa({ APPLE_TEAM_ID: "" });
     expect(r.body.applinks.details).toEqual([]);

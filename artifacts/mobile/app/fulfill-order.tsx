@@ -110,6 +110,7 @@ export default function FulfillOrderScreen() {
 
   // Step 2 — package
   const [presets, setPresets] = useState<PackagePreset[]>([]);
+  const [presetsError, setPresetsError] = useState<string | null>(null);
   const [packageChoice, setPackageChoice] = useState<PackageChoice | null>(null);
   const [suggestedWeightLb, setSuggestedWeightLb] = useState('');
   const [addingPreset, setAddingPreset] = useState(false);
@@ -163,7 +164,9 @@ export default function FulfillOrderScreen() {
     try {
       const [raw, presetList] = await Promise.all([
         api.orders.get(orderId),
-        getPackagePresets().catch(() => []),
+        getPackagePresets()
+          .then(list => { setPresetsError(null); return list; })
+          .catch((err: any) => { setPresetsError(err?.message ?? 'Could not load saved packages.'); return [] as PackagePreset[]; }),
       ]);
       const adapted = raw ? adaptApiOrder(raw) : null;
       setOrder(adapted);
@@ -589,6 +592,7 @@ export default function FulfillOrderScreen() {
         {step === 2 && (
           <>
             <SectionHeader title="Saved packages" />
+            {presetsError ? <Text style={[s.mutedText, { color: ERROR }]}>{`Couldn't load saved packages. ${presetsError}`}</Text> : null}
             <View style={s.chipRow}>
               {presets.map(p => {
                 const active = packageChoice?.kind === 'preset' && packageChoice.presetId === p.id;

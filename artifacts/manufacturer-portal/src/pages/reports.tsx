@@ -3,9 +3,11 @@
  * Lists all user-submitted content reports and lets staff update their status.
  */
 import { useState } from "react";
-import { useAuth } from "@clerk/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChipRow } from "@/components/chip-row";
+import { errorMessage, useApiRequest } from "@/lib/api";
+import { QueryError } from "@/components/query-state";
+import { useToast } from "@/hooks/use-toast";
 
 const STATUS_COLORS: Record<string, string> = {
   pending:   "bg-yellow-100 text-yellow-800",
@@ -16,35 +18,55 @@ const STATUS_COLORS: Record<string, string> = {
 
 const STATUSES = ["pending", "reviewed", "actioned", "dismissed"] as const;
 
+type Report = {
+  id: string;
+  status: string;
+  targetType: string;
+  targetId: string;
+  targetLabel?: string | null;
+  reason: string;
+  description?: string | null;
+  createdAt: string;
+};
+
 export default function Reports() {
-  const { getToken } = useAuth();
+  const request = useApiRequest();
   const qc = useQueryClient();
+  const { toast } = useToast();
   const [filter, setFilter] = useState<string>("pending");
 
-  const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, "");
-
-  const { data: rows = [], isLoading } = useQuery({
+  // The API is mounted at the site root (/api), not under the portal's
+  // /manufacturers/ base path — same as every other portal page.
+  const { data: rows = [], isLoading, error, refetch } = useQuery({
     queryKey: ["reports", filter],
-    queryFn: async () => {
-      const token = await getToken();
-      const url = `${baseUrl}/api/reports?status=${filter}&limit=100`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error("Failed to load reports");
-      return res.json();
-    },
+    queryFn: () => request<Report[]>(`/api/reports?status=${encodeURIComponent(filter)}&limit=100`),
     refetchInterval: 30_000,
   });
 
   const dismiss = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const token = await getToken();
-      await fetch(`${baseUrl}/api/reports/${id}/status`, {
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      request<Report>(`/api/reports/${encodeURIComponent(id)}/status`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
+      }),
+    // Optimistically drop the report from the current list; restore it if the
+    // server rejects the change.
+    onMutate: async ({ id }) => {
+      const key = ["reports", filter];
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<Report[]>(key);
+      qc.setQueryData<Report[]>(key, (old) => old?.filter((r) => r.id !== id));
+      return { key, previous };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx) qc.setQueryData(ctx.key, ctx.previous);
+      toast({
+        title: "Couldn't update report",
+        description: errorMessage(err),
+        variant: "destructive",
       });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["reports"] }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["reports"] }),
   });
 
   return (
@@ -70,11 +92,13 @@ export default function Reports() {
 
       {isLoading ? (
         <div className="text-center text-muted-foreground py-16">Loading…</div>
+      ) : error ? (
+        <QueryError title="Unable to load reports" description={errorMessage(error)} onRetry={() => void refetch()} />
       ) : rows.length === 0 ? (
         <div className="text-center text-muted-foreground py-16">No {filter} reports.</div>
       ) : (
         <div className="space-y-3">
-          {rows.map((r: any) => (
+          {rows.map((r) => (
             <div key={r.id} className="border border-border rounded-lg p-4">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="flex-1 basis-48 min-w-0">
@@ -83,7 +107,7 @@ export default function Reports() {
                       {r.status}
                     </span>
                     <span className="text-xs text-muted-foreground font-mono">
-                      {r.targetType} · {r.targetId.slice(0, 16)}…
+                      {r.targetType} · {String(r.targetId ?? "").slice(0, 16)}…
                     </span>
                   </div>
                   {r.targetLabel && (
@@ -96,19 +120,21 @@ export default function Reports() {
                     <p className="text-sm text-muted-foreground mt-0.5 [overflow-wrap:anywhere]">{r.description}</p>
                   )}
                   <p className="text-xs text-muted-foreground mt-2">
-                    {new Date(r.createdAt).toLocaleString()} · reporter: {r.reporterId.slice(0, 18)}…
+                    {new Date(r.createdAt).toLocaleString()}
                   </p>
                 </div>
                 {r.status === "pending" && (
                   <div className="flex gap-2 shrink-0">
                     <button
                       onClick={() => dismiss.mutate({ id: r.id, status: "actioned" })}
+                      disabled={dismiss.isPending}
                       className="px-3 py-1 text-xs bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100"
                     >
                       Action
                     </button>
                     <button
                       onClick={() => dismiss.mutate({ id: r.id, status: "dismissed" })}
+                      disabled={dismiss.isPending}
                       className="px-3 py-1 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded hover:bg-gray-100"
                     >
                       Dismiss

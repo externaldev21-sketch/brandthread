@@ -76,7 +76,8 @@ export default function ShopifyFulfillmentScreen() {
       if (res.warning) Alert.alert('Tracking sync not set up', String(res.warning));
       await load();
     } catch (err: any) {
-      Alert.alert('Could not update fulfillment', String(err?.message ?? 'Please try again.'));
+      // Show the server's reason (e.g. "Shopify connections are not configured yet") without the "API 503:" wire prefix.
+      Alert.alert('Could not update fulfillment', String(err?.message ?? 'Please try again.').replace(/^API \d{3}:\s*/, '') || 'Please try again.');
     } finally {
       setBusy(false);
     }

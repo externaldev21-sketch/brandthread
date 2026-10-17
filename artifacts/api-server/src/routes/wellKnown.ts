@@ -40,6 +40,8 @@ export const DEEP_LINK_PATHS = [
   "/checkout-return*",
   // Order emails' "Track order" button (lib/brandthreadEmail.ts orderDeepLink).
   "/buyer-order-detail*",
+  "/invite/*",
+  "/live/*",
 ];
 
 function appleAppId(): string | null {

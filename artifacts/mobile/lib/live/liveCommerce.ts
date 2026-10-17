@@ -93,6 +93,51 @@ export const setScheduledLiveReminder = (id: string, on: boolean) =>
     `/api/live/scheduled/${encodeURIComponent(id)}/remind`, { method: on ? 'PUT' : 'DELETE' }, false,
   );
 
+/** A product the seller can tag on a scheduled live. */
+export interface ScheduleProductOption { id: string; name: string; priceCents: number | null }
+
+function toCents(value: unknown, unit: 'cents' | 'dollars'): number | null {
+  const n = typeof value === 'string' ? Number(value) : value;
+  if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return null;
+  return unit === 'cents' ? Math.round(n) : Math.round(n * 100);
+}
+
+/**
+ * Tolerant mapper for the seller's product list. GET /api/products returns a
+ * bare array (with a `priceCents` "from" price), but older/other callers wrap
+ * it as `{ products }` / `{ items }` — the Schedule Live picker used to read
+ * only `r.products`, so it was always empty. Archived and malformed rows are
+ * dropped; an unknown price stays null instead of becoming $0.
+ */
+export function toScheduleProductOptions(raw: unknown): ScheduleProductOption[] {
+  const r = raw as Row | null | undefined;
+  const list: unknown[] = Array.isArray(raw) ? raw
+    : Array.isArray(r?.products) ? r!.products
+    : Array.isArray(r?.items) ? r!.items
+    : Array.isArray(r?.data) ? r!.data
+    : [];
+  const out: ScheduleProductOption[] = [];
+  const seen = new Set<string>();
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue;
+    const p = item as Row;
+    const id = typeof p.id === 'string' || typeof p.id === 'number' ? String(p.id) : '';
+    const name = typeof p.name === 'string' ? p.name.trim() : typeof p.title === 'string' ? p.title.trim() : '';
+    if (!id || !name || seen.has(id) || p.status === 'archived') continue;
+    seen.add(id);
+    const variantCents = Array.isArray(p.variants)
+      ? p.variants.map((v: Row) => toCents(v?.priceCents, 'cents')).filter((c: number | null): c is number => c !== null)
+      : [];
+    const priceCents = toCents(p.priceCents, 'cents')
+      ?? toCents(p.minPriceCents, 'cents')
+      ?? toCents(p.pricing?.priceCents, 'cents')
+      ?? (variantCents.length ? Math.min(...variantCents) : null)
+      ?? toCents(p.price, 'dollars');
+    out.push({ id, name, priceCents });
+  }
+  return out;
+}
+
 // ─── Schedule picker options (pure) ──────────────────────────────────────────
 
 export interface DayOption { key: string; label: string; sub: string; date: Date }

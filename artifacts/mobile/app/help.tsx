@@ -15,7 +15,6 @@ import { useUser } from '@clerk/expo';
 import { SupportChatModal } from '@/components/SupportChatBubble';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
-
 import { ScreenHeader } from '@/components/ScreenHeader';
 
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
@@ -81,6 +80,7 @@ export default function HelpScreen() {
   // keeps the same card size instead of stretching.
   const categoryW = gridW > 0 ? Math.floor((gridW - SP.sm * 2) / 3) : undefined;
   const [faqY, setFaqY] = useState(0);
+  const [articlesY, setArticlesY] = useState(0);
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
@@ -161,6 +161,13 @@ export default function HelpScreen() {
       { text: 'Email us', onPress: () => { Linking.openURL('mailto:support@brandthread.app').catch(() => {}); } },
     ]);
   }
+  // "Full Docs": the help center is these in-app articles, so clear any
+  // search/filter and jump to the full list instead of reopening this page.
+  function showAllArticles() {
+    setQuery('');
+    setActiveCategory(null);
+    scrollRef.current?.scrollTo({ y: articlesY, animated: true });
+  }
 
   return (
     <View style={s.root}>
@@ -236,7 +243,7 @@ export default function HelpScreen() {
         )}
 
         {/* FAQ list (search / category results, or the full list) */}
-        <View style={{ gap: SP.sm }} onLayout={(e) => setFaqY(e.nativeEvent.layout.y)}>
+        <View style={{ gap: SP.sm }} onLayout={(e) => { setFaqY(e.nativeEvent.layout.y); setArticlesY(e.nativeEvent.layout.y); }}>
           <SectionHeader
             title={isSearching ? 'Results' : 'All questions'}
             style={s.sectionHeader}
@@ -285,11 +292,11 @@ export default function HelpScreen() {
             <Icon name="mail" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Email Us</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.contactBtn} onPress={openLiveChat} activeOpacity={0.8} accessibilityRole="button">
+          <TouchableOpacity style={s.contactBtn} onPress={openLiveChat} activeOpacity={0.8} accessibilityRole="button" testID="help-live-chat">
             <Icon name="message-circle" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Live Chat</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.contactBtn} onPress={() => scrollRef.current?.scrollTo({ y: faqY, animated: true })} activeOpacity={0.8}>
+          <TouchableOpacity style={s.contactBtn} onPress={showAllArticles} activeOpacity={0.8} testID="help-full-docs">
             <Icon name="book-open" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Full Docs</Text>
           </TouchableOpacity>

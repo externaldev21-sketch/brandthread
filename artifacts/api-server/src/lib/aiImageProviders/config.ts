@@ -7,10 +7,11 @@
  * converge. Add a new `AiTool` and its config resolves the same way, no
  * code change beyond that.
  *
- * IMPORTANT: nothing in this module is wired into `routes/photography.ts`
- * yet. Defaults below intentionally mirror today's production behavior
- * (openai / single-stage) so importing this module changes nothing until a
- * route explicitly opts in after a real benchmark picks a winner.
+ * `routes/photography.ts` (Mockup to Model + its retry, and AI Photoshoot's
+ * /generate) consults this via `routing.ts`. Defaults below mirror today's
+ * production behavior (openai / single-stage), which keeps the routes on
+ * their existing OpenAI path; setting a tool's `_PROVIDER` / `_PIPELINE` env
+ * var opts that tool into another provider (whose key must also be set).
  */
 import { getImageModelChain } from "@workspace/integrations-openai-ai-server/image-model";
 import type { PipelineId, ProviderId } from "./types";

@@ -65,6 +65,10 @@ const OPTIONAL_VARS = [
   "TWILIO_ACCOUNT_SID",
   "TWILIO_AUTH_TOKEN",
   "TWILIO_MESSAGING_SERVICE_SID",
+  // Without these, /.well-known app-link files are empty and brandthread.app
+  // links open in the browser instead of the iOS / Android app.
+  "APPLE_TEAM_ID",
+  "ANDROID_SHA256_CERT_FINGERPRINTS",
 ];
 
 // Not needed to boot, and never a boot failure (an existing deploy without

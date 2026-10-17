@@ -88,9 +88,9 @@ export default function GeneralSettingsScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Resources</Text>
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <ExternalRow icon="git-merge" label="Change log" onPress={() => { Linking.openURL('https://brandthread.app/changelog'); }} colors={colors} />
-            <ExternalRow icon="help-circle" label="Brandthread Help Center" onPress={() => { router.push('/help' as never); }} colors={colors} />
-            <ExternalRow icon="code" label="Hire a Brandthread Partner" onPress={() => { router.push('/freelancer-jobs' as never); }} colors={colors} last />
+            <ExternalRow icon="git-merge" label="Change log" onPress={() => { haptic(); router.push('/changelog' as never); }} colors={colors} />
+            <ExternalRow icon="help-circle" label="Brandthread Help Center" onPress={() => { haptic(); router.push('/help' as never); }} colors={colors} />
+            <ExternalRow icon="code" label="Hire a Brandthread Partner" onPress={() => { haptic(); router.push('/freelancer-jobs' as never); }} colors={colors} last />
           </View>
         </View>
       </ScrollView>

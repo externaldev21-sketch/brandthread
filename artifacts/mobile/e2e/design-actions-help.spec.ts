@@ -111,18 +111,20 @@ test('Actions sheet has a real Help tab with four real destinations, tab row and
   await context.close();
 });
 
-test('Contact Support and Live Chat open their real external targets', async () => {
+test('Contact Support opens email; Live Chat opens the in-app support chat', async () => {
   const { context, page } = await openContextAtCanvas();
   await openHelpTab(page);
 
   await page.locator('[data-testid="help-support"]').click();
   await page.waitForTimeout(300);
   await page.locator('[data-testid="help-chat"]').click();
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(500);
 
   const opened: string[] = await page.evaluate(() => (window as any).__openedUrls ?? []);
   expect(opened).toContain('mailto:support@brandthread.app');
-  expect(opened).toContain('https://brandthread.app/chat');
+  // brandthread.app/chat never existed; Live Chat is the in-app support chat.
+  expect(opened).not.toContain('https://brandthread.app/chat');
+  await expect(page.getByText('Brandthread Support')).toBeVisible();
 
   await context.close();
 });

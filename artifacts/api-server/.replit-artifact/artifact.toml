@@ -7,7 +7,20 @@ id = "3B4_FFSkEVBkAeYMFRJ2e"
 [[services]]
 localPort = 8080
 name = "API Server"
-paths = ["/api"]
+# Besides /api, the server owns a few public, server-rendered paths
+# (src/app.ts): short links, link-in-bio pages, giveaway shares, the DMCA /
+# IP-notice form and the iOS/Android app-link verification files. Without
+# them here the router sent those to the web app, which showed "not found".
+paths = [
+  "/api",
+  "/l/",
+  "/bio/",
+  "/g/",
+  "/dmca",
+  "/legal/ip-notice",
+  "/.well-known/",
+  "/ws/",
+]
 
 [services.development]
 run = "pnpm --filter @workspace/api-server run dev"

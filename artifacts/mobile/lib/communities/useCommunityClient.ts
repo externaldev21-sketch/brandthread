@@ -168,7 +168,7 @@ function openCommunitySocket(
     getToken().then((token) => {
       if (stopped) return;
       if (!token) { schedule(); return; }
-      const url = `${API_BASE_URL.replace(/^http/, 'ws')}/ws/community?communityId=${encodeURIComponent(communityId)}&token=${encodeURIComponent(token)}`;
+      const url = `${API_BASE_URL.replace(/^http/, 'ws')}/api/ws/community?communityId=${encodeURIComponent(communityId)}&token=${encodeURIComponent(token)}`;
       let ws: WebSocket;
       try { ws = new WebSocket(url); } catch { schedule(); return; }
       socket = ws;

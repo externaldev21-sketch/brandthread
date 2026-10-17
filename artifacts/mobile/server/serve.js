@@ -174,6 +174,9 @@ const API_ROOT_PATTERNS = [
 function isApiRootPath(pathname) {
   return API_ROOT_PATTERNS.some((pattern) => pattern.test(pathname));
 }
+function isApiOwnedPath(pathname) {
+  return isApiRootPath(pathname) || /^\/(?:(?:l|bio|g)\/.+|dmca\/?|legal\/ip-notice\/?|\.well-known\/(?:apple-app-site-association|assetlinks\.json))$/.test(pathname);
+}
 
 /** The API server inside this deployment (artifacts/api-server listens on 8080). */
 function apiInternalOrigin() {
@@ -202,7 +205,7 @@ function proxyToApi(req, res, pathAndQuery) {
     });
     upstream.on('timeout', () => upstream.destroy(new Error('timeout')));
     upstream.on('error', () => resolve(false));
-    upstream.end();
+    req.pipe(upstream);
   });
 }
 
@@ -283,7 +286,7 @@ const server = http.createServer(async (req, res) => {
   }
   const acceptEncoding = String(req.headers['accept-encoding'] || '');
 
-  if ((req.method === 'GET' || req.method === 'HEAD' || !req.method) && isApiRootPath(requestedPath)) {
+  if (isApiOwnedPath(requestedPath)) {
     if (await proxyToApi(req, res, `${pathname}${requestUrl.search}`)) return;
     send(res, 502, 'Bad Gateway');
     return;
@@ -432,4 +435,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { CANONICAL_ORIGIN, GENERATED_HOST, canonicalRedirectLocation, parseRange, isApiRootPath, server };
+module.exports = { CANONICAL_ORIGIN, GENERATED_HOST, canonicalRedirectLocation, parseRange, isApiRootPath, isApiOwnedPath, server };
