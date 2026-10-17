@@ -61,6 +61,8 @@ import { afterBlockChange, afterFollowChange } from "../lib/relationshipCaches";
 import { cappedUnknown, jsonList, jsonValue, looseBody, optBoolish, validateBody } from "../middlewares/bodySchemas";
 import { pinnedAtIso, pinnedAtSql, pinnedFirst as pinnedFirstOrder } from "../lib/postPins";
 import { publicPronouns, publicStyleBadge } from "../lib/profileExtras";
+import { postDimsPayload } from "../lib/mediaDimensions";
+import { postDimsColumns } from "../lib/postDimsColumns";
 
 // Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
 // search endpoint so people search behaves consistently with product/brand
@@ -190,7 +192,9 @@ async function buildBuyerPosts(
     userId: posts.userId,
     mediaUrl: posts.mediaUrl,
     mediaUrls: posts.mediaUrls,
+    thumbnailUrl: posts.thumbnailUrl,
     slides: posts.slides,
+    ...postDimsColumns,
     aspectRatio: posts.aspectRatio,
     mediaType: posts.mediaType,
     caption: posts.caption,
@@ -282,7 +286,9 @@ async function buildBuyerPosts(
       type: row.mediaType,
       mediaUrl: row.mediaUrl,
       mediaUrls: row.mediaUrls ?? [],
+      thumbnailUrl: row.thumbnailUrl ?? null,
       slides: row.slides ?? [],
+      ...postDimsPayload(row),
       aspectRatio: row.aspectRatio,
       caption: row.caption ?? "",
       location: row.placeId ? locations.get(row.placeId) ?? null : null,
@@ -809,6 +815,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
     userId: posts.userId,
     mediaUrl: posts.mediaUrl,
     thumbnailUrl: posts.thumbnailUrl,
+    ...postDimsColumns,
     mediaType: posts.mediaType,
     caption: posts.caption,
     createdAt: posts.createdAt,
@@ -874,6 +881,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
     authorUsername: r.authorUsername ?? null,
     mediaUrl: r.mediaUrl,
     thumbnailUrl: r.thumbnailUrl ?? null,
+    ...postDimsPayload(r),
     mediaType: r.mediaType,
     caption: r.caption ?? null,
     createdAt: r.createdAt,

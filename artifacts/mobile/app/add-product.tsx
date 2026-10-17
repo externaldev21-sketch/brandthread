@@ -1151,7 +1151,7 @@ export default function AddProductScreen() {
             Alert.alert('Camera access needed', 'Allow camera access in Settings to take a photo.');
             return;
           }
-          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
+          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 1 });
           if (!result.canceled && result.assets[0]) void uploadSizeChartPhoto(result.assets[0].uri);
         },
       },
@@ -1163,7 +1163,7 @@ export default function AddProductScreen() {
             Alert.alert('Permission required', 'Please allow access to your photo library in Settings.');
             return;
           }
-          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
+          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 1 });
           if (!result.canceled && result.assets[0]) void uploadSizeChartPhoto(result.assets[0].uri);
         },
       },
@@ -1303,7 +1303,7 @@ export default function AddProductScreen() {
       allowsMultipleSelection: true,
       selectionLimit: room,
       orderedSelection: true,
-      quality: 0.9,
+      quality: 1,
     });
     if (result.canceled || result.assets.length === 0) return;
     const assets = result.assets.slice(0, room);

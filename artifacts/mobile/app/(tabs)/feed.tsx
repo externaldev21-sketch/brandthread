@@ -4,6 +4,7 @@ import { spotlightPagePropsEqual } from '@/lib/feedPageMemo';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useThreadRefresh } from '@/components/ui/ThreadRefresh';
+import { resolveAspect } from '@/lib/mediaFrame';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
 import { DEMO_RUNWAY_VIDEO_SOURCES, DEMO_RUNWAY_VIDEO_URIS } from '@/lib/demoMedia';
@@ -487,6 +488,7 @@ interface SpotlightItem {
   videoSource?: VideoSource;
   videoPosterUri?: string;
   photoAspect?: number;
+  mediaAspects?: Array<number | null>;
   videoPosterSource?: ImageSourcePropType;
   contentType: 'photo' | 'slideshow' | 'video';
   caption: string;
@@ -1999,7 +2001,7 @@ function SpotlightPageImpl({
             )
             : (
               <PhotoCarousel
-                aspects={item.mediaUris?.map(() => item.photoAspect)}
+                aspects={item.mediaAspects ?? item.mediaUris?.map(() => item.photoAspect)}
                 postId={item.id}
                 uris={item.mediaUris}
                 pageWidth={pageWidth}
@@ -2295,6 +2297,9 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     mediaUris: post.mediaUris,
     videoSource: post.contentType === 'video' ? pickPlaybackUri(post.hlsUrl, post.mediaUris[0], Platform.OS !== 'web') : undefined,
     videoPosterUri: post.thumbnailUri,
+    mediaAspects: post.mediaUris.map((_, i) => resolveAspect(post.mediaDims?.[i], {
+      postId: post.id, what: `media[${i}]`, ratio: post.aspectRatio,
+    })),
     photoAspect: (() => {
       const [w, h] = (post.aspectRatio ?? '').split(':').map(Number);
       return w > 0 && h > 0 ? w / h : undefined;

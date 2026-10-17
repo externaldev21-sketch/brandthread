@@ -41,7 +41,7 @@ export function PhotoSlide({ uri, index, count, pageWidth, pageHeight, authoredA
             pointerEvents="none"
           >
             <CachedImage
-              source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" transition={0}
+              source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" placeholder={null} transition={0}
               priority={priority === 'low' ? 'low' : priority}
               onLoad={(e) => {
                 const src = e?.source;

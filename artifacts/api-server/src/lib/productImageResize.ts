@@ -23,7 +23,7 @@
  * anything that could already fetch the original can fetch this the same
  * way.
  */
-import sharp from "sharp";
+import sharp, { type JpegOptions, type WebpOptions } from "sharp";
 import { logger } from "./logger";
 import { ObjectNotFoundError, ObjectStorageService } from "./objectStorage";
 import { getObjectAclPolicy, setObjectAclPolicy } from "./objectAcl";
@@ -34,10 +34,19 @@ const objectStorage = new ObjectStorageService();
  *  being a multi-megabyte original. */
 export const CHAT_CARD_IMAGE_WIDTH = 720;
 
-/** Long edge (px) every uploaded image is capped at on the server. */
-export const MAX_STORED_IMAGE_EDGE = 2048;
-/** JPEG/WebP quality for re-encoded uploads. */
-export const UPLOAD_IMAGE_QUALITY = 80;
+/**
+ * Stored-image box. Width is what a full-screen phone needs (2160 = a 3x
+ * iPhone's 1290 px with headroom for zoom; Instagram serves 1080–1440), the
+ * height cap only bites on very tall panoramas/screenshots.
+ */
+export const MAX_STORED_IMAGE_WIDTH = 2160;
+export const MAX_STORED_IMAGE_EDGE = 3840;
+/** Smallest width a feed/full-screen image should ever be stored at when the source allows. */
+export const MIN_FEED_IMAGE_WIDTH = 1080;
+/** JPEG/WebP quality for the single server-side encode of an upload. */
+export const UPLOAD_IMAGE_QUALITY = 90;
+/** Variant quality (variants are downscales of an already-encoded original). */
+export const VARIANT_IMAGE_QUALITY = 88;
 /** Variant widths that may be generated; anything else snaps to the nearest one. */
 export const IMAGE_VARIANT_WIDTHS = [240, 480, 720, 1080, 1600] as const;
 /**
@@ -56,6 +65,14 @@ export function snapVariantWidth(width: number): number {
     if (Math.abs(candidate - width) <= Math.abs(best - width)) best = candidate;
   }
   return best;
+}
+
+/** Target size inside the stored-image box (width ≤ 2160, long edge ≤ 3840). Never upscales. */
+export function fitStoredImage(width: number, height: number): { width: number; height: number } {
+  if (!(width > 0) || !(height > 0)) return { width, height };
+  const scale = Math.min(1, MAX_STORED_IMAGE_WIDTH / width, MAX_STORED_IMAGE_EDGE / Math.max(width, height));
+  if (scale >= 1) return { width, height };
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
 
 /** Target pixel size for a long-edge cap. Never upscales; keeps aspect ratio. */
@@ -85,11 +102,19 @@ function sharpFormatFor(contentType: string): "jpeg" | "png" | "webp" {
   return "jpeg";
 }
 
+/** Encoder options: high-quality JPEG keeps full chroma so text/edges/fabric stay crisp. */
+function formatOptions(format: "jpeg" | "png" | "webp", quality: number): JpegOptions | WebpOptions | undefined {
+  if (format === "png") return undefined;
+  if (format === "webp") return { quality, smartSubsample: true };
+  // libjpeg (not mozjpeg, whose trellis quantisation visibly smooths texture).
+  return { quality, optimiseCoding: true, chromaSubsampling: quality >= 88 ? "4:4:4" : "4:2:0" };
+}
+
 /**
- * Decode, apply EXIF orientation, cap the long edge and re-encode. sharp
- * writes no metadata unless asked, so EXIF/GPS/ICC text is dropped. PNG and
- * WebP keep their format (cut-out transparency survives); everything else is
- * JPEG. Never enlarges.
+ * Decode, apply EXIF orientation, fit the stored-image box (lanczos3) and
+ * re-encode. sharp writes no metadata unless asked, so EXIF/GPS is dropped
+ * (colour is converted to sRGB first). PNG and WebP keep their format
+ * (cut-out transparency survives); everything else is JPEG. Never enlarges.
  */
 export async function resizeImageBuffer(
   input: Buffer,
@@ -103,17 +128,24 @@ export async function resizeImageBuffer(
   const format = sharpFormatFor(contentType);
   const pipeline = sharp(input).rotate();
   const resized = width
-    ? pipeline.resize({ width, withoutEnlargement: true })
-    : pipeline.resize({ width: maxEdge, height: maxEdge, fit: "inside", withoutEnlargement: true });
+    ? pipeline.resize({ width, withoutEnlargement: true, kernel: "lanczos3" })
+    : pipeline.resize({
+      width: Math.min(MAX_STORED_IMAGE_WIDTH, maxEdge),
+      height: maxEdge,
+      fit: "inside",
+      withoutEnlargement: true,
+      kernel: "lanczos3",
+    });
   const buffer = await resized
-    .toFormat(format, format === "png" ? undefined : { quality })
+    .toFormat(format, formatOptions(format, quality))
     .toBuffer();
   return { buffer, contentType: `image/${format}` };
 }
 
 /**
- * Upload-time normalisation for raster images: cap at MAX_STORED_IMAGE_EDGE,
- * re-encode, strip metadata. Fails open (returns the original bytes) on
+ * Upload-time normalisation for raster images — the ONE server encode (the
+ * app uploads originals untouched): fit the stored-image box, re-encode at
+ * q90, strip metadata. Fails open (returns the original bytes) on
  * anything sharp cannot decode. A file that is already within the cap, has
  * no EXIF block and would not shrink is stored untouched. GIFs pass through
  * so animations survive.
@@ -125,7 +157,8 @@ export async function normalizeUploadedImage(
   if (contentType === "image/gif" || !contentType.startsWith("image/")) return { buffer: bytes, contentType };
   try {
     const metadata = await sharp(bytes).metadata();
-    const overCap = Math.max(metadata.width ?? 0, metadata.height ?? 0) > MAX_STORED_IMAGE_EDGE;
+    const fit = fitStoredImage(metadata.width ?? 0, metadata.height ?? 0);
+    const overCap = fit.width !== (metadata.width ?? 0) || fit.height !== (metadata.height ?? 0);
     const result = await resizeImageBuffer(bytes, contentType);
     if (!overCap && !metadata.exif && result.buffer.length >= bytes.length) {
       return { buffer: bytes, contentType };
@@ -178,8 +211,8 @@ export async function getImageVariantPath(
 
     const resizedBuffer = await sharp(buffer)
       .rotate()
-      .resize({ width, withoutEnlargement: true })
-      .toFormat(format, format === "png" ? undefined : { quality: 82 })
+      .resize({ width, withoutEnlargement: true, kernel: "lanczos3" })
+      .toFormat(format, formatOptions(format, VARIANT_IMAGE_QUALITY))
       .toBuffer();
 
     await objectStorage.createObjectEntityFromBuffer(resizedBuffer, contentType, derivedPath, {

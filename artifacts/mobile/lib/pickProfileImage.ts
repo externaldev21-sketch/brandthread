@@ -13,7 +13,7 @@ export async function pickFromCamera(aspect: [number, number], allowsEditing = t
     Alert.alert('Permission needed', 'Allow camera access to take a photo.');
     return null;
   }
-  const res = await ImagePicker.launchCameraAsync({ allowsEditing, aspect, quality: 0.9 });
+  const res = await ImagePicker.launchCameraAsync({ allowsEditing, aspect, quality: 1 });
   return res.canceled || !res.assets[0] ? null : res.assets[0];
 }
 
@@ -25,7 +25,7 @@ export async function pickFromLibrary(aspect: [number, number], allowsEditing = 
     return null;
   }
   const res = await ImagePicker.launchImageLibraryAsync({
-    allowsEditing, aspect, quality: 0.9, mediaTypes: ['images'],
+    allowsEditing, aspect, quality: 1, mediaTypes: ['images'],
   });
   return res.canceled || !res.assets[0] ? null : res.assets[0];
 }

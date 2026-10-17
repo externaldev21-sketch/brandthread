@@ -110,7 +110,7 @@ export async function createMuxAsset(
       input: [{ url: inputUrl }],
       playback_policy: ["public"],
       passthrough,
-      video_quality: "basic",
+      video_quality: "plus",
       max_resolution_tier: "1080p",
     }),
   });

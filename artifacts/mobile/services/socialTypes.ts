@@ -60,6 +60,11 @@ export interface PostSlide {
   url: string;
   thumbnailUrl?: string;
   duration?: number;
+  /** Pixel size of the slide and its poster (server-measured; absent until backfilled). */
+  width?: number;
+  height?: number;
+  thumbnailWidth?: number;
+  thumbnailHeight?: number;
 }
 
 export interface BuyerPost {

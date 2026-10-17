@@ -26,6 +26,9 @@ const DEFAULT_BLURHASH = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj';
  * `fallbackLabel` (a person, brand or product name): if the image fails to
  * load, the same box shows that name's initial on a plain tile instead of a
  * broken image or an endless blurhash.
+ * Pass `placeholder={null}` (with `transition={0}`) for media laid out from
+ * known dimensions — feed pages, carousels — so already-seen media paints
+ * straight from cache with no blurhash flash or fade.
  */
 export function CachedImage({
   source,
@@ -59,7 +62,7 @@ export function CachedImage({
       contentFit={contentFit}
       cachePolicy={cachePolicy}
       transition={transition}
-      placeholder={placeholder}
+      placeholder={placeholder === null ? undefined : placeholder}
       onError={(event) => {
         if (fallbackLabel !== undefined) setFailed(true);
         props.onError?.(event);

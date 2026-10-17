@@ -309,7 +309,7 @@ export default function ManufacturerMessagesScreen() {
       );
       return;
     }
-    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.8 };
+    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.9 };
     const result = source === 'camera'
       ? await ImagePicker.launchCameraAsync(options)
       : await ImagePicker.launchImageLibraryAsync({ ...options, allowsMultipleSelection: true, selectionLimit: room, orderedSelection: true });

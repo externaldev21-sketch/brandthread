@@ -5,6 +5,7 @@ import { pinPostWithReplacePrompt, unpinPost } from './postPinService';
  * API-backed social data with user-scoped local preferences and drafts.
  */
 
+import { isPosInt, mapMediaDims } from '@/lib/mediaFrame';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hasServiceToken, serviceRequest } from '@/lib/serviceConfig';
 import { fetchSponsoredSlots } from '@/services/sponsoredService';
@@ -768,6 +769,12 @@ export interface SellerThreadPost {
   hlsUrl?:           string;
   thumbnailUri?:     string;
   aspectRatio:       '9:16' | '4:5' | '3:4' | '1:1';
+  /**
+   * Server-measured pixel size per `mediaUris` entry (null = unknown) and of
+   * the poster, so media renders at its final size on the first frame.
+   */
+  mediaDims?:        Array<{ width: number; height: number } | null>;
+  posterDims?:       { width: number; height: number } | null;
   contentType:       string;
   postStatus:        'draft' | 'scheduled' | 'published' | 'archived' | 'deleted';
   isDraft:           boolean;
@@ -970,6 +977,7 @@ function mapOwnedApiPost(p: ApiPostRow, userId: string): SellerThreadPost {
     hlsUrl:          typeof p.videoHlsUrl === 'string' && p.videoHlsUrl ? p.videoHlsUrl : undefined,
     thumbnailUri:    p.thumbnailUrl ?? p.thumbnailUri ?? undefined,
     aspectRatio:     p.aspectRatio ?? '9:16',
+    ...mapMediaDims(p, apiMediaUris),
     contentType:     p.mediaType ?? p.contentType ?? 'video',
     postStatus:      status,
     isDraft:         status === 'draft',
@@ -1235,9 +1243,15 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
 /** API `slides` → client slides (drops malformed entries; undefined when there are none). */
 export function mapSlides(raw: unknown): PostSlide[] | undefined {
   if (!Array.isArray(raw)) return undefined;
-  const out = raw.flatMap((r: { kind?: unknown; url?: unknown; thumbnailUrl?: unknown; duration?: unknown } | null) => (
+  const out = raw.flatMap((r: { kind?: unknown; url?: unknown; thumbnailUrl?: unknown; duration?: unknown; width?: unknown; height?: unknown; thumbnailWidth?: unknown; thumbnailHeight?: unknown } | null) => (
     r && (r.kind === 'photo' || r.kind === 'video') && typeof r.url === 'string'
-      ? [{ kind: r.kind, url: r.url, thumbnailUrl: typeof r.thumbnailUrl === 'string' ? r.thumbnailUrl : undefined, duration: typeof r.duration === 'number' ? r.duration : undefined } as PostSlide]
+      ? [{
+        kind: r.kind, url: r.url,
+        thumbnailUrl: typeof r.thumbnailUrl === 'string' ? r.thumbnailUrl : undefined,
+        duration: typeof r.duration === 'number' ? r.duration : undefined,
+        ...(isPosInt(r.width) && isPosInt(r.height) ? { width: r.width, height: r.height } : {}),
+        ...(isPosInt(r.thumbnailWidth) && isPosInt(r.thumbnailHeight) ? { thumbnailWidth: r.thumbnailWidth, thumbnailHeight: r.thumbnailHeight } : {}),
+      } as PostSlide]
       : []
   ));
   return out.length > 0 ? out : undefined;
@@ -1248,6 +1262,7 @@ export function mapApiPostToSellerThreadPost(p: FeedPostApiRow, idx: number): Se
   const remixOf = p?.remixOf && typeof p.remixOf.postId === 'string'
     ? { postId: p.remixOf.postId, authorId: String(p.remixOf.authorId ?? ''), username: typeof p.remixOf.username === 'string' ? p.remixOf.username : null }
     : null;
+  const apiMediaUris: string[] = Array.isArray(p.mediaUrls) && p.mediaUrls.length > 0 ? p.mediaUrls : (p.mediaUrl ? [p.mediaUrl] : []);
   const authorName     = p.seller?.brandName ?? p.seller?.displayName ?? 'Seller';
   const authorHandle   = '@' + (typeof p.seller?.username === 'string' && p.seller.username
     ? p.seller.username
@@ -1269,10 +1284,11 @@ export function mapApiPostToSellerThreadPost(p: FeedPostApiRow, idx: number): Se
     caption:           p.caption   ?? '',
     hashtags:          p.hashtags ?? [],
     styleTags:         p.styleTags ?? [],
-    mediaUris:         Array.isArray(p.mediaUrls) && p.mediaUrls.length > 0 ? p.mediaUrls : (p.mediaUrl ? [p.mediaUrl] : []),
+    mediaUris:         apiMediaUris,
     hlsUrl:            typeof p.videoHlsUrl === 'string' && p.videoHlsUrl ? p.videoHlsUrl : undefined,
     thumbnailUri:      p.thumbnailUrl ?? p.thumbnailUri ?? undefined,
     aspectRatio:       (p.aspectRatio ?? '9:16') as SellerThreadPost['aspectRatio'],
+    ...mapMediaDims(p, apiMediaUris),
     slides:            mapSlides(p.slides),
     surface:           p.surface === 'profile' ? 'profile' : 'thread',
     pinnedAt:          typeof p.pinnedAt === 'string' ? p.pinnedAt : null,

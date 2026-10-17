@@ -3,13 +3,10 @@
  * (lib/api.ts `uploadImage` / `uploadMediaFile` / ad media,
  * lib/uploadWithProgress.ts, community and DM photos):
  *
- *  - downscale so the long edge is at most the preset's edge for that kind
- *    of upload (avatars 1080, messages 1600, everything else 2048 — never
- *    upscale, aspect ratio preserved),
- *  - re-encode JPEG at ~0.8 (PNG stays PNG so cut-out / logo transparency
- *    survives, WebP stays WebP),
- *  - drop EXIF/GPS: expo-image-manipulator decodes to pixels and writes a new
- *    file, which carries no metadata on iOS, Android or web (canvas).
+ * Normal JPEG/PNG/WebP originals up to 4096px pass through untouched; the
+ * server strips EXIF/GPS and performs the final encode. HEIC and oversized
+ * originals are converted at quality 1. Message/evidence presets retain
+ * their bandwidth and provider-size boundaries.
  *
  * It fails open. Anything unexpected (no dimensions, unsupported type, native
  * error) returns the original image untouched so an upload is never blocked
@@ -17,8 +14,8 @@
  */
 import { getImageDimensions } from '@/lib/imageDimensions';
 
-export const MAX_UPLOAD_EDGE = 2048;
-export const UPLOAD_QUALITY = 0.8;
+export const MAX_UPLOAD_EDGE = 4096;
+export const UPLOAD_QUALITY = 1;
 
 export type UploadImage = { uri: string; mimeType?: string | null };
 export type OutputFormat = 'jpeg' | 'png' | 'webp';
@@ -36,14 +33,14 @@ export type UploadImageKind =
 export interface ImageUploadPreset { maxEdge: number; quality: number }
 
 export const IMAGE_UPLOAD_PRESETS: Record<UploadImageKind, ImageUploadPreset> = {
-  avatar: { maxEdge: 1080, quality: UPLOAD_QUALITY },
-  logo: { maxEdge: 1080, quality: UPLOAD_QUALITY },
+  avatar: { maxEdge: MAX_UPLOAD_EDGE, quality: UPLOAD_QUALITY },
+  logo: { maxEdge: MAX_UPLOAD_EDGE, quality: UPLOAD_QUALITY },
   banner: { maxEdge: MAX_UPLOAD_EDGE, quality: UPLOAD_QUALITY },
   product: { maxEdge: MAX_UPLOAD_EDGE, quality: UPLOAD_QUALITY },
   post: { maxEdge: MAX_UPLOAD_EDGE, quality: UPLOAD_QUALITY },
   // 1600 keeps screenshots (receipts, size charts) readable in a chat.
-  message: { maxEdge: 1600, quality: UPLOAD_QUALITY },
-  evidence: { maxEdge: MAX_UPLOAD_EDGE, quality: UPLOAD_QUALITY },
+  message: { maxEdge: 1600, quality: 0.9 },
+  evidence: { maxEdge: 2048, quality: 0.8 },
   default: { maxEdge: MAX_UPLOAD_EDGE, quality: UPLOAD_QUALITY },
 };
 
@@ -93,6 +90,19 @@ export const MIME_BY_FORMAT: Record<OutputFormat, string> = {
   webp: 'image/webp',
 };
 
+function isHeic(mime: string | null | undefined, uri = ''): boolean {
+  return /image\/hei[cf]/i.test(mime ?? '') || /\.hei[cf](?:\?|$)/i.test(uri);
+}
+
+export function uploadPlan(
+  mime: string | null | undefined, uri: string, width: number, height: number,
+): { reencode: false } | { reencode: true; resize: { width: number; height: number } | null } {
+  if (!outputFormatFor(mime, uri)) return { reencode: false };
+  const target = fitWithin(width, height);
+  const resize = target.width !== width || target.height !== height ? target : null;
+  return resize || isHeic(mime, uri) ? { reencode: true, resize } : { reencode: false };
+}
+
 type Manipulated = { uri: string; base64?: string; mimeType: string };
 
 async function manipulate(image: UploadImage, kind: UploadImageKind, base64: boolean): Promise<Manipulated | null> {
@@ -120,6 +130,12 @@ async function manipulate(image: UploadImage, kind: UploadImageKind, base64: boo
 
 export async function prepareImageForUpload<T extends UploadImage>(image: T, kind: UploadImageKind = 'default'): Promise<T> {
   try {
+    if (kind !== 'message' && kind !== 'evidence') {
+      let width = 0, height = 0;
+      try { ({ width, height } = await getImageDimensions(image.uri)); }
+      catch { if (!isHeic(image.mimeType, image.uri)) return image; }
+      if (!uploadPlan(image.mimeType, image.uri, width, height).reencode) return image;
+    }
     const out = await manipulate(image, kind, false);
     if (!out) return image;
     return { ...image, uri: out.uri, mimeType: out.mimeType };

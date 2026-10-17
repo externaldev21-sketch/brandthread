@@ -857,7 +857,20 @@ export const posts = pgTable('posts', {
   slides: jsonb('slides').$type<Array<{
     kind: 'photo' | 'video'; path: string; url: string;
     thumbnailPath: string; thumbnailUrl: string; duration?: number;
+    /** Pixel size of the slide media and its poster (migration 271). */
+    width?: number; height?: number; thumbnailWidth?: number; thumbnailHeight?: number;
   }>>().notNull().default([]),
+  /**
+   * Pixel size of the primary media (video, or first slide) and its poster,
+   * so clients lay media out at its final size on the first frame. NULL = not
+   * measured yet (backfill pending); 0 = could not be measured.
+   */
+  mediaWidth: integer('media_width'),
+  mediaHeight: integer('media_height'),
+  thumbnailWidth: integer('thumbnail_width'),
+  thumbnailHeight: integer('thumbnail_height'),
+  /** Pixel size per entry of media_urls (slideshows); null entries = unknown. */
+  mediaDimensions: jsonb('media_dimensions').$type<Array<{ width: number; height: number } | null>>().notNull().default([]),
   caption: text('caption'),
   /** Optional tagged location (see schema/places.ts). Set null if the place is removed. */
   placeId: uuid('place_id').references(() => places.id, { onDelete: 'set null' }),

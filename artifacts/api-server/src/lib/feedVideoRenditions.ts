@@ -2,22 +2,24 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { canPassthrough, hasZscale, isHdr, outputFps, passthroughRemuxArgs, probeVideo, sdrStage } from "./mediaQuality";
 
 const exec = promisify(execFile);
-export const FEED_STREAM_PROFILE = "feed-abr-720-480-hls2-source-cap-v4";
-export function renditionArgs(shortEdge: 720 | 480, sourceKbps = Infinity): string[] {
-  const high = shortEdge === 720;
-  const longEdge = high ? 1280 : 854;
-  const cap = Math.max(64, Math.round(Math.min(high ? 1800 : 800, sourceKbps)));
+export const FEED_STREAM_PROFILE = "feed-abr-1080-720-480-hls2-source-cap-v5";
+export function renditionArgs(shortEdge: 1080 | 720 | 480, sourceKbps = Infinity, fps = 30, hdr = false, zscale = false): string[] {
+  const longEdge = shortEdge === 1080 ? 1920 : shortEdge === 720 ? 1280 : 854;
+  const cap = Math.max(64, Math.round(Math.min(shortEdge === 1080 ? 12000 : shortEdge === 720 ? 5000 : 1500, sourceKbps)));
+  const gop = String(Math.max(1, Math.round(2 * Math.min(60, fps))));
   return [
     "-map", "0:v:0", "-map", "0:a:0?", "-map_metadata", "-1",
-    "-vf", `scale=w='min(iw,if(gte(iw,ih),${longEdge},${shortEdge}))':h='min(ih,if(gte(iw,ih),${shortEdge},${longEdge}))':force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1`,
-    "-c:v", "libx264", "-threads", "2", "-pix_fmt", "yuv420p", "-preset", "veryfast",
+    "-vf", `scale=w='min(iw,if(gte(iw,ih),${longEdge},${shortEdge}))':h='min(ih,if(gte(iw,ih),${shortEdge},${longEdge}))':force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,setsar=1,${sdrStage(hdr, zscale)}`,
+    "-c:v", "libx264", "-threads", "2", "-pix_fmt", "yuv420p", "-preset", "medium", "-profile:v", "high", "-level:v", "4.2",
     // Capped VBR, not CBR: do not inflate already-small or static clips.
-    "-crf", high ? "23" : "25", "-maxrate", `${cap}k`,
-    "-bufsize", `${cap * 2}k`, "-r", "30", "-g", "60", "-keyint_min", "60",
+    "-crf", shortEdge === 1080 ? "18" : shortEdge === 720 ? "20" : "22", "-maxrate", `${cap}k`,
+    "-bufsize", `${cap * 2}k`, "-fpsmax", "60", "-g", gop, "-keyint_min", gop,
     "-sc_threshold", "0", "-force_key_frames", "expr:gte(t,n_forced*2)",
-    "-c:a", "aac", "-b:a", "64k", "-movflags", "+faststart", "-f", "mp4",
+    "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
+    "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-movflags", "+faststart", "-f", "mp4",
   ];
 }
 
@@ -29,10 +31,16 @@ export async function encodeFeedRenditions(input: string, directory: string) {
   const probe = JSON.parse(stdout) as { streams?: Array<{ codec_type?: string; bit_rate?: string }> };
   const sourceRate = Number(probe.streams?.find(s => s.codec_type === "video")?.bit_rate);
   const sourceKbps = Number.isFinite(sourceRate) && sourceRate > 0 ? sourceRate / 1000 : Infinity;
+  const source = await probeVideo(input);
+  const fps = outputFps([source]);
+  const zscale = isHdr(source) && await hasZscale();
   const files: Array<{ local: string; relative: string; contentType: string }> = [];
-  for (const height of [480, 720] as const) {
+  for (const height of [480, 720, 1080] as const) {
     const mp4 = join(directory, `${height}.mp4`);
-    await exec("ffmpeg", ["-v", "error", "-y", "-i", input, ...renditionArgs(height, sourceKbps), mp4],
+    const args = height === 1080 && canPassthrough(source)
+      ? passthroughRemuxArgs(input, mp4, source)
+      : ["-v", "error", "-y", "-i", input, ...renditionArgs(height, sourceKbps, fps, isHdr(source), zscale), mp4];
+    await exec("ffmpeg", args,
       { timeout: 600_000, maxBuffer: 1024 * 1024 });
     files.push({ local: mp4, relative: `${height}.mp4`, contentType: "video/mp4" });
     const hls = join(directory, String(height));
@@ -47,10 +55,12 @@ export async function encodeFeedRenditions(input: string, directory: string) {
     });
   }
   const master = join(directory, "master.m3u8");
-  // Lowest rendition first: AVPlayer starts conservatively and adapts up.
+  // Full-quality first; preserve weak-network rungs and source-rate caps.
+  const bandwidth = (cap: number) => Math.round(Math.min(cap, sourceKbps * 1000) + 160000);
   await writeFile(master, "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-INDEPENDENT-SEGMENTS\n"
-    + "#EXT-X-STREAM-INF:BANDWIDTH=1000000,AVERAGE-BANDWIDTH=864000\n480/index.m3u8\n"
-    + "#EXT-X-STREAM-INF:BANDWIDTH=2200000,AVERAGE-BANDWIDTH=1764000\n720/index.m3u8\n");
+    + `#EXT-X-STREAM-INF:BANDWIDTH=${bandwidth(canPassthrough(source) ? Infinity : 12000000)}\n1080/index.m3u8\n`
+    + `#EXT-X-STREAM-INF:BANDWIDTH=${bandwidth(5000000)}\n720/index.m3u8\n`
+    + `#EXT-X-STREAM-INF:BANDWIDTH=${bandwidth(1500000)}\n480/index.m3u8\n`);
   files.push({ local: master, relative: "master.m3u8", contentType: "application/vnd.apple.mpegurl" });
   return files;
 }
@@ -67,6 +77,6 @@ export function legacyFeedStreamTarget(path: string, rendition: unknown): string
   const root = path.match(/^(\/objects\/uploads\/feed-stream\/[a-f0-9]{64})\//)?.[1];
   if (!root) return path.startsWith("/objects/uploads/") && path.endsWith(".mp4") ? rendition : null;
   const tail = path.slice(root.length);
-  if (!/^\/(?:master\.m3u8|(?:480|720)\.mp4|(?:480|720)\/(?:index\.m3u8|segment\d{5}\.ts))$/.test(tail)) return null;
+  if (!/^\/(?:master\.m3u8|(?:480|720|1080)\.mp4|(?:480|720|1080)\/(?:index\.m3u8|segment\d{5}\.ts))$/.test(tail)) return null;
   return rendition.replace(/\/720\.mp4$/, tail);
 }

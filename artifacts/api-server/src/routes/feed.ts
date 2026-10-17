@@ -38,6 +38,7 @@ import { mutedPhrasesFor } from "../lib/safety";
 import { matchesMutedWords } from "../lib/contentModerator";
 import { planOfficialSeed, recordOfficialSeedProgress } from "../lib/officialSeed/service";
 import { isPlatformAdmin } from "../lib/platformAdmin";
+import { postDimsPayload } from "../lib/mediaDimensions";
 
 const router = Router();
 
@@ -250,6 +251,8 @@ router.get("/for-you", requireAuth, async (req, res) => {
         mediaType: post.mediaType,
         videoHlsUrl: post.videoHlsUrl ?? null,
         aspectRatio: post.aspectRatio,
+        slides: post.slides,
+        ...postDimsPayload(post),
         caption: post.caption,
         hashtags: post.hashtags,
         styleTags: post.styleTags,

@@ -7,6 +7,7 @@
  * same function backs both "Post" and "Drafts".
  */
 import { applyCropRect } from '@/lib/mediaCrop';
+import { resolveLocalAssetUri } from '@/lib/createPost/localAssetUri';
 import { ASPECT_RATIO_VALUE, SURFACE_BY_MODE } from '@/constants/postLimits';
 import { slideCropToRect } from '@/lib/createPost/crop';
 import { extractHashtags } from '@/lib/createPost/caption';
@@ -57,13 +58,14 @@ export async function publishCreatePost({ api, input, editId, onProgress, signal
       const base = (i / count) * UPLOAD_SHARE;
       const span = UPLOAD_SHARE / count;
       if (slide.kind === 'photo') {
-        const croppedUri = await applyCropRect(slide.uri, rect);
-        const up = await api.posts.uploadPhotoSlide(croppedUri, croppedUri === slide.uri ? slide.mimeType : 'image/jpeg');
+        const sourceUri = await resolveLocalAssetUri(slide.uri);
+        const croppedUri = await applyCropRect(sourceUri, rect);
+        const up = await api.posts.uploadPhotoSlide(croppedUri, croppedUri === sourceUri ? slide.mimeType : 'image/jpeg');
         // Photos are cropped on-device (orientation-safe); the server only scales and applies the look.
         items.push({ kind: 'photo', objectPath: up.objectPath, adjust: slide.adjust });
       } else {
         const up = await api.posts.uploadVideoChunked(
-          { uri: slide.uri, mimeType: slide.mimeType },
+          { uri: await resolveLocalAssetUri(slide.uri), mimeType: slide.mimeType },
           { signal, onProgress: (f) => onProgress(base + f * span, 'uploading') },
         );
         items.push({
@@ -92,8 +94,9 @@ export async function publishCreatePost({ api, input, editId, onProgress, signal
       if (signal?.aborted) throw new Error('Upload cancelled');
       const slide = media.slides[i];
       const rect = slideCropToRect(slide.crop, slide.width, slide.height, ratio);
-      const croppedUri = await applyCropRect(slide.uri, rect);
-      const result = await api.posts.uploadPhotoSlide(croppedUri, croppedUri === slide.uri ? slide.mimeType : 'image/jpeg');
+      const sourceUri = await resolveLocalAssetUri(slide.uri);
+      const croppedUri = await applyCropRect(sourceUri, rect);
+      const result = await api.posts.uploadPhotoSlide(croppedUri, croppedUri === sourceUri ? slide.mimeType : 'image/jpeg');
       uploaded.push(result.objectPath);
       onProgress(((i + 1) / media.slides.length) * UPLOAD_SHARE, 'uploading');
     }
@@ -112,7 +115,7 @@ export async function publishCreatePost({ api, input, editId, onProgress, signal
   } else {
     const { video } = media;
     const uploadedClip = video.objectPath ? { objectPath: video.objectPath } : await api.posts.uploadVideoChunked(
-      { uri: video.uri, mimeType: video.mimeType },
+      { uri: await resolveLocalAssetUri(video.uri), mimeType: video.mimeType },
       { signal, onProgress: (f) => onProgress(f * UPLOAD_SHARE, 'uploading') },
     );
     onProgress(UPLOAD_SHARE, 'processing');

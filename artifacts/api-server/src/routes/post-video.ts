@@ -15,6 +15,23 @@ import { redirectToPublicMedia } from "../lib/mediaDelivery";
 import { ObjectPermission } from "../lib/objectAcl";
 import { cappedUnknown, jsonList, jsonValue, looseBody, validateBody } from "../middlewares/bodySchemas";
 import { acceptUploadSession } from "../lib/uploadSessions";
+import { dimsMetadata, imageBufferDims } from "../lib/mediaDimensions";
+import {
+  canPassthrough,
+  composeClipChain,
+  hasZscale,
+  isHdr,
+  outputFps,
+  passthroughRemuxArgs,
+  posterArgs,
+  probeVideo,
+  videoCanvas,
+  videoEncodeArgs,
+  AUDIO_SAMPLE_RATE,
+  VIDEO_MAX_H,
+  VIDEO_MAX_W,
+  type VideoProbe,
+} from "../lib/mediaQuality";
 
 const router = Router();
 
@@ -37,11 +54,11 @@ const MAX_COMPOSE_CLIP_BYTES = 1024 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 1536 * 1024 * 1024;
 const MAX_CLIPS = 12;
 const MAX_TOTAL_DURATION_SECONDS = 600;
-// Composed output resolution — 1080p vertical, matching the quality the
-// Threads feed now expects; this used to render at 720x1280, which visibly
-// under-delivered next to a native 1080x1920 source clip in the feed.
-const OUTPUT_W = 1080;
-const OUTPUT_H = 1920;
+// Largest composed canvas — 1080p vertical. The actual canvas is only as big
+// as the sharpest clip needs (lib/mediaQuality videoCanvas), so a 720p clip is
+// never upscaled; overlays are positioned against the actual canvas.
+const OUTPUT_W = VIDEO_MAX_W;
+const OUTPUT_H = VIDEO_MAX_H;
 const COMPOSED_PREVIEW_TTL_SECONDS = 60 * 60;
 const OBJECT_PATH_RE = /^\/objects\/uploads\/[A-Za-z0-9._/-]+$/;
 
@@ -99,14 +116,6 @@ async function duration(path: string): Promise<number> {
   const value = Number.parseFloat(String(stdout).trim());
   if (!Number.isFinite(value) || value <= 0) throw new Error("Invalid video duration");
   return value;
-}
-
-async function hasAudio(path: string): Promise<boolean> {
-  const { stdout } = await exec("ffprobe", [
-    "-v", "error", "-select_streams", "a:0",
-    "-show_entries", "stream=index", "-of", "csv=p=0", path,
-  ], { timeout: 15_000, maxBuffer: 1024 * 1024 });
-  return String(stdout).trim().length > 0;
 }
 
 export function mediaUrl(req: express.Request, path: string): string {
@@ -300,9 +309,12 @@ function buildDrawtextFilter(
   textFile: string,
   outputDuration: number,
   fontPath: string,
+  canvas: { w: number; h: number } = { w: OUTPUT_W, h: OUTPUT_H },
 ): string {
-  const VW = OUTPUT_W;
-  const VH = OUTPUT_H;
+  const VW = canvas.w;
+  const VH = canvas.h;
+  // Font sizes are authored against the 1080-wide canvas.
+  const fontScale = VW / OUTPUT_W;
 
   // Convert hex color to FFmpeg format (0xRRGGBB)
   const hexRaw = overlay.color.replace("#", "");
@@ -343,11 +355,11 @@ function buildDrawtextFilter(
   const parts = [
     `textfile='${safeTextFile}'`,
     `fontfile='${safeFont}'`,
-    `fontsize=${Math.round(overlay.fontSize)}`,
+    `fontsize=${Math.max(1, Math.round(overlay.fontSize * fontScale))}`,
     `fontcolor=${ffColor}`,
     `box=${boxEnabled}`,
     `boxcolor=${boxColor}`,
-    `boxborderw=8`,
+    `boxborderw=${Math.max(1, Math.round(8 * fontScale))}`,
     `x=${xExpr}`,
     `y=${yExpr}`,
     `enable='${enableExpr}'`,
@@ -419,10 +431,57 @@ router.post("/compose-video", requireAuth, validateBody(composeVideoBody), async
   // Track temp text files for cleanup
   const textFiles: string[] = [];
 
+  /** Poster + storage + preview URLs for the finished MP4 at `output`. */
+  const finishCompose = async (
+    output: string,
+    posterOpts: { hdr: boolean; zscale: boolean },
+    passthrough: boolean,
+  ) => {
+    const outputDuration = await duration(output);
+    const thumbnail = join(dir, "thumbnail.jpg");
+    await exec("ffmpeg", posterArgs(output, thumbnail, Math.min(0.5, outputDuration / 3), posterOpts),
+      { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 });
+    // Pixel size travels with the objects so the post records it (lib/mediaDimensions).
+    const outputProbe = await probeVideo(output);
+    const dims = { width: outputProbe.width, height: outputProbe.height };
+    const thumbBytes = await fs.readFile(thumbnail);
+    const thumbDims = await imageBufferDims(thumbBytes);
+    outputObject = await storage.createObjectEntityFromBuffer(await fs.readFile(output), "video/mp4", undefined, { metadata: dimsMetadata(dims) });
+    thumbnailObject = await storage.createObjectEntityFromBuffer(thumbBytes, "image/jpeg", undefined, { metadata: dimsMetadata(thumbDims) });
+    await Promise.all([
+      storage.trySetObjectEntityAclPolicy(outputObject, { owner: clerkId, visibility: "private" }),
+      storage.trySetObjectEntityAclPolicy(thumbnailObject, { owner: clerkId, visibility: "private" }),
+    ]);
+    const [previewMediaUrl, previewThumbnailUrl] = await Promise.all([
+      storage.getObjectEntityDownloadURL(outputObject, COMPOSED_PREVIEW_TTL_SECONDS),
+      storage.getObjectEntityDownloadURL(thumbnailObject, COMPOSED_PREVIEW_TTL_SECONDS),
+    ]);
+    await Promise.all(
+      [...new Set(clips.map(clip => clip.objectPath!))]
+        .map(path => storage.deleteObjectEntity(path).catch((err) => {
+          req.log.warn({ err, clerkId, objectPath: path }, "Could not clean up composed source clip");
+        })),
+    );
+    return res.json({
+      mediaUrl: previewMediaUrl,
+      mediaPath: outputObject,
+      thumbnailUrl: previewThumbnailUrl,
+      thumbnailPath: thumbnailObject,
+      duration: outputDuration,
+      clipCount: clips.length,
+      passthrough,
+      width: dims.width,
+      height: dims.height,
+      thumbnailWidth: thumbDims?.width ?? dims.width,
+      thumbnailHeight: thumbDims?.height ?? dims.height,
+    });
+  };
+
   try {
     const inputs: string[] = [];
     const durations: number[] = [];
     const audio: boolean[] = [];
+    const probes: VideoProbe[] = [];
     let totalBytes = 0;
     for (let index = 0; index < clips.length; index += 1) {
       const file = await storage.getObjectEntityFile(clips[index].objectPath!);
@@ -449,12 +508,14 @@ router.post("/compose-video", requireAuth, validateBody(composeVideoBody), async
         return res.status(400).json({ error: "A clip is not a supported video file" });
       }
       inputs.push(path);
-      const clipDuration = await duration(path);
+      const probe = await probeVideo(path);
+      probes.push(probe);
+      const clipDuration = probe.durationSeconds > 0 ? probe.durationSeconds : await duration(path);
       if (clipDuration > MAX_TOTAL_DURATION_SECONDS) {
         return res.status(400).json({ error: "A clip exceeds the 10 minute duration limit" });
       }
       durations.push(clipDuration);
-      audio.push(await hasAudio(path));
+      audio.push(probe.hasAudio);
     }
 
     const totalDuration = durations.reduce((sum, seconds, index) => (
@@ -479,19 +540,38 @@ router.post("/compose-video", requireAuth, validateBody(composeVideoBody), async
       return res.status(400).json({ error: "Invalid trim range" });
     }
 
+    const noEdits = clips.length === 1 &&
+      (clips[0].speed === undefined || clips[0].speed === 1) &&
+      (clips[0].filter === undefined || clips[0].filter === "none") &&
+      validOverlays.length === 0 &&
+      start <= 0.05 && end >= totalDuration - 0.05;
+    if (noEdits && canPassthrough(probes[0])) {
+      // Nothing to change in the picture: keep the uploaded encode bit-for-bit
+      // (moov moved to the front so it streams), no generational loss.
+      const output = join(dir, "composed.mp4");
+      await exec("ffmpeg", passthroughRemuxArgs(inputs[0], output, probes[0]), {
+        timeout: 5 * 60_000, maxBuffer: 8 * 1024 * 1024,
+      });
+      return await finishCompose(output, { hdr: false, zscale: false }, true);
+    }
+
+    const canvas = videoCanvas(probes);
+    const fps = outputFps(probes);
+    const zscale = await hasZscale();
     const videoFilters = inputs.map((_, index) => {
       const speed = validSpeed(clips[index].speed) ? clips[index].speed : 1;
       const color = clips[index].filter === "warm"
         ? ",eq=saturation=1.12:contrast=1.04:brightness=0.02"
         : clips[index].filter === "cool" ? ",colorbalance=bs=.08"
           : clips[index].filter === "mono" ? ",hue=s=0" : "";
-      return `[${index}:v]scale=${OUTPUT_W}:${OUTPUT_H}:force_original_aspect_ratio=increase,crop=${OUTPUT_W}:${OUTPUT_H},setsar=1,fps=30${color},setpts=PTS/${speed}[v${index}]`;
+      const chain = composeClipChain(canvas, fps, { hdr: isHdr(probes[index]), zscale });
+      return `[${index}:v]${chain}${color},setpts=PTS/${speed}[v${index}]`;
     });
     const audioFilters = inputs.map((_, index) => {
       const speed = validSpeed(clips[index].speed) ? clips[index].speed : 1;
       return audio[index]
-        ? `[${index}:a]${audioTempo(speed)},aformat=sample_rates=44100:channel_layouts=stereo[a${index}]`
-        : `anullsrc=channel_layout=stereo:sample_rate=44100,atrim=duration=${durations[index] / speed}[a${index}]`;
+        ? `[${index}:a]${audioTempo(speed)},aformat=sample_rates=${AUDIO_SAMPLE_RATE}:channel_layouts=stereo[a${index}]`
+        : `anullsrc=channel_layout=stereo:sample_rate=${AUDIO_SAMPLE_RATE},atrim=duration=${durations[index] / speed}[a${index}]`;
     });
     const concat = inputs.map((_, index) => `[v${index}][a${index}]`).join("");
     const trimmedDuration = end - start;
@@ -521,7 +601,7 @@ router.post("/compose-video", requireAuth, validateBody(composeVideoBody), async
         textFiles.push(textFile);
 
         const fontPath = fontPathForStyle(ov.fontStyle, regularFont, boldFont);
-        const drawtextFilter = buildDrawtextFilter(ov, textFile, trimmedDuration, fontPath);
+        const drawtextFilter = buildDrawtextFilter(ov, textFile, trimmedDuration, fontPath, canvas);
 
         baseFilters.push(`${inputLabel}${drawtextFilter}${outputLabel}`);
       }
@@ -541,41 +621,12 @@ router.post("/compose-video", requireAuth, validateBody(composeVideoBody), async
       "-filter_complex", filter,
       "-map", finalVideoLabel,
       "-map", "[outa]",
-      "-c:v", "libx264", "-profile:v", "high", "-level:v", "4.0", "-pix_fmt", "yuv420p",
-      "-preset", "veryfast", "-crf", "20", "-maxrate", "8.5M", "-bufsize", "16M",
-      "-c:a", "aac", "-movflags", "+faststart", output,
-    ], { timeout: 20 * 60_000, maxBuffer: 8 * 1024 * 1024 });
+      ...videoEncodeArgs({ fps, outputSeconds: trimmedDuration }),
+      output,
+    ], { timeout: 30 * 60_000, maxBuffer: 8 * 1024 * 1024 });
 
-    const outputDuration = await duration(output);
-    const thumbnail = join(dir, "thumbnail.jpg");
-    await exec("ffmpeg", [
-      "-y", "-ss", String(Math.min(0.5, outputDuration / 3)),
-      "-i", output, "-frames:v", "1", "-q:v", "2", thumbnail,
-    ], { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 });
-    outputObject = await storage.createObjectEntityFromBuffer(await fs.readFile(output), "video/mp4");
-    thumbnailObject = await storage.createObjectEntityFromBuffer(await fs.readFile(thumbnail), "image/jpeg");
-    await Promise.all([
-      storage.trySetObjectEntityAclPolicy(outputObject, { owner: clerkId, visibility: "private" }),
-      storage.trySetObjectEntityAclPolicy(thumbnailObject, { owner: clerkId, visibility: "private" }),
-    ]);
-    const [previewMediaUrl, previewThumbnailUrl] = await Promise.all([
-      storage.getObjectEntityDownloadURL(outputObject, COMPOSED_PREVIEW_TTL_SECONDS),
-      storage.getObjectEntityDownloadURL(thumbnailObject, COMPOSED_PREVIEW_TTL_SECONDS),
-    ]);
-    await Promise.all(
-      [...new Set(clips.map(clip => clip.objectPath!))]
-        .map(path => storage.deleteObjectEntity(path).catch((err) => {
-          req.log.warn({ err, clerkId, objectPath: path }, "Could not clean up composed source clip");
-        })),
-    );
-    return res.json({
-      mediaUrl: previewMediaUrl,
-      mediaPath: outputObject,
-      thumbnailUrl: previewThumbnailUrl,
-      thumbnailPath: thumbnailObject,
-      duration: outputDuration,
-      clipCount: clips.length,
-    });
+    return await finishCompose(output, { hdr: false, zscale }, false);
+
   } catch (err) {
     if (outputObject) await storage.deleteObjectEntity(outputObject).catch(() => {});
     if (thumbnailObject) await storage.deleteObjectEntity(thumbnailObject).catch(() => {});
@@ -618,27 +669,32 @@ router.post("/compose-video/thumbnail", requireAuth, validateBody(videoThumbnail
 
     const [metadata] = await file.getMetadata();
     const size = Number(metadata.size ?? 0);
-    if (!Number.isFinite(size) || size <= 0 || size > MAX_CLIP_BYTES) {
+    // Composed/passthrough videos can be far larger than a single-shot clip
+    // upload, so stream to disk and accept anything compose can produce.
+    if (!Number.isFinite(size) || size <= 0 || size > MAX_COMPOSE_CLIP_BYTES) {
       return res.status(400).json({ error: "Video is empty or too large" });
     }
     const localPath = join(dir, "source.mp4");
-    const [bytes] = await file.download();
-    await fs.writeFile(localPath, bytes);
+    await file.download({ destination: localPath });
 
     const videoDuration = await duration(localPath);
     const clampedOffset = Math.max(0, Math.min(offsetSeconds, Math.max(0, videoDuration - 0.05)));
 
     const thumbnail = join(dir, "thumbnail.jpg");
-    await exec("ffmpeg", [
-      "-y", "-ss", String(clampedOffset),
-      "-i", localPath, "-frames:v", "1", "-q:v", "2", thumbnail,
-    ], { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 });
+    const probe = await probeVideo(localPath);
+    await exec("ffmpeg", posterArgs(localPath, thumbnail, clampedOffset, { hdr: isHdr(probe), zscale: await hasZscale() }),
+      { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 });
 
-    thumbnailObject = await storage.createObjectEntityFromBuffer(await fs.readFile(thumbnail), "image/jpeg");
+    const thumbBytes = await fs.readFile(thumbnail);
+    const thumbDims = await imageBufferDims(thumbBytes);
+    thumbnailObject = await storage.createObjectEntityFromBuffer(thumbBytes, "image/jpeg", undefined, { metadata: dimsMetadata(thumbDims) });
     await storage.trySetObjectEntityAclPolicy(thumbnailObject, { owner: clerkId, visibility: "private" });
     const thumbnailUrl = await storage.getObjectEntityDownloadURL(thumbnailObject, COMPOSED_PREVIEW_TTL_SECONDS);
 
-    return res.json({ thumbnailUrl, thumbnailPath: thumbnailObject, offset: clampedOffset });
+    return res.json({
+      thumbnailUrl, thumbnailPath: thumbnailObject, offset: clampedOffset,
+      thumbnailWidth: thumbDims?.width ?? null, thumbnailHeight: thumbDims?.height ?? null,
+    });
   } catch (err) {
     if (thumbnailObject) await storage.deleteObjectEntity(thumbnailObject).catch(() => {});
     req.log.error({ err, clerkId }, "Could not extract cover frame");

@@ -318,7 +318,7 @@ export default function SellerDropCreate() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: kind === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
-      quality: 0.9,
+      quality: 1,
     });
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];

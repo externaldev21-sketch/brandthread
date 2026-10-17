@@ -54,6 +54,7 @@ import { startPlanProductSyncJob } from "./planProductSync";
 import { startAdCampaignLifecycleJob } from "./adCampaignLifecycle";
 import { startSellerReferralsJob } from "./sellerReferrals";
 import { startSellerWinbackJob } from "./sellerWinback";
+import { startMediaDimensionsBackfillJob } from "./mediaDimensionsBackfill";
 import { startWeeklyDigestJob } from "./weeklyDigest";
 import { startOrderAnniversaryJob } from "./orderAnniversary";
 import { startSmsDeferredSendJob } from "./smsDeferredSend";
@@ -76,6 +77,7 @@ export const SINGLETON_JOBS: ReadonlyArray<readonly [string, () => void]> = [
   ["adCampaignLifecycle", startAdCampaignLifecycleJob],
   ["sellerReferrals", startSellerReferralsJob],
   ["sellerWinback", startSellerWinbackJob],
+  ["mediaDimensionsBackfill", startMediaDimensionsBackfillJob],
   ["weeklyDigest", startWeeklyDigestJob],
   ["orderAnniversary", startOrderAnniversaryJob],
   ["smsDeferredSend", startSmsDeferredSendJob],

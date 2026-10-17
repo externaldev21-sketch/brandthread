@@ -48,8 +48,7 @@ export function isHlsUri(uri: string): boolean {
  * the MP4: only Safari plays HLS in a plain <video> element.
  */
 export function preferLowFeedRendition(connection?: { saveData?: boolean; effectiveType?: string; downlink?: number }): boolean {
-  return !!connection?.saveData || /^(slow-2g|2g|3g)$/.test(connection?.effectiveType ?? '')
-    || (typeof connection?.downlink === 'number' && connection.downlink > 0 && connection.downlink < 2);
+  return !!connection?.saveData || /^(slow-2g|2g)$/.test(connection?.effectiveType ?? '');
 }
 
 export function pickPlaybackUri(hlsUrl: string | null | undefined, mp4Uri: string, native: boolean): string {

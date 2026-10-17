@@ -691,7 +691,7 @@ export default function StoreGenerateScreen() {
                     onPress={async () => {
                       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
                       if (!perm.granted) { Alert.alert('Permission required', 'Allow access to your photo library.'); return; }
-                      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+                      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 1 });
                       if (result.canceled || !result.assets[0]) return;
                       const asset = result.assets[0];
                       setContentUploading(value);

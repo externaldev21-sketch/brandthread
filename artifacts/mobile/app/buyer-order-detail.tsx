@@ -291,7 +291,7 @@ function ReviewSheet({
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsMultipleSelection: true,
-        quality: 0.7,
+        quality: 0.9,
         selectionLimit: MAX_REVIEW_PHOTOS - photos.length,
       });
       if (!result.canceled) setPhotos(prev => addReviewPhotos(prev, result.assets.map(a => a.uri)));

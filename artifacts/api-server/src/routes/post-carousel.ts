@@ -25,6 +25,8 @@ import { ObjectPermission } from "../lib/objectAcl";
 import { CAROUSEL_CANVAS, MAX_CAROUSEL_VIDEO_SECONDS, MAX_SLIDES_BY_SURFACE } from "../lib/postLimits";
 import { adjustFilters, cropFilter, parseAdjust, parseCrop, type Adjust, type CropRect } from "../lib/carouselAdjust";
 import { jsonList, looseBody, validateBody } from "../middlewares/bodySchemas";
+import { dimsMetadata, imageBufferDims } from "../lib/mediaDimensions";
+import { hasZscale, isHdr, outputFps, posterArgs, probeVideo, sdrStage, videoEncodeArgs, STILL_JPEG_QV } from "../lib/mediaQuality";
 
 const router = Router();
 
@@ -34,7 +36,7 @@ const storage = new ObjectStorageService();
 const exec = promisify(execFile);
 const OBJECT_PATH_RE = /^\/objects\/uploads\/[A-Za-z0-9._/-]+$/;
 const PREVIEW_TTL_SECONDS = 60 * 60;
-const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
+const MAX_PHOTO_BYTES = 40 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 1024 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 1536 * 1024 * 1024;
 const { w: W, h: H } = CAROUSEL_CANVAS;
@@ -86,7 +88,10 @@ router.post("/compose-carousel", requireAuth, validateBody(composeCarouselBody),
   const { items } = parsed;
 
   const dir = await fs.mkdtemp(join(tmpdir(), "bt-carousel-"));
-  const outputs: Array<{ kind: "photo" | "video"; mediaPath: string; thumbnailPath: string; duration?: number }> = [];
+  const outputs: Array<{
+    kind: "photo" | "video"; mediaPath: string; thumbnailPath: string; duration?: number;
+    width?: number; height?: number; thumbnailWidth?: number; thumbnailHeight?: number;
+  }> = [];
   const created: string[] = [];
   try {
     let totalBytes = 0;
@@ -137,27 +142,43 @@ router.post("/compose-carousel", requireAuth, validateBody(composeCarouselBody),
       if (item.kind === "photo") {
         outPath = join(dir, `out_${i}.jpg`);
         contentType = "image/jpeg";
-        await exec("ffmpeg", ["-y", "-i", inputs[i], "-vf", base.join(","), "-frames:v", "1", "-q:v", "2", outPath], { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 });
+        // 4:4:4 JPEG at -q:v 2: one encode, no chroma smear on text and edges.
+        await exec("ffmpeg", ["-y", "-i", inputs[i], "-vf", [...base, "format=yuvj444p"].join(","), "-frames:v", "1", "-q:v", String(STILL_JPEG_QV), outPath], { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 });
         await fs.copyFile(outPath, poster);
       } else {
         outPath = join(dir, `out_${i}.mp4`);
         contentType = "video/mp4";
         const len = (item.trimEnd ?? 0) - item.trimStart;
+        const probe = await probeVideo(inputs[i]);
+        const fps = outputFps([probe]);
+        // Crop → downscale-only lanczos (a 720p clip is not blown up to the
+        // 1080x1440 photo canvas) → SDR (HDR tone-mapped after the downscale)
+        // → look → source fps.
+        const scale = `scale=w='min(iw,${W})':h=-2:flags=lanczos`;
+        const chain = [base[0], scale, sdrStage(isHdr(probe), await hasZscale()), ...base.slice(2), `fps=${fps}`, "format=yuv420p"];
         await exec("ffmpeg", [
           "-y", "-ss", String(item.trimStart), "-t", String(len), "-i", inputs[i],
-          "-vf", [...base, "fps=30", "format=yuv420p"].join(","),
-          "-c:v", "libx264", "-profile:v", "high", "-preset", "veryfast", "-crf", "21", "-maxrate", "8M", "-bufsize", "16M",
-          "-c:a", "aac", "-ar", "44100", "-movflags", "+faststart", outPath,
-        ], { timeout: 20 * 60_000, maxBuffer: 8 * 1024 * 1024 });
-        await exec("ffmpeg", ["-y", "-ss", String(Math.min(0.5, len / 3)), "-i", outPath, "-frames:v", "1", "-q:v", "3", poster], { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 });
+          "-vf", chain.join(","),
+          ...videoEncodeArgs({ fps, outputSeconds: len, audio: probe.hasAudio }),
+          outPath,
+        ], { timeout: 30 * 60_000, maxBuffer: 8 * 1024 * 1024 });
+        await exec("ffmpeg", posterArgs(outPath, poster, Math.min(0.5, len / 3)), { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 });
       }
-      const mediaPath = await storage.createObjectEntityFromBuffer(await fs.readFile(outPath), contentType);
+      const posterBytes = await fs.readFile(poster);
+      const posterDims = await imageBufferDims(posterBytes);
+      const mediaDims = item.kind === "photo" ? posterDims : await probeVideo(outPath).then((p) => ({ width: p.width, height: p.height }));
+      const mediaPath = await storage.createObjectEntityFromBuffer(await fs.readFile(outPath), contentType, undefined, { metadata: dimsMetadata(mediaDims) });
       created.push(mediaPath);
       await storage.trySetObjectEntityAclPolicy(mediaPath, { owner: clerkId, visibility: "private" });
-      const thumbnailPath = await storage.createObjectEntityFromBuffer(await fs.readFile(poster), "image/jpeg");
+      const thumbnailPath = await storage.createObjectEntityFromBuffer(posterBytes, "image/jpeg", undefined, { metadata: dimsMetadata(posterDims) });
       created.push(thumbnailPath);
       await storage.trySetObjectEntityAclPolicy(thumbnailPath, { owner: clerkId, visibility: "private" });
-      outputs.push({ kind: item.kind, mediaPath, thumbnailPath, duration: item.kind === "video" ? (item.trimEnd ?? 0) - item.trimStart : undefined });
+      outputs.push({
+        kind: item.kind, mediaPath, thumbnailPath,
+        duration: item.kind === "video" ? (item.trimEnd ?? 0) - item.trimStart : undefined,
+        width: mediaDims?.width, height: mediaDims?.height,
+        thumbnailWidth: posterDims?.width, thumbnailHeight: posterDims?.height,
+      });
     }
 
     const result = await Promise.all(outputs.map(async (o) => ({

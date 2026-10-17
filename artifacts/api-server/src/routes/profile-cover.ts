@@ -51,6 +51,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { redirectToPublicMedia } from "../lib/mediaDelivery";
 import { ObjectPermission } from "../lib/objectAcl";
+import { longEdgeFilter, renderSilentRendition } from "../lib/mediaQuality";
 import {
   COVER_GIF_MAX_BYTES,
   COVER_MAX_UPLOAD_BYTES,
@@ -131,18 +132,12 @@ export const ffmpegCoverProcessor: CoverMediaProcessor = {
   },
   async render(input, output, poster, trim, crop) {
     const trimArgs = trim ? ["-ss", String(trim.start), "-t", String(trim.duration)] : [];
-    // Banner framing first (even dimensions for yuv420p), then 720p max on
-    // the long edge, no audio track at all (covers are always muted),
-    // faststart so playback begins while it streams.
-    await exec("ffmpeg", [
-      "-y", ...trimArgs, "-i", input,
-      "-vf", `${cropFilterFor(crop)}${SCALE_FILTER}`,
-      "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p",
-      "-movflags", "+faststart", output,
-    ], { timeout: 180_000, maxBuffer: 8 * 1024 * 1024 });
-    await exec("ffmpeg", [
-      "-y", "-ss", "0.3", "-i", output, "-frames:v", "1", "-q:v", "3", poster,
-    ], { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 });
+    // 1080p (1920 long edge) max, downscale only, source fps, no audio track
+    // at all (covers are always muted), faststart so playback begins while it
+    // streams. Was 1280 / crf 28 / 30 fps — visibly soft full-bleed.
+    await renderSilentRendition({
+      input, output, poster, inputArgs: trimArgs, scale: `${cropFilterFor(crop)}${longEdgeFilter()}`, posterOffset: 0.3,
+    });
   },
   async renderGif(input, output, poster, crop) {
     await exec("ffmpeg", [

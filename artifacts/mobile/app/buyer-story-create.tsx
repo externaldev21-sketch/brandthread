@@ -885,7 +885,7 @@ export default function StoryComposer() {
   const takePhoto = useCallback(async () => {
     if (!cameraRef.current) return;
     try {
-      const result = await cameraRef.current.takePictureAsync({ quality: uploadQuality(0.9) });
+      const result = await cameraRef.current.takePictureAsync({ quality: 1 });
       if (!result?.uri) return;
       if (gridSpec) {
         setGridCells((prev) => {
@@ -926,7 +926,7 @@ export default function StoryComposer() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
-      quality: uploadQuality(0.9),
+      quality: 1,
       videoMaxDuration: MAX_VIDEO_SECONDS,
     });
     if (!result.canceled && result.assets[0]) {

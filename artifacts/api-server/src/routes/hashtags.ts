@@ -24,6 +24,8 @@ import { matchesMutedWords } from "../lib/contentModerator";
 import { isTagAllowedPublicly, normalizeHashtag } from "../lib/hashtags";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import { mutedPhrasesFor, notBlockedWith, optionalViewerId, profilesById } from "../lib/safety";
+import { postDimsPayload } from "../lib/mediaDimensions";
+import { postDimsColumns } from "../lib/postDimsColumns";
 
 const router = Router();
 
@@ -113,6 +115,8 @@ async function postsForTag(tag: string, sort: SortMode, cursorRaw: string | null
       mediaUrls: posts.mediaUrls,
       thumbnailUrl: posts.thumbnailUrl,
       aspectRatio: posts.aspectRatio,
+      slides: posts.slides,
+      ...postDimsColumns,
       caption: posts.caption,
       hashtags: posts.hashtags,
       visibility: posts.visibility,
@@ -155,6 +159,8 @@ async function postsForTag(tag: string, sort: SortMode, cursorRaw: string | null
       mediaUrls: row.mediaUrls,
       thumbnailUrl: row.thumbnailUrl,
       aspectRatio: row.aspectRatio,
+      slides: row.slides,
+      ...postDimsPayload(row),
       caption: row.caption,
       hashtags: row.hashtags,
       createdAt: row.createdAt,

@@ -6,31 +6,24 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ObjectStorageService } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
-import { encodeFeedRenditions, FEED_STREAM_PROFILE } from "./feedVideoRenditions";
+import { encodeFeedRenditions, FEED_STREAM_PROFILE, renditionArgs } from "./feedVideoRenditions";
 
 const exec = promisify(execFile);
 const storage = new ObjectStorageService();
 const PROFILE = FEED_STREAM_PROFILE;
-export const FEED_VIDEO_FFMPEG_ARGS = [
-  "-map", "0:v:0", "-map", "0:a:0?", "-map_metadata", "-1",
-  "-vf", "scale=w='min(iw,if(gte(iw,ih),1280,720))':h='min(ih,if(gte(iw,ih),720,1280))':force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1",
-  "-c:v", "libx264", "-threads", "2", "-pix_fmt", "yuv420p", "-preset", "veryfast", "-crf", "23",
-  "-maxrate", "1800k", "-bufsize", "3600k", "-r", "30", "-g", "30",
-  "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", "-f", "mp4",
-] as const;
+export const FEED_VIDEO_FFMPEG_ARGS = renditionArgs(1080);
 
 export type FeedVideoProbe = {
-  streams: Array<{ codec_type: string; codec_name: string; width?: number; height?: number; pix_fmt?: string; bit_rate?: string }>;
+  streams: Array<{ codec_type: string; codec_name: string; codec_tag_string?: string; width?: number; height?: number; pix_fmt?: string; bit_rate?: string }>;
   format?: { bit_rate?: string; tags?: { major_brand?: string } };
 };
 export function meetsFeedVideoProfile(probe: FeedVideoProbe, faststart: boolean): boolean {
   const video = probe.streams.find(s => s.codec_type === "video");
   const audio = probe.streams.find(s => s.codec_type === "audio");
   if (!video?.width || !video.height) return false;
-  return faststart && video.codec_name === "h264" && video.pix_fmt === "yuv420p" &&
-    Math.max(video.width, video.height) <= 1280 && Math.min(video.width, video.height) <= 720 &&
-    Number(video.bit_rate ?? probe.format?.bit_rate ?? Infinity) <= 2_400_000 &&
-    !probe.format?.tags?.major_brand?.trim().startsWith("qt") &&
+  return faststart && (video.codec_name === "h264" || (video.codec_name === "hevc" && video.codec_tag_string === "hvc1")) && video.pix_fmt === "yuv420p" &&
+    Math.max(video.width, video.height) <= 1920 && Math.min(video.width, video.height) <= 1080 &&
+    Number(video.bit_rate ?? probe.format?.bit_rate ?? Infinity) <= 14_000_000 &&
     (!audio || audio.codec_name === "aac");
 }
 
@@ -127,7 +120,7 @@ export async function createFeedVideoPoster(path: string, owner: string): Promis
     const input = join(dir, "input"), output = join(dir, "poster.jpg");
     await file.download({ destination: input });
     await exec("ffmpeg", ["-v", "error", "-y", "-i", input, "-t", "30",
-      "-vf", "blackframe=amount=0:threshold=24,metadata=select:key=lavfi.blackframe.pblack:value=95:function=less,thumbnail=15,scale=720:-2",
+      "-vf", "blackframe=amount=0:threshold=24,metadata=select:key=lavfi.blackframe.pblack:value=95:function=less,thumbnail=15,scale='min(1080,iw)':-2",
       "-frames:v", "1", "-q:v", "2", output], { timeout: 120_000, maxBuffer: 1024 * 1024 });
     const bytes = await readFile(output);
     const ownerKey = createHash("sha256").update(owner).digest("hex").slice(0, 16);

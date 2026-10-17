@@ -80,7 +80,7 @@ export default function BuyerRefundRequestScreen() {
       // POST /api/returns/evidence takes JPEG, PNG or WebP photos only.
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
-      quality: 0.8,
+      quality: 0.9,
     });
     if (!result.canceled) {
       setEvidencePhotos(prev => [

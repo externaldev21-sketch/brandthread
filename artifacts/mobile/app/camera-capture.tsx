@@ -245,7 +245,7 @@ export default function CameraCapture() {
     setCaptureError(null);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      const result = await cameraRef.current.takePictureAsync({ quality: 0.9 });
+      const result = await cameraRef.current.takePictureAsync({ quality: 1 });
       if (result?.uri) {
         (global as any).__cameraCaptureResult = { uri: result.uri, type: 'photo' };
         goBackOr(router);

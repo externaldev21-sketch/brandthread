@@ -31,6 +31,7 @@ import { teamContext, requireRole } from "../middlewares/requireRole";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { redirectToPublicMedia } from "../lib/mediaDelivery";
 import { ObjectPermission } from "../lib/objectAcl";
+import { longEdgeFilter, renderSilentRendition } from "../lib/mediaQuality";
 import { setPublicCacheHeaders } from "../lib/httpCache";
 import { isUuid } from "../lib/productPairings";
 import {
@@ -66,15 +67,8 @@ export const ffmpegProductVideoProcessor: ProductVideoProcessor = {
     return value;
   },
   async render(input, output, poster) {
-    await exec("ffmpeg", [
-      "-y", "-i", input,
-      "-vf", "scale='if(gt(iw,ih),min(1280,iw),-2)':'if(gt(iw,ih),-2,min(1280,ih))',fps=30",
-      "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p",
-      "-movflags", "+faststart", output,
-    ], { timeout: 240_000, maxBuffer: 8 * 1024 * 1024 });
-    await exec("ffmpeg", [
-      "-y", "-ss", "0.3", "-i", output, "-frames:v", "1", "-q:v", "3", poster,
-    ], { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 });
+    // 1080p (1920 long edge) max, downscale only, source fps, CRF 18.
+    await renderSilentRendition({ input, output, poster, scale: longEdgeFilter(), posterOffset: 0.3 });
   },
 };
 
