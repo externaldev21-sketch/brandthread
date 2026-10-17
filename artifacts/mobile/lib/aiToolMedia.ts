@@ -21,7 +21,7 @@ export function triggerWebDownload(url: string, filename: string) {
   document.body.removeChild(a);
 }
 
-async function dataUrlToLocalFile(imageUri: string, prefix: string): Promise<string> {
+export async function dataUrlToLocalFile(imageUri: string, prefix: string): Promise<string> {
   if (!imageUri.startsWith('data:')) return imageUri;
   const b64 = imageUri.replace(/^data:image\/[a-z]+;base64,/, '');
   const file = new File(Paths.cache, `${prefix}-${Date.now()}.png`);
