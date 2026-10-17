@@ -33,6 +33,14 @@ import {
 } from '@/services/orderService';
 import { sharePackingSlip } from '@/lib/packingSlip';
 import { radius } from '@/constants/radii';
+import { RetryRow } from '@/components/ui/RetryRow';
+import { apiErrorMessage } from '@/lib/safety';
+
+function fulfillmentErrorMessage(e: unknown, fallback: string): string {
+  const m = apiErrorMessage(e, '');
+  if (m) return m;
+  return e instanceof Error && e.message && !/^API \d{3}/.test(e.message) ? e.message : fallback;
+}
 
 const LAST_PACKAGE_KEY = '@brandthread/fulfill-last-package:v1';
 const CARRIERS = ['USPS', 'UPS', 'FedEx', 'DHL', 'Other'] as const;
@@ -82,6 +90,9 @@ export default function FulfillOrderScreen() {
 
   // Step 2 — package
   const [presets, setPresets] = useState<PackagePreset[]>([]);
+  // A failed preset load must not look like "no saved packages".
+  const [presetsError, setPresetsError] = useState<string | null>(null);
+  const [savingPacked, setSavingPacked] = useState(false);
   const [packageChoice, setPackageChoice] = useState<PackageChoice | null>(null);
   const [suggestedWeightLb, setSuggestedWeightLb] = useState('');
   const [addingPreset, setAddingPreset] = useState(false);
@@ -126,13 +137,18 @@ export default function FulfillOrderScreen() {
     }
     setLoading(true);
     try {
-      const [raw, presetList] = await Promise.all([
+      const [raw, presetResult] = await Promise.all([
         api.orders.get(orderId),
-        getPackagePresets().catch(() => []),
+        getPackagePresets().then(
+          list => ({ ok: true as const, list }),
+          (e: unknown) => ({ ok: false as const, error: e }),
+        ),
       ]);
       const adapted = raw ? adaptApiOrder(raw) : null;
       setOrder(adapted);
+      const presetList = presetResult.ok ? presetResult.list : [];
       setPresets(presetList);
+      setPresetsError(presetResult.ok ? null : fulfillmentErrorMessage(presetResult.error, 'Your saved packages could not be loaded.'));
       if (adapted) {
         setChecked(Object.fromEntries(adapted.lineItems.map(li => [li.id, adapted.fulfillment.isPicked])));
       }
@@ -159,6 +175,16 @@ export default function FulfillOrderScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  const reloadPresets = useCallback(async () => {
+    try {
+      const list = await getPackagePresets();
+      setPresets(list);
+      setPresetsError(null);
+    } catch (e) {
+      setPresetsError(fulfillmentErrorMessage(e, 'Your saved packages could not be loaded.'));
+    }
+  }, []);
+
   const allChecked = order ? order.lineItems.length > 0 && order.lineItems.every(li => checked[li.id]) : false;
 
   function toggleItem(id: string) {
@@ -171,13 +197,20 @@ export default function FulfillOrderScreen() {
     setSavingChecklist(true);
     try {
       await updateFulfillmentChecklist(orderId, { isPicked: true });
+      setStep(2);
     } catch (err) {
       if (__DEV__) console.warn('[fulfill-order] checklist save failed', err);
-      // Non-fatal — the seller can still proceed and retry later.
+      Alert.alert(
+        'Couldn’t save picked items',
+        `${fulfillmentErrorMessage(err, 'The picked status wasn’t saved.')} Your team won’t see this order as picked until it saves.`,
+        [
+          { text: 'Retry', onPress: () => { void handleContinueFromChecklist(); } },
+          { text: 'Continue anyway', style: 'cancel', onPress: () => setStep(2) },
+        ],
+      );
     } finally {
       setSavingChecklist(false);
     }
-    setStep(2);
   }
 
   async function handleContinueFromPackage() {
@@ -190,10 +223,24 @@ export default function FulfillOrderScreen() {
     } catch {
       // Non-fatal.
     }
-    if (orderId) {
-      updateFulfillmentChecklist(orderId, { isPacked: true }).catch(() => {});
+    if (!orderId) { setStep(3); return; }
+    setSavingPacked(true);
+    try {
+      await updateFulfillmentChecklist(orderId, { isPacked: true });
+      setStep(3);
+    } catch (err) {
+      if (__DEV__) console.warn('[fulfill-order] mark packed failed', err);
+      Alert.alert(
+        'Couldn’t mark as packed',
+        `${fulfillmentErrorMessage(err, 'The packed status wasn’t saved.')} Your team won’t see this order as packed until it saves.`,
+        [
+          { text: 'Retry', onPress: () => { void handleContinueFromPackage(); } },
+          { text: 'Continue anyway', style: 'cancel', onPress: () => setStep(3) },
+        ],
+      );
+    } finally {
+      setSavingPacked(false);
     }
-    setStep(3);
   }
 
   async function handleAddPreset() {
@@ -420,6 +467,7 @@ export default function FulfillOrderScreen() {
         <ScreenHeader title="Fulfill Order" divider={false} />
         <View style={s.centered}>
           <Text style={s.errorText}>Couldn't load this order.</Text>
+          {orderId ? <SecondaryButton label="Retry" icon="refresh-cw" onPress={() => { void load(); }} style={{ marginTop: SP.md }} /> : null}
         </View>
       </View>
     );
@@ -522,6 +570,9 @@ export default function FulfillOrderScreen() {
         {step === 2 && (
           <>
             <SectionHeader title="Saved packages" />
+            {presetsError ? (
+              <RetryRow label="Couldn't load saved packages" onRetry={() => { void reloadPresets(); }} style={{ marginBottom: SP.sm }} />
+            ) : null}
             <View style={s.chipRow}>
               {presets.map(p => {
                 const active = packageChoice?.kind === 'preset' && packageChoice.presetId === p.id;
@@ -586,7 +637,7 @@ export default function FulfillOrderScreen() {
               </BrandthreadCard>
             )}
 
-            <PrimaryButton label="Continue" onPress={handleContinueFromPackage} disabled={!parcelDims} icon="arrow-right" />
+            <PrimaryButton label="Continue" onPress={handleContinueFromPackage} disabled={!parcelDims} loading={savingPacked} icon="arrow-right" />
           </>
         )}
 
