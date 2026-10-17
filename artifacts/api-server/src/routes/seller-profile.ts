@@ -4,7 +4,7 @@
  * PATCH /api/seller/policy    — update return / cancellation policy text
  */
 import express, { Router } from "express";
-import { db, interactions, orders, posts, users } from "@workspace/db";
+import { db, interactions, orders, posts, storefronts, users } from "@workspace/db";
 import { and, count, eq, isNotNull, notInArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -19,6 +19,8 @@ import {
 } from "../lib/storeIdentity";
 import { normalizeUploadedImage } from "../lib/productImageResize";
 import { MEDIA_REJECTED_MESSAGE, screenImageBuffer } from "../lib/mediaModeration";
+import { getOrCreateStorefront } from "./store";
+import { normalizeOnboardingGoals } from "../lib/sellerSetupChecklist";
 
 // ─── Startup migration — add tutorial flag + questionnaire + profile columns ───
 (async () => {
@@ -352,6 +354,20 @@ router.put("/profile/accent", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Seller profile not found" });
     return;
   }
+  // The public storefront renders its accent from storefronts.theme
+  // (primaryColor / accentColor), not users.store_accent_color — keep the two
+  // in step so the color the seller picks is the color buyers see.
+  if (color) {
+    try {
+      const sf = await getOrCreateStorefront(clerkId);
+      const theme = { ...((sf.theme as Record<string, unknown> | null) ?? {}), primaryColor: color, accentColor: color };
+      await db.update(storefronts).set({ theme: theme as any, updatedAt: new Date() }).where(eq(storefronts.id, sf.id));
+    } catch (err) {
+      req.log.error({ err }, "Store accent theme sync failed");
+      res.status(500).json({ error: "Could not apply your accent to your store. Please try again." });
+      return;
+    }
+  }
   res.json(updated);
 });
 
@@ -449,6 +465,16 @@ router.post("/onboarding/data", async (req, res) => {
       updated_at  = now()
     WHERE clerk_id = ${clerkId}
   `);
+  // Also keep the answers on the storefront (migration 270) so the setup
+  // checklist can prioritise tasks around the seller's goals.
+  const sf = await getOrCreateStorefront(clerkId);
+  const onboarding = {
+    ...((sf.onboarding as Record<string, unknown> | null) ?? {}),
+    goals: normalizeOnboardingGoals(goals),
+    ...(brandStage ? { brandStage } : {}),
+    ...(sellModel ? { sellModel } : {}),
+  };
+  await db.update(storefronts).set({ onboarding, updatedAt: new Date() } as any).where(eq(storefronts.id, sf.id));
   return res.json({ ok: true });
 });
 

@@ -4,6 +4,15 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api, ShopifyImportJob } from '@/lib/api';
+import { ApiError } from '@/lib/networkNotice';
+import { normalizeStoreSlug } from '@/lib/storefrontUrl';
+import {
+  BuilderListKey, SERVER_BUILDER_KEY, normalizeBuilderList, reconcileDecision,
+  builderSaveErrorMessage,
+} from './storeBuilderSync';
+import {
+  applySuggestionToStore, isAiUnavailableError, parseServerSuggestion, screenRoute,
+} from './storeAiActions';
 import {
   Storefront, StoreSection, StoreSectionType, StoreSectionSettings,
   StoreCollection, StorePage, StorePolicy, StoreMenu, StoreMenuItem,
@@ -72,6 +81,13 @@ export async function syncShopifyImportedStorefront(): Promise<Storefront> {
   if (remote?.seo && typeof remote.seo === 'object') {
     store.seo.homepageTitle = String(remote.seo.metaTitle ?? '');
     store.seo.homepageDescription = String(remote.seo.metaDescription ?? '');
+  }
+  // Imported collections belong on the server too (see commitBuilderList).
+  try {
+    await api.store.save({ collections: store.collections });
+    store.builderSync = { ...store.builderSync, collections: true };
+  } catch {
+    store.builderSync = { ...store.builderSync, collections: false };
   }
   return saveStorefront(store);
 }
@@ -413,9 +429,12 @@ export async function getStorefront(options: {
         local.publishStatus = 'unpublished';
       }
       local.sharePreviewRevokedAt = remote?.sharePreviewRevokedAt ?? null;
-      // Sync server title/slug if we don't have one locally
-      if (!local.settings.storeUrl && remote?.slug) {
-        local.settings.storeUrl = `${remote.slug}.brandthread.app`;
+      local.serverSlug = normalizeStoreSlug(remote?.slug);
+      // Sync server slug if we don't have one locally. Store the bare slug —
+      // display code builds the full URL (lib/storefrontUrl.ts); caching it
+      // with a ".brandthread.app" suffix is what produced doubled hosts.
+      if (!local.settings.storeUrl && local.serverSlug) {
+        local.settings.storeUrl = local.serverSlug;
       }
     } catch { /* no-op — API may not be reachable */ }
 
@@ -431,7 +450,14 @@ async function saveStorefront(store: Storefront): Promise<Storefront> {
   await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
 
   // Fire-and-forget sync to real API (best-effort, never blocks UI)
-  api.store.save({
+  api.store.save(storefrontApiPayload(store)).catch(() => {/* no-op */});
+
+  return store;
+}
+
+/** The storefront fields the editor syncs to PUT /api/store. */
+function storefrontApiPayload(store: Storefront): Record<string, unknown> {
+  return {
     title:       store.settings.storeName || store.settings.storeUrl || undefined,
     description: store.settings.storeName || undefined,
     theme: {
@@ -458,15 +484,25 @@ async function saveStorefront(store: Storefront): Promise<Storefront> {
       productSeoDefaults: store.seo.productSeoDefaults,
       sitemapEnabled:     store.seo.sitemapEnabled,
     },
-  } as Record<string, unknown>).catch(() => {/* no-op */});
-
-  return store;
+  };
 }
 
 export async function autosaveStorefront(partial: Partial<Storefront>): Promise<Storefront> {
   const store = await getStorefront({ refreshRemote: false });
   const updated = { ...store, ...partial, autosaveAt: new Date().toISOString() };
   return saveStorefront(updated);
+}
+
+/**
+ * Update only the on-device cache after the server already accepted a change
+ * (Store Settings / subdomain). No remote sync — the caller saved to the API.
+ */
+export async function cacheStorefrontLocally(mutate: (store: Storefront) => void): Promise<Storefront> {
+  const store = await getStorefront({ refreshRemote: false });
+  mutate(store);
+  store.lastEditedAt = new Date().toISOString();
+  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+  return store;
 }
 
 export async function updateSettings(settings: Partial<StoreSettings>): Promise<Storefront> {
@@ -692,10 +728,81 @@ export async function redoLastAction(): Promise<Storefront> {
   return saveStorefront(store);
 }
 
-// ─── Collections ──────────────────────────────────────────────────────────────
-export async function getCollections(): Promise<StoreCollection[]> {
+// ─── Builder lists (collections / pages / menus) ─────────────────────────────
+// Saved on the server storefront row (storefronts.collections / pages /
+// navigation via PUT /api/store) so they reach the live store and every
+// device. The on-device copy is only a cache / offline read fallback: a
+// change is written locally only after the server accepted it, and a failed
+// save throws StoreSaveError with text the screen shows as-is.
+
+/**
+ * Signed-out web demo (`demo=1`) — no server account, so builder lists and
+ * suggestions stay on-device there. Imported lazily: devPreview pulls in
+ * react-native, which this service otherwise doesn't need at load time.
+ */
+async function inDemoMode(): Promise<boolean> {
+  try {
+    return (await import('@/lib/devPreview')).isPreviewDemoMode();
+  } catch {
+    return false;
+  }
+}
+
+export class StoreSaveError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'StoreSaveError';
+  }
+}
+
+async function commitBuilderList(store: Storefront, key: BuilderListKey): Promise<Storefront> {
+  // The signed-out web demo (demo=1) has no server account — keep it local.
+  if (!(await inDemoMode())) {
+    try {
+      await api.store.save({ [SERVER_BUILDER_KEY[key]]: store[key] });
+    } catch (error) {
+      throw new StoreSaveError(builderSaveErrorMessage(error));
+    }
+    store.builderSync = { ...store.builderSync, [key]: true };
+  }
+  store.lastEditedAt = new Date().toISOString();
+  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+  return store;
+}
+
+async function loadBuilderList<K extends BuilderListKey>(
+  key: K,
+  onLocal?: (list: Storefront[K]) => void,
+): Promise<Storefront[K]> {
   const store = await getStorefront({ refreshRemote: false });
-  return store.collections;
+  onLocal?.(store[key]);
+  if (await inDemoMode()) return store[key];
+  let remote: any;
+  try {
+    remote = await api.store.get();
+  } catch {
+    return store[key]; // offline — last list the server confirmed on this device
+  }
+  const remoteList = remote?.[SERVER_BUILDER_KEY[key]];
+  const decision = reconcileDecision(key, remoteList, store[key], store.builderSync?.[key] === true);
+  if (decision === 'keep-local') return store[key];
+  if (decision === 'upload-local') {
+    // Lists made on this device before they were saved server-side: push once.
+    try {
+      await commitBuilderList(store, key);
+    } catch { /* stays unsynced; next load retries */ }
+    return store[key];
+  }
+  const normalized = normalizeBuilderList(key, remoteList) as Storefront[K];
+  store[key] = (key === 'menus' && (normalized as StoreMenu[]).length === 0 ? defaultMenus() : normalized) as Storefront[K];
+  store.builderSync = { ...store.builderSync, [key]: true };
+  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+  return store[key];
+}
+
+// ─── Collections ──────────────────────────────────────────────────────────────
+export async function getCollections(options: { onLocal?: (list: StoreCollection[]) => void } = {}): Promise<StoreCollection[]> {
+  return loadBuilderList('collections', options.onLocal);
 }
 
 export async function createCollection(data: Partial<StoreCollection>): Promise<Storefront> {
@@ -717,27 +824,26 @@ export async function createCollection(data: Partial<StoreCollection>): Promise<
     ...data,
   };
   store.collections.push(col);
-  return saveStorefront(store);
+  return commitBuilderList(store, 'collections');
 }
 
 export async function updateCollection(id: string, data: Partial<StoreCollection>): Promise<Storefront> {
   const store = await getStorefront({ refreshRemote: false });
   const idx = store.collections.findIndex(c => c.id === id);
-  if (idx === -1) return store;
+  if (idx === -1) throw new StoreSaveError('This collection no longer exists. Refresh and try again.');
   store.collections[idx] = { ...store.collections[idx], ...data, updatedAt: new Date().toISOString() };
-  return saveStorefront(store);
+  return commitBuilderList(store, 'collections');
 }
 
 export async function deleteCollection(id: string): Promise<Storefront> {
   const store = await getStorefront({ refreshRemote: false });
   store.collections = store.collections.filter(c => c.id !== id);
-  return saveStorefront(store);
+  return commitBuilderList(store, 'collections');
 }
 
 // ─── Pages ────────────────────────────────────────────────────────────────────
-export async function getPages(): Promise<StorePage[]> {
-  const store = await getStorefront({ refreshRemote: false });
-  return store.pages;
+export async function getPages(options: { onLocal?: (list: StorePage[]) => void } = {}): Promise<StorePage[]> {
+  return loadBuilderList('pages', options.onLocal);
 }
 
 export async function createPage(data: Partial<StorePage>): Promise<Storefront> {
@@ -755,15 +861,15 @@ export async function createPage(data: Partial<StorePage>): Promise<Storefront> 
     ...data,
   };
   store.pages.push(page);
-  return saveStorefront(store);
+  return commitBuilderList(store, 'pages');
 }
 
 export async function updatePage(id: string, data: Partial<StorePage>): Promise<Storefront> {
   const store = await getStorefront({ refreshRemote: false });
   const idx = store.pages.findIndex(p => p.id === id);
-  if (idx === -1) return store;
+  if (idx === -1) throw new StoreSaveError('This page no longer exists. Refresh and try again.');
   store.pages[idx] = { ...store.pages[idx], ...data, updatedAt: new Date().toISOString() };
-  return saveStorefront(store);
+  return commitBuilderList(store, 'pages');
 }
 
 export async function duplicatePage(id: string): Promise<Storefront> {
@@ -781,13 +887,13 @@ export async function duplicatePage(id: string): Promise<Storefront> {
     updatedAt: now,
   };
   store.pages.push(copy);
-  return saveStorefront(store);
+  return commitBuilderList(store, 'pages');
 }
 
 export async function deletePage(id: string): Promise<Storefront> {
   const store = await getStorefront({ refreshRemote: false });
   store.pages = store.pages.filter(p => p.id !== id);
-  return saveStorefront(store);
+  return commitBuilderList(store, 'pages');
 }
 
 // ─── Policies ─────────────────────────────────────────────────────────────────
@@ -818,17 +924,16 @@ export async function upsertPolicy(type: StorePolicy['type'], content: string, a
 }
 
 // ─── Menus ────────────────────────────────────────────────────────────────────
-export async function getMenus(): Promise<StoreMenu[]> {
-  const store = await getStorefront({ refreshRemote: false });
-  return store.menus;
+export async function getMenus(options: { onLocal?: (list: StoreMenu[]) => void } = {}): Promise<StoreMenu[]> {
+  return loadBuilderList('menus', options.onLocal);
 }
 
 export async function updateMenu(id: string, items: StoreMenuItem[]): Promise<Storefront> {
   const store = await getStorefront({ refreshRemote: false });
   const idx = store.menus.findIndex(m => m.id === id);
-  if (idx === -1) return store;
+  if (idx === -1) throw new StoreSaveError('This menu no longer exists. Refresh and try again.');
   store.menus[idx] = { ...store.menus[idx], items, updatedAt: new Date().toISOString() };
-  return saveStorefront(store);
+  return commitBuilderList(store, 'menus');
 }
 
 // ─── Domains ──────────────────────────────────────────────────────────────────
@@ -989,26 +1094,89 @@ export async function restoreVersion(versionId: string): Promise<Storefront> {
 }
 
 // ─── AI Suggestions ───────────────────────────────────────────────────────────
-export async function generateAISuggestions(): Promise<Storefront> {
-  const store = await getStorefront({ refreshRemote: false });
-  const active = store.aiSuggestions.filter(s => !s.dismissed && !s.applied);
-  if (active.length >= 3) return store;
-  // Pick random suggestions not already present
-  const existing = new Set(store.aiSuggestions.map(s => s.title));
-  const pool = AI_SUGGESTION_POOL.filter(s => !existing.has(s.title));
-  const picks = pool.sort(() => Math.random() - 0.5).slice(0, 3 - active.length);
-  const now = new Date().toISOString();
-  picks.forEach(p => {
-    store.aiSuggestions.push({ ...p, id: uid('sug'), dismissed: false, applied: false, createdAt: now });
-  });
-  return saveStorefront(store);
+// Real suggestions come from POST /api/store/ai/suggestions, generated from
+// this seller's store data. The built-in AI_SUGGESTION_POOL is only used in
+// the signed-out web demo (demo=1). Apply performs the suggestion's action
+// and saves it with PUT /api/store — nothing is marked applied unless the
+// server accepted the change.
+
+export class AISuggestionsUnavailableError extends Error {
+  constructor(message = 'AI suggestions are unavailable right now.') {
+    super(message);
+    this.name = 'AISuggestionsUnavailableError';
+  }
 }
 
-export async function applyAISuggestion(id: string): Promise<Storefront> {
-  const store = await getStorefront();
-  const s = store.aiSuggestions.find(s => s.id === id);
-  if (s) { s.applied = true; }
-  return saveStorefront(store);
+export async function generateAISuggestions(): Promise<Storefront> {
+  const store = await getStorefront({ refreshRemote: false });
+  const now = new Date().toISOString();
+  if (await inDemoMode()) {
+    const active = store.aiSuggestions.filter(s => !s.dismissed && !s.applied);
+    if (active.length >= 3) return store;
+    const existing = new Set(store.aiSuggestions.map(s => s.title));
+    const pool = AI_SUGGESTION_POOL.filter(s => !existing.has(s.title));
+    const picks = pool.sort(() => Math.random() - 0.5).slice(0, 3 - active.length);
+    picks.forEach(p => {
+      store.aiSuggestions.push({ ...p, id: uid('sug'), dismissed: false, applied: false, createdAt: now });
+    });
+    return saveStorefront(store);
+  }
+
+  let response: { suggestions?: unknown[] };
+  try {
+    response = await api.store.suggestions();
+  } catch (error) {
+    if (isAiUnavailableError(error)) throw new AISuggestionsUnavailableError();
+    throw new Error(storeApiErrorMessage(error, "Couldn't get suggestions right now. Please try again."));
+  }
+  const fresh = (Array.isArray(response?.suggestions) ? response.suggestions : [])
+    .map(parseServerSuggestion)
+    .filter((s): s is NonNullable<ReturnType<typeof parseServerSuggestion>> => s !== null);
+  // Keep the applied / dismissed history; replace the open suggestions.
+  const history = store.aiSuggestions.filter(s => (s.applied || s.dismissed) && s.action);
+  const dismissedTitles = new Set(history.filter(s => s.dismissed).map(s => s.title.toLowerCase()));
+  store.aiSuggestions = [
+    ...history,
+    ...fresh
+      .filter(s => !dismissedTitles.has(s.title.toLowerCase()))
+      .map(s => ({ ...s, id: uid('sug'), dismissed: false, applied: false, createdAt: now })),
+  ].slice(-30);
+  store.lastEditedAt = now;
+  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+  return store;
+}
+
+/**
+ * Performs a suggestion. Value actions are saved to the server first;
+ * open_screen suggestions return the route to open instead of changing anything.
+ */
+export async function applyAISuggestion(id: string): Promise<{ storefront: Storefront; navigateTo?: string }> {
+  const store = await getStorefront({ refreshRemote: false });
+  const sug = store.aiSuggestions.find(s => s.id === id);
+  if (!sug) throw new StoreSaveError('This suggestion is no longer available. Refresh suggestions.');
+  if (!sug.action) {
+    if (await inDemoMode()) {
+      sug.applied = true;
+      return { storefront: await saveStorefront(store) };
+    }
+    throw new StoreSaveError("This suggestion can't be applied automatically. Refresh suggestions.");
+  }
+  const route = screenRoute(sug.action);
+  if (route) return { storefront: store, navigateTo: route };
+  if (!applySuggestionToStore(store, sug.action)) {
+    throw new StoreSaveError('Your store has no hero section to update. Add one in Sections first.');
+  }
+  if (!(await inDemoMode())) {
+    try {
+      await api.store.save(storefrontApiPayload(store));
+    } catch (error) {
+      throw new StoreSaveError(builderSaveErrorMessage(error));
+    }
+  }
+  sug.applied = true;
+  store.lastEditedAt = new Date().toISOString();
+  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+  return { storefront: store };
 }
 
 export async function dismissAISuggestion(id: string): Promise<Storefront> {
@@ -1529,6 +1697,15 @@ export async function validateStore(): Promise<StoreValidationResult> {
   };
 }
 
+/** Server's own message for a failed store call (no "API 4xx:" prefix); fallback for 5xx/network. */
+function storeApiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError && error.status < 500) {
+    const message = error.message.replace(/^API \d{3}:\s*/, '').trim();
+    if (message) return message;
+  }
+  return fallback;
+}
+
 export async function publishStore(): Promise<{ success: boolean; message: string; storefront?: Storefront }> {
   const validation = await validateStore();
   if (!validation.canPublish) {
@@ -1539,22 +1716,34 @@ export async function publishStore(): Promise<{ success: boolean; message: strin
   // can roll back to the last draft even after the server restarts.
   const publishLabel = `Published ${new Date().toLocaleString()}`;
   const prePublishSnapshot = await _createVersionSnapshot(store, 'publish', publishLabel);
+
+  // Publish on the server first — only a successful POST /api/store/publish
+  // makes the store live, so local state follows the server, never the reverse.
+  let remote: { status?: string; slug?: string | null; publishedAt?: string | null } | null;
+  try {
+    remote = await api.store.publish();
+  } catch (error) {
+    return { success: false, message: storeApiErrorMessage(error, "We couldn't publish your store. Check your connection and try again.") };
+  }
+  if (remote?.status !== 'published') {
+    return { success: false, message: "We couldn't publish your store. Please try again." };
+  }
+
   api.store.saveVersion(publishLabel, prePublishSnapshot as Record<string, unknown>).catch(() => {});
 
   store.publishStatus = 'published';
-  store.publishedAt = new Date().toISOString();
+  store.publishedAt = remote.publishedAt ?? new Date().toISOString();
   await saveStorefront(store);
-
-  // Publish to real API
-  try { await api.store.publish(); } catch { /* no-op */ }
+  store.serverSlug = normalizeStoreSlug(remote.slug);
 
   return { success: true, message: 'Your store is now live.', storefront: store };
 }
 
 export async function unpublishStore(): Promise<Storefront> {
   const store = await getStorefront();
+  // Server first: a failed unpublish must not report the store as hidden.
+  await api.store.unpublish();
   store.publishStatus = 'unpublished';
-  try { await api.store.unpublish(); } catch { /* no-op */ }
   return saveStorefront(store);
 }
 

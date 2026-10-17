@@ -76,7 +76,7 @@ router.put("/policies", async (req, res) => {
     // Upsert storefront row if it doesn't exist yet
     await db.execute(sql`
       INSERT INTO storefronts (owner_id, slug, title, policies)
-      VALUES (${ownerId}, ${ownerId}, 'My Store', ${JSON.stringify(policies)}::jsonb)
+      VALUES (${ownerId}, 'store-' || substr(md5(random()::text), 1, 8), 'My Store', ${JSON.stringify(policies)}::jsonb)
       ON CONFLICT (owner_id) DO UPDATE
         SET policies   = ${JSON.stringify(policies)}::jsonb,
             updated_at = now()

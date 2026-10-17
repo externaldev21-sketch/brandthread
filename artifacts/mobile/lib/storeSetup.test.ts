@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { handleFromStoredLink, previewSocialLink, suggestHandle } from './storeSetup';
+import { canSaveSocialLinks, handleFromStoredLink, previewSocialLink, suggestHandle } from './storeSetup';
 
 describe('suggestHandle', () => {
   it('turns a store name into a handle', () => {
@@ -27,5 +27,19 @@ describe('handleFromStoredLink', () => {
     expect(handleFromStoredLink('instagram', 'https://www.instagram.com/studio')).toBe('studio');
     expect(handleFromStoredLink('tiktok', 'https://www.tiktok.com/@studio')).toBe('studio');
     expect(handleFromStoredLink('tiktok', undefined)).toBe('');
+  });
+});
+
+describe('canSaveSocialLinks', () => {
+  const empty = { status: 'empty' } as const;
+  it('lets the seller remove both saved links', () => {
+    expect(canSaveSocialLinks({ instagram: empty, tiktok: empty }, { instagram: 'shop', tiktok: 'shop' })).toBe(true);
+  });
+  it('needs one link when nothing was saved before', () => {
+    expect(canSaveSocialLinks({ instagram: empty, tiktok: empty }, { instagram: '', tiktok: '' })).toBe(false);
+    expect(canSaveSocialLinks({ instagram: previewSocialLink('instagram', '@shop'), tiktok: empty }, { instagram: '', tiktok: '' })).toBe(true);
+  });
+  it('blocks saving an invalid link', () => {
+    expect(canSaveSocialLinks({ instagram: previewSocialLink('instagram', 'https://evil.com/x'), tiktok: empty }, { instagram: 'a', tiktok: '' })).toBe(false);
   });
 });

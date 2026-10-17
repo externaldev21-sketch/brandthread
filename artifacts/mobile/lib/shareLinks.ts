@@ -109,7 +109,8 @@ export function parseShareLink(raw: string | null | undefined): ShareLinkTarget 
     return /^[a-z0-9_]{3,30}$/.test(username) ? { kind: 'profile', username, href: `/u/${q(username)}` } : null;
   }
   if (head === 'store' && a === 'product' && parts.length === 3 && ID_RE.test(b)) {
-    return { kind: 'product', id: b, href: `/product-detail?id=${q(b)}` };
+    // Owner vs shopper is decided by app/store/product/[productId].tsx (guest-allowed).
+    return { kind: 'product', id: b, href: `/store/product/${q(b)}` };
   }
   if (head === 'store' && a && a !== 'product' && parts.length === 2 && HANDLE_RE.test(a)) {
     const handle = a.toLowerCase();

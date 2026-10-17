@@ -16,7 +16,8 @@ import {
   retainDesignUploadAsset,
 } from '@/lib/designCloudImageCache';
 import { ApiError } from '@/lib/networkNotice';
-import { isPreviewDemoMode } from '@/lib/devPreview';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { fromServerBrandAsset, toServerBrandAsset, type ServerBrandAsset } from './brandAssetsSync';
 import {
   DesignProject, DesignProjectType, DesignProjectStatus, DesignCanvas,
   DesignLayer, DesignVersion, DesignVersionMeta, BrandAsset, BrandAssetTypeKind,
@@ -1300,23 +1301,62 @@ export async function restoreVersion(versionId: string): Promise<DesignProject> 
 }
 
 // ─── Brand Assets ─────────────────────────────────────────────────────────────
+// Real sellers: persisted server-side (GET/PUT /api/seller/brand-assets, stored
+// in storefronts.brand_assets) so the library survives a reinstall or a new
+// phone. Image assets must be uploaded first (objectPath) — see
+// design-brand-assets.tsx. The signed-out seller preview / demo mode keeps the
+// old device-local store so demo behaviour is unchanged. Errors propagate so
+// the screen can show them instead of pretending the save worked.
+
+function brandAssetsAreLocal(): boolean {
+  return isSellerDevPreview() || isPreviewDemoMode();
+}
+
+async function fetchServerBrandAssets(): Promise<BrandAsset[]> {
+  const res = await serviceRequest<{ assets: Array<ServerBrandAsset & { uri?: string | null }> }>('/api/seller/brand-assets');
+  return (res.assets ?? []).map(fromServerBrandAsset);
+}
+
+async function saveServerBrandAssets(assets: BrandAsset[]): Promise<BrandAsset[]> {
+  const res = await serviceRequest<{ assets: Array<ServerBrandAsset & { uri?: string | null }> }>('/api/seller/brand-assets', {
+    method: 'PUT',
+    body: JSON.stringify({ assets: assets.map(toServerBrandAsset) }),
+  });
+  return (res.assets ?? []).map(fromServerBrandAsset);
+}
 
 export async function getBrandAssets(): Promise<BrandAsset[]> {
-  return loadAssets();
+  if (brandAssetsAreLocal()) return loadAssets();
+  const server = await fetchServerBrandAssets();
+  if (server.length > 0) return server;
+  // One-time carry-over of a library saved on this phone before the server
+  // existed. Only assets that can be stored (colors, fonts, https images) are
+  // moved; a device-local image file cannot be, and stays on this phone only.
+  const local = await loadAssets().catch(() => [] as BrandAsset[]);
+  const portable = local.filter(a => {
+    try { toServerBrandAsset(a); return true; } catch { return false; }
+  });
+  if (portable.length === 0) return server;
+  return saveServerBrandAssets(portable);
 }
 
 // addBrandAsset — alias for createBrandAsset (used by design-brand-assets.tsx)
 export async function addBrandAsset(
   asset: Omit<BrandAsset, 'id' | 'createdAt'>,
 ): Promise<BrandAsset> {
-  const assets = await loadAssets();
   const newAsset: BrandAsset = {
     ...asset,
     id: uid('asset'),
     createdAt: new Date().toISOString(),
   };
-  await saveAssets([...assets, newAsset]);
-  return newAsset;
+  if (brandAssetsAreLocal()) {
+    const assets = await loadAssets();
+    await saveAssets([...assets, newAsset]);
+    return newAsset;
+  }
+  const current = await fetchServerBrandAssets();
+  const saved = await saveServerBrandAssets([...current, newAsset]);
+  return saved.find(a => a.id === newAsset.id) ?? newAsset;
 }
 
 export async function createBrandAsset(
@@ -1327,28 +1367,32 @@ export async function createBrandAsset(
 
 // renameBrandAsset — used by design-brand-assets.tsx
 export async function renameBrandAsset(id: string, name: string): Promise<BrandAsset> {
-  const assets = await loadAssets();
-  const idx = assets.findIndex(a => a.id === id);
-  if (idx === -1) throw new Error(`Asset ${id} not found`);
-  const updated: BrandAsset = { ...assets[idx], name };
-  assets[idx] = updated;
-  await saveAssets(assets);
-  return updated;
+  return updateBrandAsset(id, { name });
 }
 
 export async function updateBrandAsset(id: string, partial: Partial<BrandAsset>): Promise<BrandAsset> {
-  const assets = await loadAssets();
+  const local = brandAssetsAreLocal();
+  const assets = local ? await loadAssets() : await fetchServerBrandAssets();
   const idx = assets.findIndex(a => a.id === id);
   if (idx === -1) throw new Error(`Asset ${id} not found`);
   const updated: BrandAsset = { ...assets[idx], ...partial, id };
   assets[idx] = updated;
-  await saveAssets(assets);
-  return updated;
+  if (local) {
+    await saveAssets(assets);
+    return updated;
+  }
+  const saved = await saveServerBrandAssets(assets);
+  return saved.find(a => a.id === id) ?? updated;
 }
 
 export async function deleteBrandAsset(id: string): Promise<void> {
-  const assets = await loadAssets();
-  await saveAssets(assets.filter(a => a.id !== id));
+  if (brandAssetsAreLocal()) {
+    const assets = await loadAssets();
+    await saveAssets(assets.filter(a => a.id !== id));
+    return;
+  }
+  const assets = await fetchServerBrandAssets();
+  await saveServerBrandAssets(assets.filter(a => a.id !== id));
 }
 
 // ─── Color picker state (recents + brand palettes) ────────────────────────────

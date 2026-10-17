@@ -87,3 +87,19 @@ export function handleFromStoredLink(platform: SocialPlatform, stored: string | 
   if (!stored) return '';
   return parseSocialHandle(platform, stored) ?? stored;
 }
+
+/**
+ * Whether the socials step can save. Clearing every saved link is a real
+ * change (it removes them server-side), so an all-empty form may save when
+ * something was saved before; it only needs at least one filled link when
+ * nothing was saved yet.
+ */
+export function canSaveSocialLinks(
+  current: Record<SocialPlatform, SocialPreview>,
+  saved: Record<SocialPlatform, string>,
+): boolean {
+  const states = Object.values(current);
+  if (states.some((p) => p.status === 'invalid')) return false;
+  if (states.some((p) => p.status === 'ok')) return true;
+  return Object.values(saved).some((v) => v.trim().length > 0);
+}

@@ -56,13 +56,13 @@ WebBrowser.maybeCompleteAuthSession();
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import GoogleGlyph from '@/components/branding/GoogleGlyph';
 import {
-  APP_THEME_PRESETS,
   DEFAULT_THEME,
   getOnAccentTextStyle,
   useAppTheme,
-  type AppThemeId,
 } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
+import { STORE_ACCENT_COLORS } from '@/lib/storeSetup';
+import { dataUrlToLocalFile } from '@/lib/aiToolMedia';
 import { hydrateMyProfileFromAccount, socialKeysForUser } from '@/services/socialService';
 import { DEFAULT_BUYER_PROFILE, saveBuyerProfileForUser } from '@/lib/buyerProfile';
 import { SellerPlanRecommendationStep } from '@/components/onboarding/SellerPlanRecommendationStep';
@@ -176,8 +176,12 @@ function draftKeyForUser(userId?: string | null): string | null {
   return userId ? `${DRAFT_KEY_PREFIX}${userId}` : null;
 }
 
-function isAppThemeId(value: unknown): value is AppThemeId {
-  return typeof value === 'string' && APP_THEME_PRESETS.some((preset) => preset.id === value);
+/** Monochrome storefront accents (server allowlist: PUT /api/seller/profile/accent). */
+const STORE_ACCENT_NAMES = ['Black', 'Graphite', 'Grey', 'Silver', 'Mist', 'White'];
+const DEFAULT_STORE_ACCENT = STORE_ACCENT_COLORS[0];
+
+function isStoreAccent(value: unknown): value is string {
+  return typeof value === 'string' && STORE_ACCENT_COLORS.includes(value);
 }
 
 // ─── Clerk error mapper ──────────────────────────────────────────────────────
@@ -1722,16 +1726,19 @@ const createSsa = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 // ─── Seller preview / theme selection step ────────────────────────────────────
 function SellerPreviewStep({
   brandName,
-  selectedThemeId,
-  onSelectTheme,
+  selectedAccent,
+  onSelectAccent,
   onContinue,
   generateSample,
+  saveSampleAsLogo,
 }: {
   brandName: string;
-  selectedThemeId: AppThemeId;
-  onSelectTheme: (id: AppThemeId) => void;
+  selectedAccent: string;
+  onSelectAccent: (color: string) => void;
   onContinue: () => void;
   generateSample: (style: string) => Promise<{ b64_json: string }>;
+  /** Saves the accepted AI sample as the seller's logo (users.logoUrl). */
+  saveSampleAsLogo: (dataUri: string) => Promise<void>;
 }) {
   const { theme } = useAppTheme();
   const spreview = createSpreview(theme);
@@ -1739,6 +1746,27 @@ function SellerPreviewStep({
   const [sampleUri, setSampleUri] = useState<string | null>(null);
   const [sampleError, setSampleError] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [savingLogo, setSavingLogo] = useState(false);
+  const [logoSaved, setLogoSaved] = useState(false);
+  const [logoError, setLogoError] = useState('');
+
+  // Accepting the sample (Continue) makes it the store logo for real; a failed
+  // upload is shown with Retry / continue-without-it instead of dropping it.
+  const handleContinue = async () => {
+    if (!sampleUri || logoSaved) { onContinue(); return; }
+    if (savingLogo) return;
+    setSavingLogo(true);
+    setLogoError('');
+    try {
+      await saveSampleAsLogo(sampleUri);
+      setLogoSaved(true);
+      onContinue();
+    } catch (error: any) {
+      setLogoError(`We couldn\u2019t save this sample as your logo. ${error?.message || 'Check your connection and try again.'}`);
+    } finally {
+      setSavingLogo(false);
+    }
+  };
 
   const handleGenerate = async () => {
     if (generating || sampleUri) return;
@@ -1768,24 +1796,22 @@ function SellerPreviewStep({
       </Reveal>
       <Reveal index={3}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={spreview.themeRow}>
-          {APP_THEME_PRESETS.map((preset) => {
-            const selected = preset.id === selectedThemeId;
+          {STORE_ACCENT_COLORS.map((color, index) => {
+            const selected = color === selectedAccent;
+            const name = STORE_ACCENT_NAMES[index] ?? color;
             return (
               <PressableScale
-                key={preset.id}
-                testID={`onboarding-theme-${preset.id}`}
+                key={color}
+                testID={`onboarding-accent-${color.slice(1)}`}
                 style={[spreview.themeCard, selected && { borderColor: theme.text, borderWidth: 1 }]}
                 accessibilityRole="radio"
                 accessibilityState={{ selected }}
-                accessibilityLabel={`${preset.name} storefront theme`}
-                onPress={() => { Haptics.selectionAsync(); onSelectTheme(preset.id); }}
+                accessibilityLabel={`${name} storefront accent`}
+                onPress={() => { Haptics.selectionAsync(); onSelectAccent(color); }}
               >
-                <LinearGradient colors={preset.heroGradient} style={spreview.themeSwatch}>
-                  <View style={[spreview.themeDot, { backgroundColor: preset.accent }]} />
-                  <View style={[spreview.themeLine, { backgroundColor: preset.secondary }]} />
-                </LinearGradient>
+                <View style={[spreview.themeSwatch, { backgroundColor: color, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border }]} />
                 <View style={spreview.themeNameRow}>
-                  <Text numberOfLines={1} style={spreview.themeName}>{preset.name}</Text>
+                  <Text numberOfLines={1} style={spreview.themeName}>{name}</Text>
                   {selected ? <Feather name="check" size={13} color={theme.text} /> : null}
                 </View>
               </PressableScale>
@@ -1841,13 +1867,26 @@ function SellerPreviewStep({
           </TouchableOpacity>
         </View>
       ) : null}
+      {logoError ? (
+        <View style={spreview.errorBox}>
+          <Feather name="alert-circle" size={14} color={theme.error} />
+          <Text style={spreview.errorText}>{logoError}</Text>
+          <TouchableOpacity onPress={() => { void handleContinue(); }} disabled={savingLogo}>
+            <Text style={[spreview.retryText, { color: theme.text }]}>Retry</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onContinue} disabled={savingLogo} accessibilityLabel="Continue without saving the logo">
+            <Text style={[spreview.retryText, { color: theme.text }]}>Skip</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
       <Reveal index={6} style={spreview.continueWrap}>
         <PillButton
           testID="onboarding-preview-continue"
-          accessibilityLabel={sampleUri ? 'Continue to plans' : 'Skip sample and continue to plans'}
-          label={sampleUri ? 'Continue to plans' : 'Skip sample · Continue to plans'}
+          accessibilityLabel={sampleUri ? 'Use as my logo and continue to plans' : 'Skip sample and continue to plans'}
+          label={sampleUri ? 'Use as logo · Continue to plans' : 'Skip sample · Continue to plans'}
           variant={sampleUri ? 'primary' : 'secondary'}
-          onPress={onContinue}
+          onPress={() => { void handleContinue(); }}
+          loading={savingLogo}
         />
       </Reveal>
     </ScrollView>
@@ -1882,7 +1921,7 @@ const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
 // ─── Main onboarding component ────────────────────────────────────────────────
 export default function OnboardingScreen() {
-  const { theme, selectTheme } = useAppTheme();
+  const { theme } = useAppTheme();
   CARD = theme.card;
   FG = theme.text;
   MUTED = theme.muted;
@@ -1972,7 +2011,9 @@ export default function OnboardingScreen() {
   const [brandStage, setBrandStage]       = useState('idea');
   const [goals, setGoals]                 = useState<string[]>(DEFAULT_SELLER_GOALS);
   const [selectedPlanId, setSelectedPlanId] = useState<SellerPlanId>('starter');
-  const [selectedThemeId, setSelectedThemeId] = useState<AppThemeId>('monochrome');
+  // Storefront accent picked on the preview step — saved to the STORE
+  // (PUT /api/seller/profile/accent → storefront theme), never the app theme.
+  const [selectedAccent, setSelectedAccent] = useState<string>(DEFAULT_STORE_ACCENT);
   const [planPrepDone, setPlanPrepDone] = useState(false);
 
   const [finishing, setFinishing]         = useState(false);
@@ -2063,7 +2104,7 @@ export default function OnboardingScreen() {
               setBrandStage(draft.brandStage ?? 'idea');
               setGoals(draft.goals ?? DEFAULT_SELLER_GOALS);
               setSelectedPlanId(draft.selectedPlanId ?? recommendSellerPlan(draft.brandStage ?? '', draft.goals ?? []).planId);
-              setSelectedThemeId(isAppThemeId(draft.selectedThemeId) ? draft.selectedThemeId : 'monochrome');
+              setSelectedAccent(isStoreAccent(draft.selectedAccent) ? draft.selectedAccent : DEFAULT_STORE_ACCENT);
             }
           } catch { /* bad json, ignore */ }
         } else if (!isAddAccount && (pendingFlow === 'buyer' || pendingFlow === 'seller')) {
@@ -2112,11 +2153,11 @@ export default function OnboardingScreen() {
     const data = {
       version: DRAFT_VERSION,
       ownerId: userId,
-      flow, step, firstName, lastName, username, styleInterests, survey, brandName, brandStage, goals, selectedPlanId, selectedThemeId,
+      flow, step, firstName, lastName, username, styleInterests, survey, brandName, brandStage, goals, selectedPlanId, selectedAccent,
       ...overrides,
     };
     await AsyncStorage.setItem(draftKey, JSON.stringify(data));
-  }, [flow, step, firstName, lastName, username, styleInterests, survey, brandName, brandStage, goals, selectedPlanId, selectedThemeId, user?.id]);
+  }, [flow, step, firstName, lastName, username, styleInterests, survey, brandName, brandStage, goals, selectedPlanId, selectedAccent, user?.id]);
 
   // Persist onboarding answers under the authenticated user's immutable ID.
   useEffect(() => {
@@ -2390,7 +2431,6 @@ export default function OnboardingScreen() {
     if (finishing) return;
     setFinishing(true);
     if (isDevWebPreviewUser && typeof window !== 'undefined') {
-      await selectTheme(selectedThemeId);
       window.location.assign('/?bt_preview=seller');
       return;
     }
@@ -2421,8 +2461,10 @@ export default function OnboardingScreen() {
       if (goals.length > 0 || brandStage) {
         await api.seller.saveOnboardingData({ goals, brandStage });
       }
+      // The onboarding "Storefront accent" is the store's color (what buyers
+      // see on the public store), not this device's app theme.
+      await api.seller.setStoreAccent(selectedAccent);
       await api.auth.completeOnboarding('seller');
-      await selectTheme(selectedThemeId);
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
         [ONBOARDING_OWNER_KEY, profile.clerkId],
@@ -2781,8 +2823,13 @@ export default function OnboardingScreen() {
         ) : (
           <SellerPreviewStep
             brandName={brandName.trim()}
-            selectedThemeId={selectedThemeId}
-            onSelectTheme={setSelectedThemeId}
+            selectedAccent={selectedAccent}
+            onSelectAccent={setSelectedAccent}
+            saveSampleAsLogo={async (dataUri) => {
+              if (isDevWebPreviewUser) return; // signed-out web preview: nothing to save to
+              const uri = Platform.OS === 'web' ? dataUri : await dataUrlToLocalFile(dataUri, 'onboarding-logo');
+              await api.seller.uploadLogo({ uri, mimeType: 'image/png' });
+            }}
             generateSample={async (style) => {
               const account = await api.auth.sync({ name: firstName.trim() });
               if (account.accountType === 'buyer') {

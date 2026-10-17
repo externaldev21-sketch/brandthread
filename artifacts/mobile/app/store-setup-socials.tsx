@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useApi } from '@/hooks/useApi';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
-import { handleFromStoredLink, previewSocialLink, type SocialPlatform } from '@/lib/storeSetup';
+import { canSaveSocialLinks, handleFromStoredLink, previewSocialLink, type SocialPlatform } from '@/lib/storeSetup';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { StoreSetupScreen } from '@/components/store-setup/StoreSetupScreen';
 import { StoreSetupField, type FieldStatus } from '@/components/store-setup/StoreSetupField';
@@ -30,6 +30,7 @@ export default function StoreSetupSocialsScreen() {
 
   const [instagram, setInstagram] = useState(demo ? '@nightowlstudio' : '');
   const [tiktok, setTiktok] = useState(demo ? 'https://www.tiktok.com/@nightowlstudio' : '');
+  const [saved, setSaved] = useState<Record<SocialPlatform, string>>({ instagram: '', tiktok: '' });
   const [saving, setSaving] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -38,8 +39,11 @@ export default function StoreSetupSocialsScreen() {
     let cancelled = false;
     api.seller.getProfile().then((profile) => {
       if (cancelled) return;
-      setInstagram(handleFromStoredLink('instagram', profile.socialLinks?.instagram));
-      setTiktok(handleFromStoredLink('tiktok', profile.socialLinks?.tiktok));
+      const ig = handleFromStoredLink('instagram', profile.socialLinks?.instagram);
+      const tt = handleFromStoredLink('tiktok', profile.socialLinks?.tiktok);
+      setInstagram(ig);
+      setTiktok(tt);
+      setSaved({ instagram: ig, tiktok: tt });
     }).catch(() => {});
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -47,9 +51,9 @@ export default function StoreSetupSocialsScreen() {
 
   const igPreview = useMemo(() => previewSocialLink('instagram', instagram), [instagram]);
   const ttPreview = useMemo(() => previewSocialLink('tiktok', tiktok), [tiktok]);
-  const anyInvalid = igPreview.status === 'invalid' || ttPreview.status === 'invalid';
-  const anyFilled = igPreview.status === 'ok' || ttPreview.status === 'ok';
-  const canContinue = anyFilled && !anyInvalid && !saving;
+  // Clearing both links is allowed when links were saved before — the server
+  // removes a platform on an empty value.
+  const canContinue = canSaveSocialLinks({ instagram: igPreview, tiktok: ttPreview }, saved) && !saving;
 
   async function save() {
     if (!canContinue) return;

@@ -43,27 +43,38 @@ describe('local store navigation does not wait for server reads', () => {
     resolveRemote({ status: 'published', publishedAt: '2026-10-06T12:00:00Z', slug: 'verified-store' });
     const verified = await request;
     expect(verified.publishStatus).toBe('published');
-    expect(verified.settings.storeUrl).toBe('verified-store.brandthread.app');
+    expect(verified.settings.storeUrl).toBe('verified-store');
     // Background verification must not mutate the already-painted snapshot.
     expect(snapshots[0].publishStatus).toBe('not_started');
     expect(snapshots[0].settings.storeUrl).not.toBe('verified-store.brandthread.app');
   });
 
-  it('loads pages, menus, collections and editor state without any server reads', async () => {
+  it('paints cached pages / menus / collections first, then takes the server lists', async () => {
     await getStorefront({ refreshRemote: false });
-    await getPages();
-    await getMenus();
-    await getCollections();
     expect(mocks.get).not.toHaveBeenCalled();
+    // Builder lists are server state (storefronts.pages / navigation /
+    // collections) so the live store and other devices see them.
+    mocks.get.mockResolvedValue({
+      status: 'draft',
+      pages: [{ id: 'p1', title: 'About', slug: 'about', content: 'Hi', status: 'published' }],
+      navigation: [],
+      collections: [],
+    });
+    const painted: unknown[] = [];
+    const pages = await getPages({ onLocal: list => painted.push(list) });
+    expect(painted).toEqual([[]]);
+    expect(pages.map(p => p.id)).toEqual(['p1']);
+    expect((await getMenus()).map(m => m.type)).toEqual(['main', 'mobile', 'footer']);
+    expect(await getCollections()).toEqual([]);
   });
 
-  it('persists page edits immediately and still schedules server sync', async () => {
+  it('saves page edits to the server before reporting success', async () => {
     const created = await createPage({ title: 'About us' });
     const id = created.pages[0].id;
     await updatePage(id, { title: 'Our story' });
-    expect((await getPages())[0].title).toBe('Our story');
-    expect(mocks.get).not.toHaveBeenCalled();
     expect(mocks.save).toHaveBeenCalledTimes(2);
+    expect(mocks.save.mock.calls[1][0]).toEqual({ pages: [expect.objectContaining({ id, title: 'Our story' })] });
+    expect(mocks.get).not.toHaveBeenCalled();
   });
 
   it('section edits, reorder, toggles and autosave never preflight the network', async () => {

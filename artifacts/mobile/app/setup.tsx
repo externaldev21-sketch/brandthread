@@ -2,7 +2,9 @@
  * Brandthread Guided Setup Screen
  *
  * Walks the seller through 9 tasks to launch their store.
- * Progress persists via setupStore (AsyncStorage).
+ * Progress persists on the server via setupStore. Tasks backed by real data
+ * (payments, products, logo, publish, ...) are derived there and open their
+ * screen instead of being markable complete.
  */
 
 import React, { useState, useCallback, useRef } from 'react';
@@ -28,7 +30,7 @@ import {
   getSetupState, completeTask, skipTask,
   SetupState, SetupTask, SetupTaskId,
   completionPercent, nextTask, completedRequiredTaskCount,
-  requiredTaskCount, isSetupComplete,
+  requiredTaskCount, isSetupComplete, isAutoTrackedTask,
 } from '@/lib/setupStore';
 import { useApi } from '@/hooks/useApi';
 import {
@@ -75,7 +77,10 @@ function TaskCard({
       >
         {/* Left: check circle */}
         <TouchableOpacity
-          onPress={task.completed ? undefined : handleComplete}
+          // Auto-tracked tasks complete only when the real work is done — the
+          // circle opens the task instead of ticking it.
+          onPress={task.completed ? undefined : isAutoTrackedTask(task.id) ? () => onPress(task) : handleComplete}
+          accessibilityLabel={task.completed ? `${task.label} done` : isAutoTrackedTask(task.id) ? `Open ${task.label}` : `Mark ${task.label} complete`}
           style={[ts.check, task.completed && ts.checkDone]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
@@ -163,21 +168,40 @@ export default function SetupScreen() {
   }, [api, userId]));
 
   async function handleComplete(id: SetupTaskId) {
-    const next = await completeTask(id, userId);
-    setState(next);
+    if (isAutoTrackedTask(id)) return; // derived on the server; never ticked by hand
+    try {
+      const next = await completeTask(id, userId, { throwOnSyncError: true });
+      setState(next);
+    } catch (err) {
+      Alert.alert('Not saved', err instanceof Error && err.message ? err.message : 'Could not save your progress. Check your connection and try again.');
+    }
   }
 
   async function handleSkip(id: SetupTaskId) {
-    const next = await skipTask(id, userId);
-    setState(next);
+    try {
+      const next = await skipTask(id, userId, { throwOnSyncError: true });
+      setState(next);
+    } catch (err) {
+      Alert.alert('Not saved', err instanceof Error && err.message ? err.message : 'Could not save your progress. Check your connection and try again.');
+    }
+  }
+
+  function openTask(task: SetupTask) {
+    // push (never replace) with an explicit origin so the task's Cancel/Back
+    // pops to this checklist, not to a tabs index (docs/NAVIGATION.md).
+    try { router.push(withOrigin(task.route, 'setup') as never); } catch { /* ok */ }
   }
 
   function handleTaskPress(task: SetupTask) {
     if (task.completed) return;
+    if (isAutoTrackedTask(task.id)) {
+      // e.g. "Set up payments" goes straight to payouts setup; it ticks itself
+      // once Stripe reports the account active.
+      openTask(task);
+      return;
+    }
     Alert.alert(task.label, task.description, [
-      // push (never replace) with an explicit origin so the task's Cancel/Back
-      // pops to this checklist, not to a tabs index (docs/NAVIGATION.md).
-      { text: 'Open', onPress: () => { try { router.push(withOrigin(task.route, 'setup') as never); } catch { /* ok */ } } },
+      { text: 'Open', onPress: () => openTask(task) },
       { text: 'Mark complete', onPress: () => handleComplete(task.id) },
       { text: 'Cancel', style: 'cancel' },
     ]);
