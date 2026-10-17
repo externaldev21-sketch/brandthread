@@ -55,3 +55,20 @@ export interface FulfillmentPartnerAdapter {
   /** Optional: some partners push tracking via their own webhook instead. */
   pollTracking?(partnerOrderId: string): Promise<FulfillmentTrackingEvent | null>;
 }
+
+/**
+ * A partner adapter that can't place orders right now (not configured, or the
+ * partner has no API). `message` is written for the seller and names what to
+ * set or do; routes should return it with a 503 rather than a generic failure.
+ */
+export class FulfillmentPartnerUnavailableError extends Error {
+  readonly code = "fulfillment_partner_unavailable";
+  constructor(
+    readonly partnerKey: string,
+    readonly reason: "not_configured" | "no_public_api",
+    message: string,
+  ) {
+    super(message);
+    this.name = "FulfillmentPartnerUnavailableError";
+  }
+}

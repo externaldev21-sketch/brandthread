@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { SupportChatModal } from '@/components/SupportChatBubble';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
@@ -51,6 +52,8 @@ export default function HelpScreen() {
   const s = useMemo(() => createStyles(theme), [theme]);
   const scrollRef = useRef<ScrollView>(null);
   const [contactY, setContactY] = useState(0);
+  const [articlesY, setArticlesY] = useState(0);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
@@ -102,6 +105,14 @@ export default function HelpScreen() {
 
   function scrollToContact() {
     scrollRef.current?.scrollTo({ y: contactY, animated: true });
+  }
+
+  // "Full Docs": the help center is these in-app articles, so clear any
+  // search/filter and jump to the full list instead of reopening this page.
+  function showAllArticles() {
+    setQuery('');
+    setActiveCategory(null);
+    scrollRef.current?.scrollTo({ y: articlesY, animated: true });
   }
 
   return (
@@ -167,7 +178,7 @@ export default function HelpScreen() {
         )}
 
         {/* FAQ list (search / category results, or the full list) */}
-        <View style={{ gap: SP.sm }}>
+        <View style={{ gap: SP.sm }} onLayout={(e) => setArticlesY(e.nativeEvent.layout.y)}>
           <SectionHeader
             title={isSearching ? 'Results' : 'All questions'}
             action={activeCategory ? { label: 'Clear filter', onPress: () => setActiveCategory(null) } : undefined}
@@ -215,11 +226,11 @@ export default function HelpScreen() {
             <Feather name="mail" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Email Us</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.contactBtn} onPress={scrollToContact} activeOpacity={0.8}>
+          <TouchableOpacity style={s.contactBtn} onPress={() => setChatOpen(true)} activeOpacity={0.8} testID="help-live-chat">
             <Feather name="message-circle" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Live Chat</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('https://brandthread.app/help')} activeOpacity={0.8}>
+          <TouchableOpacity style={s.contactBtn} onPress={showAllArticles} activeOpacity={0.8} testID="help-full-docs">
             <Feather name="book-open" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Full Docs</Text>
           </TouchableOpacity>
@@ -308,6 +319,8 @@ export default function HelpScreen() {
           </View>
         </View>
       </Modal>
+
+      <SupportChatModal visible={chatOpen} onClose={() => setChatOpen(false)} />
     </View>
   );
 }

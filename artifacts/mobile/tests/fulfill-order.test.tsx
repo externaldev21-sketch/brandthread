@@ -147,6 +147,8 @@ vi.mock('@/services/orderService', () => ({
   createPackagePreset: (...args: unknown[]) => createPackagePresetMock(...args),
   deletePackagePreset: (...args: unknown[]) => deletePackagePresetMock(...args),
   updateFulfillmentChecklist: (...args: unknown[]) => updateFulfillmentChecklistMock(...args),
+  // The screen asks for a weight suggestion on mount; none keeps the seller typing it.
+  getParcelSuggestion: vi.fn().mockResolvedValue({ weightKnown: false, weightLb: 0 }),
 }));
 
 vi.mock('@/lib/packingSlip', () => ({

@@ -15,7 +15,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { ApiError } from '@/lib/networkNotice';
+import { apiErrorMessage } from '@/lib/safety';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -33,7 +34,6 @@ export default function AiBrandMemoryScreen() {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
-  const { getToken } = useAuth();
   const [localMemory, setLocalMemory] = useState<BrandMemory | null>(null);
   const [saving, setSaving] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
@@ -55,12 +55,15 @@ export default function AiBrandMemoryScreen() {
   const handleRebuild = async () => {
     setRebuilding(true);
     try {
-      const token = await getToken().catch(() => null);
-      const m = await rebuildBrandMemory(token);
+      const m = await rebuildBrandMemory();
       setLocalMemory(m);
       Alert.alert('Brand memory rebuilt', 'Your brand profile has been derived from your products, posts, and store data.');
-    } catch {
-      Alert.alert('Could not rebuild', 'There was a problem rebuilding brand memory. Try again.');
+    } catch (e) {
+      const fallback = 'There was a problem rebuilding brand memory. Try again.';
+      const message = e instanceof ApiError
+        ? apiErrorMessage(e, fallback)
+        : e instanceof Error && e.message ? e.message : fallback;
+      Alert.alert('Could not rebuild', message);
     } finally {
       setRebuilding(false);
     }

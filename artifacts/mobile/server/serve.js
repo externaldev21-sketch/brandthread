@@ -93,6 +93,41 @@ function serveFile(filePath, res, acceptEncoding = '') {
   return true;
 }
 
+// Public pages rendered by api-server (src/app.ts), not by the web app:
+// short links, link-in-bio, giveaway shares, the DMCA / IP-notice form and
+// the app-link verification files. The deployment router sends these
+// straight to api-server (its artifact.toml `paths`); if one still lands
+// here, forward it rather than answering with the SPA's "not found" page.
+const API_OWNED_PATH_RE = /^\/(?:(?:l|bio|g)\/.+|dmca\/?|legal\/ip-notice\/?|\.well-known\/(?:apple-app-site-association|assetlinks\.json))$/;
+
+function isApiOwnedPath(pathname) {
+  return API_OWNED_PATH_RE.test(pathname);
+}
+
+function proxyToApi(req, res, requestUrl) {
+  let target;
+  try {
+    target = new URL(
+      `${requestUrl.pathname}${requestUrl.search}`,
+      process.env.API_INTERNAL_ORIGIN || 'http://127.0.0.1:8080',
+    );
+  } catch {
+    send(res, 502, 'Bad Gateway');
+    return;
+  }
+  const headers = { ...req.headers };
+  headers['x-forwarded-host'] = headers['x-forwarded-host'] || headers.host || '';
+  const upstream = http.request(target, { method: req.method, headers }, (upstreamRes) => {
+    res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers);
+    upstreamRes.pipe(res);
+  });
+  upstream.on('error', () => {
+    if (res.headersSent) { res.end(); return; }
+    send(res, 502, 'This page is temporarily unavailable. Please try again in a moment.');
+  });
+  req.pipe(upstream);
+}
+
 function canonicalRedirectLocation(req, requestUrl) {
   const forwardedHost = req.headers?.['x-forwarded-host'];
   const hostHeader = String(forwardedHost || req.headers?.host || '')
@@ -149,6 +184,11 @@ const server = http.createServer(async (req, res) => {
   if (/^\/account-deletion\/?$/.test(requestedPath)) {
     const page = fs.readFileSync(path.join(__dirname, 'templates', 'account-deletion.html'), 'utf8');
     sendHtml(res, 200, page, acceptEncoding);
+    return;
+  }
+
+  if (isApiOwnedPath(requestedPath)) {
+    proxyToApi(req, res, requestUrl);
     return;
   }
 
@@ -215,4 +255,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { CANONICAL_ORIGIN, GENERATED_HOST, canonicalRedirectLocation, server };
+module.exports = { CANONICAL_ORIGIN, GENERATED_HOST, canonicalRedirectLocation, isApiOwnedPath, server };

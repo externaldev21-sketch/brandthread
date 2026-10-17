@@ -53,6 +53,10 @@ const OPTIONAL_VARS = [
   "SHIPPO_WEBHOOK_SECRET",
   "SENTRY_DSN",
   "POSTHOG_API_KEY",
+  // Without these, /.well-known app-link files are empty and brandthread.app
+  // links open in the browser instead of the iOS / Android app.
+  "APPLE_TEAM_ID",
+  "ANDROID_SHA256_CERT_FINGERPRINTS",
 ];
 
 /**

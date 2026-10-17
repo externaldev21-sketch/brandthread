@@ -48,7 +48,9 @@ describe('temporary seller preview flag', () => {
     const orders = readFileSync(resolve(root, 'lib/previewSellerOrders.ts'), 'utf8');
     const products = readFileSync(resolve(root, 'lib/previewSellerProducts.ts'), 'utf8');
     expect(aiService).toContain('if (isSellerDevPreview())');
-    expect(memory).toContain('!isSellerDevPreview() && API_BASE && authToken');
+    // Brand memory goes through serviceRequest, which refuses in the signed-out seller preview.
+    expect(memory).toContain("serviceRequest<{ fields?: Record<string, unknown> }>(");
+    expect(memory).not.toContain('fetch(');
     expect(removal).toContain('const demo = isSellerDevPreview() && isPreviewDemoMode()');
     expect(orders).toContain('allPreviewSellerOrders');
     expect(products).toContain('getPreviewSellerProducts');

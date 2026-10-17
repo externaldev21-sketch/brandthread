@@ -141,6 +141,7 @@ import { getColorPickerState, saveColorPickerState } from '@/services/designServ
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { DESIGN_STUDIO_FONTS, DEFAULT_DESIGN_STUDIO_FONT, useDesignStudioFonts } from '@/lib/designStudioFonts';
 import { radius } from '@/constants/radii';
+import { SupportChatModal } from '@/components/SupportChatBubble';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -298,6 +299,7 @@ export default function DesignCanvasScreen() {
   // ── Project state ──────────────────────────────────────────────────────────
   const [project, setProject]         = useState<DesignProject | null>(null);
   const [loading, setLoading]         = useState(true);
+  const [supportChatOpen, setSupportChatOpen] = useState(false);
   const [projectName, setProjectName] = useState('Untitled');
   const [editingName, setEditingName] = useState(false);
   const projectNameRef = useRef(projectName);
@@ -4199,6 +4201,7 @@ export default function DesignCanvasScreen() {
         onAddText={() => { closeSheet(); openSheet('text'); }}
         // HELP tab
         onOpenHelpCenter={() => { closeSheet(); router.push('/help' as never); }}
+        onOpenLiveChat={() => { closeSheet(); setSupportChatOpen(true); }}
         onOpenSettings={() => { closeSheet(); router.push('/settings' as never); }}
         onCut={handleCut}
         onCopy={handleCopyLayer}
@@ -4268,6 +4271,8 @@ export default function DesignCanvasScreen() {
         quickMenuEditSlot={quickMenuEditSlot}
         onQuickMenuEditSlot={setQuickMenuEditSlot}
       />
+
+      <SupportChatModal visible={supportChatOpen} onClose={() => setSupportChatOpen(false)} />
 
       {/* ── BRUSH LIBRARY — Procreate's own full-screen "Brushes" picker
           (left sidebar of brush-set categories, right pane of that set's
@@ -5049,6 +5054,7 @@ interface WrenchActionsSheetProps {
   // HELP — in-app destinations are navigated by the host screen (it owns
   // the router + closes the sheet first); external ones use Linking here.
   onOpenHelpCenter: () => void;
+  onOpenLiveChat: () => void;
   onOpenSettings: () => void;
 }
 
@@ -5063,7 +5069,7 @@ const WRENCH_TABS: { key: WrenchTab; label: string }[] = [
 
 function WrenchActionsSheet({
   visible, onClose, wrenchTab, setWrenchTab, selectedLayerId,
-  onInsertPhoto, onInsertFile, onTakePhoto, onAddText, onOpenHelpCenter, onOpenSettings,
+  onInsertPhoto, onInsertFile, onTakePhoto, onAddText, onOpenHelpCenter, onOpenLiveChat, onOpenSettings,
   onCut, onCopy, onCopyCanvas, onPaste, hasClipboard,
   onCropResize, animEnabled, onToggleAnimAssist,
   onFlipHorizontal, onFlipVertical, onCanvasInfo,
@@ -5572,8 +5578,8 @@ function WrenchActionsSheet({
                 testID="help-support"
               />
               <ActionCell
-                icon="message-circle" label="Live Chat" sub="brandthread.app/chat"
-                onPress={() => { Linking.openURL('https://brandthread.app/chat').catch(() => {}); }}
+                icon="message-circle" label="Live Chat" sub="Chat with support"
+                onPress={onOpenLiveChat}
                 testID="help-chat"
               />
               <ActionCell

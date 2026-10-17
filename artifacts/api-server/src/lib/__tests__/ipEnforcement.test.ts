@@ -7,6 +7,7 @@ import {
   extractProductId,
   removeStrike,
   repeatInfringerThreshold,
+  resolveSnapshotImageUrl,
   validateNotice,
 } from "../ipEnforcement";
 
@@ -65,5 +66,25 @@ describe("notice intake", () => {
     expect(validateNotice({ channel: "web_notice", goodFaithStatement: true, accuracyStatement: true, signature: " " }).ok).toBe(false);
     expect(validateNotice({ channel: "web_notice", goodFaithStatement: true, accuracyStatement: true, signature: "Jo Rights" }))
       .toEqual({ ok: true, channel: "web_notice", signature: "Jo Rights" });
+  });
+});
+
+describe("listing snapshot image", () => {
+  const sign = async (path: string) => `https://signed.example${path}?sig=1`;
+
+  it("signs private object-storage paths so the portal <img> can load them", async () => {
+    expect(await resolveSnapshotImageUrl(["/objects/uploads/a.jpg", "/objects/uploads/b.jpg"], sign))
+      .toBe("https://signed.example/objects/uploads/a.jpg?sig=1");
+  });
+
+  it("passes absolute URLs through unchanged", async () => {
+    expect(await resolveSnapshotImageUrl(["https://cdn.example/x.png"], sign)).toBe("https://cdn.example/x.png");
+  });
+
+  it("returns null for no image, unservable paths or a signing failure", async () => {
+    expect(await resolveSnapshotImageUrl([], sign)).toBeNull();
+    expect(await resolveSnapshotImageUrl(null, sign)).toBeNull();
+    expect(await resolveSnapshotImageUrl(["uploads/relative.jpg"], sign)).toBeNull();
+    expect(await resolveSnapshotImageUrl(["/objects/x.jpg"], async () => { throw new Error("no sidecar"); })).toBeNull();
   });
 });

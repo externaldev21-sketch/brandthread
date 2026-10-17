@@ -16,10 +16,13 @@ import {
   extractProductId,
   removeStrike,
   repeatInfringerThreshold,
+  resolveSnapshotImageUrl,
   validateNotice,
 } from "../lib/ipEnforcement";
+import { ObjectStorageService } from "../lib/objectStorage";
 
 const router = Router();
+const objectStorage = new ObjectStorageService();
 const RIGHTS_TYPES = ["copyright", "trademark", "counterfeit", "other"] as const;
 const CASE_STATUSES = ["submitted", "under_review", "information_requested", "dismissed", "actioned"] as const;
 const CASE_TRANSITIONS: Record<string, readonly string[]> = {
@@ -36,11 +39,16 @@ const publicCase = (c: typeof ipCases.$inferSelect) => ({
   createdAt: c.createdAt, updatedAt: c.updatedAt, resolvedAt: c.resolvedAt,
 });
 type SellerStanding = { ipStrikeCount: number; ipRepeatInfringer: boolean; ipRepeatInfringerFlaggedAt: Date | null };
-const moderatorCase = (
+const moderatorCase = async (
   c: typeof ipCases.$inferSelect,
   listing: typeof products.$inferSelect | null = null,
   seller: SellerStanding | null = null,
 ) => {
+  // Stored product images are private /objects/ paths; sign the first one so
+  // the portal's <img> can load it (null -> placeholder).
+  const snapshotImageUrl = listing
+    ? await resolveSnapshotImageUrl(listing.images, (path) => objectStorage.getObjectEntityDownloadURL(path))
+    : null;
   const { statusTokenHash: _statusTokenHash, ...safeCase } = c;
   return {
     ...safeCase,
@@ -55,6 +63,7 @@ const moderatorCase = (
           status: listing.status,
           ownerId: listing.ownerId,
           images: listing.images,
+          snapshotImageUrl,
           updatedAt: listing.updatedAt,
         }
       : null,
@@ -191,8 +200,8 @@ router.get("/", async (req, res) => {
     ))
     .orderBy(desc(ipCases.createdAt)).limit(200);
   const standings = await sellerStandings(rows.map((r) => r.case.sellerId ?? r.listing?.ownerId ?? ""));
-  return res.json(rows.map(({ case: caseRow, listing }) =>
-    moderatorCase(caseRow, listing, standings.get(caseRow.sellerId ?? listing?.ownerId ?? "") ?? null)));
+  return res.json(await Promise.all(rows.map(({ case: caseRow, listing }) =>
+    moderatorCase(caseRow, listing, standings.get(caseRow.sellerId ?? listing?.ownerId ?? "") ?? null))));
 });
 
 // Sellers with strikes or a repeat-infringer flag, flagged first.
@@ -225,7 +234,7 @@ router.get("/:id", async (req, res) => {
   if (!row) return res.status(404).json({ error: "Case not found" });
   const ownerId = row.case.sellerId ?? row.listing?.ownerId ?? "";
   const standings = await sellerStandings([ownerId]);
-  return res.json(moderatorCase(row.case, row.listing, standings.get(ownerId) ?? null));
+  return res.json(await moderatorCase(row.case, row.listing, standings.get(ownerId) ?? null));
 });
 router.get("/:id/audit", async (req, res) => {
   const rows = await db.select().from(ipCaseAuditHistory).where(eq(ipCaseAuditHistory.caseId, req.params.id))
@@ -418,7 +427,7 @@ router.patch("/:id", async (req, res) => {
     ? await db.select().from(products).where(eq(products.id, updated.listingProductId)).limit(1)
     : [];
   const standings = await sellerStandings([updated.sellerId ?? listing?.ownerId ?? ""]);
-  return res.json(moderatorCase(updated, listing ?? null, standings.get(updated.sellerId ?? listing?.ownerId ?? "") ?? null));
+  return res.json(await moderatorCase(updated, listing ?? null, standings.get(updated.sellerId ?? listing?.ownerId ?? "") ?? null));
 });
 
 export default router;
