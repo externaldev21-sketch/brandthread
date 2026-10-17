@@ -153,7 +153,8 @@ describe("Brandthread assistant — pinned inbox chat", () => {
       const body = await first.json() as Array<{ id: string; isOfficial?: boolean; lastMessage?: string }>;
       expect(body).toHaveLength(1);
       expect(body[0].isOfficial).toBe(true);
-      expect(body[0].lastMessage).toBeTruthy();
+      // Previews the welcome's text, not "Attachment" (its last message carries the chips).
+      expect(body[0].lastMessage).toBe(BUYER_WELCOME_STEPS[BUYER_WELCOME_STEPS.length - 1].text);
 
       // Drop the in-process cache so every open really hits the DB path.
       resetEnsuredWelcomeCache();

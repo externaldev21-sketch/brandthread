@@ -567,7 +567,7 @@ describe('buyer inbox', () => {
     expect(pinAction().findByType('Text' as never).props.children).toBe('Pin');
   });
 
-  it('shows a skeleton while loading, then a CTA empty state once loaded empty', async () => {
+  it('shows a skeleton while loading, then no "Keep it real in DMs" filler once loaded empty', async () => {
     let resolveConvs!: (value: ConversationFixture[]) => void;
     const pending = new Promise<ConversationFixture[]>((resolve) => { resolveConvs = resolve; });
     getConversationsMock.mockReturnValue(pending);
@@ -586,14 +586,29 @@ describe('buyer inbox', () => {
     });
 
     expect(renderer!.root.findAllByProps({ testID: 'inbox-skeleton' }, { deep: false })).toHaveLength(0);
-    expect(textContent(renderer!)).toContain('Keep it real in DMs');
-    const cta = renderer!.root.findByProps({ testID: 'primary-button-Send a message' });
-    expect(cta).toBeTruthy();
+    // The headline, subtext and "Send a message" button are gone for good;
+    // the header compose icon stays.
+    expect(textContent(renderer!)).not.toContain('Keep it real in DMs');
+    expect(textContent(renderer!)).not.toContain('Send a message to someone in your network');
+    expect(renderer!.root.findAllByProps({ testID: 'primary-button-Send a message' })).toHaveLength(0);
+    expect(renderer!.root.findAllByProps({ testID: 'inbox-header-compose' }).length).toBeGreaterThan(0);
+  });
 
+  it('the compose "+" opens New message directly, with "New group" inside it (#48, #49)', async () => {
+    getConversationsMock.mockResolvedValue([]);
     await act(async () => {
-      cta.props.onPress();
+      renderer = create(<InboxScreen />);
+      await flushPromises();
+    });
+    const plus = renderer!.root.findAllByProps({ testID: 'inbox-header-compose' })[0];
+    await act(async () => {
+      plus.props.onPress();
       await flushPromises();
     });
     expect(renderer!.root.findAllByProps({ placeholder: 'Search people' }).length).toBeGreaterThan(0);
+    expect(renderer!.root.findAllByProps({ testID: 'compose-new-group' }).length).toBeGreaterThan(0);
+    expect(textContent(renderer!)).not.toContain('Join a group');
+    expect(textContent(renderer!)).not.toContain('No one to show yet');
   });
+
 });

@@ -62,7 +62,15 @@ function getAttachmentPreview(attachment: unknown): string | undefined {
   return typeof title === "string" && title.trim() ? title.trim() : "Attachment";
 }
 
+// Brandthread assistant extras (chip rows, deep-link cards) ride along on a
+// text message — the inbox previews that text, not "Attachment".
+const TEXT_FIRST_ATTACHMENT_TYPES = new Set(["quick_replies", "agent_card"]);
+
 function getMessagePreview(body: string | null | undefined, attachment: unknown, attachments?: unknown): string | undefined {
+  const attachmentType = attachment && typeof attachment === "object" ? (attachment as { type?: unknown }).type : undefined;
+  if (typeof attachmentType === "string" && TEXT_FIRST_ATTACHMENT_TYPES.has(attachmentType) && body?.trim()) {
+    return body.trim();
+  }
   const attachmentPreview = getAttachmentPreview(attachment)
     ?? (Array.isArray(attachments) ? getAttachmentPreview(attachments[0]) : undefined);
   if (attachmentPreview) return attachmentPreview;

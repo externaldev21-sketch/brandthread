@@ -34,7 +34,6 @@ import { useApi } from '@/lib/api';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
 import { CommunityInboxRow } from '@/components/community-inbox/CommunityInboxRow';
-import { openInboxComposeMenu } from '@/components/community-inbox/InboxComposeMenu';
 import { mergeInboxRows, communityMatchesQuery, type InboxMergedRow } from '@/lib/communities/inboxModel';
 import { useInboxCommunities } from '@/lib/communities/useCommunityInbox';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
@@ -60,6 +59,9 @@ import {
   isPreviewNotesEnabled, getPreviewNotesForTray, getPreviewMyNote, postPreviewNote,
 } from '@/lib/previewNotes';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { loadBuyerProfile } from '@/lib/buyerProfile';
+import { VerifiedMark } from '@/components/community/VerifiedMark';
+import { BRANDTHREAD_ASSISTANT_NAME, sortInboxPinnedFirst } from '@/lib/brandthreadAssistant';
 import { TabPageHeader } from '@/components/layout/TabPageHeader';
 import { Glass } from '@/components/ui/Glass';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
@@ -72,8 +74,11 @@ import { radius } from '@/constants/radii';
 // and pill controls. Scale/opacity press feedback is unaffected.
 const NO_RIPPLE = false;
 
-// ─── Inbox / Requests pill row (Threads-style chips, replaces the old
-// underline-tab segmented control) ──────────────────────────────────────────
+// ─── Inbox / Requests tabs — X-style: two equal halves of the full row,
+// the active one bold with an underline spanning its whole half, one
+// full-bleed hairline under the row (#47). The filter icon floats over the
+// right edge instead of taking width from the tabs, so Inbox and Requests
+// stay centred on their halves (#46). ────────────────────────────────────────
 
 type InboxTab = 'inbox' | 'requests';
 
@@ -87,69 +92,71 @@ function InboxPillRow({
   gutter: number;
   onFilterPress: () => void;
 }) {
-  const pills: { key: InboxTab; label: string; count?: number }[] = [
+  const tabs: { key: InboxTab; label: string; count?: number }[] = [
     { key: 'inbox', label: 'Inbox' },
     { key: 'requests', label: 'Requests', count: requestsCount },
   ];
   return (
-    <View style={[pillS.row, { paddingHorizontal: gutter }]}>
+    <View style={[pillS.row, { borderBottomColor: theme.border }]} accessibilityRole="tablist">
+      {tabs.map(tab => {
+        const active = value === tab.key;
+        return (
+          // PressableScale doesn't pass flex through — the plain View owns
+          // the equal-width half.
+          <View key={tab.key} style={pillS.tab}>
+          <PressableScale
+            style={pillS.tabPress}
+            onPress={() => onChange(tab.key)}
+            rippleEnabled={NO_RIPPLE}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            testID={`inbox-tab-${tab.key}`}
+          >
+            <View style={pillS.labelRow}>
+              <Text style={[pillS.label, { color: active ? theme.text : theme.muted, fontFamily: active ? FONT.bold : FONT.medium }]}>
+                {tab.label}
+              </Text>
+              {!!tab.count && tab.count > 0 && (
+                <View style={[pillS.count, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
+                  <Text style={[pillS.countText, { color: active ? theme.onAccent : theme.muted }]}>
+                    {tab.count > 99 ? '99+' : tab.count}
+                  </Text>
+                </View>
+              )}
+            </View>
+            {active && <View style={[pillS.indicator, { backgroundColor: theme.text }]} testID={`inbox-tab-indicator-${tab.key}`} />}
+          </PressableScale>
+          </View>
+        );
+      })}
       <PressableScale
-        style={[pillS.iconPill, { borderColor: theme.border }]}
+        style={[pillS.filter, { right: gutter - 8 }]}
         onPress={onFilterPress}
         rippleEnabled={NO_RIPPLE}
         accessibilityRole="button"
         accessibilityLabel="Filter messages"
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         testID="inbox-filter-pill"
       >
-        <Feather name="sliders" size={15} color={theme.text} />
+        <Feather name="sliders" size={17} color={theme.muted} />
       </PressableScale>
-      {pills.map(pill => {
-        const active = value === pill.key;
-        return (
-          <PressableScale
-            key={pill.key}
-            style={[
-              pillS.pill,
-              active
-                ? { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }
-                : { backgroundColor: 'transparent', borderColor: theme.border },
-            ]}
-            onPress={() => onChange(pill.key)}
-            rippleEnabled={NO_RIPPLE}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
-            testID={`inbox-tab-${pill.key}`}
-          >
-            <Text style={[pillS.pillLabel, { color: active ? theme.text : theme.muted }]}>
-              {pill.label}
-            </Text>
-            {!!pill.count && pill.count > 0 && (
-              <View style={[pillS.pillCount, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
-                <Text style={[pillS.pillCountText, { color: active ? theme.onAccent : theme.muted }]}>
-                  {pill.count > 99 ? '99+' : pill.count}
-                </Text>
-              </View>
-            )}
-          </PressableScale>
-        );
-      })}
     </View>
   );
 }
 
 const pillS = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
-  iconPill: {
-    width: 36, height: 36, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center', justifyContent: 'center',
+  row: {
+    flexDirection: 'row', alignItems: 'stretch', height: 48, marginBottom: SP.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  pill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    height: 36, paddingHorizontal: SP.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth,
-  },
-  pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
-  pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  pillCountText: { fontSize: 11, fontFamily: FONT.bold },
+  tab: { flex: 1 },
+  tabPress: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  label: { fontSize: FS.base, letterSpacing: 0.1 },
+  indicator: { position: 'absolute', left: 0, right: 0, bottom: -StyleSheet.hairlineWidth, height: 3, borderRadius: 1.5 },
+  count: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  countText: { fontSize: 11, fontFamily: FONT.bold },
+  filter: { position: 'absolute', top: 0, bottom: 0, width: 32, alignItems: 'center', justifyContent: 'center' },
 });
 
 // ─── Compose sheet: unified "person" shape ────────────────────────────────────
@@ -356,7 +363,10 @@ export default function InboxScreen() {
   const { user: clerkUser } = useUser();
   const [storyTrayRows, setStoryTrayRows] = useState<StoryTrayRow[]>([]);
   const [myStoryId, setMyStoryId] = useState<string | null>(null);
-  const myAvatarUri = clerkUser?.hasImage ? clerkUser.imageUrl : undefined;
+  // #45: the same photo the Profile tab shows (lib/buyerProfile), falling
+  // back to the Clerk image — never just the initial when a photo exists.
+  const [profileAvatarUri, setProfileAvatarUri] = useState<string | null>(null);
+  const myAvatarUri = profileAvatarUri || (clerkUser?.hasImage ? clerkUser.imageUrl : undefined);
   const myDisplayName = clerkUser?.fullName || clerkUser?.firstName || clerkUser?.username || 'You';
   const myInitials = myDisplayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'Y';
 
@@ -576,6 +586,14 @@ export default function InboxScreen() {
     loadSuggested();
     loadStoryTray();
     loadNotesTray();
+    loadBuyerProfile().then(bp => setProfileAvatarUri(bp.avatarUri || null)).catch(() => {});
+    // #51: sheets belong to this screen — close them when it loses focus
+    // (Back, a tab switch, opening a thread) so none is left covering the
+    // next screen.
+    return () => {
+      setComposeVisible(false);
+      setNoteComposeVisible(false);
+    };
   }, [loadData, loadSuggested, loadStoryTray, loadNotesTray]));
 
   useEffect(() => {
@@ -602,17 +620,19 @@ export default function InboxScreen() {
         if (!haystack.includes(messagesSearchLower)) return false;
       }
       return true;
-    })
-    .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
+    });
+  const sortedConvs = sortInboxPinnedFirst(filteredConvs);
 
   // Joined community group chats live beside DMs (joining is consent), so
   // they are merged in by recency here and never counted as requests.
   const { communities: joinedCommunities, toggleMute: toggleCommunityMute } = useInboxCommunities();
   const inboxRows = mergeInboxRows(
-    filteredConvs,
+    sortedConvs,
     joinedCommunities.filter(c => communityMatchesQuery(c, messagesSearchLower)),
     { getKey: c => c.id, getTs: c => c.lastMessageTs, isPinned: c => !!c.isPinned },
   );
+
+  const officialConv = conversations.find(conv => conv.isOfficial);
 
   const requestConvs = conversations.filter(conv =>
     conv.isRequest === true && !conv.isArchived && !pendingDeleteIds.has(conv.id)
@@ -774,10 +794,16 @@ export default function InboxScreen() {
     // Alert.alert() with a button array is a silent no-op on web — this left
     // the row long-press menu completely dead in the web preview. See
     // components/ui/ActionSheet.tsx's header comment.
-    showActionSheet('Options', undefined, [
-      { text: 'Archive', onPress: () => swipeArchiveConversation(conv), style: 'destructive' },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    showActionSheet('Options', undefined, conv.isOfficial
+      // The Brandthread chat can be muted, never archived or deleted.
+      ? [
+        { text: conv.isMuted ? 'Unmute' : 'Mute', onPress: () => swipeMuteConversation(conv) },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+      : [
+        { text: 'Archive', onPress: () => swipeArchiveConversation(conv), style: 'destructive' },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
   }
 
   async function swipeArchiveConversation(conv: Conversation) {
@@ -1126,15 +1152,16 @@ export default function InboxScreen() {
         onPress: () => swipeMuteConversation(conv),
         accessibilityLabel: `Mute ${participant.name}`,
       },
-      {
+      // The Brandthread chat is permanent: mute it, never delete it.
+      ...(conv.isOfficial ? [] : [{
         key: 'delete',
         label: 'Delete',
-        icon: 'trash-2',
+        icon: 'trash-2' as const,
         color: theme.cardElevated,
         textColor: theme.error,
         onPress: () => swipeDeleteConversation(conv),
         accessibilityLabel: `Delete conversation with ${participant.name}`,
-      },
+      }]),
     ];
 
     return (
@@ -1166,8 +1193,8 @@ export default function InboxScreen() {
                 Line) while non-live rows (no ring at all) rendered fine. */}
             <View style={s.avatarContainer}>
               {conv.isOfficial ? (
-                <View style={[s.avatar56, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                  <BrandthreadLogo size={28} />
+                <View style={[s.avatar48, s.officialAvatar]} testID={`inbox-official-avatar-${conv.id}`}>
+                  <BrandthreadLogo size={26} />
                 </View>
               ) : (
                 // LIVE ring while this person is streaming; tapping the
@@ -1194,17 +1221,14 @@ export default function InboxScreen() {
             <View style={s.convCenter}>
               <View style={s.convNameRow}>
                 <Text
-                  style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.regular }]}
+                  style={[conv.isOfficial ? s.convNameOfficial : s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.regular }]}
                   numberOfLines={1}
                 >
-                  {participant.name}
+                  {conv.isOfficial ? BRANDTHREAD_ASSISTANT_NAME : participant.name}
                 </Text>
                 {conv.isOfficial && (
                   <View style={s.officialBadgeRow} testID={`inbox-official-badge-${conv.id}`}>
-                    <Feather name="check-circle" size={12} color={theme.accent} />
-                    <View style={[s.aiTag, { backgroundColor: theme.accentDim }]}>
-                      <Text style={[s.aiTagText, { color: theme.accent }]}>AI</Text>
-                    </View>
+                    <VerifiedMark size={14} />
                   </View>
                 )}
               </View>
@@ -1362,28 +1386,6 @@ export default function InboxScreen() {
     );
   }
 
-  // Threads-style empty inbox: centered circular dark badge + envelope icon,
-  // bold headline, gray subtitle, full-width filled "Send a message" button.
-  function renderInboxEmptyState() {
-    return (
-      <View style={s.inboxEmptyWrap}>
-        <View style={[s.inboxEmptyBadge, { backgroundColor: theme.cardElevated }]}>
-          <Feather name="mail" size={30} color={theme.text} />
-        </View>
-        <Text style={[s.inboxEmptyTitle, { color: theme.text }]}>Keep it real in DMs</Text>
-        <Text style={[s.inboxEmptySubtitle, { color: theme.muted }]}>
-          Send a message to someone in your network
-        </Text>
-        <PrimaryButton
-          label="Send a message"
-          onPress={openCompose}
-          style={s.inboxEmptyButton}
-          small
-        />
-      </View>
-    );
-  }
-
   // "Suggested" section — people to message, from the real
   // /api/social/suggested endpoint (activityService.getSuggestedPeople).
   // Rendered as the empty state's trailing content, and again as a list
@@ -1538,7 +1540,8 @@ export default function InboxScreen() {
           gutter={gutter}
           actions={[
             { name: 'search', onPress: openMessagesSearch, accessibilityLabel: 'Search messages', testID: 'inbox-header-search' },
-            { name: 'plus', onPress: () => openInboxComposeMenu(router, openCompose), accessibilityLabel: 'New message or group', testID: 'inbox-header-compose' },
+            // #48: straight to New message ("New group" is a row inside it).
+            { name: 'plus', onPress: openCompose, accessibilityLabel: 'New message', testID: 'inbox-header-compose' },
           ]}
         />
       )}
@@ -1576,9 +1579,9 @@ export default function InboxScreen() {
                   ]}>
                     <Text
                       style={[s.noteBubbleText, { color: myNote ? theme.text : theme.subtle, fontFamily: myNote ? FONT.medium : FONT.regular }]}
-                      numberOfLines={1}
+                      numberOfLines={2}
                     >
-                      {myNote ? myNote.text : 'Note'}
+                      {myNote ? myNote.text : 'Add a note'}
                     </Text>
                   </View>
                   <View style={[s.noteBubbleTail, { backgroundColor: theme.cardElevated, borderColor: theme.border }]} />
@@ -1627,7 +1630,7 @@ export default function InboxScreen() {
                     {note ? (
                       <>
                         <View style={[s.noteBubble, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
-                          <Text style={[s.noteBubbleText, { color: theme.text, fontFamily: FONT.medium }]} numberOfLines={1}>
+                          <Text style={[s.noteBubbleText, { color: theme.text, fontFamily: FONT.medium }]} numberOfLines={2}>
                             {note.text}
                           </Text>
                         </View>
@@ -1732,7 +1735,10 @@ export default function InboxScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
         >
           <View style={{ paddingHorizontal: gutter }}>
-            {messagesSearchLower || loadError ? renderEmptyState() : renderInboxEmptyState()}
+            {/* No "Keep it real in DMs" filler — the pinned Brandthread chat
+                means a real inbox is never empty; this branch is only hit
+                for a search with no matches or a load error. */}
+            {(messagesSearchLower || loadError) ? renderEmptyState() : null}
             {!messagesSearchLower && !loadError && renderSuggestedSection()}
           </View>
         </ScrollView>
@@ -1784,18 +1790,55 @@ export default function InboxScreen() {
               placeholder="Search people"
               style={s.composeSearchBar}
             />
+            {/* #48 / #50: "New group" lives inside New message, and the
+                Brandthread chat is always offered — so the sheet is never a
+                dead "No one to show yet". */}
+            {!composeQueryLower && (
+              <View>
+                <PressableScale
+                  style={s.composeResultRow}
+                  onPress={() => { closeCompose(); router.push('/community-create' as never); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="New group"
+                  testID="compose-new-group"
+                >
+                  <View style={[s.composeAvatar, { backgroundColor: theme.cardElevated }]}>
+                    <Feather name="users" size={18} color={theme.text} />
+                  </View>
+                  <Text style={{ flex: 1, color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }}>New group</Text>
+                </PressableScale>
+                {officialConv && (
+                  <PressableScale
+                    style={s.composeResultRow}
+                    onPress={() => { closeCompose(); openConversation(officialConv); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Message ${BRANDTHREAD_ASSISTANT_NAME}`}
+                    testID="compose-brandthread"
+                  >
+                    <View style={[s.composeAvatar, s.officialAvatar]}>
+                      <BrandthreadLogo size={22} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }} numberOfLines={1}>{BRANDTHREAD_ASSISTANT_NAME}</Text>
+                        <VerifiedMark size={12} />
+                      </View>
+                      <Text style={{ color: theme.muted, fontFamily: FONT.medium, fontSize: FS.meta }} numberOfLines={1}>Ask anything about the app</Text>
+                    </View>
+                  </PressableScale>
+                )}
+              </View>
+            )}
             {composeDirLoading && !composeQueryLower ? (
               <View style={s.composeCenter}><ActivityIndicator color={theme.accent} /></View>
             ) : composeSections.length === 0 ? (
               composeLoading ? (
                 <View style={s.composeCenter}><ActivityIndicator color={theme.accent} /></View>
-              ) : (
+              ) : composeQueryLower ? (
                 <View style={s.composeCenter}>
-                  <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>
-                    {composeQueryLower ? 'No one found' : 'No one to show yet'}
-                  </Text>
+                  <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>No one found</Text>
                 </View>
-              )
+              ) : null
             ) : (
               <SectionList
                 sections={composeSections}
@@ -2001,13 +2044,15 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   // (and empty) even for authors with no active note, so every avatar in
   // the row still lines up on the same baseline regardless of who has a
   // note bubble floating above them.
-  activeRailNoteWrap: { height: 34, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
-  noteBubbleTouchable: { height: 34, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
+  // 46pt fits a two-line note (#44) — Instagram wraps notes instead of
+  // cutting them to "Hunting ...".
+  activeRailNoteWrap: { height: 46, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
+  noteBubbleTouchable: { height: 46, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
   noteBubble: {
-    maxWidth: 84, paddingHorizontal: 12, paddingVertical: 5,
+    maxWidth: 84, paddingHorizontal: 10, paddingVertical: 5,
     borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth,
   },
-  noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14 },
+  noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14, textAlign: 'center' },
   noteBubbleTail: {
     width: 7, height: 7, marginTop: -4, borderRadius: 1.5,
     borderWidth: StyleSheet.hairlineWidth, transform: [{ rotate: '45deg' }],
@@ -2102,8 +2147,12 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
 
   // Official / AI-agent row treatment (Brandthread Agent — see the
   // isOfficial comment on Conversation in services/socialTypes.ts)
-  officialAvatar: { borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  officialBadgeRow: { flexDirection: 'row', alignItems: 'center', marginRight: SP.xs },
+  // Seamless B-logo circle (no ring/border), same 48pt photo size as every
+  // other row so names line up.
+  officialAvatar: { backgroundColor: '#0A0A0B', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  // Badge sits right after the name, not pushed to the row's far edge.
+  convNameOfficial: { flexShrink: 1, fontSize: FS.base },
+  officialBadgeRow: { flexDirection: 'row', alignItems: 'center', marginLeft: 4, marginRight: SP.xs },
   aiTag: {
     marginLeft: 4, paddingHorizontal: 5, height: 17, borderRadius: 4,
     alignItems: 'center', justifyContent: 'center',

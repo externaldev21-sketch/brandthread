@@ -16,6 +16,8 @@ import { PressableScale, StatusBadge, useUndoToast } from '@/components/Brandthr
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { VerifiedMark } from '@/components/community/VerifiedMark';
+import { BRANDTHREAD_ASSISTANT_NAME } from '@/lib/brandthreadAssistant';
 import { Chip } from '@/components/ui/Chip';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticSuccessAction, hapticSelection, hapticDestructiveConfirm, hapticToggle } from '@/lib/haptics';
@@ -600,7 +602,11 @@ export default function BuyerConversationScreen() {
   // Chat details > Nicknames: once set, the nickname replaces the real name
   // everywhere this screen shows the counterpart — header, request-mode
   // profile header, media-sheet copy, etc.
-  const displayName = participant?.nickname || participant?.name || params.participantName || 'Unknown';
+  // The Brandthread chat always shows as "Brandthread" (older threads stored
+  // "Brandthread Agent" on the participant row).
+  const displayName = (conv?.isOfficial || participant?.userId === BRANDTHREAD_AGENT_USER_ID)
+    ? BRANDTHREAD_ASSISTANT_NAME
+    : participant?.nickname || participant?.name || params.participantName || 'Unknown';
   // Chat details > Theme: a conversation-level property — same background
   // and bubble colors for both participants. Null = Brandthread's existing
   // default monochrome look, completely unchanged.
@@ -1335,7 +1341,9 @@ export default function BuyerConversationScreen() {
       setMessages(msgs);
       void result;
     } catch {
-      const { text: replyText } = cannedAgentReply(messageText);
+      // Never fake an answer for a real account: say plainly that the
+      // assistant couldn't be reached (local only, not persisted).
+      const replyText = 'Couldn’t reach Brandthread just now. Check your connection and try again.';
       setMessages((prev) => [...prev.filter((m) => m.id !== optimistic.id), optimistic, {
         id: `local-agent-fallback-${Date.now()}`,
         conversationId: conv.id,
@@ -1476,8 +1484,36 @@ export default function BuyerConversationScreen() {
 
   // ── Header options ──────────────────────────────────────────────────────────
 
+  // The Brandthread chat's header (info) menu: an "About" sheet with Mute —
+  // it can't be archived, blocked or reported (the server refuses all three).
+  function openAgentOptions() {
+    if (!participant) return;
+    showActionSheet(
+      BRANDTHREAD_ASSISTANT_NAME,
+      'Brandthread is the app\'s AI assistant. It can make mistakes, so double-check anything important.',
+      [
+        {
+          text: 'Mute',
+          onPress: async () => {
+            try {
+              const { muteUser } = await import('@/services/socialService');
+              await muteUser({
+                userId: participant.userId, name: BRANDTHREAD_ASSISTANT_NAME,
+                handle: participant.handle, initials: participant.initials, color: participant.color,
+              });
+            } catch {
+              Alert.alert('Couldn’t mute', 'Please try again.');
+            }
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
+  }
+
   function openOptions() {
     if (!participant) return;
+    if (isAgentConv) { openAgentOptions(); return; }
     // Alert.alert() with a button array is a silent no-op on web (see
     // components/ui/ActionSheet.tsx's header comment) — this left the
     // header "..." menu completely dead in the web preview. showActionSheet
@@ -1677,7 +1713,19 @@ export default function BuyerConversationScreen() {
     if (msg.attachment?.type === 'quick_replies') {
       const options = parseQuickReplies(msg.attachment.meta?.optionsJson);
       return (
-        <View style={[s.quickReplyOuterRow, { marginTop: isFirstInGroup ? 12 : 2 }]}>
+        <View>
+        {/* The message's own text (e.g. the welcome's closing line) sits
+            above its chips instead of being dropped. */}
+        {msg.text ? (
+          <View style={{ paddingLeft: BUBBLE_COLUMN_LEFT, paddingRight: SP.md, marginTop: isFirstInGroup ? 12 : 2 }}>
+            <View style={{ maxWidth: BUBBLE_MAX }}>
+              <View style={[s.bubble, { backgroundColor: receivedBubbleColor, alignSelf: 'flex-start' }]}>
+                <Text style={[s.msgText, { color: receivedTextColor }]}>{msg.text}</Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
+        <View style={[s.quickReplyOuterRow, { marginTop: msg.text ? 8 : isFirstInGroup ? 12 : 2 }]}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -1694,6 +1742,7 @@ export default function BuyerConversationScreen() {
             ))}
           </ScrollView>
         </View>
+        </View>
       );
     }
 
@@ -1707,6 +1756,16 @@ export default function BuyerConversationScreen() {
       const cardKind = att.meta?.cardKind;
       return (
         <View style={{ marginTop: isFirstInGroup ? 12 : 2, paddingLeft: BUBBLE_COLUMN_LEFT, paddingRight: SP.md }}>
+          {/* Reply text first, then its deep-link card. */}
+          {msg.text ? (
+            <View style={{ flexDirection: 'row', justifyContent: isOwn ? 'flex-end' : 'flex-start', marginBottom: 6 }}>
+              <View style={{ maxWidth: BUBBLE_MAX }}>
+                <View style={[s.bubble, { backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor, alignSelf: isOwn ? 'flex-end' : 'flex-start' }]}>
+                  <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
+                </View>
+              </View>
+            </View>
+          ) : null}
           <PressableScale rippleEnabled={false}
             bounce={false}
             style={[s.agentCardOuter, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
@@ -1718,7 +1777,7 @@ export default function BuyerConversationScreen() {
                 <ThreadCashBillIcon size={18} />
               ) : (
                 <Feather
-                  name={cardKind === 'product' ? 'shopping-bag' : cardKind === 'profile' ? 'user' : 'compass'}
+                  name={cardKind === 'product' ? 'shopping-bag' : cardKind === 'profile' ? 'user' : cardKind === 'link' ? 'arrow-up-right' : 'compass'}
                   size={18}
                   color={theme.accent}
                 />
@@ -1730,15 +1789,6 @@ export default function BuyerConversationScreen() {
             </View>
             {deepLink && <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />}
           </PressableScale>
-          {msg.text ? (
-            <View style={{ flexDirection: 'row', justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: 4 }}>
-              <View style={{ maxWidth: BUBBLE_MAX }}>
-                <View style={[s.bubble, { backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor, alignSelf: isOwn ? 'flex-end' : 'flex-start' }]}>
-                  <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
-                </View>
-              </View>
-            </View>
-          ) : null}
         </View>
       );
     }
@@ -1817,7 +1867,7 @@ export default function BuyerConversationScreen() {
           {!isOwn && (
             isLastInGroup ? (
               isAgentConv ? (
-                <View style={[s.msgAvatar, s.msgAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                <View style={[s.msgAvatar, s.msgAvatarOfficial]}>
                   <BrandthreadLogo size={16} />
                 </View>
               ) : (
@@ -1869,7 +1919,7 @@ export default function BuyerConversationScreen() {
         {!isOwn && (
           isLastInGroup ? (
             isAgentConv ? (
-              <View style={[s.msgAvatar, s.msgAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
+              <View style={[s.msgAvatar, s.msgAvatarOfficial]}>
                 <BrandthreadLogo size={16} />
               </View>
             ) : (
@@ -2193,7 +2243,7 @@ export default function BuyerConversationScreen() {
               {participant && (
                 <View style={s.headerAvatarWrap} testID="conversation-avatar">
                   {isAgentConv ? (
-                    <View style={[s.headerAvatarCircle, s.headerAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                    <View style={[s.headerAvatarCircle, s.headerAvatarOfficial]}>
                       <BrandthreadLogo size={18} />
                     </View>
                   ) : (
@@ -2208,11 +2258,8 @@ export default function BuyerConversationScreen() {
                 <View style={s.headerNameRow}>
                   <Text style={s.headerName} numberOfLines={1} ellipsizeMode="tail">{displayName}</Text>
                   {isAgentConv && (
-                    <View style={s.headerAiBadgeRow} testID="conversation-official-badge">
-                      <Feather name="check-circle" size={14} color={theme.accent} style={{ marginLeft: 4 }} />
-                      <View style={[s.headerAiTag, { backgroundColor: theme.accentDim }]}>
-                        <Text style={[s.headerAiTagText, { color: theme.accent }]}>AI</Text>
-                      </View>
+                    <View style={[s.headerAiBadgeRow, { marginLeft: 4 }]} testID="conversation-official-badge">
+                      <VerifiedMark size={14} />
                     </View>
                   )}
                 </View>
@@ -2263,7 +2310,7 @@ export default function BuyerConversationScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             testID="conversation-options"
             accessibilityRole="button"
-            accessibilityLabel={isAgentConv ? 'About Brandthread Agent' : 'More options'}
+            accessibilityLabel={isAgentConv ? 'About Brandthread' : 'More options'}
           >
             <Feather name={isAgentConv ? 'info' : 'more-horizontal'} size={ICON.lg} color={theme.muted} />
           </PressableScale>
@@ -3120,7 +3167,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerAvatarOfficial: { borderWidth: 1 },
+  // Seamless B-logo circle, no ring — same as the inbox row.
+  headerAvatarOfficial: { backgroundColor: '#0A0A0B', overflow: 'hidden' },
   headerAvatarInitials: {
     fontSize: FS.sm,
     fontFamily: FONT.bold,
@@ -3274,7 +3322,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginRight: AVATAR_GAP,
     marginBottom: 2,
   },
-  msgAvatarOfficial: { borderWidth: 1 },
+  msgAvatarOfficial: { backgroundColor: '#0A0A0B', overflow: 'hidden' },
   msgAvatarSpacer: {
     width: AVATAR_SIZE,
     marginRight: AVATAR_GAP,

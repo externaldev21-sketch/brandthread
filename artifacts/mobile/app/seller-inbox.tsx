@@ -40,7 +40,9 @@ import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
 import { BLOCK_EXPLAINER } from '@/lib/safety';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
-import { radius } from '@/constants/radii';
+import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { VerifiedMark } from '@/components/community/VerifiedMark';
+import { BRANDTHREAD_ASSISTANT_NAME, sortInboxPinnedFirst } from '@/lib/brandthreadAssistant';
 
 interface Participant {
   userId: string; name: string; handle: string;
@@ -55,6 +57,8 @@ interface ConvView {
   contextOrderNumber?: string; contextProductName?: string;
   updatedAt: string;
   isPinned?: boolean;
+  /** The pinned Brandthread assistant chat (server: buildConversationView). */
+  isOfficial?: boolean;
   isArchived?: boolean;
   // New every-role-pair DM/message-request routing: a buyer with no
   // follow-back and no real paid order now lands in the seller's Requests
@@ -67,12 +71,9 @@ interface ConvView {
 
 type InboxTab = 'inbox' | 'requests';
 
-// ─── Inbox / Requests pill row ─────────────────────────────────────────────
-// Same Inbox/Requests pattern as app/(buyer)/inbox.tsx's InboxPillRow
-// (pills with a live unread-count badge on Requests), restyled to this
-// screen's own theming (AppThemePreset, not the buyer screen's useAppTheme
-// return shape) rather than pasted verbatim — no filter icon here, this
-// screen has no equivalent affordance.
+// ─── Inbox / Requests tabs — same X-style row as app/(buyer)/inbox.tsx's
+// InboxPillRow (#46/#47): two equal halves, underline across the active
+// half, one full-bleed hairline. No filter icon on this screen.
 function InboxPillRow({
   value, onChange, requestsCount, theme,
 }: {
@@ -81,39 +82,40 @@ function InboxPillRow({
   requestsCount: number;
   theme: AppThemePreset;
 }) {
-  const pills: { key: InboxTab; label: string; count?: number }[] = [
+  const tabs: { key: InboxTab; label: string; count?: number }[] = [
     { key: 'inbox', label: 'Inbox' },
     { key: 'requests', label: 'Requests', count: requestsCount },
   ];
   return (
-    <View style={[pillS.row, { paddingHorizontal: SP.md }]}>
-      {pills.map(pill => {
-        const active = value === pill.key;
+    <View style={[pillS.row, { borderBottomColor: theme.border }]} accessibilityRole="tablist">
+      {tabs.map(tab => {
+        const active = value === tab.key;
         return (
+          // PressableScale doesn't pass flex through — the plain View owns
+          // the equal-width half.
+          <View key={tab.key} style={pillS.tab}>
           <PressableScale
-            key={pill.key}
-            style={[
-              pillS.pill,
-              active
-                ? { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }
-                : { backgroundColor: 'transparent', borderColor: theme.border },
-            ]}
-            onPress={() => onChange(pill.key)}
+            style={pillS.tabPress}
+            onPress={() => onChange(tab.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
-            testID={`seller-inbox-tab-${pill.key}`}
+            testID={`seller-inbox-tab-${tab.key}`}
           >
-            <Text style={[pillS.pillLabel, { color: active ? theme.text : theme.muted }]}>
-              {pill.label}
-            </Text>
-            {!!pill.count && pill.count > 0 && (
-              <View style={[pillS.pillCount, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
-                <Text style={[pillS.pillCountText, { color: active ? theme.onAccent : theme.muted }]}>
-                  {pill.count > 99 ? '99+' : pill.count}
-                </Text>
-              </View>
-            )}
+            <View style={pillS.labelRow}>
+              <Text style={[pillS.label, { color: active ? theme.text : theme.muted, fontFamily: active ? FONT.bold : FONT.medium }]}>
+                {tab.label}
+              </Text>
+              {!!tab.count && tab.count > 0 && (
+                <View style={[pillS.count, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
+                  <Text style={[pillS.countText, { color: active ? theme.onAccent : theme.muted }]}>
+                    {tab.count > 99 ? '99+' : tab.count}
+                  </Text>
+                </View>
+              )}
+            </View>
+            {active && <View style={[pillS.indicator, { backgroundColor: theme.text }]} />}
           </PressableScale>
+          </View>
         );
       })}
     </View>
@@ -121,14 +123,17 @@ function InboxPillRow({
 }
 
 const pillS = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-  pill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    height: 36, paddingHorizontal: SP.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth,
+  row: {
+    flexDirection: 'row', alignItems: 'stretch', height: 48, marginBottom: SP.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
-  pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  pillCountText: { fontSize: 11, fontFamily: FONT.bold },
+  tab: { flex: 1 },
+  tabPress: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  label: { fontSize: FS.base, letterSpacing: 0.1 },
+  indicator: { position: 'absolute', left: 0, right: 0, bottom: -StyleSheet.hairlineWidth, height: 3, borderRadius: 1.5 },
+  count: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  countText: { fontSize: 11, fontFamily: FONT.bold },
 });
 
 function timeAgo(ts?: number): string {
@@ -347,7 +352,11 @@ export default function SellerInboxScreen() {
           : conversation,
       ),
     );
-    router.push(('/seller-conversation?id=' + encodeURIComponent(conversationId)) as never);
+    // The Brandthread chat opens in the agent-aware thread screen (quick
+    // replies, typing, deep-link cards); seller-conversation.tsx is the
+    // buyer<->seller thread and has no assistant support.
+    const route = openedConversation?.isOfficial ? '/buyer-conversation?id=' : '/seller-conversation?id=';
+    router.push((route + encodeURIComponent(conversationId)) as never);
   }
 
   // Requests-tab row tap — deliberately does NOT optimistically clear
@@ -362,10 +371,16 @@ export default function SellerInboxScreen() {
 
   function longPressConversation(c: ConvView) {
     hapticDestructiveConfirm();
-    showActionSheet('Options', undefined, [
-      { text: 'Archive', onPress: () => swipeArchiveConversation(c), style: 'destructive' },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    showActionSheet('Options', undefined, c.isOfficial
+      // The Brandthread chat can be muted, never archived or deleted.
+      ? [
+        { text: 'Mute', onPress: () => swipeMuteConversation(c) },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+      : [
+        { text: 'Archive', onPress: () => swipeArchiveConversation(c), style: 'destructive' },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
   }
 
   // Swipe actions mirror app/(buyer)/inbox.tsx's InboxSwipeRow set (mark
@@ -508,17 +523,18 @@ export default function SellerInboxScreen() {
         onPress: () => swipeMarkReadConversation(item),
         accessibilityLabel: `Mark conversation with ${other.name || other.handle || 'buyer'} as read`,
       },
-      {
+      // The always-pinned Brandthread chat has no Pin toggle and no Delete.
+      ...(item.isOfficial ? [] : [{
         key: 'pin',
         label: item.isPinned ? 'Unpin' : 'Pin',
-        icon: 'bookmark',
+        icon: 'bookmark' as const,
         color: theme.cardElevated,
         textColor: theme.muted,
         onPress: () => swipePinConversation(item),
         accessibilityLabel: item.isPinned
           ? `Unpin conversation with ${other.name || other.handle || 'buyer'}`
           : `Pin conversation with ${other.name || other.handle || 'buyer'}`,
-      },
+      }]),
       {
         key: 'mute',
         label: 'Mute',
@@ -528,16 +544,17 @@ export default function SellerInboxScreen() {
         onPress: () => swipeMuteConversation(item),
         accessibilityLabel: `Mute ${other.name || other.handle || 'buyer'}`,
       },
-      {
+      ...(item.isOfficial ? [] : [{
         key: 'delete',
         label: 'Delete',
-        icon: 'trash-2',
+        icon: 'trash-2' as const,
         color: theme.cardElevated,
         textColor: theme.error,
         onPress: () => swipeArchiveConversation(item),
         accessibilityLabel: `Delete conversation with ${other.name || other.handle || 'buyer'}`,
-      },
+      }]),
     ];
+    const displayName = item.isOfficial ? BRANDTHREAD_ASSISTANT_NAME : (other.name || other.handle || 'Buyer');
 
     return (
       <InboxSwipeRow rowId={item.id} actions={swipeActions}>
@@ -550,14 +567,26 @@ export default function SellerInboxScreen() {
           accessibilityRole="button"
           accessibilityLabel={`Open conversation with ${other.name || other.handle || 'buyer'}`}
         >
-          <View style={[s.avatar, { backgroundColor: other.color || theme.accent }]}>
-            <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
-          </View>
+          {item.isOfficial ? (
+            // Seamless B-logo circle, no ring.
+            <View style={[s.avatar, s.officialAvatar]} testID={`seller-official-avatar-${item.id}`}>
+              <BrandthreadLogo size={28} />
+            </View>
+          ) : (
+            <View style={[s.avatar, { backgroundColor: other.color || theme.accent }]}>
+              <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
+            </View>
+          )}
           <View style={s.rowCenter}>
             <View style={s.rowTop}>
-              <Text style={[s.name, { fontFamily: hasUnread ? FONT.bold : FONT.regular }]} numberOfLines={1}>
-                {other.name || other.handle || 'Buyer'}
+              <Text style={[item.isOfficial ? s.nameOfficial : s.name, { fontFamily: hasUnread ? FONT.bold : FONT.regular }]} numberOfLines={1}>
+                {displayName}
               </Text>
+              {item.isOfficial && (
+                <View style={s.officialBadge} testID={`seller-official-badge-${item.id}`}>
+                  <VerifiedMark size={14} />
+                </View>
+              )}
               <Text style={s.time}>{timeAgo(item.lastMessageTs)}</Text>
             </View>
             {item.contextOrderNumber ? (
@@ -663,8 +692,8 @@ export default function SellerInboxScreen() {
         .filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(queryLower);
     })
-    .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)),
-  [convs, queryLower, pendingDeleteIds]);
+  , [convs, queryLower, pendingDeleteIds]);
+  const sortedConvs = useMemo(() => sortInboxPinnedFirst(visibleConvs), [visibleConvs]);
 
   const requestConvs = useMemo(() => convs.filter((c) =>
     c.isRequest === true && !c.isArchived && !pendingDeleteIds.has(c.id)
@@ -676,10 +705,10 @@ export default function SellerInboxScreen() {
   const totalUnread = visibleConvs.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
 
   const inboxRows = useMemo(() => mergeInboxRows(
-    visibleConvs,
+    sortedConvs,
     joinedCommunities.filter((c) => communityMatchesQuery(c, queryLower)),
     { getKey: (c) => c.id, getTs: (c) => c.lastMessageTs, isPinned: (c) => !!c.isPinned },
-  ), [visibleConvs, joinedCommunities, queryLower]);
+  ), [sortedConvs, joinedCommunities, queryLower]);
 
   return (
     <View style={s.root}>
@@ -818,6 +847,9 @@ const createStyles = (theme: AppThemePreset) => {
   },
   avatarImage: { width: 56, height: 56 },
   avatarInitials: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
+  officialAvatar: { backgroundColor: '#0A0A0B' },
+  nameOfficial: { flexShrink: 1, fontSize: FS.base, fontFamily: FONT.regular, color: theme.text },
+  officialBadge: { marginLeft: 4, flex: 1 },
   rowCenter: { flex: 1 },
   rowTop: { flexDirection: 'row', alignItems: 'center' },
   name: { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: theme.text },

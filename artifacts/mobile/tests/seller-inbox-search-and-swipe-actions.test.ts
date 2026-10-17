@@ -54,11 +54,13 @@ describe('seller-inbox.tsx: swipe actions', () => {
   });
 
   it('pinned conversations sort to the top of the list', () => {
-    expect(src).toContain('.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)),');
+    // Brandthread chat first, then pinned, then the rest (lib/brandthreadAssistant.ts).
+    expect(src).toContain('sortInboxPinnedFirst(visibleConvs)');
   });
 
   it('long-pressing a row still offers Archive (matches the buyer inbox’s long-press menu)', () => {
-    expect(src).toContain("showActionSheet('Options', undefined, [");
+    // Ordinary rows keep Archive; the Brandthread chat gets Mute only.
+    expect(src).toContain("showActionSheet('Options', undefined, c.isOfficial");
     expect(src).toContain("{ text: 'Archive', onPress: () => swipeArchiveConversation(c), style: 'destructive' },");
   });
 });
