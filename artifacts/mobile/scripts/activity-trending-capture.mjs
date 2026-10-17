@@ -131,11 +131,13 @@ async function run(browser, images, origin, role, target, label) {
   const settle = async (ms = 700) => { await waitForQuietNetwork(activity, 500, 8000); await page.waitForTimeout(ms); };
   const open = async () => {
     for (let attempt = 1; ; attempt += 1) {
-      // 'tab' = the buyer's Activity slot in the floating tab bar, tapped like a
-      // user would; anything else is a route pushed onto the stack.
-      await openScreen(page, activity, origin, role, target === 'tab' ? '/' : target);
+      // Tapped like a user would: 'tab' = the buyer's Activity slot in the
+      // floating tab bar; 'bell' = the seller Dashboard bell, which pushes
+      // /activity-center onto the stack.
+      await openScreen(page, activity, origin, role, '/');
       try {
-        if (target === 'tab') await page.getByTestId('buyer-tab-activity').click({ timeout: 15_000 });
+        const entry = target === 'tab' ? 'buyer-tab-activity' : 'seller-dashboard-activity';
+        await page.getByTestId(entry).first().click({ timeout: 15_000 });
         await page.locator('[data-testid="activity-chip-all"]').first().waitFor({ timeout: 15_000 });
         return;
       } catch (e) { if (attempt >= 3) throw e; }
@@ -190,7 +192,7 @@ async function main() {
   const results = {};
   try {
     results.buyerTab = await run(browser, images, origin, 'buyer', 'tab', 'buyer-tab');
-    results.sellerPushed = await run(browser, images, origin, 'seller', '/activity-center', 'seller-pushed');
+    results.sellerPushed = await run(browser, images, origin, 'seller', 'bell', 'seller-pushed');
   } finally {
     await close();
     await browser.close();

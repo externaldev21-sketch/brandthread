@@ -1,0 +1,91 @@
+{
+  "buyerTab": {
+    "empty": {
+      "header": {
+        "backButton": true,
+        "title": {
+          "top": 77,
+          "bottom": 101,
+          "height": 24
+        },
+        "header": {
+          "top": 0,
+          "bottom": 127,
+          "height": 127
+        },
+        "chipAll": {
+          "top": 128,
+          "bottom": 162,
+          "height": 34
+        },
+        "chipLabels": [
+          "All",
+          "Follows",
+          "Likes",
+          "Comments",
+          "Orders",
+          "Thread Cash"
+        ]
+      },
+      "order": {
+        "trendingTop": null,
+        "trendingRows": 0,
+        "noActivityLine": 416,
+        "findPeopleVisible": true
+      }
+    },
+    "withActivity": {
+      "order": {
+        "trendingTop": null,
+        "trendingRows": 0,
+        "noActivityLine": null,
+        "findPeopleVisible": false
+      }
+    },
+    "withActivityScrolled": {
+      "order": {
+        "trendingTop": null,
+        "trendingRows": 0,
+        "noActivityLine": null,
+        "findPeopleVisible": false
+      }
+    },
+    "trendingQueries": []
+  },
+  "sellerPushed": {
+    "empty": {
+      "header": {
+        "backButton": true,
+        "title": {
+          "top": 77,
+          "bottom": 101,
+          "height": 24
+        },
+        "header": {
+          "top": 0,
+          "bottom": 127,
+          "height": 127
+        },
+        "chipAll": {
+          "top": 128,
+          "bottom": 162,
+          "height": 34
+        },
+        "chipLabels": [
+          "All",
+          "Follows",
+          "Likes",
+          "Comments",
+          "Orders",
+          "Thread Cash"
+        ]
+      },
+      "order": {
+        "trendingTop": null,
+        "trendingRows": 0,
+        "noActivityLine": null,
+        "findPeopleVisible": false
+      }
+    }
+  }
+}

@@ -56,6 +56,12 @@ interface ScreenHeaderProps {
   variant?: 'push' | 'modal';
   /** Compatibility alias for divider={false}; hides the hairline under the header. */
   hideDivider?: boolean;
+  /**
+   * With `showBack={false}`, keep an empty back-button-sized slot so the title
+   * lines up with pushed screens (default). `false` starts the title on the
+   * gutter instead — for a top-level tab like Activity.
+   */
+  reserveBackSpace?: boolean;
 }
 
 /** Design-system rule: at most 2 action icons on the right, primary rightmost. */
@@ -73,7 +79,7 @@ const MAX_HEADER_ACTIONS = 2;
 const TITLE_SIZE = 20;
 
 export function ScreenHeader({
-  title, rightElement, actions, scrollY, collapseDistance = 48, onBack, divider = false, backTestID, backAccessibilityLabel, variant = 'push', showBack = true, hideDivider = false,
+  title, rightElement, actions, scrollY, collapseDistance = 48, onBack, divider = false, backTestID, backAccessibilityLabel, variant = 'push', showBack = true, hideDivider = false, reserveBackSpace = true,
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
@@ -110,7 +116,7 @@ export function ScreenHeader({
             >
               <Feather name="arrow-left" size={ICON.md} color={colors.foreground} />
             </PressableScale>
-          ) : <View style={{ width: COMP.iconBtn }} />
+          ) : reserveBackSpace ? <View style={{ width: COMP.iconBtn }} /> : null
         )}
 
         <View style={styles.titleBlock}>

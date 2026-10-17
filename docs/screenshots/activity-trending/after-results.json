@@ -1,0 +1,102 @@
+{
+  "buyerTab": {
+    "empty": {
+      "header": {
+        "backButton": false,
+        "title": {
+          "top": 75,
+          "bottom": 99,
+          "height": 24
+        },
+        "header": {
+          "top": 0,
+          "bottom": 123,
+          "height": 123
+        },
+        "chipAll": {
+          "top": 112,
+          "bottom": 146,
+          "height": 34
+        },
+        "chipLabels": [
+          "All",
+          "Follows",
+          "Likes",
+          "Comments",
+          "Mentions",
+          "Orders",
+          "Thread Cash"
+        ]
+      },
+      "order": {
+        "trendingTop": 241,
+        "trendingRows": 6,
+        "noActivityLine": 167,
+        "findPeopleVisible": false
+      }
+    },
+    "withActivity": {
+      "order": {
+        "trendingTop": 643,
+        "trendingRows": 6,
+        "noActivityLine": null,
+        "findPeopleVisible": false
+      }
+    },
+    "withActivityScrolled": {
+      "order": {
+        "trendingTop": 336,
+        "trendingRows": 6,
+        "noActivityLine": null,
+        "findPeopleVisible": false
+      }
+    },
+    "afterFollow": {
+      "label": "\nFollowing",
+      "followCalls": [
+        "POST /api/social/follow {\"userId\":\"seller_northline\"}"
+      ]
+    },
+    "trendingQueries": [
+      "?limit=12&exclude=following",
+      "?limit=12&exclude=following"
+    ]
+  },
+  "sellerPushed": {
+    "empty": {
+      "header": {
+        "backButton": true,
+        "title": {
+          "top": 77,
+          "bottom": 101,
+          "height": 24
+        },
+        "header": {
+          "top": 0,
+          "bottom": 127,
+          "height": 127
+        },
+        "chipAll": {
+          "top": 116,
+          "bottom": 150,
+          "height": 34
+        },
+        "chipLabels": [
+          "All",
+          "Follows",
+          "Likes",
+          "Comments",
+          "Mentions",
+          "Orders",
+          "Thread Cash"
+        ]
+      },
+      "order": {
+        "trendingTop": null,
+        "trendingRows": 0,
+        "noActivityLine": null,
+        "findPeopleVisible": false
+      }
+    }
+  }
+}

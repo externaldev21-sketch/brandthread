@@ -56,7 +56,9 @@ describe('each named screen wires its thread-motif illustration through the shar
     ['../app/buyer-search.tsx', 'illustration="search"'],
     ['../components/discover/DiscoverGrid.tsx', 'illustration="trending"'],
     ['../app/(buyer)/inbox.tsx', 'illustration="envelope"'],
-    ['../app/activity-center.tsx', 'illustration="bell"'],
+    // Activity's All/Follows empty state is a quiet one-line note with the
+    // Trending brands list right under it (Dev: "no big empty state"), so it
+    // no longer draws the bell — see lib/activityTrending.ts.
     ['../app/(buyer)/orders.tsx', 'illustration="tee"'],
     ['../app/buyer-saved.tsx', 'illustration="bookmark"'],
   ];
