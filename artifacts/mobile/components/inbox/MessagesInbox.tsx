@@ -103,7 +103,7 @@ import {
 import {
   isPreviewNotesEnabled, getPreviewNotesForTray, getPreviewMyNote, postPreviewNote,
 } from '@/lib/previewNotes';
-import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { BrandthreadAvatar } from '@/components/branding/BrandthreadAvatar';
 import { isOfficialAccountId } from '@/lib/officialAccount';
 import { EmptyState as QuietEmptyState, ScreenHeader, SectionHeader, SegmentTabs } from '@/components/reframe';
 import { IconButton } from '@/components/ui/IconButton';
@@ -1306,9 +1306,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
                 Line) while non-live rows (no ring at all) rendered fine. */}
             <View style={s.avatarContainer}>
               {conv.isOfficial || isOfficialAccountId(participant.userId) ? (
-                <View style={[s.avatar48, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                  <BrandthreadLogo size={24} />
-                </View>
+                <BrandthreadAvatar size={48} />
               ) : (
                 // LIVE ring while this person is streaming; tapping the
                 // ringed avatar opens their live instead of the thread.
@@ -1446,9 +1444,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
           >
             <View style={s.avatarContainer}>
               {isOfficialAccountId(participant.userId) ? (
-                <View style={[s.avatar48, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                  <BrandthreadLogo size={24} />
-                </View>
+                <BrandthreadAvatar size={48} />
               ) : participant.avatarUri ? (
                 <Image source={{ uri: participant.avatarUri }} style={s.avatar48} testID={`inbox-request-avatar-image-${conv.id}`} />
               ) : (
@@ -2042,7 +2038,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     position: 'absolute', left: -2, top: -2, right: -2, bottom: -2, borderRadius: 34,
   },
   storyRingUnseen: { borderWidth: 2 },
-  storyRingSeen: { borderWidth: 1.5 },
+  storyRingSeen: { borderWidth: 0 },
   // "Add to your story" badge — pure visual decoration on top of the single
   // "Your story" Pressable, never its own tappable element.
   addStoryBadge: {

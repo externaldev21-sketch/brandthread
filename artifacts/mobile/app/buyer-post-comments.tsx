@@ -261,7 +261,7 @@ function Avatar({ uri, initials, size = 38, ring = true, backgroundColor, recycl
   return (
     <View style={{
       width: size, height: size, borderRadius: size / 2, backgroundColor: backgroundColor ?? theme.cardElevated,
-      borderWidth: ring ? 1 : 0, borderColor: theme.border, alignItems: 'center', justifyContent: 'center',
+      alignItems: 'center', justifyContent: 'center',
     }}>
       <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: size > 34 ? FS.xs : 10 }}>{initials}</Text>
     </View>

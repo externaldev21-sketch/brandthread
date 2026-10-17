@@ -1361,8 +1361,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     width: 22,
     height: 22,
     borderRadius: 11,
-    borderWidth: crispPx(1.5),
-    borderColor: '#000',
     backgroundColor: CARD_ELEVATED,
     alignItems: 'center',
     justifyContent: 'center',

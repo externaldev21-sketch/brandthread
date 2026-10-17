@@ -6,8 +6,9 @@
  *   story ring  — 2pt accent stroke, only visible while the owner has an
  *                 active story (transparent otherwise, so the layout never
  *                 shifts when a story starts/expires);
- *   halo        — a background-coloured separator (border + padding) that
- *                 keeps the avatar visually apart from the ring/video;
+ *   halo        — a transparent spacer (border + padding) that keeps the
+ *                 story ring off the photo; never painted, so the avatar
+ *                 itself stays seamless;
  *   avatar      — the photo / initials disc itself.
  *
  * React Native (and RN-web) size boxes border-box: a view's width includes
@@ -23,9 +24,9 @@ export const PROFILE_AVATAR_SIZE = 72;
 /** The seller's own Profile tab (video header): Dev asked for a noticeably
  *  bigger picture there (+22% over the shared 72pt default). */
 export const PROFILE_VIDEO_HEADER_AVATAR_SIZE = 88;
-/** Background-coloured separator stroke around the avatar. */
+/** Transparent spacer stroke around the avatar (never painted). */
 export const AVATAR_HALO_BORDER = 2;
-/** Background-coloured gap between the separator stroke and the avatar. */
+/** Transparent gap between the spacer stroke and the avatar. */
 export const AVATAR_HALO_PADDING = 2;
 /** Outermost accent stroke shown while the owner has an unexpired story. */
 export const STORY_RING_WIDTH = 2;

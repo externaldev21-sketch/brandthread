@@ -1492,6 +1492,17 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   doneText:         { ...TYPE_SCALE.body, color: FG },
   noticeRow:        { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
   noticeText:       { ...TYPE_SCALE.footnote, color: FG, flex: 1 },
+  // Customer
+  customerHero:     { alignItems: 'center', gap: SP.sm },
+  avatarCircle:     { width: 64, height: 64, borderRadius: RADII.pill, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
+  avatarInitials:   { fontSize: FS.xl, fontFamily: FONT.bold, color: PURPLE },
+  customerName:     { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
+  customerEmail:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  customerPhone:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  customerStatsCard:{ gap: SP.xs },
+  addressCard:      { gap: SP.xs, marginBottom: SP.sm },
+  addressTitle:     { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.xs },
+  addressText:      { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
 
   timelineWrap:     { paddingHorizontal: SP.md, paddingVertical: SP.md },
   timelineRow:      { flexDirection: 'row', gap: SP.sm },

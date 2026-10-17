@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   popoverName: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
   popoverBtn: { minHeight: 44, borderRadius: radius.md, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   popoverBtnText: { color: '#000000', fontFamily: FONT.semibold, fontSize: FS.sm },
-  avatar: { backgroundColor: '#2A2A2E', borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  avatar: { backgroundColor: '#2A2A2E', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.sm },
 
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },

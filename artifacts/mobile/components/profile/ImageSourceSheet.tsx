@@ -23,6 +23,7 @@ import { FONT, FS, SP } from '@/lib/theme';
 import { haptics, hapticSelection } from '@/lib/haptics';
 import { showActionSheet, type ActionSheetButton } from '@/components/ui/ActionSheet';
 import { pickFromCamera, pickFromLibrary, pickVideoFromLibrary, recordAvatarVideo } from '@/lib/pickProfileImage';
+import { AvatarCropper, type AvatarCropResult } from './AvatarCropper';
 
 export const AVATAR_VIDEO_MAX_SECONDS = 10;
 
@@ -45,6 +46,8 @@ export function useImageSourceSheet() {
   const resolverRef = useRef<((asset: ImagePicker.ImagePickerAsset | null) => void) | null>(null);
   const aspectRef = useRef<[number, number]>([1, 1]);
   const nativeEditRef = useRef(true);
+  const circleRef = useRef(false);
+  const [cropAsset, setCropAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
   const settle = useCallback((asset: ImagePicker.ImagePickerAsset | null) => {
     resolverRef.current?.(asset);
@@ -53,14 +56,18 @@ export function useImageSourceSheet() {
 
   const run = useCallback((pick: () => Promise<ImagePicker.ImagePickerAsset | null>) => async () => {
     hapticSelection();
-    settle(await pick());
+    const asset = await pick();
+    if (asset && circleRef.current && asset.type !== 'video') setCropAsset(asset);
+    else settle(asset);
   }, [settle]);
 
-  const open = useCallback((opts?: { aspect?: [number, number]; onRemove?: () => void; enableVideo?: boolean; skipNativeEdit?: boolean }) => {
+  const open = useCallback((opts?: { aspect?: [number, number]; onRemove?: () => void; enableVideo?: boolean; skipNativeEdit?: boolean; cropCircle?: boolean }) => {
     // A sheet swiped away never answers; settle it before asking again.
     settle(null);
+    setCropAsset(null);
+    circleRef.current = !!opts?.cropCircle;
     aspectRef.current = opts?.aspect ?? [1, 1];
-    nativeEditRef.current = !opts?.skipNativeEdit;
+    nativeEditRef.current = !opts?.skipNativeEdit && !opts?.cropCircle;
     const onRemove = opts?.onRemove;
     const buttons: ActionSheetButton[] = [
       { text: 'Take photo', onPress: () => { void run(() => pickFromCamera(aspectRef.current, nativeEditRef.current))(); } },
@@ -89,7 +96,12 @@ export function useImageSourceSheet() {
 
   // Kept so call sites that render `{sheet}` need no change: the action
   // sheet itself is hosted once at the app root.
-  const sheet = null;
+  const finishCrop = useCallback((result: AvatarCropResult) => {
+    const original = cropAsset;
+    setCropAsset(null);
+    settle(original ? { ...original, ...result, type: 'image', mimeType: 'image/jpeg', fileName: 'avatar.jpg', fileSize: undefined, base64: undefined, exif: undefined } : null);
+  }, [cropAsset, settle]);
+  const sheet = <AvatarCropper source={cropAsset} onCancel={() => { setCropAsset(null); settle(null); }} onDone={finishCrop} />;
 
   return { open, sheet };
 }

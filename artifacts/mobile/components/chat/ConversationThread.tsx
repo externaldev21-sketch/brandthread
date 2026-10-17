@@ -42,7 +42,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
-import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { BrandthreadAvatar } from '@/components/branding/BrandthreadAvatar';
 import { isOfficialAccountId } from '@/lib/officialAccount';
 import { Chip } from '@/components/ui/Chip';
 import { Snackbar } from '@/components/ui/Snackbar';
@@ -2139,9 +2139,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
           {!isOwn && (
             isLastInGroup ? (
               showOfficialMark ? (
-                <View style={[s.msgAvatar, s.msgAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                  <BrandthreadLogo size={16} />
-                </View>
+                <BrandthreadAvatar size={28} />
               ) : participant?.avatarUri ? (
                 <CachedImage source={{ uri: participant.avatarUri }} style={s.msgAvatar} />
               ) : (
@@ -2196,9 +2194,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         {!isOwn && (
           isLastInGroup ? (
             showOfficialMark ? (
-              <View style={[s.msgAvatar, s.msgAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                <BrandthreadLogo size={16} />
-              </View>
+              <BrandthreadAvatar size={28} />
             ) : participant?.avatarUri ? (
               <CachedImage source={{ uri: participant.avatarUri }} style={s.msgAvatar} />
             ) : (
@@ -2547,9 +2543,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
               {participant && (
                 <View style={s.headerAvatarWrap} testID="conversation-avatar">
                   {showOfficialMark ? (
-                    <View style={[s.headerAvatarCircle, s.headerAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                      <BrandthreadLogo size={18} />
-                    </View>
+                    <BrandthreadAvatar size={32} />
                   ) : participant.avatarUri ? (
                     <CachedImage source={{ uri: participant.avatarUri }} style={s.headerAvatarCircle} testID="conversation-avatar-image" />
                   ) : (

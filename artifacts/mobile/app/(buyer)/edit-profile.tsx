@@ -262,7 +262,7 @@ export default function BuyerEditProfileScreen() {
   }
 
   async function pickAvatar() {
-    const asset = await openAvatarSheet({ aspect: [1, 1], enableVideo: true });
+    const asset = await openAvatarSheet({ aspect: [1, 1], enableVideo: true, cropCircle: true });
     if (!asset) return;
     if (asset.type === 'video') { await pickAvatarVideo(asset); return; }
 

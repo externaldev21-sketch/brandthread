@@ -140,7 +140,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   dotSlot: { width: 8, alignItems: 'center' },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.text },
-  avatar: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, overflow: 'hidden', borderWidth: 1, borderColor: mediaAlpha(MEDIA.foreground, 0.18), alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   initials: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },
   text: { flex: 1, gap: SP.xs },
   sentence: { fontSize: FS.base, lineHeight: 20 },

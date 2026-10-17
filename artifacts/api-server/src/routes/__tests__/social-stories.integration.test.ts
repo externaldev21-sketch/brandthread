@@ -90,6 +90,8 @@ describe("stories", () => {
     const res = await request(`/api/social/stories/user/${authorId}`, followerId);
     expect(res.status).toBe(200);
     expect((res.body as any[]).length).toBeGreaterThan(0);
+    // Not viewed yet → the profile header shows the story ring.
+    expect((res.body as any[]).every((s: any) => s.seenByMe === false)).toBe(true);
   });
 
   it("is NOT visible to a non-follower (spec: stories are visible to followers)", async () => {
@@ -123,6 +125,12 @@ describe("stories", () => {
 
     const asStranger = await request(`/api/social/stories/${storyId}/viewers`, strangerId);
     expect(asStranger.status).toBe(403);
+  });
+
+  it("marks a viewed story seenByMe on the author's story list (ring off once everything is seen)", async () => {
+    const res = await request(`/api/social/stories/user/${authorId}`, followerId);
+    expect(res.status).toBe(200);
+    expect((res.body as any[]).find((s: any) => s.id === storyIds[0])?.seenByMe).toBe(true);
   });
 
   it("appears in the follower's stories tray, unseen until viewed", async () => {

@@ -25,3 +25,10 @@ export const LOGO_SIZE = {
 // ── Glow defaults ─────────────────────────────────────────────────────────────
 export const LOGO_GLOW_COLOR   = '#DDE2E8';
 export const LOGO_GLOW_ENABLED = true;
+
+// ── Official @brandthread profile picture ────────────────────────────────────
+// Full-bleed square (chrome B centred on near-black, no transparent margin) so
+// it fills an avatar circle edge to edge and is simply cropped by it — unlike
+// LOGO_SOURCE, whose glyph sits small inside a transparent canvas.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+export const BRANDTHREAD_AVATAR_SOURCE = require('../assets/images/brandthread-avatar.png');

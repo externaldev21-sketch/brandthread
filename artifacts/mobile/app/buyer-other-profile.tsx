@@ -138,6 +138,7 @@ export default function BuyerOtherProfileScreen() {
   const [msgLoading, setMsgLoading]     = useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [storyIds, setStoryIds]         = useState<string[]>([]);
+  const [hasUnseenStory, setHasUnseenStory] = useState(false);
   // Their saved-story highlights (only the ones my audience may open); empty hides the row.
   const [highlights, setHighlights]     = useState<Highlight[]>([]);
   const [refreshing, setRefreshing]     = useState(false);
@@ -194,7 +195,10 @@ export default function BuyerOtherProfileScreen() {
       setLoadFailed(false);
       setNotFound(false);
       const stories = await api.social.storiesForUser(resolvedId).catch(() => []);
-      setStoryIds((Array.isArray(stories) ? stories : []).map((s: any) => s.id));
+      const storyList = Array.isArray(stories) ? stories : [];
+      setStoryIds(storyList.map((s: any) => s.id));
+      // Older servers don't send `seenByMe` — treat missing as unseen.
+      setHasUnseenStory(storyList.some((s: any) => s.seenByMe !== true));
       try {
         const hl = await api.social.userHighlights(resolvedId);
         setHighlights((Array.isArray(hl) ? hl : []).map(highlightFromServer));
@@ -569,7 +573,7 @@ export default function BuyerOtherProfileScreen() {
           pronouns: profile?.pronouns ?? null,
         }}
         avatar={storyIds.length > 0
-          ? { ring: true, onPress: openStories, accessibilityLabel: `View ${displayName}'s story`, liveHostId: canonicalUserId }
+          ? { ring: hasUnseenStory, onPress: openStories, accessibilityLabel: `View ${displayName}'s story`, liveHostId: canonicalUserId }
           : { liveHostId: canonicalUserId }}
         // Their banner (image or muted looping video) replaces the hero when set.
         banner={banner}

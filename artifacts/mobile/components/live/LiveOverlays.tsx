@@ -437,7 +437,7 @@ export function LiveCommentBar({
 }
 
 const styles = StyleSheet.create({
-  hostAvatar: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', flexShrink: 0 },
+  hostAvatar: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
   hostInitials: { color: '#fff', fontFamily: FONT.bold },
   // Allow the identity to truncate before it crowds the close button on
   // narrow screens. The follow button remains a separate target.
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
   viewerStack: { flexDirection: 'row', alignItems: 'center', width: 56, flexShrink: 0 },
   viewerDot: {
     width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-    borderWidth: crispPx(1.5), borderColor: 'rgba(0,0,0,0.6)', overflow: 'hidden', flexShrink: 0,
+    overflow: 'hidden', flexShrink: 0,
   },
   viewerInitials: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
   viewerCountPill: { marginLeft: 6 },

@@ -558,7 +558,7 @@ export default function BuyerDropDetail() {
             ]}
           >
             <View style={styles.brandRow}>
-              <View style={[styles.brandMark, { borderColor: `${theme.accent}AA` }]}>
+              <View style={styles.brandMark}>
                 <Text style={styles.brandInitials}>{sellerName.slice(0, 2).toUpperCase()}</Text>
               </View>
               <View>
@@ -733,7 +733,7 @@ const styles = StyleSheet.create({
   heroBadgeText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   heroCopy: { padding: 20, paddingBottom: 28 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: SP.md },
-  brandMark: { width: 38, height: 38, borderRadius: 19, borderWidth: crispPx(1.5), backgroundColor: 'rgba(0,0,0,0.62)', alignItems: 'center', justifyContent: 'center' },
+  brandMark: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.62)', alignItems: 'center', justifyContent: 'center' },
   brandInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11 },
   brandNameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   brandName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm },

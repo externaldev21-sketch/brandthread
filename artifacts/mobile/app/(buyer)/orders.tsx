@@ -940,7 +940,6 @@ function cardStyles(theme: AppThemePreset) {
       width: 40,
       height: 40,
       borderRadius: RADIUS.pill,
-      borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
     },

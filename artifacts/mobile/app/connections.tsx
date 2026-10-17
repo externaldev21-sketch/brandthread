@@ -637,7 +637,7 @@ function makeStyles(theme: AppThemePreset) {
     avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.cardElevated },
     avatarFallback: {
       width: 44, height: 44, borderRadius: 22, backgroundColor: theme.accentDim,
-      borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center',
+      alignItems: 'center', justifyContent: 'center',
     },
     avatarInitials: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.text },
     name:     { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },

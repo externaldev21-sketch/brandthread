@@ -916,7 +916,7 @@ export default function SellerProfileScreen() {
           pronouns,
           roleLabel: seller?.isOfficial ? 'Official' : 'Seller',
         }}
-        avatar={{ ring: !!seller?.verified, liveHostId: canonicalSellerId ?? routeSellerId ?? null }}
+        avatar={{ liveHostId: canonicalSellerId ?? routeSellerId ?? null }}
         // A cover video, when set, leads the hero for every viewer (muted,
         // looping, poster first); otherwise the latest video.
         hero={coverFlow.hasCover

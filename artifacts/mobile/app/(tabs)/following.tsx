@@ -282,13 +282,10 @@ export default function FollowingScreen() {
                   }
                 }}
               >
-                <LinearGradient colors={[...theme.primaryGradient]} style={s.avatarRing}>
-                  <View style={[s.avatarRingInner, { backgroundColor: palette.background }]}>
-                    <View style={[s.avatarCircle, { backgroundColor: brand.color }]}>
-                      <Text style={[TYPE_SCALE.footnote, s.avatarInitials]}>{brand.initials}</Text>
-                    </View>
-                  </View>
-                </LinearGradient>
+                {/* Seamless avatar: no decorative gradient ring/halo (that look is reserved for unseen stories). */}
+                <View style={[s.avatarCircle, { backgroundColor: brand.color }]}>
+                  <Text style={[TYPE_SCALE.footnote, s.avatarInitials]}>{brand.initials}</Text>
+                </View>
                 <Text style={[TYPE_SCALE.caption, s.avatarLabel, { color: palette.mutedForeground }]} numberOfLines={1}>
                   {(brand.handle ?? '').replace('@', '').slice(0, 8)}
                 </Text>
@@ -351,9 +348,7 @@ const s = StyleSheet.create({
   avatarsRow:    { borderBottomWidth: StyleSheet.hairlineWidth },
   avatarsScroll: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, gap: SPACING.md - 2 },
   avatarItem:    { alignItems: 'center', gap: 5, width: 60 },
-  avatarRing:    { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center' },
-  avatarRingInner: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
-  avatarCircle:  { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+  avatarCircle:  { width: 54, height: 54, borderRadius: 27, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   avatarInitials: { color: '#FFFFFF' }, // theme-exempt: initials on a per-seller identity color
   avatarLabel:   { textAlign: 'center' },
 
