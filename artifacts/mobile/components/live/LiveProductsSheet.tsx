@@ -1,106 +1,148 @@
 /**
- * Bag sheet: every product in the current live, the one being sold right
- * now marked "Live now". "Buy" hands off to the shared Shop sheet.
+ * The show's Shop, 1:1 with Whatnot's "View shop" sheet
+ * (https://mobbin.com/flows/802cf9ac-43e4-4a01-ab82-bd1177626dae): a
+ * "Search shop..." field with the close X beside it, a "Products (N)"
+ * header, then one row per item — photo on the left; name, stock and price
+ * on the right over a full-width grey action button. Whatnot's Pre-Bid /
+ * Buy Now becomes Buy now for buyers and Pin / Pinned for the host
+ * (app/seller-live.tsx) — same list, same row.
  */
-import React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, MEDIA, SP } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { TABULAR_NUMS } from '@/constants/typography';
 import type { LiveProduct } from '@/lib/live/types';
-import { LIVE_RED } from './LiveAvatarRing';
-import { Button } from '@/components/ui/Button';
 import { describeLiveCode, type LiveCode } from '@/lib/live/liveCommerce';
-import { radius } from '@/constants/radii';
+import { hapticLight } from '@/lib/haptics';
+
+export interface LiveProductAction {
+  label: string;
+  onPress: () => void;
+  /** Filled (white) instead of the default grey — the pinned item on the host's list. */
+  selected?: boolean;
+}
 
 export function LiveProductsSheet({
-  visible, hostName, products, pinnedProductId, onBuy, onClose, codes = [], appliedCode = null, onApplyCode,
+  visible, products, pinnedProductId, onBuy, actionFor, onClose, codes = [], appliedCode = null, onApplyCode,
 }: {
   visible: boolean;
-  hostName: string;
+  hostName?: string;
   products: LiveProduct[];
   pinnedProductId: string | null;
-  onBuy: (productId: string) => void;
+  /** Buyer: each row's button is "Buy now". */
+  onBuy?: (productId: string) => void;
+  /** Host: overrides the row button (Pin / Pinned). */
+  actionFor?: (product: LiveProduct, pinned: boolean) => LiveProductAction;
   onClose: () => void;
-  /** Live-only codes the host shared in this live; tap to apply at checkout. */
+  /** Live-only codes the host shared in this show; tap to apply at checkout. */
   codes?: LiveCode[];
   appliedCode?: string | null;
   onApplyCode?: (code: string) => void;
 }) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const [query, setQuery] = useState('');
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? products.filter(p => p.name.toLowerCase().includes(q)) : products;
+  }, [products, query]);
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close products" />
-      <SheetRise style={[styles.sheet, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.md }]} testID="live-products-sheet">
-        <View style={[styles.handle, { backgroundColor: theme.border }]} />
-        <View style={styles.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: theme.text }]}>Shop this live</Text>
-            <Text style={[styles.sub, { color: theme.muted }]}>{products.length} {products.length === 1 ? 'piece' : 'pieces'} from {hostName}</Text>
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close shop" />
+      <SheetRise
+        style={[styles.sheet, { backgroundColor: theme.background, borderColor: theme.borderSubtle, paddingBottom: insets.bottom + SP.sm }]}
+        testID="live-products-sheet"
+      >
+        <View style={styles.searchRow}>
+          <View style={[styles.search, { borderColor: theme.border }]}>
+            <Feather name="search" size={17} color={theme.muted} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search shop..."
+              placeholderTextColor={theme.muted}
+              style={[styles.searchInput, { color: theme.text }]}
+              returnKeyType="search"
+              accessibilityLabel="Search this show's shop"
+              testID="live-shop-search"
+            />
           </View>
-          <Pressable onPress={onClose} style={[styles.close, { backgroundColor: theme.cardElevated }]} accessibilityRole="button" accessibilityLabel="Close" hitSlop={6}>
-            <Feather name="x" size={18} color={theme.text} />
+          <Pressable onPress={onClose} style={styles.close} accessibilityRole="button" accessibilityLabel="Close shop" hitSlop={8} testID="live-shop-close">
+            <Feather name="x" size={24} color={theme.text} />
           </Pressable>
         </View>
-        <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ gap: SP.sm }}>
+
+        <ScrollView style={{ maxHeight: 560 }} contentContainerStyle={{ paddingBottom: SP.sm }} keyboardShouldPersistTaps="handled">
           {codes.length > 0 && onApplyCode && (
-            <View style={{ gap: SP.sm }} testID="live-codes">
+            <View testID="live-codes">
+              <Text style={[styles.section, { color: theme.text }]}>Codes</Text>
               {codes.map(c => {
                 const applied = appliedCode?.toUpperCase() === c.code.toUpperCase();
                 return (
-                  <View key={c.id} style={[styles.row, { borderColor: theme.border }]}>
-                    <Feather name="tag" size={18} color={theme.text} style={{ marginHorizontal: 8 }} />
+                  <View key={c.id} style={[styles.codeRow, { borderColor: theme.borderSubtle }]}>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={[styles.name, { color: theme.text }]}>{c.code}</Text>
-                      <Text style={[styles.sub, { color: theme.muted }]}>
+                      <Text style={[styles.meta, { color: theme.muted }]}>
                         {describeLiveCode(c)}{c.minOrderCents > 0 ? ` over ${formatCents(c.minOrderCents)}` : ''}
                       </Text>
                     </View>
-                    <Button
-                      label={applied ? 'Applied' : 'Apply'}
-                      variant={applied ? 'secondary' : 'primary'}
-                      size="compact"
-                      icon={applied ? 'check' : undefined}
+                    <Pressable
+                      onPress={() => { hapticLight(); onApplyCode(c.code); }}
                       disabled={applied}
-                      onPress={() => onApplyCode(c.code)}
+                      style={[styles.codeBtn, { backgroundColor: applied ? theme.cardElevated : theme.text }]}
+                      accessibilityRole="button"
                       accessibilityLabel={applied ? `${c.code} applied` : `Apply code ${c.code}`}
-                    />
+                    >
+                      <Text style={[styles.codeBtnText, { color: applied ? theme.text : theme.background }]}>{applied ? 'Applied' : 'Apply'}</Text>
+                    </Pressable>
                   </View>
                 );
               })}
             </View>
           )}
-          {products.map((p, i) => {
-            const live = p.productId === pinnedProductId;
+
+          <Text style={[styles.section, { color: theme.text }]}>Products ({products.length})</Text>
+          {shown.length === 0 && (
+            <Text style={[styles.meta, { color: theme.muted, paddingVertical: SP.md }]}>
+              {products.length === 0 ? 'No items in this show yet.' : 'No items match your search.'}
+            </Text>
+          )}
+          {shown.map(p => {
+            const pinned = p.productId === pinnedProductId;
+            const action: LiveProductAction = actionFor
+              ? actionFor(p, pinned)
+              : { label: 'Buy now', onPress: () => onBuy?.(p.productId) };
             return (
-              <View key={p.productId} style={[styles.row, { borderColor: live ? theme.text : theme.border }]}>
-                <Text style={[styles.index, { color: theme.muted }, TABULAR_NUMS]}>{i + 1}</Text>
+              <View key={p.productId} style={[styles.row, { borderColor: theme.borderSubtle }]} testID={`live-shop-row-${p.productId}`}>
                 <View style={[styles.thumb, { backgroundColor: theme.cardElevated }]}>
-                  {p.imageUri ? <CachedImage source={{ uri: p.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <Feather name="shopping-bag" size={18} color={theme.muted} />}
+                  {p.imageUri
+                    ? <CachedImage source={{ uri: p.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                    : <Feather name="shopping-bag" size={22} color={theme.muted} />}
                 </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  {live && (
-                    <View style={[styles.liveChip, { backgroundColor: LIVE_RED }]}>
-                      <Text style={[styles.liveChipText, { color: '#fff' }]}>LIVE NOW</Text>
-                    </View>
-                  )}
+                <View style={styles.rowBody}>
                   <Text style={[styles.name, { color: theme.text }]} numberOfLines={2}>{p.name}</Text>
+                  <Text style={[styles.meta, { color: theme.muted }]} numberOfLines={1}>
+                    {p.remainingUnits != null ? `Qty: ${p.remainingUnits}` : 'Buy now'}
+                    {p.sizes?.length ? ` · ${p.sizes.length} sizes` : ''}
+                  </Text>
                   <Text style={[styles.price, { color: theme.text }, TABULAR_NUMS]}>{formatCents(p.priceCents)}</Text>
+                  <Pressable
+                    onPress={() => { hapticLight(); action.onPress(); }}
+                    style={[styles.rowBtn, { backgroundColor: action.selected ? theme.text : theme.cardElevated }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${action.label}: ${p.name}`}
+                    testID={`live-shop-action-${p.productId}`}
+                  >
+                    <Text style={[styles.rowBtnText, { color: action.selected ? theme.background : theme.text }]}>{action.label}</Text>
+                  </Pressable>
                 </View>
-                <Pressable
-                  onPress={() => onBuy(p.productId)}
-                  style={[styles.buy, { backgroundColor: theme.accent }]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Buy ${p.name}`}
-                >
-                  <Text style={[styles.buyText, { color: theme.onAccent }]}>Buy</Text>
-                </Pressable>
               </View>
             );
           })}
@@ -111,20 +153,26 @@ export function LiveProductsSheet({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingHorizontal: SP.md, paddingTop: SP.xs },
-  handle: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: SP.sm },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: SP.md },
-  title: { fontFamily: FONT.bold, fontSize: FS.md },
-  sub: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
-  close: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: RADIUS.md, padding: 8 },
-  index: { fontFamily: FONT.semibold, fontSize: FS.xs, width: 14, textAlign: 'center' },
-  thumb: { width: 56, height: 56, borderRadius: RADIUS.xs, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  liveChip: { alignSelf: 'flex-start', borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1, marginBottom: 3 },
-  liveChipText: { fontFamily: FONT.bold, fontSize: 8.5, letterSpacing: 0.8 },
-  name: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  price: { fontFamily: FONT.bold, fontSize: FS.sm, marginTop: 2 },
-  buy: { height: 32, paddingHorizontal: 16, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
-  buyText: { fontFamily: FONT.bold, fontSize: FS.xs },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: MEDIA.scrim },
+  sheet: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: SP.md, paddingTop: SP.md,
+  },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
+  search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, borderRadius: 22, borderWidth: 1, paddingHorizontal: 14 },
+  searchInput: { flex: 1, fontFamily: FONT.regular, fontSize: FS.base, height: 44, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as object : null) },
+  close: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  section: { fontFamily: FONT.bold, fontSize: FS.md, marginTop: SP.sm, marginBottom: SP.xs },
+  row: { flexDirection: 'row', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  thumb: { width: 104, height: 104, borderRadius: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  rowBody: { flex: 1, minWidth: 0 },
+  name: { fontFamily: FONT.semibold, fontSize: FS.base, lineHeight: 19 },
+  meta: { fontFamily: FONT.regular, fontSize: FS.meta, marginTop: 2 },
+  price: { fontFamily: FONT.bold, fontSize: FS.md, marginTop: 4 },
+  rowBtn: { height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 'auto' },
+  rowBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  codeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  codeBtn: { height: 32, paddingHorizontal: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  codeBtnText: { fontFamily: FONT.semibold, fontSize: FS.meta },
 });

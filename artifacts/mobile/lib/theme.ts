@@ -75,6 +75,24 @@ export const CREATE_CANVAS = {
 export const ON_DARK = '#FFFFFF';                        // on gradient/colored bg
 export const ON_DARK_MUTED = '#C0C0C0';   // secondary text on gradient/colored bg — solid, not alpha
 
+/**
+ * Colors drawn ON TOP OF live video / camera frames (LIVE viewer, host
+ * controls, camera check). These stay fixed in every Appearance theme on
+ * purpose — the same white-over-video every reference app uses (TikTok LIVE,
+ * Whatnot), since the background is the picture, not the theme.
+ */
+export const MEDIA = {
+  fg: '#FFFFFF',
+  fgMuted: 'rgba(255,255,255,0.72)',
+  fgFaint: 'rgba(255,255,255,0.5)',
+  hairline: 'rgba(255,255,255,0.28)',
+  chip: 'rgba(0,0,0,0.38)',
+  scrim: 'rgba(0,0,0,0.55)',
+  backdrop: '#000000',
+  /** Text on a MEDIA.fg (white) button. */
+  onFg: '#000000',
+} as const;
+
 // ─── Primary Emphasis ─────────────────────────────────────────────────────────
 export const ACCENT        = '#FFFFFF';
 export const ACCENT_LIGHT  = '#FFFFFF';

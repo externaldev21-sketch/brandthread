@@ -9,7 +9,8 @@ import { describe, expect, it } from 'vitest';
 const read = (p: string) => readFileSync(resolve(__dirname, '..', p), 'utf8');
 const live = read('app/live.tsx');
 const overlays = read('components/live/LiveOverlays.tsx');
-const empty = read('components/live/LiveEmptyState.tsx');
+const grid = read('components/live/LiveShowsGrid.tsx');
+const liveFeed = read('app/live-feed.tsx');
 const feed = read('app/(tabs)/feed.tsx');
 const layout = read('app/_layout.tsx');
 const inbox = read('app/(buyer)/inbox.tsx');
@@ -32,29 +33,38 @@ describe('LIVE route', () => {
     expect(feed).toContain('export function VideoVisual(props: VideoVisualProps)');
   });
 
-  it('has every overlay piece: host pill, close, viewer stack, chat, pinned product, rail, hearts, comment pill', () => {
-    for (const piece of ['<LiveHostPill', '<LiveViewerStack', '<LiveChatList', '<LivePinnedProductCard', '<LiveRail', '<LiveHeartLayer', '<LiveCommentBar', 'testID="live-close"']) {
+  it('has every Whatnot overlay piece: host + Follow, viewer pill + leave, rail, chat, input, item + Buy now, hearts', () => {
+    for (const piece of ['<LiveHostRow', '<LiveTopRight', '<LiveRail', '<LiveChatList', '<LiveChatInput', '<LiveProductCard', '<LiveHeartLayer']) {
       expect(live).toContain(piece);
     }
-    expect(overlays).toContain('placeholder="Add comment..."');
-    expect(overlays).toContain('<Text style={styles.followText}>Follow</Text>');
-    expect(overlays).toContain('<Text style={styles.liveBadgeText}>LIVE</Text>');
-    // Chat shows only the last ~5 messages, fading upward.
+    expect(live).toContain("label: 'Buy now'");
+    expect(overlays).toContain('placeholder="Say something..."');
+    expect(overlays).toContain('testID="live-close"');
+    expect(overlays).toContain("{following ? 'Following' : 'Follow'}");
+    // Chat shows only the last few messages.
     expect(overlays).toContain('messages.slice(-LIVE_CHAT_VISIBLE)');
-    expect(overlays).toContain('const FADE = [');
   });
 
-  it('Buy opens the existing Shop sheet; the bag opens the product list', () => {
+  it('real shows play the host Agora video in the pager, not a hand-off to another screen', () => {
+    expect(live).toContain('<LiveRtcVideo rtc={rt?.rtc}');
+    expect(live).not.toContain('/buyer-live');
+  });
+
+  it('Buy opens the existing Shop sheet; Shop opens the product list', () => {
     expect(live).toContain('<ShopProductSheet');
     expect(live).toContain('liveShopSelection(stream, productId');
     expect(live).toContain('<LiveProductsSheet');
   });
 
-  it('never renders a blank page: loading, then pager or the empty state', () => {
-    expect(live).toContain('<LiveEmptyState');
-    expect(empty).toContain('No one&apos;s live right now');
-    expect(empty).toContain("'Remind me'");
-    expect(empty).toContain('Creators to follow');
+  it('never renders a blank page: unavailable, loading, then pager or an honest empty state', () => {
+    expect(live).toContain("availability === 'unavailable'");
+    expect(live).toContain('LIVE_NOT_CONFIGURED_TITLE');
+    expect(live).toContain(`"No one's live right now"`);
+  });
+
+  it('asks for the buyer agreement on the first show', () => {
+    expect(live).toContain('<LiveBuyerAgreementSheet');
+    expect(live).toContain("agreement === 'needed'");
   });
 
   it('animates an ended stream out before removing it', () => {
@@ -79,12 +89,11 @@ describe('Provider seam', () => {
 });
 
 describe('Entry points', () => {
-  it('the Threads header LIVE button opens the dedicated full-screen live-feed viewer', () => {
-    // PR #134 replaced the conditional "jump to nearest live card in the
-    // pager" button with an always-visible header glyph that opens the
-    // dedicated /live-feed screen (see app/live-feed.tsx).
-    expect(feed).toContain('testID="buyer-home-live"');
+  it('the Threads header LIVE entry opens the LIVE grid, and a show opens the viewer at it', () => {
     expect(feed).toContain("router.push('/live-feed' as never)");
+    expect(liveFeed).toContain('<LiveShowsGrid');
+    expect(liveFeed).toContain('liveHref({ streamId: stream.id })');
+    expect(grid).toContain('numColumns={2}');
   });
 
   it('feed rail avatars wear the LIVE ring and open the stream', () => {

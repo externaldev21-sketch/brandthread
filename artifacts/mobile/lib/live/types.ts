@@ -113,12 +113,24 @@ export type LiveEvent =
 
 export type LiveEventListener = (event: LiveEvent) => void;
 
+/** Agora audience credentials from POST /api/live/:id/join. */
+export interface LiveRtcCredentials {
+  appId: string;
+  token: string;
+  channelName: string;
+  uid: number;
+  /** The broadcaster's uid (co-hosts publish too); null on older servers. */
+  hostUid: number | null;
+}
+
 export interface LiveJoinResult {
   /** Present when joining succeeded; the pager keeps showing the stream's
    *  own `video` source either way. */
   ok: boolean;
   /** Last few chat messages so the overlay isn't empty on join. */
   recentChat: LiveChatMessage[];
+  /** Present for real Agora shows when the server has an app id. */
+  rtc?: LiveRtcCredentials | null;
 }
 
 export interface StartLiveInput {

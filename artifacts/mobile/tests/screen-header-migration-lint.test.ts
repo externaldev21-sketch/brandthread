@@ -102,7 +102,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/forgot-password.tsx',
   'app/index.tsx',
   'app/ip-report.tsx',
-  'app/live-feed.tsx',
   'app/live.tsx',
   'app/login-activity.tsx',
   'app/manufacturer-profile.tsx',

@@ -7,11 +7,12 @@
  * seller-live screen, and ending (status flips to `ended`).
  *
  * What is NOT real yet:
- *  - Video. The backend issues Agora RTC tokens, but rendering requires the
- *    native `react-native-agora` SDK and AGORA_APP_ID / AGORA_APP_CERTIFICATE,
- *    neither of which is configured. Streams therefore carry
- *    `{ kind: 'rtc', vendor: 'agora' }` and the pager shows the poster with
- *    an "Open player" hand-off to the existing /buyer-live Agora screen.
+ *  - Video renders through the native Agora SDK (components/live/
+ *    LiveRtcVideo.tsx) with the audience token `join` returns. Without
+ *    AGORA_APP_ID the server reports LIVE_NOT_CONFIGURED (GET /api/live/status)
+ *    and the LIVE screens show "LIVE isn't available yet" instead; on web /
+ *    Expo Go (no native SDK) the page shows the cover and says to watch in
+ *    the app.
  *  - Realtime transport. The repo has no websocket/realtime layer, so
  *    `subscribe` polls every few seconds (same cadence buyer-live uses).
  *  - Like counts: no counter exists, so `sendLike` is a no-op.
@@ -21,7 +22,7 @@
 import { serviceRequest } from '@/lib/serviceConfig';
 import { setSellerFollowing } from '@/services/socialService';
 import type {
-  LiveChatMessage, LiveHost, LiveProduct, LiveStream, LiveStreamProvider, SuggestedCreator,
+  LiveChatMessage, LiveHost, LiveProduct, LiveRtcCredentials, LiveStream, LiveStreamProvider, SuggestedCreator,
 } from './types';
 import { orderLiveStreams } from './liveOrdering';
 import {
@@ -99,6 +100,17 @@ function chatFromRow(row: Row): LiveChatMessage {
   };
 }
 
+export function rtcFromJoin(row: Row | null | undefined): LiveRtcCredentials | null {
+  if (!row || typeof row.agoraAppId !== 'string' || !row.agoraAppId || typeof row.channelName !== 'string') return null;
+  return {
+    appId: row.agoraAppId,
+    token: typeof row.token === 'string' ? row.token : '',
+    channelName: row.channelName,
+    uid: Number(row.agoraUid) || 0,
+    hostUid: typeof row.hostAgoraUid === 'number' ? row.hostAgoraUid : null,
+  };
+}
+
 const get = <T,>(path: string) => serviceRequest<T>(path, {}, false);
 const post = <T,>(path: string, body: unknown = {}) =>
   serviceRequest<T>(path, { method: 'POST', body: JSON.stringify(body) }, false);
@@ -143,9 +155,13 @@ export function createApiLiveProvider(): LiveStreamProvider {
     },
 
     async join(streamId) {
-      await post(`/api/live/${encodeURIComponent(streamId)}/join`);
+      const joined = await post<Row>(`/api/live/${encodeURIComponent(streamId)}/join`);
       const data = await get<{ comments: Row[] }>(`/api/live/${encodeURIComponent(streamId)}/comments`).catch(() => ({ comments: [] }));
-      return { ok: true, recentChat: (data.comments ?? []).slice(0, 5).reverse().map(chatFromRow) };
+      return {
+        ok: true,
+        recentChat: (data.comments ?? []).slice(0, 5).reverse().map(chatFromRow),
+        rtc: rtcFromJoin(joined),
+      };
     },
 
     async leave(streamId) {
