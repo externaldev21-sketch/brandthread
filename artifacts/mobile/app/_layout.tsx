@@ -47,6 +47,7 @@ import { ClerkLoadErrorBoundary } from '@/components/ClerkLoadErrorBoundary';
 import AppIntroSplash from '@/components/splash/AppIntroSplash';
 import * as Notifications from 'expo-notifications';
 import { configureServices } from '@/lib/serviceConfig';
+import { startEngagementRetryFallback } from '@/lib/engagementRetryFallback';
 import {
   clearApiCache,
   configureApi,
@@ -1049,6 +1050,12 @@ function ServiceConfigurer() {
   useEffect(() => {
     if (isLoaded && !isSignedIn) dismissNetworkNotice();
   }, [isLoaded, isSignedIn]);
+
+  // Replays likes etc. queued offline from any screen, not only the feed.
+  useEffect(() => {
+    if (!isSignedIn) return;
+    return startEngagementRetryFallback();
+  }, [isSignedIn]);
 
   // Scope social and cart AsyncStorage keys by Clerk user ID so two accounts
   // on the same device never share data — even without a full sign-out cycle.

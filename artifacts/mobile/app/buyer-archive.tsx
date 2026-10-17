@@ -1,11 +1,12 @@
 /**
  * Archive — shows posts the owner has archived and lets them restore or delete.
  * Tap navigates to the post viewer; long-press opens a restore/delete sheet.
+ * The Stories tab lists my expired stories (server story archive), newest first.
  */
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Dimensions,
-  FlatList, RefreshControl, Modal,
+  FlatList, RefreshControl, Modal, Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,8 +18,13 @@ import {
   FONT, FS, SP, RADIUS, ICON, OVERLAY, RED,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { getMyPosts, unarchivePost, deletePost } from '@/services/socialService';
+import { getMyArchivedPosts, unarchivePost, deletePost } from '@/services/socialService';
 import type { BuyerPost } from '@/services/socialTypes';
+import { useApi, type HighlightPickerStory } from '@/lib/api';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { previewHighlightPickerStories } from '@/lib/previewHighlights';
+import { apiErrorMessage } from '@/lib/safety';
+import { CachedImage } from '@/components/CachedImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -38,14 +44,29 @@ export default function BuyerArchive() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [tab, setTab] = useState<ArchiveTab>('posts');
+  const api = useApi();
   const [archivedPosts, setArchivedPosts] = useState<BuyerPost[]>([]);
+  const [archivedStories, setArchivedStories] = useState<HighlightPickerStory[]>([]);
+  const [postsFailed, setPostsFailed] = useState(false);
+  const [storiesFailed, setStoriesFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPost, setSelectedPost] = useState<BuyerPost | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const loadData = useCallback(async () => {
-    const all = await getMyPosts();
-    setArchivedPosts(all.filter(p => p.isArchived));
-  }, []);
+    const loadStories = async (): Promise<HighlightPickerStory[]> => {
+      if (isPreviewDemoMode()) return previewHighlightPickerStories().filter((st) => !st.live);
+      // A fresh (non-demo) preview session has no server stories.
+      if (isBuyerDevPreview()) return [];
+      const all = await api.social.highlightStories();
+      return all.filter((st) => !st.live);
+    };
+    const [postsResult, storiesResult] = await Promise.allSettled([getMyArchivedPosts(), loadStories()]);
+    if (postsResult.status === 'fulfilled') { setArchivedPosts(postsResult.value); setPostsFailed(false); }
+    else setPostsFailed(true);
+    if (storiesResult.status === 'fulfilled') { setArchivedStories(storiesResult.value); setStoriesFailed(false); }
+    else setStoriesFailed(true);
+  }, [api]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
@@ -56,19 +77,39 @@ export default function BuyerArchive() {
   }, [loadData]);
 
   const handleRestore = async () => {
-    if (!selectedPost) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await unarchivePost(selectedPost.id);
-    setSelectedPost(null);
-    await loadData();
+    if (!selectedPost || busy) return;
+    const post = selectedPost;
+    setBusy(true);
+    try {
+      await unarchivePost(post.id);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setSelectedPost(null);
+      setArchivedPosts(prev => prev.filter(p => p.id !== post.id));
+      await loadData();
+    } catch (error) {
+      setSelectedPost(null);
+      Alert.alert("Couldn't restore post", apiErrorMessage(error, 'Try again.'));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleDelete = async () => {
-    if (!selectedPost) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    await deletePost(selectedPost.id);
-    setSelectedPost(null);
-    await loadData();
+    if (!selectedPost || busy) return;
+    const post = selectedPost;
+    setBusy(true);
+    try {
+      await deletePost(post.id);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setSelectedPost(null);
+      setArchivedPosts(prev => prev.filter(p => p.id !== post.id));
+      await loadData();
+    } catch (error) {
+      setSelectedPost(null);
+      Alert.alert("Couldn't delete post", apiErrorMessage(error, 'Try again.'));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const postTypeIcon = (type: BuyerPost['type']): keyof typeof Feather.glyphMap => {
@@ -99,7 +140,11 @@ export default function BuyerArchive() {
           colors={(item.mediaColors?.length >= 2 ? item.mediaColors : [SURFACE, BG]) as [string, string]}
           style={styles.cellInner}
         >
-          <Feather name={postTypeIcon(item.type)} size={ICON.md} color={MUTED} />
+          {item.mediaUrl && item.type !== 'video' ? (
+            <CachedImage source={{ uri: item.mediaUrl }} style={StyleSheet.absoluteFill} contentFit="cover" recyclingKey={item.id} />
+          ) : (
+            <Feather name={postTypeIcon(item.type)} size={ICON.md} color={MUTED} />
+          )}
           {item.caption ? (
             <Text style={styles.cellCaption} numberOfLines={1}>{item.caption}</Text>
           ) : null}
@@ -108,6 +153,31 @@ export default function BuyerArchive() {
           </View>
         </LinearGradient>
       </TouchableOpacity>
+    );
+  }
+
+  function renderStory({ item }: { item: HighlightPickerStory }) {
+    return (
+      <View
+        style={styles.cell}
+        accessible
+        accessibilityLabel={`Archived story from ${new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}
+        testID={`archive-story-${item.storyId}`}
+      >
+        <LinearGradient colors={[SURFACE, BG] as [string, string]} style={styles.cellInner}>
+          {item.thumbnailUrl ? (
+            <CachedImage source={{ uri: item.thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" recyclingKey={item.storyId} />
+          ) : (
+            <Feather name="clock" size={ICON.md} color={MUTED} />
+          )}
+          <Text style={styles.cellCaption} numberOfLines={1}>
+            {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+          </Text>
+          <View style={styles.archivedBadge}>
+            <Feather name="archive" size={10} color={MUTED} />
+          </View>
+        </LinearGradient>
+      </View>
     );
   }
 
@@ -137,11 +207,20 @@ export default function BuyerArchive() {
 
       {tab === 'posts' ? (
         archivedPosts.length === 0 ? (
+          postsFailed ? (
+            <EmptyState
+              icon="alert-circle"
+              title="Couldn't load archived posts"
+              description="Check your connection and try again."
+              action={{ label: 'Try again', onPress: () => { void loadData(); } }}
+            />
+          ) : (
           <EmptyState
             icon="archive"
             title="No archived posts"
             description="Posts you archive from your profile will appear here. Only you can see them."
           />
+          )
         ) : (
           <FlatList
             data={archivedPosts}
@@ -153,11 +232,30 @@ export default function BuyerArchive() {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PURPLE} />}
           />
         )
-      ) : (
+      ) : archivedStories.length === 0 ? (
+        storiesFailed ? (
+          <EmptyState
+            icon="alert-circle"
+            title="Couldn't load archived stories"
+            description="Check your connection and try again."
+            action={{ label: 'Try again', onPress: () => { void loadData(); } }}
+          />
+        ) : (
         <EmptyState
           icon="clock"
           title="No archived stories"
           description="Stories are automatically saved here after they expire. Only you can see them."
+        />
+        )
+      ) : (
+        <FlatList
+          data={archivedStories}
+          keyExtractor={st => st.storyId}
+          numColumns={3}
+          contentContainerStyle={styles.grid}
+          columnWrapperStyle={{ gap: GAP }}
+          renderItem={renderStory}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PURPLE} />}
         />
       )}
 
