@@ -47,6 +47,7 @@ import {
   isBlockedEitherWay,
   mutedPhrasesFor,
   notBlockedWith,
+  notMutedBy,
   optionalViewerId,
   publishingRestriction,
 } from "../lib/safety";
@@ -331,7 +332,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[], viewerId: stri
     db.select({ postId: savedItems.targetId, cnt: count() }).from(savedItems)
       .where(and(inArray(savedItems.targetId, postIds), eq(savedItems.itemType, "post")))
       .groupBy(savedItems.targetId),
-    visibleCommentCounts(postIds),
+    visibleCommentCounts(postIds, viewerId),
   ]);
   const locationById = await locationsByPlaceId(postRows.map((post) => post.placeId));
   const sellerById = new Map(sellerRows.map((seller) => [seller.clerkId, seller]));
@@ -436,6 +437,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         visiblePostCondition(),
         threadSurfaceCondition(),
         notBlockedWith(clerkId, posts.userId),
+        notMutedBy(clerkId, posts.userId, "posts"),
         cursor ? sql`(${posts.createdAt}, ${posts.id}) < (${cursor.ts}::timestamp, ${cursor.id}::uuid)` : undefined,
       ))
       .orderBy(desc(posts.createdAt), desc(posts.id))
@@ -498,7 +500,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         .where(and(inArray(savedItems.targetId, postIds), eq(savedItems.itemType, "post")))
         .groupBy(savedItems.targetId),
 
-      visibleCommentCounts(postIds),
+      visibleCommentCounts(postIds, clerkId),
     ]);
 
     // Index by postId for O(1) lookup

@@ -817,14 +817,19 @@ export default function BuyerStoryViewer() {
                 {
                   text: `Mute ${currentStory.authorName}`,
                   onPress: async () => {
-                    await muteUser({
-                      userId: currentStory.authorId,
-                      name: currentStory.authorName,
-                      handle: currentStory.authorHandle,
-                      initials: currentStory.authorInitials,
-                      color: currentStory.authorColor,
-                    });
-                    goBackOr(router);
+                    try {
+                      await muteUser({
+                        userId: currentStory.authorId,
+                        name: currentStory.authorName,
+                        handle: currentStory.authorHandle,
+                        initials: currentStory.authorInitials,
+                        color: currentStory.authorColor,
+                      });
+                      goBackOr(router);
+                    } catch {
+                      Alert.alert('Couldn’t mute', 'Try again.');
+                      setIsPaused(false);
+                    }
                   },
                 },
                 {

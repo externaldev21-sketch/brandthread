@@ -56,6 +56,9 @@ export default function BuyerPrivacySettings() {
   const [serverPrivate, setServerPrivate] = useState<boolean | null>(null);
   const [privateBusy, setPrivateBusy] = useState(false);
   const [requestCount, setRequestCount] = useState(0);
+  // Contact discovery is server-backed (/api/social/contacts): null until loaded.
+  const [contacts, setContacts] = useState<{ enabled: boolean; optedIn: boolean } | null>(null);
+  const [contactsBusy, setContactsBusy] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -66,6 +69,7 @@ export default function BuyerPrivacySettings() {
         if (typeof isPrivate === 'boolean') setServerPrivate(isPrivate);
       }).catch(() => {});
       api.followRequests.list(50, 0).then((rows) => setRequestCount(Array.isArray(rows) ? rows.length : 0)).catch(() => {});
+      api.social.contacts.status().then(setContacts).catch(() => setContacts(null));
     }, [])
   );
 
@@ -110,6 +114,27 @@ export default function BuyerPrivacySettings() {
       setSaveError("Couldn't update your account privacy. Try again.");
     } finally {
       setPrivateBusy(false);
+    }
+  }
+
+  // "Contact discovery" = the server's "let friends find me" opt-in. Applied
+  // immediately (not via Save), optimistic and rolled back on failure.
+  async function applyContactDiscovery(next: boolean) {
+    if (contactsBusy || !contacts?.enabled) return;
+    setContactsBusy(true);
+    const before = contacts.optedIn;
+    setContacts({ ...contacts, optedIn: next });
+    try {
+      if (next) await api.social.contacts.optIn();
+      else await api.social.contacts.revoke();
+      const saved = await updatePrivacySettings({ contactDiscovery: next });
+      setSettings((s) => (s ? { ...s, contactDiscovery: saved.contactDiscovery } : s));
+      setSaveError(null);
+    } catch {
+      setContacts((c) => (c ? { ...c, optedIn: before } : c));
+      setSaveError("Couldn't update contact discovery. Try again.");
+    } finally {
+      setContactsBusy(false);
     }
   }
 
@@ -244,9 +269,12 @@ export default function BuyerPrivacySettings() {
           <ListRow
             icon="phone"
             title="Contact discovery"
-            subtitle="Find friends from contacts (no contacts uploaded without permission)"
+            subtitle={contacts && !contacts.enabled
+              ? "Contact discovery isn't available right now"
+              : 'Let people who have your email or number in their contacts find you'}
             subtitleNumberOfLines={2}
-            toggle={{ value: settings.contactDiscovery, onChange: v => update('contactDiscovery', v) }}
+            toggle={{ value: contacts?.optedIn ?? false, onChange: (v) => { void applyContactDiscovery(v); } }}
+            disabled={contactsBusy || !contacts?.enabled}
           />
         </Card>
 

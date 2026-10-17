@@ -313,8 +313,16 @@ export default function BuyerOtherProfileScreen() {
       .then((result) => { if (result === 'copied') setSnackbar('Profile link copied'); })
       .catch(() => {});
   };
-  const handleMute     = async () => { setMoreSheetOpen(false); await muteUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); };
-  const handleRestrict = async () => { setMoreSheetOpen(false); await restrictUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); };
+  const handleMute     = async () => {
+    setMoreSheetOpen(false);
+    try { await muteUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); }
+    catch { Alert.alert("Couldn't mute", 'Try again.'); }
+  };
+  const handleRestrict = async () => {
+    setMoreSheetOpen(false);
+    try { await restrictUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); }
+    catch { Alert.alert("Couldn't restrict", 'Try again.'); }
+  };
   const handleBlock = async () => {
     setMoreSheetOpen(false);
     const subject = { userId: canonicalUserId, name: displayName };
