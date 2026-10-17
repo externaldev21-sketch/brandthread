@@ -59,7 +59,7 @@ export default function Sellers() {
           {sellers.map((seller) => (
             <article key={seller.id} className="flex flex-col rounded-lg border border-border bg-card p-5" data-testid={`card-seller-${seller.id}`}>
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-secondary font-bold text-muted-foreground">{seller.name.substring(0, 2).toUpperCase()}</div>
+                <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-secondary font-bold text-muted-foreground">{seller.name.substring(0, 2).toUpperCase()}</div>
                 <div className="min-w-0">
                   <h2 className="truncate font-semibold">{seller.name}</h2>
                   <p className="text-xs text-muted-foreground">{seller.lastActive ? `Last message ${formatDistanceToNow(new Date(seller.lastActive), { addSuffix: true })}` : "No messages yet"}</p>

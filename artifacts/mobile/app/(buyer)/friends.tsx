@@ -447,7 +447,8 @@ export default function FriendsScreen() {
                 style={[
                   s.storyCircle,
                   { backgroundColor: story.authorColor },
-                  viewed ? [s.storyRingViewed, { borderColor: palette.mutedForeground }] : [s.storyRingUnviewed, { borderColor: theme.accent }],
+                  // Ring only while unviewed; a viewed story leaves a seamless circle.
+                  viewed ? null : [s.storyRingUnviewed, { borderColor: theme.accent }],
                 ]}
               >
                 <Text style={[TYPE_SCALE.body, s.storyInitials]}>{story.authorInitials}</Text>
@@ -638,7 +639,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  storyRingViewed: { borderWidth: 2 },
   storyRingUnviewed: { borderWidth: 2 },
   storyInitials: {
     color: '#FFFFFF', // theme-exempt: initials on a per-user identity color

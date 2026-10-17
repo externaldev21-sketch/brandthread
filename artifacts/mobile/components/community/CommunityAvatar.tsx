@@ -41,7 +41,7 @@ export function CommunityAvatar({ community, size = 52 }: CommunityAvatarProps) 
       accessibilityLabel={`${community.name} icon`}
       style={{
         width: size, height: size, borderRadius: radius, backgroundColor: colors.secondary,
-        borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center',
+        alignItems: 'center', justifyContent: 'center',
       }}
     >
       {icon ? (

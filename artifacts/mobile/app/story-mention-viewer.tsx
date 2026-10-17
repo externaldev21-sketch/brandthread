@@ -574,7 +574,7 @@ const styles = StyleSheet.create({
   progressFull: { flex: 1, backgroundColor: ON_DARK },
   progressFill: { height: '100%', backgroundColor: ON_DARK },
   header: { position: 'absolute', left: 0, right: 0, paddingLeft: SP.md, paddingRight: SP.sm, flexDirection: 'row', alignItems: 'center', zIndex: 10 },
-  avatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.sm },
   headerText: { flex: 1, marginLeft: SP.sm },
   name: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 14, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },

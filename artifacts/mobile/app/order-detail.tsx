@@ -2047,7 +2047,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Customer
   customerHero:     { alignItems: 'center', gap: SP.sm },
-  avatarCircle:     { width: 64, height: 64, borderRadius: RADII.pill, backgroundColor: PURPLE_DIM, borderWidth: 2, borderColor: BORDER_ACTIVE, alignItems: 'center', justifyContent: 'center' },
+  avatarCircle:     { width: 64, height: 64, borderRadius: RADII.pill, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
   avatarInitials:   { fontSize: FS.xl, fontFamily: FONT.bold, color: PURPLE },
   customerName:     { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   customerEmail:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },

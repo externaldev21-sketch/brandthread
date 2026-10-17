@@ -93,7 +93,7 @@ export interface ProfileShellProps<T> {
   testID?: string;
   identity: ProfileIdentity;
   avatar?: {
-    /** Accent ring — active story / verified. */
+    /** Accent story ring — only while this profile has a story the viewer hasn't seen. Off = seamless photo, no ring. */
     ring?: boolean;
     onPress?: () => void;
     accessibilityLabel?: string;
@@ -596,7 +596,9 @@ function makeStyles(theme: AppThemePreset) {
     avatarPress: { alignSelf: 'flex-start', marginBottom: SP.sm },
     avatarRing: {
       width: AVATAR_RING, height: AVATAR_RING, borderRadius: AVATAR_RING / 2,
-      borderWidth: AVATAR_RING_BORDER, borderColor: theme.text, padding: AVATAR_RING_PADDING, backgroundColor: theme.background,
+      // Seamless by default: transparent border + gap, no halo fill — the photo
+      // alone reads as the circle. Only the story ring (avatar.ring) paints it.
+      borderWidth: AVATAR_RING_BORDER, borderColor: 'transparent', padding: AVATAR_RING_PADDING,
     },
     avatar: {
       width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, overflow: 'hidden',

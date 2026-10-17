@@ -18,6 +18,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { hapticSelection } from '@/lib/haptics';
 import { pickFromCamera, pickFromLibrary, pickVideoFromLibrary, recordAvatarVideo } from '@/lib/pickProfileImage';
+import { AvatarCropper, type AvatarCropResult, type AvatarCropSource } from '@/components/profile/AvatarCropper';
 
 export const AVATAR_VIDEO_MAX_SECONDS = 10;
 
@@ -58,6 +59,12 @@ function SourceRow({
  * ('image' | 'video') is the discriminator, so this never changes the
  * hook's return type for the photo-only call sites (seller logo/banner)
  * that don't pass the flag.
+ *
+ * Pass `cropCircle: true` (profile-picture slots) to skip the system square
+ * `allowsEditing` crop and instead show the full-screen circular
+ * move-and-scale step (AvatarCropper) after a photo is picked or taken. The
+ * promise then resolves with an 800x800 JPEG of exactly what was inside the
+ * circle — or null if the person cancels the crop. Videos skip the crop.
  */
 export function useImageSourceSheet() {
   const [visible, setVisible] = useState(false);
@@ -66,6 +73,9 @@ export function useImageSourceSheet() {
   const aspectRef = useRef<[number, number]>([1, 1]);
   const nativeEditRef = useRef(true);
   const [enableVideo, setEnableVideo] = useState(false);
+  const cropCircleRef = useRef(false);
+  const pendingAssetRef = useRef<ImagePicker.ImagePickerAsset | null>(null);
+  const [cropSource, setCropSource] = useState<AvatarCropSource | null>(null);
 
   const settle = useCallback((asset: ImagePicker.ImagePickerAsset | null) => {
     setVisible(false);
@@ -73,9 +83,10 @@ export function useImageSourceSheet() {
     resolverRef.current = null;
   }, []);
 
-  const open = useCallback((opts?: { aspect?: [number, number]; onRemove?: () => void; enableVideo?: boolean; skipNativeEdit?: boolean }) => {
+  const open = useCallback((opts?: { aspect?: [number, number]; onRemove?: () => void; enableVideo?: boolean; skipNativeEdit?: boolean; cropCircle?: boolean }) => {
     aspectRef.current = opts?.aspect ?? [1, 1];
-    nativeEditRef.current = !opts?.skipNativeEdit;
+    cropCircleRef.current = !!opts?.cropCircle;
+    nativeEditRef.current = !opts?.skipNativeEdit && !opts?.cropCircle;
     onRemoveRef.current = opts?.onRemove;
     setEnableVideo(!!opts?.enableVideo);
     setVisible(true);
@@ -84,17 +95,58 @@ export function useImageSourceSheet() {
     });
   }, []);
 
+  /** Photo picked: either hand it straight back, or route it through the circle crop first. */
+  const settlePhoto = useCallback((asset: ImagePicker.ImagePickerAsset | null) => {
+    if (!asset || !cropCircleRef.current || asset.type === 'video') { settle(asset); return; }
+    // The crop is its own full-screen Modal: open it only once the sheet's
+    // Modal has finished closing (BottomSheet calls onClose again when its
+    // close animation completes — see onSheetClose below), since iOS can't
+    // present a second modal while another one is still dismissing.
+    pendingAssetRef.current = asset;
+    setVisible(false);
+  }, [settle]);
+
+  const onSheetClose = useCallback(() => {
+    const asset = pendingAssetRef.current;
+    if (asset) setCropSource({ uri: asset.uri, width: asset.width, height: asset.height });
+    else settle(null);
+  }, [settle]);
+
+  const cancelCrop = useCallback(() => {
+    pendingAssetRef.current = null;
+    setCropSource(null);
+    settle(null);
+  }, [settle]);
+
+  const finishCrop = useCallback((result: AvatarCropResult) => {
+    const original = pendingAssetRef.current;
+    pendingAssetRef.current = null;
+    setCropSource(null);
+    settle(original ? {
+      ...original,
+      uri: result.uri,
+      width: result.width,
+      height: result.height,
+      type: 'image',
+      mimeType: 'image/jpeg',
+      fileName: 'avatar.jpg',
+      fileSize: undefined,
+      base64: undefined,
+      exif: undefined,
+    } : null);
+  }, [settle]);
+
   const takePhoto = useCallback(async () => {
     hapticSelection();
     const asset = await pickFromCamera(aspectRef.current, nativeEditRef.current);
-    settle(asset);
-  }, [settle]);
+    settlePhoto(asset);
+  }, [settlePhoto]);
 
   const chooseLibrary = useCallback(async () => {
     hapticSelection();
     const asset = await pickFromLibrary(aspectRef.current, nativeEditRef.current);
-    settle(asset);
-  }, [settle]);
+    settlePhoto(asset);
+  }, [settlePhoto]);
 
   const chooseVideo = useCallback(async () => {
     hapticSelection();
@@ -116,7 +168,8 @@ export function useImageSourceSheet() {
 
   const hasRemove = !!onRemoveRef.current;
   const sheet = (
-    <BottomSheet visible={visible} onClose={() => settle(null)} testID="image-source-sheet">
+    <>
+    <BottomSheet visible={visible} onClose={onSheetClose} testID="image-source-sheet">
       <SourceRow icon="camera" label="Take Photo" onPress={() => { void takePhoto(); }} />
       <SourceRow icon="image" label="Choose from Library" onPress={() => { void chooseLibrary(); }} last={!enableVideo && !hasRemove} />
       {enableVideo ? (
@@ -129,6 +182,8 @@ export function useImageSourceSheet() {
         <SourceRow icon="trash-2" label="Remove Current Photo" destructive onPress={remove} last />
       ) : null}
     </BottomSheet>
+    <AvatarCropper source={cropSource} onCancel={cancelCrop} onDone={finishCrop} />
+    </>
   );
 
   return { open, sheet };

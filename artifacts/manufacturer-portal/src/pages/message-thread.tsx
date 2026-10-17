@@ -168,7 +168,7 @@ export default function MessageThread({ threadId }: { threadId: string }) {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary font-bold text-muted-foreground">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary font-bold text-muted-foreground">
             {thread.buyerAvatar ? <img src={thread.buyerAvatar} alt="" className="h-full w-full object-cover" /> : thread.buyerName.substring(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0">

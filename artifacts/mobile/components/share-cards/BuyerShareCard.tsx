@@ -20,7 +20,7 @@ export const BuyerShareCard = React.forwardRef<View, BuyerShareCardProps>(
 
     return (
       <ShareCardFrame ref={ref} theme={theme} qrValue={qrValue}>
-        <View style={[styles.avatar, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
+        <View style={[styles.avatar, { backgroundColor: theme.cardElevated }]}>
           {data.avatarUri ? (
             <Image source={{ uri: data.avatarUri }} style={styles.avatarImg} />
           ) : (
@@ -59,7 +59,6 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',

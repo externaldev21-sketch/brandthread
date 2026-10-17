@@ -59,7 +59,7 @@ import {
 import {
   isPreviewNotesEnabled, getPreviewNotesForTray, getPreviewMyNote, postPreviewNote,
 } from '@/lib/previewNotes';
-import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { BrandthreadAvatar } from '@/components/branding/BrandthreadAvatar';
 import { TabPageHeader } from '@/components/layout/TabPageHeader';
 import { Glass } from '@/components/ui/Glass';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
@@ -1166,9 +1166,7 @@ export default function InboxScreen() {
                 Line) while non-live rows (no ring at all) rendered fine. */}
             <View style={s.avatarContainer}>
               {conv.isOfficial ? (
-                <View style={[s.avatar56, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                  <BrandthreadLogo size={28} />
-                </View>
+                <BrandthreadAvatar size={56} />
               ) : (
                 // LIVE ring while this person is streaming; tapping the
                 // ringed avatar opens their live instead of the thread.
@@ -1667,13 +1665,10 @@ export default function InboxScreen() {
                   >
                     {noteBubble}
                     <View style={s.activeRailAvatar1}>
-                      <View
-                        style={[
-                          s.storyRing,
-                          row.seen ? s.storyRingSeen : s.storyRingUnseen,
-                          { borderColor: row.seen ? theme.border : theme.text },
-                        ]}
-                      />
+                      {/* Ring only while unseen; a seen story leaves a seamless photo. */}
+                      {row.seen ? null : (
+                        <View style={[s.storyRing, s.storyRingUnseen, { borderColor: theme.text }]} />
+                      )}
                       {row.avatarUri ? (
                         <Image source={{ uri: row.avatarUri }} style={s.activeRailAvatar} />
                       ) : (
@@ -1969,7 +1964,6 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     position: 'absolute', left: -2, top: -2, right: -2, bottom: -2, borderRadius: 34,
   },
   storyRingUnseen: { borderWidth: 2 },
-  storyRingSeen: { borderWidth: 1.5 },
   // "Add to your story" badge — pure visual decoration on top of the single
   // "Your story" Pressable, never its own tappable element.
   addStoryBadge: {
@@ -2102,7 +2096,6 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
 
   // Official / AI-agent row treatment (Brandthread Agent — see the
   // isOfficial comment on Conversation in services/socialTypes.ts)
-  officialAvatar: { borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   officialBadgeRow: { flexDirection: 'row', alignItems: 'center', marginRight: SP.xs },
   aiTag: {
     marginLeft: 4, paddingHorizontal: 5, height: 17, borderRadius: 4,

@@ -146,7 +146,7 @@ export default function Dashboard() {
               {data.messages.slice(0, 5).map((thread) => (
                 <li key={thread.id}>
                   <Link href={`/messages/${thread.id}`} className="flex items-start gap-3 px-5 py-3.5 hover:bg-secondary/30" data-testid={`link-dashboard-thread-${thread.id}`}>
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-xs font-bold text-muted-foreground">{thread.buyerName.substring(0, 2).toUpperCase()}</div>
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary text-xs font-bold text-muted-foreground">{thread.buyerName.substring(0, 2).toUpperCase()}</div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
                         <p className={cn("truncate text-sm", thread.unreadCount ? "font-semibold" : "font-medium text-muted-foreground")}>{thread.buyerName}</p>

@@ -15,7 +15,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
-import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { BrandthreadAvatar } from '@/components/branding/BrandthreadAvatar';
 import { Chip } from '@/components/ui/Chip';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticSuccessAction, hapticSelection, hapticDestructiveConfirm, hapticToggle } from '@/lib/haptics';
@@ -1817,12 +1817,12 @@ export default function BuyerConversationScreen() {
           {!isOwn && (
             isLastInGroup ? (
               isAgentConv ? (
-                <View style={[s.msgAvatar, s.msgAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                  <BrandthreadLogo size={16} />
-                </View>
+                <BrandthreadAvatar size={AVATAR_SIZE} style={s.msgAvatar} />
               ) : (
                 <View style={[s.msgAvatar, { backgroundColor: msg.fromColor }]}>
-                  <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
+                  {participant?.avatarUri
+                    ? <CachedImage source={{ uri: participant.avatarUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                    : <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>}
                 </View>
               )
             ) : <View style={s.msgAvatarSpacer} />
@@ -1869,12 +1869,12 @@ export default function BuyerConversationScreen() {
         {!isOwn && (
           isLastInGroup ? (
             isAgentConv ? (
-              <View style={[s.msgAvatar, s.msgAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                <BrandthreadLogo size={16} />
-              </View>
+              <BrandthreadAvatar size={AVATAR_SIZE} style={s.msgAvatar} />
             ) : (
               <View style={[s.msgAvatar, { backgroundColor: msg.fromColor }]}>
-                <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
+                {participant?.avatarUri
+                  ? <CachedImage source={{ uri: participant.avatarUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                  : <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>}
               </View>
             )
           ) : <View style={s.msgAvatarSpacer} />
@@ -2193,12 +2193,12 @@ export default function BuyerConversationScreen() {
               {participant && (
                 <View style={s.headerAvatarWrap} testID="conversation-avatar">
                   {isAgentConv ? (
-                    <View style={[s.headerAvatarCircle, s.headerAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                      <BrandthreadLogo size={18} />
-                    </View>
+                    <BrandthreadAvatar size={32} />
                   ) : (
                     <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
-                      <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+                      {participant.avatarUri
+                        ? <CachedImage source={{ uri: participant.avatarUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                        : <Text style={s.headerAvatarInitials}>{participant.initials}</Text>}
                     </View>
                   )}
                   {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
@@ -3117,10 +3117,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     width: 32,
     height: 32,
     borderRadius: 16,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerAvatarOfficial: { borderWidth: 1 },
   headerAvatarInitials: {
     fontSize: FS.sm,
     fontFamily: FONT.bold,
@@ -3269,12 +3269,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: AVATAR_GAP,
     marginBottom: 2,
   },
-  msgAvatarOfficial: { borderWidth: 1 },
   msgAvatarSpacer: {
     width: AVATAR_SIZE,
     marginRight: AVATAR_GAP,

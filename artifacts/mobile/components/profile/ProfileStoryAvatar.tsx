@@ -1,6 +1,7 @@
 /**
- * Own-profile avatar, Instagram style: a 72pt photo/initials disc inside a
- * background-coloured halo, with a 2pt accent story ring drawn outside it
+ * Own-profile avatar, Instagram style: a seamless 72pt photo/initials disc
+ * (no border or halo — the picture is simply cut off by the circle), with a
+ * thin transparent gap and a 2pt accent story ring drawn outside it
  * while the owner has an active story, and a white "+" badge on the
  * bottom-right edge for adding a new story.
  *
@@ -83,8 +84,10 @@ export function ProfileStoryAvatar({
         testID={`${testID}-ring`}
         style={{
           width: g.halo, height: g.halo, borderRadius: g.halo / 2,
+          // Transparent spacer only (keeps the story ring off the photo); no
+          // painted halo, so without a story the avatar reads as one clean circle.
           borderWidth: g.haloBorder, padding: g.haloPadding,
-          borderColor: theme.background, backgroundColor: theme.background,
+          borderColor: 'transparent',
         }}
       >
         <View

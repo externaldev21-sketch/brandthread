@@ -684,6 +684,9 @@ describe('buyer profile — Instagram layout', () => {
     expect(outer.width - 2 * (outer.borderWidth + (outer.padding ?? 0))).toBe(ring.width);
     // No story → the outermost stroke is transparent (layout never shifts).
     expect(outer.borderColor).toBe('transparent');
+    // Seamless avatar: the spacer between ring and photo is never painted.
+    expect(ring.borderColor).toBe('transparent');
+    expect(ring.backgroundColor).toBeUndefined();
   });
 
   it('shows the accent story ring only while the buyer has an unexpired story, and the avatar then opens it', async () => {

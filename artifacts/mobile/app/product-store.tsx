@@ -722,7 +722,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   avatarCircle: {
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: ACCENT + '33',
-    borderWidth: 1, borderColor: ACCENT + '55',
     alignItems: 'center', justifyContent: 'center',
   },
   avatarInitial: {

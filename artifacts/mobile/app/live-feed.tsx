@@ -744,7 +744,7 @@ const styles = StyleSheet.create({
   },
   avatarCircle: {
     width: 32, height: 32, borderRadius: 16, backgroundColor: '#3D2B56', overflow: 'hidden',
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)',
+    alignItems: 'center', justifyContent: 'center',
   },
   avatarLetter: { color: '#fff', fontFamily: FONT.bold, fontSize: 14 },
   hostText: { flexShrink: 1 },

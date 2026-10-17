@@ -137,8 +137,8 @@ export default function LinkInBioScreen() {
 
             <View style={s.profileRow}>
               {page.avatarUrl
-                ? <Image source={{ uri: page.avatarUrl }} style={[s.avatar, { borderColor: colors.border }]} accessibilityLabel="Profile photo" />
-                : <View style={[s.avatar, s.avatarPh, { backgroundColor: colors.secondary, borderColor: colors.border }]}><Feather name="user" size={28} color={colors.mutedForeground} /></View>}
+                ? <Image source={{ uri: page.avatarUrl }} style={s.avatar} accessibilityLabel="Profile photo" />
+                : <View style={[s.avatar, s.avatarPh, { backgroundColor: colors.secondary }]}><Feather name="user" size={28} color={colors.mutedForeground} /></View>}
               <View style={{ flex: 1 }}>
                 <Field label="Name" value={page.displayName} onChangeText={(v) => edit({ displayName: v })} maxLength={60} />
               </View>
@@ -286,8 +286,8 @@ function BioPreview({ page, products }: { page: BioPage; products: { id: string;
   return (
     <View style={[s.phone, { backgroundColor: bg, borderColor: colors.border }]} accessibilityLabel="Page preview">
       {page.avatarUrl
-        ? <Image source={{ uri: page.avatarUrl }} style={[s.pvAvatar, { borderColor: colors.border }]} />
-        : <View style={[s.pvAvatar, s.avatarPh, { backgroundColor: colors.secondary, borderColor: colors.border }]}><Text style={{ color: fg, fontFamily: FONT.bold, fontSize: FS.xl }}>{(page.displayName || 'B').slice(0, 1).toUpperCase()}</Text></View>}
+        ? <Image source={{ uri: page.avatarUrl }} style={s.pvAvatar} />
+        : <View style={[s.pvAvatar, s.avatarPh, { backgroundColor: colors.secondary }]}><Text style={{ color: fg, fontFamily: FONT.bold, fontSize: FS.xl }}>{(page.displayName || 'B').slice(0, 1).toUpperCase()}</Text></View>}
       <Text style={[s.pvName, { color: fg }]}>{page.displayName || 'Your name'}</Text>
       {!!page.bio && <Text style={[s.pvBio, { color: colors.mutedForeground }]}>{page.bio}</Text>}
       {page.showShopButton && (
@@ -316,7 +316,7 @@ function BioPreview({ page, products }: { page: BioPage; products: { id: string;
 
 const s = StyleSheet.create({
   profileRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md, marginBottom: SP.xs },
-  avatar: { width: 64, height: 64, borderRadius: 32, borderWidth: 1, marginTop: 26 },
+  avatar: { width: 64, height: 64, borderRadius: 32, overflow: 'hidden', marginTop: 26 },
   avatarPh: { alignItems: 'center', justifyContent: 'center' },
   linksHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.sm },
   addPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, minHeight: 40, borderRadius: RADIUS.pill, marginBottom: SP.sm },
@@ -329,7 +329,7 @@ const s = StyleSheet.create({
   fieldLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: 6 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   phone: { borderWidth: 1, borderRadius: RADIUS.xl, padding: SP.lg, alignItems: 'center', minHeight: 420 },
-  pvAvatar: { width: 84, height: 84, borderRadius: 42, borderWidth: 1, marginBottom: SP.sm },
+  pvAvatar: { width: 84, height: 84, borderRadius: 42, overflow: 'hidden', marginBottom: SP.sm },
   pvName: { fontSize: FS.xl, fontFamily: FONT.bold, textAlign: 'center' },
   pvBio: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', marginTop: 6, marginBottom: SP.md },
   pvBtn: { width: '100%', borderWidth: 1.5, borderRadius: 14, minHeight: 50, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md, marginTop: SP.sm },

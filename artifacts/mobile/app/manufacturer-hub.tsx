@@ -1154,7 +1154,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
 const makeRelCard = (theme: AppThemePreset) => StyleSheet.create({
   root:     { backgroundColor: theme.cardGlass, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
   topRow:   { flexDirection: 'row', gap: SP.md },
-  avatar:   { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
+  avatar:   { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarText:{ fontSize: FS.md, fontFamily: FONT.bold, color: theme.accentLight },
   avatarImage:{ width: '100%', height: '100%' },
   unread:   { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, alignSelf: 'center' },
@@ -1701,7 +1701,7 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
 
 const makeMsgCard = (theme: AppThemePreset) => StyleSheet.create({
   root:      { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: theme.cardGlass, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.md },
-  avatar:    { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border },
+  avatar:    { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarText:{ fontSize: FS.md, fontFamily: FONT.bold, color: theme.accentLight },
   body:      { flex: 1 },
   topRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },

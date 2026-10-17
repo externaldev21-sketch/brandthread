@@ -116,7 +116,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
     <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress} disabled={isPreview}>
       {/* Top row */}
       <View style={styles.cardTopRow}>
-        <View style={[styles.avatarCircle, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
+        <View style={[styles.avatarCircle, { backgroundColor: theme.accentDim }]}>
           <Text style={[styles.avatarText, { color: theme.accentLight }]}>{sellerInitial}</Text>
         </View>
         <View style={{ flex: 1 }}>
@@ -524,7 +524,6 @@ function cardStyles(theme: AppThemePreset) {
       width: 40,
       height: 40,
       borderRadius: RADIUS.pill,
-      borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
     },

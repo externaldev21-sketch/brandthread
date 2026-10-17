@@ -378,7 +378,7 @@ function ShareAction({
       accessibilityLabel={label}
       testID={`thread-share-${label.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      <View style={[styles.actionCircle, muted && styles.actionCircleMuted, avatar && { backgroundColor: avatar.color }]}>
+      <View style={[styles.actionCircle, muted && styles.actionCircleMuted, avatar && styles.actionCircleAvatar, avatar && { backgroundColor: avatar.color }]}>
          {busy ? <ActivityIndicator color={theme.onAccent} /> : avatar ? (
           <Text style={styles.avatarText}>{avatar.initials}</Text>
         ) : (
@@ -412,6 +412,8 @@ const makeStyles = (theme: { background: string; card: string; border: string; t
   action: { width: 66, alignItems: 'center', gap: 7 },
   actionCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border },
   actionCircleMuted: { backgroundColor: theme.background },
+  // Friend avatars are seamless discs — no outline (icon actions keep theirs).
+  actionCircleAvatar: { borderWidth: 0 },
   actionLabel: { minHeight: 30, color: theme.muted, fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 13, textAlign: 'center' },
   avatarText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.sm },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: theme.border },

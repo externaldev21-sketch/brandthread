@@ -1323,8 +1323,17 @@ router.get("/stories/user/:userId", async (req, res) => {
                  inArray(storyLikes.storyId, finalRows.map(r => r.id)))))
     .map(r => r.storyId)
   );
+  // `seenByMe` lets the profile header show the story ring only while
+  // something is still unseen (seen-only stories keep a seamless avatar).
+  const seenSet = new Set(
+    (await db.select({ storyId: storyViews.storyId }).from(storyViews)
+      .where(and(eq(storyViews.userId, myId),
+                 inArray(storyViews.storyId, finalRows.map(r => r.id)))))
+    .map(r => r.storyId)
+  );
 
-  res.json(await withStickerState(await withOriginalInfo(finalRows.map(r => buildStoryView(r, likedSet.has(r.id)))), myId));
+  const views = await withStickerState(await withOriginalInfo(finalRows.map(r => buildStoryView(r, likedSet.has(r.id)))), myId);
+  res.json(views.map((v) => ({ ...v, seenByMe: authorId === myId || seenSet.has(v.id) })));
 });
 
 // ─── GET /api/social/stories/following — stories tray ────────────────────────

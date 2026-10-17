@@ -408,7 +408,7 @@ function SellerGroup({
         accessibilityLabel={`Visit ${group.sellerName}'s store`}
         noMinHeight
       >
-        <View style={[sg.avatar, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
+        <View style={[sg.avatar, { backgroundColor: theme.accentDim }]}>
           {group.sellerAvatarUri ? (
             <CachedImage source={{ uri: group.sellerAvatarUri }} style={sg.avatarImage} contentFit="cover" recyclingKey={group.sellerAvatarUri} />
           ) : (
@@ -514,7 +514,7 @@ function SellerGroupLine({
 
 const makeSellerGroupStyles = (theme: AppThemePreset) => StyleSheet.create({
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-  avatar: { width: 38, height: 38, borderRadius: RADII.pill, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatar: { width: 38, height: 38, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarImage: { width: '100%', height: '100%' },
   avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
   sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },

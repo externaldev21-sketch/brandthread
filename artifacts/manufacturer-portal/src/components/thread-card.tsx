@@ -11,7 +11,7 @@ export function ThreadCard({ thread }: { thread: MessageThread }) {
       data-testid={`link-thread-${thread.id}`}
     >
       <div className="flex items-start gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary font-bold text-muted-foreground">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary font-bold text-muted-foreground">
           {thread.buyerAvatar ? (
             <img
               src={thread.buyerAvatar}

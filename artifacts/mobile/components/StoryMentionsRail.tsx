@@ -17,11 +17,12 @@ function MentionRingAvatar({ ring, styles, theme }: { ring: MentionRing; styles:
     <View
       style={[
         styles.ring,
-        // White = something unseen; dim silver once every story is viewed.
-        { borderColor: ring.seen ? theme.border : theme.text },
+        // White ring = something unseen; once every story is viewed the ring
+        // goes away and the photo stands alone (seamless avatar).
+        { borderColor: ring.seen ? 'transparent' : theme.text },
       ]}
     >
-      <View style={[styles.avatar, { width: inner, height: inner, borderRadius: inner / 2, backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }]}>
+      <View style={[styles.avatar, { width: inner, height: inner, borderRadius: inner / 2, backgroundColor: '#1C1C1E' }]}>
         {tagger.avatarUrl ? (
           <CachedImage source={{ uri: tagger.avatarUrl }} style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors />
         ) : (

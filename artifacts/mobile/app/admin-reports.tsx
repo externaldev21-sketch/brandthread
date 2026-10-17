@@ -305,7 +305,7 @@ function MiniAvatar({ profile, size = 22 }: { profile: ProfileSummary; size?: nu
   return (
     <View style={{
       width: size, height: size, borderRadius: size / 2, backgroundColor: theme.cardElevated,
-      borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center',
+      alignItems: 'center', justifyContent: 'center',
     }}>
       <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: size * 0.38 }}>{profile.initials}</Text>
     </View>

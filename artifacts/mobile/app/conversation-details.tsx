@@ -25,6 +25,7 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { PressableScale, HapticSwitch} from '@/components/BrandthreadUI';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { CachedImage } from '@/components/CachedImage';
+import { BrandthreadAvatar } from '@/components/branding/BrandthreadAvatar';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { ThemePickerSheet } from '@/components/chat/ThemePickerSheet';
 import { ThemePreviewScreen } from '@/components/chat/ThemePreviewScreen';
@@ -275,6 +276,10 @@ export default function ConversationDetailsScreen() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
         <View style={s.profileBlock}>
+          {params.participantUserId === 'brandthread-agent' ? (
+            // The official account: the B logo filling the circle, in real and preview mode alike.
+            <BrandthreadAvatar size={88} style={s.bigAvatar} />
+          ) : (
           <View style={[s.bigAvatar, { backgroundColor: params.participantColor ?? theme.accent }]}>
             {params.participantAvatarUri ? (
               <CachedImage source={{ uri: params.participantAvatarUri }} style={s.bigAvatarImg} />
@@ -282,6 +287,7 @@ export default function ConversationDetailsScreen() {
               <Text style={s.bigAvatarInitials}>{params.participantInitials ?? '?'}</Text>
             )}
           </View>
+          )}
           <Text style={[s.bigName, { color: theme.text }]} testID="chat-details-name">{displayName}</Text>
           {!!params.participantHandle && (
             <Text style={[s.bigHandle, { color: theme.muted }]}>{params.participantHandle}</Text>

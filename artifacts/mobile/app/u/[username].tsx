@@ -566,8 +566,6 @@ function makeStyles(theme: AppThemePreset) {
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
     backgroundColor: theme.cardElevated,
-    borderWidth: 1,
-    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },

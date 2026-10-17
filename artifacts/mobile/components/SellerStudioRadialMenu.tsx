@@ -1698,8 +1698,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     height: 44,
     borderRadius: 22,
     backgroundColor: theme.background,
-    borderWidth: 1.5,
-    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',

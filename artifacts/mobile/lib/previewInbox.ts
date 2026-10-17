@@ -51,7 +51,8 @@ const POSTER_SOURCES = [
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const LOGO_SOURCE = require('../assets/images/brandthread-logo.png');
+// The full-bleed @brandthread profile picture (fills the avatar circle).
+const LOGO_SOURCE = require('../assets/images/brandthread-avatar.png');
 
 // Item 73 (voice note waveform playback progress): the only bundled audio
 // asset in the app (assets/sounds/order_received.wav — registered for real by

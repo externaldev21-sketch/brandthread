@@ -264,7 +264,7 @@ export default function EditProfileScreen() {
   }
 
   async function pickAvatar() {
-    const asset = await openImageSheet({ aspect: [1, 1], enableVideo: true });
+    const asset = await openImageSheet({ aspect: [1, 1], enableVideo: true, cropCircle: true });
     if (!asset) return;
     if (asset.type === 'video') { await pickAvatarVideo(asset); return; }
 
