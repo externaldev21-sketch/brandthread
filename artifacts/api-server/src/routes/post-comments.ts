@@ -36,10 +36,13 @@ import {
   blockRelation,
   blockedUserIds,
   enqueueAutoFilterReport,
+  isRestrictedBy,
   mutedPhrasesFor,
+  mutedUserIds,
   optionalViewerId,
   profilesById,
   publishingRestriction,
+  restrictedCommentVisible,
   type ProfileSummary,
 } from "../lib/safety";
 
@@ -113,16 +116,24 @@ router.get("/:postId/comments", async (req, res) => {
       return res.status(404).json({ error: "Post not found" });
     }
 
-    const [blocked, muted] = await Promise.all([blockedUserIds(viewerId), mutedPhrasesFor(viewerId)]);
+    const [blocked, muted, mutedPeople] = await Promise.all([
+      blockedUserIds(viewerId), mutedPhrasesFor(viewerId), mutedUserIds(viewerId, "posts"),
+    ]);
+    // People I muted: their comments are hidden from me (never the post owner's own on their post).
+    const hiddenPeople = (authorId: string) => authorId !== post.userId && mutedPeople.has(authorId);
 
     // Visible comments, plus the viewer's own held comments so they can see
     // what is waiting for review.
-    const visibility = viewerId
-      ? or(
-          eq(postComments.moderationStatus, "visible"),
-          and(eq(postComments.moderationStatus, "held"), eq(postComments.authorId, viewerId)),
-        )
-      : eq(postComments.moderationStatus, "visible");
+    const visibility = and(
+      viewerId
+        ? or(
+            eq(postComments.moderationStatus, "visible"),
+            and(eq(postComments.moderationStatus, "held"), eq(postComments.authorId, viewerId)),
+          )
+        : eq(postComments.moderationStatus, "visible"),
+      // Restrict: comments from someone the post owner restricted are only visible to that person.
+      restrictedCommentVisible(viewerId, postComments.authorId, sql`${post.userId}`),
+    );
     const standing = authorInGoodStanding(postComments.authorId);
 
     const topLevel = await db
@@ -189,6 +200,7 @@ router.get("/:postId/comments", async (req, res) => {
     let hiddenByMutedWords = 0;
     const shown = all.filter((comment) => {
       if (blocked.has(comment.authorId)) return false;
+      if (hiddenPeople(comment.authorId)) return false;
       if (comment.authorId !== viewerId && matchesMutedWords(comment.body, muted)) {
         hiddenByMutedWords += 1;
         return false;
@@ -214,6 +226,10 @@ router.get("/:postId/comments", async (req, res) => {
           eq(postComments.moderationStatus, "visible"),
           standing,
           blocked.size > 0 ? notInArray(postComments.authorId, [...blocked]) : undefined,
+          restrictedCommentVisible(viewerId, postComments.authorId, sql`${post.userId}`),
+          mutedPeople.size > 0
+            ? or(eq(postComments.authorId, post.userId), notInArray(postComments.authorId, [...mutedPeople]))
+            : undefined,
         )),
       ids.length ? db.select({ commentId: postCommentLikes.commentId })
         .from(postCommentLikes)
@@ -297,13 +313,21 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
     if (viewerId && viewerId !== post.userId && (await blockRelation(viewerId, post.userId)) !== "none") {
       return res.status(404).json({ error: "Post not found" });
     }
-    const [blocked, muted] = await Promise.all([blockedUserIds(viewerId), mutedPhrasesFor(viewerId)]);
-    const visibility = viewerId
-      ? or(
-          eq(postComments.moderationStatus, "visible"),
-          and(eq(postComments.moderationStatus, "held"), eq(postComments.authorId, viewerId)),
-        )
-      : eq(postComments.moderationStatus, "visible");
+    const [blocked, muted, mutedPeople] = await Promise.all([
+      blockedUserIds(viewerId), mutedPhrasesFor(viewerId), mutedUserIds(viewerId, "posts"),
+    ]);
+    // People I muted: their comments are hidden from me (never the post owner's own on their post).
+    const hiddenPeople = (authorId: string) => authorId !== post.userId && mutedPeople.has(authorId);
+    const visibility = and(
+      viewerId
+        ? or(
+            eq(postComments.moderationStatus, "visible"),
+            and(eq(postComments.moderationStatus, "held"), eq(postComments.authorId, viewerId)),
+          )
+        : eq(postComments.moderationStatus, "visible"),
+      // Restrict: comments from someone the post owner restricted are only visible to that person.
+      restrictedCommentVisible(viewerId, postComments.authorId, sql`${post.userId}`),
+    );
     const standing = authorInGoodStanding(postComments.authorId);
 
     const rows = await db
@@ -320,7 +344,7 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
       .limit(REPLIES_PER_ROOT + 1);
     const hasMore = rows.length > REPLIES_PER_ROOT;
     const page = rows.slice(0, REPLIES_PER_ROOT);
-    const shown = page.filter((c) => !blocked.has(c.authorId)
+    const shown = page.filter((c) => !blocked.has(c.authorId) && !hiddenPeople(c.authorId)
       && (c.authorId === viewerId || !matchesMutedWords(c.body, muted)));
 
     const ids = shown.map((c) => c.id);
@@ -455,7 +479,10 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
 
     // Held comments are invisible to everyone but their author, so nobody
     // else is told about them until a moderator approves.
-    if (!held) {
+    // A comment from someone the post owner restricted is only visible to
+    // its author, so nobody (owner, replied-to person, mentions) is told.
+    const restrictedByOwner = await isRestrictedBy(post.userId, authorId);
+    if (!held && !restrictedByOwner) {
       void notifyCommentActivity({
         postId, commentId: created.id, authorId, body, parentAuthorId,
         mentionedUserIds: mentions.map((m) => m.userId),

@@ -24,6 +24,7 @@
  * there is deliberately no bulk migration of past conversations.
  */
 import { db, orders, follows, conversations } from "@workspace/db";
+import { isRestrictedBy } from "./safety";
 import { and, eq, ne, sql } from "drizzle-orm";
 
 export async function isFollowedBy(followerId: string, targetId: string): Promise<boolean> {
@@ -63,6 +64,8 @@ export async function shouldRouteToRequests(
   senderId: string,
   recipientAccountType: string | null | undefined,
 ): Promise<boolean> {
+  // Restrict: new messages from someone the recipient restricted always wait in Requests.
+  if (await isRestrictedBy(recipientId, senderId)) return true;
   const recipientFollowsSender = await isFollowedBy(recipientId, senderId);
   if (recipientFollowsSender) return false;
   if (recipientAccountType === "seller") {
@@ -77,6 +80,7 @@ export async function shouldRouteToRequests(
  *  touches a conversation that isn't currently a pending request, and never
  *  re-sorts an already-accepted conversation. */
 async function promotePendingRequests(recipientId: string, senderId: string): Promise<void> {
+  if (await isRestrictedBy(recipientId, senderId)) return;
   await db
     .update(conversations)
     .set({ isRequest: false, requestedBy: null })

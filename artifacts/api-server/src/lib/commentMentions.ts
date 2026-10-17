@@ -8,6 +8,7 @@
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { blocks, commentMentions, db, users } from "@workspace/db";
 import { extractMentions } from "./activityEvents";
+import { ownersAllowing } from "./privacySettings";
 
 export const MAX_COMMENT_MENTIONS = 5;
 
@@ -30,11 +31,14 @@ export async function resolveCommentMentions(body: string, authorId: string): Pr
   ]);
   const blocked = new Set(blockRows.map((r) => (r.blockerId === authorId ? r.blockedId : r.blockerId)));
   const byHandle = new Map(found.filter((u) => u.username).map((u) => [u.username!.toLowerCase(), u]));
+  // Privacy screen: "Who can mention you".
+  const mentionable = await ownersAllowing("whoCanMention", found.map((u) => u.clerkId), authorId);
   const out: CommentMention[] = [];
   const taken = new Set<string>();
   for (const handle of handles) {
     const user = byHandle.get(handle);
     if (!user || user.clerkId === authorId || blocked.has(user.clerkId) || taken.has(user.clerkId)) continue;
+    if (!mentionable.has(user.clerkId)) continue;
     if (out.length >= MAX_COMMENT_MENTIONS) break;
     taken.add(user.clerkId);
     out.push({ userId: user.clerkId, handle: user.username! });

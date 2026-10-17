@@ -21,6 +21,7 @@ import { requireAuth, requireModerator } from "../middlewares/requireAuth";
 import { validateRequest } from "../middlewares/validateRequest";
 import { rateLimit } from "../middlewares/rateLimit";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
+import { mutedUserIds } from "../lib/safety";
 import { getForYouFeed, applyEventToProfile, type ForYouResultItem } from "../lib/ranking/forYou";
 import { getRankingConfig, saveRankingConfig, DEFAULT_RANKING_CONFIG } from "../lib/ranking/config";
 import { hidePostFromForYou, unhidePostFromForYou } from "../lib/ranking/signals";
@@ -123,7 +124,10 @@ router.get("/for-you", requireAuth, async (req, res) => {
   const { limit, offset } = page.data;
 
   try {
-    const ranked = await getForYouFeed(userId);
+    // The ranking is cached for a short TTL, so a person muted since it was
+    // built is dropped here too (candidate generation also excludes them).
+    const [rankedAll, muted] = await Promise.all([getForYouFeed(userId), mutedUserIds(userId, "posts")]);
+    const ranked = muted.size === 0 ? rankedAll : rankedAll.filter((i) => i.isLive || !muted.has(i.sellerId));
     const slice = ranked.slice(offset, offset + limit);
     setPaginationHeaders(res, page.data, slice.length, ranked.length);
 

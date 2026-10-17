@@ -3040,10 +3040,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     privacy: {
       /** Get current server-side privacy preferences */
       get: () =>
-        get<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; canBePrivate?: boolean }>('/api/auth/privacy'),
-      /** Update server-side privacy preferences */
-      update: (settings: { dmPrivacy?: 'requests' | 'followers_only'; isPrivate?: boolean }) =>
-        patch<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean }>('/api/auth/privacy', settings),
+        get<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; canBePrivate?: boolean; settings?: Record<string, unknown> }>('/api/auth/privacy'),
+      /** Update server-side privacy preferences (`settings` = Privacy-screen keys; socialService.updatePrivacySettings sends them). */
+      update: (settings: { dmPrivacy?: 'requests' | 'followers_only'; isPrivate?: boolean; settings?: Record<string, unknown> }) =>
+        patch<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; settings?: Record<string, unknown> }>('/api/auth/privacy', settings),
     },
     /** Private-account follow requests (incoming) and the Close Friends list. */
     followRequests: {

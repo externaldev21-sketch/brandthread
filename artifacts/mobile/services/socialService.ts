@@ -73,6 +73,9 @@ function K(uid = _socialUserId) {
     blocks:             `bt:social:${uid}:blocks:v1`,
     mutes:              `bt:social:${uid}:mutes:v1`,
     restricts:          `bt:social:${uid}:restricts:v1`,
+    /** Set once this device's pre-server mutes / restricts were copied up to the server. */
+    mutesMigrated:      `bt:social:${uid}:mutes:migrated:v1`,
+    restrictsMigrated:  `bt:social:${uid}:restricts:migrated:v1`,
     saved:              `bt:social:${uid}:saved:v1`,
     privacy:            `bt:social:${uid}:privacy:v1`,
     seeded:             `bt:social:${uid}:seeded:v1`,
@@ -1678,37 +1681,134 @@ export async function seeLessActor(actorId: string): Promise<void> {
   await serviceRequest('/api/social/see-less', { method: 'POST', body: JSON.stringify({ actorId }) });
   notify();
 }
-export async function getMutedUsers(k: SocialKeys = K()): Promise<MuteRecord[]> {
-  return load<MuteRecord[]>(k.mutes, []);
+type ServerPerson = {
+  userId: string; name: string; handle: string; initials: string; createdAt: string;
+};
+
+/**
+ * Copy this device's pre-server list (mutes / restricts used to be phone-only)
+ * up to the server once, best effort. A 4xx (unknown or deleted account) is
+ * final; anything else leaves the flag unset so the next load retries.
+ */
+async function migrateLocalPeople(
+  local: string[], remote: Set<string>, flagKey: string, push: (userId: string) => Promise<unknown>,
+): Promise<string[]> {
+  const pending = local.filter((id) => id && !remote.has(id));
+  const results = await Promise.allSettled(pending.map((id) => push(id)));
+  const retry = results.some((r) => r.status === 'rejected'
+    && !((r.reason as { status?: number })?.status && (r.reason as { status: number }).status >= 400 && (r.reason as { status: number }).status < 500));
+  if (!retry) {
+    try { await AsyncStorage.setItem(flagKey, 'true'); } catch {}
+  }
+  return pending.filter((_, i) => results[i].status === 'fulfilled');
 }
+
+/**
+ * People I muted. The server is the source of truth (it hides their posts,
+ * comments and stories from me in every feed); the local list is a mirror so
+ * screens paint instantly and Discover can filter. Falls back to the mirror
+ * when the server can't be reached.
+ */
+export async function getMutedUsers(k: SocialKeys = K()): Promise<MuteRecord[]> {
+  const local = await load<MuteRecord[]>(k.mutes, []);
+  if (!canSyncSocialServer()) return local;
+  try {
+    const remote = await serviceRequest<{ mutes: ServerPerson[] }>('/api/safety/mutes');
+    let rows = Array.isArray(remote?.mutes) ? remote.mutes : [];
+    if ((await AsyncStorage.getItem(k.mutesMigrated).catch(() => null)) !== 'true') {
+      const moved = await migrateLocalPeople(
+        local.map((m) => m.mutedUserId), new Set(rows.map((r) => r.userId)), k.mutesMigrated,
+        (userId) => serviceRequest('/api/safety/mutes', { method: 'POST', body: JSON.stringify({ userId }) }, false),
+      );
+      if (moved.length > 0) {
+        const again = await serviceRequest<{ mutes: ServerPerson[] }>('/api/safety/mutes');
+        rows = Array.isArray(again?.mutes) ? again.mutes : rows;
+      }
+    }
+    const colorById = new Map(local.map((m) => [m.mutedUserId, m.mutedUserColor]));
+    const mirrored: MuteRecord[] = rows.map((r) => ({
+      id: r.userId, mutedUserId: r.userId, mutedUserName: r.name, mutedUserHandle: r.handle,
+      mutedUserInitials: r.initials, mutedUserColor: colorById.get(r.userId) ?? pickAvatarColor(r.userId), createdAt: r.createdAt,
+    }));
+    if (_socialUserId === k.userId) await save(k.mutes, mirrored);
+    return mirrored;
+  } catch {
+    return local;
+  }
+}
+/** Mute someone (their posts, comments and stories stop showing for me). Throws if the server rejects it. */
 export async function muteUser(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<void> {
+  if (canSyncSocialServer()) {
+    await serviceRequest('/api/safety/mutes', { method: 'POST', body: JSON.stringify({ userId: params.userId }) });
+    queryClient.invalidateQueries().catch(() => {});
+  }
   const k = K();
-  const mutes = await getMutedUsers(k);
-  if (mutes.some(m => m.mutedUserId === params.userId)) return;
+  const mutes = await load<MuteRecord[]>(k.mutes, []);
+  if (mutes.some(m => m.mutedUserId === params.userId)) { notify(); return; }
   mutes.unshift({ id: uid(), mutedUserId: params.userId, mutedUserName: params.name, mutedUserHandle: params.handle, mutedUserInitials: params.initials, mutedUserColor: params.color, createdAt: iso() });
   await save(k.mutes, mutes); notify();
 }
 export async function unmuteUser(userId: string): Promise<void> {
+  if (canSyncSocialServer()) {
+    await serviceRequest(`/api/safety/mutes/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+    queryClient.invalidateQueries().catch(() => {});
+  }
   const k = K();
-  const mutes = await getMutedUsers(k);
+  const mutes = await load<MuteRecord[]>(k.mutes, []);
   await save(k.mutes, mutes.filter(m => m.mutedUserId !== userId)); notify();
 }
 
 // ─── Restriction ─────────────────────────────────────────────────────────────
 
+/**
+ * People I restricted: their comments on my posts are only visible to them
+ * (and I'm not notified); their new messages wait in my requests. Server-backed,
+ * with the local list as a mirror (used when the server can't be reached).
+ */
 export async function getRestrictedUsers(k: SocialKeys = K()): Promise<RestrictRecord[]> {
-  return load<RestrictRecord[]>(k.restricts, []);
+  const local = await load<RestrictRecord[]>(k.restricts, []);
+  if (!canSyncSocialServer()) return local;
+  try {
+    const remote = await serviceRequest<{ restrictions: ServerPerson[] }>('/api/safety/restrictions');
+    let rows = Array.isArray(remote?.restrictions) ? remote.restrictions : [];
+    if ((await AsyncStorage.getItem(k.restrictsMigrated).catch(() => null)) !== 'true') {
+      const moved = await migrateLocalPeople(
+        local.map((r) => r.restrictedUserId), new Set(rows.map((r) => r.userId)), k.restrictsMigrated,
+        (userId) => serviceRequest('/api/safety/restrictions', { method: 'POST', body: JSON.stringify({ userId }) }, false),
+      );
+      if (moved.length > 0) {
+        const again = await serviceRequest<{ restrictions: ServerPerson[] }>('/api/safety/restrictions');
+        rows = Array.isArray(again?.restrictions) ? again.restrictions : rows;
+      }
+    }
+    const colorById = new Map(local.map((r) => [r.restrictedUserId, r.restrictedUserColor]));
+    const mirrored: RestrictRecord[] = rows.map((r) => ({
+      id: r.userId, restrictedUserId: r.userId, restrictedUserName: r.name, restrictedUserHandle: r.handle,
+      restrictedUserInitials: r.initials, restrictedUserColor: colorById.get(r.userId) ?? pickAvatarColor(r.userId), createdAt: r.createdAt,
+    }));
+    if (_socialUserId === k.userId) await save(k.restricts, mirrored);
+    return mirrored;
+  } catch {
+    return local;
+  }
 }
+/** Restrict someone. Throws if the server rejects it. */
 export async function restrictUser(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<void> {
+  if (canSyncSocialServer()) {
+    await serviceRequest('/api/safety/restrictions', { method: 'POST', body: JSON.stringify({ userId: params.userId }) });
+  }
   const k = K();
-  const restricts = await getRestrictedUsers(k);
-  if (restricts.some(r => r.restrictedUserId === params.userId)) return;
+  const restricts = await load<RestrictRecord[]>(k.restricts, []);
+  if (restricts.some(r => r.restrictedUserId === params.userId)) { notify(); return; }
   restricts.unshift({ id: uid(), restrictedUserId: params.userId, restrictedUserName: params.name, restrictedUserHandle: params.handle, restrictedUserInitials: params.initials, restrictedUserColor: params.color, createdAt: iso() });
   await save(k.restricts, restricts); notify();
 }
 export async function unrestrictUser(userId: string): Promise<void> {
+  if (canSyncSocialServer()) {
+    await serviceRequest(`/api/safety/restrictions/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+  }
   const k = K();
-  const restricts = await getRestrictedUsers(k);
+  const restricts = await load<RestrictRecord[]>(k.restricts, []);
   await save(k.restricts, restricts.filter(r => r.restrictedUserId !== userId)); notify();
 }
 
@@ -1821,13 +1921,67 @@ export async function getPublicCollection(collectionId: string): Promise<{
 
 // ─── Privacy ──────────────────────────────────────────────────────────────────
 
-export async function getPrivacySettings(k: SocialKeys = K()): Promise<PrivacySettings> {
-  return load<PrivacySettings>(k.privacy, DEFAULT_PRIVACY_SETTINGS);
+/** Keys the server stores and enforces (users.privacy_settings via /api/auth/privacy). */
+const SERVER_PRIVACY_KEYS = [
+  'whoCanSendFriendRequests', 'whoCanSeePosts', 'whoCanSeeFriendsList', 'whoCanReplyToStories',
+  'whoCanMention', 'activityStatusVisible', 'readReceiptsEnabled', 'searchable',
+] as const;
+type ServerPrivacyKey = typeof SERVER_PRIVACY_KEYS[number];
+
+type ServerPrivacyResponse = {
+  dmPrivacy?: PrivacySettings['whoCanMessageMe'];
+  isPrivate?: boolean;
+  settings?: Partial<Pick<PrivacySettings, ServerPrivacyKey>>;
+};
+
+function mergeServerPrivacy(base: PrivacySettings, remote: ServerPrivacyResponse | null | undefined): PrivacySettings {
+  const next: PrivacySettings = { ...base };
+  if (remote?.settings) {
+    for (const key of SERVER_PRIVACY_KEYS) {
+      const value = remote.settings[key];
+      if (value !== undefined) (next as any)[key] = value;
+    }
+  }
+  if (remote?.dmPrivacy) next.whoCanMessageMe = remote.dmPrivacy;
+  if (typeof remote?.isPrivate === 'boolean') next.profileVisibility = remote.isPrivate ? 'private' : 'public';
+  return next;
 }
+
+/**
+ * Privacy-screen settings. The server is the source of truth and enforces
+ * them; the local copy is a cache (also the only store in the dev preview,
+ * and the fallback when the server can't be reached). Contact discovery
+ * lives on /api/social/contacts and is loaded by the screen itself.
+ */
+export async function getPrivacySettings(k: SocialKeys = K()): Promise<PrivacySettings> {
+  const cached = { ...DEFAULT_PRIVACY_SETTINGS, ...(await load<Partial<PrivacySettings>>(k.privacy, {})) };
+  if (!canSyncSocialServer()) return cached;
+  try {
+    const remote = await serviceRequest<ServerPrivacyResponse>('/api/auth/privacy');
+    const next = mergeServerPrivacy(cached, remote);
+    if (_socialUserId === k.userId) await save(k.privacy, next);
+    return next;
+  } catch {
+    return cached;
+  }
+}
+/** Save privacy-screen settings to the server (throws on failure), then refresh the cache. */
 export async function updatePrivacySettings(updates: Partial<PrivacySettings>): Promise<PrivacySettings> {
   const k = K();
-  const current = await getPrivacySettings(k);
-  const next = { ...current, ...updates };
+  const current = { ...DEFAULT_PRIVACY_SETTINGS, ...(await load<Partial<PrivacySettings>>(k.privacy, {})) };
+  let next: PrivacySettings = { ...current, ...updates };
+  if (canSyncSocialServer()) {
+    const settings: Partial<Pick<PrivacySettings, ServerPrivacyKey>> = {};
+    for (const key of SERVER_PRIVACY_KEYS) {
+      if (updates[key] !== undefined) (settings as any)[key] = updates[key];
+    }
+    if (Object.keys(settings).length > 0) {
+      const remote = await serviceRequest<ServerPrivacyResponse>('/api/auth/privacy', {
+        method: 'PATCH', body: JSON.stringify({ settings }),
+      });
+      next = mergeServerPrivacy(next, remote);
+    }
+  }
   await save(k.privacy, next); notify();
   return next;
 }

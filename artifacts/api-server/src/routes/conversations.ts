@@ -28,6 +28,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { moderateMessage } from "../lib/contentModerator";
 import { blockRelation, publishingRestriction } from "../lib/safety";
+import { sharesActivityStatus, sharesReadReceipts, storyReplyDenial } from "../lib/privacySettings";
 import { publishNotification } from "./notifications-feed";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { maybeSendAwayAutoReply } from "../lib/awayAutoReply";
@@ -695,6 +696,10 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
       return res.status(403).json({ error: "You blocked this account. Unblock them to send a message.", code: "BLOCKED_BY_ME" });
     }
 
+    // Privacy screen: "Who can reply to stories" (and the story's own reply setting).
+    const storyReplyError = await storyReplyDenial(userId, attachmentItems);
+    if (storyReplyError) return res.status(403).json({ error: storyReplyError, code: "STORY_REPLIES_RESTRICTED" });
+
     if (sender.accountType !== "seller") {
       const sellerRecipients = await db
         .select({ clerkId: users.clerkId })
@@ -995,13 +1000,22 @@ router.patch("/:id/read", async (req, res) => {
   // 24h later — matching Instagram's own copy — set here rather than waited
   // on a cron job; see the sweep in GET /:id/messages.
   const disappearAt = conv?.disappearingEnabled ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
+  // Read receipts off (Privacy screen): my own unread state still clears, but
+  // senders never see "Seen" (messages keep their sent/delivered status).
+  const receipts = await sharesReadReceipts(userId);
   await Promise.all([
     db.update(conversationParticipants)
       .set({ unreadCount: 0, lastReadAt: readAt })
       .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId))),
-    db.update(messages)
-      .set({ status: "read", readAt, ...(disappearAt ? { disappearAt } : {}) })
-      .where(and(eq(messages.conversationId, id), sql`${messages.senderId} != ${userId}`, sql`${messages.readAt} IS NULL`)),
+    receipts
+      ? db.update(messages)
+        .set({ status: "read", readAt, ...(disappearAt ? { disappearAt } : {}) })
+        .where(and(eq(messages.conversationId, id), sql`${messages.senderId} != ${userId}`, sql`${messages.readAt} IS NULL`))
+      : disappearAt
+        ? db.update(messages)
+          .set({ disappearAt })
+          .where(and(eq(messages.conversationId, id), sql`${messages.senderId} != ${userId}`, sql`${messages.readAt} IS NULL`, sql`${messages.disappearAt} IS NULL`))
+        : Promise.resolve(),
   ]);
 
   return res.json({ ok: true });
@@ -1028,7 +1042,8 @@ router.patch("/:id/typing", rateLimit("mutation"), async (req, res) => {
   // A short window (a couple of poll cycles) — long enough that a normal
   // typing cadence looks continuous, short enough that a client that never
   // clears it (crash, background) doesn't leave a stale "typing…" showing.
-  const typingUntil = typing ? new Date(Date.now() + 8000) : null;
+  // Activity status off (Privacy screen): never broadcast "typing…".
+  const typingUntil = typing && (await sharesActivityStatus(userId)) ? new Date(Date.now() + 8000) : null;
   await db.update(conversationParticipants)
     .set({ typingUntil })
     .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));

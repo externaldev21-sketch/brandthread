@@ -27,7 +27,7 @@
  * seller product tag.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, View } from 'react-native';
+import { Alert, FlatList, View } from 'react-native';
 import { BrandsYouMightLikeRow } from '@/components/discover/BrandsYouMightLikeRow';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useRouter } from 'expo-router';
@@ -447,14 +447,16 @@ export default function DiscoverScreen() {
           authorName={safetyMenuPost.authorName}
           onNotInterested={() => removePostFromLists(safetyMenuPost.authorId, safetyMenuPost.id)}
           onMute={() => {
+            const target = safetyMenuPost;
             muteUser({
-              userId: safetyMenuPost.authorId,
-              name: safetyMenuPost.authorName,
-              handle: safetyMenuPost.authorHandle,
-              initials: safetyMenuPost.authorInitials,
-              color: safetyMenuPost.authorColor,
-            }).catch(() => {});
-            removePostFromLists(safetyMenuPost.authorId);
+              userId: target.authorId,
+              name: target.authorName,
+              handle: target.authorHandle,
+              initials: target.authorInitials,
+              color: target.authorColor,
+            })
+              .then(() => removePostFromLists(target.authorId))
+              .catch(() => Alert.alert("Couldn't mute", 'Try again.'));
           }}
           onReport={() => {
             openReport({

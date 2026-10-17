@@ -25,7 +25,7 @@
  * cache read — same idiom as `computeSellerRanking`/`computeTrending`.
  */
 import {
-  db, posts, users, follows, interactions, blocks,
+  db, posts, users, follows, interactions, blocks, userMutes,
   buyerTasteProfiles, sellerRankingCache, forYouFeedCache, liveStreams, buyerPreferences,
   feedNotInterested, savedItems, postComments, postTaggedProducts, productVariants, orderItems, orders,
 } from "@workspace/db";
@@ -567,6 +567,10 @@ export async function computeForYouRankingForUser(userId: string): Promise<ForYo
       .where(sql`${blocks.blockerId} = ${userId} OR ${blocks.blockedId} = ${userId}`),
     recentlySeenPostIds(userId),
   ]);
+  // Person mutes are one-way: the buyer stops seeing that seller's posts.
+  const mutedRows = await db.select({ mutedId: userMutes.mutedId }).from(userMutes)
+    .where(and(eq(userMutes.muterId, userId), eq(userMutes.mutePosts, true)));
+  const mutedSet = new Set(mutedRows.map((r) => r.mutedId));
 
   const followedIds = followRows.map((r) => r.followingId);
   const blockedSet = new Set(blockedRows.map((r) => (r.blockerId === userId ? r.blockedId : r.blockerId)));
@@ -574,7 +578,8 @@ export async function computeForYouRankingForUser(userId: string): Promise<ForYo
   const [posts_, lives] = await Promise.all([candidatePosts(userId, followedIds), liveCandidates()]);
 
   const eligible = [...posts_, ...lives].filter(
-    (c) => !blockedSet.has(c.sellerId) && !seenIds.has(c.id) && !hiddenIds.has(c.id),
+    (c) => !blockedSet.has(c.sellerId) && !seenIds.has(c.id) && !hiddenIds.has(c.id)
+      && (c.isLive || !mutedSet.has(c.sellerId)),
   );
 
   const engagement = await loadPostEngagement(

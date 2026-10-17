@@ -61,6 +61,11 @@ export const users = pgTable('users', {
   dmPrivacy:      text('dm_privacy').notNull().default('requests'),
   // Private account (buyers only): new followers need approval (follow_requests).
   isPrivate:      boolean('is_private').notNull().default(false),
+  // Account privacy choices from the Privacy screen (who can follow, see posts,
+  // see friends list, reply to stories, mention; activity status, read
+  // receipts, searchable). Only keys the person changed are stored; missing
+  // keys fall back to the server defaults in api-server lib/privacySettings.ts.
+  privacySettings: jsonb('privacy_settings').$type<Record<string, unknown>>().notNull().default({}),
   // Buyer onboarding style picks (cold start for the For You ranking pipeline).
   buyerStyleInterests: jsonb('buyer_style_interests').$type<string[]>().notNull().default([]),
   // Brand onboarding fields (seller side)
@@ -982,6 +987,29 @@ export const blocks = pgTable('blocks', {
 }, (t) => ({
   pk: primaryKey({ columns: [t.blockerId, t.blockedId] }),
   blockedIdx: index('blocks_blocked_id_idx').on(t.blockedId),
+}));
+
+// ─── Person mutes (one-way: the muter stops seeing the muted person's content) ─
+
+export const userMutes = pgTable('user_mutes', {
+  muterId:     text('muter_id').notNull(),
+  mutedId:     text('muted_id').notNull(),
+  mutePosts:   boolean('mute_posts').notNull().default(true),
+  muteStories: boolean('mute_stories').notNull().default(true),
+  createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.muterId, t.mutedId] }),
+}));
+
+// ─── Restrictions (restricted person's comments on my posts are only visible to them) ─
+
+export const userRestrictions = pgTable('user_restrictions', {
+  restrictorId: text('restrictor_id').notNull(),
+  restrictedId: text('restricted_id').notNull(),
+  createdAt:    timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.restrictorId, t.restrictedId] }),
+  restrictedIdx: index('user_restrictions_restricted_id_idx').on(t.restrictedId),
 }));
 
 // ─── Conversations & Messages (buyer ↔ seller DM) ────────────────────────────

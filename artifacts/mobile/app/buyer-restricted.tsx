@@ -6,7 +6,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, StyleSheet,
-  TextInput, Modal, Pressable,
+  TextInput, Modal, Pressable, Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,9 +44,14 @@ export default function RestrictedAccountsScreen() {
 
   const handleUnrestrict = async (user: RestrictRecord) => {
     hapticDestructiveConfirm();
-    await unrestrictUser(user.restrictedUserId);
-    setRestricted(r => r.filter(u => u.restrictedUserId !== user.restrictedUserId));
-    setConfirmUser(null);
+    try {
+      await unrestrictUser(user.restrictedUserId);
+      setRestricted(r => r.filter(u => u.restrictedUserId !== user.restrictedUserId));
+    } catch {
+      Alert.alert("Couldn't unrestrict", 'Try again.');
+    } finally {
+      setConfirmUser(null);
+    }
   };
 
   const filtered = restricted.filter(u =>
