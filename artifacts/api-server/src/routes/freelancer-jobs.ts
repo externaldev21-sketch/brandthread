@@ -14,13 +14,14 @@
  *  4. Cancelling a paid job (pending/accepted only) refunds the PaymentIntent.
  */
 import { Router } from "express";
-import { db, freelancers, freelancerJobs, users } from "@workspace/db";
+import { db, freelancers, freelancerJobs, freelancerReviews, users } from "@workspace/db";
 import { and, eq, desc, inArray, isNull, ne, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { getWebOrigin } from "../lib/webOrigin";
 import { requireStripe, computeApplicationFeeCents } from "../lib/stripe";
 import { payoutIdempotencyKey, refundJobPayment } from "../lib/freelancerEscrow";
 import { logger } from "../lib/logger";
+import { recomputeFreelancerRating, starsToTenths } from "../lib/freelancerRatings";
 
 const router = Router();
 
@@ -275,10 +276,17 @@ router.get("/", async (req, res) => {
       .limit(1);
 
     const hirerRows = await db
-      .select({ job: freelancerJobs, freelancer: freelancers, user: USER_FIELDS })
+      .select({
+        job: freelancerJobs,
+        freelancer: freelancers,
+        user: USER_FIELDS,
+        reviewRatingTenths: freelancerReviews.ratingTenths,
+        reviewComment: freelancerReviews.comment,
+      })
       .from(freelancerJobs)
       .innerJoin(freelancers, eq(freelancers.id, freelancerJobs.freelancerId))
       .leftJoin(users, eq(users.clerkId, freelancers.userId))
+      .leftJoin(freelancerReviews, eq(freelancerReviews.jobId, freelancerJobs.id))
       .where(eq(freelancerJobs.sellerId, clerkUserId))
       .orderBy(desc(freelancerJobs.createdAt))
       .limit(100);
@@ -302,6 +310,9 @@ router.get("/", async (req, res) => {
           freelancerName: r.user?.displayName || r.user?.name || "Freelancer",
           freelancerAvatarUrl: r.user?.profileImageUrl || r.user?.avatarUrl || null,
           serviceType: r.freelancer.serviceType,
+          review: r.reviewRatingTenths != null
+            ? { ratingTenths: r.reviewRatingTenths, comment: r.reviewComment ?? "" }
+            : null,
         }),
       ),
       asFreelancer: freelancerRows.map((r) =>
@@ -348,6 +359,11 @@ router.get("/:id", async (req, res) => {
     const byId = new Map(parties.map((p) => [p.clerkId, p]));
     const fUser = byId.get(row.freelancer.userId);
     const hUser = byId.get(row.job.sellerId);
+    const [review] = await db
+      .select({ ratingTenths: freelancerReviews.ratingTenths, comment: freelancerReviews.comment })
+      .from(freelancerReviews)
+      .where(eq(freelancerReviews.jobId, row.job.id))
+      .limit(1);
 
     res.json({
       job: shapeJob(row.job, {
@@ -358,6 +374,7 @@ router.get("/:id", async (req, res) => {
         freelancerAvatarUrl: fUser?.profileImageUrl || fUser?.avatarUrl || null,
         hirerName: hUser?.displayName || hUser?.name || "Seller",
         hirerAvatarUrl: hUser?.profileImageUrl || hUser?.avatarUrl || null,
+        review: review ?? null,
       }),
     });
   } catch (err) {
@@ -781,6 +798,77 @@ router.patch("/:id/complete", async (req, res) => {
     });
   } catch (err: any) {
     sendError(req, res, err, "Failed to complete job");
+  }
+});
+
+/**
+ * POST /api/freelancer-jobs/:id/review
+ * The hirer rates the freelancer once the job is completed.
+ * Body: { rating: 1–5 (half stars allowed), comment?: string (≤ 1000) }.
+ * One review per job — posting again edits it. The freelancer's average
+ * rating and review count are recomputed from all their reviews.
+ */
+router.post("/:id/review", async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const { id } = req.params;
+    if (!UUID_RE.test(id)) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
+    const ratingTenths = starsToTenths(req.body?.rating);
+    if (ratingTenths == null) {
+      res.status(400).json({ error: "Choose a rating from 1 to 5 stars" });
+      return;
+    }
+    const rawComment = req.body?.comment;
+    if (rawComment != null && typeof rawComment !== "string") {
+      res.status(400).json({ error: "Comment must be text" });
+      return;
+    }
+    const comment = (rawComment ?? "").trim();
+    if (comment.length > 1000) {
+      res.status(400).json({ error: "Keep your comment under 1000 characters" });
+      return;
+    }
+
+    const row = await loadJobWithFreelancer(id);
+    if (!row) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
+    if (roleFor(row, clerkUserId) !== "hirer") {
+      res.status(403).json({ error: "Only the person who hired this freelancer can rate them" });
+      return;
+    }
+    if (row.job.status !== "completed") {
+      res.status(409).json({ error: "You can rate a freelancer once the job is completed" });
+      return;
+    }
+
+    const now = new Date();
+    const [review] = await db
+      .insert(freelancerReviews)
+      .values({
+        jobId: row.job.id,
+        freelancerId: row.freelancer.id,
+        reviewerUserId: clerkUserId,
+        ratingTenths,
+        comment,
+      })
+      .onConflictDoUpdate({
+        target: freelancerReviews.jobId,
+        set: { ratingTenths, comment, updatedAt: now },
+      })
+      .returning();
+
+    const rating = await recomputeFreelancerRating(row.freelancer.id);
+    res.json({
+      review: { ratingTenths: review.ratingTenths, comment: review.comment },
+      freelancer: { id: row.freelancer.id, ...rating },
+    });
+  } catch (err: any) {
+    sendError(req, res, err, "Failed to save review");
   }
 });
 

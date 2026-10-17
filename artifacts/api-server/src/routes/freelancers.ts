@@ -2,16 +2,18 @@
  * Freelancer marketplace — public browsing + freelancer self-service profile.
  * Mounted at /api/freelancers.
  *
- * Public:        GET /            (list, filterable)
+ * Public:        GET /            (list, filterable, sortable: ?sort=rating|jobs|rate_asc|rate_desc|newest)
  *                GET /:id         (full profile)
+ *                GET /:id/reviews (reviews from hirers of completed jobs)
  * Authenticated: GET /me          (own profile incl. Connect status)
  *                POST /apply      (create or update own profile)
  *                DELETE /me       (deactivate listing)
  */
 import { Router } from "express";
-import { db, freelancers, users } from "@workspace/db";
-import { and, eq, gte, lte, desc, sql } from "drizzle-orm";
+import { db, freelancers, freelancerReviews, users } from "@workspace/db";
+import { and, asc, eq, gte, lte, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { parseFreelancerSort, type FreelancerSort } from "../lib/freelancerRatings";
 
 const router = Router();
 
@@ -54,6 +56,8 @@ function shapeFreelancer(
     isActive:            f.isActive,
     totalJobsCompleted:  f.totalJobsCompleted,
     avgRatingTenths:     f.avgRatingTenths,
+    /** Reviews behind avgRatingTenths (0 = unrated). */
+    reviewCount:         f.reviewCount ?? 0,
     /** Freelancer has begun Connect onboarding — hireable. */
     hasConnectedAccount: !!f.stripeAccountId,
     /** Connect account fully verified (charges + payouts enabled). */
@@ -65,14 +69,37 @@ function shapeFreelancer(
   };
 }
 
+function orderFor(sort: FreelancerSort) {
+  switch (sort) {
+    case "jobs":
+      return [desc(freelancers.totalJobsCompleted), desc(freelancers.avgRatingTenths), desc(freelancers.createdAt)];
+    case "rate_asc":
+      return [asc(freelancers.hourlyRateCents), desc(freelancers.avgRatingTenths), desc(freelancers.createdAt)];
+    case "rate_desc":
+      return [desc(freelancers.hourlyRateCents), desc(freelancers.avgRatingTenths), desc(freelancers.createdAt)];
+    case "newest":
+      return [desc(freelancers.createdAt)];
+    case "rating":
+    default:
+      // Rated freelancers first (by average, then by how many reviews back it).
+      return [
+        desc(freelancers.avgRatingTenths),
+        desc(freelancers.reviewCount),
+        desc(freelancers.totalJobsCompleted),
+        desc(freelancers.createdAt),
+      ];
+  }
+}
+
 /**
  * GET /api/freelancers
  * Public list of active freelancers.
- * Query: serviceType, minRate (cents), maxRate (cents), available=true (has payout account)
+ * Query: serviceType, minRate (cents), maxRate (cents), available=true (has payout account),
+ *        sort=rating (default) | jobs | rate_asc | rate_desc | newest
  */
 router.get("/", async (req, res) => {
   try {
-    const { serviceType, minRate, maxRate, available } = req.query as Record<string, string | undefined>;
+    const { serviceType, minRate, maxRate, available, sort } = req.query as Record<string, string | undefined>;
 
     const conds = [eq(freelancers.isActive, true)];
     if (serviceType && (FREELANCER_SERVICE_TYPES as readonly string[]).includes(serviceType)) {
@@ -89,11 +116,7 @@ router.get("/", async (req, res) => {
       .from(freelancers)
       .leftJoin(users, eq(users.clerkId, freelancers.userId))
       .where(and(...conds))
-      .orderBy(
-        desc(freelancers.avgRatingTenths),
-        desc(freelancers.totalJobsCompleted),
-        desc(freelancers.createdAt),
-      )
+      .orderBy(...orderFor(parseFreelancerSort(sort)))
       .limit(100);
 
     res.json({ freelancers: rows.map((r) => shapeFreelancer(r.freelancer, r.user)) });
@@ -229,6 +252,46 @@ router.delete("/me", requireAuth, async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to deactivate freelancer listing");
     res.status(500).json({ error: "Failed to deactivate listing" });
+  }
+});
+
+/**
+ * GET /api/freelancers/:id/reviews
+ * Public: reviews hirers left on this freelancer's completed jobs (newest first).
+ */
+router.get("/:id/reviews", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(id)) {
+      res.status(404).json({ error: "Freelancer not found" });
+      return;
+    }
+    const rows = await db
+      .select({
+        id: freelancerReviews.id,
+        ratingTenths: freelancerReviews.ratingTenths,
+        comment: freelancerReviews.comment,
+        createdAt: freelancerReviews.createdAt,
+        reviewer: USER_FIELDS,
+      })
+      .from(freelancerReviews)
+      .leftJoin(users, eq(users.clerkId, freelancerReviews.reviewerUserId))
+      .where(eq(freelancerReviews.freelancerId, id))
+      .orderBy(desc(freelancerReviews.createdAt))
+      .limit(50);
+    res.json({
+      reviews: rows.map((r) => ({
+        id: r.id,
+        ratingTenths: r.ratingTenths,
+        comment: r.comment,
+        createdAt: r.createdAt,
+        reviewerName: r.reviewer?.displayName || r.reviewer?.name || "Seller",
+        reviewerAvatarUrl: r.reviewer?.profileImageUrl || r.reviewer?.avatarUrl || null,
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err, freelancerId: req.params.id }, "Failed to load freelancer reviews");
+    res.status(500).json({ error: "Failed to load reviews" });
   }
 });
 
