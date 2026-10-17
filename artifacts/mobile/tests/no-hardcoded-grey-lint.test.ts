@@ -69,8 +69,6 @@ const HARDCODED_GREY_ALLOWLIST = new Set([
   'app/buyer-post-comments.tsx',
   'app/buyer-search.tsx',
   'app/design-bg-replace.tsx',
-  'app/seller-go-live.tsx',
-  'app/seller-live.tsx',
   'app/store-editor.tsx',
   'components/buyer-feed/ShopSideTab.tsx',
   'components/profile/ProfileStoryAvatar.tsx',
