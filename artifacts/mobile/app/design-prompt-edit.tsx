@@ -1,6 +1,11 @@
 /**
  * Brandthread Design Studio — Edit with Prompt
- * Route: /design-prompt-edit
+ * Route: /design-prompt-edit  (Studio tab → "Edit with Prompt")
+ *
+ * Sends the chosen image + prompt to the real AI endpoint
+ * (POST /api/mockup/generate, mode "prompt_edit", Growth plan) via
+ * designService.applyPromptEdit. Source images come from the device or the
+ * seller's Brand Assets; results are saved to Photos / Brand Assets for real.
  */
 import React, { useState } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
@@ -21,7 +26,9 @@ import {
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
-import { applyPromptEdit } from '@/services/designService';
+import { applyPromptEdit, createBrandAsset, getBrandAssets } from '@/services/designService';
+import { saveImageToCameraRoll, shareImage } from '@/lib/aiToolMedia';
+import { aiToolErrorMessage } from '@/lib/aiToolErrors';
 import type { AIGenerationResult } from '@/services/designTypes';
 import { radius } from '@/constants/radii';
 
@@ -32,13 +39,6 @@ const EXAMPLE_PROMPTS = [
   'Remove wrinkles',
   'Make image look like a campaign photo',
   'Put the model in a studio',
-];
-
-const RECENT_PROJECTS = [
-  'Summer Drop Hoodie',
-  'Logo Tee — White',
-  'Fall Collection Jacket',
-  'Streetwear Lookbook',
 ];
 
 export default function DesignPromptEditScreen() {
@@ -72,18 +72,61 @@ export default function DesignPromptEditScreen() {
     }
   }
 
-  function chooseFromRecent() {
-    Alert.alert(
-      'Recent Projects',
-      'Choose a project to edit',
-      [
-        ...RECENT_PROJECTS.map((p) => ({
-          text: p,
-          onPress: () => setImageUri(`mock://project/${p.replace(/\s/g, '-').toLowerCase()}`),
-        })),
-        { text: 'Cancel', style: 'cancel' as const },
-      ],
-    );
+  async function chooseFromBrandAssets() {
+    let images: { id: string; name: string; uri: string }[] = [];
+    try {
+      const assets = await getBrandAssets();
+      images = assets
+        .filter((a) => !!a.uri && !a.uri.startsWith('mock://'))
+        .slice(-8)
+        .reverse()
+        .map((a) => ({ id: a.id, name: a.name || 'Untitled asset', uri: a.uri! }));
+    } catch {
+      Alert.alert('Couldn’t load Brand Assets', 'Upload an image from your device instead.');
+      return;
+    }
+    if (images.length === 0) {
+      Alert.alert('No saved images yet', 'Images you save to Brand Assets show up here. Upload one from your device for now.');
+      return;
+    }
+    Alert.alert('Brand Assets', 'Choose an image to edit', [
+      ...images.map((a) => ({ text: a.name, onPress: () => { setImageUri(a.uri); setResult(null); } })),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
+  }
+
+  async function saveResultToPhotos() {
+    const uri = result?.imageUris[0];
+    if (!uri) return;
+    const saved = await saveImageToCameraRoll(uri, 'prompt-edit');
+    if (saved.ok) {
+      Alert.alert('Saved', 'The edited image was saved.');
+    } else {
+      Alert.alert(
+        saved.reason === 'permission' ? 'Permission required' : saved.reason === 'unavailable' ? 'Unavailable' : 'Save failed',
+        saved.reason === 'permission'
+          ? 'Allow photo library access to save this image.'
+          : saved.reason === 'unavailable'
+            ? 'Saving to Photos is unavailable in this app build.'
+            : 'Could not save this image. Please try again.',
+      );
+    }
+  }
+
+  async function saveResultToBrandAssets() {
+    const uri = result?.imageUris[0];
+    if (!uri) return;
+    try {
+      await createBrandAsset({
+        name: prompt.trim().slice(0, 40) || 'Prompt edit',
+        type: 'graphic',
+        uri,
+        tags: ['ai-generated', 'prompt-edit'],
+      });
+      Alert.alert('Saved', 'Added to Brand Assets.');
+    } catch {
+      Alert.alert('Save failed', 'Could not save to Brand Assets. Please try again.');
+    }
   }
 
   async function handleGenerate() {
@@ -105,8 +148,8 @@ export default function DesignPromptEditScreen() {
         preserveGarmentColor,
       });
       setResult(res);
-    } catch {
-      Alert.alert('Error', 'Generation failed. Please try again.');
+    } catch (err) {
+      Alert.alert('Edit failed', aiToolErrorMessage(err, 'Generation failed. Please try again.'));
     } finally {
       setIsGenerating(false);
     }
@@ -134,12 +177,12 @@ export default function DesignPromptEditScreen() {
             <View style={s.uploadZone}>
               <Feather name="upload-cloud" size={ICON.xxl} color={theme.muted} />
               <Text style={s.uploadTitle}>Upload or choose image</Text>
-              <Text style={s.uploadSub}>JPG, PNG, WEBP up to 20MB</Text>
+              <Text style={s.uploadSub}>JPG, PNG, WEBP up to 8MB</Text>
             </View>
           )}
           <View style={s.uploadActions}>
             <PrimaryButton label={imageUri ? 'Change image' : 'Upload image'} onPress={pickImage} icon="upload" style={s.uploadBtn} />
-            <SecondaryButton label="Recent projects" onPress={chooseFromRecent} icon="folder" style={s.uploadBtn} />
+            <SecondaryButton label="Brand Assets" onPress={() => { void chooseFromBrandAssets(); }} icon="folder" style={s.uploadBtn} />
           </View>
         </BrandthreadCard>
 
@@ -208,10 +251,10 @@ export default function DesignPromptEditScreen() {
               style={s.compToggle}
             />
             <View style={s.resultActions}>
-              <PrimaryButton label="Save result" onPress={() => Alert.alert('Saved', 'Result saved to your gallery.')} icon="save" style={s.actionBtn} />
+              <PrimaryButton label="Save result" onPress={() => { void saveResultToPhotos(); }} icon="save" style={s.actionBtn} />
               <SecondaryButton label="Try again" onPress={handleGenerate} icon="refresh-cw" style={s.actionBtn} />
-              <SecondaryButton label="Save to Brand Assets" onPress={() => Alert.alert('Saved', 'Added to Brand Assets.')} icon="bookmark" style={s.actionBtn} />
-              <SecondaryButton label="Add to product" onPress={() => Alert.alert('Add to Product', 'Choose a product to attach this image to.')} icon="package" style={s.actionBtn} />
+              <SecondaryButton label="Save to Brand Assets" onPress={() => { void saveResultToBrandAssets(); }} icon="bookmark" style={s.actionBtn} />
+              <SecondaryButton label="Share" onPress={() => { const u = result.imageUris[0]; if (u) void shareImage(u, 'prompt-edit'); }} icon="share" style={s.actionBtn} />
             </View>
           </View>
         )}
