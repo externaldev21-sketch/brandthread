@@ -54,6 +54,7 @@ vi.mock("@workspace/db", () => {
   const conversationParticipants = table("conversationParticipants");
   const messages = table("messages");
   const messageReactions = table("messageReactions");
+  const messageHidden = table("messageHidden");
   const blocks = table("blocks");
   const follows = table("follows");
   const users = table("users");
@@ -86,6 +87,7 @@ vi.mock("@workspace/db", () => {
     conversationParticipants,
     messages,
     messageReactions,
+    messageHidden,
     blocks,
     follows,
     users,

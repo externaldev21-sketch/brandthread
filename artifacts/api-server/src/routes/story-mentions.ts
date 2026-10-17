@@ -24,6 +24,7 @@ import { publishNotification } from "./notifications-feed";
 import { actorFieldsFromProfile } from "../lib/activityEvents";
 import { rateLimit } from "../middlewares/rateLimit";
 import { blockRelation, blockedUserIds, profilesById, publishingRestriction } from "../lib/safety";
+import { ownerAllows, ownersAllowing, resolveAccountPrivacy } from "../lib/privacySettings";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { storyListedFor } from "../lib/storyVisibility";
 import { storyHiddenFrom } from "../lib/interactionSettings";
@@ -116,7 +117,12 @@ router.get("/mention-search", async (req, res) => {
     .orderBy(asc(sql`COALESCE(${users.username}, ${users.displayName}, ${users.name})`))
     .limit(q.length === 0 ? limit : 200);
 
-  const people = rows.map((u) => {
+  // Privacy screen: only people who let me mention them, and (unless I
+  // already follow them) only people who appear in search.
+  const mentionable = await ownersAllowing("whoCanMention", rows.map((u) => u.clerkId), myId);
+  const pickable = rows.filter((u) => mentionable.has(u.clerkId)
+    && (followingSet.has(u.clerkId) || resolveAccountPrivacy(u.privacySettings).searchable));
+  const people = pickable.map((u) => {
     const name = (u.accountType === "seller" ? u.brandName : null) || u.displayName || u.name || "Brandthread member";
     return {
       userId: u.clerkId,
@@ -282,6 +288,9 @@ router.post("/stories/:id/mention-reply", rateLimit("messaging"), async (req, re
   const relation = await blockRelation(myId, story.authorId);
   if (relation === "blocked_by_me") { res.status(403).json({ error: "You blocked this account. Unblock them to send a message.", code: "BLOCKED_BY_ME" }); return; }
   if (relation !== "none") { res.status(403).json({ error: "Unable to send message.", code: "BLOCKED" }); return; }
+  if (!(await ownerAllows("whoCanReplyToStories", story.authorId, myId))) {
+    res.status(403).json({ error: "This person has turned off story replies from you.", code: "STORY_REPLIES_RESTRICTED" }); return;
+  }
 
   // The tagger sees who is replying to the story they tagged, so the
   // routing decision is always from the replier (me) to the tagger.

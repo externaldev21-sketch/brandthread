@@ -13,14 +13,17 @@
  * PUT    /api/conversations/:id/messages/:messageId/reactions   — set my reaction (upsert)
  * DELETE /api/conversations/:id/messages/:messageId/reactions   — remove my reaction
  * PATCH  /api/conversations/:id/read      — mark read
- * PATCH  /api/conversations/:id/mute      — mute or unmute this conversation
+ * PATCH  /api/conversations/:id/mute      — mute or unmute this conversation ({ durationMinutes } or legacy { muted })
+ * PATCH  /api/conversations/:id/archive   — archive / unarchive for me ({ archived })
+ * DELETE /api/conversations/:id/for-me    — delete the chat for me only (other side keeps it)
+ * DELETE /api/conversations/:id/messages/:messageId/for-me — hide one message for me only
  * PATCH  /api/conversations/:id/typing    — set/clear my "typing…" signal (polled by the other side)
  * PATCH  /api/conversations/:id/accept    — accept a message request
  * DELETE /api/conversations/:id           — decline / delete conversation
  */
 import { Router } from "express";
 import {
-  db, conversations, conversationParticipants, messages, messageReactions, blocks, users,
+  db, conversations, conversationParticipants, messages, messageReactions, messageHidden, blocks, users,
   products, orders, posts, notificationsFeed, accountMutes,
 } from "@workspace/db";
 import { eq, and, desc, inArray, sql, or, ilike } from "drizzle-orm";
@@ -29,6 +32,7 @@ import { cappedUnknown, jsonList, jsonValue, looseBody, optBoolish, optNumberish
 import { rateLimit } from "../middlewares/rateLimit";
 import { moderateMessage } from "../lib/contentModerator";
 import { blockRelation, oneToOneNotBlockedWith, publishingRestriction } from "../lib/safety";
+import { sharesActivityStatus, sharesReadReceipts, storyReplyDenial } from "../lib/privacySettings";
 import { publishNotification } from "./notifications-feed";
 import { emitToUsers } from "../ws/messagesHub";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
@@ -124,6 +128,22 @@ function getMessagePreview(body: string | null | undefined, attachment: unknown,
   return body?.trim() || undefined;
 }
 
+// Messages the viewer deleted for themselves — one by one (message_hidden) or
+// the whole history up to a "Delete chat" (conversation_participants.hidden_at)
+// — are invisible to that viewer only; everyone else still sees them.
+function visibleToViewer(userId: string) {
+  return sql`NOT EXISTS (
+    SELECT 1 FROM ${messageHidden}
+     WHERE ${messageHidden.messageId} = ${messages.id} AND ${messageHidden.userId} = ${userId}
+  ) AND NOT EXISTS (
+    SELECT 1 FROM ${conversationParticipants}
+     WHERE ${conversationParticipants.conversationId} = ${messages.conversationId}
+       AND ${conversationParticipants.userId} = ${userId}
+       AND ${conversationParticipants.hiddenAt} IS NOT NULL
+       AND ${messages.createdAt} <= ${conversationParticipants.hiddenAt}
+  )`;
+}
+
 function buildConversationView(
   conv: typeof conversations.$inferSelect,
   parts: (typeof conversationParticipants.$inferSelect)[],
@@ -149,6 +169,7 @@ function buildConversationView(
   const nicknameMap = (conv as { nicknames?: Record<string, string> | null }).nicknames ?? {};
   const myMutedUntil = me?.mutedUntil ?? null;
   const myPinnedAt = me?.pinnedAt ?? null;
+  const myMuteActive = !!myMutedUntil && myMutedUntil.getTime() > Date.now();
   return {
     id:   conv.id,
     type: conv.type,
@@ -172,7 +193,7 @@ function buildConversationView(
     })),
     // Chat details > Mute. Present only when actively muted (a past
     // mutedUntil behaves as unmuted on the client).
-    mutedUntil: myMutedUntil && myMutedUntil.getTime() > Date.now() ? myMutedUntil.toISOString() : undefined,
+    mutedUntil: myMuteActive ? myMutedUntil!.toISOString() : undefined,
     // Chat details > Theme / Disappearing messages (both conversation-level,
     // identical for every participant — never per-viewer).
     themeId: (conv as { themeId?: string | null }).themeId ?? undefined,
@@ -182,7 +203,7 @@ function buildConversationView(
       ? new Date(conv.lastMessageAt).getTime()
       : undefined,
     unreadCount:        me?.unreadCount        ?? 0,
-    isMuted:            !!(myMutedUntil && myMutedUntil.getTime() > Date.now()),
+    isMuted:            myMuteActive,
     isFriendshipActive: true,
     // Per-viewer Archive (migration 131) — was hardcoded false, so a client
     // archive reverted on the next refresh.
@@ -327,9 +348,11 @@ router.get("/", async (req, res) => {
     .innerJoin(conversations, eq(conversations.id, conversationParticipants.conversationId))
     .where(and(
       eq(conversationParticipants.userId, userId),
-      sql`${conversationParticipants.hiddenAt} IS NULL`,
       // Blocked either way: the 1:1 thread leaves both inboxes (Instagram).
       oneToOneNotBlockedWith(userId, conversations.id, conversations.type),
+      // "Delete for me" (DELETE /:id/for-me): gone from my inbox until a
+      // message newer than the delete arrives.
+      sql`(${conversationParticipants.hiddenAt} IS NULL OR ${conversations.lastMessageAt} > ${conversationParticipants.hiddenAt})`,
     ))
     .orderBy(desc(conversations.updatedAt))
     .limit(limit)
@@ -359,6 +382,7 @@ router.get("/", async (req, res) => {
       ))
       .where(and(
         inArray(messages.conversationId, convIds),
+        visibleToViewer(userId),
         // The inbox row previews only what the thread itself would show:
         // never a moderator-removed, deleted or expired (disappearing)
         // message, nor one from before this viewer cleared the chat.
@@ -384,12 +408,22 @@ router.get("/", async (req, res) => {
   }
 
   const presence = await loadPresence([userId, ...allParts.map((p) => p.userId)]).catch(() => undefined);
+  // conversations.lastMessage is shared by both sides, so it must not be the
+  // fallback preview where the newest messages are ones I deleted for me.
+  const hiddenForMe = new Set<string>(
+    allParts.filter((p) => p.userId === userId && p.hiddenAt).map((p) => p.conversationId),
+  );
+  const hiddenRows = await db.selectDistinct({ conversationId: messages.conversationId })
+    .from(messageHidden)
+    .innerJoin(messages, eq(messages.id, messageHidden.messageId))
+    .where(and(eq(messageHidden.userId, userId), inArray(messages.conversationId, convIds)));
+  for (const row of hiddenRows) hiddenForMe.add(row.conversationId);
 
   return res.json(convs.map((c) => buildConversationView(
     c,
     partsByConv.get(c.id) ?? [],
     userId,
-    previewByConversation.get(c.id),
+    previewByConversation.get(c.id) ?? (hiddenForMe.has(c.id) ? "" : undefined),
     presence,
   )));
 });
@@ -668,7 +702,10 @@ router.get("/:id/messages", async (req, res) => {
   // conversation per instance. Reads used to wait on a DELETE every time.
   sweepExpiredMessages(id);
   // Unsent messages (DELETE …/messages/:id) are gone for everyone.
-  const notExpired = sql`(${messages.disappearAt} IS NULL OR ${messages.disappearAt} >= now()) AND ${messages.deletedAt} IS NULL`;
+  const notExpired = and(
+    sql`(${messages.disappearAt} IS NULL OR ${messages.disappearAt} >= now()) AND ${messages.deletedAt} IS NULL`,
+    visibleToViewer(userId),
+  );
 
   const whereClause = q
     // Search is literal: % and _ typed by the user are not wildcards.
@@ -815,6 +852,10 @@ router.post("/:id/messages", rateLimit("messaging"), validateBody(sendMessageBod
     if (myBlockRows.length > 0) {
       return res.status(403).json({ error: "You blocked this account. Unblock them to send a message.", code: "BLOCKED_BY_ME" });
     }
+
+    // Privacy screen: "Who can reply to stories" (and the story's own reply setting).
+    const storyReplyError = await storyReplyDenial(userId, attachmentItems);
+    if (storyReplyError) return res.status(403).json({ error: storyReplyError, code: "STORY_REPLIES_RESTRICTED" });
 
     if (sender.accountType !== "seller") {
       const sellerRecipients = await db
@@ -988,8 +1029,10 @@ router.post("/:id/messages", rateLimit("messaging"), validateBody(sendMessageBod
     db.update(conversations)
       .set({ lastMessage: previewText.slice(0, 100), lastMessageAt: new Date(), updatedAt: new Date() })
       .where(eq(conversations.id, id)),
+    // A new message also brings an archived chat back to the recipient's
+    // main inbox (Instagram-style), so archiving never buries a reply.
     db.update(conversationParticipants)
-      .set({ unreadCount: sql`unread_count + 1` })
+      .set({ unreadCount: sql`unread_count + 1`, archivedAt: null })
       .where(and(eq(conversationParticipants.conversationId, id), sql`user_id != ${userId}`)),
     // A new message brings a deleted-for-me chat back (with only new history).
     db.update(conversationParticipants)
@@ -1232,13 +1275,20 @@ router.patch("/:id/read", async (req, res) => {
   // 24h later — matching Instagram's own copy — set here rather than waited
   // on a cron job; see the sweep in GET /:id/messages.
   const disappearAt = conv?.disappearingEnabled ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
+  // Read receipts off (Privacy screen): my own unread state still clears, but
+  // senders never see "Seen" (messages keep their sent/delivered status).
+  const receipts = await sharesReadReceipts(userId);
   await Promise.all([
     db.update(conversationParticipants)
       .set({ unreadCount: 0, lastReadAt: readAt })
       .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId))),
-    db.update(messages)
+    receipts ? db.update(messages)
       .set({ status: "read", readAt, ...(disappearAt ? { disappearAt } : {}) })
-      .where(and(eq(messages.conversationId, id), sql`${messages.senderId} != ${userId}`, sql`${messages.readAt} IS NULL`)),
+      .where(and(eq(messages.conversationId, id), sql`${messages.senderId} != ${userId}`, sql`${messages.readAt} IS NULL`))
+      : disappearAt
+        ? db.update(messages).set({ disappearAt })
+          .where(and(eq(messages.conversationId, id), sql`${messages.senderId} != ${userId}`, sql`${messages.readAt} IS NULL`, sql`${messages.disappearAt} IS NULL`))
+        : Promise.resolve(),
     // This thread's "New message" Activity rows are read too — the badge
     // adds feed rows to conversation unread counts, so leaving them unread
     // double-counted every message and kept the badge up after reading.
@@ -1286,7 +1336,8 @@ router.patch("/:id/typing", rateLimit("mutation"), validateBody(typingBody), asy
   // A short window (a couple of poll cycles) — long enough that a normal
   // typing cadence looks continuous, short enough that a client that never
   // clears it (crash, background) doesn't leave a stale "typing…" showing.
-  const typingUntil = typing ? new Date(Date.now() + 8000) : null;
+  // Activity status off (Privacy screen): never broadcast "typing…".
+  const typingUntil = typing && (await sharesActivityStatus(userId)) ? new Date(Date.now() + 8000) : null;
   await db.update(conversationParticipants)
     .set({ typingUntil })
     .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
@@ -1369,6 +1420,79 @@ router.patch("/:id/pin", validateBody(pinBody), async (req, res) => {
     .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
 
   return res.json({ ok: true, pinnedAt: pinnedAt?.toISOString() ?? null });
+});
+
+// ─── PATCH /api/conversations/:id/archive ────────────────────────────────────
+// Inbox long-press > Archive / the Archived filter's Unarchive. Body:
+// { archived: boolean }. Per-membership like pin above — the other
+// participant's inbox is untouched. A new incoming message clears it.
+router.patch("/:id/archive", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  const archived = (req.body as { archived?: unknown } | undefined)?.archived;
+  if (typeof archived !== "boolean") {
+    return res.status(400).json({ error: "archived must be a boolean" });
+  }
+
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(404).json({ error: "Conversation not found" });
+
+  const archivedAt = archived ? new Date() : null;
+  await db.update(conversationParticipants)
+    .set({ archivedAt })
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
+
+  return res.json({ ok: true, isArchived: archived, archivedAt: archivedAt?.toISOString() ?? null });
+});
+
+// ─── DELETE /api/conversations/:id/for-me ────────────────────────────────────
+// Inbox swipe > Delete: delete the chat for ME only. It leaves my inbox and
+// every message up to now is hidden for me; the other participant keeps the
+// whole thread. If they message again, the chat comes back with only the
+// newer messages. (DELETE /:id below is the request-decline hard delete.)
+router.delete("/:id/for-me", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(404).json({ error: "Conversation not found" });
+
+  const hiddenAt = new Date();
+  await db.update(conversationParticipants)
+    .set({ hiddenAt, unreadCount: 0, archivedAt: null, pinnedAt: null })
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
+
+  return res.json({ ok: true, hiddenAt: hiddenAt.toISOString() });
+});
+
+// ─── DELETE /api/conversations/:id/messages/:messageId/for-me ────────────────
+// Message long-press > "Delete for me". Hides one message from my copy of
+// the thread only; it stays for everyone else. Idempotent.
+const MESSAGE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+router.delete("/:id/messages/:messageId/for-me", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id, messageId } = req.params;
+
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(403).json({ error: "Not a participant" });
+
+  if (!MESSAGE_ID_RE.test(messageId)) return res.status(404).json({ error: "Message not found" });
+  const [msg] = await db.select({ id: messages.id }).from(messages)
+    .where(and(eq(messages.id, messageId), eq(messages.conversationId, id)))
+    .limit(1);
+  if (!msg) return res.status(404).json({ error: "Message not found" });
+
+  await db.insert(messageHidden).values({ messageId, userId }).onConflictDoNothing();
+  return res.json({ ok: true });
 });
 
 // ─── PATCH /api/conversations/:id/nickname ───────────────────────────────────

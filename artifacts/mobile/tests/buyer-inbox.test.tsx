@@ -23,14 +23,15 @@ const { nativeComponent } = vi.hoisted(() => ({
 
 const {
   getConversationsMock, getNotificationsMock, markConversationReadMock,
-  archiveConversationMock, muteUserMock, subscribeSocialMock, routerMock,
+  archiveConversationMock, muteConversationMock, deleteConversationForMeMock, subscribeSocialMock, routerMock,
   setConversationPinnedMock,
 } = vi.hoisted(() => ({
   getConversationsMock: vi.fn(),
   getNotificationsMock: vi.fn(),
   markConversationReadMock: vi.fn(),
   archiveConversationMock: vi.fn(),
-  muteUserMock: vi.fn(),
+  muteConversationMock: vi.fn(),
+  deleteConversationForMeMock: vi.fn(),
   subscribeSocialMock: vi.fn(() => () => {}),
   routerMock: { back: vi.fn(), push: vi.fn() },
   setConversationPinnedMock: vi.fn(),
@@ -353,7 +354,8 @@ vi.mock('@/services/socialService', () => ({
   searchProfiles: vi.fn().mockResolvedValue([]),
   createOrGetConversation: vi.fn(),
   getFriendSuggestions: vi.fn().mockResolvedValue([]),
-  muteUser: muteUserMock,
+  muteConversation: muteConversationMock,
+  deleteConversationForMe: deleteConversationForMeMock,
   setConversationPinned: setConversationPinnedMock,
   MY_USER_ID: 'me',
 }));
@@ -367,6 +369,7 @@ vi.mock('@/services/activityService', () => ({
 }));
 
 import InboxScreen from '@/app/(buyer)/inbox';
+import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
 
 type ConversationFixture = ReturnType<typeof conversation>;
 
@@ -431,8 +434,9 @@ describe('buyer inbox', () => {
     getConversationsMock.mockReset();
     getNotificationsMock.mockReset().mockResolvedValue([]);
     markConversationReadMock.mockReset().mockResolvedValue(undefined);
-    archiveConversationMock.mockReset().mockResolvedValue(undefined);
-    muteUserMock.mockReset().mockResolvedValue(undefined);
+    archiveConversationMock.mockReset().mockResolvedValue(true);
+    muteConversationMock.mockReset().mockResolvedValue('9999-12-31T00:00:00.000Z');
+    deleteConversationForMeMock.mockReset().mockResolvedValue(undefined);
     setConversationPinnedMock.mockReset().mockResolvedValue(true);
   });
 
@@ -543,7 +547,9 @@ describe('buyer inbox', () => {
       renderer!.root.findByProps({ testID: 'inbox-swipe-mute-swipe-thread' }).props.onPress();
       await flushPromises();
     });
-    expect(muteUserMock).toHaveBeenCalledWith(expect.objectContaining({ userId: 'seller-swipe-thread' }));
+    // The real per-chat mute ("until I turn it back on"), not a person-level mute.
+    expect(muteConversationMock).toHaveBeenCalledWith('swipe-thread', -1);
+    expect(renderer!.root.findByProps({ testID: 'inbox-swipe-mute-swipe-thread' }).findByType('Text' as never).props.children).toBe('Unmute');
 
     await act(async () => {
       renderer!.root.findByProps({ testID: 'inbox-swipe-read-swipe-thread' }).props.onPress();
@@ -551,12 +557,16 @@ describe('buyer inbox', () => {
     });
     expect(markConversationReadMock).toHaveBeenCalledWith('swipe-thread');
 
-    // Delete last: the row (and its swipe actions) leaves the list once archived.
+    // Delete last: confirmed, it deletes the chat for me only (never a hard
+    // delete for both people), and the row leaves the list.
+    vi.mocked(confirmDestructiveActionSheet).mockResolvedValueOnce(true);
     await act(async () => {
       renderer!.root.findByProps({ testID: 'inbox-swipe-delete-swipe-thread' }).props.onPress();
       await flushPromises();
     });
-    expect(archiveConversationMock).toHaveBeenCalledWith('swipe-thread');
+    expect(deleteConversationForMeMock).toHaveBeenCalledWith('swipe-thread');
+    expect(archiveConversationMock).not.toHaveBeenCalled();
+    expect(renderer!.root.findAllByProps({ testID: 'inbox-conversation-swipe-thread' }, { deep: false })).toHaveLength(0);
   });
 
   it('pins a conversation from the swipe action, optimistically and for real, and shows Unpin once pinned', async () => {

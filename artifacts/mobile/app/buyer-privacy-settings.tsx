@@ -63,6 +63,9 @@ export default function BuyerPrivacySettings() {
   const [requestCount, setRequestCount] = useState(0);
   // "Saved by people you follow" on product pages — server-backed, written on toggle.
   const [showSaves, setShowSaves] = useState(true);
+  // Contact discovery is server-backed (/api/social/contacts): null until loaded.
+  const [contacts, setContacts] = useState<{ enabled: boolean; optedIn: boolean } | null>(null);
+  const [contactsBusy, setContactsBusy] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -79,6 +82,7 @@ export default function BuyerPrivacySettings() {
         });
       });
       api.followRequests.list(50, 0).then((rows) => setRequestCount(Array.isArray(rows) ? rows.length : 0)).catch(() => {});
+      api.social.contacts.status().then(setContacts).catch(() => setContacts(null));
     }, [])
   );
 
@@ -136,6 +140,26 @@ export default function BuyerPrivacySettings() {
     } catch {
       setShowSaves(!next);
       setSaveError("Couldn't save. Try again.");
+    }
+  }
+  // "Contact discovery" = the server's "let friends find me" opt-in. Applied
+  // immediately (not via Save), optimistic and rolled back on failure.
+  async function applyContactDiscovery(next: boolean) {
+    if (contactsBusy || !contacts?.enabled) return;
+    setContactsBusy(true);
+    const before = contacts.optedIn;
+    setContacts({ ...contacts, optedIn: next });
+    try {
+      if (next) await api.social.contacts.optIn();
+      else await api.social.contacts.revoke();
+      const saved = await updatePrivacySettings({ contactDiscovery: next });
+      setSettings((s) => (s ? { ...s, contactDiscovery: saved.contactDiscovery } : s));
+      setSaveError(null);
+    } catch {
+      setContacts((c) => (c ? { ...c, optedIn: before } : c));
+      setSaveError("Couldn't update contact discovery. Try again.");
+    } finally {
+      setContactsBusy(false);
     }
   }
 
@@ -276,9 +300,12 @@ export default function BuyerPrivacySettings() {
           <ListRow
             icon="phone"
             title="Contact discovery"
-            subtitle="Find people you know from your contacts. Nothing is uploaded without your permission."
-            subtitleNumberOfLines={3}
-            toggle={{ value: settings.contactDiscovery, onChange: v => update('contactDiscovery', v) }}
+            subtitle={contacts && !contacts.enabled
+              ? "Contact discovery isn't available right now"
+              : 'Let people who have your email or number in their contacts find you'}
+            subtitleNumberOfLines={2}
+            toggle={{ value: contacts?.optedIn ?? false, onChange: (v) => { void applyContactDiscovery(v); } }}
+            disabled={contactsBusy || !contacts?.enabled}
           />
         </Card>
 
@@ -317,6 +344,22 @@ export default function BuyerPrivacySettings() {
             value="Manage"
             chevron
             onPress={() => router.push('/buyer-muted' as never)}
+          />
+          <View style={styles.divider} />
+          <ListRow
+            icon="user-x"
+            title="Restricted accounts"
+            value="Manage"
+            chevron
+            onPress={() => router.push('/buyer-restricted' as never)}
+          />
+          <View style={styles.divider} />
+          <ListRow
+            icon="eye-off"
+            title="Hidden posts"
+            value="Manage"
+            chevron
+            onPress={() => router.push('/buyer-hidden-posts' as never)}
           />
         </Card>
       </Animated.ScrollView>

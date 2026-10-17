@@ -168,20 +168,25 @@ router.get("/highlights/me", async (req, res) => {
   res.json(rows.map((r) => highlightView(r, items.get(r.id) ?? [])));
 });
 
-/** Stories I can put in a highlight: live ones first, then the archive. */
+/**
+ * Stories I can put in a highlight: live ones first, then the archive. A
+ * story that has expired but not yet been moved to story_archive by the
+ * cleanup job (runs every 15 min) is still listed, as archived (live: false).
+ */
 router.get("/highlights/stories", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const limit = Math.min(parseInt(String(req.query.limit ?? "60"), 10) || 60, 120);
-  const [live, archived] = await Promise.all([
+  const now = new Date();
+  const [current, archived] = await Promise.all([
     db.select().from(stories)
-      .where(and(eq(stories.authorId, myId), gt(stories.expiresAt, new Date()), eq(stories.moderationStatus, "visible")))
+      .where(and(eq(stories.authorId, myId), eq(stories.moderationStatus, "visible")))
       .orderBy(desc(stories.createdAt)).limit(limit),
     db.select().from(storyArchive).where(eq(storyArchive.authorId, myId))
       .orderBy(desc(storyArchive.storyCreatedAt)).limit(limit),
   ]);
-  const liveIds = new Set(live.map((r) => r.id));
+  const liveIds = new Set(current.map((r) => r.id));
   const all = [
-    ...live.map((r) => ({ storyId: r.id, media: r.media as unknown[], visibility: normalizeAudience(r.privacyVisibility), createdAt: r.createdAt, live: true })),
+    ...current.map((r) => ({ storyId: r.id, media: r.media as unknown[], visibility: normalizeAudience(r.privacyVisibility), createdAt: r.createdAt, live: new Date(r.expiresAt).getTime() > now.getTime() })),
     ...archived.filter((r) => !liveIds.has(r.storyId))
       .map((r) => ({ storyId: r.storyId, media: r.media as unknown[], visibility: normalizeAudience(r.visibility), createdAt: r.storyCreatedAt, live: false })),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, limit);

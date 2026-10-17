@@ -13,6 +13,7 @@ import { db, notificationsFeed, posts } from "@workspace/db";
 import { setComposedMediaVisibility } from "../routes/post-video";
 import { publishNotification } from "../routes/notifications-feed";
 import { postThumbnail } from "./activityEvents";
+import { notifyPostTagsIfLive } from "./postUserTags";
 import { logger } from "./logger";
 import { notifyPostUserTags } from "./postUserTags";
 
@@ -102,6 +103,8 @@ export async function onPostPublished(
       logger.warn({ err, postId: post.id }, "Scheduled post live notification failed");
     }
   }
+  // People tagged while it was a draft / scheduled hear about it now.
+  await notifyPostTagsIfLive(post.id);
 }
 
 const BATCH = 100;

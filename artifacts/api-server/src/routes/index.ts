@@ -144,6 +144,7 @@ import discountCodesRouter from "./discount-codes";
 import emailOptInRouter from "./email-opt-in";
 import salesRouter from "./sales";
 import returnsRouter from "./returns";
+import orderProblemsRouter from "./order-problems";
 import returnLabelsRouter from "./return-labels";
 import sellerVerificationRouter from "./seller-verification";
 import productLaunchesRouter from "./product-launches";
@@ -515,6 +516,7 @@ router.use("/package-presets",           packagePresetsRouter); // router applie
 router.use("/discount-codes",            tc, discountCodesRouter);
 router.use("/sales",                     tc, salesRouter);
 router.use("/returns",                   tc, returnsRouter);
+router.use("/order-problems",            tc, orderProblemsRouter);
 router.use("/return-labels",             returnLabelsRouter);
 router.use("/sample-orders",             tc, featureGate("manufacturer_hub", { only: [{ method: "POST", path: "/", when: (req) => req.body?.orderType === "bulk" }] }), sampleOrdersRouter); // bulk orders: Growth+, samples: every plan
 router.use("/drop-wallets",              tc, dropWalletRouter);

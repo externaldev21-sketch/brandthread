@@ -363,7 +363,8 @@ export default function BuyerNotifications() {
     }).catch(() => {
       // In-app navigation must remain available if analytics capture fails.
     });
-    if (!isBuyerDevPreview()) await markNotificationRead(notif.id);
+    // Opening the notification must not wait on (or fail with) the read receipt.
+    if (!isBuyerDevPreview()) void markNotificationRead(notif.id).catch(() => {});
     setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
     notifNavigation(notif, router);
   };
@@ -383,13 +384,7 @@ export default function BuyerNotifications() {
     const notif = optionsFor;
     if (!notif) return;
     closeOptions();
-    if (notif.isRead) {
-      if (!isBuyerDevPreview()) await markNotificationUnread(notif.id);
-      setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: false } : n));
-    } else {
-      if (!isBuyerDevPreview()) await markNotificationRead(notif.id);
-      setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
-    }
+    await toggleRead(notif, false);
   };
 
   const handleDeleteOption = async () => {
@@ -411,8 +406,28 @@ export default function BuyerNotifications() {
       setNotifs(prev => prev.map(n => n.category === notif.category ? { ...n, isMuted: true } : n));
       return;
     }
-    await muteNotificationCategory(notif.category);
+    const label = categoryLabel(notif.category);
+    try {
+      await muteNotificationCategory(notif.category);
+    } catch {
+      Alert.alert(`Could not mute ${label} alerts`, 'Try again.');
+      return;
+    }
     await loadNotifs();
+    Alert.alert(`${label} alerts muted`, `You won't get ${label.toLowerCase()} notifications or push alerts.`, [
+      {
+        text: 'Undo',
+        onPress: async () => {
+          try {
+            await muteNotificationCategory(notif.category, false);
+            await loadNotifs();
+          } catch {
+            Alert.alert('Could not unmute', 'Try again.');
+          }
+        },
+      },
+      { text: 'OK', style: 'cancel' },
+    ]);
   };
 
   const handleClearRead = () => {
@@ -423,10 +438,16 @@ export default function BuyerNotifications() {
         onPress: async () => {
           
           if (isBuyerDevPreview()) {
-            setNotifs(prev => prev.filter(n => !n.isRead));
+            setNotifs(prev => prev.filter(n => !n.isRead || !!selectedCategory && n.category !== selectedCategory));
             return;
           }
-          await clearAllReadNotifications();
+          hapticDestructiveConfirm();
+          try {
+            await clearAllReadNotifications(selectedCategory ?? null);
+          } catch {
+            Alert.alert('Could not clear notifications', 'Try again.');
+            return;
+          }
           await loadNotifs();
         },
       },
@@ -434,14 +455,21 @@ export default function BuyerNotifications() {
     ]);
   };
 
-  const toggleRead = async (notif: Notification) => {
-    
+  const toggleRead = async (notif: Notification, haptic = true) => {
     if (isBuyerDevPreview()) {
-      // Signed-out preview: local-only, never the protected endpoints.
-    } else if (notif.isRead) {
-      await markNotificationUnread(notif.id);
-    } else {
-      await markNotificationRead(notif.id);
+      setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: !n.isRead } : n));
+      return;
+    }
+    if (haptic) hapticToggle();
+    try {
+      if (notif.isRead) {
+        await markNotificationUnread(notif.id);
+      } else {
+        await markNotificationRead(notif.id);
+      }
+    } catch {
+      Alert.alert(notif.isRead ? 'Could not mark as unread' : 'Could not mark as read', 'Try again.');
+      return;
     }
     setNotifs(prev => prev.map(item =>
       item.id === notif.id ? { ...item, isRead: !notif.isRead } : item

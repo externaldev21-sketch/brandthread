@@ -1,6 +1,6 @@
 import { and, count, eq, inArray, lte, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import { db, interactions, postComments, posts } from "@workspace/db";
-import { authorInGoodStanding } from "./safety";
+import { authorInGoodStanding, restrictedCommentVisible } from "./safety";
 import { privateAuthorVisibleTo } from "./privateAccount";
 import { OFFICIAL_ACCOUNT_CLERK_ID, officialSeedPublicSql } from "./officialSeed/config";
 
@@ -62,7 +62,7 @@ export async function publicProfileLikes(userId: string): Promise<number> {
  * Visible comment counts per post. Held, removed, and suspended/deleted
  * authors' comments are excluded so counts match what people can read.
  */
-export async function visibleCommentCounts(postIds: string[]): Promise<Map<string, number>> {
+export async function visibleCommentCounts(postIds: string[], viewerId?: string | null): Promise<Map<string, number>> {
   if (postIds.length === 0) return new Map();
   const rows = await db
     .select({ postId: postComments.postId, n: count() })
@@ -72,6 +72,8 @@ export async function visibleCommentCounts(postIds: string[]): Promise<Map<strin
       eq(postComments.moderationStatus, "visible"),
       eq(postComments.hiddenByOwner, false),
       authorInGoodStanding(postComments.authorId),
+      // Comments from someone the post owner restricted only count for their author.
+      restrictedCommentVisible(viewerId, postComments.authorId, sql`(SELECT p.user_id FROM posts p WHERE p.id = ${postComments.postId})`),
     ))
     .groupBy(postComments.postId);
   return new Map(rows.map((row) => [row.postId, Number(row.n)]));

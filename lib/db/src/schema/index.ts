@@ -110,6 +110,7 @@ export const users = pgTable('users', {
   // previewUrl, url } from the licensed provider, or null. Only served while
   // profile music is configured and flagged on (api-server lib/profileMusic.ts).
   profileSong:    jsonb('profile_song'),
+  privacySettings: jsonb('privacy_settings').$type<Record<string, unknown>>().notNull().default({}),
   // Buyer onboarding style picks (cold start for the For You ranking pipeline).
   buyerStyleInterests: jsonb('buyer_style_interests').$type<string[]>().notNull().default([]),
   // Brand onboarding fields (seller side)
@@ -3131,3 +3132,4 @@ export const fxRates = pgTable('fx_rates', {
 export * from './sellerMilestones';
 export * from './closet';
 export * from './firstWeek';
+export * from './orderProblems';

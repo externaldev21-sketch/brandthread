@@ -1,68 +1,85 @@
 /**
- * People tags on posts (the profile "Tagged" tab, GET /api/social/profile/:id/tagged).
+ * People tagged in a post (`post_user_tags`), derived from the caption's
+ * @mentions — the composer's "Tag people" inserts @handles into the caption,
+ * so the caption is the single source of truth for who is tagged.
  *
- * The create flow's "Tag people" step writes @handles into the caption, so the
- * caption is the source of truth: on create and on every caption edit the
- * post's `post_user_tags` rows are synced to the @handles it contains.
- * Resolution follows the comment-mention rules (lib/commentMentions.ts): not
- * yourself, not a missing/deleted/suspended account, nobody blocked in either
- * direction. Syncing is idempotent (unique (post_id, tagged_user_id)).
+ * Resolution reuses the comment-mention rules (resolveCommentMentions): no
+ * self-tags, no missing/deleted/suspended accounts, nobody in a block
+ * relation with the author. Caption @mentions send no separate "mentioned
+ * you" notification, so the "tagged you" alert is the only one a person gets.
  *
- * Tagged people are told once the post is live (published + visible) via the
- * existing notifyPostTag, which is itself idempotent per (person, post, tagger)
- * — so drafts / scheduled / held posts notify when they go live, not before.
+ * "Tagged you" is only sent once the post is live (published + not held by
+ * moderation); drafts, scheduled and held posts are notified when they go
+ * live (see notifyPostTagsIfLive callers). Each tag row records when its
+ * alert went out (notified_at), so later edits, archive/restore or the person
+ * clearing their notifications never re-send it.
  */
-import { and, eq, inArray } from "drizzle-orm";
-import { db, postUserTags, posts } from "@workspace/db";
+import { and, eq, inArray, isNull } from "drizzle-orm";
+import { db, posts, postUserTags } from "@workspace/db";
 import { resolveCommentMentions } from "./commentMentions";
 import { notifyPostTag } from "./activityEvents";
+import { logger } from "./logger";
 
-/** Instagram allows up to 20 people per post; the caption parser caps at 10 handles. */
+/**
+ * Make the post's tag rows match the @mentions in `caption`: removes people
+ * no longer mentioned and adds new ones. Returns the tagged user ids.
+ */
 export const MAX_POST_USER_TAGS = 10;
-
-/** Sync a post's people tags to the @handles in its caption. Returns who was added / removed. */
-export async function syncPostUserTags(
-  post: { id: string; userId: string; caption: string | null },
-): Promise<{ added: string[]; removed: string[] }> {
-  const wanted = await resolveCommentMentions(post.caption ?? "", post.userId, MAX_POST_USER_TAGS);
-  const wantedIds = new Set(wanted.map((m) => m.userId));
+type TaggedPost = { id: string; userId: string; caption: string | null };
+type TagChanges = { added: string[]; removed: string[] };
+export function syncPostUserTags(post: TaggedPost): Promise<TagChanges>;
+export function syncPostUserTags(postId: string, authorId: string, caption: string | null | undefined): Promise<string[]>;
+export async function syncPostUserTags(input: string | TaggedPost, authorId?: string, caption?: string | null): Promise<string[] | TagChanges> {
+  const postId = typeof input === "string" ? input : input.id;
+  const author = typeof input === "string" ? authorId! : input.userId;
+  const text = typeof input === "string" ? caption : input.caption;
+  const mentions = await resolveCommentMentions(text ?? "", author, MAX_POST_USER_TAGS);
+  const wanted = mentions.map((m) => m.userId);
   const existing = await db.select({ taggedUserId: postUserTags.taggedUserId })
-    .from(postUserTags).where(eq(postUserTags.postId, post.id));
-  const existingIds = new Set(existing.map((row) => row.taggedUserId));
-  const added = [...wantedIds].filter((id) => !existingIds.has(id));
-  const removed = [...existingIds].filter((id) => !wantedIds.has(id));
-  if (removed.length > 0) {
+    .from(postUserTags).where(eq(postUserTags.postId, postId));
+  const stale = existing.map((r) => r.taggedUserId).filter((id) => !wanted.includes(id));
+  if (stale.length > 0) {
     await db.delete(postUserTags)
-      .where(and(eq(postUserTags.postId, post.id), inArray(postUserTags.taggedUserId, removed)));
+      .where(and(eq(postUserTags.postId, postId), inArray(postUserTags.taggedUserId, stale)));
   }
-  if (added.length > 0) {
+  if (wanted.length > 0) {
     await db.insert(postUserTags)
-      .values(added.map((taggedUserId) => ({ postId: post.id, taggedUserId })))
+      .values(wanted.map((taggedUserId) => ({ postId, taggedUserId })))
       .onConflictDoNothing();
   }
-  return { added, removed };
+  return typeof input === "string"
+    ? wanted
+    : { added: wanted.filter(id => !existing.some(row => row.taggedUserId === id)), removed: stale };
 }
 
-/** Tell everyone tagged in a post — only once it is published and visible. */
-export async function notifyPostUserTags(postId: string): Promise<void> {
-  const [post] = await db.select({ userId: posts.userId, postStatus: posts.postStatus, moderationStatus: posts.moderationStatus })
-    .from(posts).where(eq(posts.id, postId)).limit(1);
-  if (!post || post.postStatus !== "published" || post.moderationStatus !== "visible") return;
-  const tags = await db.select({ taggedUserId: postUserTags.taggedUserId })
-    .from(postUserTags).where(eq(postUserTags.postId, postId));
-  for (const tag of tags) {
-    await notifyPostTag({ postId, taggerId: post.userId, taggedUserId: tag.taggedUserId });
+/** Send "tagged you" to everyone tagged in the post, if it is live. Never throws. */
+export async function notifyPostTagsIfLive(postId: string): Promise<void> {
+  try {
+    const [post] = await db.select({
+      userId: posts.userId, postStatus: posts.postStatus, moderationStatus: posts.moderationStatus,
+    }).from(posts).where(eq(posts.id, postId)).limit(1);
+    if (!post || post.postStatus !== "published" || post.moderationStatus !== "visible") return;
+    // Claim un-notified tags first so concurrent publishes can't double-send.
+    const tags = await db.update(postUserTags).set({ notifiedAt: new Date() })
+      .where(and(eq(postUserTags.postId, postId), isNull(postUserTags.notifiedAt)))
+      .returning({ taggedUserId: postUserTags.taggedUserId });
+    for (const tag of tags) {
+      await notifyPostTag({ postId, taggerId: post.userId, taggedUserId: tag.taggedUserId });
+    }
+  } catch (err) {
+    logger.warn({ err, postId }, "Post tag notifications failed");
   }
 }
 
-/** Create / caption-edit hook: sync tags, then notify if the post is live. Never throws. */
+export const notifyPostUserTags = notifyPostTagsIfLive;
+
 export async function syncAndNotifyPostUserTags(
-  post: { id: string; userId: string; caption: string | null },
-  log?: { error: (obj: unknown, msg: string) => void },
+  post: TaggedPost,
+  log?: { error: (obj: unknown, message: string) => void },
 ): Promise<void> {
   try {
     await syncPostUserTags(post);
-    await notifyPostUserTags(post.id);
+    await notifyPostTagsIfLive(post.id);
   } catch (err) {
     log?.error({ err, postId: post.id }, "Could not sync post people tags");
   }

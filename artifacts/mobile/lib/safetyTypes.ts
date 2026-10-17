@@ -50,6 +50,10 @@ export interface ThreadComment {
   /** Photo reply attached to this comment (POST /api/comment-media/upload). */
   media?: CommentMedia | null;
   replies: ThreadComment[];
+  /** Root only: more than the inlined replies exist (page with repliesNextCursor). */
+  hasMoreReplies?: boolean;
+  /** Root only: `after` cursor for GET …/comments/:id/replies. */
+  repliesNextCursor?: string | null;
 }
 
 export interface CommentMedia {

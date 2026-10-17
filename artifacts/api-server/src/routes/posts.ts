@@ -39,6 +39,7 @@ import { rateLimit } from "../middlewares/rateLimit";
 import { notifyCaptionMentions } from "../lib/activityEvents";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
+import { ownerAllows } from "../lib/privacySettings";
 import { taggedProductVisibleTo } from "../lib/productVisibility";
 import { screenText, MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
 import {
@@ -64,6 +65,7 @@ import {
   isBlockedEitherWay,
   mutedPhrasesFor,
   notBlockedWith,
+  notMutedBy,
   optionalViewerId,
   publishingRestriction,
 } from "../lib/safety";
@@ -388,7 +390,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[], viewerId: stri
     db.select({ postId: savedItems.targetId, cnt: count() }).from(savedItems)
       .where(and(inArray(savedItems.targetId, postIds), eq(savedItems.itemType, "post")))
       .groupBy(savedItems.targetId),
-    visibleCommentCounts(postIds),
+    visibleCommentCounts(postIds, viewerId),
   ]);
   const locationById = await locationsByPlaceId(postRows.map((post) => post.placeId));
   const sellerById = new Map(sellerRows.map((seller) => [seller.clerkId, seller]));
@@ -500,6 +502,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         visiblePostCondition(),
         threadSurfaceCondition(),
         notBlockedWith(clerkId, posts.userId),
+        notMutedBy(clerkId, posts.userId, "posts"),
         cursor ? sql`(${posts.createdAt}, ${posts.id}) < (${cursor.ts}::timestamp, ${cursor.id}::uuid)` : undefined,
       ))
       .orderBy(desc(posts.createdAt), desc(posts.id))
@@ -562,7 +565,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         .where(and(inArray(savedItems.targetId, postIds), eq(savedItems.itemType, "post")))
         .groupBy(savedItems.targetId),
 
-      visibleCommentCounts(postIds),
+      visibleCommentCounts(postIds, clerkId),
     ]);
 
     // Index by postId for O(1) lookup
@@ -2113,6 +2116,9 @@ router.get("/:id", async (req, res) => {
       const mutual = !!viewerId && edges.some((e) => e.followerId === viewerId) && edges.some((e) => e.followerId === post.userId);
       // A fit check linked to a product is shown on that product's page (F6 fits).
       if (!mutual && !(await isFitCheckPost(post.id))) return res.status(404).json({ error: "Post not found" });
+      if (!(await ownerAllows("whoCanSeePosts", post.userId, viewerId!))) {
+        return res.status(404).json({ error: "Post not found" });
+      }
     }
   }
 
@@ -2133,7 +2139,7 @@ router.get("/:id", async (req, res) => {
       .where(and(eq(interactions.postId, id), eq(interactions.type, "like"))),
     db.select({ count: count() }).from(interactions)
       .where(and(eq(interactions.postId, id), eq(interactions.type, "repost"))),
-    visibleCommentCounts([id]),
+    visibleCommentCounts([id], viewerId),
     db.select({ count: count() }).from(interactions)
       .where(and(eq(interactions.postId, id), eq(interactions.type, "share"))),
     db.select({ count: count() }).from(savedItems)

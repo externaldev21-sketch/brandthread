@@ -20,7 +20,7 @@ import { withStorefrontBannerAdopted } from "../lib/storefrontBanner";
 import { ObjectStorageService } from "../lib/objectStorage";
 
 const bannerStorage = new ObjectStorageService();
-import { db, users, follows, storyHighlightItems, closeFriends, stories, storyMentions, storyLikes, storyViews, notes, blocks, followRequests, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
+import { db, users, follows, storyHighlightItems, closeFriends, stories, storyMentions, storyLikes, storyViews, notes, blocks, followRequests, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes, savedItems, feedNotInterested } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { getUserAppSettings } from "../lib/userAppSettingsStore";
@@ -33,10 +33,14 @@ import {
   authorInGoodStanding,
   blockRelation,
   mutedPhrasesFor,
+  mutedUserIds,
   notBlockedWith,
   profilesById,
   publishingRestriction,
 } from "../lib/safety";
+import {
+  ownerAllows, ownersAllowing, privacySettingsOf, resolveAccountPrivacy, stricterReplyPerm, userIsSearchable,
+} from "../lib/privacySettings";
 import { actorFieldsFromProfile, notifyStoryLike, notifyStoryMention, notifyStoryReshare } from "../lib/activityEvents";
 import { viewerRelations, audienceAllows, viewerMayOpenAudience, followGateAllows, closeFriendOfAuthorIds } from "../lib/storyAccess";
 import { normalizeNoteAudience, parseNoteAudience } from '../lib/noteAudience';
@@ -175,8 +179,10 @@ async function buildBuyerPosts(
   offset: number,
   postId?: string,
   /** Profile grid only: pinned posts first (most recently pinned first). */
-  pinnedFirst = false,
+  pinnedFirstOrOptions: boolean | { excludeNotInterested?: boolean } = false,
+  opts: { excludeNotInterested?: boolean } = typeof pinnedFirstOrOptions === "object" ? pinnedFirstOrOptions : {},
 ) {
+  const pinnedFirst = typeof pinnedFirstOrOptions === "boolean" ? pinnedFirstOrOptions : false;
   if (authorIds.length === 0) return [];
   const pageRows = await db.select({
     id: posts.id,
@@ -211,6 +217,11 @@ async function buildBuyerPosts(
       authorInGoodStanding(posts.userId),
       notBlockedWith(viewerId, posts.userId),
       ...(postId ? [eq(posts.id, postId)] : []),
+      // Feeds honour the viewer's "Not interested" hides (undoable via
+      // DELETE /api/feed/not-interested/:postId); profiles still show them.
+      ...(opts.excludeNotInterested
+        ? [sql`NOT EXISTS (SELECT 1 FROM ${feedNotInterested} WHERE ${feedNotInterested.userId} = ${viewerId} AND ${feedNotInterested.postId} = ${posts.id})`]
+        : []),
     ))
     // Pinned posts first, newest pin first (Pin to your profile; lib/postPins.ts).
     .orderBy(...(pinnedFirst ? [pinnedFirstOrder(posts.id), desc(posts.createdAt)] : [desc(posts.createdAt)]))
@@ -223,21 +234,24 @@ async function buildBuyerPosts(
     : pageRows.filter((row) => row.userId === viewerId || !matchesMutedWords(row.caption, muted));
   if (rows.length === 0) return [];
   const postIds = rows.map((row) => row.id);
-  const [likeRows, repostRows, commentRows, myRows] = await Promise.all([
+  const [likeRows, repostRows, commentRows, myRows, savedRows] = await Promise.all([
     db.select({ postId: interactions.postId, n: count() }).from(interactions)
       .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "like")))
       .groupBy(interactions.postId),
     db.select({ postId: interactions.postId, n: count() }).from(interactions)
       .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "repost")))
       .groupBy(interactions.postId),
-    visibleCommentCounts(postIds),
+    visibleCommentCounts(postIds, viewerId),
     db.select({ postId: interactions.postId, type: interactions.type }).from(interactions)
       .where(and(
         inArray(interactions.postId, postIds),
         eq(interactions.userId, viewerId),
         inArray(interactions.type, ["like", "repost"]),
       )),
+    db.select({ targetId: savedItems.targetId }).from(savedItems)
+      .where(and(eq(savedItems.userId, viewerId), inArray(savedItems.targetId, postIds))),
   ]);
+  const saved = new Set(savedRows.map((row) => row.targetId));
   const counts = (rows: Array<{ postId: string | null; n: number }>) =>
     new Map(rows.filter((row) => row.postId).map((row) => [row.postId as string, Number(row.n)]));
   const likes = counts(likeRows);
@@ -305,6 +319,17 @@ router.post("/follow", rateLimit("follow"), validateBody(userIdBody), async (req
   const [target] = await db.select({ clerkId: users.clerkId, isPrivate: users.isPrivate })
     .from(users).where(eq(users.clerkId, userId)).limit(1);
   if (!target) { res.status(404).json({ error: "User not found" }); return; }
+
+  // Privacy screen: "Who can send friend requests". Already following stays a no-op.
+  const [alreadyFollowing] = await db.select({ f: follows.followerId }).from(follows)
+    .where(and(eq(follows.followerId, myId), eq(follows.followingId, userId))).limit(1);
+  if (!alreadyFollowing && !(await ownerAllows("whoCanSendFriendRequests", userId, myId))) {
+    res.status(403).json({
+      error: "This person isn't accepting friend requests from you right now.",
+      code: "FRIEND_REQUESTS_RESTRICTED",
+    });
+    return;
+  }
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`
@@ -715,6 +740,9 @@ router.get("/posts/:postId", async (req, res) => {
     if ((((mutual as any).rows ?? []) as any[]).length === 0) {
       res.status(403).json({ error: "Posts are available to friends only" }); return;
     }
+    if (!(await ownerAllows("whoCanSeePosts", authorId, myId))) {
+      res.status(403).json({ error: "This person has limited who can see their posts.", code: "POSTS_PRIVATE" }); return;
+    }
   }
 
   const [found] = await buildBuyerPosts(myId, [authorId], 1, 0, postId);
@@ -751,6 +779,9 @@ router.get("/profile/:userId/posts", async (req, res) => {
     if ((((mutual as any).rows ?? []) as any[]).length === 0) {
       res.status(403).json({ error: "Posts are available to friends only" }); return;
     }
+    if (!(await ownerAllows("whoCanSeePosts", other, myId))) {
+      res.status(403).json({ error: "This person has limited who can see their posts.", code: "POSTS_PRIVATE" }); return;
+    }
   }
   res.json(await buildBuyerPosts(myId, [other], limit, offset, undefined, true));
 });
@@ -770,6 +801,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
     res.status(404).json({ error: "User not found" }); return;
   }
   if (other !== myId && !(await viewerCanSeeContent(myId, other))) { res.json([]); return; }
+  if (other !== myId && !(await ownerAllows("whoCanSeePosts", other, myId))) { res.json([]); return; }
   const { limit, offset } = page.data;
   const window = limit + offset;
   const rows = await db.select({
@@ -833,7 +865,9 @@ router.get("/profile/:userId/tagged", async (req, res) => {
       };
     });
 
-  const postItems = rows.map((r) => ({
+  // Each tagging author's own "Who can see your posts" applies too.
+  const allowedAuthors = await ownersAllowing("whoCanSeePosts", [...new Set(rows.map((r) => r.userId))], myId);
+  const postItems = rows.filter((r) => r.userId === myId || allowedAuthors.has(r.userId)).map((r) => ({
     id: r.id,
     authorId: r.userId,
     authorName: r.authorName ?? null,
@@ -865,9 +899,16 @@ router.get("/friends/activity", async (req, res) => {
     JOIN users u ON u.clerk_id = f1.following_id AND u.account_type = 'buyer'
     WHERE f1.follower_id = ${myId}
   `);
-  const authorIds = (((mutualRows as any).rows ?? []) as any[])
+  const friendIds = (((mutualRows as any).rows ?? []) as any[])
     .map((row: any) => String(row.following_id));
-  res.json(await buildBuyerPosts(myId, authorIds, limit, offset));
+  // People I muted drop out of my friends feed (one-way), as do friends whose
+  // "Who can see your posts" leaves me out.
+  const [muted, allowed] = await Promise.all([
+    mutedUserIds(myId, "posts"),
+    ownersAllowing("whoCanSeePosts", friendIds, myId),
+  ]);
+  const authorIds = friendIds.filter((id) => !muted.has(id) && allowed.has(id));
+  res.json(await buildBuyerPosts(myId, authorIds, limit, offset, undefined, { excludeNotInterested: true }));
 });
 
 /**
@@ -886,6 +927,11 @@ async function resolveListOwner(req: any, res: any, myId: string): Promise<strin
   }
   // Private account: follower/following lists are for approved followers only.
   if (owner !== myId && !(await viewerCanSeeContent(myId, owner))) { res.json([]); return null; }
+  // Privacy screen: "Who can see your friends list".
+  if (owner !== myId && !(await ownerAllows("whoCanSeeFriendsList", owner, myId))) {
+    res.status(403).json({ error: "This person keeps their friends list private.", code: "FRIENDS_LIST_PRIVATE" });
+    return null;
+  }
   return owner;
 }
 
@@ -1086,6 +1132,8 @@ router.get("/search", async (req, res) => {
         isNull(users.suspendedAt),
         isNull(users.deletedAt), isNull(users.deletionRequestedAt),
         notBlockedWith(myId, users.clerkId),
+        // Privacy screen: "Appear in search" off hides the account from people search.
+        userIsSearchable(),
         or(
           fuzzyMatch(users.name,        term, pattern),
           fuzzyMatch(users.displayName, term, pattern),
@@ -1172,6 +1220,7 @@ router.get("/suggested", async (req, res) => {
       isNull(users.suspendedAt),
       isNull(users.deletedAt), isNull(users.deletionRequestedAt),
       ne(users.clerkId, myId),
+      userIsSearchable(),
       excludeFromFresh.length > 0 ? notInArray(users.clerkId, excludeFromFresh) : undefined,
     ))
     .orderBy(desc(users.createdAt))
@@ -1188,7 +1237,8 @@ router.get("/suggested", async (req, res) => {
 
   res.json(candidateIds.map((id) => {
     const user = byId.get(id);
-    if (!user) return null;
+    // Not searchable = not suggested either (applies to mutual-follow candidates too).
+    if (!user || !resolveAccountPrivacy(user.privacySettings).searchable) return null;
     const mutual = mutualById.get(id);
     const mutualCount = mutual ? Number(mutual.mutualCount) : 0;
     const fresh = freshById.get(id);
@@ -1298,6 +1348,7 @@ router.post("/stories", validateBody(createStoryBody), async (req, res) => {
   }).from(users).where(eq(users.clerkId, myId)).limit(1);
   if (!me) { res.status(403).json({ error: "Account not found" }); return; }
   const myName = me.displayName || me.name || "Brandthread member";
+  const accountPrivacy = await privacySettingsOf(myId);
 
   // Slurs and threats are filtered everywhere, including story text.
   const storyText = rawMedia
@@ -1370,6 +1421,9 @@ router.post("/stories", validateBody(createStoryBody), async (req, res) => {
     ? "close_friends"
     : privacy?.visibility === "friends" ? "friends" : "public";
 
+  // An explicit per-story choice wins; otherwise use the account default.
+  const replyPerm = privacy?.replyPermission ?? accountStoryReplies;
+
   const [row] = await db.insert(stories).values({
     authorId:           myId,
     authorName:         myName,
@@ -1380,9 +1434,9 @@ router.post("/stories", validateBody(createStoryBody), async (req, res) => {
     media,
     // Unspecified per-story reply settings follow the account's "Story
     // replies" setting (Settings → Who can message and see me).
-    repliesDisabled:    repliesDisabled ?? accountStoryReplies === "off",
+    repliesDisabled:    repliesDisabled ?? replyPerm === "off",
     privacyVisibility:  visibility,
-    privacyReplyPerm:   privacy?.replyPermission ?? (accountStoryReplies === "off" ? "everyone" : accountStoryReplies),
+    privacyReplyPerm:   replyPerm === "off" ? "everyone" : replyPerm,
     originalStoryId:    reshareOf?.id ?? null,
     originalAuthorId:   reshareOf?.authorId ?? null,
     moderationStatus:   storyHeld ? "held" : "visible",
@@ -1514,12 +1568,13 @@ router.get("/stories/following", async (req, res) => {
       .flatMap((b) => [b.blockerId === myId ? b.blockedId : b.blockerId]),
   );
 
+  const mutedIds = await mutedUserIds(myId, "stories");
   const rel = await viewerRelations(myId, rows.map((r) => r.authorId));
   const hidingAuthors = await authorsHidingStoriesFrom(myId, Array.from(new Set(rows.map((r) => r.authorId))));
   const visibleRows = rows.filter((r) => {
     if (r.authorId === myId) return true;
     if (blockedIds.has(r.authorId)) return false;
-    if (hidingAuthors.has(r.authorId)) return false;
+    if (hidingAuthors.has(r.authorId) || mutedIds.has(r.authorId)) return false;
     return followGateAllows(r.privacyVisibility, r.authorId, myId, rel)
       && audienceAllows(r.privacyVisibility, r.authorId, myId, rel);
   });
@@ -1816,6 +1871,7 @@ router.get("/notes/following", async (req, res) => {
             ),
           ),
           sql`NOT EXISTS (SELECT 1 FROM ${blocks} WHERE (${blocks.blockerId} = ${myId} AND ${blocks.blockedId} = ${notes.authorId}) OR (${blocks.blockedId} = ${myId} AND ${blocks.blockerId} = ${notes.authorId}))`,
+          notMutedBy(myId, notes.authorId, "stories"),
         ),
       ),
     ))

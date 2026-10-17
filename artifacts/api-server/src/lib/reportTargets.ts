@@ -13,6 +13,7 @@ import {
 } from "@workspace/db";
 import type { ReportTargetType } from "./safety";
 import { closeCommunityRoom } from "../ws/communityHub";
+import { notifyPostTagsIfLive } from "./postUserTags";
 
 export const REPORT_TARGET_TYPES: readonly ReportTargetType[] = [
   "post", "video", "live", "live_comment", "comment", "story", "product", "profile", "message",
@@ -313,6 +314,8 @@ export async function releaseHeldContent(type: ReportTargetType, id: string, mod
       .set({ moderationStatus: "visible", moderatedAt: now, updatedAt: now })
       .where(and(eq(posts.id, id), eq(posts.moderationStatus, "held")))
       .returning({ id: posts.id });
+    // A held post's tagged people are told once a moderator releases it.
+    if (rows.length > 0) await notifyPostTagsIfLive(id);
     return rows.length > 0;
   } else if (type === "story") {
     const rows = await db.update(stories)

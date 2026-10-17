@@ -1,12 +1,12 @@
 /**
  * Blocked & muted — manage who you've blocked (server-enforced everywhere),
- * accounts you've muted on this device, and your muted words.
+ * accounts you've muted (server-backed, see socialService.getMutedUsers), and your muted words.
  *
  * Blocks come from GET /api/social/blocks; unblocking calls the server so the
  * change applies on every device immediately.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 
 import { Icon } from '@/components/ui/Icon';
 
@@ -91,8 +91,13 @@ export default function BlockedAndMutedScreen() {
   }
 
   async function unmute(record: MuteRecord) {
-    await unmuteUser(record.mutedUserId);
-    setMuted((prev) => prev.filter((row) => row.id !== record.id));
+    hapticToggle();
+    try {
+      await unmuteUser(record.mutedUserId);
+      setMuted((prev) => prev.filter((row) => row.id !== record.id));
+    } catch {
+      Alert.alert("Couldn't unmute", 'Try again.');
+    }
   }
 
   const header = (
@@ -102,7 +107,7 @@ export default function BlockedAndMutedScreen() {
         <Text style={s.explainerText}>
           {tab === 'blocked'
             ? 'Blocked accounts can’t find your profile, see your posts, comments or stories, or message you — and you won’t see theirs. They aren’t notified.'
-            : 'Muting hides someone’s stories and posts on this device without telling them. They can still message you.'}
+            : 'Muting hides someone’s stories, posts and comments from you without telling them. They can still message you.'}
         </Text>
       </View>
       <PressableScale style={s.wordsRow} onPress={() => router.push('/muted-words' as never)} accessibilityRole="button">

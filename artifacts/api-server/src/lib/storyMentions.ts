@@ -22,6 +22,7 @@ import { and, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { extractMentions } from "./activityEvents";
 import { shouldRouteToRequests } from "./conversationRouting";
 import { tagStatusFor, usersRequiringTagApproval } from "./interactionSettings";
+import { ownersAllowing } from "./privacySettings";
 
 /** Instagram allows up to 10 mentions on a story. */
 export const MAX_STORY_MENTIONS = 10;
@@ -108,6 +109,8 @@ export async function sanitizeStoryMentions(
   const byId = new Map(found.map((u) => [u.clerkId, u]));
   const byHandle = new Map(found.filter((u) => u.username).map((u) => [u.username!.toLowerCase(), u]));
   const blocked = await blockedEitherWay(taggerId);
+  // Privacy screen: "Who can mention you" — people who don't allow the tagger are dropped.
+  const mentionable = await ownersAllowing("whoCanMention", found.map((u) => u.clerkId), taggerId);
 
   const mentions: VerifiedMention[] = [];
   const taken = new Set<string>();
@@ -116,7 +119,7 @@ export async function sanitizeStoryMentions(
 
   for (const c of candidates) {
     const target = (c.userId && byId.get(c.userId)) || (c.handle ? byHandle.get(c.handle) : undefined);
-    const ok = !!target && target.clerkId !== taggerId && !blocked.has(target.clerkId);
+    const ok = !!target && target.clerkId !== taggerId && !blocked.has(target.clerkId) && mentionable.has(target.clerkId);
     if (!ok) {
       if (c.source === "sticker") droppedOverlays.add(c.overlay);
       continue;

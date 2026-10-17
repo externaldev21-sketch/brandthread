@@ -350,10 +350,16 @@ export default function BuyerOtherProfileScreen() {
     setMoreSheetOpen(false);
     if (await copyProfileLink(profile?.username, Clipboard.setStringAsync)) { hapticSuccess(); setSnackbar('Link copied'); }
   };
-  const handleMute     = async () => { setMoreSheetOpen(false); await muteUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); };
-  // No "Restrict" here: it was only saved on this device, so the other person
-  // could still comment, message and see activity — it promised protection it
-  // didn't give. Mute, Report and Block are enforced by the server.
+  const handleMute     = async () => {
+    setMoreSheetOpen(false);
+    try { await muteUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); }
+    catch { Alert.alert("Couldn't mute", 'Try again.'); }
+  };
+  const handleRestrict = async () => {
+    setMoreSheetOpen(false);
+    try { await restrictUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); }
+    catch { Alert.alert("Couldn't restrict", 'Try again.'); }
+  };
   const handleBlock = async () => {
     setMoreSheetOpen(false);
     const subject = { userId: canonicalUserId, name: displayName };

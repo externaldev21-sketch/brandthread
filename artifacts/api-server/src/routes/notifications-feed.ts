@@ -26,6 +26,7 @@ import { firstItemImageByOrder, orderIdsMissingImage, storedOrOrderImage } from 
 import {
   normalizePushEventCategory,
   safePushImageUrl,
+  pushCategoryForFeedCategory,
   sendPushToUser,
   type PushEventCategory,
 } from "../lib/push";
@@ -381,6 +382,73 @@ buyerRouter.patch("/read-all", async (req, res) => {
   return res.json({ ok: true });
 });
 
+/**
+ * "Clear read notifications": deletes the caller's read rows (optionally only
+ * one category, matching the filter chip the button was shown under).
+ * Registered before DELETE /:id so "read" is never taken for an id.
+ */
+buyerRouter.delete("/read", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const category = typeof req.query.category === "string" && req.query.category.trim()
+    ? req.query.category.trim()
+    : null;
+  const removed = await db.delete(notificationsFeed)
+    .where(and(
+      eq(notificationsFeed.userId, userId),
+      eq(notificationsFeed.isRead, true),
+      ...(category ? [eq(notificationsFeed.category, category)] : []),
+    ))
+    .returning({ id: notificationsFeed.id });
+  return res.json({ ok: true, removed: removed.length });
+});
+
+/**
+ * "Mute <category> alerts" (Activity row menu). Stored as a `category:` key in
+ * activity_mutes, so publishNotification() keeps future rows of that category
+ * muted (out of the unread feed, no push); a `push:` key also stops pushes
+ * sent directly through sendPushToUser(). Existing rows are flagged too.
+ * `muted: false` undoes it.
+ */
+buyerRouter.post("/mute-category", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const category = typeof req.body?.category === "string" ? req.body.category.trim() : "";
+  const muted = req.body?.muted !== false;
+  if (!category || category.length > 64) {
+    return res.status(400).json({ error: "category is required" });
+  }
+  const keys = categoryMuteKeys(category);
+  if (muted) {
+    await db.insert(activityMutes)
+      .values(keys.map((muteKey) => ({ userId, muteKey })))
+      .onConflictDoNothing();
+  } else {
+    await db.delete(activityMutes)
+      .where(and(eq(activityMutes.userId, userId), eq(activityMutes.muteKey, `category:${category}`)));
+    // Aliases share one push key (e.g. "payout"/"finance" → push:payout): keep
+    // it while another muted category still maps to it.
+    const pushKey = keys.find((key) => key.startsWith("push:"));
+    if (pushKey) {
+      const stillMuted = await db.select({ muteKey: activityMutes.muteKey }).from(activityMutes)
+        .where(and(eq(activityMutes.userId, userId), sql`${activityMutes.muteKey} LIKE 'category:%'`));
+      const shared = stillMuted.some((row) => categoryMuteKeys(row.muteKey.slice("category:".length)).includes(pushKey));
+      if (!shared) {
+        await db.delete(activityMutes)
+          .where(and(eq(activityMutes.userId, userId), eq(activityMutes.muteKey, pushKey)));
+      }
+    }
+  }
+  await db.update(notificationsFeed).set({ isMuted: muted })
+    .where(and(eq(notificationsFeed.userId, userId), eq(notificationsFeed.category, category)));
+  return res.json({ ok: true, category, muted });
+});
+
+buyerRouter.patch("/:id/unread", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  await db.update(notificationsFeed).set({ isRead: false })
+    .where(and(eq(notificationsFeed.id, req.params.id), eq(notificationsFeed.userId, userId)));
+  return res.json({ ok: true });
+});
+
 buyerRouter.patch("/:id/read", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   await db.update(notificationsFeed).set({ isRead: true })
@@ -396,6 +464,12 @@ buyerRouter.delete("/:id", async (req, res) => {
   emitToUsers([userId], { type: "badges.changed" });
   return res.json({ ok: true });
 });
+
+/** Mute keys written by POST /mute-category for one feed category. */
+export function categoryMuteKeys(category: string): string[] {
+  const pushCategory = pushCategoryForFeedCategory(category);
+  return [`category:${category}`, ...(pushCategory ? [`push:${pushCategory}`] : [])];
+}
 
 // ─── Internal publisher (used by other routes, e.g. order status webhooks) ───
 
@@ -497,7 +571,11 @@ export async function publishNotification(n: PublishInput): Promise<void> {
   // "See less" preferences (Activity "..." menu) — a muted type or a muted
   // actor keeps future matching events out of the recipient's unread feed,
   // without silently dropping the row entirely (still fetchable, just muted).
-  const muteKeys = [`type:${n.type}`, ...(n.actorId ? [`actor:${n.actorId}`] : [])];
+  const muteKeys = [
+    `type:${n.type}`,
+    `category:${n.category}`,
+    ...(n.actorId ? [`actor:${n.actorId}`] : []),
+  ];
   const muted = await db.select({ muteKey: activityMutes.muteKey }).from(activityMutes)
     .where(and(eq(activityMutes.userId, n.userId), inArray(activityMutes.muteKey, muteKeys)));
   const isMuted = muted.length > 0;
