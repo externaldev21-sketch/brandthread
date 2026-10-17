@@ -13,7 +13,7 @@
  *  - First page leads with today's ranked (trending) posts, then fills with
  *    recent public posts from everyone (sellers, buyers, @brandthread) so a
  *    thin ranking never yields an empty grid. Later pages are recent posts,
- *    minus the ranked ids already shown.
+ *    minus the ranked posts page one led with (each post shows exactly once).
  *  - Every item carries `imageUrl`: the post/video poster, the first carousel
  *    slide, or the photo itself. Posts with no still are left out (and a few
  *    missing video posters are generated in the background per request, see
@@ -120,20 +120,23 @@ router.get("/", async (req, res) => {
 
     const rankedIds = kind === "forYou" ? await rankedIdsForToday() : [];
 
-    // ── Ranked lead (first page only) ──────────────────────────────────────
-    let ranked: Array<Awaited<ReturnType<typeof queryRows>>[number]> = [];
-    if (!cursor && rankedIds.length > 0) {
-      const cap = Math.floor(limit / 2);
-      if (cap > 0) {
-        const rows = await queryRows(and(...base, inArray(posts.id, rankedIds.slice(0, 100)))!, 100);
-        const order = new Map(rankedIds.map((id, i) => [id, i]));
-        ranked = rows.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)).slice(0, cap);
-      }
+    // ── Ranked lead ─────────────────────────────────────────────────────────
+    // The top `limit / 2` eligible ranked posts lead page one. Every page
+    // recomputes that same set (deterministic for a given day, viewer and
+    // limit) so later pages exclude exactly what page one showed — ranked
+    // posts beyond the lead still appear later, in recency order.
+    let leadRanked: Array<Awaited<ReturnType<typeof queryRows>>[number]> = [];
+    const cap = Math.floor(limit / 2);
+    if (rankedIds.length > 0 && cap > 0) {
+      const rows = await queryRows(and(...base, inArray(posts.id, rankedIds.slice(0, 100)))!, 100);
+      const order = new Map(rankedIds.map((id, i) => [id, i]));
+      leadRanked = rows.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)).slice(0, cap);
     }
+    const ranked = cursor ? [] : leadRanked;
 
     // ── Recent fill / later pages ──────────────────────────────────────────
     const recentWhere: Array<SQL | undefined> = [...base];
-    if (rankedIds.length > 0) recentWhere.push(notInArray(posts.id, rankedIds.slice(0, 100)));
+    if (leadRanked.length > 0) recentWhere.push(notInArray(posts.id, leadRanked.map((r) => r.id)));
     if (cursor) recentWhere.push(sql`(${posts.createdAt}, ${posts.id}) < (${cursor.ts}::timestamp, ${cursor.id}::uuid)`);
     const want = limit - ranked.length;
     const recentRows = await queryRows(and(...recentWhere)!, want + 1);

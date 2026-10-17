@@ -45,7 +45,7 @@ import { ThemedRefreshControl } from '@/components/ui';
 import { hapticLight } from '@/lib/haptics';
 import type { EditorialTileItem } from '@/components/discover/EditorialTile';
 import { DiscoverFilterRow, type DiscoverFilterKey } from '@/components/discover/DiscoverFilterRow';
-import { DiscoverGrid } from '@/components/discover/DiscoverGrid';
+import { DiscoverGrid, GRID_GAP, GRID_GUTTER, gridGeometry } from '@/components/discover/DiscoverGrid';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { DiscoverPostViewer } from '@/components/discover/DiscoverPostViewer';
 import { DiscoverSafetyMenu } from '@/components/discover/DiscoverSafetyMenu';
@@ -60,11 +60,12 @@ import { getFriendSuggestions, muteUser } from '@/services/socialService';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_DISCOVER_GESTURE } from '@/lib/firstRunTips/content';
 import {
-  composeDiscoverPosts, composeDiscoverBrands, composeDiscoverPeople, composeDiscoverDrops,
+  composeDiscoverBrands, composeDiscoverPeople, composeDiscoverDrops,
   type DiscoverPost, type DiscoverBrandCard as BrandCardData, type DiscoverPersonSuggestion, type DiscoverDrop,
 } from '@/lib/discoverFeed';
 import { DISCOVER_KEYS, loadHighDemand, loadJustDropped } from '@/lib/discoverTabData';
 import { useStickyState } from '@/lib/stickyState';
+import { useDiscoverFeed } from '@/hooks/useDiscoverFeed';
 import { prefetchImage } from '@/lib/prefetch';
 
 // First visit with nothing cached: hold the skeleton until the grid AND
@@ -108,17 +109,15 @@ export default function DiscoverScreen() {
   const [people, setPeople, hadPeople] = useStickyState<DiscoverPersonSuggestion[]>(DISCOVER_KEYS.people, [], { persist: true });
   const [peopleLoading, setPeopleLoading] = useState(!hadPeople);
 
-  // For You / Fits grid state (kept separate so switching filters doesn't refetch).
-  const [forYouPosts, setForYouPosts, hadForYou] = useStickyState<DiscoverPost[]>(DISCOVER_KEYS.forYou, [], { persist: true });
-  const [forYouLoading, setForYouLoading] = useState(!hadForYou);
-  const [forYouLoadingMore, setForYouLoadingMore] = useState(false);
-  const forYouLimit = useRef(30);
-
-  const [fitsPosts, setFitsPosts, hadFits] = useStickyState<DiscoverPost[]>(DISCOVER_KEYS.fits, []);
-  const [fitsLoading, setFitsLoading] = useState(!hadFits);
-  const [fitsLoadingMore, setFitsLoadingMore] = useState(false);
-  const fitsFetched = useRef(false);
-  const fitsLimit = useRef(30);
+  // For You / Fits grids (kept separate so switching filters doesn't refetch).
+  // Cursor-paged over GET /api/public/discover: pages append, refresh keeps
+  // the tiles until new ones arrive, errors keep the tiles + inline retry —
+  // see hooks/useDiscoverFeed.ts and lib/discoverPaging.ts.
+  const forYou = useDiscoverFeed({ api, isSignedIn: !!isSignedIn, filter: 'forYou', cacheKey: DISCOVER_KEYS.forYou, persist: true });
+  const fits = useDiscoverFeed({ api, isSignedIn: !!isSignedIn, filter: 'fits', cacheKey: DISCOVER_KEYS.fits, enabled: filter === 'fits' });
+  const forYouPosts = forYou.posts;
+  const forYouLoading = forYou.state.loadingFirst;
+  const [hadForYou] = useState(() => forYou.state.loadedOnce);
 
   const [brands, setBrands, hadBrands] = useStickyState<BrandCardData[]>(DISCOVER_KEYS.brands, [], { persist: true });
   // Top slice of the same real brand data the Brands filter's own grid
@@ -173,27 +172,6 @@ export default function DiscoverScreen() {
     }
   }, [setPeople]);
 
-  const fetchForYou = useCallback(async (append = false) => {
-    if (append) setForYouLoadingMore(true);
-    try {
-      const rows = await composeDiscoverPosts({ api, isSignedIn: !!isSignedIn, filter: 'forYou', limit: forYouLimit.current });
-      setForYouPosts(rows);
-    } finally {
-      if (append) setForYouLoadingMore(false); else setForYouLoading(false);
-    }
-  }, [api, isSignedIn, setForYouPosts]);
-
-  const fetchFits = useCallback(async (append = false) => {
-    fitsFetched.current = true;
-    if (append) setFitsLoadingMore(true);
-    try {
-      const rows = await composeDiscoverPosts({ api, isSignedIn: !!isSignedIn, filter: 'fits', limit: fitsLimit.current });
-      setFitsPosts(rows);
-    } finally {
-      if (append) setFitsLoadingMore(false); else setFitsLoading(false);
-    }
-  }, [api, isSignedIn, setFitsPosts]);
-
   const fetchBrands = useCallback(async () => {
     try {
       setBrands(await composeDiscoverBrands({ api, isSignedIn: !!isSignedIn }));
@@ -215,7 +193,6 @@ export default function DiscoverScreen() {
     fetchJustDropped();
     fetchHighDemand();
     fetchPeople();
-    fetchForYou();
     // Same fetch the Brands filter's own grid uses (composeDiscoverBrands) —
     // the "Trending Brands" rail below is just the top slice of that same
     // real data, not a second brand data source.
@@ -224,7 +201,6 @@ export default function DiscoverScreen() {
   }, []);
 
   useEffect(() => {
-    if (filter === 'fits' && !fitsFetched.current) fetchFits();
     if (filter === 'drops' && !dropsFetched.current) fetchDrops();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
@@ -279,15 +255,15 @@ export default function DiscoverScreen() {
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     hapticLight();
-    forYouLimit.current = 30;
-    fitsLimit.current = 30;
+    // Stale-while-revalidate: every list keeps what it shows until its new
+    // data lands; nothing is cleared up front.
     Promise.all([
       fetchJustDropped(), fetchHighDemand(), fetchPeople(), shelves.reload(),
-      filter === 'fits' ? fetchFits() : fetchForYou(),
+      filter === 'fits' ? fits.refresh() : forYou.refresh(),
       filter === 'brands' ? fetchBrands() : Promise.resolve(),
       filter === 'drops' ? fetchDrops() : Promise.resolve(),
     ]).finally(() => setRefreshing(false));
-  }, [filter, shelves.reload, fetchJustDropped, fetchHighDemand, fetchPeople, fetchForYou, fetchFits, fetchBrands, fetchDrops]);
+  }, [filter, shelves.reload, fetchJustDropped, fetchHighDemand, fetchPeople, forYou.refresh, fits.refresh, fetchBrands, fetchDrops]);
 
   function openViewer(post: DiscoverPost, flatIndex: number, allPosts: DiscoverPost[]) {
     hapticLight();
@@ -311,9 +287,9 @@ export default function DiscoverScreen() {
   );
 
   function removePostFromLists(authorId: string, onlyPostId?: string) {
-    const filterFn = (p: DiscoverPost) => (onlyPostId ? p.id !== onlyPostId : p.authorId !== authorId);
-    setForYouPosts((prev) => prev.filter(filterFn));
-    setFitsPosts((prev) => prev.filter(filterFn));
+    const hide = (id: string, author: string) => (onlyPostId ? id === onlyPostId : author === authorId);
+    forYou.removeWhere(hide);
+    fits.removeWhere(hide);
   }
 
   const header = (
@@ -347,7 +323,13 @@ export default function DiscoverScreen() {
           ref={listRef}
           posts={forYouPosts}
           loading={forYouLoading && revealed}
-          loadingMore={forYouLoadingMore}
+          loadingMore={forYou.state.loadingMore}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          showEmpty={forYou.showEmpty}
+          error={forYou.state.error}
+          onRetry={forYou.retry}
+          holdIncompleteRow={!forYou.state.reachedEnd}
           justDroppedItems={justDroppedItems}
           trendingBrands={trendingBrands}
           trendingProducts={shelves.trendingProducts}
@@ -358,11 +340,7 @@ export default function DiscoverScreen() {
           shopTheLookPosts={shopTheLookPosts}
           onOpenShopTheLook={openShopTheLook}
           people={people}
-          onEndReached={() => {
-            if (forYouLoadingMore || forYouLoading || forYouLimit.current >= 120) return;
-            forYouLimit.current += 30;
-            fetchForYou(true);
-          }}
+          onEndReached={forYou.loadMore}
           onTilePress={(post, idx) => openViewer(post, idx, forYouPosts)}
           onTileLongPress={setSafetyMenuPost}
           contentContainerStyle={{ paddingBottom: barInset + SP.md }}
@@ -374,17 +352,19 @@ export default function DiscoverScreen() {
       {filter === 'fits' && (
         <DiscoverGrid
           ref={listRef}
-          posts={fitsPosts}
-          loading={fitsLoading}
-          loadingMore={fitsLoadingMore}
+          posts={fits.posts}
+          loading={fits.state.loadingFirst}
+          loadingMore={fits.state.loadingMore}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          showEmpty={fits.showEmpty}
+          error={fits.state.error}
+          onRetry={fits.retry}
+          holdIncompleteRow={!fits.state.reachedEnd}
           showRails={false}
           people={people}
-          onEndReached={() => {
-            if (fitsLoadingMore || fitsLoading || fitsLimit.current >= 120) return;
-            fitsLimit.current += 30;
-            fetchFits(true);
-          }}
-          onTilePress={(post, idx) => openViewer(post, idx, fitsPosts)}
+          onEndReached={fits.loadMore}
+          onTilePress={(post, idx) => openViewer(post, idx, fits.posts)}
           onTileLongPress={setSafetyMenuPost}
           contentContainerStyle={{ paddingBottom: barInset + SP.md }}
           ListHeaderComponent={header as never}
@@ -520,16 +500,15 @@ export default function DiscoverScreen() {
 
 
 /** Full-screen version of DiscoverGrid's own loading rows — same 3-column,
- *  1pt-gap, 3:4 tiles — so the cross-fade lands on identical geometry. */
+ *  16pt-gutter, 3pt-gap, 3:4 tiles — so the cross-fade lands on identical geometry. */
 function DiscoverGridSkeleton() {
   const { width, height } = useWindowDimensions();
-  const cell = Math.floor((width - 2) / 3);
-  const cellHeight = Math.round((cell * 4) / 3);
+  const { cell, cellHeight } = gridGeometry(width);
   const rows = Math.max(3, Math.ceil(height / cellHeight));
   return (
-    <View style={{ overflow: 'hidden', flex: 1 }}>
+    <View style={{ overflow: 'hidden', flex: 1, paddingTop: X_SPACE[12] }}>
       {Array.from({ length: rows }, (_, r) => (
-        <View key={r} style={{ flexDirection: 'row', gap: 1, marginBottom: 1 }}>
+        <View key={r} style={{ flexDirection: 'row', gap: GRID_GAP, marginBottom: GRID_GAP, paddingHorizontal: GRID_GUTTER }}>
           {[0, 1, 2].map((c) => <DiscoverTileSkeleton key={c} width={cell} height={cellHeight} />)}
         </View>
       ))}

@@ -156,6 +156,17 @@ describe("GET /api/public/discover", () => {
     await db.delete(trendingCache).where(eq(trendingCache.cacheDate, today));
   });
 
+  it("shows ranked posts beyond page one's lead exactly once, later in the feed", async () => {
+    const rankedPosts = [];
+    for (let i = 0; i < 6; i++) rankedPosts.push(await seedPost(seller, 700 + i, { caption: `ranked ${i}` }));
+    await db.insert(trendingCache).values({ cacheDate: today, results: rankedPosts.map((p) => ({ id: p.id })), itemCount: rankedPosts.length });
+    const first = await get("/api/public/discover?limit=4"); // lead = top 2 ranked
+    expect(first.body.items.slice(0, 2).map((i: any) => i.id)).toEqual(rankedPosts.slice(0, 2).map((p) => p.id));
+    const { items } = await walk("limit=4");
+    for (const p of rankedPosts) expect(items.filter((item) => item.id === p.id)).toHaveLength(1);
+    await db.delete(trendingCache).where(eq(trendingCache.cacheDate, today));
+  });
+
   it("filters blocked authors, hidden posts, and limits Fits to buyer posts", async () => {
     const blockedPost = await seedPost(blockedAuthor, 4);
     const draft = await seedPost(seller, 5, { postStatus: "draft" });

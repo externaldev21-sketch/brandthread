@@ -1,23 +1,16 @@
 /**
- * Discover — For You feed composition (PR A: "Discover grid + viewer +
- * filters + people row").
+ * Discover — For You / Fits grid data, plus the Brands / People / Drops lists.
  *
- * v1 explainable ranking, composed client-side from existing endpoints —
- * no new backend yet (that's PR B — a dedicated ranking endpoint; buyers
- * never tag products, so "Shop the look" only ever appears on posts that
- * carry a seller product tag):
- *   - brand/seller posts come from the existing public Trending feed
- *     (already cross-user, already real) — `api.publicTrending.get(limit)`.
- *   - buyer posts come from the signed-in buyer's friend activity feed
- *     (the only cross-user buyer-post source that exists today; open
- *     buyer-post discovery across everyone needs the PR B ranking
- *     endpoint) — `api.social.friendActivity(limit, offset)`.
- *   - the mix favors accounts the buyer follows and recent engagement
- *     (organicScore/finalScore already reflect recency+engagement on the
- *     trending payload); blocked/muted authors are always dropped.
- *   - cold start: when real results are thin, preview mode backfills with
- *     lib/previewDiscover.ts fixtures so the grid never looks empty in
- *     ?bt_preview=buyer. Never active outside the dev/preview gate.
+ * The grid reads ONE server endpoint, GET /api/public/discover (see
+ * fetchDiscoverPage): cursor-paged, ranked posts first then recent public
+ * posts from everyone, every item with an image. It replaced composing the
+ * grid client-side from /api/public/trending (no image field → empty dark
+ * tiles; limit > 50 → 400 on the second page → grid replaced by the empty
+ * state) plus friend activity.
+ *
+ * Blocked/muted authors are always dropped. Cold start in preview mode only
+ * (?bt_preview=buyer / demo): a thin first page is backfilled with
+ * lib/previewDiscover.ts fixtures. Never active outside the dev/preview gate.
  */
 import { getBlockedUsers, getMutedUsers } from '@/services/socialService';
 import { isPreviewCatalogEnabled } from '@/lib/previewCatalog';
@@ -47,6 +40,9 @@ export interface DiscoverPost {
   imageUri?: string;
   caption?: string;
   likesCount: number;
+  /** The author turned like counts off — show views (or nothing) instead. */
+  likesHidden?: boolean;
+  viewsCount?: number;
   commentsCount: number;
   likedByMe?: boolean;
   savedByMe?: boolean;
@@ -96,49 +92,27 @@ function colorFor(id: string): string {
   return AVATAR_SHADES[hash % AVATAR_SHADES.length];
 }
 
-/** Maps one row of `api.publicTrending.get()` into a brand/seller Discover tile. */
-function mapTrendingToPost(row: any): DiscoverPost | null {
-  if (!row?.id || !row?.brandId) return null;
+/** Maps one item of `api.publicDiscover.page()` into a Discover tile. */
+export function mapDiscoverItemToPost(row: any): DiscoverPost | null {
+  if (!row?.id || !row?.author?.userId || !row?.imageUrl) return null;
+  const author = row.author;
+  const name = author.name || 'Brandthread member';
   return {
-    id: `trend_${row.id}`,
-    authorId: row.brandId,
-    authorName: row.brand ?? 'Brand',
-    authorHandle: `@${String(row.brand ?? 'brand').toLowerCase().replace(/\s+/g, '')}`,
-    authorInitials: initialsOf(row.brand ?? 'B'),
-    authorColor: colorFor(row.brandId),
-    authorAccountType: 'seller',
-    authorVerified: !!row.verified,
-    media: row.mediaType === 'video' ? 'video' : 'photo',
-    imageUri: row.imageUri ?? undefined,
+    id: String(row.id),
+    authorId: author.userId,
+    authorName: name,
+    authorHandle: author.handle || `@${String(name).toLowerCase().replace(/\s+/g, '')}`,
+    authorInitials: initialsOf(name),
+    authorColor: colorFor(author.userId),
+    authorAvatarUrl: author.avatarUrl ?? undefined,
+    authorAccountType: author.accountType === 'buyer' ? 'buyer' : 'seller',
+    media: row.mediaType === 'video' ? 'video' : row.mediaType === 'slideshow' ? 'slideshow' : 'photo',
+    imageUri: row.imageUrl,
     caption: row.caption ?? undefined,
-    likesCount: row.likesCount ?? 0,
+    likesCount: typeof row.likesCount === 'number' ? row.likesCount : 0,
+    likesHidden: row.likesCount === null,
+    viewsCount: typeof row.viewsCount === 'number' ? row.viewsCount : 0,
     commentsCount: row.commentsCount ?? 0,
-    // The current public Trending payload never sends this — forward
-    // compatible passthrough for once a seller-tagged trending post exists,
-    // so "Shop the look" only ever appears where a real tag is present.
-    productTags: Array.isArray(row.productTags) ? row.productTags : undefined,
-    createdAt: new Date().toISOString(),
-  };
-}
-
-/** Maps one row of `api.social.friendActivity()` into a buyer Discover tile. */
-function mapFriendPostToPost(row: any): DiscoverPost | null {
-  if (!row?.id || !row?.authorId) return null;
-  return {
-    id: `friend_${row.id}`,
-    authorId: row.authorId,
-    authorName: row.authorName ?? 'Buyer',
-    authorHandle: row.authorHandle ?? `@${String(row.authorName ?? 'buyer').toLowerCase().replace(/\s+/g, '')}`,
-    authorInitials: row.authorInitials ?? initialsOf(row.authorName ?? 'B'),
-    authorColor: row.authorColor ?? colorFor(row.authorId),
-    authorAccountType: 'buyer',
-    media: row.type === 'video' ? 'video' : row.type === 'slideshow' ? 'slideshow' : 'photo',
-    imageUri: row.mediaUrl ?? undefined,
-    caption: row.caption ?? undefined,
-    likesCount: row.likesCount ?? 0,
-    commentsCount: row.commentsCount ?? 0,
-    likedByMe: !!row.likedByMe,
-    savedByMe: !!row.savedByMe,
     createdAt: row.createdAt ?? new Date().toISOString(),
   };
 }
@@ -150,46 +124,40 @@ export interface ComposeDiscoverFeedOptions {
   limit?: number;
 }
 
-/** One page of the For You / Fits grid, real data first, preview-backfilled on cold start. */
-export async function composeDiscoverPosts({ api, isSignedIn, filter, limit = 30 }: ComposeDiscoverFeedOptions): Promise<DiscoverPost[]> {
-  const [blocked, muted] = await Promise.all([
+export interface DiscoverPage {
+  posts: DiscoverPost[];
+  /** null only when the server says this was the last page. */
+  nextCursor: string | null;
+}
+
+/**
+ * One page of the For You / Fits grid from GET /api/public/discover.
+ *
+ * The server owns ordering (ranked first, then recent public posts) and
+ * guarantees every item has an image, so pages are appended as-is — no
+ * client re-sort, which used to reshuffle tiles already on screen. Throws on
+ * a network/server error so the caller can keep what it already shows and
+ * offer a retry, instead of treating a failure as "no posts".
+ *
+ * Preview mode (?bt_preview / demo only) backfills a thin FIRST page with
+ * lib/previewDiscover.ts fixtures; never active outside the dev/preview gate.
+ */
+export async function fetchDiscoverPage({
+  api, isSignedIn, filter, limit = 24, cursor = null,
+}: ComposeDiscoverFeedOptions & { cursor?: string | null }): Promise<DiscoverPage> {
+  const [blocked, muted, response] = await Promise.all([
     getBlockedUsers().catch(() => []),
     getMutedUsers().catch(() => []),
+    api.publicDiscover.page({ cursor, limit, kind: filter }),
   ]);
   const hiddenIds = new Set<string>([
     ...blocked.map((b) => b.blockedUserId),
     ...muted.map((m) => m.mutedUserId),
   ]);
+  let posts: DiscoverPost[] = (Array.isArray(response?.items) ? response.items : [])
+    .map(mapDiscoverItemToPost)
+    .filter((p: DiscoverPost | null): p is DiscoverPost => !!p && !hiddenIds.has(p.authorId));
 
-  let posts: DiscoverPost[] = [];
-
-  if (filter !== 'fits') {
-    try {
-      const { trending } = await api.publicTrending.get(limit);
-      posts.push(...(Array.isArray(trending) ? trending : []).map(mapTrendingToPost).filter((p: DiscoverPost | null): p is DiscoverPost => !!p));
-    } catch {
-      // Keep going — friend posts (and preview backfill) can still fill the grid.
-    }
-  }
-
-  if (isSignedIn) {
-    try {
-      const rows = await api.social.friendActivity(20, 0);
-      posts.push(...(Array.isArray(rows) ? rows : []).map(mapFriendPostToPost).filter((p: DiscoverPost | null): p is DiscoverPost => !!p));
-    } catch {
-      // No friends yet, or offline — fine, the rest of the mix still shows.
-    }
-  }
-
-  posts = posts.filter((p) => !hiddenIds.has(p.authorId));
-
-  if (posts.length < 12 && isPreviewCatalogEnabled()) {
-    const seeded = getPreviewDiscoverPosts(filter);
-    const existingIds = new Set(posts.map((p) => p.id));
-    posts.push(...seeded.filter((p) => !existingIds.has(p.id)));
-  }
-
-  if (filter === 'fits') posts = posts.filter((p) => p.authorAccountType === 'buyer');
   if (!isSignedIn) {
     // Guests keep their list on this device; signed-in accounts are filtered
     // server-side. An unreadable local list must not blank the whole grid.
@@ -197,11 +165,17 @@ export async function composeDiscoverPosts({ api, isSignedIn, filter, limit = 30
     posts = posts.filter((post) => !matchesGuestMutedWords(post.caption, phrases));
   }
 
-  // Recency + engagement, interleaved so one account never dominates a run
-  // of consecutive tiles (a simple, explainable v1 — no personalization
-  // model yet; that's the PR B ranking endpoint).
-  posts.sort((a, b) => (b.likesCount + b.commentsCount * 2) - (a.likesCount + a.commentsCount * 2));
-  return posts;
+  const nextCursor = typeof response?.nextCursor === 'string' && response.nextCursor ? response.nextCursor : null;
+  if (!cursor && posts.length < 12 && isPreviewCatalogEnabled()) {
+    const existingIds = new Set(posts.map((p) => p.id));
+    posts.push(...getPreviewDiscoverPosts(filter).filter((p) => !existingIds.has(p.id)));
+  }
+  return { posts, nextCursor };
+}
+
+/** First page only — for callers that show a fixed slice (Search's suggestions, the app-start warmer). */
+export async function composeDiscoverPosts(opts: ComposeDiscoverFeedOptions): Promise<DiscoverPost[]> {
+  return (await fetchDiscoverPage(opts)).posts;
 }
 
 export async function composeDiscoverBrands({ api, isSignedIn }: { api: any; isSignedIn: boolean }): Promise<DiscoverBrandCard[]> {

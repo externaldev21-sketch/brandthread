@@ -4068,6 +4068,37 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       },
     },
     /**
+     * Buyer Discover grid (posts). Cursor-paged: pass the previous page's
+     * `nextCursor`; null means the real end. Every item has an `imageUrl`
+     * (video poster / first carousel slide / photo). limit is capped at 50.
+     *   GET /api/public/discover?cursor=&limit=&kind=forYou|fits
+     */
+    publicDiscover: {
+      page: (opts: { cursor?: string | null; limit?: number; kind?: 'forYou' | 'fits' } = {}) => {
+        const params = new URLSearchParams();
+        params.set('limit', String(opts.limit ?? 24));
+        if (opts.kind) params.set('kind', opts.kind);
+        if (opts.cursor) params.set('cursor', opts.cursor);
+        return get<{
+          items: Array<{
+            id: string;
+            mediaType: string;
+            imageUrl: string;
+            mediaUrl: string;
+            aspectRatio: string | null;
+            caption: string | null;
+            createdAt: string;
+            likesCount: number | null;
+            viewsCount: number;
+            commentsCount: number;
+            ranked: boolean;
+            author: { userId: string; name: string; handle: string; avatarUrl: string | null; accountType: string | null };
+          }>;
+          nextCursor: string | null;
+        }>(`/api/public/discover?${params.toString()}`);
+      },
+    },
+    /**
      * Public "For You" ranked Discover feed — no auth required (an Authorization
      * header is sent when available but the server does not require it).
      * Contract (matched exactly against the backend ranking endpoint):

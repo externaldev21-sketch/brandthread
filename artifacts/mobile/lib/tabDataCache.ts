@@ -77,7 +77,7 @@ export const PERSISTED_TAB_KEYS = [
   'inbox:myNote',
   'inbox:notesByAuthor',
   'inbox:suggested',
-  'discover:forYou',
+  'discover:forYouFeed',
   'discover:justDropped',
   'discover:highDemand',
   'discover:people',
