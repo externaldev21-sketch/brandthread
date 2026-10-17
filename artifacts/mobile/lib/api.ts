@@ -3778,6 +3778,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       summary: () =>
         get<{ totalImpressions: number; spentCentsThisMonth: number; activeCount: number }>('/api/boosts/summary'),
     },
+    /** Admin-curated "Featured on Discover" picks (public, read-only). */
+    publicFeatured: {
+      list: () => get<PublicFeaturedPicks>('/api/public/featured'),
+    },
     /** Featured brand slots on Discover (seller purchase flow; /active is public). */
     featuredSlots: {
       active: () => get<{ label: 'Featured'; brands: FeaturedBrand[] }>('/api/featured-slots/active'),
@@ -4244,6 +4248,14 @@ export interface PlacePage { place: PlaceInfo; postCount: number; sort: 'top' | 
 
 // ─── Promotions (featured slots + admin approval) ─────────────────────────────
 export type FeaturedBrand = { slotId: string; sellerId: string; name: string; imageUrl: string | null; verified: boolean };
+/** GET /api/public/featured — admin "Featured on Discover" picks. */
+export type PublicFeaturedPicks = {
+  brands: Array<{ userId: string; label: string | null; name?: string; imageUrl?: string | null; verified?: boolean }>;
+  threads: Array<{
+    postId: string; label: string | null; authorId?: string; caption?: string | null;
+    mediaType?: string; thumbnailUrl?: string | null;
+  }>;
+};
 export type FeaturedSlot = {
   id: string; placement: string; durationDays: number; priceCents: number;
   startsAt: string; endsAt: string; status: string;

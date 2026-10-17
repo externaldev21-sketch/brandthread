@@ -39,6 +39,12 @@ import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import { useLiveModeration } from '@/lib/live/useLiveModeration';
 import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
 import { radius } from '@/constants/radii';
+import {
+  LIVE_VIDEO_CONNECT_TIMEOUT_MS,
+  canRetryLiveVideo,
+  liveVideoPlaceholderText,
+  type LiveVideoState,
+} from '@/lib/live/liveVideoConnect';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -82,6 +88,9 @@ function BuyerLiveNativeScreen() {
   const [viewerCount, setViewerCount]     = useState(0);
   const [broadcastUid, setBroadcastUid]   = useState<number | null>(null);
   const [agoraReady, setAgoraReady]       = useState(false);
+  const [videoState, setVideoState]       = useState<LiveVideoState>(AgoraModule ? 'connecting' : 'unsupported');
+  const [retryingVideo, setRetryingVideo] = useState(false);
+  const videoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [purchaseTag, setPurchaseTag]     = useState<ProductTag | null>(null);
   const [purchaseProduct, setPurchaseProduct] = useState<any>(null);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
@@ -122,6 +131,7 @@ function BuyerLiveNativeScreen() {
     return () => {
       handleLeave(false);
       if (fallbackPollRef.current) clearInterval(fallbackPollRef.current);
+      clearVideoTimeout();
     };
   }, []);
 
@@ -190,50 +200,107 @@ function BuyerLiveNativeScreen() {
       const joinData = await (api as any).live.join(params.streamId) as any;
       joinedRef.current = true;
 
-      // Init Agora if available
-      if (AgoraModule && joinData.agoraAppId) {
-        const { createAgoraRtcEngine, ChannelProfileType, ClientRoleType } = AgoraModule;
-        try {
-          const engine = createAgoraRtcEngine();
-          engine.initialize({ appId: joinData.agoraAppId });
-          engine.setChannelProfile(ChannelProfileType.ChannelProfileLiveBroadcasting);
-          engine.setClientRole(ClientRoleType.ClientRoleAudience);
-          engine.enableVideo();
-          engine.registerEventHandler({
-            // react-native-agora v6 passes (connection, remoteUid); accept either shape.
-            // With co-hosts there can be several publishers: only the host's uid is the
-            // main video, and only the host going offline ends the stream.
-            onUserJoined: (a: any, b?: number) => {
-              const uid: number = typeof a === 'number' ? a : (b as number);
-              if (hostUidRef.current == null || uid === hostUidRef.current) { setBroadcastUid(uid); setAgoraReady(true); }
-            },
-            onUserOffline: (a: any, b?: number) => {
-              const uid: number = typeof a === 'number' ? a : (b as number);
-              if (hostUidRef.current == null || uid === hostUidRef.current) setEnded(true);
-            },
-            onJoinChannelSuccess: () => {},
-            onError: (err: any) => console.warn('[Agora viewer]', err),
-          });
-          engine.joinChannel(
-            joinData.token || null,
-            joinData.channelName,
-            joinData.agoraUid,
-            { clientRoleType: AgoraModule.ClientRoleType.ClientRoleAudience },
-          );
-          engineRef.current = engine;
-        } catch (e) {
-          console.warn('[Agora viewer init]', e);
-        }
-      }
+      connectVideo(joinData);
     } catch (e: any) {
       Alert.alert('Couldn’t join the live', apiErrorMessage(e, 'Try again.'));
       if (e?.status === 403) { goBackOr(router); }
+      else if (AgoraModule) setVideoState('failed');
     } finally {
       setLoading(false);
     }
     // Realtime updates now come from useLiveSocket above (connects once
     // `loading` clears) — it does its own one-shot backfill via poll() on
     // connect, and falls back to polling only if the socket can't connect.
+  }
+
+  function clearVideoTimeout() {
+    if (videoTimeoutRef.current) { clearTimeout(videoTimeoutRef.current); videoTimeoutRef.current = null; }
+  }
+
+  function failVideo(reason: unknown) {
+    console.warn('[Agora viewer]', reason);
+    clearVideoTimeout();
+    setVideoState(prev => (prev === 'connected' ? prev : 'failed'));
+  }
+
+  function releaseEngine() {
+    try { engineRef.current?.leaveChannel(); engineRef.current?.release(); } catch {}
+    engineRef.current = null;
+  }
+
+  // Starts (or restarts) the Agora viewer. Bounded by a timeout so a stream
+  // whose video never arrives shows an error with Retry instead of sitting on
+  // "Connecting…" forever.
+  function connectVideo(joinData: any) {
+    if (!AgoraModule) { setVideoState('unsupported'); return; }
+    clearVideoTimeout();
+    setVideoState('connecting');
+    if (!joinData?.agoraAppId || !joinData?.channelName) {
+      failVideo('join response had no Agora app id / channel');
+      return;
+    }
+    videoTimeoutRef.current = setTimeout(() => {
+      videoTimeoutRef.current = null;
+      setVideoState(prev => (prev === 'connecting' ? 'failed' : prev));
+    }, LIVE_VIDEO_CONNECT_TIMEOUT_MS);
+    const { createAgoraRtcEngine, ChannelProfileType, ClientRoleType } = AgoraModule;
+    try {
+      const engine = createAgoraRtcEngine();
+      engine.initialize({ appId: joinData.agoraAppId });
+      engine.setChannelProfile(ChannelProfileType.ChannelProfileLiveBroadcasting);
+      engine.setClientRole(ClientRoleType.ClientRoleAudience);
+      engine.enableVideo();
+      engine.registerEventHandler({
+        // react-native-agora v6 passes (connection, remoteUid); accept either shape.
+        // With co-hosts there can be several publishers: only the host's uid is the
+        // main video, and only the host going offline ends the stream.
+        onUserJoined: (a: any, b?: number) => {
+          const uid: number = typeof a === 'number' ? a : (b as number);
+          if (hostUidRef.current == null || uid === hostUidRef.current) {
+            clearVideoTimeout();
+            setBroadcastUid(uid);
+            setAgoraReady(true);
+            setVideoState('connected');
+          }
+        },
+        onUserOffline: (a: any, b?: number) => {
+          const uid: number = typeof a === 'number' ? a : (b as number);
+          if (hostUidRef.current == null || uid === hostUidRef.current) setEnded(true);
+        },
+        onJoinChannelSuccess: () => {},
+        onError: (err: any) => failVideo(err),
+      });
+      engine.joinChannel(
+        joinData.token || null,
+        joinData.channelName,
+        joinData.agoraUid,
+        { clientRoleType: AgoraModule.ClientRoleType.ClientRoleAudience },
+      );
+      engineRef.current = engine;
+    } catch (e) {
+      failVideo(e);
+    }
+  }
+
+  async function retryVideo() {
+    if (retryingVideo) return;
+    hapticLight();
+    setRetryingVideo(true);
+    releaseEngine();
+    setBroadcastUid(null);
+    setAgoraReady(false);
+    setVideoState('connecting');
+    try {
+      // A fresh join gets a fresh token (the old one may be why it failed).
+      const joinData = await (api as any).live.join(params.streamId) as any;
+      joinedRef.current = true;
+      connectVideo(joinData);
+    } catch (e: any) {
+      failVideo(e);
+      Alert.alert('Couldn’t join the live', apiErrorMessage(e, 'Try again.'));
+    } finally {
+      setRetryingVideo(false);
+    }
   }
 
   async function poll() {
@@ -476,9 +543,21 @@ function BuyerLiveNativeScreen() {
       ) : (
         <View style={[StyleSheet.absoluteFill, s.videoPlaceholder]}>
           <Feather name="video" size={40} color={MUTED} />
+          {videoState === 'connecting' ? <ActivityIndicator color={MUTED} /> : null}
           <Text style={s.videoPlaceholderText}>
-            {AgoraModule ? 'Connecting…' : 'Live video works in the Brandthread app.'}
+            {liveVideoPlaceholderText(videoState)}
           </Text>
+          {canRetryLiveVideo(videoState) ? (
+            <PressableScale
+              onPress={retryVideo}
+              disabled={retryingVideo}
+              style={[s.backBtn, { backgroundColor: LIVE_RED, marginTop: 4 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Retry live video"
+            >
+              <Text style={s.backBtnText}>{retryingVideo ? 'Retrying…' : 'Retry'}</Text>
+            </PressableScale>
+          ) : null}
         </View>
       )}
 
