@@ -28,6 +28,7 @@ import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribut
 import { useApi } from '@/hooks/useApi';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import { reportHref } from '@/lib/safety';
+import { dropsOnLabel, upcomingDropRelease } from '@/lib/dropProductContext';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import { useAuth } from '@clerk/expo';
 import { useSignInGate } from '@/hooks/useSignInGate';
@@ -504,8 +505,10 @@ export default function BuyerProductDetailScreen() {
   const { theme, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM, BORDER_ACTIVE, BORDER_FOCUS, GRAD_PRIMARY, SHADOW_PURPLE } = useChrome();
   const s = makeStyles(theme);
   const wl = makeWaitlistStyles(theme);
-  const { productId, sourcePostId, sourceTagId, editVariantId, editCartItemId, src } = useLocalSearchParams<{
+  const { productId, sourcePostId, sourceTagId, editVariantId, editCartItemId, src, dropReleaseAt, dropName } = useLocalSearchParams<{
     productId?: string;
+    dropReleaseAt?: string;
+    dropName?: string;
     sourcePostId?: string;
     sourceTagId?: string;
     editVariantId?: string;
@@ -541,6 +544,8 @@ export default function BuyerProductDetailScreen() {
   const [sellerPaymentReady, setSellerPaymentReady] = useState<boolean | null>(null);
   const [sellerPaymentReason, setSellerPaymentReason] = useState<string | null>(null);
   const [sellerVacationMessage, setSellerVacationMessage] = useState<string | null>(null);
+  // Opened from an upcoming drop: show "Drops <date>" and hold purchase until launch.
+  const dropsAt = upcomingDropRelease(typeof dropReleaseAt === 'string' ? dropReleaseAt : null);
   const [refreshing, setRefreshing] = useState(false);
   // Track whether options were touched at least once (for required-option feedback)
   const [optionsTouched, setOptionsTouched] = useState(false);
@@ -1098,6 +1103,17 @@ export default function BuyerProductDetailScreen() {
                </View>
              </View>
            )}
+          {dropsAt && (
+            <View style={s.vacationBanner} accessibilityRole="alert" testID="product-drops-on">
+              <Feather name="clock" size={ICON.sm} color={FG} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.vacationTitle}>Drops {dropsOnLabel(dropsAt)}</Text>
+                <Text style={s.vacationText}>
+                  {dropName ? `Part of ${dropName}. ` : ''}You can buy this piece once the drop goes live.
+                </Text>
+              </View>
+            </View>
+          )}
           {sellerVacationMessage && (
             <View style={s.vacationBanner} accessibilityRole="alert">
               <Feather name="sun" size={ICON.sm} color={ORANGE} />
@@ -1428,8 +1444,21 @@ export default function BuyerProductDetailScreen() {
         accessibilityRole="toolbar"
         accessibilityLabel="Product purchase actions"
       >
+        {/* Upcoming drop: purchase actions are held until launch. */}
+        {dropsAt ? (
+          <Button
+            label={`Drops ${dropsOnLabel(dropsAt)}`}
+            icon="clock"
+            variant="secondary"
+            onPress={() => {}}
+            disabled
+            accessibilityLabel={`Not available yet. Drops ${dropsOnLabel(dropsAt)}`}
+            style={s.buyNowBtn}
+            testID="product-drops-on-cta"
+          />
+        ) : null}
         {/* Real "Add to cart" + "Buy now" pair (it was an unlabeled bag icon). */}
-        {addedToCart ? (
+        {dropsAt ? null : addedToCart ? (
           <Button
             label="In your bag"
             icon="check"
@@ -1452,7 +1481,7 @@ export default function BuyerProductDetailScreen() {
           />
         )}
 
-        {product.isPreOrder ? (
+        {dropsAt ? null : product.isPreOrder ? (
           <Button
             label={reserved ? 'Reserved ✓' : 'Reserve (No Charge)'}
             onPress={handleReserve}
