@@ -70,7 +70,9 @@ describe('Messages "Options" menus use showActionSheet, not the dead-on-web Aler
   it('inbox "Filter messages" pill gives real feedback instead of a dead Alert.alert', () => {
     const src = read('app/(buyer)/inbox.tsx');
     const fn = src.slice(src.indexOf('function openFilterMenu()'), src.indexOf('function openFilterMenu()') + 600);
-    expect(fn).toContain('showSnackbar(');
+    // Item 96: a real filter sheet (not a "coming soon" snackbar).
+    expect(fn).toContain("showActionSheet('Filter messages'");
+    expect(fn).not.toContain('coming soon');
     expect(fn).not.toMatch(/Alert\.alert\(\s*'/);
   });
 });
