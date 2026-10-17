@@ -1494,8 +1494,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   noticeText:       { ...TYPE_SCALE.footnote, color: FG, flex: 1 },
   // Customer
   customerHero:     { alignItems: 'center', gap: SP.sm },
-  avatarCircle:     { width: 64, height: 64, borderRadius: RADII.pill, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
-  avatarInitials:   { fontSize: FS.xl, fontFamily: FONT.bold, color: PURPLE },
+  avatarCircle:     { width: 64, height: 64, borderRadius: RADII.pill, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center' },
+  avatarInitials:   { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.accentLight },
   customerName:     { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   customerEmail:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
   customerPhone:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },

@@ -353,16 +353,8 @@ function QuickEditPriceSheet({ product, visible, onClose, onSaved }: QuickEditPr
 
 // ─── Sort Options ───────────────────────────────────────────────────────────────
 
-type SortKey = 'name' | 'price_asc' | 'price_desc' | 'newest' | 'oldest' | 'sales';
-
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: 'newest', label: 'Newest first' },
-  { key: 'oldest', label: 'Oldest first' },
-  { key: 'name', label: 'Name A-Z' },
-  { key: 'price_asc', label: 'Price: low to high' },
-  { key: 'price_desc', label: 'Price: high to low' },
-  { key: 'sales', label: 'Best selling' },
-];
+type SortKey = ProductSortKey;
+const SORT_OPTIONS = PRODUCT_SORT_OPTIONS;
 
 // ─── Filter Modal ─────────────────────────────────────────────────────────────
 
@@ -444,46 +436,8 @@ function FilterModal({ visible, current, currentSort, onApply, onClose }: Filter
 
 // Options, labels and their sortBy/sortDir live in lib/sellerLists/productSort.ts
 // (the sheet drives the real getProducts query — nothing is re-sorted here).
-type SortKey = ProductSortKey;
-const SORT_OPTIONS = PRODUCT_SORT_OPTIONS;
 // Restored across launches when it's still one of these.
 const PRODUCT_FILTER_KEYS: ProductFilter[] = ['all', 'active', 'draft', 'scheduled', 'archived', 'pre-order', 'pre-made', 'low-stock', 'out-of-stock'];
-
-function SortModal({
-  visible, current, onSelect, onClose,
-}: {
-  visible: boolean;
-  current: SortKey;
-  onSelect: (k: SortKey) => void;
-  onClose: () => void;
-}) {
-  const { theme } = useAppTheme();
-  const sh = React.useMemo(() => createSheetStyles(theme), [theme]);
-  const PURPLE_LIGHT = theme.accentLight;
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Close" style={sh.overlay} onPress={onClose} />
-      <SheetRise style={sh.sheet}>
-        <View style={sh.handle} />
-        <Text style={sh.sheetTitle}>Sort Products</Text>
-        {SORT_OPTIONS.map(({ key, label }) => (
-          <PressableScale
-            key={key}
-            style={[sh.sortOption, current === key && sh.sortOptionActive]}
-            onPress={() => { haptic('select'); onSelect(key); onClose(); }}
-            accessibilityLabel={label}
-            accessibilityState={{ selected: current === key }}
-          >
-            <Text style={[sh.sortOptionText, current === key && sh.sortOptionTextActive]}>
-              {label}
-            </Text>
-            {current === key && <Icon name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
-          </PressableScale>
-        ))}
-      </SheetRise>
-    </Modal>
-  );
-}
 
 const FAB_CLEARANCE = 64; // 56pt button + 8pt gap
 

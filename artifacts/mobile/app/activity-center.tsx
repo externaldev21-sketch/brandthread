@@ -1230,7 +1230,6 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
         <ScreenHeader
           title="Activity"
           showBack={!isTab}
-          reserveBackSpace={!isTab}
           actions={hasUnread ? [{
             icon: 'check-circle',
             onPress: () => { void handleMarkAll(); },

@@ -599,7 +599,7 @@ function FilterSheet({
             <TouchableOpacity
               key={`sort-${key}`}
               style={[s.sortOption, currentSort === key && s.sortOptionActive]}
-              onPress={() => { Haptics.selectionAsync(); onSelectSort(key); onClose(); }}
+              onPress={() => { haptic('select'); onSelectSort(key); onClose(); }}
               activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityLabel={`Sort by ${label}`}

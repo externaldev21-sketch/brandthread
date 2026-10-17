@@ -747,7 +747,7 @@ export default function ProfileScreen() {
                   variant="secondary"
                   size="compact"
                   fullWidth
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShareSheetVisible(true); }}
+                  onPress={() => { haptics.light(); setShareSheetVisible(true); }}
                   accessibilityHint="Opens a shareable profile card, QR code, and link"
                   style={[s.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
                   testID="seller-share-profile-btn"

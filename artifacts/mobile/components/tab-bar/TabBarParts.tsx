@@ -486,6 +486,8 @@ export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean,
   const peakStretch = useSharedValue(0);
   const opacity = useSharedValue(shown ? 1 : 0);
   const committedShown = useRef(shown);
+  const committedIndex = useRef(restingX);
+  const pressedAt = useRef(0);
   const retarget = useRef(initialPillState(restingX));
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -518,6 +520,7 @@ export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean,
     opacity.set(withTiming(shown ? 1 : 0, { duration: 180 }));
     if (committedShown.current !== shown) {
       committedShown.current = shown;
+      committedIndex.current = restingX;
       retarget.current = initialPillState(restingX);
       target.set(restingX);
       // With a park (buyer Profile circle), appearing/hiding glides between
@@ -528,12 +531,14 @@ export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean,
       else glideTo(restingX);
       return;
     }
+    committedIndex.current = restingX;
     const step = pillCommit(retarget.current, restingX, Date.now());
     retarget.current = step.state;
     if (step.moveTo !== null) glideTo(step.moveTo);
   }, [shown, restingX, parkedAt, reduceMotion, opacity, target, x, glideTo, jumpTo]);
 
   const press = useCallback((index: number) => {
+    pressedAt.current = index !== committedIndex.current || !committedShown.current ? Date.now() : 0;
     committedShown.current = true;
     opacity.set(withTiming(1, { duration: 180 }));
     const step = pillPress(retarget.current, index, Date.now());

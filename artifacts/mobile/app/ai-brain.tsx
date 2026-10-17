@@ -335,6 +335,8 @@ function MessageBubble({
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
 interface EmptyStateProps {
+  context: AIScreenContext;
+  onPillPress: (text: string) => void;
   isTablet: boolean;
   /** False while the assistant is turned off — prompt chips would only be refused. */
   showPrompts?: boolean;

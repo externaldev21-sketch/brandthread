@@ -675,6 +675,7 @@ export interface BuyerOrderApiRow {
   sellerDisplayName?: string | null;
   sellerName?: string | null;
   sellerHandle?: string | null;
+  sellerLogoUrl?: string | null;
   status?: string | null;
   stripePaymentIntentId?: string | null;
   items?: BuyerOrderItemApiRow[] | null;

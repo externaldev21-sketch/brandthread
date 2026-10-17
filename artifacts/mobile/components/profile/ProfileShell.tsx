@@ -408,7 +408,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const topPad = headerTopInset;
   const videoAvatarSize = avatarGeometry(PROFILE_VIDEO_HEADER_AVATAR_SIZE).outer;
   const roleChips = [
-    <ProfileChip key="role" size="sm" label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} />,
+    ...(roleChipLabel ? [<ProfileChip key="role" size="sm" label={roleChipLabel} icon={roleChipIcon} />] : []),
     ...(identity.extraChips ?? []).map((c) => <ProfileChip key={c.label} size="sm" label={c.label} icon={c.icon} />),
   ];
   const bannerHeader = bannerMode ? (

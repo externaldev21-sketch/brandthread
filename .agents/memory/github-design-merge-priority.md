@@ -14,3 +14,9 @@ When syncing reviewed design PRs from GitHub dev, treat origin/dev as the source
 **Why:** The user reviewed the GitHub design changes and explicitly chose them over divergent local UI when a merge conflict occurred. They later explicitly required merge-only syncing with the local preview selector intact; a concurrent rebase previously disrupted the shared checkout.
 
 **How to apply:** During a requested GitHub dev sync, safeguard uncommitted work, inspect conflicts before resolution, and take the incoming file for UI conflicts when the user has confirmed those PRs as authoritative. Keep unrelated runtime fixes and the requested local preview selector intact, then verify the combined app with typecheck and preview.
+
+For reviewed PRs based on an older GitHub snapshot, the owner's explicit instruction to keep both sides takes precedence over taking an incoming UI file wholesale. Port the PR's described changes into the current shared component when an old route has since become a wrapper.
+
+**Why:** Older PRs can restore monolithic inbox, conversation, or Bag screens and silently bypass newer shared privacy, persistence, quantity, and cache behavior.
+
+**How to apply:** Read each PR's body, identify the current owner of its behavior, and integrate there. Preserve native icon imports and shared haptics while applying the approved visual or interaction change. A merge commit alone is not proof that every described change was integrated.
