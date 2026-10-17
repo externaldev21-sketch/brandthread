@@ -16,7 +16,7 @@ Every screen gets a side-by-side image under `docs/screenshots/claude/launch-ref
   - The API server was not running locally. A plain "Couldn't load" state is therefore not counted as a finding unless the same screen also fails in demo mode.
 - **Route sweep:** all 358 static routes were loaded once and triaged for "reachable but unfinished" screens (section E).
 - **Reference images:** these are the Mobbin MCP's inline previews, which are low-res. Full-res `image_url` downloads are blocked by the same network policy. Every reference is linked to its `mobbin_url` so it can be opened at full size.
-- **Approved apps:** every screen's primary reference comes from the approved apps (TikTok, Instagram, Depop, Vinted, Vestiaire, GOAT, Whatnot, Etsy, Shopify/Shop, X, Cash App, Revolut). A few onboarding entries in section E add a second frame from another app (Substack, Realtor.com, Hypelist, Pinterest, Oura, Zocdoc, Beli) only where no approved app had a matching step on Mobbin. Treat those as layout hints; the approved-app frame is the one to copy.
+- **Approved apps:** every screen's primary reference comes from the approved apps (TikTok, Instagram, Depop, Vinted, Vestiaire, GOAT, Whatnot, Etsy, Shopify/Shop, X, Cash App, Revolut). A few onboarding entries in section E also cite a frame from another app (Substack, Hypelist, Pinterest, Oura, Beli, Zocdoc) as a secondary layout hint. The approved-app frame is always the one to copy. The one step with no approved-app equivalent, the buyer-or-seller picker, says so and gives the Depop flow (no picker; "Start selling" later) as the fix.
 - **Seller menu trigger:** on this code the left tab-bar button opens the Studio menu on **tap**. Swiping it does nothing. The launch rule says never to change that trigger, glow or tab bar look, so section C audits the menu's **content** only.
 
 ## Owned by other sessions (not duplicated here)
@@ -134,13 +134,13 @@ These are bugs, not taste. Each one is detailed in its section.
 | D | Analytics sub-pages / Promote / Reviews | [Shopify: row lists](https://mobbin.com/screens/f736b711-925d-41d8-8750-a7ca6298ca42) |
 | E | Welcome (`/onboarding`, step 0 `WELCOME`; also served at `/account-type` and `/thread-explainer`, which redirect here when signed out) | [Depop: Welcome](https://mobbin.com/screens/aeb6b5b3-ab09-4fdb-8a87-54de341e2049)<br>[Hypelist: Welcome back](https://mobbin.com/screens/d96461fe-6ec6-4fe1-b002-3ae3373b9e19) |
 | E | Sign in (`/sign-in`) | [Instagram: Log in](https://mobbin.com/screens/f58993f9-06e7-4cea-a346-bd439ac0d6af)<br>[Depop: Sign up or login (email-first)](https://mobbin.com/screens/f6be3377-6f07-4518-ac80-e1f4fdb31c8b) |
-| E | Buyer or seller (`/onboarding`, step 1 `ACCOUNT_TYPE`) | [Substack: What brings you here?](https://mobbin.com/screens/fbb0f72a-66db-4e8b-beb0-dd79ddf29a11)<br>[Realtor.com: How can we help you](https://mobbin.com/screens/6e8e9a21-16e1-451c-8501-1c922357003b) |
+| E | Buyer or seller (`/onboarding`, step 1 `ACCOUNT_TYPE`) | [Depop: Start selling, Step 2 of 5](https://mobbin.com/screens/f1309ebc-8e30-48ea-8d56-0b72b1692c1e)<br>[Substack: What brings you here?](https://mobbin.com/screens/fbb0f72a-66db-4e8b-beb0-dd79ddf29a11) |
 | E | Create your account (`/onboarding`, step 2 `AUTH`, `SharedAuthStep`) | [Depop: Sign up or login (email-first)](https://mobbin.com/screens/f6be3377-6f07-4518-ac80-e1f4fdb31c8b)<br>[Depop: Welcome with OAuth](https://mobbin.com/screens/aeb6b5b3-ab09-4fdb-8a87-54de341e2049) |
 | E | What should we call you? (`/onboarding`, step 3 `NAME`) | [Depop: single-field step](https://mobbin.com/screens/f6be3377-6f07-4518-ac80-e1f4fdb31c8b) |
 | E | What do you want to see? (`/onboarding`, buyer step 4 `STYLE`) | [Whatnot: Let's find you something to shop for](https://mobbin.com/screens/6c141413-f738-43dd-9357-bea357bcf256)<br>[Depop: Show these brands in search](https://mobbin.com/screens/d4d76cbf-174b-4f5a-9c7a-df5521f6d0b1)<br>[Pinterest: interests grid](https://mobbin.com/screens/acb4ba2c-6b67-4302-b41e-81c9baaebaa3) |
 | E | What sizes do you wear? (`/onboarding`, buyer step 5 `SIZES`) | [Depop: Sizes](https://mobbin.com/screens/b1033b65-657a-46ab-892e-ce3fc8b85e3b) |
 | E | Follow a few brands (`/onboarding`, buyer step 6 `BRANDS`) | [X: Suggested for you](https://mobbin.com/screens/aebb416e-f4cb-4cb4-80da-2b1e31de6825) |
-| E | Never miss what matters (`/onboarding`, buyer step 8 / seller step 9 `NOTIFICATIONS`) | [Beli: Stay connected](https://mobbin.com/screens/441290e3-2ea8-4b7a-8017-40aefe806713)<br>[Zocdoc: Turn on notifications](https://mobbin.com/screens/624436bd-5176-4fb7-99af-161f59d3ac99) |
+| E | Never miss what matters (`/onboarding`, buyer step 8 / seller step 9 `NOTIFICATIONS`) | [Instagram: Turn on notifications](https://mobbin.com/screens/52549a8c-3cf5-4345-8266-f96580685602)<br>[TikTok: system prompt over the feed](https://mobbin.com/screens/68107d3f-3d37-44b2-af37-6a6b0be45a07)<br>[Beli](https://mobbin.com/screens/441290e3-2ea8-4b7a-8017-40aefe806713)<br>[Zocdoc](https://mobbin.com/screens/624436bd-5176-4fb7-99af-161f59d3ac99) |
 | E | Welcome to Brandthread (`/onboarding`, buyer step 9 / seller step 10 `SUCCESS`) | [TikTok: lands directly in the feed](https://mobbin.com/screens/7d1897a6-1e73-49f3-8310-69af88c3e2d9) |
 | E | Seller: Brand name + Brand stage (`/onboarding`, seller steps 4–5) | [Shopify: I am running my store as… (radio list)](https://mobbin.com/screens/c6e64236-9325-4812-b08f-e083aa084093)<br>[Depop: Start selling, Step 2 of 5](https://mobbin.com/screens/f1309ebc-8e30-48ea-8d56-0b72b1692c1e) |
 | E | Seller: Goals + "Make it feel like yours" (`/onboarding`, seller steps 6–7) | [Depop: Start selling, Step 2 of 5](https://mobbin.com/screens/f1309ebc-8e30-48ea-8d56-0b72b1692c1e)<br>[Depop: brand chips](https://mobbin.com/screens/d4d76cbf-174b-4f5a-9c7a-df5521f6d0b1) |
@@ -1340,7 +1340,8 @@ Reference: [Shopify: row lists](https://mobbin.com/screens/f736b711-925d-41d8-87
 
 ![E-account-type.jpg](screenshots/claude/launch-reference-audit/E-account-type.jpg)
 
-- Reference: [Substack: What brings you here?](https://mobbin.com/screens/fbb0f72a-66db-4e8b-beb0-dd79ddf29a11) · [Realtor.com: How can we help you](https://mobbin.com/screens/6e8e9a21-16e1-451c-8501-1c922357003b)
+- Reference: [Depop: Start selling, Step 2 of 5](https://mobbin.com/screens/f1309ebc-8e30-48ea-8d56-0b72b1692c1e) (approved app; secondary layout hint only: [Substack: What brings you here?](https://mobbin.com/screens/fbb0f72a-66db-4e8b-beb0-dd79ddf29a11))
+- **Approved-app pattern:** Depop and Vinted ask no buyer/seller question at sign-up. Everyone lands as a buyer, and selling is a later opt-in ("Start selling" → a short stepped setup). Mobbin has no buy-or-sell picker from an approved app; the closest frames are Substack, Realtor.com, Fiverr and Wise.
 - **Not in any reference app:**
   - The progress indicator is a "needle and thread" line: a solid white stroke with a dashed tail and ~10 hollow nodes. Every reference uses a plain segmented bar, dots, or "Step 2 of 5".
   - Letter-spaced kickers ("E x p l o r e", "C r e a t e") sit above each card title.
@@ -1348,9 +1349,11 @@ Reference: [Shopify: row lists](https://mobbin.com/screens/f736b711-925d-41d8-87
 - **Deviations:**
   - The cards are ~220–240pt tall, so the seller card runs under the sticky Continue button at 390x844 (its last row, "Launch your storefront / Analytics & growth tools", is clipped).
   - Substack's two cards are ~70pt each: icon, title, one-line subtitle, radio.
-- **Fix (Substack 1:1):**
-  - Two compact rows: icon, "Shop" / "Sell", a one-line subtitle, and a radio on the right.
-  - Remove the kickers and the checklists.
+- **Fix (Depop flow; Substack layout if Dev keeps the choice):**
+  - Preferred: drop this step. Send everyone to the buyer feed, and start seller setup from "Start selling" (as Depop does), which is already what the seller steps 4–7 do.
+  - If the choice stays:
+    - Two compact rows: icon, "Shop" / "Sell", a one-line subtitle, and a radio on the right.
+    - Remove the kickers and the checklists.
   - Replace the thread progress line with a thin segmented bar (Depop's "Start selling" uses "Step 2 of 5" text; Pinterest uses dots).
   - The progress line also appears on every later step, so fixing it once fixes the whole flow.
 
@@ -1430,7 +1433,7 @@ Reference: [Shopify: row lists](https://mobbin.com/screens/f736b711-925d-41d8-87
 
 ![E-notifications.jpg](screenshots/claude/launch-reference-audit/E-notifications.jpg)
 
-- Reference: [Beli: Stay connected](https://mobbin.com/screens/441290e3-2ea8-4b7a-8017-40aefe806713) · [Zocdoc: Turn on notifications](https://mobbin.com/screens/624436bd-5176-4fb7-99af-161f59d3ac99)
+- Reference: [Instagram: Turn on notifications](https://mobbin.com/screens/52549a8c-3cf5-4345-8266-f96580685602) · [TikTok: system prompt over the feed](https://mobbin.com/screens/68107d3f-3d37-44b2-af37-6a6b0be45a07) (secondary: [Beli](https://mobbin.com/screens/441290e3-2ea8-4b7a-8017-40aefe806713), [Zocdoc](https://mobbin.com/screens/624436bd-5176-4fb7-99af-161f59d3ac99))
 - **Not in any reference app:**
   - The sine-wave thread line with a bell bubble threaded on it.
   - The progress bar is still visible on a permission screen.
@@ -1438,7 +1441,7 @@ Reference: [Shopify: row lists](https://mobbin.com/screens/f736b711-925d-41d8-87
   - The copy talks about web ("Browser notifications are not enabled here… from the Brandthread app"). It's a web-only branch, but it shows in the preview.
   - The bullet list is left-aligned while the references center a short paragraph.
   - The CTA says "Continue", not "Turn on notifications".
-- **Fix (Beli/Zocdoc):** centered illustration (a static bell or a phone mock with a notification), centered title, a 2-line paragraph, a primary "Turn on notifications", and a "Not now" text link. Hide the progress bar.
+- **Fix (Instagram 1:1):** a centered "Turn on notifications" title and a one-line paragraph near the top, one static monochrome illustration in the middle, and a full-width primary "Turn on" pinned to the bottom (plus "Not now" text under it). Hide the progress bar. TikTok's alternative is to skip this screen entirely and fire the system prompt over the first feed video.
 
 ### Welcome to Brandthread (`/onboarding`, buyer step 9 / seller step 10 `SUCCESS`)
 
