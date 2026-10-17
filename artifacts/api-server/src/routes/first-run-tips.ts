@@ -9,13 +9,16 @@
  * Mounted at /api/first-run-tips.
  *   GET  /seen        — { seenTipIds: string[], skipAll: boolean }
  *   POST /:tipId/seen — mark one tip id as seen for this account (idempotent)
- *   POST /skip-all     — suppress every future first-run tip for this account
+ *   POST /skip-all     — body { skipAll?: boolean } (default true). true
+ *                        suppresses every future first-run tip; false turns
+ *                        "Skip all tips" back off (seen tips stay seen).
  *   POST /reset         — "Replay tips": clears all seen state and skipAll
  */
 import { Router } from "express";
 import { db, firstRunTipsSeen, firstRunTipsSettings } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { parseSkipAllBody } from "../lib/firstRunTipsSkipAll";
 
 const router = Router();
 router.use(requireAuth);
@@ -50,12 +53,14 @@ router.post("/:tipId/seen", async (req, res) => {
 
 router.post("/skip-all", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
+  const parsed = parseSkipAllBody(req.body);
+  if (!parsed.ok) return res.status(400).json({ error: parsed.error });
 
   await db.insert(firstRunTipsSettings)
-    .values({ userId, skipAll: true })
+    .values({ userId, skipAll: parsed.skipAll })
     .onConflictDoUpdate({
       target: firstRunTipsSettings.userId,
-      set: { skipAll: true, updatedAt: new Date() },
+      set: { skipAll: parsed.skipAll, updatedAt: new Date() },
     });
 
   return res.status(204).end();

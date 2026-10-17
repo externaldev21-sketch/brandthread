@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, View, Text, StyleSheet, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { hapticToggle } from '@/lib/haptics';
@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
+import { describePushRegistrationIssue, getLastPushRegistrationIssue } from '@/lib/contextualPushPermission';
 
 interface ToggleRow {
   key: string;
@@ -56,6 +57,17 @@ export default function PushNotificationsScreen() {
     GROUPS.forEach((g) => g.rows.forEach((r) => { initial[r.key] = r.default; }));
     return initial;
   });
+  // Last device-registration failure (e.g. missing EAS project ID), so a
+  // broken push setup is visible instead of silently doing nothing.
+  const [registrationIssue, setRegistrationIssue] = useState<string | null>(null);
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let active = true;
+    getLastPushRegistrationIssue().then((issue) => {
+      if (active) setRegistrationIssue(describePushRegistrationIssue(issue));
+    });
+    return () => { active = false; };
+  }, []);
 
   function toggle(key: string) {
     hapticToggle();
@@ -70,6 +82,20 @@ export default function PushNotificationsScreen() {
         contentContainerStyle={{ paddingTop: SPACING.md + 4, paddingBottom: 60, paddingHorizontal: SPACING.md + 4 }}
         showsVerticalScrollIndicator={false}
       >
+        {registrationIssue ? (
+          <View style={styles.group}>
+            <Text style={[TYPE_SCALE.footnote, styles.groupTitle, { color: colors.foreground }]}>This device</Text>
+            <Card style={styles.card}>
+              <ListRow
+                testID="push-registration-issue"
+                icon="alert-circle"
+                title="Push isn't set up on this device"
+                subtitle={registrationIssue}
+                subtitleNumberOfLines={6}
+              />
+            </Card>
+          </View>
+        ) : null}
         {GROUPS.map((group) => (
           <View key={group.title} style={styles.group}>
             <Text style={[TYPE_SCALE.footnote, styles.groupTitle, { color: colors.foreground }]}>{group.title}</Text>

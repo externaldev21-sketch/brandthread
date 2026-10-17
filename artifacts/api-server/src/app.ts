@@ -17,6 +17,7 @@ import {
   jsonNotFound,
   normalizeErrorResponses,
 } from "./middlewares/errorHandling";
+import { clerkAuthDiagnostics } from "./lib/clerkKeyReporting";
 import { appRateLimiter, rateLimit } from "./middlewares/rateLimit";
 import { validateMutationEnvelope } from "./middlewares/validateRequest";
 import { DESIGN_STUDIO_ASSET_MIME_TYPES } from "./lib/designStudioAssetTypes";
@@ -175,6 +176,8 @@ app.use(
     ),
   })),
 );
+// Logs an explicit CLERK_SECRET_KEY message when Clerk rejects the key.
+app.use(clerkAuthDiagnostics);
 
 app.use(appRateLimiter);
 // Attributes AI calls made while handling a request to the signed-in caller.

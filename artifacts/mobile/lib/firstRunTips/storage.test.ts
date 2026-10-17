@@ -14,6 +14,7 @@ import {
   replayAllTips,
   setSkipAllTips,
   syncFirstRunTipsFromServer,
+  updateSkipAllTips,
 } from './storage';
 
 /** A fake server, like the real first_run_tips_seen / first_run_tips_settings tables. */
@@ -32,6 +33,7 @@ function makeServer() {
         seenByUser.set('user_123', set);
       }),
       skipAll: vi.fn(async () => { skipAllByUser.set('user_123', true); }),
+      setSkipAll: vi.fn(async (value: boolean) => { skipAllByUser.set('user_123', value); }),
       reset: vi.fn(async () => { seenByUser.set('user_123', new Set()); skipAllByUser.set('user_123', false); }),
     },
   };
@@ -135,6 +137,33 @@ describe('First-run tips persistence — local cache + server reconcile', () => 
 
     const localOther = await readLocalFirstRunTipsState('user_456');
     expect(localOther.seenIds.size).toBe(0);
+  });
+
+  it('updateSkipAllTips turns Skip all off on the server and locally, keeping seen tips', async () => {
+    const { api, skipAllByUser } = makeServer();
+    const on = await updateSkipAllTips('user_123', true, { seenIds: new Set(['a']), skipAll: false }, api);
+    expect(on.skipAll).toBe(true);
+    expect(skipAllByUser.get('user_123')).toBe(true);
+
+    const off = await updateSkipAllTips('user_123', false, on, api);
+    expect(off.skipAll).toBe(false);
+    expect(off.seenIds.has('a')).toBe(true);
+    expect(api.firstRunTips.setSkipAll).toHaveBeenLastCalledWith(false);
+    expect(skipAllByUser.get('user_123')).toBe(false);
+    expect((await readLocalFirstRunTipsState('user_123')).skipAll).toBe(false);
+
+    // And the next server reconcile keeps it off.
+    expect((await syncFirstRunTipsFromServer('user_123', api)).skipAll).toBe(false);
+  });
+
+  it('updateSkipAllTips restores the previous local value and rethrows when the server fails', async () => {
+    const { api } = makeServer();
+    await updateSkipAllTips('user_123', true, { seenIds: new Set(), skipAll: false }, api);
+    api.firstRunTips.setSkipAll.mockRejectedValueOnce(new Error('Server error'));
+    await expect(
+      updateSkipAllTips('user_123', false, { seenIds: new Set(), skipAll: true }, api),
+    ).rejects.toThrow('Server error');
+    expect((await readLocalFirstRunTipsState('user_123')).skipAll).toBe(true);
   });
 
   async function markTipSeenAndFlush(userId: string) {

@@ -36,6 +36,8 @@ import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { isAgentUserId } from "../lib/brandthreadAgent";
 import { enrichProductAttachments } from "../lib/productAttachmentInfo";
 import { enrichOrderAttachments } from "../lib/orderAttachmentInfo";
+import { getUserAppSettingsMany } from "../lib/userAppSettingsStore";
+import { maskReadReceipt } from "../lib/userAppSettings";
 import {
   checkUpload, validateMediaAttachment, decideOrderShare, decidePostShare, decideProductShare,
 } from "../lib/dmAttachmentPolicy";
@@ -344,6 +346,18 @@ router.post("/", rateLimit("messaging"), async (req, res) => {
         return res.status(403).json({ error: `Unable to add ${p.name || "that person"} to the group.`, code: "BLOCKED" });
       }
     }
+    // "Who can add you to groups" (Settings → Who can message and see me):
+    // 'friends' only lets people the invitee follows add them.
+    const inviteeSettings = await getUserAppSettingsMany(participants.map((p) => p.userId));
+    for (const p of participants) {
+      if (inviteeSettings.get(p.userId)?.groupAdds !== "friends") continue;
+      if (!(await isFollowedBy(p.userId, myUserId))) {
+        return res.status(403).json({
+          error: `${p.name || "That person"} only lets people they follow add them to groups.`,
+          code: "GROUP_ADD_RESTRICTED",
+        });
+      }
+    }
     const [conv] = await db.insert(conversations).values({ type: "group" }).returning();
     await db.insert(conversationParticipants).values([
       {
@@ -595,11 +609,15 @@ router.get("/:id/messages", async (req, res) => {
     msgs.map((m) => m.replyToId).filter((v): v is string => !!v),
   );
 
-  const adapted = msgs.reverse().map((m) => adaptMessage(
+  // Read receipts (Settings → Who can message and see me): a participant who
+  // turned them off never reveals that they read the viewer's messages.
+  const otherSettings = await getUserAppSettingsMany(parts.filter((p) => p.userId !== userId).map((p) => p.userId));
+  const othersShareReadReceipts = [...otherSettings.values()].every((s) => s.readReceipts);
+  const adapted = msgs.reverse().map((m) => maskReadReceipt(adaptMessage(
     m,
     reactionsByMessage.get(m.id) ?? [],
     m.replyToId ? replyPreviewById.get(m.replyToId) : undefined,
-  ));
+  ), userId, othersShareReadReceipts));
   // Product cards (item 70): always show the CURRENT price/name/image, or an
   // honest "No longer available" state — never the stale value cached on the
   // message at send time. See lib/productAttachmentInfo.ts.

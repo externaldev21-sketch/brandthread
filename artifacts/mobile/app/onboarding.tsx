@@ -68,7 +68,7 @@ import { DEFAULT_BUYER_PROFILE, saveBuyerProfileForUser } from '@/lib/buyerProfi
 import { SellerPlanRecommendationStep } from '@/components/onboarding/SellerPlanRecommendationStep';
 import { recommendSellerPlan } from '@/lib/sellerPlans';
 import type { SellerPlanId } from '@/lib/sellerBilling';
-import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
+import { registerGrantedPushToken, requestOnboardingPushPermission } from '@/lib/contextualPushPermission';
 import {
   queueBuyerOnboardingSync,
   isRecoverableBuyerOnboardingSyncError,
@@ -461,7 +461,7 @@ const createSl = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
 
 // ─── Notifications step ────────────────────────────────────────────────────────
-function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: () => void; onSkip: () => void }) {
+function NotificationsStep({ flow, onEnable, onSkip, enabling = false }: { flow: Flow; onEnable: () => void; onSkip: () => void; enabling?: boolean }) {
   const { theme } = useAppTheme();
   const sn = createSn(theme);
   const insets  = useSafeAreaInsets();
@@ -510,7 +510,7 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
       </View>
 
       <Reveal index={8} style={sn.btns}>
-        <PillButton label="Continue" onPress={onEnable} />
+        <PillButton testID="onboarding-notifications-continue" label="Continue" onPress={onEnable} loading={enabling} disabled={enabling} />
         <PillButton
           testID="onboarding-notifications-skip"
           accessibilityLabel="Not now"
@@ -2184,6 +2184,21 @@ export default function OnboardingScreen() {
     prevSignedIn.current = isSignedIn ?? false;
   }, [isSignedIn, ready, flow]);
 
+  // "Never miss what matters" → Continue: ask for notification permission
+  // and register the push token. Denial, web and errors never block
+  // onboarding — the step always advances.
+  const [enablingPush, setEnablingPush] = useState(false);
+  async function enableNotificationsAndContinue(next: number) {
+    if (enablingPush) return;
+    setEnablingPush(true);
+    try {
+      await requestOnboardingPushPermission(user?.id, api);
+    } finally {
+      setEnablingPush(false);
+      transitionTo(next, 1);
+    }
+  }
+
   // ── Navigation helpers ──────────────────────────────────────────────────────
   function transitionTo(next: number, dir: 1 | -1, initiatedAt = performance.now()) {
     const sequence = ++transitionSequence.current;
@@ -2632,7 +2647,8 @@ export default function OnboardingScreen() {
       if (step === BUYER_STEP_INDEX.NOTIFICATIONS) return (
         <NotificationsStep
           flow="buyer"
-          onEnable={() => transitionTo(BUYER_STEP_INDEX.SUCCESS, 1)}
+          enabling={enablingPush}
+          onEnable={() => { void enableNotificationsAndContinue(BUYER_STEP_INDEX.SUCCESS); }}
           onSkip={() => transitionTo(BUYER_STEP_INDEX.SUCCESS, 1)}
         />
       );
@@ -2805,7 +2821,8 @@ export default function OnboardingScreen() {
       if (step === SELLER_STEP_INDEX.NOTIFICATIONS) return (
         <NotificationsStep
           flow="seller"
-          onEnable={() => transitionTo(SELLER_STEP_INDEX.SUCCESS, 1)}
+          enabling={enablingPush}
+          onEnable={() => { void enableNotificationsAndContinue(SELLER_STEP_INDEX.SUCCESS); }}
           onSkip={() => transitionTo(SELLER_STEP_INDEX.SUCCESS, 1)}
         />
       );

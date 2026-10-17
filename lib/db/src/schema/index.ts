@@ -10,6 +10,7 @@ export * from './money';
 export * from './productLaunches';
 export * from './threadCash';
 export * from './threadCashExpiry';
+export * from './userAppSettings';
 export * from './shopifyFulfillment';
 export * from './productFit';
 export * from './metaAds';
@@ -47,6 +48,10 @@ export const users = pgTable('users', {
   // Buyer / unified profile fields
   displayName: text('display_name'),
   bio: text('bio'),
+  // Free-text pronouns shown on the public profile (migration 271).
+  pronouns: text('pronouns'),
+  // Buyer "Style badge" pill ({ label, emoji, enabled }); null = never set (migration 271).
+  styleBadge: jsonb('style_badge').$type<{ label: string; emoji: string; enabled: boolean }>(),
   profileImageUrl: text('profile_image_url'),
   accountType: text('account_type'), // 'buyer' | 'seller' | 'both'
   appThemeId: text('app_theme_id').notNull().default('monochrome'),

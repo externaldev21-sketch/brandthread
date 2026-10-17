@@ -8,7 +8,9 @@ type AlertButton = {
   onPress?: () => void | Promise<void>;
 };
 
-const { alertMock, useUserMock, routerBackMock, routerPushMock } = vi.hoisted(() => ({
+const { alertMock, useUserMock, routerBackMock, routerPushMock, shareMock, clipboardMock } = vi.hoisted(() => ({
+  shareMock: vi.fn(async () => ({ action: 'sharedAction' })),
+  clipboardMock: vi.fn(async () => true),
   alertMock: vi.fn(),
   useUserMock: vi.fn(),
   routerBackMock: vi.fn(),
@@ -31,6 +33,8 @@ vi.mock('react-native', () => {
     Modal: nativeComponent('Modal'),
     Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
     Pressable: nativeComponent('Pressable'),
+    Share: { share: shareMock },
+    Switch: nativeComponent('Switch'),
     ScrollView: nativeComponent('ScrollView'),
     StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
     Text: nativeComponent('Text'),
@@ -104,7 +108,20 @@ vi.mock('expo-router', () => ({
 
 vi.mock('@clerk/expo', () => ({
   useUser: useUserMock,
+  useReverification: (fn: (...args: unknown[]) => unknown) => fn,
 }));
+
+vi.mock('expo-clipboard', () => ({ setStringAsync: clipboardMock }));
+vi.mock('@/components/CachedImage', () => ({
+  CachedImage: (props: Record<string, unknown>) => require('react').createElement('CachedImage', props),
+}));
+
+// lib/useFocusedAnimationLoop (via BrandthreadUI) reads NavigationContext;
+// the real package pulls in untransformed react-native Flow sources.
+vi.mock('@react-navigation/native', () => {
+  const React = require('react');
+  return { NavigationContext: React.createContext(undefined) };
+});
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -175,6 +192,9 @@ type TestUser = {
   reload: ReturnType<typeof vi.fn>;
   updatePassword: ReturnType<typeof vi.fn>;
   createExternalAccount: ReturnType<typeof vi.fn>;
+  createTOTP: ReturnType<typeof vi.fn>;
+  verifyTOTP: ReturnType<typeof vi.fn>;
+  createBackupCode: ReturnType<typeof vi.fn>;
 };
 
 let currentUser: TestUser;
@@ -206,6 +226,9 @@ function makeUser(accounts: ExternalAccount[] = []): TestUser {
       currentUser.passwordEnabled = true;
     }),
     createExternalAccount: vi.fn(),
+    createTOTP: vi.fn(async () => ({ secret: 'SECRET', uri: 'otpauth://totp/x' })),
+    verifyTOTP: vi.fn(async () => ({ backupCodes: ['code-1', 'code-2'] })),
+    createBackupCode: vi.fn(async () => ({ codes: ['fresh-1', 'fresh-2'] })),
   };
 }
 
@@ -377,5 +400,82 @@ describe('LoginMethods linked-account removal', () => {
     expect(rendererForTest.root.findByProps({ testID: 'setup-password-login-method' })).toBeTruthy();
     expect(rendererForTest.root.findByProps({ testID: 'password-setup-error' }).props.children)
       .toBe("Couldn't add your password. Try again.");
+  });
+});
+
+describe('LoginMethods authenticator setup backup codes', () => {
+  beforeEach(() => {
+    alertMock.mockReset();
+    shareMock.mockClear();
+    clipboardMock.mockClear();
+    currentUser = makeUser([makeExternalAccount('google')]);
+    useUserMock.mockImplementation(() => ({ user: currentUser, isLoaded: true }));
+  });
+
+  afterEach(async () => {
+    await act(async () => {
+      rendererForTest?.unmount();
+    });
+  });
+
+  function textContent(): string {
+    return rendererForTest.root
+      .findAll((node) => (node.type as unknown) === 'Text')
+      .map((node) => node.children.filter((c) => typeof c === 'string').join(''))
+      .join('|');
+  }
+
+  async function startAndVerify() {
+    rendererForTest = await renderScreen();
+    const enable = rendererForTest.root.findAll((n) => n.props.label === 'Enable' && typeof n.props.onPress === 'function')[0];
+    await act(async () => { await enable.props.onPress(); });
+    const input = rendererForTest.root.findAll((n) => n.props.placeholder === '000000' && typeof n.props.onChangeText === 'function')[0];
+    await act(async () => { input.props.onChangeText('123456'); });
+    await act(async () => {
+      await rendererForTest.root.findAllByProps({ testID: 'totp-verify' })[0].props.onPress();
+    });
+  }
+
+  const done = () => rendererForTest.root.findAllByProps({ testID: 'setup-backup-codes-done' })[0];
+
+  it('shows the codes returned by verifyTOTP and requires acknowledgement before finishing', async () => {
+    await startAndVerify();
+    expect(currentUser.verifyTOTP).toHaveBeenCalledWith({ code: '123456' });
+    expect(currentUser.createBackupCode).not.toHaveBeenCalled();
+    expect(textContent()).toContain('code-1');
+    expect(done().props.disabled).toBe(true);
+
+    await act(async () => { await rendererForTest.root.findAllByProps({ testID: 'setup-copy-backup-codes' })[0].props.onPress(); });
+    expect(clipboardMock).toHaveBeenCalledWith(expect.stringContaining('code-2'));
+    await act(async () => { await rendererForTest.root.findAllByProps({ testID: 'setup-share-backup-codes' })[0].props.onPress(); });
+    expect(shareMock).toHaveBeenCalledWith({ message: expect.stringContaining('code-1') });
+
+    await act(async () => { rendererForTest.root.findAllByProps({ testID: 'setup-backup-codes-ack' })[0].props.toggle.onChange(true); });
+    expect(done().props.disabled).toBe(false);
+    await act(async () => { done().props.onPress(); });
+    expect(alertMock).toHaveBeenLastCalledWith('Two-factor authentication enabled', expect.any(String));
+  });
+
+  it('generates codes with createBackupCode when verify returns none', async () => {
+    currentUser.verifyTOTP.mockResolvedValueOnce({ backupCodes: [] });
+    await startAndVerify();
+    expect(currentUser.createBackupCode).toHaveBeenCalledOnce();
+    expect(textContent()).toContain('fresh-1');
+  });
+
+  it('shows the real error when backup code generation fails and keeps Done disabled', async () => {
+    currentUser.verifyTOTP.mockResolvedValueOnce({});
+    currentUser.createBackupCode.mockRejectedValueOnce(new Error('Backup codes are disabled for this instance.'));
+    await startAndVerify();
+    expect(textContent()).toContain('Backup codes are disabled for this instance.');
+    expect(done().props.disabled).toBe(true);
+    expect(rendererForTest.root.findAllByProps({ testID: 'setup-generate-backup-codes' }).length).toBeGreaterThan(0);
+  });
+
+  it('keeps the setup step open with an inline error when the code is wrong', async () => {
+    currentUser.verifyTOTP.mockRejectedValueOnce({ errors: [{ code: 'form_code_incorrect', message: 'Incorrect code' }] });
+    await startAndVerify();
+    expect(rendererForTest.root.findAllByProps({ testID: 'totp-verify-error' }).length).toBeGreaterThan(0);
+    expect(rendererForTest.root.findAllByProps({ testID: 'setup-backup-codes-done' })).toHaveLength(0);
   });
 });

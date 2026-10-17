@@ -8,6 +8,7 @@
  */
 import { logger } from "./logger";
 import { assertStagingIsSafe, resolveAppEnv } from "./appEnv";
+import { probeClerkSecretKey, reportClerkKeyIssues } from "./clerkKeyReporting";
 
 type RequiredVar = {
   name: string;
@@ -74,6 +75,11 @@ export function validateEnv(): void {
         "The server cannot start without these — see docs/launch/README.md.",
     );
   }
+
+  // Prefix / quotes / whitespace / dev-vs-prod mismatch checks, then one
+  // live call so a rejected CLERK_SECRET_KEY is obvious at boot.
+  reportClerkKeyIssues();
+  void probeClerkSecretKey();
 
   const missingOptional = OPTIONAL_VARS.filter((name) => !process.env[name]?.trim());
   if (missingOptional.length > 0) {

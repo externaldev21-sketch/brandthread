@@ -12,6 +12,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { isStoreLanguage } from "../lib/storeLanguage";
 
 const router = Router();
 router.use(requireAuth);
@@ -34,6 +35,9 @@ router.get("/", async (req, res) => {
 router.patch("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const updates = req.body; // e.g. { language: 'fr', ...}
+  if (updates && typeof updates === "object" && "storeLanguage" in updates && !isStoreLanguage(updates.storeLanguage)) {
+    return res.status(400).json({ error: "Unsupported store language", code: "INVALID_STORE_LANGUAGE" });
+  }
 
   try {
     await db.execute(sql`

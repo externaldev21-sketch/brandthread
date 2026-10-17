@@ -5,7 +5,7 @@
 import React, { useCallback, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, } from 'react-native';
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -21,6 +21,9 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
+import { updateBuyerSettings } from '@/lib/buyerSettingsSync';
+import { apiErrorMessage } from '@/lib/safety';
+import { useApi } from '@/lib/api';
 import { radius } from '@/constants/radii';
 
 const TOPS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL+'];
@@ -81,6 +84,7 @@ export default function ShoppingPreferences() {
   const s = createStyles(colors);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const api = useApi();
   const [settings, setSettings] = useState<BuyerSettingsState | null>(null);
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [hasChanges, setHasChanges] = useState(false);
@@ -96,6 +100,18 @@ export default function ShoppingPreferences() {
     const next = await patchBuyerSettings(updates);
     setSettings(next);
     setHasChanges(true);
+  }
+
+  // Personalized recommendations is an account setting the For You ranking
+  // reads on the server — saved immediately, rolled back with the real error.
+  async function setPersonalized(v: boolean) {
+    setSettings(prev => prev ? { ...prev, personalizedRecommendations: v } : prev);
+    try {
+      setSettings(await updateBuyerSettings(api, { personalizedRecommendations: v }));
+    } catch (error) {
+      setSettings(prev => prev ? { ...prev, personalizedRecommendations: !v } : prev);
+      Alert.alert('Couldn’t update recommendations', apiErrorMessage(error, 'Check your connection and try again.'));
+    }
   }
 
   async function save() {
@@ -228,7 +244,7 @@ export default function ShoppingPreferences() {
             </View>
             <HapticSwitch
               value={Boolean(settings.personalizedRecommendations)}
-              onValueChange={v => patch({ personalizedRecommendations: v })}
+              onValueChange={v => { void setPersonalized(v); }}
             />
           </View>
         </View>

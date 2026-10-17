@@ -32,6 +32,7 @@ import {
 } from "../lib/pagination";
 import { setPublicCacheHeaders, setViewerScopedCacheHeaders } from "../lib/httpCache";
 import { applySalesToVariants } from "../lib/pricing/salesRuntime";
+import { getStoreLanguage } from "../lib/storeLanguage";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -1294,7 +1295,10 @@ router.get("/sellers/:sellerId", async (req, res) => {
   if (viewerId && viewerId !== canonicalClerkId && await isBlockedEitherWay(viewerId, canonicalClerkId)) {
     return res.status(404).json({ error: "Seller not found" });
   }
-  const vacation = await getSellerVacationStatus(canonicalClerkId);
+  const [vacation, storeLanguage] = await Promise.all([
+    getSellerVacationStatus(canonicalClerkId),
+    getStoreLanguage(canonicalClerkId),
+  ]);
 
   const activeProductsWhere = and(
     eq(products.ownerId, canonicalClerkId),
@@ -1389,6 +1393,8 @@ router.get("/sellers/:sellerId", async (req, res) => {
       vacationMode: vacation.active,
       vacationMessage: vacation.active ? vacation.message : null,
       vacationUntil: vacation.until?.toISOString() ?? null,
+      // Language tag the seller writes their store content in (no translation).
+      storeLanguage,
       profileImageUrl,
       productsCount: Number(activeProductsCount),
       videosCount: Number(publicPostsCount),

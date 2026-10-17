@@ -61,6 +61,7 @@ import { RESHARE_CARD_RADIUS, RESHARE_FALLBACK_COLORS, reshareGradientFromBackgr
 import type { MentionPerson } from '@/services/socialTypes';
 import { radius } from '@/constants/radii';
 import { getMediaLibrary } from '@/lib/mediaLibraryCompat';
+import { getBuyerSettingsSnapshot, uploadQuality } from '@/lib/buyerSettings';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
@@ -770,7 +771,7 @@ export default function StoryComposer() {
     if (!cameraRef.current) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      const result = await cameraRef.current.takePictureAsync({ quality: 0.9 });
+      const result = await cameraRef.current.takePictureAsync({ quality: uploadQuality(0.9) });
       if (!result?.uri) return;
       if (gridSpec) {
         setGridCells((prev) => {
@@ -811,7 +812,7 @@ export default function StoryComposer() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
-      quality: 0.9,
+      quality: uploadQuality(0.9),
       videoMaxDuration: MAX_VIDEO_SECONDS,
     });
     if (!result.canceled && result.assets[0]) {
@@ -978,9 +979,11 @@ export default function StoryComposer() {
         overlays: payload.ovs.length ? payload.ovs : undefined,
       }];
 
+      // Settings → Who can message and see me → Story replies.
+      const accountReplies = getBuyerSettingsSnapshot().storyReplies;
       const privacy: StoryPrivacySettings = {
         visibility: 'public',
-        replyPermission: 'everyone',
+        replyPermission: accountReplies === 'off' ? 'everyone' : accountReplies,
         hiddenFromUserIds: [],
         closeFriendsOnly: closeOnly,
       };
@@ -989,7 +992,7 @@ export default function StoryComposer() {
       // with the same media, which would have published every story — and
       // notified every @mention — twice.) media[].overlays carries the mention
       // fields (mentionUserId/mentionHandle/mentionStyle/opacity) through as-is.
-      await createStory({ media, privacy, repliesDisabled: false, originalStoryId: reshareStoryId });
+      await createStory({ media, privacy, repliesDisabled: accountReplies === 'off', originalStoryId: reshareStoryId });
 
       hapticSuccessAction();
       // Let the ring visibly complete (matches IG's own pill, which always

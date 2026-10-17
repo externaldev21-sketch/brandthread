@@ -1,12 +1,16 @@
 /**
  * Account Type Settings — lets a user see their current account type
- * and request a switch between Buyer and Seller modes.
+ * and switch between Buyer and Seller modes. The switch applies right away:
+ * the server accountType is updated first, then the local role (RoleContext
+ * + AuthGate's 'user_role') and the app routes to the new home. A buyer with
+ * no brand yet sets one up here and continues into the store setup checklist.
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView,
+  View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView, TextInput,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +22,14 @@ import { useAuth } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAgeStatus } from '@/lib/ageGate';
 import { AgeAskInline, AgeRestrictedInline } from '@/components/age/AgeNotices';
+import { useRole } from '@/contexts/RoleContext';
+import {
+  SELLER_BRAND_STAGES,
+  accountTypeSwitchErrorMessage,
+  destinationAfterSwitch,
+  emitAccountRoleChanged,
+  needsSellerSetup,
+} from '@/lib/accountTypeSwitch';
 
 type AccountType = 'seller' | 'buyer';
 
@@ -30,11 +42,17 @@ export default function AccountTypeSettingsScreen() {
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const requestRef = useRef(0);
   const age = useAgeStatus();
+  const { setRole } = useRole();
 
   const [currentType, setCurrentType] = useState<AccountType | null>(null);
   const [selectedType, setSelectedType] = useState<AccountType | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Brand fields every seller account needs (see needsSellerSetup).
+  const [sellerSetupNeeded, setSellerSetupNeeded] = useState(false);
+  const [brandName, setBrandName] = useState('');
+  const [brandStage, setBrandStage] = useState('');
   const accountInfo: Record<AccountType, { icon: keyof typeof Feather.glyphMap; color: string; title: string; bullets: string[] }> = {
     seller: {
       icon: 'shopping-bag',
@@ -53,14 +71,21 @@ export default function AccountTypeSettingsScreen() {
   function fetchProfile() {
     const requestId = ++requestRef.current;
     setLoading(true);
+    setLoadError(null);
     api.auth.me()
-      .then((profile: any) => {
+      .then((profile) => {
         if (requestId !== requestRef.current) return;
         const t: AccountType = profile?.accountType === 'buyer' ? 'buyer' : 'seller';
         setCurrentType(t);
         setSelectedType(t);
+        const brand = profile as { brandName?: string | null; brandStage?: string | null };
+        setSellerSetupNeeded(needsSellerSetup(brand));
+        setBrandName(brand.brandName?.trim() ?? '');
+        setBrandStage(brand.brandStage?.trim() ?? '');
       })
-      .catch(() => {
+      .catch((error) => {
+        if (requestId !== requestRef.current) return;
+        setLoadError(accountTypeSwitchErrorMessage(error));
       })
       .finally(() => setLoading(false));
   }
@@ -83,34 +108,49 @@ export default function AccountTypeSettingsScreen() {
   }, []);
 
   const isDirty = selectedType !== null && selectedType !== currentType;
+  const showSellerSetup = isDirty && selectedType === 'seller' && sellerSetupNeeded;
+  const sellerSetupValid = brandName.trim().length > 0 && brandStage.length > 0;
+  const canSave = isDirty && (!showSellerSetup || sellerSetupValid);
+
+  async function applySwitch(target: AccountType) {
+    setSaving(true);
+    try {
+      const settingUpSeller = target === 'seller' && sellerSetupNeeded;
+      if (settingUpSeller) {
+        // Same server write seller onboarding uses for the brand fields.
+        await api.auth.onboarding({ brandName: brandName.trim(), brandStage });
+      }
+      // Server is authoritative (it also enforces the seller age gate).
+      await api.auth.updateProfile({ accountType: target });
+      if (settingUpSeller) setSellerSetupNeeded(false);
+      setCurrentType(target);
+      // AuthGate routes by this key; RoleContext keeps its own per-user key.
+      await AsyncStorage.setItem('user_role', target).catch(() => {});
+      await setRole(target).catch(() => {});
+      emitAccountRoleChanged(target);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const dest = destinationAfterSwitch(target, { completedSellerSetupNow: settingUpSeller });
+      router.replace(dest.home as never);
+      if (dest.next) router.push(dest.next as never);
+    } catch (error) {
+      Alert.alert('Could not switch account type', accountTypeSwitchErrorMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleSave() {
-    if (!selectedType || !isDirty) return;
+    if (!selectedType || !canSave) return;
+    const target = selectedType;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
-      `Switch to ${accountInfo[selectedType].title}?`,
-      'Switching account type will change the features available to you. You can switch back at any time.',
+      `Switch to ${accountInfo[target].title}?`,
+      target === 'seller' && sellerSetupNeeded
+        ? 'We\u2019ll save your brand and take you to your store setup checklist. You can switch back at any time.'
+        : 'Switching account type changes the features available to you. You can switch back at any time.',
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Switch',
-          onPress: async () => {
-            setSaving(true);
-            try {
-              await api.auth.updateProfile({ accountType: selectedType });
-              setCurrentType(selectedType);
-              Alert.alert(
-                'Account type updated',
-                `You are now a ${accountInfo[selectedType].title}. Restart the app to apply all changes.`,
-                [{ text: 'OK', onPress: () => goBackOr(router, '/buyer-settings-menu') }],
-              );
-            } catch {
-              Alert.alert('Error', 'Could not update account type. Please try again.');
-            } finally {
-              setSaving(false);
-            }
-          },
-        },
+        { text: 'Switch', onPress: () => { void applySwitch(target); } },
       ],
     );
   }
@@ -123,8 +163,18 @@ export default function AccountTypeSettingsScreen() {
         <View style={s.loadingWrap}>
           <ActivityIndicator color={colors.primary} />
         </View>
+      ) : loadError && !currentType ? (
+        <View style={s.loadingWrap}>
+          <Text style={s.errorText}>{loadError}</Text>
+          <TouchableOpacity style={s.retryBtn} activeOpacity={0.85} onPress={fetchProfile}>
+            <Text style={s.retryText}>Try again</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 60 }}>
+        <ScrollView
+          contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 60 }}
+          keyboardShouldPersistTaps="handled"
+        >
 
           {/* Current badge */}
           {currentType && (
@@ -176,17 +226,58 @@ export default function AccountTypeSettingsScreen() {
             );
           })}
 
+          {/* Seller setup — a buyer with no brand yet sets one up before switching */}
+          {showSellerSetup && age.status === 'ok' && (
+            <View style={s.setupWrap}>
+              <Text style={s.sectionLabel}>Set up your brand</Text>
+              <Text style={s.setupHint}>
+                Seller accounts need a brand. After switching you'll continue to your store setup checklist.
+              </Text>
+              <TextInput
+                style={s.input}
+                value={brandName}
+                onChangeText={setBrandName}
+                placeholder="Brand name"
+                placeholderTextColor={colors.mutedForeground}
+                autoCapitalize="words"
+                maxLength={60}
+                accessibilityLabel="Brand name"
+              />
+              {SELLER_BRAND_STAGES.map((stage) => {
+                const isSel = brandStage === stage.value;
+                return (
+                  <TouchableOpacity
+                    key={stage.value}
+                    style={[s.stageRow, isSel && { borderColor: colors.primary }]}
+                    activeOpacity={0.8}
+                    onPress={() => { Haptics.selectionAsync(); setBrandStage(stage.value); }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSel }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.typeTitle}>{stage.label}</Text>
+                      <Text style={s.bulletText}>{stage.sub}</Text>
+                    </View>
+                    <View style={[s.radioOuter, isSel && { borderColor: colors.primary }]}>
+                      {isSel && <View style={[s.radioInner, { backgroundColor: colors.primary }]} />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
           {/* Save button */}
           {age.status !== 'ok' && selectedType === 'seller' ? (age.status === 'restricted' ? <AgeRestrictedInline /> : <AgeAskInline onResolved={age.setBand} />) : <TouchableOpacity
-            style={[s.saveBtn, { backgroundColor: colors.primary }, !isDirty && s.saveBtnDisabled]}
+            style={[s.saveBtn, { backgroundColor: colors.primary }, !canSave && s.saveBtnDisabled]}
             activeOpacity={0.85}
-            disabled={!isDirty || saving}
+            disabled={!canSave || saving}
             onPress={handleSave}
           >
             {saving ? (
               <ActivityIndicator color={colors.primaryForeground} />
             ) : (
-              <Text style={[s.saveBtnText, { color: colors.primaryForeground }, !isDirty && { color: colors.mutedForeground }]}>
+              <Text style={[s.saveBtnText, { color: colors.primaryForeground }, !canSave && { color: colors.mutedForeground }]}>
                 {isDirty ? `Switch to ${selectedType ? accountInfo[selectedType].title : ''}` : 'No changes'}
               </Text>
             )}
@@ -224,6 +315,14 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   saveBtn:        { borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center', marginTop: SP.md, minHeight: 48 },
   saveBtnDisabled:{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   saveBtnText:    { fontSize: FS.base, lineHeight: 19, fontFamily: FONT.bold },
+
+  setupWrap:  { marginTop: SP.sm },
+  setupHint:  { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.regular, color: colors.mutedForeground, marginBottom: SP.sm },
+  input:      { backgroundColor: colors.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: SP.md, paddingVertical: 12, fontSize: FS.base, fontFamily: FONT.regular, color: colors.foreground, marginBottom: SP.sm },
+  stageRow:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: colors.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: colors.border, padding: SP.md, marginBottom: SP.xs },
+  errorText:  { fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', paddingHorizontal: SP.lg },
+  retryBtn:   { marginTop: SP.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: SP.lg, paddingVertical: 10 },
+  retryText:  { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.semibold, color: colors.foreground },
 
   disclaimer: { fontSize: FS.xs, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: SP.md },
 });

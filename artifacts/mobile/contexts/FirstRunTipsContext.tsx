@@ -24,6 +24,7 @@ import {
   replayAllTips,
   setSkipAllTips,
   syncFirstRunTipsFromServer,
+  updateSkipAllTips,
 } from '@/lib/firstRunTips/storage';
 
 interface FirstRunTipsContextValue {
@@ -37,6 +38,8 @@ interface FirstRunTipsContextValue {
   activeTipId: string | null;
   markSeen: (tipId: string) => void;
   setSkipAllTips: () => void;
+  /** Settings toggle: persists on/off to server + local; rejects (and reverts) on failure. */
+  setSkipAll: (value: boolean) => Promise<void>;
   replayTips: () => Promise<void>;
 }
 
@@ -95,6 +98,21 @@ export function FirstRunTipsProvider({ children }: { children: React.ReactNode }
     setState((current) => setSkipAllTips(userId, current, api));
   }, [userId, api]);
 
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const setSkipAll = useCallback(async (value: boolean) => {
+    const previous = stateRef.current;
+    // Optimistic flip so the switch responds instantly; reverted on failure.
+    setState((current) => ({ ...current, skipAll: value }));
+    try {
+      await updateSkipAllTips(userId, value, previous, api);
+    } catch (error) {
+      setState((current) => ({ ...current, skipAll: previous.skipAll }));
+      throw error;
+    }
+  }, [userId, api]);
+
   const replayTips = useCallback(async () => {
     const reset = await replayAllTips(userId, api);
     setState(reset);
@@ -109,8 +127,9 @@ export function FirstRunTipsProvider({ children }: { children: React.ReactNode }
     activeTipId,
     markSeen,
     setSkipAllTips: doSkipAll,
+    setSkipAll,
     replayTips,
-  }), [ready, hasSeen, state.skipAll, claim, release, activeTipId, markSeen, doSkipAll, replayTips]);
+  }), [ready, hasSeen, state.skipAll, claim, release, activeTipId, markSeen, doSkipAll, setSkipAll, replayTips]);
 
   return <FirstRunTipsContext.Provider value={value}>{children}</FirstRunTipsContext.Provider>;
 }

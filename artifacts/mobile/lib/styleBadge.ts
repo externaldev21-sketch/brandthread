@@ -33,3 +33,14 @@ export async function saveStyleBadge(state: StyleBadgeState): Promise<void> {
     [STYLE_BADGE_ENABLED_KEY, String(state.enabled)],
   ]);
 }
+
+/** The locally saved badge, or null when this device never saved one. */
+export async function loadStoredStyleBadge(): Promise<StyleBadgeState | null> {
+  const pairs = await AsyncStorage.multiGet([
+    STYLE_BADGE_LABEL_KEY,
+    STYLE_BADGE_EMOJI_KEY,
+    STYLE_BADGE_ENABLED_KEY,
+  ]);
+  if (pairs.every(p => p[1] === null || p[1] === undefined)) return null;
+  return loadStyleBadge();
+}

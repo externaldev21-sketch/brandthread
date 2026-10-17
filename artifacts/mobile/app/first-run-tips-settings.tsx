@@ -1,7 +1,8 @@
 /**
  * Settings > Tips — the real controls for the first-run tips system:
  *  - "Skip all tips": suppresses every future first-run tip for this account
- *    (server-side, migration 110's first_run_tips_settings).
+ *    (server-side, migration 110's first_run_tips_settings). Toggling it off
+ *    clears skipAll on the server and locally; seen tips stay seen.
  *  - "Replay tips": a genuine reset — clears seen-state locally AND on the
  *    server, and turns "Skip all tips" back off, so every first-run tip
  *    shows again from a fresh state next time its screen is opened.
@@ -25,21 +26,32 @@ export default function FirstRunTipsSettingsScreen() {
   const [replayVisible, setReplayVisible] = useState(false);
   const [replaying, setReplaying] = useState(false);
   const [replayedAt, setReplayedAt] = useState<number | null>(null);
+  const [savingSkipAll, setSavingSkipAll] = useState(false);
+  const [error, setError] = useState('');
 
   async function toggleSkipAll(value: boolean) {
+    if (savingSkipAll) return;
     hapticLight();
-    if (value) controller.setSkipAllTips();
-    // Turning it back off isn't a supported path here — "Skip all" is a
-    // one-way suppress; "Replay tips" below is the real reset, which also
-    // clears skipAll.
+    setError('');
+    setSavingSkipAll(true);
+    try {
+      await controller.setSkipAll(value);
+    } catch (e) {
+      setError(tipsErrorMessage(e, value ? "Couldn't turn on Skip all tips." : "Couldn't turn off Skip all tips."));
+    } finally {
+      setSavingSkipAll(false);
+    }
   }
 
   async function confirmReplay() {
     setReplaying(true);
+    setError('');
     try {
       await controller.replayTips();
       hapticSuccess();
       setReplayedAt(Date.now());
+    } catch (e) {
+      setError(tipsErrorMessage(e, "Couldn't replay tips."));
     } finally {
       setReplaying(false);
       setReplayVisible(false);
@@ -63,13 +75,19 @@ export default function FirstRunTipsSettingsScreen() {
               </Text>
             </View>
             <HapticSwitch
+              testID="first-run-tips-skip-all"
               value={controller.skipAll}
+              disabled={savingSkipAll}
               onValueChange={toggleSkipAll}
               trackColor={{ false: colors.border, true: colors.primary }}
               thumbColor={controller.skipAll ? colors.primaryForeground : colors.foreground}
               accessibilityLabel="Skip all tips"
             />
           </View>
+
+          {error ? (
+            <Text testID="first-run-tips-error" style={[styles.error, { color: colors.destructive }]}>{error}</Text>
+          ) : null}
 
           <PressableScale
             onPress={() => { hapticLight(); setReplayVisible(true); }}
@@ -101,8 +119,14 @@ export default function FirstRunTipsSettingsScreen() {
   );
 }
 
+function tipsErrorMessage(e: unknown, fallback: string): string {
+  const message = e instanceof Error ? e.message.trim() : '';
+  return message ? `${fallback} ${message}` : `${fallback} Check your connection and try again.`;
+}
+
 const styles = StyleSheet.create({
   page: { flex: 1 },
+  error: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: SP.sm, lineHeight: 16 },
   section: { paddingHorizontal: 20, paddingTop: 18 },
   sectionSubtitle: { fontSize: FS.sm, fontFamily: FONT.regular, marginBottom: 18, lineHeight: 18 },
   // padding: 16 (not SP.md's 14) — the audit's text-fit check flags
