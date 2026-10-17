@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, Redirect, Route, Switch, useLocation } from "wouter";
 import { Show, useClerk } from "@clerk/react";
-import { Activity, Banknote, Cpu, Gift, LayoutDashboard, Megaphone, Menu, ScrollText, ShieldAlert, ShoppingBag, Sparkles, Users } from "lucide-react";
+import { Activity, Banknote, Copyright, Cpu, EyeOff, Gift, LayoutDashboard, Megaphone, Menu, ScrollText, ShieldAlert, ShoppingBag, SlidersHorizontal, Sparkles, Users } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import NotFound from "@/pages/not-found";
@@ -14,6 +14,9 @@ import OrdersPage from "./pages/orders";
 import RevenuePage from "./pages/revenue";
 import AiSpendPage from "./pages/ai-spend";
 import ModerationPage from "./pages/moderation";
+import HeldPage from "./pages/held";
+import RepeatInfringersPage from "./pages/repeat-infringers";
+import RankingPage from "./pages/ranking";
 import FeaturedPage from "./pages/featured";
 import AnnouncementsPage from "./pages/announcements";
 import InvitesPage from "./pages/invites";
@@ -27,6 +30,9 @@ const NAV = [
   { href: "/admin/revenue", label: "Revenue", icon: Banknote },
   { href: "/admin/ai-spend", label: "AI spend", icon: Cpu },
   { href: "/admin/moderation", label: "Moderation", icon: ShieldAlert },
+  { href: "/admin/held", label: "Held content", icon: EyeOff },
+  { href: "/admin/repeat-infringers", label: "Repeat infringers", icon: Copyright },
+  { href: "/admin/ranking", label: "Feed ranking", icon: SlidersHorizontal },
   { href: "/admin/promotions", label: "Promoted threads", icon: Sparkles },
   { href: "/admin/featured", label: "Featured", icon: Activity },
   { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
@@ -111,6 +117,9 @@ function Gate() {
         <Route path="/admin/revenue" component={RevenuePage} />
         <Route path="/admin/ai-spend" component={AiSpendPage} />
         <Route path="/admin/moderation" component={ModerationPage} />
+        <Route path="/admin/held" component={HeldPage} />
+        <Route path="/admin/repeat-infringers" component={RepeatInfringersPage} />
+        <Route path="/admin/ranking" component={RankingPage} />
         <Route path="/admin/promotions" component={PromotionsPage} />
         <Route path="/admin/featured" component={FeaturedPage} />
         <Route path="/admin/announcements" component={AnnouncementsPage} />
