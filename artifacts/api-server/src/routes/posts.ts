@@ -76,6 +76,7 @@ import { pinnedAtByPostId, pinnedFirst } from "../lib/postPins";
 import { normalizeFeedVideoPath, createFeedVideoPoster } from "../lib/feedVideoEncoding";
 import { feedStreamMasterPath } from "../lib/feedVideoRenditions";
 import { postDimsColumns } from "../lib/postDimsColumns";
+import { ensureVideoPoster } from "../lib/videoPoster";
 
 const router = Router();
 
@@ -1136,6 +1137,11 @@ async function publishPost(req: Request, res: Response) {
     .catch((err) => req.log.error({ err, postId: post.id }, "Could not index post hashtags"));
   // People tags: the "Tag people" step writes @handles into the caption.
   await syncAndNotifyPostUserTags(post, req.log);
+  // A video saved without a poster would render as a blank grid tile; make
+  // one in the background (lib/videoPoster.ts, never blocks the response).
+  if (post.mediaType === "video" && !post.thumbnailUrl) {
+    void ensureVideoPoster(post, { origin: `${req.protocol}://${req.get("host")}` });
+  }
   if (!captionHeld && screenHeld && heldVerdict) {
     await recordHeldMedia({
       targetType: post.mediaType === "video" ? "video" : "post",

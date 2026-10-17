@@ -11,8 +11,8 @@
  * scroll position and infinite-scroll stay simple. Rows recycle by type
  * (getItemType), so a tile row is only ever reused as another tile row.
  */
-import React, { forwardRef, useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import React, { forwardRef, useCallback, useMemo, useRef } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { RefreshControlProps } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -33,10 +33,18 @@ import { buildMasonrySections, splitMasonryColumns, tileAspectRatio, type Masonr
 import { DiscoverSectionHeader } from './DiscoverSectionHeader';
 import { DiscoverMasonryTile, DiscoverMasonryTileSkeleton, MASONRY_CAPTION_HEIGHT } from './DiscoverMasonryTile';
 import { DiscoverTrendingNowRail } from './DiscoverTrendingNowRail';
+import { ThemedRefreshControl } from '@/components/ui/ThemedRefreshControl';
 
 export type { GridRow } from '@/lib/discoverGridPacking';
 
-const GAP = 1;
+export const GRID_GAP = 3;
+const GAP = GRID_GAP;
+export const GRID_GUTTER = 16;
+export function gridGeometry(width: number) {
+  const cell = Math.floor((width - GRID_GUTTER * 2 - GAP * 2) / 3);
+  const cellHeight = Math.round(cell * 4 / 3);
+  return { cell, cellHeight, big: cell * 2 + GAP, bigHeight: cellHeight * 2 + GAP };
+}
 
 type SponsoredRow = { key: string; type: 'sponsored'; item: SponsoredFeedItem };
 type Row = GridRow | SponsoredRow;
@@ -97,6 +105,12 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
   renderSponsored?: (item: SponsoredFeedItem) => React.ReactElement;
   /** Pull-to-refresh control for the grid. */
   refreshControl?: React.ReactElement<RefreshControlProps>;
+  refreshing?: boolean;
+  onRefresh?: () => void;
+  showEmpty?: boolean;
+  error?: 'first' | 'refresh' | 'more' | null;
+  onRetry?: () => void;
+  holdIncompleteRow?: boolean;
   /**
    * 'explore' (default) is the 3-column Instagram Explore grid; 'masonry' is
    * the Pinterest-style staggered 2-column For You grid with "Trending now"
@@ -127,11 +141,17 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
   sponsored = EMPTY_SPONSORED,
   renderSponsored,
   refreshControl,
+  refreshing = false,
+  onRefresh,
+  showEmpty,
+  error = null,
+  onRetry,
+  holdIncompleteRow = false,
   layout = 'explore',
 }, ref) {
   const { theme } = useAppTheme();
   const { width } = useWindowDimensions();
-  const cell = Math.floor((width - GAP * 2) / 3);
+  const cell = Math.floor((width - GRID_GUTTER * 2 - GAP * 2) / 3);
   // 3:4 portrait (width:height) — the whole outfit fits, not a near-square
   // crop. The 2x2 feature spans two rows at the same ratio: doubling both
   // dimensions and adding the row gap keeps width:height at 3:4.
@@ -150,11 +170,21 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
   }, [posts]);
 
   const masonry = layout === 'masonry';
+  const packed = useMemo(() => {
+    const columns = masonry ? 2 : 3;
+    if (!holdIncompleteRow || posts.length < columns) return posts;
+    const rem = posts.length % columns;
+    return rem ? posts.slice(0, posts.length - rem) : posts;
+  }, [holdIncompleteRow, posts, masonry]);
+  const latest = useRef({ onTilePress, onTileLongPress, flatIndexOf });
+  latest.current = { onTilePress, onTileLongPress, flatIndexOf };
+  const handleTilePress = useCallback((post: DiscoverPost) => latest.current.onTilePress(post, latest.current.flatIndexOf.get(post.id) ?? 0), []);
+  const handleTileLongPress = useCallback((post: DiscoverPost) => latest.current.onTileLongPress(post), []);
   const rows = useMemo((): Row[] => {
     if (loading) {
       return [0, 1, 2].map((i): GridRow => ({ key: `skeleton-${i}`, type: 'normal', tiles: [] }));
     }
-    return withSponsoredRows(buildGridRows(posts, {
+    return withSponsoredRows(buildGridRows(packed, {
       showRails,
       hasJustDropped: justDroppedItems.length > 0,
       hasHighDemand: highDemandItems.length > 0,
@@ -169,7 +199,7 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
   }, [
     sponsored,
     renderSponsored,
-    posts,
+    packed,
     loading,
     showRails,
     justDroppedItems.length,
@@ -243,17 +273,33 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
     );
   }
 
-  const listFooter = (loadingMore || ListFooterExtra) ? (
+  const retry = (label: string) => (
+    <View style={{ padding: SP.md, alignItems: 'center', gap: 8 }}>
+      <Text style={{ color: theme.muted }}>{label}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Retry" hitSlop={8} onPress={onRetry}>
+        <Text style={{ color: theme.text }}>Retry</Text>
+      </Pressable>
+    </View>
+  );
+  const listHeader = (
+    <>
+      {typeof ListHeaderComponent === 'function' ? React.createElement(ListHeaderComponent) : ListHeaderComponent ?? null}
+      {(error === 'refresh' || (error === 'first' && posts.length > 0)) && onRetry ? retry("Couldn't refresh.") : null}
+      <View style={{ height: 12 }} />
+    </>
+  );
+  const listFooter = (loadingMore || error === 'more' || ListFooterExtra) ? (
     <>
       {loadingMore ? (
         <View style={styles.footerLoading}>
-          <TileRailSkeleton />
+          <ActivityIndicator size="small" color={theme.muted} />
         </View>
       ) : null}
+      {error === 'more' && onRetry ? retry("Couldn't load more.") : null}
       {ListFooterExtra ?? null}
     </>
   ) : null;
-  const listEmpty = !loading ? (
+  const listEmpty = error === 'first' && onRetry ? retry("Couldn't load Discover.") : (showEmpty ?? !loading) ? (
     <EmptyState
       title="Nothing to show yet"
       message="Posts from buyers and brands will show up here as the community grows."
@@ -273,7 +319,8 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
         onEndReachedThreshold={0.6}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={contentContainerStyle}
-        ListHeaderComponent={ListHeaderComponent}
+        refreshControl={refreshControl ?? (onRefresh ? <ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined)}
+        ListHeaderComponent={listHeader}
         ListEmptyComponent={listEmpty}
         renderItem={({ item: section }) => {
           if (section.type === 'skeleton') {
@@ -314,8 +361,8 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
       onEndReachedThreshold={0.6}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={contentContainerStyle}
-      refreshControl={refreshControl}
-      ListHeaderComponent={ListHeaderComponent}
+      refreshControl={refreshControl ?? (onRefresh ? <ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined)}
+      ListHeaderComponent={listHeader}
       ListEmptyComponent={listEmpty}
       renderItem={({ item: row }) => {
         if (loading) {
@@ -337,8 +384,8 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
                   post={post}
                   width={row.cols === 2 ? half : cell}
                   height={row.cols === 2 ? halfHeight : cellHeight}
-                  onPress={() => onTilePress(post, flatIndexOf.get(post.id) ?? 0)}
-                  onLongPress={() => onTileLongPress(post)}
+                  onPress={handleTilePress}
+                  onLongPress={handleTileLongPress}
                 />
               ))}
             </View>
@@ -382,7 +429,7 @@ const skeletonRowType = () => 'skeleton';
 const gridRowType = (row: Row) => (row.type === 'rail' ? `rail-${row.kind}` : row.type);
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: GAP, marginBottom: GAP },
+  row: { flexDirection: 'row', gap: GAP, marginBottom: GAP, paddingHorizontal: GRID_GUTTER },
   footerLoading: { paddingHorizontal: SP.md, paddingVertical: SP.md },
   masonryBlock: { flexDirection: 'row', alignItems: 'flex-start', gap: MASONRY_GUTTER, paddingHorizontal: MASONRY_SIDE, marginBottom: MASONRY_ROW_GAP },
 });

@@ -5,14 +5,16 @@
  */
 import type { EditorialTileItem } from '@/components/discover/EditorialTile';
 import { getPreviewCatalog, getPreviewCatalogByDemand, isPreviewCatalogEnabled } from '@/lib/previewCatalog';
-import { composeDiscoverPosts } from '@/lib/discoverFeed';
+import { fetchDiscoverPage } from '@/lib/discoverFeed';
 import { setCachedTabData } from '@/lib/tabDataCache';
 import { prefetchImage } from '@/lib/prefetch';
 import type { BrandthreadApi } from '@/lib/api';
 
 export const DISCOVER_KEYS = {
-  forYou: 'discover:forYou',
-  fits: 'discover:fits',
+  // `{ posts, nextCursor }` pages (lib/discoverPaging.ts). New key names so
+  // a pre-cursor cached array (possibly an empty one) is never read back.
+  forYou: 'discover:forYouFeed',
+  fits: 'discover:fitsFeed',
   justDropped: 'discover:justDropped',
   highDemand: 'discover:highDemand',
   people: 'discover:people',
@@ -75,12 +77,13 @@ export async function loadHighDemand(api: BrandthreadApi): Promise<EditorialTile
  *  the same cache keys the Discover screen seeds its state from. */
 export async function warmDiscoverTab(api: BrandthreadApi, isSignedIn: boolean): Promise<void> {
   const [forYou, justDropped, highDemand] = await Promise.all([
-    composeDiscoverPosts({ api, isSignedIn, filter: 'forYou', limit: 30 }),
+    fetchDiscoverPage({ api, isSignedIn, filter: 'forYou', limit: 24 }).catch(() => undefined),
     loadJustDropped(api).catch(() => undefined),
     loadHighDemand(api).catch(() => undefined),
   ]);
-  setCachedTabData(DISCOVER_KEYS.forYou, forYou);
+  // Never cache an empty page over content a previous visit showed.
+  if (forYou && forYou.posts.length > 0) setCachedTabData(DISCOVER_KEYS.forYou, forYou);
   if (justDropped) setCachedTabData(DISCOVER_KEYS.justDropped, justDropped);
   if (highDemand) setCachedTabData(DISCOVER_KEYS.highDemand, highDemand);
-  forYou.slice(0, 9).forEach((post) => prefetchImage(post.imageUri));
+  forYou?.posts.slice(0, 9).forEach((post) => prefetchImage(post.imageUri));
 }
