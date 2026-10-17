@@ -99,19 +99,19 @@ export default function BuyerInviteScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   async function copyCode() {
-    if (!invite) return;
+    if (!invite) { showToast("Couldn't load your invite code. Try again."); return; }
     await Clipboard.setStringAsync(invite.code);
     showToast('Code copied');
   }
 
   async function copyLink() {
-    if (!invite) return;
+    if (!invite) { showToast("Couldn't load your invite code. Try again."); return; }
     await Clipboard.setStringAsync(invite.link);
     showToast('Link copied');
   }
 
   async function shareInvite() {
-    if (!invite) return;
+    if (!invite) { showToast("Couldn't load your invite code. Try again."); return; }
     try {
       await Share.share({ message: invite.shareText, url: invite.link });
     } catch {

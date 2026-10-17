@@ -26,6 +26,20 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 
 import { EmailExportSection } from '@/components/security/EmailExportSection';
+import { saveExportFile } from '@/lib/saveExportFile';
+
+/**
+ * Item 122: the instant export is only "ready" once a file actually reached
+ * the person: a browser download on web, the share sheet on native. With
+ * no share sheet the file never leaves the app's cache, so that is reported
+ * as an error pointing at the emailed link instead of a fake success.
+ */
+export const EXPORT_NO_SHARE_SHEET = "This device can't open a share sheet, so the file couldn't be saved. Use the emailed download link below instead.";
+export const EXPORT_FAILED = "Couldn't prepare your data. Check your connection and try again.";
+
+export function dataExportFilename(now: number = Date.now()): string {
+  return `brandthread-my-data-${now}.json`;
+}
 
 type DataCategory = { key: string; label: string; sub: string; icon: IconName; selected: boolean };
 
@@ -45,6 +59,8 @@ export default function BuyerDownloadData() {
   const [requestedAt, setRequestedAt] = useState<string | null>(null);
   const [categories, setCategories] = useState<DataCategory[]>(DEFAULT_CATEGORIES);
   const [loading, setLoading] = useState(false);
+  // Inline, not Alert: RN-web's Alert is a no-op, so the website would show nothing.
+  const [error, setError] = useState<string | null>(null);
 
   function toggleCat(key: string) {
     setCategories(prev => prev.map(c => c.key === key ? { ...c, selected: !c.selected } : c));
@@ -54,24 +70,27 @@ export default function BuyerDownloadData() {
     const selected = categories.filter(c => c.selected).map(c => c.key) as Array<'profile' | 'orders' | 'messages'>;
     if (selected.length === 0) return;
     setLoading(true);
+    setError(null);
     try {
       const data = await api.auth.exportData(selected);
-      const file = new File(Paths.cache, `brandthread-my-data-${Date.now()}.json`);
-      file.write(JSON.stringify(data, null, 2));
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(file.uri, {
-          mimeType: 'application/json',
-          dialogTitle: 'Download my Brandthread data',
-        });
-      } else {
-        Alert.alert('Export ready', 'Your data is ready. Save it or send it anywhere.');
+      const delivered = await saveExportFile({
+        filename: dataExportFilename(),
+        mimeType: 'application/json',
+        encoding: 'utf8',
+        data: JSON.stringify(data, null, 2),
+      }, 'Download my Brandthread data');
+      if (!delivered) {
+        hapticError();
+        setError(EXPORT_NO_SHARE_SHEET);
+        return;
       }
       
       setRequestedAt(data.exportedAt);
       setRequested(true);
-    } catch (err: any) {
+    } catch {
       haptic('error');
       Alert.alert('Export failed', "Couldn't prepare your data. Try again.");
+      setError(EXPORT_FAILED);
     } finally {
       setLoading(false);
     }
@@ -94,7 +113,7 @@ export default function BuyerDownloadData() {
             <Text style={s.successTitle}>Export ready</Text>
             {formattedDate && <Text style={s.successDate}>Generated {formattedDate}</Text>}
             <Text style={s.successDesc}>
-              Your data is ready. Save it or send it anywhere.
+              Your file was downloaded or handed to your share sheet. Save it or send it anywhere.
             </Text>
             <Button label="Generate another export" onPress={() => setRequested(false)} variant="tertiary" size="small" style={s.againBtn} />
           </View>
@@ -127,6 +146,13 @@ export default function BuyerDownloadData() {
               </Text>
             </View>
 
+            {error && (
+              <View style={[s.note, s.errorNote]} accessibilityRole="alert" testID="download-data-error">
+                <Feather name="alert-triangle" size={14} color={palette.foreground} />
+                <Text style={[s.noteText, { color: palette.foreground }]}>{error}</Text>
+              </View>
+            )}
+
             <EmailExportSection categories={categories.filter(c => c.selected).map(c => c.key)} />
           </>
         )}
@@ -157,6 +183,7 @@ const makeStyles = (palette: ReturnType<typeof useColors>) => StyleSheet.create(
   note: { flexDirection: 'row', gap: 8, padding: SPACING.sm, backgroundColor: palette.card, borderRadius: 12, borderWidth: 1, borderColor: palette.border, alignItems: 'flex-start' },
   noteText: { flex: 1, ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 17 },
   footerCount: { ...TYPE_SCALE.caption, color: palette.mutedForeground, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  errorNote: { marginTop: SPACING.sm },
   successCard: { alignItems: 'center', paddingVertical: SPACING.xxl, gap: SPACING.md },
   successTitle: { ...TYPE_SCALE.title2, color: palette.foreground },
   successDate: { ...TYPE_SCALE.footnote, color: palette.mutedForeground },

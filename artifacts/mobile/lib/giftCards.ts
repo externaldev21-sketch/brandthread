@@ -82,6 +82,20 @@ export function giftCardBalanceLine(card: Pick<GiftCard, 'balanceCents' | 'initi
     : `${formatCents(card.balanceCents)} of ${formatCents(card.initialCents)}`;
 }
 
+/**
+ * Item 119: one line for a "Check balance" result (POST /api/gift-cards/lookup),
+ * e.g. "$18.00 of $25.00 left at Acme · No expiry". A card that can't be spent
+ * leads with why (Voided / Expired / Fully used).
+ */
+export function giftCardBalanceCheckSummary(
+  card: Pick<GiftCard, 'balanceCents' | 'initialCents' | 'status' | 'expiresAt'>,
+  storeName: string | null | undefined,
+): string {
+  const store = storeName?.trim() || 'this store';
+  if (card.status !== 'active') return `${giftCardStatusLabel(card)} · ${formatCents(card.balanceCents)} left at ${store}`;
+  return `${giftCardBalanceLine(card)} left at ${store} · ${giftCardStatusLabel(card)}`;
+}
+
 /** Whole-dollar text a person typed ("25", "$25.50") to cents, or null. */
 export function amountTextToCents(text: string): number | null {
   const cleaned = text.replace(/[$,\s]/g, '');

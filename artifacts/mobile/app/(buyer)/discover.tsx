@@ -383,7 +383,7 @@ export default function DiscoverScreen() {
           <FirstWeekCard state={firstWeek.state} onDismiss={firstWeek.dismiss} />
         </View>
       )}
-      {filter === 'forYou' && <DiscoverFeaturedRail brands={featured.brands} />}
+      {filter === 'forYou' && <DiscoverFeaturedRail brands={featured.brands} threads={featured.threads} />}
       {filter === 'forYou' && <BrandsYouMightLikeRow state={brandsYouMightLike} />}
     </>
   );

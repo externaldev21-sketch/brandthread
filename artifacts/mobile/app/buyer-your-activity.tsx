@@ -1,6 +1,9 @@
 /**
- * Your Activity — time-in-app summary plus actual engagement counts
- * loaded from the social and saved-items services. No hard-coded numbers.
+ * Your Activity — real engagement counts and recent history: posts, saved
+ * items and reposts (social / saved-items services), likes and comments
+ * (GET /api/buyer/activity) and search history (GET /api/public/search/recent).
+ * No hard-coded numbers. Time spent in the app is not tracked anywhere, so
+ * this screen does not show it (item 110).
  */
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
@@ -15,6 +18,8 @@ import { useApi } from '@/lib/api';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, ErrorState, ListRow, SkeletonBlock, SkeletonLine } from '@/components/ui';
+import { useApi, type BuyerActivityResponse } from '@/lib/api';
+import { activityDateLabel, activitySnippet, searchCountLabel } from '@/lib/yourActivity';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 
@@ -49,6 +54,8 @@ export default function BuyerYourActivity() {
   const [savedCount, setSavedCount] = useState(0);
   const [repostCount, setRepostCount] = useState(0);
   const [moreReposts, setMoreReposts] = useState(false);
+  const [activity, setActivity] = useState<BuyerActivityResponse | null>(null);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
@@ -64,6 +71,8 @@ export default function BuyerYourActivity() {
       setPostCount(0);
       setSavedCount(0);
       setRepostCount(0);
+      setActivity(null);
+      setRecentSearches([]);
       setLoadError(false);
       setLoaded(true);
       return;
@@ -72,11 +81,13 @@ export default function BuyerYourActivity() {
     try {
       // Reposts come from the server (#146): feed reposts never touched the
       // old on-device list, so this count used to stay at 0.
-      const [posts, saved, reposts] = await Promise.all([getMyPosts(), getSavedItems(), api.posts.myReposts()]);
+      const [posts, saved, reposts, mine, recent] = await Promise.all([getMyPosts(), getSavedItems(), api.posts.myReposts(), api.buyer.activity(), api.public.recent(30)]);
       setPostCount(posts.filter(p => !p.isDraft && !p.isArchived).length);
       setSavedCount(saved.length);
       setRepostCount(reposts.items.length);
       setMoreReposts(!!reposts.nextCursor);
+      setActivity(mine);
+      setRecentSearches(recent.recent.map(r => r.query));
     } catch (error) {
       // Don't show a false "0 across the board" empty state on a failed
       // fetch — surface a real error with a retry instead.
@@ -92,6 +103,12 @@ export default function BuyerYourActivity() {
     { icon: 'bookmark' as const, label: 'Saved items', value: String(savedCount), sub: 'Across all types', color: theme.accentLight },
     { icon: 'repeat' as const, label: 'Reposts', value: `${repostCount}${moreReposts ? '+' : ''}`, sub: 'To your profile', color: theme.accent, href: '/buyer-reposts' },
   ];
+  const interactionItems = [
+    { icon: 'heart' as const, label: 'Likes', value: String(activity?.likes.total ?? 0), sub: 'Posts you liked' },
+    { icon: 'message-square' as const, label: 'Comments', value: String(activity?.comments.total ?? 0), sub: 'Comments and replies' },
+    { icon: 'search' as const, label: 'Searches', value: searchCountLabel(recentSearches.length, 30), sub: 'Recent search terms' },
+  ];
+  const openPost = (postId: string) => router.push(`/buyer-post-viewer?postId=${encodeURIComponent(postId)}` as never);
 
   return (
     <View style={s.page}>
@@ -132,7 +149,70 @@ export default function BuyerYourActivity() {
               })}
             </View>
 
+            <Text style={s.groupLabel}>Interactions</Text>
+            <View style={s.statsGrid}>
+              {interactionItems.map(item => (
+                <Card key={item.label} style={s.statCard}>
+                  <Feather name={item.icon} size={ICON.md} color={theme.text} />
+                  <Text style={s.statValue}>{item.value}</Text>
+                  <Text style={s.statLabel}>{item.label}</Text>
+                  <Text style={s.statSub}>{item.sub}</Text>
+                </Card>
+              ))}
+            </View>
 
+            <Text style={s.groupLabel}>Recent likes</Text>
+            {(activity?.likes.items.length ?? 0) === 0 ? (
+              <Text style={s.empty}>Posts you like will show up here.</Text>
+            ) : (
+              <Card style={s.card}>
+                {activity!.likes.items.slice(0, 5).map(item => (
+                  <ListRow
+                    key={`like-${item.postId}`}
+                    icon="heart"
+                    iconColor={theme.text}
+                    title={item.authorName}
+                    subtitle={[activitySnippet(item.caption), activityDateLabel(item.likedAt)].filter(Boolean).join(' · ')}
+                    chevron
+                    onPress={() => openPost(item.postId)}
+                  />
+                ))}
+              </Card>
+            )}
+
+            <Text style={s.groupLabel}>Recent comments</Text>
+            {(activity?.comments.items.length ?? 0) === 0 ? (
+              <Text style={s.empty}>Comments you write will show up here.</Text>
+            ) : (
+              <Card style={s.card}>
+                {activity!.comments.items.slice(0, 5).map(item => (
+                  <ListRow
+                    key={`comment-${item.id}`}
+                    icon={item.isReply ? 'corner-down-right' : 'message-square'}
+                    iconColor={theme.text}
+                    title={activitySnippet(item.body) || 'Comment'}
+                    subtitle={`On ${item.authorName}'s post · ${activityDateLabel(item.createdAt)}`}
+                    chevron
+                    onPress={() => openPost(item.postId)}
+                  />
+                ))}
+              </Card>
+            )}
+
+            <Text style={s.groupLabel}>Search history</Text>
+            <Card style={s.card}>
+              {recentSearches.slice(0, 5).map(term => (
+                <ListRow key={`search-${term}`} icon="clock" iconColor={theme.muted} title={term} />
+              ))}
+              <ListRow
+                icon="search"
+                iconColor={theme.text}
+                title={recentSearches.length > 0 ? 'See all searches' : 'No recent searches'}
+                subtitle="Review or clear what you've searched for"
+                chevron
+                onPress={() => router.push('/buyer-search-history' as never)}
+              />
+            </Card>
           </>
         )}
         <Text style={s.groupLabel}>History</Text>
@@ -179,5 +259,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   statCardPress: { flex: 1, minWidth: 0, display: 'flex' },
   statLabel: { ...TYPE_SCALE.footnote, fontFamily: FONT.medium, color: theme.text },
   statSub: { ...TYPE_SCALE.caption, color: theme.muted },
+  empty: { ...TYPE_SCALE.footnote, color: theme.muted },
   card: { paddingVertical: SPACING.xxs, paddingHorizontal: SPACING.md, overflow: 'hidden' },
 });

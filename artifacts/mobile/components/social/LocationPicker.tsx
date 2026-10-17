@@ -19,6 +19,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 
 import { RADII } from '@/constants/radii';
+import { locationSearchNotice } from '@/lib/locationSearchNotice';
 
 const DEBOUNCE_MS = 250;
 
@@ -69,6 +70,9 @@ export function LocationPicker({ value, onSelect, onClear, coords, placeholder =
   const [searching, setSearching] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // false = the server has no GOOGLE_PLACES_API_KEY, so only already-used
+  // places are searchable (null until the first search answers).
+  const [providerEnabled, setProviderEnabled] = useState<boolean | null>(null);
   const seq = useRef(0);
   const trimmed = query.trim();
 
@@ -85,9 +89,15 @@ export function LocationPicker({ value, onSelect, onClear, coords, placeholder =
     const timer = setTimeout(async () => {
       try {
         const res = await api.places.search(trimmed, coords);
-        if (id === seq.current) setResults(res.places);
+        if (id === seq.current) {
+          setResults(res.places);
+          setProviderEnabled(typeof res.providerEnabled === 'boolean' ? res.providerEnabled : null);
+        }
       } catch {
-        if (id === seq.current) setResults([]);
+        if (id === seq.current) {
+          setResults([]);
+          setError('Couldn’t search places. You can still add it as a custom location.');
+        }
       } finally {
         if (id === seq.current) setSearching(false);
       }
@@ -165,6 +175,11 @@ export function LocationPicker({ value, onSelect, onClear, coords, placeholder =
       </View>
 
       {error ? <Text style={[styles.error, { color: theme.text }]}>{error}</Text> : null}
+      {!error && locationSearchNotice({ query, providerEnabled, searching }) ? (
+        <Text style={[styles.error, { color: theme.muted }]} testID="location-picker-provider-notice">
+          {locationSearchNotice({ query, providerEnabled, searching })}
+        </Text>
+      ) : null}
 
       <View testID="location-picker-results">
         {results.map((result, index) => {

@@ -57,6 +57,7 @@ import avatarVideoRouter from "./avatar-video";
 import buyerRouter from "./buyer";
 import checkoutIntentRouter, { guestCheckoutIntentRouter } from "./checkout-intent";
 import orderAddOnRouter from "./order-add-on";
+import buyerActivityRouter from "./buyer-activity";
 import guestCheckoutRouter from "./guest-checkout";
 import connectRouter, { connectRedirectRouter } from "./connect";
 import {
@@ -437,6 +438,7 @@ router.use("/buyer/checkout/payment-intent", checkoutIntentRouter);
 router.use("/buyer/post-purchase",       buyerPostPurchaseRouter);
 router.use("/buyer/add-on", orderAddOnRouter);
 router.use("/buyer/notifications",       notificationsFeedRouter);
+router.use("/buyer/activity",            buyerActivityRouter); // Your Activity: my likes + comments
 router.use("/notifications",             notificationEventsRouter);
 router.use("/social/mutes",              accountMutesRouter); // account mutes (GET/POST/DELETE); the /social routers define no /mutes route
 router.use("/buyer",                     buyerRouter);

@@ -46,7 +46,8 @@ import { isWellFormedDropId } from '@/lib/dropId';
 
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { buildCanonicalDropUrl } from '@/lib/shareDrop';
-
+import { dropAlertErrorCopy } from '@/lib/dropAlertError';
+import { buyerProductHref } from '@/lib/dropProductContext';
 import { computeCountdownParts, type CountdownParts } from '@/lib/dropCountdown';
 import { ProductPhotoPlaceholder } from '@/components/media/ProductPhoto';
 import { productPhotoHeight } from '@/constants/media';
@@ -427,8 +428,10 @@ export default function BuyerDropDetail() {
         ? await api.publicDrops.unsubscribe(dropId)
         : await api.publicDrops.subscribe(dropId);
       setSubscribed(result.subscribed);
-    } catch {
-      Alert.alert('Sign in to get drop alerts', 'Create or sign in to your buyer account, then tap Notify me again.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      const copy = dropAlertErrorCopy(error);
+      Alert.alert(copy.title, copy.message);
     } finally {
       setNotifyLoading(false);
     }
@@ -450,6 +453,10 @@ export default function BuyerDropDetail() {
       return;
     }
     if (!isLive) {
+      // Upcoming drop: open the product page with "drops on <date>" context
+      // (purchase buttons stay held there until launch).
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      router.push(buyerProductHref(product, { releaseAt: targetReleaseAt ?? null, name: drop?.name ?? null }) as never);
       return;
     }
     if (product.soldOut) return;

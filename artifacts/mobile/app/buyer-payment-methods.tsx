@@ -22,9 +22,7 @@ import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@clerk/expo';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
-
-import { Button, Card, IconButton } from '@/components/ui';
-
+import { Button, Card, ErrorState, IconButton } from '@/components/ui';
 import { EmptyState } from '@/components/BrandthreadUI';
 
 import { haptics } from '@/lib/haptics';
@@ -68,12 +66,15 @@ export default function BuyerPaymentMethodsScreen() {
   const api = useApi();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed fetch is an error, never "No saved payment methods".
+  const [loadError, setLoadError] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const [settingDefault, setSettingDefault] = useState<string | null>(null);
   const { userId } = useAuth();
 
   const load = async () => {
     setLoading(true);
+    setLoadError(false);
     if (!userId) {
       setPaymentMethods([]);
       setLoading(false);
@@ -81,9 +82,11 @@ export default function BuyerPaymentMethodsScreen() {
     }
     try {
       const data = await api.reviews.paymentMethods() as any;
-      setPaymentMethods(data.paymentMethods ?? []);
+      if (!data || !Array.isArray(data.paymentMethods)) throw new Error('Unexpected payment methods response');
+      setPaymentMethods(data.paymentMethods);
     } catch {
       setPaymentMethods([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -134,6 +137,12 @@ export default function BuyerPaymentMethodsScreen() {
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
+      ) : loadError ? (
+        <ErrorState
+          message="Couldn't load your payment methods. Check your connection and try again."
+          onRetry={() => { void load(); }}
+          style={{ flex: 1 }}
+        />
       ) : (
         <ScrollView
           contentContainerStyle={[s.body, { paddingBottom: insets.bottom + 40 }]}

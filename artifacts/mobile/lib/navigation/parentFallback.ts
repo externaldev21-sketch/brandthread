@@ -21,6 +21,7 @@
 export const PARENT_FALLBACK: Record<string, string> = {
   '/order-detail': '/(tabs)/orders',
   '/buyer-order-detail': '/(buyer)/orders',
+  '/buyer-order-tracking': '/(buyer)/orders',
   '/product-store': '/(buyer)/discover',
   '/buyer-product-detail': '/(buyer)/discover',
   '/payouts': '/(tabs)/more',
