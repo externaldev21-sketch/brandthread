@@ -906,17 +906,6 @@ export default function OrdersScreen() {
   const listRows = useMemo(() => flattenOrderSections(sections), [sections]);
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
-  // Filter counts
-  const filterCounts = useMemo(() => {
-    const map: Partial<Record<OrderListFilter, number>> = {};
-    FILTERS.forEach(({ key }) => {
-      const visibleOrders = ordersOwnerId === userId ? orders : [];
-      const count = filterOrderList(visibleOrders, key).length;
-      if (key !== 'all') map[key] = count;
-    });
-    return map;
-  }, [orders, ordersOwnerId, userId]);
-
   // ─── Actions ───────────────────────────────────────────────────────────────
 
   const handleShip = useCallback((orderId: string) => {
@@ -1137,7 +1126,10 @@ export default function OrdersScreen() {
           label,
           active: activeFilter === key,
           onPress: () => setActiveFilter(key),
-          count: key !== 'all' && filterCounts[key] != null ? filterCounts[key] : undefined,
+          // No count badges (Shopify's order tabs have none): with real
+          // counts the five chips ran ~100pt past a 390pt screen, cutting
+          // "Archived" off at the edge (polish #93). The selected tab's
+          // count shows in the "N orders · To ship" line under the chips.
         }))}
       />
 
