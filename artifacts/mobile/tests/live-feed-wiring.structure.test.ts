@@ -18,6 +18,8 @@ const sellerProfile = read('app/seller-profile.tsx');
 const factory = read('lib/live/liveProvider.ts');
 const apiProvider = read('lib/live/apiLiveProvider.ts');
 const rightActionRail = read('components/buyer-feed/RightActionRail.tsx');
+const homeTabs = read('components/buyer-feed/HomeFeedTabs.tsx');
+const liveNow = read('components/buyer-feed/LiveNowList.tsx');
 
 describe('LIVE route', () => {
   it('is registered as a full-screen modal with no seller tab bar over it', () => {
@@ -79,15 +81,19 @@ describe('Provider seam', () => {
 });
 
 describe('Entry points', () => {
-  it('the Threads header LIVE edge tab opens the dedicated full-screen live-feed viewer', () => {
-    // PR #134 replaced the conditional "jump to nearest live card in the
-    // pager" button with an always-visible header glyph that opens the
-    // dedicated /live-feed screen (see app/live-feed.tsx). That glyph now
-    // lives in the left-edge slide-out tab (components/buyer-feed/LiveEdgeTab.tsx).
-    const edgeTab = read('components/buyer-feed/LiveEdgeTab.tsx');
-    expect(edgeTab).toContain('testID="buyer-home-live"');
-    expect(feed).toContain('<LiveEdgeTab');
-    expect(feed).toContain("onOpenLive={() => router.push('/live-feed' as never)}");
+  it('LIVE is the first header tab (LIVE · Following · Threads) and its body opens streams in the LIVE pager', () => {
+    // The TV glyph / red edge tab are gone: LIVE is a text tab on the same
+    // underline control as Following/Threads, showing real live streams.
+    expect(homeTabs).toContain("{ id: 'live', label: 'LIVE' },\n  { id: 'following', label: 'Following' },\n  { id: 'for-you', label: 'Threads' },");
+    expect(homeTabs).toContain('variant="underline"');
+    expect(feed).toContain('<HomeFeedTabs testID="buyer-home-tabs" onChange={handleHomeTabChange} />');
+    expect(feed).not.toContain('testID="buyer-home-live"');
+    expect(feed).not.toContain('LiveEdgeTab');
+    expect(feed).toContain('<LiveNowList');
+    expect(liveNow).toContain('getLiveStreamProvider().listLive()');
+    expect(liveNow).toContain('openLive({ streamId: item.id, hostId: item.host.id })');
+    // Nobody live: one quiet line, never sample cards.
+    expect(liveNow).toContain('No one&apos;s live right now');
   });
 
   it('feed rail avatars wear the LIVE ring and open the stream', () => {

@@ -102,9 +102,6 @@ import { ClaimedRemainingLabel, TimeRemainingLabel, UrgencyBar, HighDemandSectio
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 
 import { FeedGestureGuide } from '@/components/FeedGestureGuide';
-
-import { SegmentedControl } from '@/components/ui/SegmentedControl';
-
 import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 
 import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
@@ -147,7 +144,6 @@ import { TapHeartBurst } from '@/components/buyer-feed/TapHeartBurst';
 import { persistPostAction, postActionPending, subscribePostEngagement } from '@/lib/postEngagement';
 
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
-
 import { PollCard } from '@/components/social/PollCard';
 import { ShopTagPill } from '@/components/buyer-feed/ShopSideTab';
 
@@ -182,7 +178,8 @@ import { creditLabel, OFFICIAL_AVATAR_SOURCE } from '@/lib/officialAccount';
 import { noteThreadOnScreen } from '@/services/officialSeedService';
 import { previewOfficialPosts } from '@/lib/previewOfficialAccount';
 import type { PostCredit } from '@/services/socialService';
-import { LiveCartPush, LiveEdgeTab, useLiveEdgeTab } from '@/components/buyer-feed/LiveEdgeTab';
+import { LiveNowList } from '@/components/buyer-feed/LiveNowList';
+import { HomeFeedTabs, type HomeFeedTabId } from '@/components/buyer-feed/HomeFeedTabs';
 import { a11yHidden } from '@/lib/a11yHidden';
 
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
@@ -2467,16 +2464,9 @@ function FeedScreenContent({
   // buyerHeaderHeight below) stays where it was.
   const buyerTopRowPaddingTop = Math.max(0, previewTopInset - 1);
   const buyerHeaderHeight = buyerTopRowPaddingTop + TOP_TABS_ROW_HEIGHT + 1;
-  // LIVE moved out of this row into the left-edge tab (LiveEdgeTab), so the
-  // cart alone holds the left cluster, nudged inward off the edge (clear of
-  // that tab's peeking dot) toward the centered tabs. Narrow phones use a
-  // tighter gap, gutter and nudge so the centered tabs still clear it.
+  // Cart and Search flank the centered LIVE / Following / Threads tabs.
   const topRowIconGap = windowWidth < 350 ? 8 : 14;
   const topRowSideGutter = windowWidth < 350 ? 12 : 16;
-  // Clears the resting vertical red LIVE tab (LIVE_REST_WIDTH = 17pt from
-  // the screen edge, 44pt touch target) on every width: 16 + 30 = 46pt,
-  // narrow 12 + 28 = 40pt.
-  const cartInset = windowWidth < 350 ? 28 : 30;
   // Guard width for the centered tabs (buyerTabSwitcherWrap below): the
   // left cluster is the inset cart, the right is search alone.
   // Bounding the tabs' wrap symmetrically by the wider cluster's
@@ -2484,7 +2474,7 @@ function FeedScreenContent({
   // — that's what centering means here) while guaranteeing the underline
   // labels' own box never physically reaches into either icon cluster's
   // tap area at any screen width, down to 320pt.
-  const topRowSideGuard = Math.max(cartInset + 24, 24 * 2 + topRowIconGap) + 6;
+  const topRowSideGuard = 24 + 6;
   // The feed is the buyer Home tab, always shown with the tab bar's compact
   // (Instagram iOS 26-style) sizing — see BuyerTabBar/buyerTabBarMetrics —
   // so its own layout math uses the compact inset, not the regular one every
@@ -2541,10 +2531,6 @@ function FeedScreenContent({
     setTopBarHeight(prev => (prev === h ? prev : h));
   }, []);
   const [activeIndex, setActiveIndex] = useState(0);
-  // Left-edge LIVE tab (buyer Home header) — tucks back on any scroll,
-  // page change, feed-tab switch or leaving the screen.
-  const liveTab = useLiveEdgeTab();
-  const collapseLiveTab = liveTab.collapse;
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const pageWidth = viewportSize.width || windowWidth;
   const pageHeight = viewportSize.height || windowHeight;
@@ -2562,6 +2548,20 @@ function FeedScreenContent({
     router.setParams({ tab: undefined });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabParam]);
+  // Buyer Home's LIVE tab (header: LIVE · Following · Threads). Kept apart
+  // from `feedTab` so the post feed underneath keeps its tab, position and
+  // loaded pages — switching LIVE -> Threads is instant, no reload.
+  const [liveTabActive, setLiveTabActive] = useState(false);
+  // Header tab tap (HomeFeedTabs already updated its own label/underline;
+  // this runs in a transition). Returning to the tab the feed was already
+  // on keeps its place.
+  const handleHomeTabChange = useCallback((tab: HomeFeedTabId) => {
+    if (tab === 'live') { setLiveTabActive(true); return; }
+    setLiveTabActive(false);
+    if (tab === feedTab) return;
+    setActiveIndex(0);
+    setFeedTab(tab);
+  }, [feedTab]);
   // Following|Threads content cross-fade: a soft 150ms dissolve on the
   // list's own opacity when the tab (and therefore its underlying data)
   // changes, instead of the new content just popping in. Gated by
@@ -2911,12 +2911,6 @@ function FeedScreenContent({
   // the real count and bump only if it went up (an add happened) — never on
   // first load, a plain refocus, or a removal.
   const screenFocused = useIsFocused();
-  useEffect(() => {
-    if (!screenFocused) collapseLiveTab();
-  }, [screenFocused, collapseLiveTab]);
-  useEffect(() => {
-    collapseLiveTab();
-  }, [activeIndex, feedTab, collapseLiveTab]);
   useEffect(() => {
     if (userId) {
       setGuestMutedPhrases([]);
@@ -3658,7 +3652,6 @@ function FeedScreenContent({
       <Animated.View style={[styles.feedContentFade, { opacity: feedContentOpacity }]}>
       {viewportReady && <ParentScrollGestureScope><FlatList
         ref={feedListRef}
-        onScrollBeginDrag={collapseLiveTab}
         // The creator player remounts once its videos load so it opens at the tapped one.
         key={`thread-${pageWidth}x${pageHeight}${isCreatorFeed && feedLoading ? '-loading' : ''}`}
         data={displayItems}
@@ -3838,8 +3831,8 @@ function FeedScreenContent({
             <SpotlightPage
               item={spotlight}
               headerClearance={topBarHeight}
-              isActive={contentIndex === activeContentIndex && !showNotifs}
-              preload={screenFocused && !showNotifs && !userDataSaver && Math.abs(contentIndex - activeContentIndex) === 1}
+              isActive={contentIndex === activeContentIndex && !showNotifs && !liveTabActive}
+              preload={screenFocused && !showNotifs && !liveTabActive && !userDataSaver && Math.abs(contentIndex - activeContentIndex) === 1}
               isFirstItem={contentIndex === activeContentIndex}
                 pageWidth={pageWidth}
               pageHeight={pageHeight}
@@ -3870,6 +3863,17 @@ function FeedScreenContent({
       </Animated.View>
       {threadRefreshIndicator}
 
+      {/* LIVE tab body — covers the paused post feed (kept mounted underneath
+          so Following/Threads come back exactly where they were). */}
+      {isBuyerSurface && !isCreatorFeed && (
+        <LiveNowList
+          active={screenFocused}
+          topInset={buyerHeaderHeight + 8}
+          bottomInset={buyerBarInset + 8}
+          pageWidth={pageWidth}
+        />
+      )}
+
       {/* ─ Legibility scrims: fixed overlay above the list (not per-cell), so
           they stay put while the video underneath swipes past. Standard
           TikTok-style small gradients only — a short one at the very top
@@ -3897,36 +3901,38 @@ function FeedScreenContent({
           rail to help the top icons (heart, comment) on a bright clip. */}
       {isBuyerSurface && (
         <>
-          {/* Polish pass: top scrim widened to a flat ~140pt band (was
-              insets.top + 90, i.e. ~124-140pt depending on device — now a
-              fixed 140 regardless of inset, per spec) so "Following" holds
-              up against bright stage-light footage; bottom scrim's peak
-              nudged 0.55 -> 0.6 and its band pinned to a flat ~260pt
-              (was pageHeight * 0.4, which ran to ~330-370pt on tall
-              screens — more than needed and inconsistent device to
-              device) for the silver-dress (Maison Vela) clip. */}
+          {/* Header fade, one for every post (video, photo, slideshow): a
+              soft TikTok-style wash, taller and eased so it never reads as a
+              band, but ~0.3 at the tab row (was ~0.13) so "Following" and
+              the icons hold up over white/bright footage. */}
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0)']}
-            locations={[0, 0.5, 1]}
-            style={[styles.topScrim, { height: 140 }]}
+            colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.32)', 'rgba(0,0,0,0.12)', 'rgba(0,0,0,0)']}
+            locations={[0, 0.4, 0.72, 1]}
+            style={[styles.topScrim, { height: 200 }]}
           />
-          {/* V5 (less-AI pass): one soft black 0 → 60% gradient sized to
-              the caption area only (chrome anchor + caption stack + a short
-              fade above it), not a fixed 260pt band. */}
-          <LinearGradient
-            pointerEvents="none"
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.6)']}
-            style={[styles.bottomScrim, { height: bottomClearance + CAPTION_BOTTOM_GAP + CAPTION_SCRIM_HEIGHT }]}
-          />
-          <LinearGradient
-            pointerEvents="none"
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.08)', 'rgba(0,0,0,0.25)']}
-            locations={[0, 0.5, 1]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.railEdgeFade}
-          />
+          {!liveTabActive && (
+            <>
+              {/* Polish pass: bottom scrim's peak
+                  nudged 0.55 -> 0.6 and its band pinned to a flat ~260pt
+                  (was pageHeight * 0.4, which ran to ~330-370pt on tall
+                  screens — more than needed and inconsistent device to
+                  device) for the silver-dress (Maison Vela) clip. */}
+              <LinearGradient
+                pointerEvents="none"
+                 colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.6)']}
+                 style={[styles.bottomScrim, { height: bottomClearance + CAPTION_BOTTOM_GAP + CAPTION_SCRIM_HEIGHT }]}
+              />
+              <LinearGradient
+                pointerEvents="none"
+                colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.08)', 'rgba(0,0,0,0.25)']}
+                locations={[0, 0.5, 1]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.railEdgeFade}
+              />
+            </>
+          )}
         </>
       )}
 
@@ -3988,7 +3994,7 @@ function FeedScreenContent({
           onLayout={onTopBarLayout}
         >
           {/* Buyer Threads Home: For You feed chrome — one line, TikTok-
-              style: LIVE and cart on the left, a centered "Following | Threads"
+              style: cart on the left, a centered "LIVE · Following · Threads"
               underline switcher (real SegmentedControl from the shared
               design system — see components/ui/SegmentedControl.tsx),
               search alone on the right. Friends and Drops used to also live
@@ -4006,8 +4012,7 @@ function FeedScreenContent({
               of glitch as the old shop pill's frosted background — see
               ShopSideTab above. */}
           <View style={styles.buyerTopRow}>
-            <View style={[styles.buyerTopCluster, { paddingLeft: cartInset }]}>
-              <LiveCartPush controller={liveTab} cartX={cartInset} leftInset={insets.left} gutter={topRowSideGutter}>
+            <View style={[styles.buyerTopCluster, { gap: topRowIconGap }]}>
               <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
                 <TouchableOpacity
                   style={styles.buyerTopIconBtn}
@@ -4017,9 +4022,7 @@ function FeedScreenContent({
                   }}
                   accessibilityRole="button"
                   accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
-                  // Left slop kept short so it doesn't reach into the LIVE
-                  // tab's own 44pt touch target (screen x 0-44).
-                  hitSlop={{ top: 4, bottom: 4, left: 2, right: 7 }}
+                  hitSlop={{ top: 4, bottom: 4, left: 10, right: 10 }}
                   testID="buyer-home-cart-icon"
                 >
                   <Icon name="shopping-cart" size={24} color={ON_DARK} />
@@ -4032,7 +4035,6 @@ function FeedScreenContent({
                   )}
                 </TouchableOpacity>
               </Animated.View>
-              </LiveCartPush>
             </View>
 
             {/* Absolutely centered on the screen (left:0/right:0), not a
@@ -4047,17 +4049,7 @@ function FeedScreenContent({
               style={[styles.buyerTabSwitcherWrap, { left: topRowSideGuard, right: topRowSideGuard }]}
               pointerEvents="box-none"
             >
-              <SegmentedControl
-                variant="underline"
-                size="compact"
-                testID="buyer-home-tabs"
-                options={[
-                  { id: 'following', label: 'Following' },
-                  { id: 'for-you', label: 'Threads' },
-                ]}
-                selectedId={feedTab}
-                onChange={(id) => switchFeedTab(id as 'following' | 'for-you')}
-              />
+              <HomeFeedTabs testID="buyer-home-tabs" onChange={handleHomeTabChange} />
             </View>
 
             {/* Bell dropped — Activity already has its own bell in the
@@ -4175,17 +4167,6 @@ function FeedScreenContent({
           </View>
         )}
       </View>
-      )}
-
-      {/* LIVE edge tab — buyer Threads Home only, centered on the header row. */}
-      {isBuyerSurface && !isCreatorFeed && (
-        <LiveEdgeTab
-          controller={liveTab}
-          top={previewTopInset + 4 + TOP_TABS_ROW_HEIGHT / 2}
-          leftInset={insets.left}
-          gutter={topRowSideGutter}
-          onOpenLive={() => router.push('/live-feed' as never)}
-        />
       )}
 
       {/* Notifications now open the real /buyer-notifications screen instead of
