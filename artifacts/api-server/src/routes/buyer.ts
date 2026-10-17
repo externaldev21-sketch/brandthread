@@ -1620,6 +1620,11 @@ router.get("/orders", async (req, res) => {
         threadCashAppliedCents:  orders.threadCashAppliedCents,
         cancellationReason:      orders.cancellationReason,
         createdAt:               orders.createdAt,
+        // The seller's brand mark, same source as the buyer brand rails
+        // (profile photo, then avatar). The order card falls back to it when
+        // a line item has no photo.
+        sellerProfileImageUrl:   users.profileImageUrl,
+        sellerAvatarUrl:         users.avatarUrl,
         ...deliveryColumns,
       })
       .from(orders)
@@ -1634,8 +1639,9 @@ router.get("/orders", async (req, res) => {
     const thumbs = await loadOrderListThumbs(rows.map((row) => row.id));
     // The list carries the timeline and guarantee but not the scan history
     // (events are loaded with the order detail).
-    res.json(rows.map((row) => ({
+    res.json(rows.map(({ sellerProfileImageUrl, sellerAvatarUrl, ...row }) => ({
       ...row,
+      sellerLogoUrl: sellerProfileImageUrl ?? sellerAvatarUrl ?? null,
       delivery: buildBuyerDelivery(row),
       items: thumbs.get(row.id)?.items ?? [],
       thumbnailUrl: thumbs.get(row.id)?.thumbnailUrl ?? null,

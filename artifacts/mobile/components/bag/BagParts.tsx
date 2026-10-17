@@ -45,7 +45,7 @@ export function BagHeader({ topInset, onClose, rightElement }: { topInset: numbe
         accessibilityLabel="Close bag"
         testID="bag-close"
       >
-        <Text style={s.closeText}>Close</Text>
+        <Icon name="chevron-left" size={24} color={theme.text} />
       </Pressable>
       <View style={s.titleRow}>
         <Text style={s.title} accessibilityRole="header">Bag</Text>
@@ -300,7 +300,7 @@ export function BagEmpty({
         <View style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="shopping-bag" size={52} color={theme.text} />
         </View>
-        <Text style={[s.emptyLine, { fontSize: FS.lg, fontFamily: FONT.bold }]}>Your cart is empty</Text>
+        <Text style={[s.emptyLine, { fontSize: FS.lg, fontFamily: FONT.bold }]}>Your bag is empty</Text>
         <Button label="Shop Threads" onPress={onShopNow} style={s.shopNow} testID="cart-shop-now" />
       </View>
       {arrivals.length > 0 && (
@@ -383,7 +383,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   barButton: { alignSelf: 'stretch' },
 
   emptyLine: { fontFamily: FONT.regular, fontSize: FS.base, color: theme.text, marginTop: SP.md },
-  shopNow: { alignSelf: 'flex-start', marginTop: SP.md, minWidth: 180 },
+  shopNow: { alignSelf: 'center', marginTop: SP.md, minWidth: 180 },
   arrivals: { marginTop: SP.xl },
   arrivalsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SP.sm },
   arrivalsRow: { gap: SP.sm, paddingRight: SP.md },

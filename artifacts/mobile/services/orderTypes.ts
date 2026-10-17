@@ -545,6 +545,8 @@ export interface BuyerOrderView {
   sellerId: string;
   sellerName: string;
   sellerHandle: string;
+  /** The seller's brand mark (GET /api/buyer/orders sellerLogoUrl); order cards fall back to it when an item has no photo. */
+  sellerLogoUri?: string;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   fulfillmentStatus: FulfillmentStatus;

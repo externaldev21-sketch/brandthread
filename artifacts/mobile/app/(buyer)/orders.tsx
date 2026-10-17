@@ -1,3 +1,5 @@
+import { Pressable, ScrollView, type ImageStyle, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { formatCents } from '@/lib/money';
 import { Icon as Feather } from '@/components/ui/Icon';
 import { openContextMenu } from '@/lib/contextMenu';
@@ -60,7 +62,8 @@ import { searchOrders } from '@/lib/orderSearch';
 import { Header, SkeletonBlock, useCenteredContentPadding } from '@/components/layout';
 
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
-
+import { stepIndex } from '@/components/orders/OrderProgressTimeline';
+import { orderDisplayNumber } from '@/lib/orderDisplayNumber';
 import { useReorderFlow } from '@/components/orders/ReorderFlow';
 
 import { canReorderStatus } from '@/lib/reorderSummary';
@@ -140,6 +143,171 @@ function applyFilter(orders: BuyerOrderView[], filter: BuyerFilterKey): BuyerOrd
   }
 }
 
+// ─── Card pieces ──────────────────────────────────────────────────────────────
+
+/** The seller's logo in a circle, or their initial when there's none (or it fails to load). */
+function BrandMark({ order, style, textStyle }: { order: BuyerOrderView; style: StyleProp<ViewStyle>; textStyle: StyleProp<TextStyle> }) {
+  const { theme } = useAppTheme();
+  const [failed, setFailed] = useState(false);
+  const logo = failed ? undefined : order.sellerLogoUri;
+  return (
+    <View style={[style, { backgroundColor: theme.accentDim, borderColor: theme.accent, overflow: 'hidden' }]}>
+      {logo ? (
+        <Image source={{ uri: logo }} style={StyleSheet.absoluteFill} resizeMode="cover" onError={() => setFailed(true)} accessibilityIgnoresInvertColors />
+      ) : (
+        <Text style={[textStyle, { color: theme.accentLight }]}>{order.sellerName.charAt(0).toUpperCase()}</Text>
+      )}
+    </View>
+  );
+}
+
+/**
+ * Item photo. When the item has none, or it fails to load, the tile shows the
+ * seller's brand mark instead of a gray placeholder icon (item 80).
+ */
+function OrderItemThumb({ item, order, style, fallbackStyle, markStyle, textStyle }: {
+  item: BuyerOrderView['lineItems'][number];
+  order: BuyerOrderView;
+  style: StyleProp<ImageStyle & ViewStyle>;
+  fallbackStyle: StyleProp<ViewStyle>;
+  markStyle: StyleProp<ViewStyle>;
+  textStyle: StyleProp<TextStyle>;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (item.imageUri && !failed) {
+    return <Image source={{ uri: item.imageUri }} style={style as StyleProp<ImageStyle>} resizeMode="cover" accessibilityLabel={item.productName} onError={() => setFailed(true)} />;
+  }
+  return (
+    <View style={[style as StyleProp<ViewStyle>, fallbackStyle]} accessibilityLabel={item.productName}>
+      <BrandMark order={order} style={markStyle} textStyle={textStyle} />
+    </View>
+  );
+}
+
+const CARD_STEPS = ['Ordered', 'Shipped', 'Delivered'] as const;
+
+/**
+ * Three labelled steps for the card (item 81). Uses the order detail
+ * tracker's own stage rule (stepIndex) so the card and the detail screen
+ * never disagree: placed/confirmed → Ordered, shipped/out for delivery →
+ * Shipped, delivered → Delivered. Monochrome like that tracker.
+ */
+function CardProgress({ order }: { order: BuyerOrderView }) {
+  const { theme } = useAppTheme();
+  const detailStep = stepIndex(order.status, order.trackingStatus);
+  const current = detailStep >= 4 ? 2 : detailStep >= 2 ? 1 : 0;
+  return (
+    <View style={progressStyles.row} accessibilityLabel={`Order progress: ${CARD_STEPS[current]}`}>
+      {CARD_STEPS.map((label, i) => {
+        const reached = i <= current;
+        return (
+          <View key={label} style={progressStyles.step}>
+            <View style={progressStyles.track}>
+              <View style={[progressStyles.line, { backgroundColor: i === 0 ? 'transparent' : reached ? theme.text : theme.border }]} />
+              <View style={[progressStyles.dot, { backgroundColor: reached ? theme.text : 'transparent', borderColor: reached ? theme.text : theme.border }]} />
+              <View style={[progressStyles.line, { backgroundColor: i === CARD_STEPS.length - 1 ? 'transparent' : i < current ? theme.text : theme.border }]} />
+            </View>
+            <Text
+              numberOfLines={1}
+              style={[progressStyles.label, { color: reached ? theme.text : theme.muted, fontFamily: i === current ? FONT.semibold : FONT.regular }]}
+            >
+              {label}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const progressStyles = StyleSheet.create({
+  row: { flexDirection: 'row', paddingVertical: SP.xs },
+  step: { flex: 1, alignItems: 'center' },
+  track: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', height: 10 },
+  line: { flex: 1, height: 1.5 },
+  dot: { width: 10, height: 10, borderRadius: 5, borderWidth: 1.5 },
+  label: { fontSize: FS.xs, marginTop: SP.xs },
+});
+
+// ─── Filter tabs ──────────────────────────────────────────────────────────────
+
+/**
+ * X-style filter tabs (item 83): plain labels, the active one bold with a
+ * label-wide underline, one hairline under the row. Same spec as the reframe
+ * SegmentTabs primitive (44pt row, 15pt labels, 3pt underline, 24pt gap),
+ * kept local to this screen. The row scrolls; a short fade at the right
+ * edge marks that more tabs follow and goes away once the row is scrolled
+ * to its end.
+ */
+function OrderFilterTabs({ value, onChange, gutter }: { value: BuyerFilterKey; onChange: (key: BuyerFilterKey) => void; gutter: number }) {
+  const { theme } = useAppTheme();
+  const [viewport, setViewport] = useState(0);
+  const [content, setContent] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const moreToRight = content > 0 && offset + viewport < content - 2;
+  return (
+    <View style={[tabStyles.row, { borderBottomColor: theme.border }]} accessibilityRole="tablist">
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        bounces={false}
+        overScrollMode="never"
+        scrollEventThrottle={32}
+        onLayout={e => setViewport(e.nativeEvent.layout.width)}
+        onContentSizeChange={w => setContent(w)}
+        onScroll={e => setOffset(e.nativeEvent.contentOffset.x)}
+        contentContainerStyle={{ paddingHorizontal: gutter, gap: 24 }}
+      >
+        {FILTER_CHIPS.map(item => {
+          const active = value === item.key;
+          return (
+            <Pressable
+              key={item.key}
+              onPress={() => {
+                if (active) return;
+                Haptics.selectionAsync();
+                onChange(item.key);
+              }}
+              style={({ pressed }) => pressed && tabStyles.pressed}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={item.label}
+            >
+              <View style={tabStyles.labelWrap}>
+                <Text
+                  numberOfLines={1}
+                  style={[tabStyles.label, { color: active ? theme.text : theme.muted, fontFamily: active ? FONT.bold : FONT.medium }]}
+                >
+                  {item.label}
+                </Text>
+                {active && <View style={[tabStyles.indicator, { backgroundColor: theme.text }]} />}
+              </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      {moreToRight && (
+        <LinearGradient
+          pointerEvents="none"
+          colors={[`${theme.background}00`, theme.background]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={tabStyles.fade}
+        />
+      )}
+    </View>
+  );
+}
+
+const tabStyles = StyleSheet.create({
+  row: { height: 44, borderBottomWidth: StyleSheet.hairlineWidth },
+  labelWrap: { height: 44, justifyContent: 'center', minWidth: 24 },
+  label: { fontSize: 15, lineHeight: 20 },
+  indicator: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, borderRadius: 2 },
+  pressed: { opacity: 0.6 },
+  fade: { position: 'absolute', top: 0, right: 0, bottom: 0, width: 40 },
+});
+
 // ─── Order Card ───────────────────────────────────────────────────────────────
 // Visual, tracker-forward card: seller + order meta up top, a live compact
 // status tracker as the centerpiece, then item preview / total / actions.
@@ -150,7 +318,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onTra
   const styles = useMemo(() => cardStyles(theme), [theme]);
   const firstItem = order.lineItems[0];
   const extraCount = order.lineItems.length - 1;
-  const sellerInitial = order.sellerName.charAt(0).toUpperCase();
+  const orderLabel = orderDisplayNumber(order.orderNumber);
   const isTerminalStatus = order.status === 'cancelled' || order.status === 'refunded' || order.status === 'disputed';
   // Preview orders are list-only here: never pass their synthetic IDs into
   // a detail or mutation route that can reach the live API.
@@ -181,15 +349,26 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onTra
   };
 
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress} onPressIn={isPreview ? undefined : () => prefetchBuyerOrderOnPressIn(order.id)} onLongPress={isPreview ? undefined : openMenu} delayLongPress={350} disabled={isPreview}>
+    // The card's body is the tap target (item 82); Track / Reorder are its
+    // siblings, never nested inside it, so web never renders button-in-button.
+    <View style={styles.card}>
+    <TouchableOpacity
+      activeOpacity={0.82}
+      onPress={onPress}
+      onPressIn={isPreview ? undefined : () => prefetchBuyerOrderOnPressIn(order.id)}
+      onLongPress={isPreview ? undefined : openMenu}
+      delayLongPress={350}
+      disabled={isPreview}
+      accessibilityLabel={`${orderLabel ?? 'Order'} from ${order.sellerName}, ${statusBadgeLabel(order.status).toLowerCase()}`}
+      accessibilityHint={isPreview ? undefined : 'Opens order details'}
+    >
       {/* Top row */}
       <View style={styles.cardTopRow}>
-        <View style={[styles.avatarCircle, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
-          <Text style={[styles.avatarText, { color: theme.accentLight }]}>{sellerInitial}</Text>
-        </View>
+        <BrandMark order={order} style={styles.avatarCircle} textStyle={styles.avatarText} />
         <View style={{ flex: 1 }}>
           <Text style={styles.sellerName}>{order.sellerName}</Text>
-          <Text style={styles.orderMeta}>{order.orderNumber} · {fmtDate(order.createdAt)}</Text>
+          {/* "Order #10234 · Oct 3" — never a raw or synthetic ID (item 79). */}
+          <Text style={styles.orderMeta}>{orderLabel ? `${orderLabel} · ` : ''}{fmtDate(order.createdAt)}</Text>
         </View>
         {showBadge && (
           <StatusBadge
@@ -214,13 +393,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onTra
       {thumbs.length > 0 && (
         <View style={styles.thumbRow}>
           {thumbs.map((item, i) => (
-            item.imageUri ? (
-              <Image cachePolicy="memory-disk" key={i} recyclingKey={item.imageUri} source={{ uri: item.imageUri }} style={styles.thumb} contentFit="cover" accessibilityLabel={item.productName} />
-            ) : (
-              <View key={i} style={[styles.thumb, styles.thumbFallback]}>
-                <Icon name="image" size={16} color={theme.subtle} />
-              </View>
-            )
+            <OrderItemThumb key={i} item={item} order={order} style={styles.thumb} fallbackStyle={styles.thumbFallback} markStyle={styles.thumbMark} textStyle={styles.avatarText} />
           ))}
           {order.lineItems.length > thumbs.length && (
             <View style={[styles.thumb, styles.thumbFallback]}>
@@ -242,10 +415,14 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onTra
         )}
       </View>
 
-      {/* Live status tracker — visual centerpiece of the card */}
+      {/* Live status tracker — visual centerpiece of the card. Labelled
+          Ordered · Shipped · Delivered (item 81); cancelled / refunded /
+          disputed keep the shared timeline's exception pill. */}
       {!autoRefunded && (
         <View style={styles.trackerWrap}>
-          <OrderStatusTimeline status={order.status} compact />
+          {isTerminalStatus
+            ? <OrderStatusTimeline status={order.status} compact />
+            : <CardProgress order={order} />}
         </View>
       )}
 
@@ -278,16 +455,16 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onTra
           <Text style={styles.trackingText}>
             {trackingLabel(order.trackingStatus)}
             {order.estimatedDelivery ? ` → Est. ${fmtDate(order.estimatedDelivery)}` : ''}
-            {isPreview && order.trackingNumber ? ` · ${order.trackingNumber}` : ''}
           </Text>
         </View>
       )}
 
-      {/* Actions */}
+    </TouchableOpacity>
+
+      {/* Actions — the card opens the order (item 82), so only the extra
+          actions get buttons, and only when they apply. */}
+      {((order.trackingNumber && !isPreview) || (onReorder && canReorderStatus(order.status))) && (
       <View style={styles.actionsRow}>
-        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onPress} activeOpacity={0.8} disabled={isPreview} hitSlop={ORDER_ACTION_HIT_SLOP} accessibilityRole="button">
-          <Text style={[styles.actionBtnText, { color: theme.accentLight }]}>View Order Details</Text>
-        </TouchableOpacity>
         {order.trackingNumber && !isPreview && (
           <TouchableOpacity
              style={[styles.actionBtn, styles.actionBtnSecondary, { backgroundColor: theme.secondaryDim, borderColor: theme.secondary }]}
@@ -315,7 +492,8 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onTra
           </TouchableOpacity>
         )}
       </View>
-    </TouchableOpacity>
+      )}
+    </View>
   );
 });
 
@@ -616,22 +794,9 @@ export default function BuyerOrdersScreen() {
           <SearchBar value={query} onChange={setQuery} placeholder="Search all orders" />
         </View>
       ) : null}
-      <ChipRow
-        selectedIndex={FILTER_CHIPS.findIndex(i => i.key === filter)}
-        hapticOnSelect={false}
-        inset={centeredPadding}
-        gap={8}
-        contentContainerStyle={{ paddingBottom: SP.sm }}
-      >
-        {FILTER_CHIPS.map(item => (
-          <FilterChip
-            key={item.key}
-            label={item.label}
-            active={filter === item.key}
-            onPress={() => setFilter(item.key)}
-          />
-        ))}
-      </ChipRow>
+      {/* Filter tabs — X-style underline tabs with a right-edge fade while
+          more tabs are off-screen (item 83). */}
+      <OrderFilterTabs value={filter} onChange={setFilter} gutter={centeredPadding} />
 
       {showingReturns ? (
         (returnsLoading || returnsOwnerId !== userId) && visibleReturns.length === 0 ? (
@@ -817,6 +982,15 @@ function cardStyles(theme: AppThemePreset) {
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.cardElevated,
+    },
+    // Brand mark centred in a photo-less thumbnail tile.
+    thumbMark: {
+      width: 32,
+      height: 32,
+      borderRadius: RADIUS.pill,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     itemText: {
       fontSize: FS.sm,
