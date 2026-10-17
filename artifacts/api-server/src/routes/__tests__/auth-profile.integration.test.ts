@@ -118,6 +118,27 @@ describe("PATCH /api/auth/profile", () => {
       bio: "Thoughtful essentials for everyday wear.",
     });
   });
+
+  it("saves pronouns and the style badge, and rejects oversized values", async () => {
+    const ok = await patchProfile({
+      pronouns: " they/them ",
+      styleBadge: { label: " Archive Fashion ", emoji: "🎞️", enabled: true },
+    });
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({
+      pronouns: "they/them",
+      styleBadge: { label: "Archive Fashion", emoji: "🎞️", enabled: true },
+    });
+
+    const tooLong = await patchProfile({ pronouns: "x".repeat(31) });
+    expect(tooLong.status).toBe(400);
+    const badBadge = await patchProfile({ styleBadge: { label: "x".repeat(25), emoji: "", enabled: true } });
+    expect(badBadge.status).toBe(400);
+
+    const cleared = await patchProfile({ pronouns: "", styleBadge: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body).toMatchObject({ pronouns: null, styleBadge: null });
+  });
 });
 
 describe("Founding Seller on switching to selling", () => {

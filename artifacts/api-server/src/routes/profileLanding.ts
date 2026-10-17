@@ -8,6 +8,7 @@ import { withStorefrontBannerAdopted } from "../lib/storefrontBanner";
 import { ObjectStorageService } from "../lib/objectStorage";
 
 const bannerStorage = new ObjectStorageService();
+import { getStoreLanguage } from "../lib/storeLanguage";
 
 const escapeHtml = (value: string) =>
   value.replace(/[&<>"']/g, (char) => ({
@@ -81,6 +82,12 @@ export async function profileLanding(req: Request, res: Response): Promise<void>
     const shopHref = profile.accountType === "seller"
       ? `/seller-profile?sellerId=${encodeURIComponent(profile.id)}&isOwner=false${forwardedQuery(req.query)}`
       : null;
+    // A seller's bio is written in their "Store language"; tag it so browsers
+    // and screen readers read it correctly. The page chrome stays English.
+    const bioLang = profile.accountType === "seller" && profile.clerkId
+      ? await getStoreLanguage(profile.clerkId)
+      : null;
+    const bioLangAttr = bioLang && bioLang !== "en" ? ` lang="${bioLang}"` : "";
 
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; img-src https:; base-uri 'none'; form-action 'none'");
@@ -107,7 +114,7 @@ h1{font-size:26px;line-height:1.2;margin:22px 0 6px}.handle{color:#a6a6a6;margin
 </style></head><body><main>
 <div class="brand">BRANDTHREAD</div>${coverImage ? `<img src="${escapeHtml(coverImage)}" alt="" class="cover">` : ""}${image}
 <h1>${name}</h1><p class="handle">@${handle}</p>
-${bio ? `<p class="bio">${bio}</p>` : `<p class="bio">On Brandthread</p>`}
+${bio ? `<p class="bio"${bioLangAttr}>${bio}</p>` : `<p class="bio">On Brandthread</p>`}
 ${shopHref
   ? `<a class="button" href="${escapeHtml(shopHref)}">Shop ${name}</a>`
   : `<a class="button" href="brandthread://u/${encodeURIComponent(profile.username)}">Open in Brandthread</a>`}

@@ -40,6 +40,9 @@ import { useBuyerPreferences } from '@/hooks/useBuyerPreferences';
 
 import { mergeStyleInterests, selectedCategoriesFromInterests, type ShoppingSizeField } from '@/lib/shoppingPreferences';
 
+import { updateBuyerSettings } from '@/lib/buyerSettingsSync';
+import { apiErrorMessage } from '@/lib/safety';
+import { useApi } from '@/lib/api';
 import { radius } from '@/constants/radii';
 
 const TOPS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL+'];
@@ -112,6 +115,7 @@ export default function ShoppingPreferences() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tabBarInset = useSellerTabBarInset();
+  const api = useApi();
   const [settings, setSettings] = useState<BuyerSettingsState | null>(null);
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [hasChanges, setHasChanges] = useState(false);
@@ -169,6 +173,17 @@ export default function ShoppingPreferences() {
         delete next[field];
         return next;
       });
+    }
+  }
+  // Personalized recommendations is an account setting the For You ranking
+  // reads on the server — saved immediately, rolled back with the real error.
+  async function setPersonalized(v: boolean) {
+    setSettings(prev => prev ? { ...prev, personalizedRecommendations: v } : prev);
+    try {
+      setSettings(await updateBuyerSettings(api, { personalizedRecommendations: v }));
+    } catch (error) {
+      setSettings(prev => prev ? { ...prev, personalizedRecommendations: !v } : prev);
+      Alert.alert('Couldn’t update recommendations', apiErrorMessage(error, 'Check your connection and try again.'));
     }
   }
 
@@ -319,7 +334,7 @@ export default function ShoppingPreferences() {
             </View>
             <HapticSwitch
               value={Boolean(settings.personalizedRecommendations)}
-              onValueChange={v => patch({ personalizedRecommendations: v })}
+              onValueChange={v => { void setPersonalized(v); }}
               accessibilityLabel="Personalized recommendations"
               accessibilityHint="Use your activity to surface relevant products"
             />

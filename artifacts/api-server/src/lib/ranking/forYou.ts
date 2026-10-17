@@ -32,6 +32,7 @@ import {
 import { eq, and, inArray, gte, sql, desc, ne, isNotNull } from "drizzle-orm";
 import { logger } from "../logger";
 import { privateAuthorVisibleTo } from "../privateAccount";
+import { getUserAppSettings } from "../userAppSettingsStore";
 import {
   DEFAULT_EVENT_WEIGHTS, DEFAULT_RANKING_CONFIG, getRankingConfig, getRankingConfigSync,
   type RankingConfig,
@@ -313,6 +314,20 @@ async function loadSurveyPreferences(userId: string): Promise<{ styleInterests: 
   }
 }
 
+/**
+ * "Personalized recommendations" off (Settings → Content you see): rank with
+ * an empty taste profile, so For You falls back to recency + engagement only
+ * — nothing learned from the buyer's behaviour or picks shapes the order.
+ */
+export function neutralProfile(profile: SeededProfile): SeededProfile {
+  return { ...profile, categoryAffinity: {}, styleTagAffinity: {}, sellerAffinity: {}, likedBrandIds: new Set() };
+}
+
+async function loadRankingProfile(userId: string): Promise<SeededProfile> {
+  const [profile, { settings }] = await Promise.all([loadOrSeedProfile(userId), getUserAppSettings(userId)]);
+  return settings.personalizedRecommendations ? profile : neutralProfile(profile);
+}
+
 async function loadOrSeedProfile(userId: string): Promise<SeededProfile> {
   const [survey, profile] = await Promise.all([loadSurveyPreferences(userId), loadOrSeedBaseProfile(userId)]);
   return {
@@ -562,7 +577,7 @@ export async function computeForYouRankingForUser(userId: string): Promise<ForYo
   const [cfg, hiddenIds, profile, followRows, blockedRows, seenIds, hiddenCreators] = await Promise.all([
     getRankingConfig(),
     notInterestedPostIds(userId),
-    loadOrSeedProfile(userId),
+    loadRankingProfile(userId),
     db.select({ followingId: follows.followingId }).from(follows).where(eq(follows.followerId, userId)),
     db.select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId }).from(blocks)
       .where(sql`${blocks.blockerId} = ${userId} OR ${blocks.blockedId} = ${userId}`),

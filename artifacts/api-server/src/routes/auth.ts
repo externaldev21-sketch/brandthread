@@ -12,6 +12,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { awardLoyaltyPointsOnce } from "./loyalty";
 import { sendWelcomeEmail } from "../lib/brandthreadEmail";
+import { recordSignInAndAlert } from "../lib/loginAlerts";
 import { isMailerConfigured, sendPasswordResetEmail } from "../lib/mailer";
 import {
   DELETION_GRACE_DAYS,
@@ -69,6 +70,13 @@ import { isUniqueViolation, isUsernameUniqueViolation, violatedConstraint } from
 import { validateHandle } from "../lib/storeIdentity";
 import { isEmailUniqueViolation, releaseStaleEmailClaims } from "../lib/staleEmailClaim";
 import { ProfileRoleTakenError, activeSiblingIds, assertRoleAvailable, isLoginWithLiveSiblings, recordProfileRole } from "../lib/accountProfiles";
+import {
+  pronounsForStorage,
+  pronounsSchema,
+  styleBadgeForStorage,
+  styleBadgeSchema,
+  type StyleBadge,
+} from "../lib/profileExtras";
 import { createWelcomeConversationOnce } from "../lib/brandthreadAgent";
 import { AGE_RESTRICTED_MESSAGE, bandMaySellOrEarn, denyIfAgeRestricted } from "../lib/ageGate";
 import { LEGAL_ACCEPTANCE_SOURCES, recordLegalAcceptance, type LegalAcceptanceSource } from "../lib/legalAcceptance";
@@ -125,6 +133,7 @@ const profileBodySchema = z.object({
   socialLinks: z.record(z.string(), z.string().trim().max(300)).optional(),
   // Optional pronouns shown next to the name; "" or null clears them.
   pronouns: z.string().trim().max(40, "Pronouns can be up to 40 characters.").nullable().optional(),
+  styleBadge: styleBadgeSchema.optional(),
 }).passthrough();
 const privacyBodySchema = z.object({
   dmPrivacy: z.enum(["requests", "followers_only"]).optional(),
@@ -320,6 +329,16 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
         req.log.warn({ err, clerkUserId }, "Welcome email delivery failed");
       });
     }
+    // Login alerts (Settings → Password and security): records this Clerk
+    // session and emails the owner when it's a new sign-in. Off the
+    // request path; never fails the sync.
+    void recordSignInAndAlert({
+      userId: clerkUserId,
+      sessionId: getAuth(req).sessionId,
+      email: user.email,
+      name: user.displayName ?? user.name,
+      userAgent: req.get("user-agent") ?? null,
+    });
     res.status(created ? 201 : 200).json({ ...user, deletionCancelled });
     // New-device sign-in alert (lib/security/signInAlerts.ts); never delays or fails sync.
     void noteSignIn(clerkUserId, getAuth(req).sessionId ?? null, req.log);
@@ -959,7 +978,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
   const clerkId = (req as any).clerkUserId as string;
   const {
     displayName, brandName, bio, website, name, username, accountType, appThemeId, appIconId, expectedClerkId,
-    category, location, contactEmail, tags, socialLinks, pronouns,
+    category, location, contactEmail, tags, socialLinks, pronouns, styleBadge,
   } = req.body as {
     displayName?: string;
     brandName?:   string;
@@ -977,6 +996,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
     tags?:         string[];
     socialLinks?:  Record<string, string>;
     pronouns?:     string | null;
+    styleBadge?:   StyleBadge | null;
   };
   if (expectedClerkId && expectedClerkId !== clerkId) {
     (req as any).log?.warn("profile update rejected after account context changed");
@@ -1034,6 +1054,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
   if (tags         !== undefined) updates.tags         = tags;
   if (socialLinks  !== undefined) updates.socialLinks   = socialLinks;
   if (pronouns     !== undefined) updates.pronouns     = pronouns?.trim() || null;
+  if (styleBadge   !== undefined) updates.styleBadge    = styleBadgeForStorage(styleBadge);
 
   // Username: format + uniqueness check + 14-day change cooldown
   if (username !== undefined) {

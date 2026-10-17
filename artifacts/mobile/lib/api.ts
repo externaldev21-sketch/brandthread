@@ -1428,6 +1428,7 @@ export interface LocalUserProfile {
   ageBand?: 'under_13' | '13_17' | '18_plus' | null;
   /** Optional pronouns shown next to the name (users.pronouns). */
   pronouns?: string | null;
+  styleBadge?: { label: string; emoji: string; enabled: boolean } | null;
 }
 
 /** GET/PUT /api/store/subdomain. 'active' = claimed server-side (platform-owned host). */
@@ -1642,6 +1643,24 @@ async function postWithUploadProgress<T>(
     xhr.send(payload);
   });
 }
+/** Server-side account app settings — mirrors api-server lib/userAppSettings.ts. */
+export interface MeAppSettings {
+  readReceipts: boolean;
+  activityStatus: boolean;
+  groupAdds: 'everyone' | 'friends';
+  storyReplies: 'everyone' | 'friends' | 'off';
+  hideLikeCounts: boolean;
+  personalizedRecommendations: boolean;
+  sensitiveContent: 'less' | 'standard' | 'more';
+  reduceMotion: boolean;
+  captions: boolean;
+  autoplayVideos: boolean;
+  highQualityUploads: boolean;
+  dataSaver: boolean;
+  highContrast: boolean;
+  loginAlerts: boolean;
+  appLanguage: string;
+}
 
 export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () => 'anonymous') {
   const get     = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope);
@@ -1806,6 +1825,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         contactEmail?: string;
         tags?:         string[];
         socialLinks?:  Record<string, string>;
+        /** ≤ 30 chars; "" clears it. */
+        pronouns?:     string;
+        /** label ≤ 24, emoji ≤ 8; null clears it. */
+        styleBadge?:   { label: string; emoji: string; enabled: boolean } | null;
       }) => patch<any>('/api/auth/profile', body),
       /** Upload the current account's profile photo (buyer or seller). Cropped to a
        *  square client-side and displayed as a circle. Shared with the seller avatar
@@ -3751,6 +3774,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             users: Array<{ userId: string; username: string | null; displayName: string | null; avatarUrl: string | null }>;
             count: number;
           };
+          /** Public profile extras; styleBadge is present only when the owner enabled it. */
+          pronouns?: string | null; styleBadge?: { label: string; emoji: string } | null;
         }>(`/api/social/profile/${encodeURIComponent(userId)}`),
       /** Posts where someone tagged this profile (the profile "Tagged" tab). */
       tagged: (userId: string, limit = 30, offset = 0) =>
@@ -4006,6 +4031,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       update: (settings: { dmPrivacy?: 'requests' | 'followers_only'; isPrivate?: boolean; readReceipts?: boolean; showActivityStatus?: boolean; showSavesToFollowers?: boolean }) =>
         patch<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; readReceipts?: boolean; showActivityStatus?: boolean; showSavesToFollowers?: boolean }>('/api/auth/privacy', settings),
     },
+    /**
+     * Account app settings (privacy, content, accessibility, security),
+     * stored server-side so they follow the account across devices and the
+     * API can enforce them. See artifacts/api-server/src/lib/userAppSettings.ts.
+     */
+    meSettings: {
+      get: () => freshGet<{ settings: MeAppSettings; updatedAt: string | null }>('/api/me/settings'),
+      update: (body: Partial<MeAppSettings>) =>
+        patch<{ settings: MeAppSettings; updatedAt: string }>('/api/me/settings', body),
+      resetRecommendations: () => post<{ ok: boolean }>('/api/me/settings/reset-recommendations', {}),
+    },
     /** Private-account follow requests (incoming) and the Close Friends list. */
     followRequests: {
       list: (limit = 50, offset = 0) =>
@@ -4085,6 +4121,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       get: () => get<{ seenTipIds: string[]; skipAll: boolean }>('/api/first-run-tips/seen'),
       markSeen: (tipId: string) => post<void>(`/api/first-run-tips/${encodeURIComponent(tipId)}/seen`, {}),
       skipAll: () => post<void>('/api/first-run-tips/skip-all', {}),
+      /** Explicit on/off for Settings > Tips (false turns "Skip all tips" back off). */
+      setSkipAll: (skipAll: boolean) => post<void>('/api/first-run-tips/skip-all', { skipAll }),
       reset: () => post<void>('/api/first-run-tips/reset', {}),
     },
     /** "Add to this order": the post-purchase add-on offer (routes/order-add-on.ts). */

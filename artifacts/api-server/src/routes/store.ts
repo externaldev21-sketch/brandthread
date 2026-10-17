@@ -18,6 +18,7 @@ import {
   customDomainRoutingEnabled, hashStorePassword, sanitizeStoreSettingsInput,
   toOwnerStorefront, toPublicStorefront, validateStorePassword, validateStoreSlug,
 } from "../lib/storeSettingsSecurity";
+import { getStoreLanguage } from "../lib/storeLanguage";
 
 const router = Router();
 
@@ -288,7 +289,11 @@ import { CANONICAL_WEB_ORIGIN } from "../lib/webOrigin";
 export async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boolean; sf?: any; optOutTracking?: boolean }): Promise<string> {
   const isPreview = opts?.isPreview ?? true;
   const sf = opts?.sf ?? await getOrCreateStorefront(ownerId);
-  const storeProducts = await getStoreProducts(ownerId);
+  const [storeProducts, storeLanguage] = await Promise.all([
+    getStoreProducts(ownerId),
+    // Seller's "Store language": tags the page's content language only (no translation).
+    getStoreLanguage(ownerId),
+  ]);
   // Growth: first-party attribution capture + (validated-ID-only) Meta/TikTok pixels.
   // Only the public site gets these, never the private preview.
   let growthHead = "";
@@ -481,7 +486,7 @@ export async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boo
   const bannerText    = isPreview ? "Private Preview link · Not yet published" : "";
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${escapeAttr(storeLanguage)}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">

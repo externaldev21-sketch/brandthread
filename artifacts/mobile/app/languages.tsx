@@ -1,6 +1,9 @@
 /**
- * Brandthread — Languages (store localization settings)
- * Low-priority: stores preferred store language in seller_settings.
+ * Brandthread — Store language (seller).
+ * Saves seller_settings.storeLanguage. The server uses it as the language TAG
+ * of the seller's storefront page (html lang), the bio on their shared profile
+ * link, and the public seller payload (`storeLanguage`). Nothing is
+ * translated — the copy below says so.
  */
 import React, { useState, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
@@ -91,8 +94,9 @@ export default function LanguagesScreen() {
         await api.seller.updateSettings({ storeLanguage: code }) as any;
       }
       setStoreLanguage(code);
-    } catch {
-      Alert.alert("Couldn't save language", 'Try again.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message.replace(/^API \d{3}:\s*/, '') : '';
+      Alert.alert('Could not save store language', message && !message.startsWith('{') ? message : 'Please try again.');
     } finally {
       setSaving(null);
     }
@@ -102,7 +106,7 @@ export default function LanguagesScreen() {
 
   return (
     <View style={[s.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Languages" />
+      <ScreenHeader title="Store language" />
       {loading ? (
         <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
       ) : (
@@ -126,10 +130,16 @@ export default function LanguagesScreen() {
           <View style={s.section}>
             {isBuyer ? null : (
               <>
-                <Text style={[s.sectionTitle, { color: colors.foreground }]}>Published languages</Text>
-                <Text style={[s.sectionSubtitle, { color: colors.mutedForeground }]}>
-                  Select your store's primary language. Buyers will see content in this language.
-                </Text>
+            <Text style={[s.sectionTitle, { color: colors.foreground }]}>Language you write your store in</Text>
+            <Text style={[s.sectionSubtitle, { color: colors.mutedForeground }]}>
+              This sets the language tag on your storefront page and listing metadata, so browsers, search engines and screen readers read your content correctly.
+            </Text>
+            <View style={[s.noticeCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Icon name="info" size={16} color={colors.mutedForeground} />
+              <Text style={[s.noticeText, { color: colors.mutedForeground }]}>
+                Translation isn't available yet. Buyers see your products and policies exactly as you write them, and the app and storefront buttons stay in English.
+              </Text>
+            </View>
               </>
             )}
 
@@ -180,7 +190,7 @@ export default function LanguagesScreen() {
           {isBuyer ? null : (
           <View style={s.section}>
             <Text style={[s.footerNote, { color: colors.mutedForeground }]}>
-              To translate your product descriptions and policies for international buyers, enable multi-language support from your plan settings.
+              To reach buyers in another language today, write your product titles, descriptions and policies in that language.
             </Text>
           </View>
           )}
@@ -208,5 +218,7 @@ const s = StyleSheet.create({
   defaultBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   langNative: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 2, textAlign: 'left', writingDirection: 'ltr', alignSelf: 'stretch' },
   langMarket: { fontSize: 11, fontFamily: FONT.regular },
+  noticeCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: RADIUS.lg, borderWidth: 1, padding: 12, marginBottom: 14 },
+  noticeText: { flex: 1, fontSize: 12, fontFamily: FONT.regular, lineHeight: 17 },
   footerNote: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 18 },
 });

@@ -23,6 +23,7 @@ const bannerStorage = new ObjectStorageService();
 import { db, users, follows, storyHighlightItems, closeFriends, stories, storyMentions, storyLikes, storyViews, notes, blocks, followRequests, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { getUserAppSettings } from "../lib/userAppSettingsStore";
 import { rateLimit } from "../middlewares/rateLimit";
 import { publishNotification } from "./notifications-feed";
 import { resolveToClerkId } from "./public";
@@ -54,6 +55,7 @@ import { viewerCanSeeContent } from "../lib/privateAccount";
 import { afterBlockChange, afterFollowChange } from "../lib/relationshipCaches";
 import { cappedUnknown, jsonList, jsonValue, looseBody, optBoolish, validateBody } from "../middlewares/bodySchemas";
 import { pinnedAtIso, pinnedAtSql, pinnedFirst as pinnedFirstOrder } from "../lib/postPins";
+import { publicPronouns, publicStyleBadge } from "../lib/profileExtras";
 
 // Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
 // search endpoint so people search behaves consistently with product/brand
@@ -666,6 +668,9 @@ router.get("/profile/:userId", async (req, res) => {
     isFollowedBy,
     isMutual: isFollowing && isFollowedBy,
     iBlockedThem,
+    // Public profile extras (migration 271); the style badge only when enabled.
+    pronouns:   publicPronouns(user.pronouns),
+    styleBadge: publicStyleBadge(user.styleBadge),
     // Private accounts: header data stays visible; content is follower-only.
     isPrivate: user.isPrivate === true,
     pronouns: user.pronouns ?? null,
@@ -1356,6 +1361,9 @@ router.post("/stories", validateBody(createStoryBody), async (req, res) => {
   const storyHeld = !!storyVerdict && isFlagged(storyVerdict);
 
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const accountStoryReplies = (repliesDisabled === undefined || privacy?.replyPermission === undefined)
+    ? (await getUserAppSettings(myId)).settings.storyReplies
+    : "everyone";
   // Close Friends wins over the coarser visibility: the mobile client sends
   // { visibility: 'public', closeFriendsOnly: true } for a Close Friends story.
   const visibility = privacy?.closeFriendsOnly === true
@@ -1370,9 +1378,11 @@ router.post("/stories", validateBody(createStoryBody), async (req, res) => {
     authorColor:         avatarColor(myId),
     authorAccountType:   me.accountType ?? "buyer",
     media,
-    repliesDisabled:    repliesDisabled ?? false,
+    // Unspecified per-story reply settings follow the account's "Story
+    // replies" setting (Settings → Who can message and see me).
+    repliesDisabled:    repliesDisabled ?? accountStoryReplies === "off",
     privacyVisibility:  visibility,
-    privacyReplyPerm:   privacy?.replyPermission ?? "everyone",
+    privacyReplyPerm:   privacy?.replyPermission ?? (accountStoryReplies === "off" ? "everyone" : accountStoryReplies),
     originalStoryId:    reshareOf?.id ?? null,
     originalAuthorId:   reshareOf?.authorId ?? null,
     moderationStatus:   storyHeld ? "held" : "visible",

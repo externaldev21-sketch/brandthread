@@ -1,66 +1,52 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, type TextInputProps } from 'react-native';
-
-import { Icon, type IconName } from '@/components/ui/Icon';
-
-
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { useRouter } from 'expo-router';
-
 import { useUser } from '@clerk/expo';
-
 import { useAppTheme } from '@/contexts/AppThemeContext';
-
 import { useColors } from '@/hooks/useColors';
-
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
-
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
-
+import { useApi } from '@/lib/api';
+import { isBuyerDevPreview } from '@/lib/devPreview';
+import {
+  PRONOUNS_MAX, isValidUsername, normalizeUsername, personalDetailsPatch, profileSaveErrorMessage,
+  type PersonalDetailsInput, type ProfileSaveError,
+} from '@/lib/profileExtras';
 import { ScreenHeader } from '@/components/ScreenHeader';
-
 import { Card, ListRow, StickyBottomCTA } from '@/components/ui';
-
-import { haptics } from '@/lib/haptics';
-
+import { hapticError, hapticSuccess } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
-
 import { SPACING } from '@/constants/spacing';
-
+import { RADII } from '@/constants/radii';
 import { FONT } from '@/lib/theme';
-
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
-import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
-
-import { getPreviewAccount } from '@/lib/previewAccount';
-
-/** Fields stored in BuyerProfileFields — everything editable is persisted. */
-type PersistedKey = keyof Omit<BuyerProfileFields, 'aiCreator' | 'avatarUri'>;
+type EditableKey = keyof PersonalDetailsInput;
 
 type FieldDef = {
-  key: PersistedKey | 'email' | 'birthday';
+  key: EditableKey | 'email' | 'phone' | 'birthday';
   label: string;
   placeholder: string;
-  icon: IconName;
+  icon: keyof typeof Feather.glyphMap;
   editable?: boolean;
+  maxLength?: number;
   keyboardType?: 'default' | 'email-address' | 'phone-pad';
-  autoComplete?: TextInputProps['autoComplete'];
-  textContentType?: TextInputProps['textContentType'];
-  autoCapitalize?: TextInputProps['autoCapitalize'];
+  autoCapitalize?: 'none' | 'words';
 };
 
-// email and birthday are managed in Login methods and locked in the UI.
+// Name, username and pronouns save to the account (PATCH /api/auth/profile).
+// Email and phone are Clerk-verified and change through their own screens;
+// birthday is only used at sign-up for the age check and is never stored.
 const FIELDS: FieldDef[] = [
-  { key: 'name',     label: 'Name',      placeholder: 'Your name',         icon: 'user', autoComplete: 'name', textContentType: 'name', autoCapitalize: 'words' },
-  { key: 'username', label: 'Username',  placeholder: '@username',          icon: 'at-sign', autoComplete: 'username', textContentType: 'username', autoCapitalize: 'none' },
-  { key: 'email',    label: 'Email',     placeholder: 'your@email.com',     icon: 'mail',    keyboardType: 'email-address', editable: false, autoComplete: 'email', textContentType: 'emailAddress', autoCapitalize: 'none' },
-  { key: 'phone',    label: 'Phone',     placeholder: 'Add phone number',   icon: 'phone',   keyboardType: 'phone-pad', autoComplete: 'tel', textContentType: 'telephoneNumber' },
-  { key: 'birthday', label: 'Birthday',  placeholder: 'Set in Login methods', icon: 'calendar', editable: false },
-  { key: 'pronouns', label: 'Pronouns',  placeholder: 'e.g. they/them',     icon: 'smile' },
+  { key: 'name',     label: 'Name',      placeholder: 'Your name',        icon: 'user',    autoCapitalize: 'words' },
+  { key: 'username', label: 'Username',  placeholder: 'username',         icon: 'at-sign', autoCapitalize: 'none', maxLength: 30 },
+  { key: 'email',    label: 'Email',     placeholder: 'Not added',        icon: 'mail',     editable: false },
+  { key: 'phone',    label: 'Phone',     placeholder: 'Not added',        icon: 'phone',    editable: false },
+  { key: 'birthday', label: 'Birthday',  placeholder: 'Not set',          icon: 'calendar', editable: false },
+  { key: 'pronouns', label: 'Pronouns',  placeholder: 'e.g. they/them',   icon: 'smile',   autoCapitalize: 'none', maxLength: PRONOUNS_MAX },
 ];
-const EDITABLE_KEYS: string[] = FIELDS.filter((f) => f.editable !== false).map((f) => f.key);
 
 /** Masks a real email address, e.g. "jordan@example.com" -> "••••@example.com". */
 function maskEmail(email: string | null | undefined): string {
@@ -69,113 +55,174 @@ function maskEmail(email: string | null | undefined): string {
   return `••••@${domain}`;
 }
 
+const EMPTY: PersonalDetailsInput = { name: '', username: '', pronouns: '' };
+
 export default function BuyerPersonalDetails() {
   const { theme } = useAppTheme();
   const palette = useColors();
   const s = makeStyles(palette, theme);
   const insets = useSafeAreaInsets();
-  const inputRefs = useRef<Record<string, TextInput | null>>({});
   const router = useRouter();
+  const api = useApi();
   const { user } = useUser();
-  const [fields, setFields] = useState<BuyerProfileFields>({ ...DEFAULT_BUYER_PROFILE });
+  // Dev-web preview has no signed-in account: keep the old local-only save there.
+  const preview = __DEV__ && isBuyerDevPreview();
+  const [local, setLocal] = useState<BuyerProfileFields>({ ...DEFAULT_BUYER_PROFILE });
+  const [fields, setFields] = useState<PersonalDetailsInput>(EMPTY);
+  const [saved, setSaved] = useState<PersonalDetailsInput>(EMPTY);
+  const [ageVerified, setAgeVerified] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  // The signed-out buyer preview stands in for the preview account
-  // (lib/previewAccount.ts): its name and username, plus the rest with demo=1.
-  const [previewAccount] = useState(() => (!user && isBuyerDevPreview() ? getPreviewAccount('buyer', isPreviewDemoMode()) : null));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<ProfileSaveError | null>(null);
 
   useEffect(() => {
-    // Seed from BOTH sources; social profile is authoritative for shared identity.
-    Promise.all([loadBuyerProfile(), getMyProfile()]).then(([local, social]) => {
-      setFields({
-        ...local,
-        name:     local.name || social.name || previewAccount?.name || '',
-        username: local.username || social.username || previewAccount?.username || DEFAULT_BUYER_PROFILE.username,
-        pronouns: local.pronouns || social.pronouns || previewAccount?.pronouns || '',
-        phone:    local.phone || previewAccount?.phone || '',
-      });
+    // The server account is authoritative (it is what /u/<username> and the
+    // QR code resolve); local values are only a fallback when it can't be reached.
+    Promise.all([
+      loadBuyerProfile(),
+      getMyProfile(),
+      preview ? Promise.resolve(null) : api.auth.me().catch(() => null),
+    ]).then(([localProfile, social, me]) => {
+      const initial: PersonalDetailsInput = me
+        ? { name: me.displayName || me.name || '', username: me.username || '', pronouns: me.pronouns || '' }
+        : {
+            name: localProfile.name || social.name,
+            username: localProfile.username || social.username || '',
+            pronouns: localProfile.pronouns || social.pronouns || '',
+          };
+      setLocal(localProfile);
+      setFields(initial);
+      setSaved(me ? initial : EMPTY);
+      setAgeVerified(!!me?.ageBand);
       setLoaded(true);
     });
-  }, [previewAccount]);
+  }, [api, preview]);
 
-  function set(key: string, val: string) {
+  function set(key: EditableKey, val: string) {
     setFields(prev => ({ ...prev, [key]: val }));
     setHasChanges(true);
+    setError(null);
   }
 
-  function getValue(key: string): string {
-    if (key === 'email') return maskEmail(user?.primaryEmailAddress?.emailAddress ?? (previewAccount?.email || undefined));
-    if (key === 'birthday') return '';
-    const val = (fields as unknown as Record<string, unknown>)[key];
-    return typeof val === 'string' ? val : '';
+  function getValue(key: FieldDef['key']): string {
+    if (key === 'email') return maskEmail(user?.primaryEmailAddress?.emailAddress);
+    if (key === 'phone') return user?.primaryPhoneNumber?.phoneNumber ?? '';
+    if (key === 'birthday') return ageVerified ? 'Verified at sign-up' : '';
+    return fields[key];
   }
 
   async function handleSave() {
-    // Persist locally; only sync non-empty shared identity fields to the social
-    // profile so saving an unrelated field (e.g. phone) never overwrites an
-    // already-set name or username with an empty string.
-    const socialPatch: Partial<{ name: string; username: string; pronouns: string }> = {};
-    if (fields.name.trim()) socialPatch.name = fields.name;
-    if (fields.username.trim()) socialPatch.username = fields.username;
-    if (fields.pronouns.trim()) socialPatch.pronouns = fields.pronouns;
-    await Promise.all([
-      saveBuyerProfile(fields),
-      Object.keys(socialPatch).length > 0 ? updateMyProfile(socialPatch) : Promise.resolve(),
-    ]);
-    haptics.success();
-    goBackOr(router);
+    if (saving) return;
+    if (!fields.name.trim()) { hapticError(); setError({ field: null, message: 'Name is required.' }); return; }
+    if (!isValidUsername(fields.username)) {
+      hapticError();
+      setError({ field: 'username', message: 'Letters, numbers and underscores only (3–30 characters).' });
+      return;
+    }
+    const patch = personalDetailsPatch(fields, saved);
+    setSaving(true);
+    setError(null);
+    try {
+      let next: PersonalDetailsInput = {
+        name: fields.name.trim(),
+        username: normalizeUsername(fields.username),
+        pronouns: fields.pronouns.trim(),
+      };
+      if (!preview && Object.keys(patch).length > 0) {
+        const updated = await api.auth.updateProfile(patch);
+        next = {
+          name: updated?.displayName || updated?.name || next.name,
+          username: updated?.username || next.username,
+          pronouns: updated?.pronouns ?? '',
+        };
+      }
+      // Mirror the saved account values locally so other screens agree.
+      await Promise.all([
+        saveBuyerProfile({ ...local, ...next }),
+        updateMyProfile(next),
+      ]);
+      hapticSuccess();
+      setSaved(next);
+      setHasChanges(false);
+      goBackOr(router);
+    } catch (err) {
+      hapticError();
+      setError(profileSaveErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (!loaded) return <View style={{ flex: 1, backgroundColor: 'transparent' }} />;
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Personal details" />
+      <ScreenHeader title="Personal Details" />
 
-      <ScrollView contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + (hasChanges ? 120 : 40) }} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + (hasChanges ? 120 : 40) }}>
         <Text style={s.sectionDesc}>
-          Keep your details up to date. Change your email and birthday in Login methods.
+          Your name, username and pronouns appear on your profile. Email and phone are verified by your sign-in.
         </Text>
 
         <Card style={s.card}>
           {FIELDS.map((field, i) => {
             const isEditable = field.editable !== false;
-            const nextKey = EDITABLE_KEYS[EDITABLE_KEYS.indexOf(field.key) + 1];
-            return (
-              <React.Fragment key={field.key}>
-                <View style={s.row}>
-                  <Icon name={field.icon} size={17} color={theme.accent} style={{ width: 24 }} />
-                  <Text style={s.rowLabel}>{field.label}</Text>
+            const isBirthday = field.key === 'birthday';
+            const value = getValue(field.key);
+            const row = (
+              <View style={s.row}>
+                <Feather name={field.icon} size={17} color={theme.accent} style={{ width: 24 }} />
+                <Text style={s.rowLabel}>{field.label}</Text>
+                {isEditable ? (
                   <TextInput
-                    ref={(r) => { inputRefs.current[field.key] = r; }}
-                    style={[s.input, !isEditable && s.inputDisabled]}
-                    value={getValue(field.key)}
-                    onChangeText={v => isEditable && set(field.key, v)}
+                    style={s.input}
+                    value={value}
+                    onChangeText={v => set(field.key as EditableKey, v)}
                     placeholder={field.placeholder}
                     placeholderTextColor={palette.mutedForeground}
-                    editable={isEditable}
                     keyboardType={field.keyboardType ?? 'default'}
-                    autoComplete={field.autoComplete}
-                    textContentType={field.textContentType}
-                    autoCapitalize={field.autoCapitalize}
+                    autoCapitalize={field.autoCapitalize ?? 'sentences'}
+                    maxLength={field.maxLength}
                     autoCorrect={false}
-                    returnKeyType={isEditable && nextKey ? 'next' : 'done'}
-                    blurOnSubmit={!(isEditable && nextKey)}
-                    onSubmitEditing={isEditable && nextKey ? () => inputRefs.current[nextKey]?.focus() : undefined}
+                    returnKeyType="done"
+                    accessibilityLabel={field.label}
                   />
-                  {!isEditable && <Icon name="lock" size={14} color={palette.mutedForeground} />}
-                </View>
+                ) : (
+                  <Text style={[s.input, s.inputDisabled]} numberOfLines={1}>{value || field.placeholder}</Text>
+                )}
+                {!isEditable && <Feather name="lock" size={14} color={palette.mutedForeground} />}
+              </View>
+            );
+            return (
+              <React.Fragment key={field.key}>
+                {isBirthday ? (
+                  <Pressable
+                    onPress={() => router.push('/help' as never)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Birthday. Contact support to correct it"
+                  >
+                    {row}
+                  </Pressable>
+                ) : row}
+                {error?.field === field.key && (
+                  <Text style={s.fieldError} accessibilityLiveRegion="polite">{error.message}</Text>
+                )}
                 {i < FIELDS.length - 1 && <View style={s.divider} />}
               </React.Fragment>
             );
           })}
         </Card>
 
+        {error && error.field === null && (
+          <Text style={s.formError} accessibilityLiveRegion="polite">{error.message}</Text>
+        )}
+
         {/* Note about locked fields */}
         <View style={s.note}>
-          <Icon name="info" size={14} color={palette.mutedForeground} />
+          <Feather name="info" size={14} color={palette.mutedForeground} />
           <Text style={s.noteText}>
-            Change your email in Login methods.
+            Change your email or phone number with the options below. Your birthday is used at sign-up for age verification and isn’t stored — contact support in Help to correct it.
           </Text>
         </View>
 
@@ -187,7 +234,7 @@ export default function BuyerPersonalDetails() {
       </ScrollView>
 
       {hasChanges && (
-        <StickyBottomCTA label="Save Changes" onPress={() => { void handleSave(); }} />
+        <StickyBottomCTA label="Save Changes" loading={saving} disabled={saving} onPress={() => { void handleSave(); }} />
       )}
     </View>
   );
@@ -200,10 +247,10 @@ const makeStyles = (palette: ReturnType<typeof useColors>, theme: ReturnType<typ
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: 14, gap: 10 },
   rowLabel: { ...TYPE_SCALE.footnote, fontFamily: FONT.medium, color: palette.mutedForeground, width: 72 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginLeft: SPACING.md },
-  // minWidth 0: a web <input> otherwise keeps its intrinsic width and pushes
-  // longer placeholders past the row's right padding.
-  input: { flex: 1, minWidth: 0, ...TYPE_SCALE.body, color: palette.foreground, textAlign: 'right', padding: 0 },
+  input: { flex: 1, ...TYPE_SCALE.body, color: palette.foreground, textAlign: 'right', padding: 0 },
   inputDisabled: { color: palette.mutedForeground },
-  note: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.md },
-  noteText: { ...TYPE_SCALE.body, color: palette.mutedForeground, flex: 1 },
+  note: { flexDirection: 'row', gap: 8, marginTop: SPACING.md, padding: SPACING.sm, backgroundColor: palette.card, borderRadius: RADII.card, borderWidth: 1, borderColor: palette.border, alignItems: 'flex-start' },
+  noteText: { flex: 1, ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 17 },
+  fieldError: { ...TYPE_SCALE.footnote, color: palette.destructive, paddingHorizontal: SPACING.md, paddingBottom: SPACING.sm },
+  formError: { ...TYPE_SCALE.footnote, color: palette.destructive, marginTop: SPACING.sm },
 });

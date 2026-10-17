@@ -7,6 +7,9 @@ import { Router } from "express";
 import { db, userSettings } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { rateLimit } from "../middlewares/rateLimit";
+import { resolveUserAppSettings } from "../lib/userAppSettings";
+import { resetRecommendations } from "../lib/userAppSettingsStore";
 import {
   mergeUserSettings, parseUserSettingsPatch, storedSizeOk, toUserSettingsDto,
 } from "../lib/userSettings";
@@ -18,14 +21,15 @@ router.get("/", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   try {
     const [row] = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
-    res.json(toUserSettingsDto(row));
+    const dto = toUserSettingsDto(row);
+    res.json({ ...dto, settings: { ...dto.settings, ...resolveUserAppSettings(dto.settings) } });
   } catch (err) {
     (req as any).log?.error?.({ err }, "user settings read failed");
     res.status(500).json({ error: "Couldn't load your settings. Try again." });
   }
 });
 
-router.patch("/", async (req, res) => {
+router.patch("/", rateLimit("mutation"), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const parsed = parseUserSettingsPatch(req.body);
   if (!parsed.ok) {
@@ -47,11 +51,17 @@ router.patch("/", async (req, res) => {
       res.status(413).json({ error: "Settings payload too large" });
       return;
     }
-    res.json(toUserSettingsDto(result));
+    const dto = toUserSettingsDto(result);
+    res.json({ ...dto, settings: { ...dto.settings, ...resolveUserAppSettings(dto.settings) } });
   } catch (err) {
     (req as any).log?.error?.({ err }, "user settings save failed");
     res.status(500).json({ error: "Couldn't save your settings. Try again." });
   }
+});
+
+router.post("/reset-recommendations", rateLimit("mutation"), async (req, res) => {
+  await resetRecommendations((req as any).clerkUserId);
+  res.json({ ok: true });
 });
 
 export default router;

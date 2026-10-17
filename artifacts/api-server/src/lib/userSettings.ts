@@ -64,6 +64,8 @@ export const userSettingsPatchSchema = z.object({
   pronouns: shortText(40),
   gender: shortText(40),
   socialPrivacy: socialPrivacySchema.nullable().optional(),
+  highContrast: z.boolean().nullable().optional(),
+  appLanguage: z.string().trim().regex(/^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/).max(16).nullable().optional(),
 }).strict();
 
 export type UserSettingsPatch = z.infer<typeof userSettingsPatchSchema>;

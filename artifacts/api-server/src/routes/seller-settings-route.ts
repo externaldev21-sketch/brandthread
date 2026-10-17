@@ -14,6 +14,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { checkoutSettingsPatchError } from "../lib/sellerCheckoutSettings";
+import { isStoreLanguage } from "../lib/storeLanguage";
 
 const router = Router();
 router.use(requireAuth);
@@ -39,6 +40,9 @@ router.patch("/", async (req, res) => {
   // Checkout keys are enforced at checkout, so only valid values may be stored.
   const invalid = checkoutSettingsPatchError(updates);
   if (invalid) return res.status(400).json({ error: invalid, code: "VALIDATION_ERROR" });
+  if (updates && typeof updates === "object" && "storeLanguage" in updates && !isStoreLanguage(updates.storeLanguage)) {
+    return res.status(400).json({ error: "Unsupported store language", code: "INVALID_STORE_LANGUAGE" });
+  }
 
   try {
     await db.execute(sql`

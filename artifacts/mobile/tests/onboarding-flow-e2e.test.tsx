@@ -348,6 +348,7 @@ vi.mock('@/lib/buyerProfile', () => ({
 
 vi.mock('@/lib/contextualPushPermission', () => ({
   registerGrantedPushToken: vi.fn(async () => {}),
+  requestOnboardingPushPermission: vi.fn(async () => ({ status: 'denied' })),
 }));
 
 vi.mock('@/lib/legalConsent', () => ({

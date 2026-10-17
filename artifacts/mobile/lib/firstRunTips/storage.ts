@@ -19,6 +19,7 @@ export interface FirstRunTipsApi {
     get: () => Promise<{ seenTipIds: string[]; skipAll: boolean }>;
     markSeen: (tipId: string) => Promise<void>;
     skipAll: () => Promise<void>;
+    setSkipAll?: (skipAll: boolean) => Promise<void>;
     reset: () => Promise<void>;
   };
 }
@@ -130,6 +131,32 @@ export function setSkipAllTips(
   void writeLocalSkipAll(userId, true);
   if (api) void api.firstRunTips.skipAll().catch(() => {});
   return { ...current, skipAll: true };
+}
+
+/**
+ * Settings > Tips toggle. Unlike the fire-and-forget setSkipAllTips above,
+ * this awaits the server so the switch can't silently diverge: on failure the
+ * local cache is restored to the previous value and the error is rethrown
+ * for the screen to show.
+ */
+export async function updateSkipAllTips(
+  userId: string | null | undefined,
+  value: boolean,
+  current: FirstRunTipsLocalState,
+  api?: FirstRunTipsApi,
+): Promise<FirstRunTipsLocalState> {
+  await writeLocalSkipAll(userId, value);
+  if (api) {
+    try {
+      if (api.firstRunTips.setSkipAll) await api.firstRunTips.setSkipAll(value);
+      else if (value) await api.firstRunTips.skipAll();
+      else throw new Error('This app version cannot turn "Skip all tips" off.');
+    } catch (error) {
+      await writeLocalSkipAll(userId, current.skipAll);
+      throw error;
+    }
+  }
+  return { ...current, skipAll: value };
 }
 
 /** "Replay tips" (Settings) — a genuine reset of all seen-state, local and server. */

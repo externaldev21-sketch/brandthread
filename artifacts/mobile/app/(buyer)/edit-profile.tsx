@@ -28,6 +28,7 @@ import { loadStyleBadge, saveStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeSta
 
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields, profileExtrasFromSettings, profileExtrasToSettings } from '@/lib/buyerProfile';
 
+import { profileSaveErrorMessage, styleBadgeForServer, styleBadgeFromServer } from '@/lib/profileExtras';
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 
 import { useApi } from '@/lib/api';
@@ -368,10 +369,10 @@ export default function BuyerEditProfileScreen() {
     const remoteSettings = preview || !canSyncAccountServer()
       ? Promise.resolve(null)
       : withTimeout(fetchAccountSettings({ force: true }), 3_000).then(r => r.settings).catch(() => null);
-    Promise.all([loadStyleBadge(), loadBuyerProfile(), getMyProfile(), remoteSettings])
-      .then(([badgeState, rawProfileState, socialProfile, remote]) => {
+    Promise.all([loadStyleBadge(), loadBuyerProfile(), getMyProfile(), remoteSettings, preview ? Promise.resolve(null) : api.auth.me().catch(() => null)])
+      .then(([badgeState, rawProfileState, socialProfile, remote, me]) => {
         const profileState = { ...rawProfileState, ...profileExtrasFromSettings(remote) };
-        setBadge(badgeState);
+        setBadge(styleBadgeFromServer(me?.styleBadge) ?? badgeState ?? { ...DEFAULT_STYLE_BADGE, enabled: false });
         const merged: CoreFields = {
           name: profileState.name || socialProfile.name,
           username: profileState.username || socialProfile.username || DEFAULT_BUYER_PROFILE.username,
@@ -379,7 +380,7 @@ export default function BuyerEditProfileScreen() {
           link: profileState.links || socialProfile.website || '',
         };
         setExtra({
-          pronouns: profileState.pronouns || socialProfile.pronouns || '',
+          pronouns: me?.pronouns || profileState.pronouns || socialProfile.pronouns || '',
           gender: profileState.gender || '',
           aiCreator: profileState.aiCreator,
         });
@@ -391,7 +392,7 @@ export default function BuyerEditProfileScreen() {
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
-  }, [preview]);
+  }, [api, preview]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
 
@@ -504,6 +505,8 @@ export default function BuyerEditProfileScreen() {
           bio: cleanedFields.bio,
           website: cleanedFields.links,
           location: cleanedFields.location.trim() || undefined,
+          pronouns: cleanedFields.pronouns.trim().slice(0, 30),
+          styleBadge: styleBadgeForServer(cleanedBadge),
         }),
         // Best effort: the local copy above is already saved, and an older
         // server without /api/me/settings must not block saving the profile.
@@ -516,8 +519,10 @@ export default function BuyerEditProfileScreen() {
       setLoadedProfile(cleanedFields);
       showToast('Profile updated');
       setTimeout(() => goBackOr(router), 500);
-    } catch {
-      Alert.alert('Could not save', 'Something went wrong saving your profile. Please try again.');
+    } catch (err) {
+      const mapped = profileSaveErrorMessage(err);
+      if (mapped.field === 'username') { setUsernameStatus('invalid'); setUsernameError(mapped.message); }
+      Alert.alert('Could not save', mapped.message);
     } finally {
       setSaving(false);
     }

@@ -15,6 +15,7 @@
  *   login, the local two-factor placeholder).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSyncExternalStore } from 'react';
 import { getAccountStorageScope, resolveAccountKey } from '@/lib/accountStorage';
 import {
   canSyncAccountServer, fetchAccountSettings, isPermanentSettingsError, patchAccountSettings, withTimeout,
@@ -68,6 +69,7 @@ export interface BuyerSettingsState {
   captions: boolean;
   /** Settings → Accessibility → "Disable haptic feedback". See lib/hapticsPreference.ts. */
   disableHaptics: boolean;
+  highContrast: boolean;
 }
 
 export const DEFAULT_BUYER_SETTINGS: BuyerSettingsState = {
@@ -114,7 +116,42 @@ export const DEFAULT_BUYER_SETTINGS: BuyerSettingsState = {
   reduceMotion: false,
   captions: true,
   disableHaptics: false,
+  highContrast: false,
 };
+
+let snapshot = { ...DEFAULT_BUYER_SETTINGS };
+let snapshotScope: string | null = null;
+const settingsListeners = new Set<(settings: BuyerSettingsState) => void>();
+
+export function getBuyerSettingsSnapshot(): BuyerSettingsState {
+  const scope = getAccountStorageScope();
+  if (snapshotScope !== scope) {
+    snapshotScope = scope;
+    snapshot = { ...DEFAULT_BUYER_SETTINGS };
+  }
+  return snapshot;
+}
+
+export function subscribeBuyerSettings(listener: (settings: BuyerSettingsState) => void): () => void {
+  settingsListeners.add(listener);
+  return () => { settingsListeners.delete(listener); };
+}
+
+function publishSettings(settings: BuyerSettingsState, scope: string): void {
+  if (getAccountStorageScope() !== scope) return;
+  getBuyerSettingsSnapshot();
+  snapshot = settings;
+  settingsListeners.forEach(listener => listener(settings));
+}
+
+export function useBuyerSettings(): BuyerSettingsState {
+  return useSyncExternalStore(subscribeBuyerSettings, getBuyerSettingsSnapshot, getBuyerSettingsSnapshot);
+}
+
+export const REDUCED_UPLOAD_QUALITY = 0.6;
+export function uploadQuality(highQuality = 1): number {
+  return getBuyerSettingsSnapshot().highQualityUploads ? highQuality : Math.min(highQuality, REDUCED_UPLOAD_QUALITY);
+}
 
 type Key = keyof BuyerSettingsState;
 
@@ -240,7 +277,7 @@ function scheduleFlush(uid: string): void {
   }, FLUSH_DEBOUNCE_MS));
 }
 
-export async function loadBuyerSettings(): Promise<BuyerSettingsState> {
+async function loadBuyerSettingsForCurrentAccount(): Promise<BuyerSettingsState> {
   const uid = getAccountStorageScope();
   const key = await storageKey(uid);
   const local = await readLocal(key);
@@ -264,10 +301,18 @@ export async function loadBuyerSettings(): Promise<BuyerSettingsState> {
   }
 }
 
+export async function loadBuyerSettings(): Promise<BuyerSettingsState> {
+  const scope = getAccountStorageScope();
+  const settings = await loadBuyerSettingsForCurrentAccount();
+  publishSettings(settings, scope);
+  return settings;
+}
+
 async function saveFor(uid: string, settings: BuyerSettingsState): Promise<void> {
   const key = await storageKey(uid);
   const prev = await readLocal(key);
   await AsyncStorage.setItem(key, JSON.stringify(settings));
+  publishSettings(settings, uid);
   if (!canSyncAccountServer(uid)) return;
   const changed = changedSyncedKeys(prev, settings);
   if (!changed.length) return;
@@ -290,6 +335,9 @@ export async function patchBuyerSettings(patch: Partial<BuyerSettingsState>) {
 
 /** Test-only. */
 export function __resetBuyerSettingsForTests(): void {
+  snapshotScope = null;
+  snapshot = { ...DEFAULT_BUYER_SETTINGS };
+  settingsListeners.clear();
   lastServerSync.clear();
   flushTimers.forEach((t) => clearTimeout(t));
   flushTimers.clear();

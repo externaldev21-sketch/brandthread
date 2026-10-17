@@ -4,14 +4,15 @@
  */
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, Platform,
+  View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, Platform, Share,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
-import { useUser } from '@clerk/expo';
+import { useUser, useReverification } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import QRCode from 'react-native-qrcode-svg';
@@ -27,6 +28,8 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
+import { SecurityErrorBox } from '@/components/security/SecurityFormKit';
+import { canFinishTwoFactorSetup, describeTwoFactorError, extractBackupCodes, formatBackupCodesForShare } from '@/lib/twoFactorSetup';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -47,9 +50,19 @@ export default function LoginMethods() {
   const insets = useSafeAreaInsets();
   const { user, isLoaded } = useUser();
   const [twoFaLoading, setTwoFaLoading] = useState(false);
-  const [totpModal, setTotpModal] = useState<{ secret: string; uri: string; backupCodes: string[] } | null>(null);
+  const [totpModal, setTotpModal] = useState<{ secret: string; uri: string } | null>(null);
   const [verifyCode, setVerifyCode] = useState('');
   const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState('');
+  // After verifyTOTP succeeds 2FA is live, so the modal switches to a
+  // mandatory "save your backup codes" step before it can be closed.
+  const [setupPhase, setSetupPhase] = useState<'scan' | 'codes'>('scan');
+  const [setupCodes, setSetupCodes] = useState<string[]>([]);
+  const [codesError, setCodesError] = useState('');
+  const [codesBusy, setCodesBusy] = useState(false);
+  const [codesSaved, setCodesSaved] = useState(false);
+  const [codesCopied, setCodesCopied] = useState(false);
+  const createBackupCodes = useReverification(() => user!.createBackupCode());
   const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
   const [removingProvider, setRemovingProvider] = useState<OAuthProvider | null>(null);
   const [passwordSetupOpen, setPasswordSetupOpen] = useState(false);
@@ -237,36 +250,117 @@ export default function LoginMethods() {
   }
 
   // ── 2FA helpers ─────────────────────────────────────────────────────────────
+  function resetTotpSetup() {
+    setTotpModal(null);
+    setVerifyCode('');
+    setVerifyError('');
+    setSetupPhase('scan');
+    setSetupCodes([]);
+    setCodesError('');
+    setCodesSaved(false);
+    setCodesCopied(false);
+  }
+
   async function handleEnable2FA() {
     if (!user) return;
     setTwoFaLoading(true);
     try {
-      const totp = await (user as any).createTOTP();
-      setTotpModal({
-        secret: totp.secret,
-        uri: totp.uri,
-        backupCodes: totp.backupCodes ?? [],
-      });
-    } catch (e: any) {
-      Alert.alert("Couldn't start 2FA setup", 'Try again.');
+      const totp = await user.createTOTP();
+      resetTotpSetup();
+      setTotpModal({ secret: totp.secret ?? '', uri: totp.uri ?? '' });
+    } catch (e) {
+      Alert.alert("Couldn't start 2FA setup", describeTwoFactorError(e));
     } finally {
       setTwoFaLoading(false);
+    }
+  }
+
+  async function generateSetupBackupCodes() {
+    if (!user || codesBusy) return;
+    setCodesBusy(true);
+    setCodesError('');
+    try {
+      const codes = extractBackupCodes(await createBackupCodes());
+      if (codes.length === 0) throw new Error('No backup codes were returned. Try again.');
+      setSetupCodes(codes);
+    } catch (e) {
+      setCodesError(describeTwoFactorError(e));
+    } finally {
+      setCodesBusy(false);
     }
   }
 
   async function handleVerifyTOTP() {
     if (!user || !verifyCode.trim()) return;
     setVerifying(true);
+    setVerifyError('');
     try {
-      await (user as any).verifyTOTP({ code: verifyCode.trim() });
-      setTotpModal(null);
+      const verified = await user.verifyTOTP({ code: verifyCode.trim() });
       setVerifyCode('');
-      Alert.alert('Two-factor authentication enabled', 'Your account is now protected with 2FA.');
-    } catch (e: any) {
-      Alert.alert("That code isn't right", 'Try again.');
+      setSetupPhase('codes');
+      const codes = extractBackupCodes(verified);
+      if (codes.length > 0) {
+        setSetupCodes(codes);
+      } else {
+        // Clerk only returns codes on the verify response when backup codes
+        // are enabled for the instance; otherwise mint a set explicitly.
+        await generateSetupBackupCodes();
+      }
+      void user.reload().catch(() => {});
+    } catch (e) {
+      setVerifyError(describeTwoFactorError(e, 'code'));
     } finally {
       setVerifying(false);
     }
+  }
+
+  async function copySetupCodes() {
+    try {
+      await Clipboard.setStringAsync(formatBackupCodesForShare(setupCodes));
+      setCodesCopied(true);
+    } catch (e) {
+      setCodesError(e instanceof Error && e.message ? `Couldn't copy codes: ${e.message}` : "Couldn't copy codes.");
+    }
+  }
+
+  async function shareSetupCodes() {
+    try {
+      await Share.share({ message: formatBackupCodesForShare(setupCodes) });
+    } catch (e) {
+      setCodesError(e instanceof Error && e.message ? `Couldn't share codes: ${e.message}` : "Couldn't share codes.");
+    }
+  }
+
+  function finishTotpSetup() {
+    if (!canFinishTwoFactorSetup({ codes: setupCodes, acknowledged: codesSaved })) return;
+    resetTotpSetup();
+    Alert.alert('Two-factor authentication enabled', 'Your account is now protected with 2FA.');
+  }
+
+  function closeTotpModal() {
+    if (setupPhase !== 'codes') {
+      resetTotpSetup();
+      return;
+    }
+    if (canFinishTwoFactorSetup({ codes: setupCodes, acknowledged: codesSaved })) {
+      finishTotpSetup();
+      return;
+    }
+    if (setupCodes.length === 0) {
+      // Codes could not be generated: 2FA is already on, so let the user
+      // leave but tell them exactly where to get codes later.
+      Alert.alert(
+        'Backup codes not saved',
+        'Two-factor authentication is on, but you have no backup codes yet. Generate them from Login Methods > Backup codes.',
+        [{ text: 'Stay' }, { text: 'Leave', style: 'destructive', onPress: resetTotpSetup }],
+      );
+      return;
+    }
+    Alert.alert(
+      'Save your backup codes',
+      "Copy or share your backup codes, then confirm you've saved them. Without them you can be locked out if you lose your authenticator app.",
+      [{ text: 'OK' }],
+    );
   }
 
   // Turning 2FA off needs a current code, so it lives on its own screen.
@@ -569,15 +663,78 @@ export default function LoginMethods() {
       </Modal>
 
       {/* TOTP setup modal */}
-      <Modal visible={!!totpModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setTotpModal(null); setVerifyCode(''); }}>
+      <Modal visible={!!totpModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeTotpModal}>
         <ModalSafeArea>
         <View style={s.modal}>
           <ScreenHeader
-            title="Set up authenticator app"
+            title={setupPhase === 'codes' ? 'Save backup codes' : 'Set up authenticator app'}
             variant="modal"
-            onBack={() => { setTotpModal(null); setVerifyCode(''); }}
+            onBack={closeTotpModal}
           />
 
+          {setupPhase === 'codes' ? (
+          <ScrollView contentContainerStyle={s.modalBody}>
+            <Text style={s.modalStep}>
+              Two-factor authentication is on. Save these backup codes somewhere safe. Each code works once and lets you sign in if you lose your authenticator app.
+            </Text>
+
+            {setupCodes.length > 0 ? (
+              <View style={s.backupCodesBox} testID="setup-backup-codes">
+                {setupCodes.map((code) => (
+                  <Text key={code} style={s.backupCode} selectable>{code}</Text>
+                ))}
+              </View>
+            ) : null}
+
+            <SecurityErrorBox message={codesError} testID="setup-backup-codes-error" />
+
+            {setupCodes.length > 0 ? (
+              <>
+                <Button
+                  testID="setup-copy-backup-codes"
+                  label={codesCopied ? 'Copied' : 'Copy codes'}
+                  variant="secondary"
+                  icon={codesCopied ? 'check' : 'copy'}
+                  fullWidth
+                  onPress={copySetupCodes}
+                />
+                <Button
+                  testID="setup-share-backup-codes"
+                  label="Share codes"
+                  variant="secondary"
+                  icon="share"
+                  fullWidth
+                  style={{ marginTop: SPACING.sm }}
+                  onPress={shareSetupCodes}
+                />
+                <ListRow
+                  testID="setup-backup-codes-ack"
+                  title="I've saved my backup codes"
+                  toggle={{ value: codesSaved, onChange: setCodesSaved }}
+                  style={{ marginTop: SPACING.md }}
+                />
+              </>
+            ) : (
+              <Button
+                testID="setup-generate-backup-codes"
+                label="Generate backup codes"
+                onPress={generateSetupBackupCodes}
+                loading={codesBusy}
+                fullWidth
+                style={s.verifyBtn}
+              />
+            )}
+
+            <Button
+              testID="setup-backup-codes-done"
+              label="Done"
+              onPress={finishTotpSetup}
+              disabled={!canFinishTwoFactorSetup({ codes: setupCodes, acknowledged: codesSaved })}
+              fullWidth
+              style={[s.verifyBtn, { marginTop: SPACING.md }]}
+            />
+          </ScrollView>
+          ) : (
           <ScrollView contentContainerStyle={s.modalBody}>
             <Text style={s.modalStep}>1. Open your authenticator app (Google Authenticator, Authy, 1Password, etc.)</Text>
             <Text style={s.modalStep}>2. Scan this code with your authenticator app, or enter the key below.</Text>
@@ -608,18 +765,10 @@ export default function LoginMethods() {
               textAlign="center"
             />
 
-            {totpModal?.backupCodes && totpModal.backupCodes.length > 0 && (
-              <>
-                <Text style={s.modalStep}>4. Save these backup codes somewhere safe:</Text>
-                <View style={s.backupCodesBox}>
-                  {totpModal.backupCodes.map((code, i) => (
-                    <Text key={i} style={s.backupCode} selectable>{code}</Text>
-                  ))}
-                </View>
-              </>
-            )}
+            <SecurityErrorBox message={verifyError} testID="totp-verify-error" />
 
             <Button
+              testID="totp-verify"
               label="Verify & enable 2FA"
               onPress={handleVerifyTOTP}
               disabled={verifyCode.length < 6}
@@ -628,6 +777,7 @@ export default function LoginMethods() {
               style={s.verifyBtn}
             />
           </ScrollView>
+          )}
         </View>
         </ModalSafeArea>
       </Modal>
