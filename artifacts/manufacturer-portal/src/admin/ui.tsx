@@ -74,7 +74,7 @@ export function Chips<T extends string>({ value, options, onChange }: { value: T
 export function ActionButton({ children, solid, ...props }: { solid?: boolean } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button {...props}
-      className={cn("inline-flex h-8 min-w-[5rem] items-center justify-center whitespace-nowrap rounded-md border px-3 text-xs font-medium",
+      className={cn("inline-flex h-8 min-w-[5rem] items-center justify-center whitespace-nowrap rounded-md border px-3 text-xs font-medium disabled:pointer-events-none disabled:opacity-40",
         solid ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground")}>
       {children}
     </button>

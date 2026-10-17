@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Link } from "wouter";
 import { ActionButton, ActionGroup, Badge, Chips, ConfirmAction, DataTable, ErrorLine, PageTitle, Pager, StatCards } from "../ui";
 import { useModerationPost, useModerationQuery, useModerationResolve, when } from "../api";
 
@@ -63,7 +64,7 @@ export default function ModerationPage() {
 
   return (
     <>
-      <PageTitle title="Moderation" />
+      <PageTitle title="Moderation" action={<Link href="/admin/held" className="text-sm underline">Held content queue</Link>} />
       {data && <StatCards items={[
         { label: "Open reports", value: String(data.summary.open) },
         { label: "Over 24 hours", value: String(data.summary.overdue ?? 0) },

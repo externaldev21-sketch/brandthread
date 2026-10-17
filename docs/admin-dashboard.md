@@ -44,6 +44,9 @@ onboarding redirect).
 | Featured | `GET/POST /admin/featured` · `PATCH/DELETE /admin/featured/:id` · public read: `GET /api/public/featured` |
 | Announcements | `GET/POST /admin/announcements` · `GET /admin/announcements/audience?audience=` |
 | Invite codes | `GET/POST /admin/invites` · `POST /admin/invites/:id/disable\|enable` |
+| Held content | `GET /admin/held?type=all\|post\|story\|comment\|media&cursor=` · `GET /admin/held/counts` · `POST /admin/held/:type/:id/approve\|remove` (same queue as `/api/moderation/held`, admin-gated + audited) |
+| Repeat infringers | `GET /admin/repeat-infringers` (sellers with IP strikes + their cases) · `POST /admin/repeat-infringers/:userId/clear {resetStrikes?}` |
+| Feed ranking | `GET /admin/ranking` · `PATCH /admin/ranking` (partial config, clamped) · `POST /admin/ranking/reset` — `RANKING_WEIGHTS_JSON` env still wins over stored values |
 | Audit | `GET /admin/audit?actor=&action=&targetId=` |
 | Metrics | `GET /admin/metrics/today` (today vs the same time yesterday, in `ADMIN_REPORT_TIMEZONE`, default America/Chicago) · `/metrics/cohorts?months=` (30-day repeat rate by first-purchase month) · `/metrics/top?days=` (top sellers + products) · `/metrics/funnel?days=` (install → sign-up → first purchase) · `/metrics/seller-risk?days=` (refund / chargeback rate per seller, flagged above 2%) · `/metrics/inactive-sellers` (no sale, product edit, post or app open for 14+ days). Definitions: `lib/admin/launchMetrics.ts` |
 | Kill switches | `GET /admin/kill-switches` · `POST /admin/kill-switches/:key {enabled, reason}` for `liveEnabled`, `paymentsEnabled`, `aiEnabled` (rows in `feature_flags`). Off = new lives / checkouts / AI requests get `503 {code: LIVE_PAUSED / PAYMENTS_PAUSED / AI_PAUSED}` within ~10 s; webhooks, refunds and payouts are never paused. See `lib/killSwitches.ts` |
