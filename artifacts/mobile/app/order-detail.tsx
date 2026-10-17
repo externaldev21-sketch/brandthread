@@ -24,7 +24,7 @@ import { quoteFromSchedule } from '@/lib/feeSchedule';
 import { adaptReturnRow, itemsTotalCents, returnReasonLabel as returnRequestReasonLabel, statusLabel as returnRequestStatusLabel, type ReturnView } from '@/lib/returns';
 import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
-import { mapTrackingEvents, resolveTrackingUrl, trackingStatusText } from '@/lib/orderTracking';
+import { mapTrackingEvents, resolveTrackingUrl, trackingStatusText } from '@/lib/sellerOrderTracking';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { getInitials } from '@/lib/format';

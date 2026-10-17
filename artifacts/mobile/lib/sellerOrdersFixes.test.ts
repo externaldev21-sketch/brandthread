@@ -20,7 +20,7 @@ vi.mock('expo-sharing', () => ({
 
 import { buildCsv, csvFilename, escapeCsvCell, exportCsvFile } from './csvExport';
 import { ordersForExport, ordersToCsv, runBulk, summarizeBulk } from './orderBulk';
-import { mapTrackingEvents, resolveTrackingUrl, trackingStatusText } from './orderTracking';
+import { mapTrackingEvents, resolveTrackingUrl, trackingStatusText } from './sellerOrderTracking';
 import { filterRoles, permissionSummary } from './rolesFilter';
 import { SELLER_PUSH_GROUPS, categoryValue } from './sellerPushPrefs';
 import { activityResourceType, memberLastSeenLabel, relativeTime } from './teamActivity';
