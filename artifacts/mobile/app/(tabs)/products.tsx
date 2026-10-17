@@ -351,22 +351,38 @@ function QuickEditPriceSheet({ product, visible, onClose, onSaved }: QuickEditPr
   );
 }
 
+// ─── Sort Options ───────────────────────────────────────────────────────────────
+
+type SortKey = 'name' | 'price_asc' | 'price_desc' | 'newest' | 'oldest' | 'sales';
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'newest', label: 'Newest first' },
+  { key: 'oldest', label: 'Oldest first' },
+  { key: 'name', label: 'Name A-Z' },
+  { key: 'price_asc', label: 'Price: low to high' },
+  { key: 'price_desc', label: 'Price: high to low' },
+  { key: 'sales', label: 'Best selling' },
+];
+
 // ─── Filter Modal ─────────────────────────────────────────────────────────────
 
 interface FilterModalProps {
   visible: boolean;
   current: ProductFilter;
-  onApply: (f: ProductFilter) => void;
+  currentSort: SortKey;
+  onApply: (f: ProductFilter, sort: SortKey) => void;
   onClose: () => void;
 }
 
-function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
+// One filter control for the list (Depop's shop filter sheet): "Sort by"
+// lives in this sheet instead of behind a second icon button in the header.
+function FilterModal({ visible, current, currentSort, onApply, onClose }: FilterModalProps) {
   const { theme } = useAppTheme();
   const sh = React.useMemo(() => createSheetStyles(theme), [theme]);
-  const PURPLE_LIGHT = theme.accentLight;
   const [selected, setSelected] = useState<ProductFilter>(current);
+  const [selectedSort, setSelectedSort] = useState<SortKey>(currentSort);
 
-  useEffect(() => { setSelected(current); }, [current, visible]);
+  useEffect(() => { setSelected(current); setSelectedSort(currentSort); }, [current, currentSort, visible]);
 
   const staticChips: { label: string; value: ProductFilter }[] = [
     { label: 'All',          value: 'all' },
@@ -392,6 +408,18 @@ function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
       <SheetRise style={[sh.sheet, { paddingBottom: SP.xl }]}>
         <View style={sh.handle} />
         <Text style={sh.sheetTitle}>Filter Products</Text>
+        <Text style={[fm.sectionLabel, { color: theme.muted }]}>Sort by</Text>
+        <View style={fm.chips}>
+          {SORT_OPTIONS.map(option => (
+            <FilterChip
+              key={option.key}
+              label={option.label}
+              active={selectedSort === option.key}
+              onPress={() => setSelectedSort(option.key)}
+            />
+          ))}
+        </View>
+        <Text style={[fm.sectionLabel, { color: theme.muted }]}>Status</Text>
         <View style={fm.chips}>
           {staticChips.map(chip => (
             <FilterChip
@@ -404,7 +432,7 @@ function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
         </View>
         <PrimaryButton
           label="Apply"
-          onPress={() => { onApply(selected); onClose(); }}
+          onPress={() => { onApply(selected, selectedSort); onClose(); }}
           style={{ marginTop: SP.md, marginHorizontal: SP.md }}
         />
       </SheetRise>
@@ -801,20 +829,24 @@ export default function ProductsScreen() {
     }
   }, [products, sort, previewDemo, previewOnly]);
 
-  // Status filter pills
+  // Status filter pills — Shopify's Products tabs (All / Active / Draft /
+  // Archived), which fit a 390pt screen without the last chip cut off at the
+  // edge. Low/Out of stock and the rest stay one tap away in the filter sheet.
   const filterPills: { label: string; value: ProductFilter }[] = [
     { label: 'All', value: 'all' },
     { label: 'Active', value: 'active' },
     { label: 'Draft', value: 'draft' },
     { label: 'Archived', value: 'archived' },
-    { label: 'Low Stock', value: 'low-stock' },
-    { label: 'Out of Stock', value: 'out-of-stock' },
   ];
 
   const currentSortLabel = productSortLabel(sort);
   // The selected status chip already shows Active/Draft/etc. as selected.
   // Highlight the separate filter control only for choices outside that row.
   const hasActiveFilter = filter !== 'all' && !filterPills.some(pill => pill.value === filter);
+  // Search, filter and status chips only once there is something to search or
+  // filter. Kept on while loading (most sellers have products, so the header
+  // doesn't jump) and whenever a filter/search is what emptied the list.
+  const hasAnyProducts = loading || products.length > 0 || filter !== 'all' || searchQuery.trim().length > 0;
 
   // Product detail reads the same device product store, so a signed-out
   // preview's saved product opens there too.
@@ -947,12 +979,7 @@ export default function ProductsScreen() {
       {/* ── Fixed header ── */}
       <SellerListHeader
         title="Products"
-        titleMenu={[
-          { key: 'all', label: 'All products', selected: filter === 'all', onSelect: () => setFilter('all') },
-          { key: 'collections', label: 'Collections', selected: false, onSelect: () => router.push('/store-collections' as never) },
-          { key: 'bundles', label: 'Bundles', selected: false, onSelect: () => router.push('/product-bundles' as never) },
-        ]}
-        titleAccessibilityLabel="Products, choose a view"
+        showControls={hasAnyProducts}
         actions={[
           {
             icon: isGrid ? 'list' : 'grid',
@@ -962,6 +989,7 @@ export default function ProductsScreen() {
           {
             icon: 'more-horizontal',
             onPress: (event?: unknown) => openPullDownMenu(event, [
+              { label: 'Collections', icon: 'layers', onPress: () => router.push('/store-collections' as never) },
               { label: 'Select products', icon: 'check-square', onPress: () => router.push('/products-bulk-edit' as never) },
               { label: 'Import products (CSV)', icon: 'file-text', onPress: () => router.push('/product-import' as never) },
               { label: 'Import from Shopify', icon: 'shopping-bag', onPress: () => router.push('/shopify-import' as never) },
@@ -982,8 +1010,6 @@ export default function ProductsScreen() {
         onFilterPress={() => { haptic('sheet'); setFilterModalVisible(true); }}
         hasActiveFilter={hasActiveFilter}
         filterAccessibilityLabel={filter !== 'all' ? `Filter: ${filter}` : 'Filter products'}
-        onSortPress={() => setSortModalVisible(true)}
-        sortAccessibilityLabel={`Sort: ${currentSortLabel}`}
         chips={filterPills.map(pill => ({
           key: pill.value,
           label: pill.label,
@@ -996,8 +1022,6 @@ export default function ProductsScreen() {
             pill.value === 'active' ? stats?.active ?? 0 :
             pill.value === 'draft' ? stats?.draft ?? 0 :
             pill.value === 'archived' ? stats?.archived ?? 0 :
-            pill.value === 'low-stock' ? stats?.lowStock ?? 0 :
-            pill.value === 'out-of-stock' ? stats?.outOfStock ?? 0 :
             undefined,
         }))}
       />
@@ -1064,23 +1088,15 @@ export default function ProductsScreen() {
       <FilterModal
         visible={filterModalVisible}
         current={filter}
-        onApply={(f) => {
+        currentSort={sort}
+        onApply={(f, nextSort) => {
           LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           setFilter(f);
+          setSort(nextSort);
         }}
         onClose={() => setFilterModalVisible(false)}
       />
 
-      {/* Sort modal */}
-      <SortModal
-        visible={sortModalVisible}
-        current={sort}
-        onSelect={k => {
-          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-          setSort(k);
-        }}
-        onClose={() => setSortModalVisible(false)}
-      />
 
       {/* Quick stock editor — tapping a card's stock chip/label opens this. */}
       <StockEditorSheet
@@ -1195,28 +1211,16 @@ const createSheetStyles = (theme: any) => {
     fontFamily: FONT.medium,
     color: FG,
   },
-  sortOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  sortOptionActive: {},
-  sortOptionText: {
-    fontSize: FS.base,
-    fontFamily: FONT.medium,
-    color: MUTED,
-  },
-  sortOptionTextActive: {
-    color: PURPLE_LIGHT,
-    fontFamily: FONT.semibold,
-  },
   });
 };
 
 const fm = StyleSheet.create({
+  sectionLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    paddingHorizontal: SP.xs,
+    marginBottom: SP.xs,
+  },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',

@@ -75,9 +75,15 @@ export interface SellerListHeaderProps {
   onFilterPress: () => void;
   hasActiveFilter: boolean;
   filterAccessibilityLabel: string;
-  onSortPress: () => void;
-  sortAccessibilityLabel: string;
+  /** Omit to fold sorting into the filter sheet (one filter control, the
+   *  Depop/Shopify pattern) instead of a second icon button. */
+  onSortPress?: () => void;
+  sortAccessibilityLabel?: string;
   chips: SellerListHeaderChip[];
+  /** false hides search, filter and status chips — for a list with no data
+   *  at all, where there is nothing to search or filter (Shopify's empty
+   *  Orders/Products screens show only the title and the empty state). */
+  showControls?: boolean;
 }
 
 /** The count-line row every screen renders itself (inside its own list's
@@ -104,7 +110,7 @@ export function SellerListHeader({
   searchValue, onSearchChange, searchPlaceholder,
   onFilterPress, hasActiveFilter, filterAccessibilityLabel,
   onSortPress, sortAccessibilityLabel,
-  chips,
+  chips, showControls = true,
 }: SellerListHeaderProps) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
@@ -203,6 +209,7 @@ export function SellerListHeader({
         </Modal>
       )}
 
+      {showControls && (<>
       {/* Search row */}
       <View style={s.searchRow}>
         <View style={s.searchBoxRow}>
@@ -220,7 +227,7 @@ export function SellerListHeader({
         >
           <Icon name="sliders" size={14} color={hasActiveFilter ? theme.accentLight : theme.muted} />
         </PressableScale>
-        <PressableScale
+        {onSortPress && <PressableScale
           style={s.controlBtn}
           onPress={onSortPress}
           accessibilityLabel={sortAccessibilityLabel}
@@ -228,7 +235,7 @@ export function SellerListHeader({
           {/* Sort, not "expand": arrow-up-down reads as sorting at a glance;
               the old double-chevron read as "show more". */}
           <ArrowUpDownIcon size={14} color={theme.muted} />
-        </PressableScale>
+        </PressableScale>}
       </View>
 
       {/* Status chips — a swipeable rail (components/ChipRail.tsx): native
@@ -236,6 +243,7 @@ export function SellerListHeader({
           scrolls the chip into view, count badge hidden at 0. Only this
           row scrolls; the search bar and its two buttons stay fixed. */}
       <ChipRail chips={chips} testID="seller-list-chip-rail" />
+      </>)}
     </View>
   );
 }

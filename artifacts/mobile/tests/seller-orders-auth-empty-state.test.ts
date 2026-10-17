@@ -23,15 +23,19 @@ describe('seller orders read state', () => {
     expect(ordersSource).toContain('if (hasLoadedRef.current || timerRef.current !== null) return;');
   });
 
-  it('uses an honest, flat empty state — icon + line only, no button, no card/box behind it', () => {
+  it('uses an honest, flat empty state — icon + line + one Share store action, no card/box behind it', () => {
     expect(ordersSource).toContain('<EmptyState');
     // Per-filter honest titles (lib/sellerLists/emptyCopy.ts) — still flat,
     // icon + one line, and still no CTA on any Orders empty state.
     expect(ordersSource).toContain('icon={emptyCopy.icon}');
     expect(ordersSource).toContain('title={emptyCopy.title}');
     // Dev's repeated, explicit instruction: no CTA on this empty state, and
-    // no grey card/box container behind it — flat, directly on the screen
-    // background. (Superseded item 40 CTA; see PR for seller-orders-cleanup.)
+    // Polish #94 (Dev's hands-on audit, newer than the earlier no-CTA call):
+    // a store with no orders offers "Share your store to get your first
+    // sale" (Shopify's empty Orders: title + helper + one button). Still no
+    // grey card/box container behind it, and never an Add product CTA here.
+    expect(ordersSource).toContain("'Share your store to get your first sale.'");
+    expect(ordersSource).toContain("actionLabel={orders.length === 0 ? 'Share store' : undefined}");
     expect(ordersSource).not.toContain('actionLabel="Add your first product"');
     expect(ordersSource).not.toContain('onAction={() => router.push(\'/add-product\'');
     expect(ordersSource).not.toContain('if (loading) return null');

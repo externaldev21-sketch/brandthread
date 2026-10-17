@@ -32,6 +32,8 @@ import { useStoreLink } from '@/hooks/useStoreLink';
 
 import { navigateOrShareStore } from '@/lib/shareStoreSheet';
 
+import { previewSellerBrandName } from '@/lib/previewIdentity';
+import { Avatar } from '@/components/ui/Avatar';
 import { middleTruncate } from '@/lib/middleTruncate';
 
 import SetupWalkthroughSheet from '@/components/SetupWalkthroughSheet';
@@ -298,6 +300,25 @@ export default function SellerHomeCommerceDashboard({
   const storeLink = useStoreLink();
   const storeUrl = storeLink.url;
   const [storeUrlCopied, setStoreUrlCopied] = useState(false);
+  // Store name + logo for the header (Shopify home: avatar + store name, not
+  // a generic "Dashboard" title). Same profile fetch as the URL above.
+  const [storeIdentity, setStoreIdentity] = useState<{ name: string | null; logoUrl: string | null }>(() => ({
+    name: previewSellerBrandName(),
+    logoUrl: null,
+  }));
+  useEffect(() => {
+    let cancelled = false;
+    if (sellerPreview) return;
+    api.seller.getProfile().then((profile) => {
+      if (cancelled) return;
+      const p = profile as typeof profile & { avatarPosterUrl?: string | null };
+      setStoreIdentity({
+        name: previewSellerBrandName() ?? (profile.brandName || profile.displayName || null),
+        logoUrl: p.avatarPosterUrl || profile.profileImageUrl || null,
+      });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [api, sellerPreview]);
 
   const handleCopyStoreUrl = useCallback(() => {
     if (!storeUrl) return;
@@ -878,22 +899,27 @@ export default function SellerHomeCommerceDashboard({
           {/* ── Top bar ─────────────────────────────────────────────────── */}
           <View style={styles.topBar}>
             <View testID="seller-dashboard-scroll-position" accessibilityLabel="Seller dashboard scroll position" accessible style={styles.titleRow}>
-              <Text style={[styles.screenTitle, { color: theme.text ?? FG }]}>Dashboard</Text>
-              {storeUrl && (
-                <TouchableOpacity
-                  onPress={handleCopyStoreUrl}
-                  style={styles.storeUrlRow}
-                  hitSlop={{ top: 10, bottom: 10, left: 4, right: 10 }}
-                  accessibilityRole="button"
-                  accessibilityLabel="Copy store link"
-                  testID="seller-dashboard-store-url"
-                >
-                  <Text style={[styles.storeUrlText, { color: theme.muted }]} numberOfLines={1} ellipsizeMode="middle">
-                    {middleTruncate(storeUrl.replace(/^https?:\/\//, ''))}
-                  </Text>
-                  <Icon name={storeUrlCopied ? 'check' : 'copy'} size={13} color={theme.muted} />
-                </TouchableOpacity>
-              )}
+              <Avatar uri={storeIdentity.logoUrl} name={storeIdentity.name ?? 'Store'} size={40} />
+              <View style={styles.titleCopy}>
+                <Text style={[styles.screenTitle, { color: theme.text ?? FG }]} numberOfLines={1} testID="seller-dashboard-store-name">
+                  {storeIdentity.name ?? 'Dashboard'}
+                </Text>
+                {storeUrl && (
+                  <TouchableOpacity
+                    onPress={handleCopyStoreUrl}
+                    style={styles.storeUrlRow}
+                    hitSlop={{ top: 10, bottom: 10, left: 4, right: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Copy store link"
+                    testID="seller-dashboard-store-url"
+                  >
+                    <Text style={[styles.storeUrlText, { color: theme.muted }]} numberOfLines={1} ellipsizeMode="middle">
+                      {middleTruncate(storeUrl.replace(/^https?:\/\//, ''))}
+                    </Text>
+                    <Icon name={storeUrlCopied ? 'check' : 'copy'} size={13} color={theme.muted} />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
             {/* Share store — opens the one Share store sheet (components/store/ShareStoreSheet). */}
             <TouchableOpacity
@@ -1012,12 +1038,14 @@ export default function SellerHomeCommerceDashboard({
                 <SellerDashboardQuickActions theme={theme} onNavigate={nav} />
               </View>
 
-              {/* ── Stat tile grid ───────────────────────────────────────── */}
-              {!newSeller && (
-                <View style={styles.section}>
-                  <SellerDashboardStatGrid tiles={tiles} activeKey={metric} onSelect={(key) => setMetric(key as MetricKey)} theme={theme} />
-                </View>
-              )}
+              {/* ── Stat tile grid ───────────────────────────────────────────
+                  Shown for a brand-new store too: real zeros (Orders 0,
+                  Visitors 0…) are the headline numbers sellers expect at the
+                  top (Shopify home shows Sessions / Total sales / Orders at
+                  0). Zero deltas render blank, never a fabricated trend. */}
+              <View style={styles.section}>
+                <SellerDashboardStatGrid tiles={tiles} activeKey={metric} onSelect={(key) => setMetric(key as MetricKey)} theme={theme} />
+              </View>
 
               <View style={styles.section}>
                 <SellerLiveMap data={liveMap.data} ping={liveMap.ping} theme={theme} />
@@ -1107,9 +1135,10 @@ export default function SellerHomeCommerceDashboard({
                   when AI Settings turns them off or there are none. */}
               <SellerDashboardAISuggestions theme={theme} refreshKey={retryTick + storeContextTick} style={styles.section} />
 
-              {!newSeller && topProducts && topProducts.length > 0 && (
+              {topProducts && (newSeller || topProducts.length > 0) && (
                 <View style={styles.section}>
                   <SellerDashboardTopProducts
+                    emptyMessage="Your best sellers show up here after your first sale."
                     products={topProducts}
                     theme={theme}
                     onOpenProduct={() => nav('/(tabs)/products')}
@@ -1141,6 +1170,16 @@ export default function SellerHomeCommerceDashboard({
               {activityItems.length > 0 && (
                 <View style={styles.section}>
                   <SellerDashboardActivityFeed items={activityItems} theme={theme} onNavigate={nav} />
+                </View>
+              )}
+              {recentOrders && (newSeller || recentOrders.length > 0) && (
+                <View style={styles.section}>
+                  <SellerDashboardRecentOrders
+                    emptyMessage="No orders yet. New orders show up here first."
+                    orders={recentOrders}
+                    onOpenOrder={(id) => nav(`/order-detail?id=${id}`)}
+                    onSeeAll={() => nav('/(tabs)/orders')}
+                  />
                 </View>
               )}
             </>
@@ -1209,13 +1248,15 @@ const styles = StyleSheet.create({
   // flex: 1 so the store-url row below has room to shrink/truncate instead
   // of pushing the fixed-size activity bell off the right edge; the
   // ActivityBellButton itself keeps its own fixed width, unaffected.
-  titleRow: { flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: SP.sm, marginRight: SP.sm },
+  titleRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginRight: SP.sm },
+  // Store name over its public URL, next to the store avatar.
+  titleCopy: { flex: 1, minWidth: 0 },
   screenTitle: { fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.4 },
-  // The seller's public store URL, baseline-aligned with the title, never
+  // The seller's public store URL, on its own line under the store name, never
   // wrapping — flexShrink lets IT truncate (middle-ellipsis) before the row
   // itself would ever wrap. No background/border — a plain silver link, per
   // Dev's "no toast, no wording" instinct for this whole affordance.
-  storeUrlRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  storeUrlRow: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', maxWidth: '100%' },
   storeUrlText: { flexShrink: 1, fontFamily: FONT.regular, fontSize: 13 },
 
   heroSkeleton: { paddingTop: SP.md },

@@ -14,17 +14,24 @@ export function SellerDashboardTopProducts({
   theme,
   onOpenProduct,
   onSeeAll,
+  emptyMessage,
 }: {
   products: TopProductSummary[];
   theme: AppThemePreset;
   onOpenProduct: (productId: string) => void;
   onSeeAll: () => void;
+  /** Shown under the section title when nothing has sold yet; omit to hide
+   *  the section entirely. */
+  emptyMessage?: string;
 }) {
-  if (products.length === 0) return null;
+  if (products.length === 0 && !emptyMessage) return null;
 
   return (
     <View testID="seller-dashboard-top-products">
       <SellerDashboardSectionTitle title="Top products" theme={theme} action="See all" onAction={onSeeAll} />
+      {products.length === 0 && (
+        <Text style={[styles.emptyText, { color: theme.muted }]}>{emptyMessage}</Text>
+      )}
       <View>
         {products.slice(0, 5).map((product, index) => (
           <PressableScale
@@ -58,6 +65,7 @@ export function SellerDashboardTopProducts({
 }
 
 const styles = StyleSheet.create({
+  emptyText: { fontFamily: FONT.regular, fontSize: FS.sm, paddingVertical: SP.sm },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

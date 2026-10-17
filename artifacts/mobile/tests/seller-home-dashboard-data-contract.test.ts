@@ -84,18 +84,17 @@ describe('seller home dashboard data contract', () => {
     expect(source).toContain("return { direction: 'flat', label: '' }");
   });
 
-  it('hides stat tiles/top products and shows the setup card for a brand-new seller', () => {
+  it('shows the setup card (not action-needed) and empty top-products/recent-orders for a brand-new seller', () => {
     expect(source).toContain('const newSeller = everSoldCount !== null && isNewSeller(everSoldCount)');
     expect(source).toContain('newSeller ? (');
     expect(source).toContain('<SellerDashboardSetupCard');
-    // Every other real-activity section is explicitly gated on !newSeller —
-    // never shown alongside zeroed/fabricated data for a brand-new seller.
-    expect(source).toContain('{!newSeller && (');
-    expect(source).toContain('{!newSeller && topProducts && topProducts.length > 0 && (');
-    // Recent orders became the Recent activity feed (orders + followers +
-    // reviews) — real rows only, so it simply has nothing to show for a
-    // seller with no activity yet.
-    expect(source).toContain('{activityItems.length > 0 && (');
+    // Polish #90/#91: a brand-new seller still sees the real (zero) stat
+    // tiles and the Recent orders / Top products sections with an honest
+    // empty line — never fabricated rows.
+    expect(source).toContain('emptyMessage="No orders yet. New orders show up here first."');
+    expect(source).toContain('emptyMessage="Your best sellers show up here after your first sale."');
+    expect(source).toContain('{topProducts && (newSeller || topProducts.length > 0) && (');
+    expect(source).toContain('{recentOrders && (newSeller || recentOrders.length > 0) && (');
   });
 
   it('renders a flat baseline chart (never fabricated activity) for a brand-new seller', () => {

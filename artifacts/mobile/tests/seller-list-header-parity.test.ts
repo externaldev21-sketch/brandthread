@@ -53,13 +53,27 @@ describe('Title dropdown replaces the Alert.alert title menu', () => {
     }
   });
 
-  it('both screens pass SellerListHeader a titleMenu of real, working options', () => {
-    expect(productsSource).toMatch(/titleMenu=\{\[/);
-    expect(productsSource).toContain('All products');
-    expect(productsSource).toContain('Collections');
-    expect(ordersSource).toMatch(/titleMenu=\{\[/);
-    expect(ordersSource).toContain('All orders');
-    expect(ordersSource).toContain('Returns');
+  it('the title is plain text (no unclear dropdown); its old views live in the ••• menu', () => {
+    // Polish #96: "Products ⌄" / "Orders ⌄" weren't obviously tappable or
+    // clear about what they switched, so the title dropdown is gone and
+    // Collections / Returns are labelled rows in each screen's ••• menu.
+    expect(productsSource).not.toMatch(/titleMenu=\{/);
+    expect(productsSource).toContain("{ text: 'Collections', onPress: () => router.push('/store-collections' as never) }");
+    expect(ordersSource).not.toMatch(/titleMenu=\{/);
+    expect(ordersSource).toContain("{ text: 'Returns', onPress: () => setActiveFilter('returned') }");
+  });
+
+  it('one filter button: sort lives in the filter sheet, not a second header icon', () => {
+    expect(productsSource).not.toContain('onSortPress=');
+    expect(ordersSource).not.toContain('onSortPress=');
+    expect(productsSource).toContain('>Sort by</Text>');
+    expect(ordersSource).toContain('>Sort by</Text>');
+  });
+
+  it('hides search/filter/chips until the list has data', () => {
+    expect(productsSource).toContain('showControls={hasAnyProducts}');
+    expect(ordersSource).toContain('showControls={hasAnyOrders}');
+    expect(headerSource).toContain('{showControls && (');
   });
 
   it('the shared header only renders the chevron/dropdown when a titleMenu is actually passed', () => {

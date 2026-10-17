@@ -20,10 +20,9 @@ describe('profile screens never hit the real API in dev-preview, however Clerk i
     const src = read('app/(tabs)/profile.tsx');
     expect(src).toContain("import { isSellerDevPreview } from '@/lib/devPreview';");
     // loadPosts, loadMyStories, loadProfile, loadSocialCounts, loadShopCount,
-    // loadPage, loadShopProducts and loadUnreadMessages (the seller action
-    // row's Messages badge, added for the Edit+Messages action-row redesign)
-    // each have their own identical guard.
-    expect(src.match(/if \(!authLoaded \|\| !userId \|\| isSellerDevPreview\(\)\) return;/g)?.length).toBe(8);
+    // loadPage and loadShopProducts each have their own identical guard
+    // (loadUnreadMessages went away with the Messages button, polish #99).
+    expect(src.match(/if \(!authLoaded \|\| !userId \|\| isSellerDevPreview\(\)\) return;/g)?.length).toBe(7);
     expect(src).toContain('if (authLoaded && userId && !isSellerDevPreview()) void loadPage();');
     // Preview never loads Clerk, so it settles without waiting on authLoaded.
     expect(src).toContain('if ((authLoaded && !userId) || isSellerDevPreview()) { setPostsLoading(false); setStatsInitialLoading(false); }');
