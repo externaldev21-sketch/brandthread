@@ -1562,12 +1562,14 @@ export async function getNotifications(k: SocialKeys = K()): Promise<Notificatio
 }
 export async function markNotificationRead(id: string): Promise<void> {
   const k = K();
-  serviceRequest('/api/buyer/notifications/' + encodeURIComponent(id) + '/read', { method: 'PATCH', body: JSON.stringify({}) }).catch(() => {});
+  await serviceRequest('/api/buyer/notifications/' + encodeURIComponent(id) + '/read', { method: 'PATCH', body: JSON.stringify({}) });
   const notifs = await getNotifications(k);
   await save(k.notifications, notifs.map(n => n.id === id ? { ...n, isRead: true } : n)); notify();
 }
 export async function markNotificationUnread(id: string): Promise<void> {
   const k = K();
+  // Server first: a local-only flag was overwritten by the next refetch.
+  await serviceRequest('/api/buyer/notifications/' + encodeURIComponent(id) + '/unread', { method: 'PATCH', body: JSON.stringify({}) });
   const notifs = await getNotifications(k);
   await save(k.notifications, notifs.map(n => n.id === id ? { ...n, isRead: false } : n)); notify();
 }
@@ -1582,21 +1584,23 @@ export async function deleteNotification(id: string): Promise<void> {
   const notifs = await getNotifications(k);
   await save(k.notifications, notifs.filter(n => n.id !== id)); notify();
 }
-export async function muteNotificationCategory(category: NotificationCategory): Promise<void> {
+/**
+ * "Mute <category> alerts": stored server-side, so future notifications of that
+ * category stay out of the feed and stop pushing. `muted: false` undoes it.
+ */
+export async function muteNotificationCategory(category: NotificationCategory, muted = true): Promise<void> {
   const k = K();
+  await serviceRequest('/api/buyer/notifications/mute-category', { method: 'POST', body: JSON.stringify({ category, muted }) });
   const notifs = await getNotifications(k);
-  await save(k.notifications, notifs.map(n => n.category === category ? { ...n, isMuted: true } : n)); notify();
+  await save(k.notifications, notifs.map(n => n.category === category ? { ...n, isMuted: muted } : n)); notify();
 }
-export async function clearAllReadNotifications(): Promise<void> {
+/** Deletes read notifications on the server (optionally one category only). */
+export async function clearAllReadNotifications(category?: NotificationCategory | null): Promise<void> {
   const k = K();
-  try {
-    await serviceRequest('/api/buyer/notifications/read-all', { method: 'PATCH', body: JSON.stringify({}) });
-    const notifs = await getNotifications(k);
-    await save(k.notifications, notifs.filter(n => !n.isRead));
-    notify(); return;
-  } catch { /* fall through to existing local logic */ }
+  const query = category ? '?category=' + encodeURIComponent(category) : '';
+  await serviceRequest('/api/buyer/notifications/read' + query, { method: 'DELETE' });
   const notifs = await getNotifications(k);
-  await save(k.notifications, notifs.filter(n => !n.isRead)); notify();
+  await save(k.notifications, notifs); notify();
 }
 export async function getNotificationPreferences(k: SocialKeys = K()): Promise<NotificationPreference[]> {
   return load<NotificationPreference[]>(k.notifPrefs, DEFAULT_NOTIFICATION_PREFS);
@@ -1733,7 +1737,11 @@ export async function saveItem(
     options?.onRemoteSaved?.();
     notify();
     return saved;
-  } catch { /* fall through to existing local logic */ }
+  } catch (error) {
+    // Only the offline buyer preview keeps a phone-only copy; a real account
+    // must see the failure instead of a save that never reached the server.
+    if (!isBuyerDevPreview()) throw error;
+  }
   const items = await getSavedItems(k);
   const existing = items.find(i => i.targetId === params.targetId);
   if (existing) return existing;
@@ -1750,7 +1758,9 @@ export async function removeSavedItem(targetId: string): Promise<void> {
     await serviceRequest('/api/buyer/saved/' + encodeURIComponent(targetId), { method: 'DELETE' });
     notify();
     return;
-  } catch { /* fall through to existing local logic */ }
+  } catch (error) {
+    if (!isBuyerDevPreview()) throw error;
+  }
   const items = await getSavedItems(k);
   await save(k.saved, items.filter(i => i.targetId !== targetId));
   const p = await getMyProfile(k);

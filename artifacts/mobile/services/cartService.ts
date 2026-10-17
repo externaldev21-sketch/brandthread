@@ -1015,19 +1015,41 @@ export async function createProblemReport(params: {
   description: string;
   evidenceUris: string[];
   contactedSeller: boolean;
+  /** Reply-to details for the support ticket mirrored from this report. */
+  contactEmail?: string;
+  contactName?: string;
 }): Promise<BuyerProblemReport> {
-  const k = keys();
-  const problems = await loadProblems(k);
-  const report: BuyerProblemReport = {
-    id: uid(),
-    ...params,
-    escalatedToSupport: false,
-    status: 'open',
-    submittedAt: now(),
+  const { api } = await import('@/lib/api');
+  // Saved on the server (seller + support see it). Photos picked on the
+  // device are uploaded first, like return evidence; failures throw so the
+  // screen shows an error instead of a success that never left the phone.
+  const evidenceUrls: string[] = [];
+  for (const uri of params.evidenceUris) {
+    if (uri.startsWith('/objects/')) { evidenceUrls.push(uri); continue; }
+    const uploaded = await api.returns.uploadEvidence({ uri });
+    evidenceUrls.push(uploaded.objectPath);
+  }
+  const created = await api.orderProblems.create({
+    orderId: params.orderId,
+    type: params.type,
+    description: params.description,
+    evidenceUrls,
+    contactedSeller: params.contactedSeller,
+    email: params.contactEmail,
+    name: params.contactName,
+  });
+  return {
+    id: created.id,
+    orderId: created.orderId ?? undefined,
+    orderNumber: created.orderNumber ?? params.orderNumber,
+    type: created.type as BuyerProblemType,
+    description: created.description,
+    evidenceUris: created.evidenceUrls,
+    contactedSeller: created.contactedSeller,
+    escalatedToSupport: created.escalatedToSupport,
+    status: created.status,
+    submittedAt: created.submittedAt,
   };
-  problems.push(report);
-  await AsyncStorage.setItem(k.problems, JSON.stringify(problems));
-  return report;
 }
 
 async function loadProblems(k: CartKeys = keys()): Promise<BuyerProblemReport[]> {

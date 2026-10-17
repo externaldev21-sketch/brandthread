@@ -44,6 +44,10 @@ export interface ThreadComment {
   /** Server-verified @mentions in `body`. */
   mentions?: { userId: string; handle: string }[];
   replies: ThreadComment[];
+  /** Root only: more than the inlined replies exist (page with repliesNextCursor). */
+  hasMoreReplies?: boolean;
+  /** Root only: `after` cursor for GET …/comments/:id/replies. */
+  repliesNextCursor?: string | null;
 }
 
 export interface CommentThread {

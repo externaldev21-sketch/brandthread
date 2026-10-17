@@ -15,7 +15,7 @@ import { Router } from "express";
 import { attachQuoteData } from "../lib/quotedPosts";
 import { locationsByPlaceId } from "../lib/places";
 import { publicCoverFields } from "../lib/profileCover";
-import { db, users, follows, storyHighlightItems, closeFriends, stories, storyMentions, storyLikes, storyViews, notes, blocks, followRequests, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
+import { db, users, follows, storyHighlightItems, closeFriends, stories, storyMentions, storyLikes, storyViews, notes, blocks, followRequests, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes, savedItems, feedNotInterested } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
@@ -142,6 +142,7 @@ async function buildBuyerPosts(
   limit: number,
   offset: number,
   postId?: string,
+  opts: { excludeNotInterested?: boolean } = {},
 ) {
   if (authorIds.length === 0) return [];
   const pageRows = await db.select({
@@ -176,6 +177,11 @@ async function buildBuyerPosts(
       authorInGoodStanding(posts.userId),
       notBlockedWith(viewerId, posts.userId),
       ...(postId ? [eq(posts.id, postId)] : []),
+      // Feeds honour the viewer's "Not interested" hides (undoable via
+      // DELETE /api/feed/not-interested/:postId); profiles still show them.
+      ...(opts.excludeNotInterested
+        ? [sql`NOT EXISTS (SELECT 1 FROM ${feedNotInterested} WHERE ${feedNotInterested.userId} = ${viewerId} AND ${feedNotInterested.postId} = ${posts.id})`]
+        : []),
     ))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
@@ -187,7 +193,7 @@ async function buildBuyerPosts(
     : pageRows.filter((row) => row.userId === viewerId || !matchesMutedWords(row.caption, muted));
   if (rows.length === 0) return [];
   const postIds = rows.map((row) => row.id);
-  const [likeRows, repostRows, commentRows, myRows] = await Promise.all([
+  const [likeRows, repostRows, commentRows, myRows, savedRows] = await Promise.all([
     db.select({ postId: interactions.postId, n: count() }).from(interactions)
       .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "like")))
       .groupBy(interactions.postId),
@@ -201,7 +207,10 @@ async function buildBuyerPosts(
         eq(interactions.userId, viewerId),
         inArray(interactions.type, ["like", "repost"]),
       )),
+    db.select({ targetId: savedItems.targetId }).from(savedItems)
+      .where(and(eq(savedItems.userId, viewerId), inArray(savedItems.targetId, postIds))),
   ]);
+  const saved = new Set(savedRows.map((row) => row.targetId));
   const counts = (rows: Array<{ postId: string | null; n: number }>) =>
     new Map(rows.filter((row) => row.postId).map((row) => [row.postId as string, Number(row.n)]));
   const likes = counts(likeRows);
@@ -241,7 +250,7 @@ async function buildBuyerPosts(
       repostsCount: reposts.get(row.id) ?? 0,
       likedByMe: mine.get(row.id)?.has("like") ?? false,
       repostedByMe: mine.get(row.id)?.has("repost") ?? false,
-      savedByMe: false,
+      savedByMe: saved.has(row.id),
       isArchived: false,
       isDraft: row.postStatus === "draft",
       createdAt: row.createdAt,
@@ -773,7 +782,7 @@ router.get("/friends/activity", async (req, res) => {
   `);
   const authorIds = (((mutualRows as any).rows ?? []) as any[])
     .map((row: any) => String(row.following_id));
-  res.json(await buildBuyerPosts(myId, authorIds, limit, offset));
+  res.json(await buildBuyerPosts(myId, authorIds, limit, offset, undefined, { excludeNotInterested: true }));
 });
 
 /**

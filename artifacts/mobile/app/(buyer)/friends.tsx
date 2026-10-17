@@ -24,7 +24,7 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
 import {
-  MY_USER_ID, subscribeSocial, saveItem, createOrGetConversation, getStories,
+  MY_USER_ID, subscribeSocial, saveItem, removeSavedItem, createOrGetConversation, getStories,
 } from '@/services/socialService';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import type { Friendship, Story, BuyerPost } from '@/services/socialTypes';
@@ -66,7 +66,7 @@ function PostCard({
   post: BuyerPost;
   saved: boolean;
   onLike: (post: BuyerPost) => void;
-  onRepost: (id: string) => void;
+  onRepost: (post: BuyerPost) => void;
   onSave: (post: BuyerPost) => void;
   onOpenComments: (post: BuyerPost) => void;
   onNotInterested: (post: BuyerPost) => void;
@@ -149,7 +149,7 @@ function PostCard({
           <Feather name="message-circle" size={ICON.lg} color={palette.mutedForeground} />
           <Text style={[TYPE_SCALE.callout, s.actionCount, { color: palette.mutedForeground }]}>{post.commentsCount}</Text>
         </PressableScale>
-        <PressableScale style={s.actionItem} onPress={() => onRepost(post.id)}>
+        <PressableScale style={s.actionItem} onPress={() => onRepost(post)}>
           <Feather
             name="repeat"
             size={ICON.lg}
@@ -219,13 +219,13 @@ export default function FriendsScreen() {
   const [savedIds,     setSavedIds]     = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [snackbar, setSnackbar] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
+  const [snackbar, setSnackbar] = useState<{ visible: boolean; message: string; actionLabel?: string; onAction?: () => void }>({ visible: false, message: '' });
   const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showSnackbar = useCallback((message: string) => {
+  const showSnackbar = useCallback((message: string, action?: { label: string; onPress: () => void }) => {
     if (snackbarTimer.current) clearTimeout(snackbarTimer.current);
-    setSnackbar({ visible: true, message });
-    snackbarTimer.current = setTimeout(() => setSnackbar(prev => ({ ...prev, visible: false })), 2200);
+    setSnackbar({ visible: true, message, actionLabel: action?.label, onAction: action?.onPress });
+    snackbarTimer.current = setTimeout(() => setSnackbar(prev => ({ ...prev, visible: false })), action ? 4000 : 2200);
   }, []);
   useEffect(() => () => { if (snackbarTimer.current) clearTimeout(snackbarTimer.current); }, []);
 
@@ -252,7 +252,10 @@ export default function FriendsScreen() {
       const now = Date.now();
       setStories(stories.filter(s => s.expiresAt > now));
       setApiFollowing(Array.isArray(followingRows) ? followingRows : []);
-      setFeedPosts(Array.isArray(activityRows) ? activityRows : []);
+      const activity = Array.isArray(activityRows) ? activityRows : [];
+      setFeedPosts(activity);
+      // The server reports savedByMe per post, so the bookmark survives a refresh.
+      setSavedIds(new Set(activity.filter(p => p.savedByMe).map(p => p.id)));
     } catch (error) {
       // No backend reachable in the dev-web preview. Default is a brand-new,
       // zero-state account (fresh install) — never reached for a real
@@ -310,11 +313,11 @@ export default function FriendsScreen() {
     }).catch(() => { setFeedPosts(prev => prev.map(p => p.id === post.id ? post : p)); Alert.alert('Could not update like', 'Try again.'); });
   }
 
-  function handleRepost(postId: string) {
+  function handleRepost(post: BuyerPost) {
     hapticPrimaryAction();
     setFeedPosts(prev =>
       prev.map(p =>
-        p.id === postId
+        p.id === post.id
           ? {
               ...p,
               repostedByMe: !p.repostedByMe,
@@ -323,36 +326,74 @@ export default function FriendsScreen() {
           : p,
       ),
     );
-    api.posts.interact(postId, { type: 'repost' }).catch(() => { setFeedPosts(prev => prev.map(p => p.id === postId ? { ...p, repostedByMe: !p.repostedByMe, repostsCount: p.repostedByMe ? p.repostsCount - 1 : p.repostsCount + 1 } : p)); Alert.alert('Could not update repost', 'Try again.'); });
+    // The server treats an omitted value as "add", so undo must say "remove".
+    api.posts.interact(post.id, {
+      type: 'repost',
+      value: post.repostedByMe ? 'remove' : 'add',
+    }).catch(() => { setFeedPosts(prev => prev.map(p => p.id === post.id ? post : p)); Alert.alert('Could not update repost', 'Try again.'); });
   }
 
-  function handleSave(post: BuyerPost) {
-    hapticPrimaryAction();
-    const wasSaved = savedIds.has(post.id);
+  function setSavedLocally(postId: string, saved: boolean) {
     setSavedIds(prev => {
       const next = new Set(prev);
-      if (wasSaved) next.delete(post.id); else next.add(post.id);
+      if (saved) next.add(postId); else next.delete(postId);
       return next;
     });
-    if (wasSaved) {
-      showSnackbar('Removed from saved');
-      return;
-    }
-    saveItem({
-      type: 'post',
-      targetId: post.id,
-      title: post.authorName + '\'s post',
-      accentColor: post.authorColor,
-    }, {
-      onRemoteSaved: () => { void requestContextualPushPermission(userId, api); },
-    });
-    showSnackbar('Saved');
   }
 
-  function handleNotInterested(post: BuyerPost) {
+  async function handleSave(post: BuyerPost) {
+    hapticPrimaryAction();
+    const wasSaved = savedIds.has(post.id);
+    setSavedLocally(post.id, !wasSaved);
+    try {
+      if (wasSaved) {
+        await removeSavedItem(post.id);
+        showSnackbar('Removed from saved');
+      } else {
+        await saveItem({
+          type: 'post',
+          targetId: post.id,
+          title: post.authorName + '\'s post',
+          accentColor: post.authorColor,
+        }, {
+          onRemoteSaved: () => { void requestContextualPushPermission(userId, api); },
+        });
+        showSnackbar('Saved');
+      }
+    } catch {
+      setSavedLocally(post.id, wasSaved);
+      Alert.alert(wasSaved ? 'Could not remove from saved' : 'Could not save', 'Try again.');
+    }
+  }
+
+  async function handleNotInterested(post: BuyerPost) {
     hapticSelection();
+    const index = feedPosts.findIndex(p => p.id === post.id);
+    const restore = () => setFeedPosts(prev => {
+      if (prev.some(p => p.id === post.id)) return prev;
+      const next = [...prev];
+      next.splice(Math.min(Math.max(index, 0), next.length), 0, post);
+      return next;
+    });
     setFeedPosts(prev => prev.filter(p => p.id !== post.id));
-    showSnackbar('Post hidden');
+    try {
+      await api.posts.interact(post.id, { type: 'not_interested' });
+    } catch {
+      restore();
+      Alert.alert('Could not hide post', 'Try again.');
+      return;
+    }
+    showSnackbar('Post hidden', {
+      label: 'Undo',
+      onPress: () => {
+        setSnackbar(prev => ({ ...prev, visible: false }));
+        restore();
+        api.feed.undoNotInterested(post.id).catch(() => {
+          setFeedPosts(prev => prev.filter(p => p.id !== post.id));
+          Alert.alert('Could not undo', 'The post is still hidden. You can undo it from Privacy → Hidden posts.');
+        });
+      },
+    });
   }
 
   function handleOpenComments(post: BuyerPost) {
@@ -608,7 +649,7 @@ export default function FriendsScreen() {
         />
       )}
 
-      <Snackbar visible={snackbar.visible} message={snackbar.message} onDismiss={() => setSnackbar(prev => ({ ...prev, visible: false }))} />
+      <Snackbar visible={snackbar.visible} message={snackbar.message} actionLabel={snackbar.actionLabel} onAction={snackbar.onAction} onDismiss={() => setSnackbar(prev => ({ ...prev, visible: false }))} />
     </View>
   );
 }

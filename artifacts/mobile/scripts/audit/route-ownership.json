@@ -113,6 +113,7 @@
     { "match": "/buyer-blocked", "owner": "profilesSocial" },
     { "match": "/buyer-muted", "owner": "profilesSocial" },
     { "match": "/buyer-restricted", "owner": "profilesSocial" },
+    { "match": "/buyer-hidden-posts", "owner": "profilesSocial" },
     { "match": "/buyer-report", "owner": "profilesSocial" },
     { "match": "/buyer-problem-report", "owner": "profilesSocial" },
     { "match": "/buyer-notifications", "owner": "profilesSocial" },

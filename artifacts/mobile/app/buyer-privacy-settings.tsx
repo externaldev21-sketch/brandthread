@@ -294,6 +294,14 @@ export default function BuyerPrivacySettings() {
             chevron
             onPress={() => router.push('/buyer-restricted' as never)}
           />
+          <View style={styles.divider} />
+          <ListRow
+            icon="eye-off"
+            title="Hidden posts"
+            value="Manage"
+            chevron
+            onPress={() => router.push('/buyer-hidden-posts' as never)}
+          />
         </Card>
       </ScrollView>
 

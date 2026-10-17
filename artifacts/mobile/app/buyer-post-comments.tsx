@@ -46,6 +46,7 @@ import { InlineSpinner, InlineError } from '@/components/InlineFeedback';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { insertReplies, replyCursorsFrom } from '@/lib/comments/replyPages';
 import { useApi } from '@/lib/api';
 import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
 import { apiErrorCode, apiErrorMessage, reportHref, shortRelativeTime, BLOCK_EXPLAINER } from '@/lib/safety';
@@ -134,6 +135,8 @@ interface ViewRepliesRow {
   rootId: string;
   count: number;
   expanded: boolean;
+  /** "View more replies": the root has replies past the inlined first page. */
+  loadMore?: boolean;
 }
 
 function isViewRepliesRow(row: Row | ViewRepliesRow): row is ViewRepliesRow {
@@ -374,22 +377,27 @@ function CommentRow({
 // Reply threads start collapsed under their root comment (TikTok/Reels
 // pattern) — this row expands or re-collapses them on tap.
 
-function ViewRepliesButton({ count, expanded, onToggle }: { count: number; expanded: boolean; onToggle: () => void }) {
+function ViewRepliesButton({ count, expanded, onToggle, label, hasMore }: {
+  count: number; expanded: boolean; onToggle: () => void;
+  /** Overrides the toggle copy (used by the "View more replies" row). */
+  label?: string;
+  /** The root has more replies than the inlined first page. */
+  hasMore?: boolean;
+}) {
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
+  const text = label ?? (expanded ? 'Hide replies' : `View ${count}${hasMore ? '+' : ''} ${count === 1 && !hasMore ? 'reply' : 'replies'}`);
   return (
     <PressableScale
       style={s.viewRepliesRow}
       onPress={() => { hapticLight(); onToggle(); }}
       accessibilityRole="button"
-      accessibilityLabel={expanded ? 'Hide replies' : `View ${count} ${count === 1 ? 'reply' : 'replies'}`}
+      accessibilityLabel={text}
       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
       noMinHeight
     >
       <View style={s.viewRepliesLine} />
-      <Text style={s.viewRepliesText}>
-        {expanded ? 'Hide replies' : `View ${count} ${count === 1 ? 'reply' : 'replies'}`}
-      </Text>
+      <Text style={s.viewRepliesText}>{text}</Text>
       <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={12} color={MUTED} />
     </PressableScale>
   );
@@ -681,6 +689,9 @@ export default function BuyerPostCommentsScreen() {
   const [comments, setComments] = useState<Row[]>([]);
   /** Root comment ids whose reply thread is expanded (collapsed by default). */
   const [expandedRoots, setExpandedRoots] = useState<Set<string>>(new Set());
+  /** Root id → cursor for its next page of replies (only roots with more than 50). */
+  const [replyCursors, setReplyCursors] = useState<Record<string, string>>({});
+  const loadingRepliesFor = useRef<Set<string>>(new Set());
   const [meta, setMeta] = useState({ hiddenByMutedWords: 0, commentsDisabled: false, canComment: true, isPostOwner: false, nextCursor: null as string | null });
   const [inputText, setInputText] = useState('');
   const [replyingTo, setReplyingTo] = useState<Row | null>(null);
@@ -758,6 +769,7 @@ export default function BuyerPostCommentsScreen() {
     try {
       const thread = await api.comments.list(postId);
       setComments(flatten(thread.comments));
+      setReplyCursors(replyCursorsFrom(thread.comments));
       setMeta({
         hiddenByMutedWords: thread.hiddenByMutedWords,
         commentsDisabled: thread.commentsDisabled,
@@ -784,6 +796,7 @@ export default function BuyerPostCommentsScreen() {
     try {
       const thread = await api.comments.list(postId, meta.nextCursor);
       setComments((prev) => [...prev, ...flatten(thread.comments)]);
+      setReplyCursors((prev) => ({ ...prev, ...replyCursorsFrom(thread.comments) }));
       setMeta((prev) => ({ ...prev, nextCursor: thread.nextCursor }));
     } catch {
       // The footer keeps its "Load more" affordance for a manual retry.
@@ -1012,13 +1025,40 @@ export default function BuyerPostCommentsScreen() {
       }
       if (replies.length > 0) {
         const expanded = expandedRoots.has(row.id);
+        const hasMore = !!replyCursors[row.id];
         if (expanded) out.push(...replies);
+        if (expanded && hasMore) out.push({ _viewReplies: true, rootId: row.id, count: 0, expanded, loadMore: true });
         out.push({ _viewReplies: true, rootId: row.id, count: replies.length, expanded });
       }
       i = j;
     }
     return out;
-  }, [comments, expandedRoots, user?.id, guestMutedPhrases]);
+  }, [comments, expandedRoots, replyCursors, user?.id, guestMutedPhrases]);
+
+  const loadMoreReplies = useCallback(async (rootId: string) => {
+    const cursor = replyCursors[rootId];
+    if (!cursor || loadingRepliesFor.current.has(rootId)) return;
+    loadingRepliesFor.current.add(rootId);
+    try {
+      const page = await api.comments.replies(postId, rootId, cursor);
+      setComments((prev) => {
+        const root = prev.find((row) => row.id === rootId && !row.isReply);
+        const rows: Row[] = (page.replies ?? []).map((reply) => ({
+          ...reply, isReply: true, parentAuthorName: root?.author.name,
+        }));
+        return insertReplies(prev, rootId, rows);
+      });
+      setReplyCursors((prev) => {
+        const next = { ...prev };
+        if (page.repliesNextCursor) next[rootId] = page.repliesNextCursor; else delete next[rootId];
+        return next;
+      });
+    } catch {
+      showToast('Could not load more replies. Try again.');
+    } finally {
+      loadingRepliesFor.current.delete(rootId);
+    }
+  }, [api, postId, replyCursors, showToast]);
 
   const toggleReplies = useCallback((rootId: string) => {
     setExpandedRoots(prev => {
@@ -1161,7 +1201,7 @@ export default function BuyerPostCommentsScreen() {
             ref={listRef}
             data={loading ? [] : visibleRows}
             refreshControl={pull.refreshControl}
-            keyExtractor={row => (isViewRepliesRow(row) ? `view-replies-${row.rootId}` : row.id)}
+            keyExtractor={row => (isViewRepliesRow(row) ? `view-replies-${row.rootId}${row.loadMore ? '-more' : ''}` : row.id)}
             extraData={highlightId}
             onScrollToIndexFailed={handleScrollToIndexFailed}
             showsVerticalScrollIndicator={false}
@@ -1176,7 +1216,9 @@ export default function BuyerPostCommentsScreen() {
           )}
           renderItem={({ item }) => (
             isViewRepliesRow(item) ? (
-              <ViewRepliesButton count={item.count} expanded={item.expanded} onToggle={() => toggleReplies(item.rootId)} />
+              item.loadMore
+                ? <ViewRepliesButton count={0} expanded={false} label="View more replies" onToggle={() => { void loadMoreReplies(item.rootId); }} />
+                : <ViewRepliesButton count={item.count} expanded={item.expanded} hasMore={!!replyCursors[item.rootId]} onToggle={() => toggleReplies(item.rootId)} />
             ) : (
               <CommentRow
                 comment={item}
