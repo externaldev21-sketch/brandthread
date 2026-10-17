@@ -36,6 +36,12 @@ import { minHitSlop } from '@/lib/hitSlop';
 // Asset FAB draws 39pt tall. Pad touch areas to 44pt without changing layout.
 const TAB_HIT_SLOP = minHitSlop({ height: 32 }); // 34pt pill minus its 1pt border (web slop is measured from the padding box)
 const FAB_HIT_SLOP = minHitSlop({ height: 39 });
+import { useApi } from '@/hooks/useApi';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+
+function errorText(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}
 
 function formatDate(iso: string): string {
   try {
@@ -53,16 +59,22 @@ export default function DesignBrandAssetsScreen() {
   const insets = useSafeAreaInsets();
   const tabBarInset = useSellerTabBarInset();
   const router = useRouter();
+  const api = useApi();
   const [assets, setAssets] = useState<BrandAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<string>('all');
 
   // ── Load assets ────────────────────────────────────────────────────────────
+  const [loadError, setLoadError] = useState<string | null>(null);
   async function loadAssets() {
     setLoading(true);
+    setLoadError(null);
     try {
-      setAssets(await getBrandAssets());
+      const all = await getBrandAssets();
+      setAssets(all);
+    } catch (err) {
+      setLoadError(errorText(err, 'Could not load your brand assets. Check your connection and try again.'));
     } finally {
       setLoading(false);
     }
@@ -88,12 +100,13 @@ export default function DesignBrandAssetsScreen() {
         onPress: async () => {
           const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
           if (result.canceled || !result.assets?.[0]) return;
+          const picked = result.assets[0];
           Alert.alert('Asset Type', 'What is this image?', [
-            { text: 'Logo',    onPress: () => saveImageAsset(result.assets![0].uri, 'logo') },
-            { text: 'Icon',    onPress: () => saveImageAsset(result.assets![0].uri, 'icon') },
-            { text: 'Graphic', onPress: () => saveImageAsset(result.assets![0].uri, 'graphic') },
-            { text: 'Photo',   onPress: () => saveImageAsset(result.assets![0].uri, 'photo') },
-            { text: 'Mockup',  onPress: () => saveImageAsset(result.assets![0].uri, 'mockup') },
+            { text: 'Logo',    onPress: () => saveImageAsset(picked, 'logo') },
+            { text: 'Icon',    onPress: () => saveImageAsset(picked, 'icon') },
+            { text: 'Graphic', onPress: () => saveImageAsset(picked, 'graphic') },
+            { text: 'Photo',   onPress: () => saveImageAsset(picked, 'photo') },
+            { text: 'Mockup',  onPress: () => saveImageAsset(picked, 'mockup') },
             { text: 'Cancel',  style: 'cancel' },
           ]);
         },
@@ -103,9 +116,17 @@ export default function DesignBrandAssetsScreen() {
         onPress: () => {
           Alert.prompt('Brand Color', 'Enter hex color (e.g. #0EA5E9):', async (hex) => {
             if (!hex?.trim()) return;
-            const color = hex.startsWith('#') ? hex : '#' + hex;
-            const newAsset = await addBrandAsset({ name: color, type: 'color', color, tags: [] });
-            setAssets(prev => [newAsset, ...prev]);
+            const color = (hex.trim().startsWith('#') ? hex.trim() : '#' + hex.trim()).toUpperCase();
+            if (!/^#[0-9A-F]{6}$/.test(color)) {
+              Alert.alert('Invalid color', 'Enter a 6-digit hex color like #0EA5E9.');
+              return;
+            }
+            try {
+              const newAsset = await addBrandAsset({ name: color, type: 'color', color, tags: [] });
+              setAssets(prev => [newAsset, ...prev]);
+            } catch (err) {
+              Alert.alert('Could not save color', errorText(err, 'Please try again.'));
+            }
           });
         },
       },
@@ -114,8 +135,12 @@ export default function DesignBrandAssetsScreen() {
         onPress: () => {
           Alert.prompt('Font Name', 'Enter font family name:', async (name) => {
             if (!name?.trim()) return;
-            const newAsset = await addBrandAsset({ name: name.trim(), type: 'font', fontFamily: name.trim(), tags: [] });
-            setAssets(prev => [newAsset, ...prev]);
+            try {
+              const newAsset = await addBrandAsset({ name: name.trim(), type: 'font', fontFamily: name.trim(), tags: [] });
+              setAssets(prev => [newAsset, ...prev]);
+            } catch (err) {
+              Alert.alert('Could not save font', errorText(err, 'Please try again.'));
+            }
           });
         },
       },
@@ -123,11 +148,25 @@ export default function DesignBrandAssetsScreen() {
     ]);
   }
 
-  async function saveImageAsset(uri: string, type: BrandAssetType) {
+  const [uploading, setUploading] = useState(false);
+  async function saveImageAsset(picked: { uri: string; mimeType?: string | null }, type: BrandAssetType) {
     const name = type.charAt(0).toUpperCase() + type.slice(1) + ' ' + (assets.length + 1);
-    const newAsset = await addBrandAsset({ name, type, uri, tags: [] });
-    setAssets(prev => [newAsset, ...prev]);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setUploading(true);
+    try {
+      // Real sellers: upload the bytes to storage first and save only the
+      // stored object path — a file:// URI is useless on any other device.
+      // The signed-out preview / demo keeps the local-only library.
+      const local = isSellerDevPreview() || isPreviewDemoMode();
+      const newAsset = local
+        ? await addBrandAsset({ name, type, uri: picked.uri, tags: [] })
+        : await addBrandAsset({ name, type, objectPath: (await api.products.uploadImage(picked)).objectPath, tags: [] });
+      setAssets(prev => [newAsset, ...prev]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      Alert.alert('Upload failed', errorText(err, 'Could not upload this image. Check your connection and try again.'));
+    } finally {
+      setUploading(false);
+    }
   }
 
   // ── Asset long press ───────────────────────────────────────────────────────
@@ -139,8 +178,12 @@ export default function DesignBrandAssetsScreen() {
         onPress: () => {
           Alert.prompt('Rename', 'New name:', async (name) => {
             if (!name?.trim()) return;
-            await renameBrandAsset(asset.id, name.trim());
-            setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, name: name.trim() } : a));
+            try {
+              await renameBrandAsset(asset.id, name.trim());
+              setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, name: name.trim() } : a));
+            } catch (err) {
+              Alert.alert('Could not rename', errorText(err, 'Please try again.'));
+            }
           }, 'plain-text', asset.name);
         },
       },
@@ -183,8 +226,12 @@ export default function DesignBrandAssetsScreen() {
             {
               text: 'Delete', style: 'destructive',
               onPress: async () => {
-                await deleteBrandAsset(asset.id);
-                setAssets(prev => prev.filter(a => a.id !== asset.id));
+                try {
+                  await deleteBrandAsset(asset.id);
+                  setAssets(prev => prev.filter(a => a.id !== asset.id));
+                } catch (err) {
+                  Alert.alert('Could not delete', errorText(err, 'Please try again.'));
+                }
               },
             },
           ]);
@@ -263,6 +310,15 @@ export default function DesignBrandAssetsScreen() {
         <View style={bas.loadingWrap}>
           <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm }}>Loading assets…</Text>
         </View>
+      ) : loadError ? (
+        <View style={{ flex: 1 }}>
+          <EmptyState
+            icon="alert-circle"
+            title="Couldn't load assets"
+            description={loadError}
+            action={{ label: 'Try again', onPress: () => { void loadAssets(); }, icon: 'refresh-cw' }}
+          />
+        </View>
       ) : filtered.length === 0 ? (
         <View style={{ flex: 1 }}>
           <EmptyState
@@ -290,11 +346,12 @@ export default function DesignBrandAssetsScreen() {
         <TouchableOpacity
           style={[bas.fab, { bottom: (tabBarInset || insets.bottom) + SP.lg }]}
           onPress={handleAddAsset}
+          disabled={uploading}
           activeOpacity={0.85}
           hitSlop={FAB_HIT_SLOP}
         >
           <Icon name="upload" size={ICON.md} color={theme.onAccent} />
-          <Text style={bas.fabText}>Upload asset</Text>
+          <Text style={bas.fabText}>{uploading ? 'Uploading…' : 'Upload asset'}</Text>
         </TouchableOpacity>
       )}
     </View>

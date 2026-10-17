@@ -163,6 +163,7 @@ import sellerLaunchChecklistRouter from "./seller-launch-checklist";
 import sellerMorningBriefRouter from "./seller-morning-brief";
 import sellerMilestonesRouter from "./seller-milestones";
 import sellerLiveMapRouter from "./seller-live-map";
+import sellerBrandAssetsRouter from "./seller-brand-assets";
 import sellerLocationsRouter from "./seller-locations";
 import sellerTerminalRouter from "./seller-terminal";
 import sellerMetafieldsRouter from "./seller-metafields";
@@ -461,6 +462,7 @@ router.use("/seller/terminal",           tc, sellerTerminalRouter); // Pop-up mo
 router.use("/seller/morning-brief",      tc, sellerMorningBriefRouter);
 router.use("/seller/milestones",         tc, sellerMilestonesRouter);
 router.use("/seller/live-map",           tc, sellerLiveMapRouter);
+router.use("/seller/brand-assets",       tc, sellerBrandAssetsRouter);
 router.use("/seller",                    tc, sellerProfileRouter);
 router.use("/reviews",                   tc, reviewsRouter);
 router.use("/product-qa",                tc, productQaRouter);

@@ -18,8 +18,12 @@ import { ListRow } from '@/components/ui/ListRow';
 import { haptics, haptic } from '@/lib/haptics';
 
 
-import { getStorefront, updateSettings } from '@/services/storeService';
-
+import { updateSettings } from '@/services/storeService';
+import { hapticToggle } from '@/lib/haptics';
+import { getStorefront } from '@/services/storeService';
+import { loadStoreSettings, saveStoreSettings, slugFromStoreUrl } from '@/services/storeSettingsSync';
+import { ApiError } from '@/lib/networkNotice';
+import { apiErrorMessage } from '@/lib/safety';
 import { Storefront, StoreSettings, StorePublishStatus } from '@/services/storeTypes';
 
 import { radius } from '@/constants/radii';
@@ -121,26 +125,55 @@ export default function StoreSettingsScreen() {
       setRisingOptIn(!next);
     }
   }, [api]);
+  const [currentSlug, setCurrentSlug] = useState('');
+  const [hasStorePassword, setHasStorePassword] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useFocusEffect(useCallback(() => {
     let active = true;
-    getStorefront().then(s => {
-      if (!active) return;
-      setForm(s.settings);
-      setLoading(false);
-    }).catch(() => { if (active) setLoading(false); });
+    // Server is the source of truth; the local cache only paints first.
+    getStorefront({ refreshRemote: false })
+      .then(async local => {
+        if (!active) return;
+        const cached = { ...local.settings, storeUrl: slugFromStoreUrl(local.settings.storeUrl), storePassword: '' };
+        setForm(cached);
+        try {
+          const server = await loadStoreSettings(cached);
+          if (!active) return;
+          const { hasStorePassword: hasPw, ...settings } = server;
+          setForm(settings);
+          setCurrentSlug(settings.storeUrl);
+          setHasStorePassword(hasPw);
+          setLoadError(null);
+        } catch (e) {
+          if (active) setLoadError(apiErrorMessage(e, "Couldn't load your saved settings. Showing this device's copy."));
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []));
 
   const patch = (partial: Partial<StoreSettings>) => setForm(f => ({ ...f, ...partial }));
 
   const handleSave = async () => {
+    if (loadError) {
+      Alert.alert("Can't save yet", "Your saved settings couldn't be loaded. Check your connection and reopen Store Settings.");
+      return;
+    }
     setSaving(true);
     try {
-      await updateSettings(form);
+      const result = await saveStoreSettings(form, { currentSlug, hasStorePassword });
+      setCurrentSlug(result.slug);
+      setHasStorePassword(result.hasStorePassword);
+      setForm(f => ({ ...f, storeUrl: result.slug, storePassword: '' }));
       Alert.alert('Saved', 'Store settings updated.');
-    } catch {
-      Alert.alert("Couldn't save settings", 'Try again.');
+    } catch (e) {
+      const fallback = "Couldn't save settings. Check your connection and try again.";
+      const message = e instanceof ApiError
+        ? apiErrorMessage(e, fallback)
+        : e instanceof Error && e.message && !/network|fetch/i.test(e.message) ? e.message : fallback;
+      Alert.alert('Not saved', message);
     } finally {
       setSaving(false);
     }
@@ -171,6 +204,7 @@ export default function StoreSettingsScreen() {
         </View>
       ) : (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[ss.scroll, { paddingBottom: 60 + tabBarInset }]}>
+        {loadError ? <Text style={ss.errorText}>{loadError}</Text> : null}
 
         {/* STORE IDENTITY */}
         <SectionHeader title="IDENTITY" style={ss.sectionHeader} />
@@ -190,10 +224,11 @@ export default function StoreSettingsScreen() {
               <TextInput returnKeyType="done"
                 style={[ss.input, { flex: 1, minWidth: 0 }]}
                 value={form.storeUrl}
-                onChangeText={v => patch({ storeUrl: v })}
-                placeholder="desires"
+                onChangeText={v => patch({ storeUrl: v.toLowerCase() })}
+                placeholder="yourstore"
                 placeholderTextColor={colors.mutedForeground}
                 autoCapitalize="none"
+                autoCorrect={false}
               />
               <Text style={ss.urlSuffix}>.brandthread.app</Text>
             </View>
@@ -300,7 +335,7 @@ export default function StoreSettingsScreen() {
                   style={ss.input}
                   value={form.storePassword ?? ''}
                   onChangeText={v => patch({ storePassword: v })}
-                  placeholder="Store access password"
+                  placeholder={hasStorePassword ? 'Password set. Enter a new one to change it' : 'Store access password'}
                   placeholderTextColor={colors.mutedForeground}
                   secureTextEntry
                 />
@@ -431,5 +466,10 @@ function makeStyles(colors: Colors) {
       minHeight: 44, justifyContent: 'center',
     },
     statusChipLabel: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium },
+    saveBtn: { marginHorizontal: SP.md, marginTop: SP.lg },
+    errorText: {
+      marginHorizontal: SP.md, marginTop: SP.md,
+      fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium, color: colors.destructive,
+    },
   });
 }

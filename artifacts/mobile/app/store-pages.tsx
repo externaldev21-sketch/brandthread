@@ -111,7 +111,7 @@ export default function StorePagesScreen() {
 
   async function loadPages() {
     try {
-      const result = await getPages();
+      const result = await getPages({ onLocal: local => { if (local.length) setPages(local); } });
       setPages(result);
       setPagesFailed(false);
     } catch {
@@ -153,8 +153,8 @@ export default function StorePagesScreen() {
             try {
               await deletePage(page.id);
               await loadPages();
-            } catch {
-              Alert.alert('Error', 'Failed to delete page.');
+            } catch (e) {
+              Alert.alert("Couldn't delete page", e instanceof Error ? e.message : 'Please try again.');
             }
           },
         },
@@ -166,8 +166,8 @@ export default function StorePagesScreen() {
     try {
       await duplicatePage(page.id);
       await loadPages();
-    } catch {
-      Alert.alert('Error', 'Failed to duplicate page.');
+    } catch (e) {
+      Alert.alert("Couldn't duplicate page", e instanceof Error ? e.message : 'Please try again.');
     }
   }
 
@@ -195,8 +195,9 @@ export default function StorePagesScreen() {
       }
       await loadPages();
       setMode('list');
-    } catch {
-      Alert.alert('Error', 'Failed to save page.');
+    } catch (e) {
+      // Nothing was saved — say why instead of pretending.
+      Alert.alert("Couldn't save page", e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setSaving(false);
     }

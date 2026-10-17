@@ -225,6 +225,8 @@ router.get("/", async (req, res) => {
       // Lowest variant price ("from" price) so pickers (e.g. Schedule Live
       // product tags) can show/send a real price. Null when no variants.
       priceCents: sql<number | null>`min(${productVariants.priceCents})::int`,
+      // Lets the seller app's Products tab show a real price for each row.
+      minPriceCents: sql<number | null>`min(${productVariants.priceCents})::int`,
     })
     .from(products)
     .leftJoin(productVariants, eq(productVariants.productId, products.id))

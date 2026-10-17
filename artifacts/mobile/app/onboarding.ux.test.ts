@@ -16,6 +16,53 @@ describe("Dev's onboarding items", () => {
     expect(allOnboardingCopy).not.toContain("One account for everything");
     expect(accountType).toContain("Buyer and seller accounts are separate. You can have both.");
   });
+});
+describe("onboarding questionnaire defaults", () => {
+  it("preselects editable preference choices without pre-filling identity fields", () => {
+    expect(source).toContain("useState<string[]>(DEFAULT_BUYER_INTERESTS)");
+    expect(source).toContain("useState('idea')");
+    expect(source).toContain("useState<string[]>(DEFAULT_SELLER_GOALS)");
+    expect(source).toContain("selectedPlanId",);
+    expect(source).toContain("setStyleArr((prev) => prev.includes(item)");
+    expect(source).toContain("setGoals((prev) => prev.includes(g)");
+    expect(source).toContain('useState(\'\')');
+    expect(source).toContain("selectedAccent,");
+    expect(source).toContain("isStoreAccent(draft.selectedAccent)");
+  });
+});
+
+describe("seller pre-plan experience", () => {
+  it("uses the store accent palette and a server-backed one-sample request", () => {
+    expect(source).toContain("STORE_ACCENT_COLORS.map");
+    expect(source).toContain("Saved when your seller workspace is created.");
+    expect(source).toContain("api.logo.onboardingSample");
+    expect(source).toContain("onboarding-generate-sample");
+    expect(source).toContain("Your real AI sample is ready.");
+    expect(source).toContain("Retry");
+    expect(source).toContain("Skip sample · Continue to plans");
+    expect(source).toContain('accessibilityRole="radio"');
+    expect(source).toContain("accessibilityState={{ selected }}");
+    // The storefront accent saves to the store, never the seller's app theme.
+    expect(source).toContain("await api.seller.setStoreAccent(selectedAccent)");
+    expect(source).not.toContain("selectTheme(");
+  });
+
+  it("saves the accepted AI sample as the seller logo and surfaces failures", () => {
+    expect(source).toContain("await api.seller.uploadLogo({ uri, mimeType: 'image/png' })");
+    expect(source).toContain("await saveSampleAsLogo(sampleUri)");
+    expect(source).toContain("We couldn\\u2019t save this sample as your logo.");
+  });
+});
+
+describe("v7 step order: Welcome opener, then AccountType, then path-specific auth", () => {
+  it("Welcome is step 0, AccountType step 1, Auth step 2 for both flows", () => {
+    expect(BUYER_STEP_INDEX.WELCOME).toBe(0);
+    expect(BUYER_STEP_INDEX.ACCOUNT_TYPE).toBe(1);
+    expect(BUYER_STEP_INDEX.AUTH).toBe(2);
+    expect(SELLER_STEP_INDEX.WELCOME).toBe(0);
+    expect(SELLER_STEP_INDEX.ACCOUNT_TYPE).toBe(1);
+    expect(SELLER_STEP_INDEX.AUTH).toBe(2);
+  });
 
   it("2: one question per screen, buyer/seller first, Create new account starts at that question", () => {
     expect(BUYER_STEPS[1]).toBe("ACCOUNT_TYPE");

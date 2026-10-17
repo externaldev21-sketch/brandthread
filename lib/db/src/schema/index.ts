@@ -2289,6 +2289,20 @@ export const storefronts = pgTable('storefronts', {
   seo:           json('seo').$type<Record<string, unknown>>().notNull().default({}),
   socialLinks:   json('social_links').$type<Record<string, unknown>>().notNull().default({}),
   analyticsCode: text('analytics_code'),
+  // Store Builder state (migration 270). Shapes are validated in the
+  // api-server store route; JSON here so the builder can evolve additively.
+  collections:    json('collections').$type<unknown[]>().notNull().default([]),
+  pages:          json('pages').$type<unknown[]>().notNull().default([]),
+  navigation:     json('navigation').$type<unknown[]>().notNull().default([]),
+  storeSettings:  json('store_settings').$type<Record<string, unknown>>().notNull().default({}),
+  brandAssets:    json('brand_assets').$type<Record<string, unknown>>().notNull().default({}),
+  setupChecklist: json('setup_checklist').$type<Record<string, unknown>>().notNull().default({}),
+  onboarding:     json('onboarding').$type<Record<string, unknown>>().notNull().default({}),
+  // Migration 272: store policies (seller-settings route) and the salted
+  // scrypt hash of the optional storefront password (never the plaintext;
+  // never returned to clients — GET /api/store exposes hasStorePassword).
+  policies:          json('policies').$type<unknown[]>().notNull().default([]),
+  storePasswordHash: text('store_password_hash'),
   publishedAt:          timestamp('published_at'),
   sharePreviewRevokedAt: timestamp('share_preview_revoked_at', { withTimezone: true }),
   // SHA-256 fingerprint of the one currently valid public preview token.

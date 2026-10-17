@@ -10,7 +10,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import * as Clipboard from 'expo-clipboard';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { useApi } from '@/lib/api';
+import { useApi, API_BASE_URL } from '@/lib/api';
+import { buildStorefrontSiteUrl, displayUrl } from '@/lib/storefrontUrl';
 import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
@@ -21,6 +22,7 @@ import { getStorefront, validateStore, publishStore, unpublishStore, StoreValida
 import { Storefront } from '@/services/storeTypes';
 import { isSellerSetupOrigin, leaveSetupFlow, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { storeHostFrom, storeViewUrl } from '@/lib/storeAddress';
+import { apiErrorMessage } from '@/lib/safety';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { minHitSlop } from '@/lib/hitSlop';
@@ -153,8 +155,7 @@ export default function StorePublishScreen() {
     if (!store) return;
     Alert.alert(
       'Publish your store?',
-      // One store link (BT-220/BT-316): the store website, not a subdomain.
-      storeLink.url ? `Your store will be live at ${displayStoreLink(storeLink.url)}` : 'Your store will go live.',
+      siteUrl ? `Your store will be live at ${displayUrl(siteUrl)}` : 'Your store will be visible to buyers.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -167,10 +168,10 @@ export default function StorePublishScreen() {
                 setPublished(true);
                 await doValidate().catch(() => {});
               } else {
-                Alert.alert('Cannot publish', result.message);
+                Alert.alert("Couldn't publish your store", result.message);
               }
             } catch {
-              Alert.alert('Couldn’t publish', 'Check your connection and try again.');
+              Alert.alert("Couldn't publish your store", 'Check your connection and try again.');
             } finally {
               setPublishing(false);
             }
@@ -188,15 +189,13 @@ export default function StorePublishScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Unpublish', style: 'destructive', onPress: async () => {
-            // Only flip the UI once the server confirms.
             try {
               await unpublishStore();
-            } catch {
-              Alert.alert('Couldn’t unpublish', 'Your store is still live. Check your connection and try again.');
-              return;
+              setPublished(false);
+              await doValidate();
+            } catch (error) {
+              Alert.alert("Couldn't unpublish your store", apiErrorMessage(error, 'Check your connection and try again.'));
             }
-            setPublished(false);
-            await doValidate().catch(() => {});
           },
         },
       ],
@@ -207,6 +206,9 @@ export default function StorePublishScreen() {
   const storeHost = storeAddressHost(store);
   const viewUrl = storeHost?.endsWith('.brandthread.app') ? storeViewUrl(storeHost) : storeHost ? `https://${storeHost}` : null;
   const storeUrlLabel = storeLink.url ? displayStoreLink(storeLink.url) : null;
+  // The live site is served by the API at /api/store/site/:slug for the
+  // server's storefront slug (lib/storefrontUrl.ts) — not a subdomain.
+  const siteUrl = storeLink.url ?? buildStorefrontSiteUrl(store?.serverSlug, API_BASE_URL) ?? viewUrl;
 
   return (
     <View style={pub.root}>
@@ -331,10 +333,10 @@ export default function StorePublishScreen() {
                 <Icon name="check-circle" size={ICON.xxl} color={SUCCESS} />
               </View>
               <Text style={pub.successTitle}>Your store is live</Text>
-              {storeUrlLabel ? <Text style={pub.successUrl}>{storeUrlLabel}</Text> : storeHost ? <Text style={pub.successUrl}>https://{storeHost}</Text> : null}
+              {siteUrl ? <Text style={pub.successUrl}>{displayUrl(siteUrl)}</Text> : null}
               <View style={pub.successActions}>
-                {storeLink.url || viewUrl ? (
-                  <SecondaryButton label="View store" onPress={() => Linking.openURL(storeLink.url ?? viewUrl!).catch(() => Alert.alert("Couldn't open your store", 'Try again.'))} icon="external-link" style={{ flex: 1 }} />
+                {siteUrl ? (
+                  <SecondaryButton label="View store" onPress={() => Linking.openURL(siteUrl).catch(() => Alert.alert("Couldn't open your store", 'Try again.'))} icon="external-link" style={{ flex: 1 }} />
                 ) : (
                   <SecondaryButton label="Set address" onPress={() => router.push('/store-domain' as never)} icon="globe" style={{ flex: 1 }} />
                 )}
@@ -350,7 +352,7 @@ export default function StorePublishScreen() {
           <GradientCard colors={theme.primaryGradient} style={pub.card} glow>
             <Text style={[pub.publishReadyTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Ready to go live.</Text>
             <Text style={[pub.publishStoreName, { color: `${theme.onAccent}CC` }]}>{store?.settings.storeName || 'Your Store'}</Text>
-              {storeUrlLabel ? <Text style={[pub.publishUrl, { color: `${theme.onAccent}B3` }]}>{storeUrlLabel}</Text> : null}
+              {siteUrl ? <Text style={[pub.publishUrl, { color: `${theme.onAccent}B3` }]}>{displayUrl(siteUrl)}</Text> : null}
             <PrimaryButton
               label={publishing ? 'Publishing...' : 'Publish Store →'}
               onPress={handlePublish}

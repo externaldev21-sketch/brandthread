@@ -54,8 +54,8 @@ import { localPreviewSaves } from '@/lib/sellerProductPreview';
 import { Product, ProductFilter } from '@/services/productTypes';
 
 import { formatCents, parseDecimalToCents } from '@/lib/money';
-
-
+import { apiErrorMessage } from '@/lib/safety';
+import { FormInput } from '@/components/BrandthreadUI';
 import { SheetRise } from '@/components/motion/SheetRise';
 
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
@@ -643,8 +643,11 @@ export default function ProductsScreen() {
       getProductSalesFlags().then(setSalesFlags, () => {});
       if (filter === 'all' && !debouncedQuery && !previewOnlyRef.current) setCachedTabData('seller-products', list);
       await loadStats();
-    } catch {
-      if (!silent) setProducts([]);
+    } catch (error) {
+      if (!silent) {
+        setProducts([]);
+        Alert.alert("Couldn't load your products", apiErrorMessage(error, 'Check your connection and pull down to try again.'));
+      }
     } finally {
       setLoading(false);
     }

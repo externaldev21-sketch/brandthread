@@ -225,6 +225,10 @@ export interface BrandAsset {
   name: string;
   type: BrandAssetTypeKind;
   uri?: string;
+  /** Private storage path of an uploaded image (server-persisted library). */
+  objectPath?: string;
+  /** An https image URL saved as-is (no upload needed). */
+  remoteUrl?: string;
   color?: string;
   fontFamily?: string;
   tags: string[];

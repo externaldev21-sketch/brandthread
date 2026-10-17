@@ -1,7 +1,8 @@
 /**
  * Brandthread — Store Policies
- * Wired to real backend: GET/PUT /api/seller/settings/policies
- * Falls back to storeService (AsyncStorage) if API unavailable.
+ * Wired to real backend: GET/PUT /api/seller/settings/policies.
+ * The server is the only store: a failed load or save is shown as an error,
+ * never as "saved" (saving a list built from stale data would overwrite it).
  */
 import React, { useState, useCallback, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
@@ -28,6 +29,7 @@ import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 // use the local storeService copy and the local template instead.
 const inDevPreview = () => isSellerDevPreview() || isBuyerDevPreview();
 import { CancelWindowSetting } from '@/components/seller/CancelWindowSetting';
+import { apiErrorMessage } from '@/lib/safety';
 
 export type PolicyType = 'shipping' | 'return' | 'refund' | 'privacy' | 'terms' | 'pre_order';
 
@@ -60,6 +62,7 @@ export default function StorePoliciesScreen() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [storeName, setStoreName] = useState('Your store');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     getStorefront().then(sf => {
@@ -74,15 +77,10 @@ export default function StorePoliciesScreen() {
       if (inDevPreview()) throw new Error('preview');
       const data = await (api.seller as any).getPolicies() as any;
       setPolicies(Array.isArray(data.policies) ? data.policies : []);
-    } catch {
-      // Fallback to storeService (AsyncStorage)
-      try {
-        const { getPolicies } = await import('@/services/storeService');
-        const p = await getPolicies();
-        setPolicies(p);
-      } catch {
-        setPolicies([]);
-      }
+      setLoadError(null);
+    } catch (e) {
+      setPolicies([]);
+      setLoadError(apiErrorMessage(e, "Couldn't load your policies. Check your connection and try again."));
     } finally {
       setLoading(false);
     }
@@ -138,6 +136,10 @@ export default function StorePoliciesScreen() {
 
   const handleSave = async () => {
     if (!selectedType) return;
+    if (loadError) {
+      Alert.alert('Not saved', "Your saved policies couldn't be loaded, so saving now could overwrite them. Go back and try again.");
+      return;
+    }
     setSaving(true);
     try {
       const now = new Date().toISOString();
@@ -145,21 +147,18 @@ export default function StorePoliciesScreen() {
         ...policies.filter(p => p.type !== selectedType),
         { type: selectedType, content, aiGenerated, updatedAt: now },
       ];
-      // Try real API
-      try {
-        if (inDevPreview()) throw new Error('preview');
-        await (api.seller as any).savePolicies(updated);
-        setPolicies(updated);
-      } catch {
-        // Fallback to storeService
+      if (inDevPreview()) {
         const { upsertPolicy } = await import('@/services/storeService');
         await upsertPolicy(selectedType, content, aiGenerated);
-        setPolicies(updated);
+      } else {
+        await (api.seller as any).savePolicies(updated);
       }
+      setPolicies(updated);
       closeEdit();
       Alert.alert('Saved', 'Policy saved successfully.');
-    } catch {
-      Alert.alert("Couldn't save policy", 'Try again.');
+    } catch (e) {
+      // Keep the editor open with the text so nothing is lost.
+      Alert.alert('Not saved', apiErrorMessage(e, "Couldn't save this policy. Check your connection and try again."));
     } finally {
       setSaving(false);
     }
@@ -222,6 +221,9 @@ export default function StorePoliciesScreen() {
           <Text style={[s.intro, { color: MUTED }]}>
             Add policies that explain how you handle shipping, returns, privacy, and more. Buyers can view these before and after purchase.
           </Text>
+          {loadError ? (
+            <Text style={[s.intro, { color: theme.error }]}>{loadError}</Text>
+          ) : null}
 
           <View style={[s.listCard, { backgroundColor: CARD, borderColor: BORDER }]}>
             {POLICY_TYPES.map((pt, i) => {

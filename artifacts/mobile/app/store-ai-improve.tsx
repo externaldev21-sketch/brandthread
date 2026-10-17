@@ -15,8 +15,7 @@ import { GRAD_CARD_GLOW, FONT, FS, SP, ICON } from '@/lib/theme';
 
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, EmptyState } from '@/components/BrandthreadUI';
 
-import { getStorefront, generateAISuggestions, applyAISuggestion, dismissAISuggestion, storefrontStorageKey } from '@/services/storeService';
-
+import { getStorefront, generateAISuggestions, applyAISuggestion, dismissAISuggestion, storefrontStorageKey, AISuggestionsUnavailableError } from '@/services/storeService';
 import { Storefront, StoreAISuggestion } from '@/services/storeTypes';
 
 import { ChipRow } from '@/components/ui/ChipRow';
@@ -61,43 +60,67 @@ export default function StoreAiImproveScreen() {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<Category>('all');
   const [showDismissed, setShowDismissed] = useState(false);
+  // Real AI only: when the server has no AI configured we say so instead of
+  // showing canned tips. `loadError` is any other failure (network, 5xx).
+  const [unavailable, setUnavailable] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const s = await getStorefront();
-      setSuggestions(s.aiSuggestions);
-    } finally {
-      setLoading(false);
-    }
+  const load = async (): Promise<StoreAISuggestion[]> => {
+    const s = await getStorefront({ refreshRemote: false });
+    setSuggestions(s.aiSuggestions);
+    return s.aiSuggestions;
   };
 
   const handleRefresh = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       await generateAISuggestions();
-      await load();
+      setUnavailable(null);
+    } catch (e) {
+      if (e instanceof AISuggestionsUnavailableError) setUnavailable(e.message);
+      else setLoadError(e instanceof Error ? e.message : "Couldn't get suggestions right now.");
     } finally {
+      await load().catch(() => {});
       setLoading(false);
     }
   };
 
   useFocusEffect(useCallback(() => {
-    handleRefresh();
+    // Only call the AI when there is nothing open to review.
+    load()
+      .then(list => {
+        if (list.some(s => !s.dismissed && !s.applied)) setLoading(false);
+        else void handleRefresh();
+      })
+      .catch(() => { void handleRefresh(); });
   }, []));
 
+  const runApply = async (sug: StoreAISuggestion) => {
+    try {
+      const result = await applyAISuggestion(sug.id);
+      if (result.navigateTo) {
+        router.push(result.navigateTo as never);
+        return;
+      }
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await load();
+    } catch (e) {
+      Alert.alert("Couldn't apply", e instanceof Error ? e.message : 'Please try again.');
+    }
+  };
+
   const handleApply = (sug: StoreAISuggestion) => {
+    if (sug.action?.type === 'open_screen') {
+      void runApply(sug);
+      return;
+    }
     Alert.alert(
       'Apply this change?',
-      sug.recommendation,
+      sug.previewChange ? `${sug.recommendation}\n\n${sug.previewChange}` : sug.recommendation,
       [
-        { text: 'Not now', style: 'cancel' },
-        {
-          text: 'Apply change', onPress: async () => {
-            await applyAISuggestion(sug.id);
-            await load();
-          },
-        },
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Apply', onPress: () => { void runApply(sug); } },
       ],
     );
   };
@@ -108,7 +131,7 @@ export default function StoreAiImproveScreen() {
   };
 
   const handleRestore = async (sug: StoreAISuggestion) => {
-    const s = await getStorefront();
+    const s = await getStorefront({ refreshRemote: false });
     const found = s.aiSuggestions.find(x => x.id === sug.id);
     if (found) {
       found.dismissed = false;
@@ -151,7 +174,22 @@ export default function StoreAiImproveScreen() {
         {/* Active Suggestions */}
         {filtered.length === 0 && loading ? (
           <ActivityIndicator color={MUTED} style={ai.loader} />
-        ) : filtered.length === 0 ? (
+        ) : unavailable && filtered.length === 0 ? (
+          <EmptyState
+            icon="cloud-off"
+            title="AI suggestions unavailable"
+            description={unavailable}
+            style={ai.emptyState}
+          />
+        ) : loadError && filtered.length === 0 && !loading ? (
+          <EmptyState
+            icon="alert-circle"
+            title="Couldn't load suggestions"
+            description={loadError}
+            action={{ label: 'Try again', onPress: handleRefresh, icon: 'refresh-cw' }}
+            style={ai.emptyState}
+          />
+        ) : filtered.length === 0 && !loading ? (
           <EmptyState
             icon="check-circle"
             title="No suggestions right now"
@@ -187,7 +225,7 @@ export default function StoreAiImproveScreen() {
                   </TouchableOpacity>
                 )}
                 <SecondaryButton label="Dismiss" small accent={MUTED} onPress={() => handleDismiss(sug)} style={{ flex: 1 }} />
-                <PrimaryButton label="Apply" small onPress={() => handleApply(sug)} style={{ flex: 1 }} />
+                <PrimaryButton label={sug.action?.type === 'open_screen' ? 'Open' : 'Apply'} small onPress={() => handleApply(sug)} style={{ flex: 1 }} />
               </View>
             </GradientCard>
           ))

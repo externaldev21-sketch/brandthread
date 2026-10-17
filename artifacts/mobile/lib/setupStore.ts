@@ -1,11 +1,16 @@
 /**
  * Brandthread Setup Store
  *
- * Persists seller guided-setup progress via AsyncStorage.
+ * Seller guided-setup progress. The server is the source of truth
+ * (GET/PUT /api/seller/launch-checklist/setup, stored on the storefront): tasks
+ * backed by real data (payments, products, logo, publish, ...) are derived
+ * there and can't be ticked by hand, and skips / tips / walkthrough flags
+ * follow the seller to a new phone. AsyncStorage is only an offline cache.
  * All reads/writes go through this module — no direct AsyncStorage calls in screens.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { loadRemoteSetup, saveRemoteSetup, type RemoteSetup, type RemoteSetupStoredState } from '@/lib/setupRemote';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,6 +62,15 @@ const DEFAULT_TASKS: Omit<SetupTask, 'completed' | 'skipped'>[] = [
     // sellers who enter setup before onboarding state has synced.
     icon: 'shield',
     route: '/seller-verification',
+  },
+  {
+    id: 'connect_payments',
+    label: 'Set up payments',
+    description: 'Link Stripe Connect so you can receive payouts',
+    icon: 'credit-card',
+    // Payouts hub → Stripe Connect onboarding. Completion is read from
+    // Stripe on the server, never ticked by hand.
+    route: '/payouts',
   },
   {
     id: 'first_product',
@@ -117,6 +131,26 @@ const DEFAULT_TASKS: Omit<SetupTask, 'completed' | 'skipped'>[] = [
     optional: true,
   },
 ];
+
+/**
+ * Tasks whose completion is derived from real account data on the server
+ * (mirrors DERIVED_SETUP_TASK_IDS in the api-server). These cannot be marked
+ * complete by hand — the seller has to actually do them.
+ */
+export const AUTO_TRACKED_TASK_IDS: readonly SetupTaskId[] = [
+  'verify_account',
+  'connect_payments',
+  'first_product',
+  'shipping_rates',
+  'customize_store',
+  'connect_domain',
+  'publish_store',
+  'first_post',
+];
+
+export function isAutoTrackedTask(id: SetupTaskId): boolean {
+  return AUTO_TRACKED_TASK_IDS.includes(id);
+}
 
 function createDefaultState(): SetupState {
   return {
@@ -250,12 +284,32 @@ export async function getSetupState(
     }
 
     const state = raw ? normalizeState(JSON.parse(raw)) : createDefaultState();
+
+    let remote: RemoteSetup | null = null;
+    try {
+      remote = await loadRemoteSetup();
+    } catch {
+      remote = null; // offline: fall back to the cached copy below
+    }
+    if (remote) {
+      // One-time carry-over: a seller whose progress so far lived only on this
+      // phone keeps their skips/flags the first time the server is empty.
+      if (isPristineRemote(remote.state) && hasLocalProgress(state)) {
+        try {
+          remote = (await saveRemoteSetup(toRemoteState(state))) ?? remote;
+        } catch { /* keep the server copy; retried next load */ }
+      }
+      const merged = applyRemoteSetup(state, remote);
+      await writeCache(merged, resolvedUserId);
+      return merged;
+    }
+
     const next = applySellerOnboardingCompletion(state, options.onboardingComplete === true);
     if (next.started !== state.started || next.tasks.some((task, index) =>
       task.completed !== state.tasks[index]?.completed ||
       task.skipped !== state.tasks[index]?.skipped
     )) {
-      await saveSetupState(next, resolvedUserId);
+      await writeCache(next, resolvedUserId);
     }
     return next;
   } catch {
@@ -263,12 +317,96 @@ export async function getSetupState(
   }
 }
 
-export async function saveSetupState(state: SetupState, userId?: string | null): Promise<void> {
+function isPristineRemote(state: RemoteSetupStoredState): boolean {
+  return !state.started && !state.dismissed && !state.walkthroughShown && !state.celebrated &&
+    state.dismissedTips.length === 0 && state.openedFeatures.length === 0 &&
+    Object.keys(state.tasks ?? {}).length === 0;
+}
+
+function hasLocalProgress(state: SetupState): boolean {
+  return state.started || state.dismissed || state.walkthroughShown || state.celebrated ||
+    state.dismissedTips.length > 0 || state.openedFeatures.length > 0 ||
+    state.tasks.some(t => t.skipped || (t.completed && !isAutoTrackedTask(t.id)));
+}
+
+/** The per-seller part the server stores (derived completion is never sent). */
+export function toRemoteState(state: SetupState): RemoteSetupStoredState {
+  const tasks: RemoteSetupStoredState['tasks'] = {};
+  for (const t of state.tasks) {
+    const entry: { completed?: boolean; skipped?: boolean } = {};
+    if (t.skipped && !t.completed) entry.skipped = true;
+    if (t.completed && !isAutoTrackedTask(t.id)) entry.completed = true;
+    if (entry.skipped || entry.completed) tasks[t.id] = entry;
+  }
+  return {
+    started: state.started,
+    dismissed: state.dismissed,
+    walkthroughShown: state.walkthroughShown,
+    celebrated: state.celebrated,
+    dismissedTips: state.dismissedTips,
+    openedFeatures: state.openedFeatures,
+    tasks,
+  };
+}
+
+/**
+ * Builds the screen state from the server: derived done flags win, stored
+ * skips/flags come from the server copy, and tasks follow the goal-based order.
+ */
+export function applyRemoteSetup(local: SetupState, remote: RemoteSetup): SetupState {
+  const stored = remote.state;
+  const byId = new Map(local.tasks.map(t => [t.id, t]));
+  const orderIds = [
+    ...remote.order.filter((id): id is SetupTaskId => byId.has(id as SetupTaskId)),
+    ...local.tasks.map(t => t.id).filter(id => !remote.order.includes(id)),
+  ];
+  const tasks = orderIds.map(id => {
+    const task = byId.get(id)!;
+    const derivedValue = remote.derived[id];
+    const completed = typeof derivedValue === 'boolean'
+      ? derivedValue
+      : stored.tasks?.[id]?.completed === true;
+    const skipped = !completed && stored.tasks?.[id]?.skipped === true;
+    return { ...task, completed, skipped };
+  });
+  const started = stored.started || tasks.some(t => t.completed);
+  return {
+    started,
+    dismissed: stored.dismissed && !started,
+    currentStep: tasks.find(t => !t.completed && !t.skipped)?.id ?? null,
+    tasks,
+    dismissedTips: stored.dismissedTips ?? [],
+    openedFeatures: stored.openedFeatures ?? [],
+    walkthroughShown: stored.walkthroughShown,
+    celebrated: stored.celebrated,
+    lastUpdated: Date.now(),
+  };
+}
+
+async function writeCache(state: SetupState, userId: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(setupStorageKeyForUser(userId), JSON.stringify({ ...state, lastUpdated: Date.now() }));
+  } catch { /* non-fatal */ }
+}
+
+export interface SaveSetupOptions {
+  /** Throw when the server save fails (screens that show the error). */
+  throwOnSyncError?: boolean;
+}
+
+export async function saveSetupState(
+  state: SetupState,
+  userId?: string | null,
+  options: SaveSetupOptions = {},
+): Promise<void> {
   const resolvedUserId = userId ?? activeUserId;
   if (!resolvedUserId) return;
+  await writeCache(state, resolvedUserId);
   try {
-    await AsyncStorage.setItem(setupStorageKeyForUser(resolvedUserId), JSON.stringify({ ...state, lastUpdated: Date.now() }));
-  } catch { /* non-fatal */ }
+    await saveRemoteSetup(toRemoteState(state));
+  } catch (error) {
+    if (options.throwOnSyncError) throw error;
+  }
 }
 
 export async function markSetupStarted(userId?: string | null): Promise<SetupState> {
@@ -306,21 +444,34 @@ export async function markCelebrated(userId?: string | null): Promise<SetupState
   return next;
 }
 
-export async function completeTask(id: SetupTaskId, userId?: string | null): Promise<SetupState> {
+/**
+ * Records a task as done. For an auto-tracked task this is only an optimistic
+ * local hint after the real action succeeded — the server ignores it and the
+ * next load shows the derived value.
+ */
+export async function completeTask(
+  id: SetupTaskId,
+  userId?: string | null,
+  options: SaveSetupOptions = {},
+): Promise<SetupState> {
   const state = await getSetupState(userId);
   const tasks = state.tasks.map(t => t.id === id ? { ...t, completed: true, skipped: false } : t);
   const nextIncomplete = tasks.find(t => !t.completed && !t.skipped);
   const next: SetupState = { ...state, tasks, currentStep: nextIncomplete?.id ?? null };
-  await saveSetupState(next, userId);
+  await saveSetupState(next, userId, options);
   return next;
 }
 
-export async function skipTask(id: SetupTaskId, userId?: string | null): Promise<SetupState> {
+export async function skipTask(
+  id: SetupTaskId,
+  userId?: string | null,
+  options: SaveSetupOptions = {},
+): Promise<SetupState> {
   const state = await getSetupState(userId);
   const tasks = state.tasks.map(t => t.id === id ? { ...t, skipped: true } : t);
   const nextIncomplete = tasks.find(t => !t.completed && !t.skipped);
   const next: SetupState = { ...state, tasks, currentStep: nextIncomplete?.id ?? null };
-  await saveSetupState(next, userId);
+  await saveSetupState(next, userId, options);
   return next;
 }
 

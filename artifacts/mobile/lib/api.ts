@@ -4579,11 +4579,18 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Change the store's subdomain on the server. */
       updateSlug: (slug: string) => patch<import('./storeAddress.types').StoreAddress>('/api/store/slug', { slug }),
       deleteDomain: (domainId: string) => del<any>(`/api/store/domains/${encodeURIComponent(domainId)}`),
+      /** Set (string) or clear (null) the storefront password. Stored hashed server-side. */
+      setPassword: (password: string | null) =>
+        put<{ ok: boolean; hasStorePassword: boolean }>('/api/store/password', { password }),
+      /** Change the public store URL slug. 400 invalid/reserved, 409 taken. */
+      setSlug: (slug: string) => put<{ slug: string }>('/api/store/slug', { slug }),
       // AI generation
       generate:   (answers: Record<string, unknown>) => post<any>('/api/store/ai/generate', { answers }),
       fromLogo:   (base64: string, answers?: Record<string, unknown>) => post<any>('/api/store/ai/from-logo', { base64, answers }),
       fromMoodboard: (base64List: string[], answers?: Record<string, unknown>) => post<any>('/api/store/ai/from-moodboard', { base64List, answers }),
       fromSocial:  (socialUrl: string, context?: Record<string, unknown>) => post<any>('/api/store/ai/from-social', { socialUrl, ...(context ?? {}) }),
+      /** "Improve Store" — AI suggestions from the seller's real store data (503 code ai_unavailable when AI isn't configured). */
+      suggestions: () => post<{ suggestions: Array<Record<string, unknown>> }>('/api/store/ai/suggestions', {}),
       previewToken: () => get<{ token: string; ttlSeconds: number }>('/api/store/preview-token'),
       previewHtml:  () => getText('/api/store/preview'),
       sharePreview: () => post<{ token: string; url: string; expiresAt: string; ttlSeconds: number }>('/api/store/share-preview', {}),

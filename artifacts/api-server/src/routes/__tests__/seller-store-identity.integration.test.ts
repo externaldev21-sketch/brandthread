@@ -3,8 +3,8 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
-import { db, users } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { db, storefronts, users } from "@workspace/db";
+import { eq, inArray, sql } from "drizzle-orm";
 
 const suffix = crypto.randomBytes(5).toString("hex");
 const me = `store-identity-me-${suffix}`;
@@ -38,6 +38,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await db.delete(storefronts).where(inArray(storefronts.ownerId, [me, other]));
   await db.delete(users).where(inArray(users.clerkId, [me, other, fresh]));
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
@@ -160,5 +161,39 @@ describe("PUT /social-links", () => {
     const bad = await call("PUT", "/social-links", { tiktok: "https://evil.com/@studio" });
     expect(bad.status).toBe(400);
     expect(bad.body.field).toBe("tiktok");
+  });
+});
+
+describe("PUT /social-links — removing every link", () => {
+  it("persists clearing both Instagram and TikTok at once", async () => {
+    await call("PUT", "/social-links", { instagram: "@both.gone", tiktok: "@both.gone" });
+    const r = await call("PUT", "/social-links", { instagram: "", tiktok: "" });
+    expect(r.status).toBe(200);
+    expect(r.body.socialLinks.instagram).toBeUndefined();
+    expect(r.body.socialLinks.tiktok).toBeUndefined();
+    const profile = (await call("GET", "/profile")).body;
+    expect(profile.socialLinks.instagram).toBeUndefined();
+    expect(profile.socialLinks.tiktok).toBeUndefined();
+  });
+});
+
+describe("PUT /profile/accent — public storefront theme", () => {
+  it("writes the accent into storefronts.theme, which the public store renders", async () => {
+    expect((await call("PUT", "/profile/accent", { color: "#4a4a4a" })).status).toBe(200);
+    const [sf] = await db.select().from(storefronts).where(eq(storefronts.ownerId, me)).limit(1);
+    expect((sf.theme as any).primaryColor).toBe("#4A4A4A");
+    expect((sf.theme as any).accentColor).toBe("#4A4A4A");
+  });
+});
+
+describe("POST /onboarding/data", () => {
+  it("keeps the seller's goals on the storefront for the setup checklist", async () => {
+    // seller_goals is added by the router's startup migration; make sure it exists.
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS seller_goals JSONB`);
+    const r = await call("POST", "/onboarding/data", { goals: ["Ship orders", "Grow sales", 7], brandStage: "launched" });
+    expect(r.status).toBe(200);
+    const [sf] = await db.select().from(storefronts).where(eq(storefronts.ownerId, me)).limit(1);
+    expect((sf.onboarding as any).goals).toEqual(["Ship orders", "Grow sales"]);
+    expect((sf.onboarding as any).brandStage).toBe("launched");
   });
 });

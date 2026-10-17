@@ -20,6 +20,7 @@ import {
   collectLocalImageUris, draftFromServer, mergeDrafts, timeOf, withRemoteImageUris,
   type DraftSyncMetaMap, type ServerDraftRow,
 } from '@/lib/productDraftSync';
+import { mapServerProduct, mergeServerAndLocalProducts, isServerProductId, type ServerProductRow } from '@/services/serverProducts';
 
 // ─── Demo preview overlay (?bt_preview=seller&demo=1) ─────────────────────────
 // A real account's store always starts empty (see header comment above) —
@@ -203,9 +204,38 @@ function uid(): string {
 
 // ─── Product CRUD ─────────────────────────────────────────────────────────────
 
-export async function getProducts(query?: ProductSearchQuery): Promise<Product[]> {
+// ─── Server catalog (products published via add-product live on the API) ─────
+// Short-lived cache so one screen load (list + stats) costs a single request.
+const SERVER_LIST_TTL_MS = 3_000;
+let _serverList: { uid: string; at: number; products: Product[] } | null = null;
+
+async function fetchServerProducts(): Promise<Product[]> {
+  const uid = _productUserId;
+  if (_serverList && _serverList.uid === uid && Date.now() - _serverList.at < SERVER_LIST_TTL_MS) {
+    return _serverList.products;
+  }
+  const rows = await serviceRequest<ServerProductRow[]>('/api/products', {}, false);
+  const products = Array.isArray(rows) ? rows.map(mapServerProduct) : [];
+  if (_productUserId === uid) _serverList = { uid, at: Date.now(), products };
+  return products;
+}
+
+/** Device cache merged with the seller's server catalog. If the server can't be
+ *  reached and there is nothing on the device either, the error propagates so
+ *  the caller can show it instead of a misleading empty catalog. */
+async function loadCatalog(): Promise<Product[]> {
   await ensureInitialized();
-  let list = (await demoActive()) ? [..._products, ...(await ensurePreviewProducts())] : [..._products];
+  if (await demoActive()) return [..._products, ...(await ensurePreviewProducts())];
+  try {
+    return mergeServerAndLocalProducts(await fetchServerProducts(), _products);
+  } catch (error) {
+    if (_products.length === 0) throw error;
+    return [..._products];
+  }
+}
+
+export async function getProducts(query?: ProductSearchQuery): Promise<Product[]> {
+  let list = await loadCatalog();
 
   if (query?.filter && query.filter !== 'all') {
     list = list.filter(p => {
@@ -253,7 +283,16 @@ export async function getProducts(query?: ProductSearchQuery): Promise<Product[]
 
 export async function getProduct(id: string): Promise<Product | undefined> {
   await ensureInitialized();
-  return _products.find(p => p.id === id) ?? (await findPreviewProduct(id));
+  const local = _products.find(p => p.id === id) ?? (await findPreviewProduct(id));
+  if (local || !isServerProductId(id)) return local;
+  // Published products live on the server (owner-scoped GET /api/products/:id).
+  // A 404 means "not yours / doesn't exist"; any other failure propagates.
+  try {
+    return mapServerProduct(await serviceRequest<ServerProductRow>(`/api/products/${encodeURIComponent(id)}`, {}, false));
+  } catch (error) {
+    if ((error as { status?: number })?.status === 404) return undefined;
+    throw error;
+  }
 }
 
 // Convenience alias
@@ -373,6 +412,7 @@ export async function deleteProduct(id: string): Promise<DeletedProductRecovery>
     method: 'DELETE',
   });
   _products = _products.filter(p => p.id !== id);
+  _serverList = null;
   await persist();
   return recovery ?? {};
 }
@@ -383,6 +423,7 @@ export async function restoreProduct(id: string): Promise<void> {
     method: 'POST',
     body: JSON.stringify({}),
   });
+  _serverList = null;
   // The server response is authoritative but may not return a complete product.
   // Leave cache hydration to the next list read rather than manufacturing data.
 }
@@ -830,8 +871,7 @@ export async function getTaggableProducts(forDraftContent = false): Promise<Prod
 // ─── Summary stats ────────────────────────────────────────────────────────────
 
 export async function getProductStats() {
-  await ensureInitialized();
-  const list = (await demoActive()) ? [..._products, ...(await ensurePreviewProducts())] : _products;
+  const list = await loadCatalog();
   return summarizeProducts(list);
 }
 

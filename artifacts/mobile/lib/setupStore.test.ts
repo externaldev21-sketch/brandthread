@@ -11,6 +11,12 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   default: { getItem, setItem, removeItem },
 }));
 
+// Offline server: these tests cover the local cache path.
+vi.mock('@/lib/setupRemote', () => ({
+  loadRemoteSetup: vi.fn(async () => null),
+  saveRemoteSetup: vi.fn(async () => null),
+}));
+
 import {
   completedRequiredTaskCount,
   completeTask,
