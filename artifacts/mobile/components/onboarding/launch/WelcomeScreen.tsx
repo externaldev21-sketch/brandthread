@@ -1,7 +1,7 @@
 /**
  * Welcome — TikTok "Sign up for TikTok" / "Log in to TikTok", 1:1:
  * big left-aligned title, stacked hairline option rows (icon left, label
- * centred), the legal line near the bottom, and a grey footer band with
+ * centred; Continue with Apple first, as Depop does), the legal line near the bottom, and a grey footer band with
  * "Already have an account? Log in" (toggles to the log-in variant).
  * Mobbin: https://mobbin.com/screens/46bf3222-f4bb-4584-9906-e4df964b3fe0
  *         https://mobbin.com/screens/29a6cf9e-6c19-46f8-8b27-f387df675e40
@@ -67,13 +67,6 @@ export function WelcomeScreen({
           {signup ? 'Sign up\nfor Brandthread' : 'Log in to Brandthread'}
         </Text>
         <View style={s.options}>
-          <OutlineOption
-            testID="onboarding-use-email"
-            label={signup ? 'Use email' : 'Use phone or email'}
-            icon={<Feather name="user" size={20} color={theme.text} />}
-            onPress={onEmail}
-            disabled={!!busy}
-          />
           {onApple ? (
             <OutlineOption
               testID="onboarding-apple"
@@ -84,6 +77,13 @@ export function WelcomeScreen({
               disabled={!!busy && busy !== 'apple'}
             />
           ) : null}
+          <OutlineOption
+            testID="onboarding-use-email"
+            label={signup ? 'Use email' : 'Use phone or email'}
+            icon={<Feather name="user" size={20} color={theme.text} />}
+            onPress={onEmail}
+            disabled={!!busy}
+          />
           {onGoogle ? (
             <OutlineOption
               testID="onboarding-google"

@@ -78,7 +78,11 @@ const h = vi.hoisted(() => {
     ai: { brandMemoryRebuild: vi.fn(async () => ({})) },
   };
   const storage = new Map<string, string>();
-  return { host, calls, clerk, signUp, signIn, api, storage, router: { replace: vi.fn(), push: vi.fn(), back: vi.fn() } };
+  const startSSOFlow = vi.fn(async ({ strategy }: { strategy: string }) => {
+    calls.push(`clerk.sso:${strategy}`);
+    return { createdSessionId: 'sess_1', setActive: async () => { clerk.signedIn = true; clerk.notify(); } };
+  });
+  return { host, calls, clerk, signUp, signIn, api, storage, startSSOFlow, router: { replace: vi.fn(), push: vi.fn(), back: vi.fn() } };
 });
 
 vi.mock('react-native', () => ({
@@ -135,7 +139,7 @@ vi.mock('@clerk/expo', () => {
     useUser: () => { useClerkTick(); return { isLoaded: true, user: h.clerk.signedIn ? { id: 'user_1', firstName: 'Sam', lastName: 'Lee', primaryEmailAddress: { emailAddress: 'sam@example.com' } } : null }; },
     useSignUp: () => ({ signUp: h.signUp }),
     useSignIn: () => ({ signIn: h.signIn }),
-    useSSO: () => ({ startSSOFlow: vi.fn(async () => ({ createdSessionId: 'sess_1', setActive: async () => { h.clerk.signedIn = true; h.clerk.notify(); } })) }),
+    useSSO: () => ({ startSSOFlow: h.startSSOFlow }),
   };
 });
 vi.mock('@/contexts/AppThemeContext', () => ({
@@ -291,6 +295,20 @@ describe('launch onboarding (real screen, mocked Clerk + API)', () => {
     expect(h.calls).not.toContain('notifications.request');
     expect(h.router.replace).toHaveBeenLastCalledWith('/(tabs)/');
     expect(h.router.push).toHaveBeenLastCalledWith('/store-setup-brand');
+  });
+
+  it('offers Continue with Apple first and signs up through Clerk oauth_apple after the birthday', async () => {
+    await render();
+    const options = tree.root.findAll((n) => typeof n.type === 'string' && ['onboarding-apple', 'onboarding-use-email', 'onboarding-google'].includes(n.props.testID));
+    expect(options.map((n) => n.props.testID)).toEqual(['onboarding-apple', 'onboarding-use-email', 'onboarding-google']);
+
+    await press('onboarding-apple');
+    expect(has('onboarding-birthday')).toBe(true);
+    expect(h.calls).toEqual([]);
+    await type('onboarding-dob', '01152000');
+    await press('onboarding-dob-continue');
+    expect(h.calls).toEqual(['clerk.sso:oauth_apple']);
+    expect(has('onboarding-username')).toBe(true);
   });
 
   it('an email that already has an account logs in with a code instead (Depop: one field for both)', async () => {
