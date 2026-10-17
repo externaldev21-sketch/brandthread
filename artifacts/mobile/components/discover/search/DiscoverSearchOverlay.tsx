@@ -314,7 +314,18 @@ export function DiscoverSearchOverlay({
         nativeID="buyer-search-scroll"
       >
         {trimmed ? (
-          <SearchSuggestions query={trimmed} sections={sections} searching={live.searching} onSubmitQuery={() => submitTerm(trimmed)} />
+          <>
+            {!trimmed && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 8 }}>
+                {['Streetwear', 'Vintage', 'Y2K', 'Accessories', 'Sneakers', 'Denim', 'Outerwear', 'Luxury'].map(category => (
+                  <Pressable key={category} onPress={() => submitTerm(category)} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 }}>
+                    <Text style={{ color: theme.text }}>{category}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+            <SearchSuggestions query={trimmed} sections={sections} searching={live.searching} onSubmitQuery={() => submitTerm(trimmed)} />
+          </>
         ) : (
           <SearchEmptyState
             recent={recents.recent}

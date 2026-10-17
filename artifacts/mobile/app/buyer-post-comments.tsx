@@ -1398,12 +1398,9 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
           ListEmptyComponent={
             !loading && !fetchError
               ? (
-                <EmptyState
-                  icon="message-circle"
-                  title={meta.commentsDisabled ? 'Comments are off' : 'Start the conversation'}
-                  description={meta.commentsDisabled ? 'The creator turned off comments for this post.' : 'Be the first to comment.'}
-                  compact
-                />
+                <Text style={s.emptyLine} testID="comments-empty-line">
+                  {meta.commentsDisabled ? 'Comments are turned off for this post.' : 'No comments yet. Start the conversation.'}
+                </Text>
               )
               : null
           }
@@ -1472,10 +1469,12 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
               ) : meta.commentsDisabled ? (
                 <Text style={s.lockedText}>Comments are turned off for this post.</Text>
               ) : (
-                <PressableScale onPress={() => router.push('/sign-in' as never)} accessibilityRole="button">
-                  <Text style={s.lockedText}>
-                    <Text style={{ color: theme.text, fontFamily: FONT.semibold }}>Sign in</Text> to join the conversation.
-                  </Text>
+                <PressableScale style={s.signedOutRow} onPress={() => router.push('/sign-in' as never)} accessibilityRole="button" testID="comments-signed-out-composer">
+                  <Icon name="user" size={32} color={MUTED} />
+                  <View style={s.signedOutPill}>
+                    <Text style={s.signedOutPlaceholder}>Sign in to join the conversation</Text>
+                    <Text style={{ color: theme.text, fontFamily: FONT.semibold }}>Sign in</Text>
+                  </View>
                 </PressableScale>
               )}
             </View>
@@ -1836,6 +1835,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   replyingLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, flex: 1 },
   replyingName: { fontFamily: FONT.semibold },
   lockedComposer: { minHeight: 56, alignItems: 'center', justifyContent: 'center', paddingVertical: SP.sm },
+  emptyLine: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', padding: SP.md },
+  signedOutRow: { flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%' },
+  signedOutPill: { flex: 1, flexDirection: 'row', alignItems: 'center', minHeight: 40, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, paddingHorizontal: 14, gap: 8 },
+  signedOutPlaceholder: { flex: 1, color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
   lockedText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
   // Bare emoji evenly spaced across the full width — no chip circle, no
   // background — sitting directly above the composer.

@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,6 +45,7 @@ import { isBuyerDevPreview } from '@/lib/devPreview';
 import { remixActionVisible, remixRoute } from '@/lib/remix';
 import { publishPostEngagement } from '@/lib/postEngagement';
 import { OFFICIAL_AVATAR_SOURCE, isOfficialAccountId } from '@/lib/officialAccount';
+import { isDarkColor, shareTileWidth, SHARE_TILE_DARK } from '@/lib/shareSheetGrid';
 
 interface ThreadShareSheetProps {
   visible: boolean;
@@ -482,6 +484,7 @@ function AccountThreadShareSheet({
                 busy={busy === 'invite'}
                 onPress={() => void systemShare('invite', `Join me on Brandthread and check this out\n${postUrl}`)}
               />
+              <ShareAction label="Find friends" icon="users" onPress={() => { onClose(); router.push('/(buyer)/friends' as never); }} />
             </ScrollView>
           </View>
 
@@ -490,6 +493,8 @@ function AccountThreadShareSheet({
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionRow}>
               <ShareAction label="Copy link" icon="link-2" busy={busy === 'copy'} onPress={() => void copyLink()} />
               <ShareAction label="SMS" icon="message-circle" busy={busy === 'sms'} onPress={() => void openExternal('sms')} />
+              <ShareAction label="WhatsApp" icon="message-circle" onPress={() => { void Linking.openURL(`https://wa.me/?text=${encodeURIComponent(postUrl)}`).catch(() => onFeedback('Could not open WhatsApp', 'error')); }} />
+              <ShareAction label="Snapchat" icon="share-2" onPress={() => void openMore()} />
               <ShareAction label="Email" icon="mail" busy={busy === 'email'} onPress={() => void openExternal('email')} />
               <ShareAction label="Instagram" icon="instagram" busy={busy === 'instagram'} onPress={() => void shareToInstagram()} />
               <ShareAction label="More" icon="more-horizontal" busy={busy === 'more'} onPress={openMoreOptions} />
@@ -553,9 +558,10 @@ function ShareAction({
 }) {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
+  const { width } = useWindowDimensions();
   return (
     <Pressable
-      style={styles.action}
+      style={[styles.action, { width: shareTileWidth(width) }]}
       onPress={onPress}
       disabled={busy}
       accessibilityRole="button"
@@ -580,9 +586,9 @@ function ShareAction({
 
 const makeStyles = (theme: { background: string; card: string; border: string; text: string; muted: string; surface: string; onAccent: string }) => StyleSheet.create({
   section: { paddingVertical: 8 },
-  actionRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 8 },
+  actionRow: { flexDirection: 'row', paddingHorizontal: 8 },
   action: { width: 60, alignItems: 'center', gap: 6 },
-  actionCircle: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden', backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border },
+  actionCircle: { width: 52, height: 52, borderRadius: 26, overflow: 'hidden', backgroundColor: isDarkColor(theme.card) ? SHARE_TILE_DARK : theme.surface, alignItems: 'center', justifyContent: 'center' },
   actionCircleMuted: { backgroundColor: theme.background },
   actionLabel: { minHeight: 28, color: theme.muted, fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 14, textAlign: 'center' },
   avatarImage: { width: '100%', height: '100%' },

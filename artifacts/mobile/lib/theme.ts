@@ -125,6 +125,8 @@ export const MEDIA = {
     seam: '#3A3A3A',
   },
 } as const;
+// Share-sheet tile circles on a black sheet (Dev's audit #34: black-on-black read as holes).
+export const SHARE_TILE_FILL = '#2A2A2A';
 
 // ─── Primary Emphasis ─────────────────────────────────────────────────────────
 export const ACCENT        = '#FFFFFF';

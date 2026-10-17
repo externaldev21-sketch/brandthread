@@ -1,0 +1,35 @@
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('./TrendingCreatorPreview', () => ({ TrendingCreatorPreview: () => null }));
+import { previewFit, trendingCardSize } from './FollowingTrendingCreators';
+
+describe('Trending creators card geometry', () => {
+  it('is a 3:5 card about 250x417 at 390pt with the next card peeking', () => {
+    const { width, height } = trendingCardSize(390);
+    expect(width).toBeGreaterThanOrEqual(240);
+    expect(width).toBeLessThanOrEqual(260);
+    expect(height).toBeGreaterThanOrEqual(400);
+    expect(height).toBeLessThanOrEqual(430);
+    // Centered card leaves room for a neighbour to peek on each side.
+    expect((390 - width) / 2 - 10).toBeGreaterThan(40);
+  });
+  it('keeps 3:5 when capped by the available height', () => {
+    const { width, height } = trendingCardSize(390, 360);
+    expect(height).toBe(360);
+    expect(width).toBe(216);
+  });
+  it('covers a vertical 9:16 video with only a small top/bottom trim', () => {
+    const { width, height } = trendingCardSize(390);
+    expect(previewFit({ w: 720, h: 1280 }, width, height)).toBe('cover');
+    // Cover of 9:16 in the card trims well under a tenth of the height.
+    expect(1 - (height / width) / (1280 / 720)).toBeLessThan(0.1);
+  });
+  it('uses contain (over a blurred copy) for landscape and square sources', () => {
+    const { width, height } = trendingCardSize(390);
+    expect(previewFit({ w: 1920, h: 1080 }, width, height)).toBe('contain');
+    expect(previewFit({ w: 1080, h: 1080 }, width, height)).toBe('contain');
+  });
+  it('defaults to cover when the size is unknown', () => {
+    expect(previewFit(undefined, 250, 417)).toBe('cover');
+    expect(previewFit({ w: 0, h: 0 }, 250, 417)).toBe('cover');
+  });
+});
