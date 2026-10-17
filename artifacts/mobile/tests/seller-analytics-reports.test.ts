@@ -103,7 +103,9 @@ describe('report screens', () => {
       expect(read('app/_layout.tsx')).toContain(`<Stack.Screen name="${name}"`);
       expect(ANALYTICS_REPORTS.map(r => r.href)).toContain(`/${name}`);
     }
-    expect(ANALYTICS_REPORTS.filter(r => r.badge).map(r => r.href)).toEqual(['/analytics-advanced']);
+    // PRO badges only on reports whose API is requirePlan("pro").
+    expect(ANALYTICS_REPORTS.filter(r => r.badge).map(r => r.href).sort())
+      .toEqual(['/analytics-advanced', '/analytics-cohorts', '/analytics-customers']);
     expect(read('app/(tabs)/analytics.tsx')).toContain('<AnalyticsReportsList />');
   });
   it('read only through sellerInsightsService, whose preview branch runs before the network', () => {
