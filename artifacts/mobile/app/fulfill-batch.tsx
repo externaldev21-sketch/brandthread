@@ -36,22 +36,27 @@ export default function FulfillBatchScreen() {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState<'labels' | 'ship' | null>(null);
   const [results, setResults] = useState<RowResult[]>([]);
+  // Orders that couldn't be loaded are listed, never silently dropped.
+  const [loadFailures, setLoadFailures] = useState<Array<{ id: string; message: string }>>([]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       const loaded: Order[] = [];
+      const failures: Array<{ id: string; message: string }> = [];
       for (const id of ids) {
         try {
           const raw = await api.orders.get(id);
           if (raw) loaded.push(adaptApiOrder(raw));
-        } catch {
-          // Skipped orders surface in the results list once an action runs.
+          else failures.push({ id, message: 'Order not found' });
+        } catch (err: any) {
+          failures.push({ id, message: err?.message ? String(err.message).replace(/^API \d{3}:\s*/, '') : 'Could not load this order' });
         }
       }
       if (!cancelled) {
         setOrders(loaded);
+        setLoadFailures(failures);
         setLoading(false);
       }
     })();
@@ -130,6 +135,20 @@ export default function FulfillBatchScreen() {
                 <Text style={s.mutedText}>{o.customer.name}</Text>
               </BrandthreadCard>
             ))}
+            {loadFailures.length > 0 && (
+              <>
+                <SectionHeader title={`Couldn't load ${loadFailures.length} order${loadFailures.length === 1 ? '' : 's'}`} />
+                {loadFailures.map(f => (
+                  <BrandthreadCard key={f.id} style={s.resultRow}>
+                    <Feather name="alert-circle" size={ICON.md} color={ERROR} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.orderNumber}>{f.id.slice(0, 8)}</Text>
+                      <Text style={s.mutedText}>{f.message} — not included below.</Text>
+                    </View>
+                  </BrandthreadCard>
+                ))}
+              </>
+            )}
 
             <View style={s.actionRow}>
               <PrimaryButton label="Print labels" icon="tag" onPress={handlePrintLabels} loading={running === 'labels'} disabled={running !== null || orders.length === 0} style={{ flex: 1 }} />

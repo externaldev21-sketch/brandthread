@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Platform, Share } from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Platform } from 'react-native';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
@@ -27,6 +27,10 @@ import { useApi } from '@/hooks/useApi';
 import { useAuth } from '@clerk/expo';
 import { clearBadge } from '@/lib/orderBadgeStore';
 import { formatCents } from '@/lib/money';
+import { exportCsvFile } from '@/lib/csvExport';
+import { runBulk, summarizeBulk, ordersForExport, ordersToCsv } from '@/lib/orderBulk';
+import { apiErrorMessage } from '@/lib/safety';
+import { OptionSheet } from '@/components/ui/OptionSheet';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useScrollReset } from '@/hooks/useScrollReset';
@@ -979,48 +983,93 @@ export default function OrdersScreen() {
     );
   }, []);
 
-  const handleBulkMarkReady = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      await Promise.all(selectedIds.map(id => api.orders.updateStatus(id, 'fulfilled')));
-      setSelectedIds([]);
-      await loadData(generationRef.current);
-    } catch {
-      Alert.alert('Error', 'Could not bulk update orders.');
+  // Runs one existing per-order endpoint over the selection and reports
+  // exactly which orders failed (and why) instead of a blanket error.
+  const runBulkAction = useCallback(async (actionLabel: string, fn: (id: string) => Promise<unknown>) => {
+    if (isPreviewMode) {
+      Alert.alert('Preview', 'Bulk actions are not available in the preview.');
+      return;
     }
-  }, [api, selectedIds, loadData]);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const byId = new Map(orders.map(o => [o.id, o]));
+    const result = await runBulk(selectedIds, fn, {
+      label: id => byId.get(id)?.orderNumber ?? id.slice(0, 8),
+      errorMessage: e => apiErrorMessage(e, 'Request failed'),
+    });
+    // Keep the failed orders selected so the seller can retry or inspect them.
+    setSelectedIds(result.failed.map(f => f.id));
+    const summary = summarizeBulk(result, actionLabel);
+    if (summary) Alert.alert(summary.title, summary.message);
+    await loadData(generationRef.current);
+  }, [isPreviewMode, orders, selectedIds, loadData]);
+
+  const handleBulkMarkReady = useCallback(() => {
+    void runBulkAction('mark orders ready', id => api.orders.updateStatus(id, 'fulfilled'));
+  }, [api, runBulkAction]);
+
+  const handleBulkMarkProcessing = useCallback(() => {
+    void runBulkAction('mark orders processing', id => api.orders.updateStatus(id, 'processing'));
+  }, [api, runBulkAction]);
+
+  const handleBulkMarkPacked = useCallback(() => {
+    void runBulkAction('mark orders packed', id => api.orders.updateFulfillmentChecklist(id, { isPicked: true, isPacked: true }));
+  }, [api, runBulkAction]);
 
   const handleExportCsv = useCallback(async () => {
     try {
       const visibleOrders = ordersOwnerId === userId ? orders : [];
-      const rows = visibleOrders.map(o => {
-        const customer = o.customer?.name ?? o.customer?.email ?? 'Unknown';
-        const date = new Date(o.createdAt).toLocaleDateString('en-US');
-        const total = formatCents(o.payment.totalCents);
-        const itemCount = o.listItemCount ?? o.lineItems.length;
-        return [
-          o.orderNumber ?? o.id.slice(0, 8),
-          `"${customer.replace(/"/g, '""')}"`,
-          date, o.status, o.paymentStatus,
-          o.fulfillmentStatus ?? 'unfulfilled',
-          itemCount, total,
-        ].join(',');
-      });
-      const csv = ['Order #,Customer,Date,Status,Payment,Fulfillment,Items,Total', ...rows].join('\n');
-      await Share.share({ message: csv, title: 'Orders Export' });
+      // With a selection, export just the selected orders.
+      const toExport = ordersForExport(visibleOrders, selectedIds);
+      if (toExport.length === 0) {
+        Alert.alert('Nothing to export', 'There are no orders to export yet.');
+        return;
+      }
+      const csv = ordersToCsv(toExport, formatCents);
+      const shared = await exportCsvFile('orders', csv, 'Export orders');
+      if (!shared) Alert.alert('Export saved', 'Sharing is not available on this device.');
     } catch {
       Alert.alert('Export failed', 'Could not export orders. Please try again.');
     }
-  }, [orders, ordersOwnerId, userId]);
+  }, [orders, ordersOwnerId, userId, selectedIds]);
+
+  // OptionSheet rather than an Alert button list: Android alerts show at
+  // most three buttons.
+  const [bulkSheetVisible, setBulkSheetVisible] = useState(false);
+  const handleBulkMenu = useCallback(() => setBulkSheetVisible(true), []);
+  const bulkOptions = useMemo(() => {
+    const selectAll = { id: 'select_all', label: `Select all shown (${filtered.length})`, icon: 'check-square' as const };
+    if (selectedIds.length === 0) return [selectAll];
+    return [
+      { id: 'processing', label: 'Mark processing', icon: 'clock' as const },
+      { id: 'packed', label: 'Mark packed', icon: 'box' as const },
+      { id: 'ready', label: 'Mark ready to ship', icon: 'package' as const },
+      { id: 'ship', label: 'Ship (add tracking or buy labels)', icon: 'send' as const },
+      { id: 'export', label: 'Export selected (CSV)', icon: 'download' as const },
+      selectAll,
+      { id: 'clear', label: 'Clear selection', icon: 'x' as const },
+    ];
+  }, [filtered.length, selectedIds.length]);
+  const handleBulkOption = useCallback((id: string) => {
+    setBulkSheetVisible(false);
+    switch (id) {
+      case 'select_all': setSelectedIds(filtered.map(o => o.id)); break;
+      case 'processing': handleBulkMarkProcessing(); break;
+      case 'packed': handleBulkMarkPacked(); break;
+      case 'ready': handleBulkMarkReady(); break;
+      case 'ship': handleBulkFulfill(); break;
+      case 'export': void handleExportCsv(); break;
+      case 'clear': setSelectedIds([]); break;
+    }
+  }, [filtered, handleBulkMarkProcessing, handleBulkMarkPacked, handleBulkMarkReady, handleBulkFulfill, handleExportCsv]);
 
   const handleMoreMenu = useCallback(() => {
     showActionSheet('Orders', 'Choose an action', [
-      { text: 'Export CSV', onPress: handleExportCsv },
-      { text: 'Bulk Actions', onPress: () => showActionSheet('Bulk', 'Long-press orders to select.', [{ text: 'OK' }]) },
+      { text: selectedIds.length > 0 ? `Export selected (${selectedIds.length})` : 'Export CSV', onPress: handleExportCsv },
+      { text: 'Bulk Actions', onPress: handleBulkMenu },
       { text: 'Refresh', onPress: onRefresh },
       { text: 'Cancel', style: 'cancel' },
     ]);
-  }, [onRefresh, handleExportCsv]);
+  }, [onRefresh, handleExportCsv, handleBulkMenu, selectedIds.length]);
 
   // ─── Render helpers ────────────────────────────────────────────────────────
 
@@ -1210,6 +1259,10 @@ export default function OrdersScreen() {
                 <Feather name="download" size={ICON.xs} color={MUTED} />
                 <Text style={[s.bulkBtnText, { color: MUTED }]}>Export</Text>
               </TouchableOpacity>
+              <TouchableOpacity style={s.bulkBtn} onPress={handleBulkMenu} accessibilityRole="button" accessibilityLabel="More bulk actions">
+                <Feather name="more-horizontal" size={ICON.xs} color={MUTED} />
+                <Text style={[s.bulkBtnText, { color: MUTED }]}>More</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={s.bulkBtn} onPress={() => setSelectedIds([])} accessibilityRole="button" accessibilityLabel="Clear selected orders">
                 <Feather name="x" size={ICON.xs} color={RED} />
                 <Text style={[s.bulkBtnText, { color: RED }]}>Clear</Text>
@@ -1233,6 +1286,18 @@ export default function OrdersScreen() {
         current={FILTERS.some(filter => filter.key === activeFilter) ? 'all' : activeFilter as OrderFilterKey}
         onSelect={k => setActiveFilter(k)}
         onClose={() => setFilterSheetVisible(false)}
+      />
+
+      <OptionSheet
+        visible={bulkSheetVisible}
+        onClose={() => setBulkSheetVisible(false)}
+        title="Bulk actions"
+        description={selectedIds.length === 0
+          ? 'Select orders to act on several at once. You can also long-press an order to select it.'
+          : `${selectedIds.length} ${selectedIds.length === 1 ? 'order' : 'orders'} selected`}
+        options={bulkOptions}
+        selectedId=""
+        onSelect={handleBulkOption}
       />
 
       <FirstRunTip

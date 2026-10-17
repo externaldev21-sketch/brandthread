@@ -27,6 +27,7 @@ import type { Request, RequestHandler } from "express";
 import { db, teamMembers, users } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { teamMembershipOrderBy } from "../lib/teamMembership";
+import { touchTeamMemberActivity } from "../lib/teamSessionLog";
 
 export type TeamRole =
   | "owner"
@@ -204,11 +205,9 @@ export async function resolveTeamContext(req: Request): Promise<TeamContext | nu
       ctx.actorRole = (membership.role as TeamRole) ?? "staff";
       ctx.storeOwnerId = membership.ownerId;
       ctx.teamMembershipId = membership.id;
-      // Touch lastActiveAt (fire & forget) — drives online/offline status.
-      db.update(teamMembers)
-        .set({ lastActiveAt: new Date() })
-        .where(eq(teamMembers.id, membership.id))
-        .then(() => {}, () => {});
+      // Touch lastActiveAt (fire & forget) — drives online/offline status,
+      // and logs a store sign-in to the team audit log after a 30 min gap.
+      void touchTeamMemberActivity(membership.id, membership.ownerId, userId, ctx.actorRole);
     }
   } catch (err) {
     if (err instanceof InvalidStoreContextError) throw err;

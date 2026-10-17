@@ -168,6 +168,8 @@ export interface Shipment {
   trackingNumber?: string;
   trackingStatus?: TrackingStatus;
   trackingEvents: TrackingEvent[];
+  /** Carrier tracking page (server `trackingUrl`, or built from carrier + number). */
+  trackingUrl?: string;
   labelId?: string;
   shippedAt?: string;
   estimatedDelivery?: string;
