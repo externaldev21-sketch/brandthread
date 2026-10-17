@@ -69,6 +69,12 @@ interface ScreenHeaderProps {
    * small centered title fades into the same row (CollapsingTitleBar).
    */
   collapse?: LargeTitleCollapse;
+  /**
+   * With `showBack={false}`, keep an empty back-button-sized slot so the title
+   * lines up with pushed screens (default). `false` starts the title on the
+   * gutter instead — for a top-level tab like Activity.
+   */
+  reserveBackSpace?: boolean;
 }
 
 /** Design-system rule: at most 2 action icons on the right, primary rightmost. */
@@ -86,7 +92,7 @@ const MAX_HEADER_ACTIONS = 2;
 const TITLE_SIZE = 20;
 
 export function ScreenHeader({
-  title, rightElement, actions, scrollY, collapseDistance = 48, onBack, divider = false, backTestID, backAccessibilityLabel, variant = 'push', showBack = true, hideDivider = false, collapse,
+  title, rightElement, actions, scrollY, collapseDistance = 48, onBack, divider = false, backTestID, backAccessibilityLabel, variant = 'push', showBack = true, hideDivider = false, collapse, reserveBackSpace = true,
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
@@ -134,7 +140,7 @@ export function ScreenHeader({
             >
               <Icon name="arrow-left" size={ICON.md} color={colors.foreground} />
             </PressableScale>
-          ) : <View style={{ width: COMP.iconBtn }} />
+          ) : reserveBackSpace ? <View style={{ width: COMP.iconBtn }} /> : null
         )}
 
         <View style={[styles.titleBlock, collapse ? styles.titleBlockClip : null]} onLayout={(e) => setTitleRoom(e.nativeEvent.layout.width)}>

@@ -4231,11 +4231,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       },
       trendingProducts: (limit = 12) =>
         get<{ windowDays: number; products: any[] }>(`/api/public/trending/products?limit=${encodeURIComponent(String(limit))}`),
-      trendingBrands: (limit = 12) =>
+      /** `excludeFollowing`: drop brands the signed-in viewer follows, and their own store. */
+      trendingBrands: (limit = 12, opts: { excludeFollowing?: boolean } = {}) =>
         get<{ windowDays: number; brands: Array<{
           id: string; sellerId: string; name: string; brandType: string | null; logoUrl: string | null;
           coverImageUrl: string | null; followerCount: number; verified: boolean;
-        }> }>(`/api/public/trending/brands?limit=${encodeURIComponent(String(limit))}`),
+        }> }>(`/api/public/trending/brands?limit=${encodeURIComponent(String(limit))}${opts.excludeFollowing ? '&exclude=following' : ''}`),
     },
     /** Discount codes — seller-managed promo codes */
     discountCodes: {

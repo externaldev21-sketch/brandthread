@@ -17,7 +17,7 @@ import {
   db, products, productVariants, users, orders, orderItems, follows,
   savedItems, storeVisits, stockReservations,
 } from "@workspace/db";
-import { and, desc, eq, gte, inArray, isNull, isNotNull, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, isNotNull, ne, notInArray, sql } from "drizzle-orm";
 import { setPublicCacheHeaders } from "../lib/httpCache";
 import { publicCoverFields, storefrontCoverUrl } from "../lib/profileCover";
 import { withStorefrontBannerAdopted } from "../lib/storefrontBanner";
@@ -225,7 +225,11 @@ router.get("/trending/products", async (req, res) => {
   }
 });
 
-// GET /api/public/trending/brands?limit=
+// GET /api/public/trending/brands?limit=&exclude=following
+// `exclude=following` (signed-in viewers only) drops the viewer's own store
+// and every brand they already follow — Activity's inline "Trending brands"
+// list only shows brands there's something to do with. Without it the
+// ranking is unchanged.
 router.get("/trending/brands", async (req, res) => {
   const page = parsePagination(req.query, { limit: 12 });
   if (!page.success) {
@@ -236,6 +240,7 @@ router.get("/trending/brands", async (req, res) => {
   try {
     const viewerId = optionalViewerId(req);
     if (!viewerId) setPublicCacheHeaders(res);
+    const excludeFollowing = viewerId && req.query.exclude === "following" ? viewerId : null;
     const since = windowStart(new Date());
 
     const [orderRows, followRows, saveRows, visitRows] = await Promise.all([
@@ -305,6 +310,10 @@ router.get("/trending/brands", async (req, res) => {
         isNull(users.deletedAt),
         eq(users.policyRestricted, false),
         notBlockedWith(viewerId, users.clerkId),
+        excludeFollowing ? ne(users.clerkId, excludeFollowing) : undefined,
+        excludeFollowing
+          ? sql`not exists (select 1 from ${follows} where ${follows.followerId} = ${excludeFollowing} and ${follows.followingId} = ${users.clerkId})`
+          : undefined,
       ));
     const ranked = rankByScore(
       sellers.map((s) => ({ ...s, id: s.clerkId, score: scoreBrandSignals(signals.get(s.clerkId)!) })),

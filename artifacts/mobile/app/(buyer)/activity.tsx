@@ -8,5 +8,13 @@
  * "tab bar disappears when you tap the bell" bug this route exists to fix.
  * The root `app/activity-center.tsx` route is unchanged and still used by
  * the seller side's `ActivityBellButton` instances.
+ *
+ * `isTab`: a top-level tab has nowhere to go back to, so no back arrow
+ * (audit #52); the pushed root route keeps its arrow.
  */
-export { default } from '../activity-center';
+import React from 'react';
+import ActivityCenterScreen from '../activity-center';
+
+export default function BuyerActivityTab() {
+  return <ActivityCenterScreen isTab />;
+}
