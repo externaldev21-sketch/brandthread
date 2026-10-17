@@ -120,7 +120,7 @@ describe("builder state on the live store", () => {
   it("serves GET /public/:slug to signed-out visitors (registered before requireAuth)", async () => {
     const res = await fetch(`${base}/api/store/public/${SLUG}`, { headers: { "x-test-signed-out": "1" } });
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.slug).toBe(SLUG);
     expect(body.storePasswordHash).toBeUndefined();
     const owner = await fetch(`${base}/api/store`, { headers: { "x-test-signed-out": "1" } });
