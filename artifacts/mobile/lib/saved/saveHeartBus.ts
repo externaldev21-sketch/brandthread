@@ -23,6 +23,7 @@ export interface SaveHeartToast {
 
 export type SaveHeartEvent =
   | { type: 'toast'; toast: SaveHeartToast }
+  | { type: 'post-sheet'; item: SaveToCollectionItem; thumbnailUri?: string }
   | { type: 'sheet'; draft: SavedProductDraft };
 
 type Handler = (event: SaveHeartEvent) => void;

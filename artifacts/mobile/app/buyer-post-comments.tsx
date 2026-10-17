@@ -98,8 +98,9 @@ import { COMMENT_SORTS, sortRoots, type CommentSort } from '@/lib/commentSort';
 import { TranslationLink, useCaptionTranslation } from '@/components/translation/CaptionTranslation';
 
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
-import { CommentPhotoButton, CommentPhotoDraft, CommentPhotoView, useCommentPhotoDraft } from '@/components/comments/CommentPhoto';
+import { CommentPhotoDraft, CommentPhotoView, useCommentPhotoDraft } from '@/components/comments/CommentPhoto';
 import { createComment } from '@/services/commentMediaService';
+import { isOfficialAccountId, officialAvatarUri } from '@/lib/officialAccount';
 
 const MAX_COMMENT_LENGTH = 1000;
 // Links the comment list's KeyboardGestureArea to the composer's TextInput
@@ -149,6 +150,29 @@ function useFailOnNestedButtonWarning() {
     };
     return () => { console.error = original; };
   }, []);
+}
+
+/** Reaction state shared by root and reply rows. */
+type Reaction = Pick<ThreadComment, 'likedByMe' | 'likesCount'> & { dislikedByMe?: boolean };
+
+/** Optimistic like toggle — liking always clears an active dislike. */
+export function applyOptimisticLike<T extends Reaction>(c: T, liked: boolean): T {
+  return { ...c, likedByMe: liked, dislikedByMe: liked ? false : c.dislikedByMe, likesCount: Math.max(0, c.likesCount + (liked ? 1 : -1)) };
+}
+
+/** Optimistic dislike toggle — disliking removes an active like (and its count). */
+export function applyOptimisticDislike<T extends Reaction>(c: T, disliked: boolean): T {
+  return {
+    ...c,
+    dislikedByMe: disliked,
+    likedByMe: disliked ? false : c.likedByMe,
+    likesCount: disliked && c.likedByMe ? Math.max(0, c.likesCount - 1) : c.likesCount,
+  };
+}
+
+/** Restores a row's reaction fields from a pre-mutation snapshot. */
+export function restoreReaction<T extends Reaction>(c: T, snapshot: Reaction): T {
+  return { ...c, likedByMe: snapshot.likedByMe, dislikedByMe: snapshot.dislikedByMe, likesCount: snapshot.likesCount };
 }
 
 /** A flattened list row: roots followed by their replies. */
@@ -318,11 +342,12 @@ function LikeHeart({
 // overlapping interactive elements — spurious hover/press flicker on the
 // outer row whenever the cursor crossed into an inner button).
 
-const CommentRow = React.memo(function CommentRow({
+export const CommentRow = React.memo(function CommentRow({
   comment,
   highlighted = false,
   postAuthorId,
   onLike,
+  onDislike,
   onReply,
   onMore,
   onPressMention,
@@ -332,6 +357,7 @@ const CommentRow = React.memo(function CommentRow({
   highlighted?: boolean;
   postAuthorId: string;
   onLike: (comment: Row) => void;
+  onDislike?: (comment: Row) => void;
   onReply: (comment: Row) => void;
   onMore: (comment: Row) => void;
   onPressMention?: (mention: CommentMentionRef) => void;
@@ -345,7 +371,7 @@ const CommentRow = React.memo(function CommentRow({
 
   return (
     <View style={[s.commentRow, comment.isReply && s.commentRowIndented, isPending && s.commentRowPending, highlighted && s.commentRowHighlighted]} testID={highlighted ? 'comment-deep-link-highlight' : undefined}>
-      <Avatar uri={comment.author.avatarUrl} initials={comment.author.initials} size={comment.isReply ? 26 : 32} recyclingKey={comment.id} />
+      <Avatar uri={isOfficialAccountId(comment.author.userId) ? (officialAvatarUri() ?? comment.author.avatarUrl) : comment.author.avatarUrl} initials={comment.author.initials} size={comment.isReply ? 26 : 32} recyclingKey={comment.id} />
 
       <View style={s.commentBody}>
         <PressableScale
@@ -414,6 +440,7 @@ const CommentRow = React.memo(function CommentRow({
             opens the same options menu. */}
         <View style={s.commentMeta}>
           <Text style={s.commentTime}>{isPending ? 'Posting…' : shortRelativeTime(comment.createdAt)}</Text>
+          {!isPending && !comment.pendingReview && <Text style={s.commentTime}>·</Text>}
           {!isPending && !comment.pendingReview && (
             <PressableScale
               style={s.replyBtn}
@@ -438,6 +465,22 @@ const CommentRow = React.memo(function CommentRow({
           accessibilityLabel={`${comment.likedByMe ? 'Unlike' : 'Like'} comment`}
           itemKey={comment.id}
         />
+      )}
+      {!isPending && !comment.pendingReview && onDislike && (
+        <PressableScale
+          style={s.commentLike}
+          onPress={() => onDislike(comment)}
+          accessibilityRole="button"
+          accessibilityLabel={comment.dislikedByMe ? 'Remove dislike' : 'Dislike comment'}
+          accessibilityState={{ selected: !!comment.dislikedByMe }}
+          hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}
+          testID={`comment-dislike-${comment.id}`}
+          noMinHeight
+        >
+          <View style={s.commentLikeIconWrap}>
+            <FontAwesome name={comment.dislikedByMe ? 'thumbs-down' : 'thumbs-o-down'} size={15} color={comment.dislikedByMe ? FG : MUTED} />
+          </View>
+        </PressableScale>
       )}
     </View>
   );
@@ -587,13 +630,83 @@ function CommentActionsSheet({
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
+type CommentsThreadInput = {
+  postId: string;
+  postAuthorId?: string;
+  postAuthorName?: string;
+  postAuthorInitials?: string;
+  postAuthorColor?: string;
+  postCaption?: string;
+  postMediaUri?: string;
+  postPosterUri?: string;
+  postMediaColor1?: string;
+  postMediaColor2?: string;
+  postType?: string;
+  /** Deep link from an Activity row / push: open on this exact comment. */
+  commentId?: string;
+};
+
+/** Route entry: reads params and renders the full split-modal screen. */
 export default function BuyerPostCommentsScreen() {
+  const params = useLocalSearchParams<CommentsThreadInput>();
+  return <CommentsThread input={params} />;
+}
+
+export interface ThreadCommentsSheetProps {
+  visible: boolean;
+  postId: string;
+  postAuthorId?: string;
+  postAuthorName?: string;
+  postCaption?: string;
+  onClose: () => void;
+}
+
+/**
+ * Inline comments over a still-mounted, still-playing feed/viewer: the shared
+ * BottomSheet (dim backdrop, grabber drag) around the same real thread the
+ * route uses — no media box, no second video player. Nothing mounts or
+ * loads until `visible` first turns true; the thread unmounts shortly after
+ * close so a reopen refetches fresh.
+ */
+export function ThreadCommentsSheet({ visible, postId, postAuthorId, postAuthorName, postCaption, onClose }: ThreadCommentsSheetProps) {
+  const { height } = useWindowDimensions();
+  const [mounted, setMounted] = useState(visible);
+  useEffect(() => {
+    if (visible) { setMounted(true); return; }
+    const t = setTimeout(() => setMounted(false), 400);
+    return () => clearTimeout(t);
+  }, [visible]);
+  const input = useMemo<CommentsThreadInput>(
+    () => ({ postId, postAuthorId, postAuthorName, postCaption }),
+    [postId, postAuthorId, postAuthorName, postCaption],
+  );
+  if (!mounted) return null;
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      scrollable={false}
+      padded={false}
+      headerRight="none"
+      maxHeightRatio={0.92}
+      accessibilityLabel="Comments"
+      testID="thread-comments-sheet"
+    >
+      <View style={{ height: Math.round(height * 0.7) }}>
+        <CommentsThread input={input} embedded onClose={onClose} />
+      </View>
+    </Sheet>
+  );
+}
+
+function CommentsThread({ input, embedded = false, onClose }: { input: CommentsThreadInput; embedded?: boolean; onClose?: () => void }) {
   useFailOnNestedButtonWarning();
   const { theme } = useAppTheme();
   const { height: windowHeight } = useWindowDimensions();
   const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const close = useStableCallback(() => { if (onClose) onClose(); else goBackOr(router); });
   const api = useApi();
   const { user } = useUser();
   const [guestMutedPhrases, setGuestMutedPhrases] = useState<string[] | null>(null);
@@ -634,7 +747,7 @@ export default function BuyerPostCommentsScreen() {
   const [expanded, setExpanded] = useState(false);
   const expandedRef = useRef(false);
   expandedRef.current = expanded;
-  const sheetBaseHeight = windowHeight * (expanded ? 0.92 : 0.65);
+  const sheetBaseHeight = windowHeight * (expanded ? 0.92 : 0.7);
   const sheetMaxHeight = windowHeight * 0.92;
   const sheetHeight = Math.min(sheetBaseHeight + keyboardHeight, sheetMaxHeight);
 
@@ -686,7 +799,7 @@ export default function BuyerPostCommentsScreen() {
           setExpanded(false);
           Animated.spring(dragY, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 0 }).start();
         } else if (gesture.dy > DISMISS_THRESHOLD || gesture.vy > 1.2) {
-          Animated.timing(dragY, { toValue: windowHeight, duration: 180, useNativeDriver: true }).start(() => goBackOr(router));
+          Animated.timing(dragY, { toValue: windowHeight, duration: 180, useNativeDriver: true }).start(() => close());
         } else {
           Animated.spring(dragY, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 0 }).start();
         }
@@ -696,27 +809,13 @@ export default function BuyerPostCommentsScreen() {
       },
     }),
   ).current;
-  const params = useLocalSearchParams<{
-    postId: string;
-    postAuthorId?: string;
-    postAuthorName?: string;
-    postAuthorInitials?: string;
-    postAuthorColor?: string;
-    postCaption?: string;
-    postMediaUri?: string;
-    postPosterUri?: string;
-    postMediaColor1?: string;
-    postMediaColor2?: string;
-    postType?: string;
-    /** Deep link from an Activity row / push: open on this exact comment. */
-    commentId?: string;
-  }>();
+  const params = input;
   const targetCommentId = typeof params.commentId === 'string' ? params.commentId : '';
 
   const postId = params.postId ?? '';
   const isPreviewPost = postId.length > 0 && !UUID_RE.test(postId);
   const postAuthorId = params.postAuthorId ?? '';
-  const mediaUri = params.postMediaUri ?? '';
+  const mediaUri = embedded ? '' : (params.postMediaUri ?? '');
   const posterUri = params.postPosterUri ?? '';
   const postType = params.postType ?? 'photo';
   const [videoPlaying, setVideoPlaying] = useState(false);
@@ -760,6 +859,9 @@ export default function BuyerPostCommentsScreen() {
   const [comments, setComments] = useState<Row[]>([]);
   /** Top / Newest chips under the header, YouTube's comments sheet (#142). */
   const [sort, setSort] = useState<CommentSort>('top');
+  // Sort + photo tools live behind the header options menu so the initial
+  // layout matches the reference (no pill row above the list).
+  const [optionsOpen, setOptionsOpen] = useState(false);
   /** Root comment ids whose reply thread is expanded (collapsed by default). */
   const [expandedRoots, setExpandedRoots] = useState<Set<string>>(new Set());
   const [meta, setMeta] = useState({ hiddenByMutedWords: 0, commentsDisabled: false, canComment: true, isPostOwner: false, nextCursor: null as string | null });
@@ -888,14 +990,31 @@ export default function BuyerPostCommentsScreen() {
     if (liked) haptic('like');
     // Optimistic update
     setCommentsSynced(prev => prev.map(c => c.id === comment.id
-      ? { ...c, likedByMe: liked, likesCount: Math.max(0, c.likesCount + (liked ? 1 : -1)) }
+      ? applyOptimisticLike(c, liked)
       : c));
     if (isPreviewPost) return; // Local-only — nothing to confirm against a server.
     try {
       const result = await api.comments.like(postId, comment.id, liked);
-      setCommentsSynced(prev => prev.map(c => c.id === comment.id ? { ...c, likedByMe: result.liked, likesCount: result.likesCount } : c));
+      setCommentsSynced(prev => prev.map(c => c.id === comment.id ? { ...c, likedByMe: result.liked, dislikedByMe: result.liked ? false : c.dislikedByMe, likesCount: result.likesCount } : c));
     } catch {
-      setCommentsSynced(prev => prev.map(c => c.id === comment.id ? { ...c, likedByMe: comment.likedByMe, likesCount: comment.likesCount } : c));
+      setCommentsSynced(prev => prev.map(c => c.id === comment.id ? restoreReaction(c, comment) : c));
+    }
+  }, [api, isPreviewPost, postId, setCommentsSynced]);
+
+  // Dislike is server-backed only (api.comments.dislike) — same endpoint and
+  // state for root and reply rows. Disliking clears an active like.
+  const handleDislike = useCallback(async (comment: Row) => {
+    if (isPreviewPost) return; // No server row: never fake a local-only dislike.
+    const disliked = !comment.dislikedByMe;
+    hapticLight();
+    setCommentsSynced(prev => prev.map(c => c.id === comment.id
+      ? applyOptimisticDislike(c, disliked)
+      : c));
+    try {
+      const result = await api.comments.dislike(postId, comment.id, disliked);
+      setCommentsSynced(prev => prev.map(c => c.id === comment.id ? { ...c, dislikedByMe: result.disliked, likedByMe: result.liked, likesCount: result.likesCount } : c));
+    } catch {
+      setCommentsSynced(prev => prev.map(c => c.id === comment.id ? restoreReaction(c, comment) : c));
     }
   }, [api, isPreviewPost, postId, setCommentsSynced]);
 
@@ -1183,6 +1302,7 @@ export default function BuyerPostCommentsScreen() {
   // the list's props referentially stable so the visible comment rows (and
   // the list header) don't re-render / remount with each character.
   const onLikeStable = useStableCallback(handleLike);
+  const onDislikeStable = useStableCallback(handleDislike);
   const onReplyStable = useStableCallback(handleReply);
   const onPressMentionStable = useStableCallback(handlePressMention);
   const renderCommentRow = useCallback(({ item }: { item: Row | ViewRepliesRow }) => (
@@ -1194,12 +1314,13 @@ export default function BuyerPostCommentsScreen() {
         highlighted={item.id === highlightId}
         postAuthorId={postAuthorId}
         onLike={onLikeStable}
+        onDislike={isPreviewPost ? undefined : onDislikeStable}
         onReply={onReplyStable}
         onMore={setActionsFor}
         onPressMention={onPressMentionStable}
       />
     )
-  ), [highlightId, postAuthorId, toggleReplies, onLikeStable, onReplyStable, onPressMentionStable]);
+  ), [highlightId, postAuthorId, toggleReplies, onLikeStable, onDislikeStable, isPreviewPost, onReplyStable, onPressMentionStable]);
   const listHeader = useMemo(() => (
     <>
       {loading && [0, 1, 2, 3].map(i => <CommentSkeletonRow key={i} />)}
@@ -1224,71 +1345,35 @@ export default function BuyerPostCommentsScreen() {
     );
   }
 
-  return (
-    <View style={s.overlay}>
-      {/* Media lives in its own fixed box spanning screenTop → sheetTop —
-          never the full screen — so the video/poster shrinks DOWN to fit
-          inside it (contentFit="contain", centered) like real TikTok, instead
-          of rendering at its own intrinsic pixel size (e.g. 1080x1920) inside
-          a 390pt box and showing a blown-up crop. The box resizes with the
-          sheet on the same non-spring SHEET_TIMING curve as the keyboard
-          opens/closes — it only ever shrinks/grows in place, never zooms. */}
-      <Animated.View style={[s.mediaBox, { height: mediaAreaHeight }]}>
-        {mediaUri ? (
-          postType === 'video' ? (
-            <>
-              {posterUri && (!videoPlaying || videoErrored) ? (
-                <CachedImage
-                  source={{ uri: posterUri }}
-                  style={s.mediaFill}
-                  contentFit="contain"
-                  testID="comments-video-poster"
-                />
-              ) : null}
-              {!videoErrored && (
-                <VideoView
-                  player={mediaPlayer}
-                  style={[s.mediaFill, posterUri && !videoPlaying && { opacity: 0 }]}
-                  contentFit="contain"
-                  nativeControls={false}
-                  testID="comments-video-preview"
-                />
-              )}
-            </>
-          ) : (
-            <CachedImage source={{ uri: mediaUri }} style={s.mediaFill} contentFit="contain" />
-          )
-        ) : null}
-        <PressableScale
-          style={s.backdrop}
-          activeOpacity={1}
-          onPress={() => goBackOr(router)}
-          accessibilityRole="button"
-          accessibilityLabel="Close comments"
-          noMinHeight
-        />
-      </Animated.View>
-      <Animated.View style={[s.sheet, { height: sheetHeightAnim, transform: [{ translateY: dragY }] }]}>
-        <KeyboardAvoidingView
-          style={s.sheetInner}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
-          testID="comments-sheet"
-        >
+  const sheetBody = (
+    <>
           {/* Drag-to-dismiss handle — dragging down from here (not from the
               comment list, so it never fights list scrolling) springs the
               sheet back if released early, or slides it fully closed. */}
-          <View style={s.dragHandleArea} {...dragResponder.panHandlers}>
-            <View style={s.dragHandle} />
-          </View>
+          {embedded ? null : (
+            <View style={s.dragHandleArea} {...dragResponder.panHandlers}>
+              <View style={s.dragHandle} />
+            </View>
+          )}
           <View style={s.header}>
-            <View style={s.headerSide} />
+            {!meta.commentsDisabled ? (
+              <PressableScale
+                style={s.headerSide}
+                onPress={() => { hapticLight(); setOptionsOpen(true); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Comment options, sorted by ${COMMENT_SORTS.find((o) => o.id === sort)?.label ?? sort}`}
+                testID="comments-options"
+              >
+                <Icon name="sliders" size={18} color={MUTED} />
+              </PressableScale>
+            ) : <View style={s.headerSide} />}
             <Text style={s.headerTitle}>
               {loading ? 'Comments' : `${realCount} comment${realCount === 1 ? '' : 's'}`}
             </Text>
             <PressableScale
               style={s.headerSide}
-              onPress={() => goBackOr(router)}
+              onPress={close}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel="Close comments"
@@ -1296,30 +1381,6 @@ export default function BuyerPostCommentsScreen() {
               <Icon name="x" size={20} color={FG} />
             </PressableScale>
           </View>
-          {!meta.commentsDisabled ? (
-            <View style={s.sortRow} accessibilityRole="tablist">
-              {COMMENT_SORTS.map((option) => {
-                const selected = sort === option.id;
-                return (
-                  <PressableScale
-                    key={option.id}
-                    style={[s.sortChip, selected && s.sortChipOn]}
-                    onPress={() => {
-                      if (selected) return;
-                      haptic('select');
-                      setSort(option.id);
-                      listRef.current?.scrollToOffset({ offset: 0, animated: false });
-                    }}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected }}
-                    testID={`comments-sort-${option.id}`}
-                  >
-                    <Text style={[s.sortChipText, selected && s.sortChipTextOn]}>{option.label}</Text>
-                  </PressableScale>
-                );
-              })}
-            </View>
-          ) : null}
 
           <KeyboardGestureArea style={{ flex: 1 }} textInputNativeID={COMMENT_INPUT_NATIVE_ID}>
           <FlashList
@@ -1473,20 +1534,6 @@ export default function BuyerPostCommentsScreen() {
                 leftAccessory={<Avatar uri={myAvatar} initials={myInitials} size={32} ring={false} backgroundColor="#2a2a2a" />}
                 rightAccessory={(
                   <>
-                    <CommentPhotoButton
-                      style={s.inputTool}
-                      color={MUTED}
-                      disabled={photo.uploading}
-                      onPress={() => { hapticLight(); void photo.pick(); }}
-                    />
-                    <PressableScale
-                      style={s.inputTool}
-                      onPress={() => inputRef.current?.focus()}
-                      accessibilityRole="button"
-                      accessibilityLabel="Emoji"
-                    >
-                      <Icon name="smile" size={18} color={MUTED} />
-                    </PressableScale>
                     <PressableScale
                       style={s.inputTool}
                       onPress={() => {
@@ -1495,8 +1542,18 @@ export default function BuyerPostCommentsScreen() {
                       }}
                       accessibilityRole="button"
                       accessibilityLabel="Mention someone"
+                      testID="composer-mention"
                     >
                       <Text style={s.mentionIcon}>@</Text>
+                    </PressableScale>
+                    <PressableScale
+                      style={s.inputTool}
+                      onPress={() => inputRef.current?.focus()}
+                      accessibilityRole="button"
+                      accessibilityLabel="Emoji"
+                      testID="composer-emoji"
+                    >
+                      <Icon name="smile" size={18} color={MUTED} />
                     </PressableScale>
                   </>
                 )}
@@ -1505,9 +1562,43 @@ export default function BuyerPostCommentsScreen() {
           )}
           <KeyboardAccessoryBar nativeID={COMMENT_ACCESSORY_ID} />
         </View>
-        </KeyboardAvoidingView>
-      </Animated.View>
-
+    </>
+  );
+  const optionsSheet = (
+    <Sheet
+      visible={optionsOpen}
+      onClose={() => setOptionsOpen(false)}
+      headerRight="none"
+      accessibilityLabel="Comment options"
+      testID="comments-options-sheet"
+    >
+      <MenuBlocks
+        onClose={() => setOptionsOpen(false)}
+        testID="comments-options-menu"
+        sections={[
+          COMMENT_SORTS.map((option) => ({
+            key: `sort-${option.id}`,
+            icon: sort === option.id ? ('check' as const) : ('list' as const),
+            label: `Sort: ${option.label}`,
+            onPress: () => {
+              if (sort === option.id) return;
+              haptic('select');
+              setSort(option.id);
+              listRef.current?.scrollToOffset({ offset: 0, animated: false });
+            },
+          })),
+          ...(!composerLocked ? [[{
+            key: 'photo',
+            icon: 'image' as const,
+            label: 'Add photo to comment',
+            disabled: photo.uploading,
+            onPress: () => { hapticLight(); void photo.pick(); },
+          }]] : []),
+        ]}
+      />
+    </Sheet>
+  );
+  const actionsSheet = (
       <CommentActionsSheet
         comment={actionsFor}
         onClose={() => setActionsFor(null)}
@@ -1518,6 +1609,74 @@ export default function BuyerPostCommentsScreen() {
         canPin={meta.isPostOwner}
         onTogglePin={handleTogglePin}
       />
+  );
+  if (embedded) {
+    return (
+      <View style={s.sheetInner} testID="comments-sheet">
+        {sheetBody}
+        {actionsSheet}
+        {optionsSheet}
+      </View>
+    );
+  }
+
+  return (
+    <View style={s.overlay}>
+      {/* Media lives in its own fixed box spanning screenTop → sheetTop —
+          never the full screen — so the video/poster shrinks DOWN to fit
+          inside it (contentFit="contain", centered) like real TikTok, instead
+          of rendering at its own intrinsic pixel size (e.g. 1080x1920) inside
+          a 390pt box and showing a blown-up crop. The box resizes with the
+          sheet on the same non-spring SHEET_TIMING curve as the keyboard
+          opens/closes — it only ever shrinks/grows in place, never zooms. */}
+      <Animated.View style={[s.mediaBox, { height: mediaAreaHeight }]}>
+        {mediaUri ? (
+          postType === 'video' ? (
+            <>
+              {posterUri && (!videoPlaying || videoErrored) ? (
+                <CachedImage
+                  source={{ uri: posterUri }}
+                  style={s.mediaFill}
+                  contentFit="contain"
+                  testID="comments-video-poster"
+                />
+              ) : null}
+              {!videoErrored && (
+                <VideoView
+                  player={mediaPlayer}
+                  style={[s.mediaFill, posterUri && !videoPlaying && { opacity: 0 }]}
+                  contentFit="contain"
+                  nativeControls={false}
+                  testID="comments-video-preview"
+                />
+              )}
+            </>
+          ) : (
+            <CachedImage source={{ uri: mediaUri }} style={s.mediaFill} contentFit="contain" />
+          )
+        ) : null}
+        <PressableScale
+          style={s.backdrop}
+          activeOpacity={1}
+          onPress={close}
+          accessibilityRole="button"
+          accessibilityLabel="Close comments"
+          noMinHeight
+        />
+      </Animated.View>
+      <Animated.View style={[s.sheet, { height: sheetHeightAnim, transform: [{ translateY: dragY }] }]}>
+        <KeyboardAvoidingView
+          style={s.sheetInner}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+          testID="comments-sheet"
+        >
+          {sheetBody}
+        </KeyboardAvoidingView>
+      </Animated.View>
+
+      {actionsSheet}
+      {optionsSheet}
     </View>
   );
 }
@@ -1615,7 +1774,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   // children of one centered row — no minHeight tap-target box around
   // either one, which is what used to float Reply above Time. 4pt below the
   // comment text, per TikTok's own comment-row spacing.
-  commentMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: 4 },
+  commentMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: 4 },
   // `noMinHeight` on the Reply Pressable itself (a wider tap area comes from
   // `hitSlop` instead) — otherwise PressableScale's forced 44pt-tall box
   // stretches this whole meta row to 44pt regardless of the 12pt text inside it.

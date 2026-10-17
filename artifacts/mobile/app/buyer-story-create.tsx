@@ -58,6 +58,7 @@ import {
   MAX_MENTIONS_PER_STORY, MENTION_MIN_SCALE, activeMentionQuery, clampMentionOpacity, clampOverlayPosition, clampOverlayScale,
   insertMention, nextMentionStyle, tapSlop, taggedPeople, withAt,
 } from '@/lib/storyMentionSticker';
+import { storyPostShareSeed, type StoryPostShareSeed } from '@/lib/storyPostShare';
 import { RESHARE_CARD_RADIUS, RESHARE_FALLBACK_COLORS, reshareGradientFromBackground, sampleImageColor } from '@/lib/storyReshare';
 import type { MentionPerson } from '@/services/socialTypes';
 import { radius } from '@/constants/radii';
@@ -515,11 +516,16 @@ export default function StoryComposer() {
 
   // Reshare ("Add to your story" from a story that tagged me): skips the camera
   // and opens the editor on a text-type slide holding the original as a card.
-  const params = useLocalSearchParams<{ reshareStoryId?: string; reshareImage?: string; reshareHandle?: string; reshareSlide?: string }>();
+  const params = useLocalSearchParams<{ reshareStoryId?: string; reshareImage?: string; reshareHandle?: string; reshareSlide?: string; sharePostId?: string }>();
   const reshareStoryId = firstParam(params.reshareStoryId);
-  const reshareImage = firstParam(params.reshareImage);
-  const reshareHandle = firstParam(params.reshareHandle);
-  const isReshare = !!reshareStoryId;
+  // "Add to Story" from the Thread share sheet: only the post id is passed;
+  // the poster, caption and link come from api.posts.get below.
+  const sharePostId = reshareStoryId ? undefined : firstParam(params.sharePostId);
+  const [sharedPost, setSharedPost] = useState<StoryPostShareSeed | null>(null);
+  const reshareImage = firstParam(params.reshareImage) ?? sharedPost?.imageUri ?? undefined;
+  const reshareHandle = firstParam(params.reshareHandle) ?? sharedPost?.creatorName;
+  const isReshare = !!reshareStoryId || !!sharePostId;
+  const sharedPostPending = !!sharePostId && !sharedPost;
   const [reshareBg, setReshareBg] = useState<string>(RESHARE_FALLBACK_COLORS[0]);
   const [reshareUnavailable, setReshareUnavailable] = useState(false);
 
@@ -727,6 +733,49 @@ export default function StoryComposer() {
     void sampleImageColor(reshareImage).then((hex) => { if (!cancelled && hex) setReshareBg(hex); });
     return () => { cancelled = true; };
   }, [isReshare, reshareImage]);
+
+  // Shared post: fetch the authoritative post and seed the reshare card,
+  // canonical link and caption. Re-runs (dropping stale results) when the
+  // signed-in account changes; refused/deleted posts show the unavailable state.
+  const sharePostOwner = user?.id ?? null;
+  useEffect(() => {
+    if (!sharePostId) return;
+    let cancelled = false;
+    setSharedPost(null);
+    setReshareUnavailable(false);
+    if (!sharePostOwner) { setReshareUnavailable(true); return; }
+    void (async () => {
+      let result;
+      try {
+        result = storyPostShareSeed(await api.posts.get(sharePostId), sharePostId);
+      } catch {
+        result = { ok: false as const, reason: 'not_found' as const };
+      }
+      if (cancelled) return;
+      if (!result.ok) { setReshareUnavailable(true); return; }
+      const seed = result.seed;
+      setSharedPost(seed);
+      const cardY = Math.max(topInset + 40, (H - RESHARE_CARD_HEIGHT) / 2 - 56);
+      setOverlays([
+        {
+          id: 'ov_reshare_card', type: 'reshare_card',
+          x: (W - RESHARE_CARD_WIDTH) / 2, y: cardY, rotation: 0, scale: 0.88,
+          cardImageUri: seed.imageUri ?? undefined, cardRadius: RESHARE_CARD_RADIUS,
+        },
+        {
+          id: 'ov_shared_post_link', type: 'link',
+          x: W / 2 - 80, y: cardY + RESHARE_CARD_HEIGHT * 0.88 + 12, rotation: 0, scale: 1,
+          linkUrl: seed.postUrl, linkText: `${seed.creatorName} on Brandthread`,
+        },
+        ...(seed.caption ? [{
+          id: 'ov_shared_post_caption', type: 'text' as const,
+          x: W / 2 - 120, y: Math.max(topInset + 8, cardY - 56), rotation: 0, scale: 1,
+          text: seed.caption, color: '#FFFFFF', align: 'center' as const, size: 18, bgStyle: 'translucent' as const,
+        }] : []),
+      ]);
+    })();
+    return () => { cancelled = true; };
+  }, [api, sharePostId, sharePostOwner, topInset]);
 
   // ── Camera controls ──────────────────────────────────────────────────────
 
@@ -1078,7 +1127,7 @@ export default function StoryComposer() {
   // Reshare's "Your story" / "Close Friends" buttons publish straight away, like
   // Instagram's own add-to-story screen (no extra Share sheet in between).
   const shareReshare = (closeFriends: boolean) => {
-    if (isPosting || reshareUnavailable) return;
+    if (isPosting || reshareUnavailable || sharedPostPending) return;
     setSelectedId(null);
     setCloseFriendsOnly(closeFriends);
     void doShare({ type: 'text', bg: reshareBg, ovs: overlays }, { closeFriendsOnly: closeFriends });
@@ -1661,7 +1710,7 @@ export default function StoryComposer() {
           selected={ov.id === selectedId}
           removable={ov.type !== 'reshare_card'}
         >
-          {renderOverlayContent(ov, { creditHandle: reshareHandle, onCreditPress: reshareStoryId ? openReshareOriginal : undefined })}
+          {renderOverlayContent(ov, { creditHandle: reshareHandle, onCreditPress: reshareStoryId ? openReshareOriginal : sharePostId ? () => router.push(`/buyer-post-viewer?postId=${encodeURIComponent(sharePostId)}` as never) : undefined })}
         </OverlayChip>
       ))}
 
@@ -1784,8 +1833,8 @@ export default function StoryComposer() {
             <View style={styles.reshareUnavailable} testID="reshare-unavailable">
               <Icon name="slash" size={16} color={ON_DARK} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.reshareUnavailableTitle}>Story unavailable</Text>
-                <Text style={styles.reshareUnavailableSub}>This story expired or you can no longer share it.</Text>
+                <Text style={styles.reshareUnavailableTitle}>{sharePostId ? 'Post unavailable' : 'Story unavailable'}</Text>
+                <Text style={styles.reshareUnavailableSub}>{sharePostId ? "This post was removed, isn't public, or you're signed out, so it can't be added to your story." : 'This story expired or you can no longer share it.'}</Text>
               </View>
               <TouchableOpacity onPress={() => goBackOr(router)} accessibilityRole="button" accessibilityLabel="Close">
                 <Text style={styles.reshareNotNow}>Close</Text>
@@ -1797,7 +1846,7 @@ export default function StoryComposer() {
                 <PressableScale
                   style={[styles.reshareAction, isPosting && { opacity: 0.6 }]}
                   onPress={() => shareReshare(false)}
-                  disabled={isPosting}
+                  disabled={isPosting || sharedPostPending}
                   accessibilityRole="button"
                   accessibilityLabel="Share to your story"
                   testID="reshare-your-story"
@@ -1808,7 +1857,7 @@ export default function StoryComposer() {
                 <PressableScale
                   style={[styles.reshareAction, styles.reshareActionOutline, isPosting && { opacity: 0.6 }]}
                   onPress={() => shareReshare(true)}
-                  disabled={isPosting}
+                  disabled={isPosting || sharedPostPending}
                   accessibilityRole="button"
                   accessibilityLabel="Share to Close Friends"
                   testID="reshare-close-friends"

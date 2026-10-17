@@ -1,4 +1,4 @@
-import { haptics, hapticLight, hapticMedium, hapticSelection, haptic } from '@/lib/haptics';
+import { haptics, hapticLight, hapticMedium, hapticSelection, haptic, hapticFollow } from '@/lib/haptics';
 
 import { spotlightPagePropsEqual } from '@/lib/feedPageMemo';
 
@@ -24,7 +24,7 @@ import { useRouter, useIsFocused, useScrollToTop, useLocalSearchParams } from 'e
 
 import { useReportSheet } from '@/components/safety/ReportSheet';
 
-import { useAuth } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 
 import { ForYouEmptyShop } from '@/components/feed/ForYouEmptyShop';
 
@@ -85,9 +85,11 @@ import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
 
-import { FIRST_FRAME_FALLBACK_MS, pickPlaybackUri, remoteVideoUri, shouldRevealVideo, withVideoCaching } from '@/lib/videoPreload';
+import { FEED_VIDEO_BUFFER_OPTIONS, pickPlaybackUri, remoteVideoUri, shouldRevealVideo, withVideoCaching } from '@/lib/videoPreload';
+import { beginFeedVideoTiming, completeFeedVideoTiming } from '@/lib/feedVideoTiming';
 
 import { useFeedVideoPreload } from '@/hooks/useFeedVideoPreload';
+import { recordFeedVideoError } from '@/lib/feedVideoDiagnostics';
 
 import { FEED_FRAME_SAMPLER_PROPS, mark as perfMark, useScreenInteractive } from '@/lib/perf';
 
@@ -121,6 +123,7 @@ import { EngagementButton, FeedToastProvider, useFeedToast } from '@/components/
 import { formatCount, isUUID as isUUIDId } from '@/lib/engagementUtils';
 
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
+import { ThreadCommentsSheet } from '@/app/buyer-post-comments';
 
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 
@@ -140,6 +143,8 @@ import { getVideoFeedPage, loadExactCreatorVideoReplay, loadVideoFeedThrough } f
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
+import { TapHeartBurst } from '@/components/buyer-feed/TapHeartBurst';
+import { persistPostAction, postActionPending, subscribePostEngagement } from '@/lib/postEngagement';
 
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 
@@ -164,7 +169,15 @@ import { finishedVideoIds, loadFinishedVideos, markVideoFinished, reachedEnd, wi
 import { useDataSaverSetting } from '@/hooks/useDataSaverSetting';
 import { useProductSoldOut } from '@/hooks/useProductSoldOut';
 import { DiscoverEntityCard } from '@/components/discover/DiscoverEntityCard';
+import { ParentScrollGestureScope } from '@/components/media/ParentScrollGesture';
 import { PhotoCarousel } from '@/components/buyer-feed/PhotoCarousel';
+import { SoundDisc } from '@/components/buyer-feed/SoundDisc';
+import { clearModeChromeStyle } from '@/components/buyer-feed/clearMode';
+import { usePhotoAutoAdvance } from '@/components/buyer-feed/photoAutoAdvance';
+import { claimsProfileSwipe, firesProfileSwipe } from '@/components/buyer-feed/horizontalProfileSwipe';
+import { ClearModeExit } from '@/components/buyer-feed/ClearModeExit';
+import { isGuestFollowing } from '@/components/buyer-feed/guestFollowing';
+import { FollowingTrendingCreators, type TrendingCreator } from '@/components/buyer-feed/FollowingTrendingCreators';
 import { creditLabel, OFFICIAL_AVATAR_SOURCE } from '@/lib/officialAccount';
 import { noteThreadOnScreen } from '@/services/officialSeedService';
 import { previewOfficialPosts } from '@/lib/previewOfficialAccount';
@@ -230,6 +243,9 @@ const RAIL_BOTTOM_GAP = CAPTION_BOTTOM_GAP + 3;
 const PROGRESS_ABOVE_BAR = 6;
 // How long the paused play glyph stays before fading (V9).
 const PAUSE_GLYPH_HOLD_MS = 600;
+// Long-press → Video options (the old 250ms hold that raced it is removed;
+// 2x stays reachable via the options sheet's Playback speed).
+const LONG_PRESS_MS = 450;
 // Less-AI pass (V5): the bottom gradient only covers the caption area —
 // the caption stack's usual height (product chip + name + 2-line caption +
 // sound line) plus a short fade above it.
@@ -467,11 +483,13 @@ interface SpotlightItem {
   creator: string;
   handle: string;
   avatarColor: string;
+  avatarUri?: string;
   initials: string;
   verified: boolean;
   mediaUris: string[];
   videoSource?: VideoSource;
   videoPosterUri?: string;
+  photoAspect?: number;
   videoPosterSource?: ImageSourcePropType;
   contentType: 'photo' | 'slideshow' | 'video';
   caption: string;
@@ -518,6 +536,16 @@ interface SpotlightItem {
 type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
 
 /** A caption product mention opens the same Shop sheet as a product tag, scoped to just the mentioned product (straight to its detail). */
+/** Minimal SpotlightItem for the shared, role-aware handleOpenCreator (profile / live). */
+function trendingCreatorAsItem(c: TrendingCreator): SpotlightItem {
+  return {
+    id: c.startPostId ?? `trending-${c.sellerId}`, creator: c.name, handle: c.handle ?? '', avatarColor: '#000', avatarUri: c.avatarUri,
+    initials: c.name.trim().slice(0, 2).toUpperCase(), verified: c.verified, mediaUris: [], contentType: 'video', caption: '', sound: '',
+    productName: '', productPrice: '', productOriginalPrice: null, accentColor: '#000', likes: 0, comments: [], reposts: 0, shares: 0, saves: 0,
+    sellerId: c.sellerId, authorAccountType: c.accountType, official: c.official,
+  };
+}
+
 function mentionShopTarget(item: SpotlightItem, mention: PostProductMention): [SpotlightItem, SpotlightProductTag] {
   const tag: SpotlightProductTag = item.productTags?.find((t) => t.productId === mention.productId) ?? {
     productId: mention.productId,
@@ -1052,6 +1080,7 @@ type EngagementState = {
   liked: boolean; likes: number;
   saved: boolean; saves: number;
   reposted: boolean; reposts: number;
+  shares?: number;
   following: boolean;
   comments: { id: string; user: string; text: string }[];
 };
@@ -1068,6 +1097,7 @@ function initialEngagement(item: SpotlightItem): EngagementState {
     liked: item.likedByMe === true, likes: item.likes,
     saved: item.savedByMe === true, saves: item.saves,
     reposted: item.repostedByMe === true, reposts: item.reposts,
+    shares: item.shares,
     following: false,
     // Some feed items arrive without a comments array (e.g. posts restored
     // from the feed cache); never let that reach the memo comparator below.
@@ -1102,7 +1132,7 @@ function formatPlaybackTime(totalSeconds: number): string {
  * fight the seek) and resumes automatically on release, unless the post was
  * already manually paused (tap-to-pause elsewhere on the video is untouched
  * — this component only ever touches the player directly, never the parent's
- * `paused`/`holdPaused` state). While dragging: the line thickens, a round
+ * `paused` state). While dragging: the line thickens, a round
  * thumb appears on it, a "current / total" time bubble tracks the thumb, and
  * a selection haptic "tick" fires every ~3% of the scrub so long drags feel
  * textured rather than silent.
@@ -1119,8 +1149,9 @@ function formatPlaybackTime(totalSeconds: number): string {
  * `_WITH_REPOST`, see components/buyer-feed/CaptionBlock.tsx) instead of a
  * second hand-tuned number means the two can't drift apart again. */
 function ScrubProgressBar({
-  player, progress, bottom, chromeTop, externallyPaused = false,
+  player, progress, bottom, chromeTop, externallyPaused = false, onScrubbingChange,
 }: {
+  onScrubbingChange?: (scrubbing: boolean) => void;
   player: ReturnType<typeof useVideoPlayer>;
   progress: number;
   bottom: number;
@@ -1133,12 +1164,19 @@ function ScrubProgressBar({
   externallyPaused?: boolean;
 }) {
   const [dragging, setDragging] = useState(false);
+  const onScrubRef = useRef(onScrubbingChange);
+  onScrubRef.current = onScrubbingChange;
+  useEffect(() => { onScrubRef.current?.(dragging); }, [dragging]);
   const [dragProgress, setDragProgress] = useState(progress);
   const [trackWidth, setTrackWidth] = useState(0);
   const thickness = useRef(new Animated.Value(2)).current;
   const thumbScale = useRef(new Animated.Value(0)).current;
   const trackWidthRef = useRef(0);
   const lastTickFraction = useRef(0);
+  const pausedRef = useRef(externallyPaused);
+  const progressRef = useRef(progress);
+  pausedRef.current = externallyPaused;
+  progressRef.current = progress;
 
   useEffect(() => { trackWidthRef.current = trackWidth; }, [trackWidth]);
   useEffect(() => { if (!dragging) setDragProgress(progress); }, [progress, dragging]);
@@ -1162,10 +1200,10 @@ function ScrubProgressBar({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
         setDragging(true);
-        lastTickFraction.current = progress;
+        lastTickFraction.current = progressRef.current;
         player.pause();
         Animated.parallel([
-          Animated.timing(thickness, { toValue: 7, duration: 120, useNativeDriver: false }),
+          Animated.timing(thickness, { toValue: 7, duration: 120, useNativeDriver: true }),
           Animated.spring(thumbScale, { toValue: 1, useNativeDriver: true, speed: 30 }),
         ]).start();
         seekToLocationX(evt.nativeEvent.locationX);
@@ -1176,18 +1214,18 @@ function ScrubProgressBar({
       onPanResponderRelease: () => {
         setDragging(false);
         Animated.parallel([
-          Animated.timing(thickness, { toValue: 2, duration: 150, useNativeDriver: false }),
+          Animated.timing(thickness, { toValue: 2, duration: 150, useNativeDriver: true }),
           Animated.timing(thumbScale, { toValue: 0, duration: 120, useNativeDriver: true }),
         ]).start();
-        if (!externallyPaused) player.play();
+        if (!pausedRef.current) player.play();
       },
       onPanResponderTerminate: () => {
         setDragging(false);
         Animated.parallel([
-          Animated.timing(thickness, { toValue: 2, duration: 150, useNativeDriver: false }),
+          Animated.timing(thickness, { toValue: 2, duration: 150, useNativeDriver: true }),
           Animated.timing(thumbScale, { toValue: 0, duration: 120, useNativeDriver: true }),
         ]).start();
-        if (!externallyPaused) player.play();
+        if (!pausedRef.current) player.play();
       },
     }),
   ).current;
@@ -1195,7 +1233,6 @@ function ScrubProgressBar({
   const shown = dragging ? dragProgress : progress;
   const thumbLeft = trackWidth > 0 ? shown * trackWidth : 0;
   const duration = player.duration || 0;
-  const bubbleLeft = trackWidth > 0 ? Math.min(Math.max(thumbLeft - 34, 0), Math.max(trackWidth - 68, 0)) : 0;
   const hitAreaScreenBottom = bottom - 13;
   // Never *less* than the thumb-hugging 22 this used to always be (so on a
   // short/no-caption post the bubble still sits close to the thumb) — only
@@ -1212,7 +1249,7 @@ function ScrubProgressBar({
       accessibilityValue={{ min: 0, max: 100, now: Math.round(shown * 100) }}
     >
       {dragging && (
-        <View style={[styles.scrubBubble, { left: bubbleLeft, bottom: bubbleBottom }]} pointerEvents="none">
+        <View style={[styles.scrubBubble, { bottom: bubbleBottom }]} pointerEvents="none" testID="scrub-timestamp">
           <Text style={styles.scrubBubbleText}>
             {formatPlaybackTime(shown * duration)} / {formatPlaybackTime(duration)}
           </Text>
@@ -1223,7 +1260,7 @@ function ScrubProgressBar({
           brand accent color over the whole bar, which is both an
           unrequested color for this monochrome polish pass and not what
           "white 90% on a 25% track" asked for. */}
-      <Animated.View style={[styles.progressTrack, { height: thickness }]}>
+      <Animated.View style={[styles.progressTrack, { height: 7, transform: [{ scaleY: thickness.interpolate({ inputRange: [2, 7], outputRange: [2 / 7, 1] }) }] }]}>
         <View style={[styles.progressFill, { width: `${shown * 100}%` }]} />
       </Animated.View>
       <Animated.View
@@ -1297,6 +1334,8 @@ type VideoVisualProps = {
   captions?: CaptionSegment[];
   /** Fired once per play-through when the clip reaches its end (or loops). */
   onFinished?: () => void;
+  /** True while the viewer drags the scrub bar (feed hides chrome, watch-7). */
+  onScrubbingChange?: (scrubbing: boolean) => void;
 };
 
 /**
@@ -1364,7 +1403,7 @@ function PosterOnlyVisual({
   const frameAspect = pageWidth != null && frameHeight ? pageWidth / frameHeight : pageAspect;
   const cropFraction = 1 - Math.min(videoAspect, frameAspect) / Math.max(videoAspect, frameAspect);
   const coverThreshold = bottomStripHeight > 0 ? IMMERSIVE_FRAME_COVER_CROP_THRESHOLD : FULL_PAGE_COVER_CROP_THRESHOLD;
-  const fit = immersive && cropFraction <= coverThreshold ? 'cover' : 'contain';
+  const fit = 'cover' as const;
   const posterImage = posterSource ?? (posterUri ? { uri: posterUri } : undefined);
   const frameStyle = pageWidth != null && frameHeight != null
     ? { position: 'absolute' as const, top: 0, left: 0, width: pageWidth, height: frameHeight }
@@ -1404,11 +1443,13 @@ function LiveVideoVisual({
   onFirstFramePainted,
   captions,
   onFinished,
+  onScrubbingChange,
 }: VideoVisualProps) {
   const player = useVideoPlayer(source, p => {
     p.loop = true;
     p.muted = muted;
     if (progressBottom != null) p.timeUpdateEventInterval = 0.25;
+    if (Platform.OS !== 'web') p.bufferOptions = FEED_VIDEO_BUFFER_OPTIONS;
   });
   const appActive = useAppActive();
   // The setup callback above only runs when the player is created, so the
@@ -1428,22 +1469,14 @@ function LiveVideoVisual({
   // mount/unmount can only pop the pause glyph in, never fade it out on
   // release, since it's gone from the tree the instant `paused` flips back.
   //
-  // Less-AI pass (V9): on pause the large translucent play glyph appears,
-  // holds 0.6s, then fades out — it tells the buyer the tap paused the
-  // video, then gets out of the way. Resuming hides it straight away.
+  // A paused video keeps its translucent play affordance until resumed.
+  // Inactive prepared players must never paint a pause overlay.
   const pauseOverlayOpacity = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     pauseOverlayOpacity.stopAnimation();
-    if (!paused) {
-      Animated.timing(pauseOverlayOpacity, { toValue: 0, duration: 120, useNativeDriver: true }).start();
-      return;
-    }
-    Animated.sequence([
-      Animated.timing(pauseOverlayOpacity, { toValue: 1, duration: 120, useNativeDriver: true }),
-      Animated.delay(PAUSE_GLYPH_HOLD_MS),
-      Animated.timing(pauseOverlayOpacity, { toValue: 0, duration: 240, useNativeDriver: true }),
-    ]).start();
-  }, [paused, pauseOverlayOpacity]);
+    Animated.timing(pauseOverlayOpacity, { toValue: paused && isActive ? 1 : 0, duration: 120, useNativeDriver: true }).start();
+    return () => pauseOverlayOpacity.stopAnimation();
+  }, [paused, isActive, pauseOverlayOpacity]);
   // `playingChange`'s `isPlaying: true` (used alone, previously) fires the
   // instant `player.play()` is *called* — on web this is wired to the
   // HTMLVideoElement's `play` event (see expo-video's VideoPlayer.web.tsx
@@ -1468,13 +1501,14 @@ function LiveVideoVisual({
   // flashes black between poster and video. A player that is preloaded as the
   // next page renders that frame while hidden, so revealing it is instant.
   const [firstFrameRendered, setFirstFrameRendered] = useState(false);
-  const [firstFrameTimedOut, setFirstFrameTimedOut] = useState(false);
-  React.useEffect(() => {
-    if (!(hasStarted && readyToPlay) || firstFrameRendered) return undefined;
-    const timer = setTimeout(() => setFirstFrameTimedOut(true), FIRST_FRAME_FALLBACK_MS);
-    return () => clearTimeout(timer);
-  }, [hasStarted, readyToPlay, firstFrameRendered]);
-  const videoVisible = shouldRevealVideo({ hasStarted, readyToPlay, firstFrameRendered, firstFrameTimedOut });
+  const videoVisible = shouldRevealVideo({ hasStarted, readyToPlay, firstFrameRendered, firstFrameTimedOut: false });
+  const timingRef = useRef<ReturnType<typeof beginFeedVideoTiming> | null>(null);
+  React.useLayoutEffect(() => {
+    if (!isActive) { timingRef.current = null; return; }
+    timingRef.current ??= beginFeedVideoTiming(signalPostId ?? 'feed-video');
+    if (videoVisible) completeFeedVideoTiming(timingRef.current);
+  }, [isActive, videoVisible, signalPostId]);
+  React.useLayoutEffect(() => { setFirstFrameRendered(false); }, [player]);
   const showPoster = Boolean(posterSource || posterUri) && !videoVisible;
   const showFallbackCover = !showPoster && !videoVisible;
   // Fit/crop math runs against the full-bleed frame's aspect (the whole
@@ -1485,14 +1519,15 @@ function LiveVideoVisual({
   const frameAspect = pageWidth != null && frameHeight ? pageWidth / frameHeight : pageAspect;
   const cropFraction = 1 - Math.min(videoAspect, frameAspect) / Math.max(videoAspect, frameAspect);
   const coverThreshold = bottomStripHeight > 0 ? IMMERSIVE_FRAME_COVER_CROP_THRESHOLD : FULL_PAGE_COVER_CROP_THRESHOLD;
-  const fit = immersive && cropFraction <= coverThreshold ? 'cover' : 'contain';
+  const fit = 'cover' as const;
   const posterImage = posterSource ?? (posterUri ? { uri: posterUri } : undefined);
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const subscription = player.addListener('playingChange', ({ isPlaying }) => {
       if (isPlaying) setHasStarted(true);
     });
-    const statusSubscription = player.addListener('statusChange', ({ status }) => {
-      if (status === 'readyToPlay') setReadyToPlay(true);
+    const statusSubscription = player.addListener('statusChange', ({ status, error }) => {
+      setReadyToPlay(status === 'readyToPlay');
+      if (status === 'error') recordFeedVideoError(signalPostId ?? 'feed-video', remoteVideoUri(source), error?.message ?? 'Unknown player error');
     });
     if (player.status === 'readyToPlay') setReadyToPlay(true);
     const trackSubscription = player.addListener('videoTrackChange', ({ videoTrack }) => {
@@ -1500,10 +1535,10 @@ function LiveVideoVisual({
       if (size && size.width > 0 && size.height > 0) setVideoAspect(size.width / size.height);
     });
     return () => { subscription.remove(); statusSubscription.remove(); trackSubscription.remove(); };
-  }, [player]);
+  }, [player, signalPostId, source]);
   const firstFramePaintedRef = React.useRef(false);
   const reportFirstFramePainted = React.useCallback(() => {
-    if (firstFramePaintedRef.current) return;
+    if (firstFramePaintedRef.current || !onFirstFramePainted) return;
     firstFramePaintedRef.current = true;
     onFirstFramePainted?.();
   }, [onFirstFramePainted]);
@@ -1531,6 +1566,8 @@ function LiveVideoVisual({
   useMeaningfulVideoWatch(player, isActive && !paused && isScreenFocused, onWatched);
   useFeedWatchSignals(player, isActive, signalPostId);
   React.useEffect(() => {
+    // Expo web attaches its HTML video view in a child passive effect;
+    // a layout-effect play() runs too early and has no mounted view to start.
     // isFocused is required (not just isActive) so navigating to a modal on
     // top of the feed (e.g. the comments sheet) pauses this clip, and — the
     // real fix here — coming back explicitly re-issues play() rather than
@@ -1548,6 +1585,7 @@ function LiveVideoVisual({
       player.play();
     } else {
       player.pause();
+      if (!isActive) player.currentTime = 0;
     }
   }, [isActive, paused, isScreenFocused, player, pageWidth, pageHeight]);
   React.useEffect(() => {
@@ -1577,7 +1615,7 @@ function LiveVideoVisual({
         {showPoster && (
           <CachedImage
             source={posterSource ?? { uri: posterUri! }}
-            style={StyleSheet.absoluteFill}
+            style={[StyleSheet.absoluteFill, { zIndex: 1 }]}
             contentFit={fit}
             priority={posterPriority}
             onLoad={reportFirstFramePainted}
@@ -1585,7 +1623,7 @@ function LiveVideoVisual({
         )}
         {showFallbackCover && (
           <View
-            style={[StyleSheet.absoluteFill, { backgroundColor: fallbackColor ?? '#0a0a0a' }]}
+            style={[StyleSheet.absoluteFill, { zIndex: 1, backgroundColor: fallbackColor ?? '#0a0a0a' }]}
             pointerEvents="none"
           />
         )}
@@ -1593,7 +1631,7 @@ function LiveVideoVisual({
           player={player}
           // Explicit size: on web the style lands on a <video>, which ignores
           // inset-only sizing and would otherwise render at its intrinsic size.
-          style={[StyleSheet.absoluteFill, styles.videoFill, (showPoster || showFallbackCover) && { opacity: 0 }]}
+          style={[StyleSheet.absoluteFill, styles.videoFill]}
           contentFit={fit}
           nativeControls={false}
           onFirstFrameRender={() => setFirstFrameRendered(true)}
@@ -1613,6 +1651,7 @@ function LiveVideoVisual({
           bottom={progressBottom}
           chromeTop={chromeTop ?? progressBottom + 34}
           externallyPaused={paused}
+          onScrubbingChange={onScrubbingChange}
         />
       )}
     </>
@@ -1668,7 +1707,7 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange, onFirstImagePa
 // presentational components to them below.
 
 function SpotlightPageImpl({
-  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, videoFrameInset, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, onVideoWatched, soundOn, onToggleSound, onFirstFramePainted, reduceMotion = false,
+  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, headerClearance = 0, videoFrameInset, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, onVideoWatched, soundOn, onToggleSound, onFirstFramePainted, reduceMotion = false,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -1683,6 +1722,8 @@ function SpotlightPageImpl({
   pageWidth: number;
   pageHeight: number;
   bottomClearance: number;
+  /** Measured overlay header bottom: clear-mode exit must remain tappable. */
+  headerClearance?: number;
   /**
    * Height of the sharp video frame's bottom cutoff, from the page's bottom
    * edge — "the line" the immersive video stops at. Distinct from
@@ -1726,16 +1767,19 @@ function SpotlightPageImpl({
   const { openReport } = useReportSheet();
   const { push } = useThreadPull();
   const feedApi = useApi();
-  const commentCountDelta = useCommentCountDelta(item.id);
+  const commentCountDelta = useCommentCountDelta(item.id, item.commentsCount);
   // The creator player (no tab bar) always plays edge to edge like Buyer Home.
   const immersive = immersiveProp || !hasTabBar;
+  const { userId: railViewerId } = useAuth();
+  const { user: railViewer } = useUser();
   const [paused, setPaused] = useState(false);
   /** Which page of a multi-photo post is currently visible, for the pager dots. */
   /** Pause while the buyer is holding down on the left/center of the video — distinct from the tap-to-toggle `paused` above, so releasing always resumes rather than fighting a manual pause. */
-  const [holdPaused, setHoldPaused] = useState(false);
   /** 2x while holding the right side of the video. */
   const [speedActive, setSpeedActive] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  useEffect(() => { if (!isActive) { setCommentsOpen(false); setShareOpen(false); } }, [isActive]);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   useEffect(() => { if (!isActive) setCaptionExpanded(false); }, [isActive]);
   // Shop tag pill's shared expand/collapse state — see ShopSideTab.tsx's
@@ -1768,8 +1812,15 @@ function SpotlightPageImpl({
   // Starts at the taller of the two nominal minimums so the very first
   // frame (before layout fires) still clears a repost row if there is one.
   const [captionBlockHeight, setCaptionBlockHeight] = useState(CAPTION_BLOCK_HEIGHT_WITH_REPOST);
+  const [captionBottomOffset, setCaptionBottomOffset] = useState(item.credit ? 76 : 52);
   /** Long-press "Video options" sheet (components/buyer-feed/LongPressMenu). */
   const [menuOpen, setMenuOpen] = useState(false);
+  const [watchedForRepost, setWatchedForRepost] = useState(false);
+  React.useEffect(() => {
+    if (!isActive || item.contentType === 'video') return;
+    const timer = setTimeout(() => setWatchedForRepost(true), 4000);
+    return () => clearTimeout(timer);
+  }, [isActive, item.id, item.contentType]);
   const { showToast } = useFeedToast();
   // Auto-captions (lib/captions): only the active page asks for its track.
   const captionsFlag = useFeatureFlag('autoCaptions');
@@ -1795,22 +1846,13 @@ function SpotlightPageImpl({
       else showToast(result.message, result.reason === 'cancelled' ? 'info' : 'error');
     });
   }, [item.id, item.mediaUris, showToast]);
-  const heartBurst = useRef(new Animated.Value(0)).current;
-  // Separate from `heartBurst` (which only drives opacity/fade): the scale
-  // pop needs its own sequence, not a value interpolated off the fade.
-  const heartBurstScale = useRef(new Animated.Value(0.6)).current;
   /** Where the double-tap heart appears: the second tap's point inside the
    *  page (TikTok / Instagram Reels), not a fixed spot. */
   const [heartBurstPoint, setHeartBurstPoint] = useState<{ x: number; y: number } | null>(null);
   const lastPressPoint = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const heartScale = useRef(new Animated.Value(1)).current;
   const speedPillOpacity = useRef(new Animated.Value(0)).current;
-  const repostScale = useRef(new Animated.Value(1)).current;
-  const saveScale = useRef(new Animated.Value(1)).current;
   const lastTap = useRef(0);
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdTriggered = useRef(false);
   // No entrance animation on the overlay chrome (rail + bottom-info block):
   // it must move 1:1 with its own page as part of the same cell, exactly
   // like the video does, with zero opacity/position animation when a cell
@@ -1821,7 +1863,18 @@ function SpotlightPageImpl({
   // holding sturdy with the page. `chromeStyle` is now a plain, static,
   // always-settled style — kept as a style object (not removed outright) so
   // every call site below stays unchanged.
-  const chromeStyle = { opacity: 1 };
+  const [clearMode, setClearMode] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
+  const chromeStyle = clearModeChromeStyle(clearMode || scrubbing);
+  const [photoAutoAdvance, setPhotoAutoAdvance] = usePhotoAutoAdvance();
+  const openCreatorRef = useRef(() => onOpenCreator(item));
+  openCreatorRef.current = () => onOpenCreator(item);
+  const isVideoPost = item.contentType === 'video';
+  const profileSwipe = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_e, g) => isVideoPost && claimsProfileSwipe(g.dx, g.dy),
+    onPanResponderTerminationRequest: () => true,
+    onPanResponderRelease: (_e, g) => { if (firesProfileSwipe(g.dx, g.dy, g.vx)) { haptic('select'); openCreatorRef.current(); } },
+  }), [isVideoPost]);
   const friendReposts = item.friendReposts ?? [];
   const hasRepostIdentity = engagement?.reposted === true || friendReposts.length > 0;
   const repostLabel = engagement?.reposted
@@ -1834,36 +1887,12 @@ function SpotlightPageImpl({
 
   React.useEffect(() => () => {
     if (pauseTimer.current) clearTimeout(pauseTimer.current);
-    if (holdTimer.current) clearTimeout(holdTimer.current);
   }, []);
 
   /** Double-tap heart: appears where the second tap landed, pops once
    *  (0.6 -> 1.1 -> 1), holds, fades. No particles, no second burst. */
   function burstHeart(point: { x: number; y: number }) {
-    setHeartBurstPoint(point);
-    heartBurst.stopAnimation();
-    heartBurstScale.stopAnimation();
-    heartBurst.setValue(1);
-    heartBurstScale.setValue(0.6);
-    Animated.sequence([
-      Animated.timing(heartBurstScale, { toValue: 1.1, duration: 120, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.timing(heartBurstScale, { toValue: 1, duration: 80, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-    ]).start();
-    Animated.timing(heartBurst, { toValue: 0, duration: 200, delay: 450, useNativeDriver: true }).start();
-    // Item 148: the big heart is the "liked" signal; the particle spray that
-    // used to play around it was decoration and is gone.
-  }
-
-  /** The one pop every rail toggle (like, repost, save) shares: 1 -> 1.15
-   *  -> 1 over 180ms, played once when the action turns ON (never on undo).
-   *  No ring, spin or drop on top of it. */
-  function popOnce(value: Animated.Value) {
-    value.stopAnimation();
-    value.setValue(1);
-    Animated.sequence([
-      Animated.timing(value, { toValue: 1.15, duration: 90, useNativeDriver: true }),
-      Animated.timing(value, { toValue: 1, duration: 90, useNativeDriver: true }),
-    ]).start();
+    setHeartBurstPoint({ ...point });
   }
 
   function handleQuickTap() {
@@ -1872,9 +1901,7 @@ function SpotlightPageImpl({
       lastTap.current = 0;
       if (pauseTimer.current) { clearTimeout(pauseTimer.current); pauseTimer.current = null; }
       onDoubleTapLike(item.id);
-      if (!engagement?.liked) popOnce(heartScale);
-      burstHeart(lastPressPoint.current);
-      haptic('like');
+      if (railViewerId) burstHeart(lastPressPoint.current);
     } else {
       lastTap.current = now;
       pauseTimer.current = setTimeout(() => {
@@ -1884,44 +1911,36 @@ function SpotlightPageImpl({
     }
   }
 
-  /** Press and hold the right ~40% of the video = 2x speed with a small
-   * "2x" pill; holding anywhere else pauses. Releasing restores 1x / plays.
-   * A quick tap (release before the hold threshold) falls through to the
-   * existing single/double-tap handling above. */
-  function handlePressIn(evt: { nativeEvent: { locationX: number; locationY: number } }) {
-    holdTriggered.current = false;
-    const x = evt.nativeEvent.locationX;
-    lastPressPoint.current = { x, y: evt.nativeEvent.locationY };
-    holdTimer.current = setTimeout(() => {
-      holdTriggered.current = true;
-      // A tap already queued for "toggle pause" must not also fire once the hold resolves.
-      if (pauseTimer.current) { clearTimeout(pauseTimer.current); pauseTimer.current = null; }
-      lastTap.current = 0;
-      if (x > pageWidth * 0.6) {
-        setSpeedActive(true);
-        Animated.timing(speedPillOpacity, { toValue: 1, duration: 120, useNativeDriver: true }).start();
-      } else {
-        setHoldPaused(true);
-      }
-    }, 250);
+  // Long-press opens Video options (2x lives in its Playback speed action);
+  // single/double tap run from onPress, which RN skips after a long-press
+  // or when a scroll steals the touch — no spurious pause.
+  const longPressHandled = useRef(false);
+  function cancelPressTimers() {
+    if (pauseTimer.current) { clearTimeout(pauseTimer.current); pauseTimer.current = null; }
+    lastTap.current = 0;
   }
-
+  function handleLongPress() {
+    cancelPressTimers();
+    longPressHandled.current = true;
+    haptic('longPress');
+    setMenuOpen(true);
+  }
+  // Paging away mid-press must not leave a queued pause behind.
+  useEffect(() => { if (!isActive) { cancelPressTimers(); longPressHandled.current = false; } }, [isActive]);
+  // The "2x" pill follows the menu's Playback speed toggle.
+  useEffect(() => {
+    Animated.timing(speedPillOpacity, { toValue: speedActive ? 1 : 0, duration: 120, useNativeDriver: true }).start();
+  }, [speedActive, speedPillOpacity]);
+  function handlePressIn(evt: { nativeEvent: { locationX: number; locationY: number } }) {
+    longPressHandled.current = false;
+    lastPressPoint.current = { x: evt.nativeEvent.locationX, y: evt.nativeEvent.locationY };
+  }
   function handlePressOut() {
-    if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
-    if (holdTriggered.current) {
-      holdTriggered.current = false;
-      if (speedActive) {
-        setSpeedActive(false);
-        Animated.timing(speedPillOpacity, { toValue: 0, duration: 120, useNativeDriver: true }).start();
-      }
-      if (holdPaused) setHoldPaused(false);
-      return;
-    }
-    handleQuickTap();
+    if (longPressHandled.current) longPressHandled.current = false;
   }
 
   return (
-    <View style={{ width: pageWidth, height: pageHeight, backgroundColor: '#000' }}>
+    <View style={{ width: pageWidth, height: pageHeight, backgroundColor: '#000', ...(Platform.OS === 'web' ? { scrollSnapAlign: 'start', scrollSnapStop: 'always' } : {}) }} {...profileSwipe.panHandlers}>
       {/* Explicit width/height on the Pressable itself, not just its
           absoluteFill'd parent: on web, a plain Pressable/View with no
           intrinsic content and only absolutely-positioned children can
@@ -1931,8 +1950,10 @@ function SpotlightPageImpl({
           (390x0) while the separately-sized blurred mirror strip kept
           rendering, producing an all-black screen with nothing playing. */}
       <Pressable
-        onLongPress={() => { haptic('longPress'); setMenuOpen(true); }}
-        delayLongPress={550}
+        onPress={() => { if (!longPressHandled.current) handleQuickTap(); longPressHandled.current = false; }}
+        onLongPress={handleLongPress}
+        delayLongPress={LONG_PRESS_MS}
+        testID={`video-touch-surface-${item.id}`}
         onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ width: pageWidth, height: pageHeight }}>
         <View style={[StyleSheet.absoluteFill, { width: pageWidth, height: pageHeight }]}>
           {item.contentType === 'video'
@@ -1941,8 +1962,8 @@ function SpotlightPageImpl({
                 source={withVideoCaching(item.videoSource ?? item.mediaUris[0], Platform.OS !== 'web')}
                 isActive={isActive}
                 preload={preload}
-                paused={paused || holdPaused}
-                onWatched={() => onVideoWatched(item.id)}
+                paused={paused}
+                onWatched={() => { setWatchedForRepost(true); onVideoWatched(item.id); }}
                 signalPostId={item.id}
                 onFinished={onVideoFinished}
                 rate={speedActive ? 2 : 1}
@@ -1971,36 +1992,32 @@ function SpotlightPageImpl({
                 pageAspect={pageHeight > 0 ? pageWidth / pageHeight : undefined}
                 pageWidth={pageWidth}
                 pageHeight={pageHeight}
-                bottomStripHeight={immersive && hasTabBar ? (videoFrameInset ?? bottomClearance) : 0}
+                // Media continues behind the floating bar. Only chrome,
+                // captions and the progress control reserve its clearance.
+                bottomStripHeight={0}
                 onFirstFramePainted={isFirstItem ? onFirstFramePainted : undefined}
                 captions={captionTrack && captionsOn ? captionTrack.segments : undefined}
+                onScrubbingChange={setScrubbing}
               />
             )
             : (
               <PhotoCarousel
+                aspects={item.mediaUris?.map(() => item.photoAspect)}
                 postId={item.id}
                 uris={item.mediaUris}
                 pageWidth={pageWidth}
                 pageHeight={pageHeight}
                 isActive={isActive || preload}
-                // Below the floating Following | Threads bar; the segment
-                // indicator sits where a video's progress bar would.
+                // Below the floating header; tappable dots clear the entire
+                // measured caption/sound stack, not just the tab bar.
                 counterTop={insets.top + (hasTabBar ? 60 : 16)}
-                indicatorBottom={bottomClearance + 2}
+                indicatorBottom={bottomClearance + CAPTION_BOTTOM_GAP + captionBlockHeight + 8}
                 onFirstImagePainted={isFirstItem ? onFirstFramePainted : undefined}
+                autoAdvance={photoAutoAdvance && isActive && !menuOpen}
+                holding={paused}
               />
             )}
-          <Animated.View
-            pointerEvents="none"
-            style={[styles.heartBurst, heartBurstPoint
-              ? { left: heartBurstPoint.x - HEART_BURST_SIZE / 2, top: heartBurstPoint.y - HEART_BURST_SIZE / 2 }
-              : styles.heartBurstHidden, {
-              opacity: heartBurst,
-              transform: [{ scale: heartBurstScale }],
-            }]}
-          >
-            <Icon name="heart" size={HEART_BURST_SIZE} color={ON_DARK} />
-          </Animated.View>
+          <TapHeartBurst point={heartBurstPoint} reduceMotion={reduceMotion} />
           {item.contentType === 'video' && (
             <Animated.View
               pointerEvents="none"
@@ -2022,6 +2039,8 @@ function SpotlightPageImpl({
 
       {/* "more" caption: dim the video a little so the full text reads,
           TikTok-style (#151). Tapping the dimmed video collapses it. */}
+      {clearMode && <ClearModeExit top={Math.max(insets.top + 8, headerClearance + 12)} right={12 + insets.right} onExit={() => setClearMode(false)} />}
+
       {captionExpanded && (
         <Pressable
           style={[StyleSheet.absoluteFill, styles.captionDim]}
@@ -2045,32 +2064,60 @@ function SpotlightPageImpl({
           lives in the caption block (CaptionBlock's sound row) instead of a
           rail-mounted disc — matches dev's #129 rail exactly. */}
       <RightActionRail
-        style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP, right: 10 + insets.right }]}
+        style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP, right: 8 + insets.right }]}
+        shareBottom={bottomClearance + CAPTION_BOTTOM_GAP + captionBottomOffset}
         creator={item.creator}
         hostId={item.sellerId}
         avatarColor={item.avatarColor}
+        avatarUri={item.avatarUri}
+        isOfficial={item.official}
+        isSelf={!!railViewerId && item.sellerId === railViewerId}
         avatarSource={item.official ? OFFICIAL_AVATAR_SOURCE : undefined}
         initials={item.initials}
         accentColor={item.accentColor}
         engagement={engagement}
         commentsCount={(item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta}
-        shares={item.shares}
+        shares={engagement?.shares ?? item.shares}
         saves={item.saves}
         onOpenCreator={() => { onOpenCreator(item); }}
         onPressInCreator={() => prefetchCreatorProfile(item)}
         onFollow={() => onFollow(item.id)}
         onLike={async () => { await onLike(item.id); }}
-        onOpenComments={() => onOpenComments(item.id)}
-        onRepost={async () => { if (!engagement?.reposted) popOnce(repostScale); await onRepost(item.id); }}
-        onSave={async () => { if (!engagement?.saved) popOnce(saveScale); await onSave(item.id); }}
+        onOpenComments={() => { haptic('sheet'); setCommentsOpen(true); }}
+        onRepost={() => onRepost(item.id)}
+        onSave={() => onSave(item.id)}
+        onSaveLongPress={() => {
+          const toast = savedPostToast({ ...item, id: feedPostId(item.id) });
+          if (toast.action?.kind === 'save-to-collection') {
+            emitSaveHeartEvent({ type: 'post-sheet', item: toast.action.item, thumbnailUri: toast.thumbnailUri });
+          }
+        }}
         onShare={() => setShareOpen(true)}
-        heartScale={heartScale}
-        repostScale={repostScale}
-        saveScale={saveScale}
         testIdBase={item.id}
         reduceMotion={reduceMotion}
+        footerSlot={item.contentType === 'video' ? (
+          <SoundDisc
+            avatarUri={item.avatarUri}
+            avatarSource={item.official ? OFFICIAL_AVATAR_SOURCE : undefined}
+            initials={item.initials}
+            sound={item.sound}
+            spinning={isActive}
+            reduceMotion={reduceMotion}
+            soundOn={soundOn}
+            onPress={onToggleSound}
+            testID={`sound-disc-${item.id}`}
+          />
+        ) : undefined}
       />
 
+      <ThreadCommentsSheet
+        visible={commentsOpen && isActive}
+        postId={feedPostId(item.id)}
+        postAuthorId={item.sellerId}
+        postAuthorName={item.creator}
+        postCaption={item.caption}
+        onClose={() => setCommentsOpen(false)}
+      />
       <ThreadShareSheet
         visible={shareOpen}
         postId={item.id}
@@ -2079,6 +2126,12 @@ function SpotlightPageImpl({
         productName={item.productName}
         mediaUri={item.mediaUris[0]}
         isVideo={item.contentType === 'video'}
+        shareCount={engagement?.shares ?? item.shares}
+        reposted={!!engagement?.reposted}
+        onRepost={() => onRepost(item.id)}
+        recommendationReason={item.sponsored
+          ? 'This is a paid promotion.'
+          : 'You are viewing a post in the Threads feed. Posts can include accounts you follow and posts available to you.'}
         onClose={() => setShareOpen(false)}
         onReport={() => openReport({
           targetType: item.contentType === 'video' ? 'video' : 'post',
@@ -2123,6 +2176,9 @@ function SpotlightPageImpl({
           ownerId: item.sellerId,
           ownerName: item.creator,
         })}
+        clearMode={clearMode}
+        photoAutoAdvance={item.contentType !== 'video' && item.mediaUris.length > 1 ? { on: photoAutoAdvance, onToggle: () => setPhotoAutoAdvance(!photoAutoAdvance) } : undefined}
+        onToggleClearMode={() => setClearMode(v => !v)}
         onClose={() => setMenuOpen(false)}
       />
 
@@ -2132,6 +2188,8 @@ function SpotlightPageImpl({
           the ShopSideTab rendered above instead of a CaptionBlock slot. */}
       <CaptionBlock
         style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}
+        onCaptionBottomOffsetChange={setCaptionBottomOffset}
+        location={item.location}
         creator={item.creator}
         verified={!!item.verified}
         sponsored={item.sponsored}
@@ -2155,6 +2213,7 @@ function SpotlightPageImpl({
         soundOn={soundOn}
         onToggleSound={onToggleSound}
         friendReposts={friendReposts}
+        selfRepost={engagement?.reposted ? { avatarUri: railViewer?.imageUrl, name: railViewer?.fullName ?? 'You' } : undefined}
         hasRepostIdentity={hasRepostIdentity}
         repostLabel={repostLabel}
         onOpenRepostIdentity={() => {
@@ -2170,7 +2229,18 @@ function SpotlightPageImpl({
         belowCaptionSlot={<PollCard postId={feedPostId(item.id)} variant="overlay" />}
         soundActive={isActive}
         reduceMotion={reduceMotion}
-        topSlot={!!item.productTags?.length && shopTagShown && (
+        topSlot={((watchedForRepost && isActive && !engagement?.reposted) || (!!item.productTags?.length && shopTagShown)) && <View style={{ alignItems: 'flex-start', gap: 8 }}>
+          {watchedForRepost && isActive && !engagement?.reposted && (
+            <Pressable
+              onPress={() => { void onRepost(item.id); }}
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 4, backgroundColor: '#FFFFFF', opacity: pressed ? 0.7 : 1 })}
+              accessibilityRole="button" accessibilityLabel="Repost this post" testID={`repost-prompt-${item.id}`}
+            >
+              <Icon name="repeat" size={16} color="#000000" />
+              <Text style={{ color: '#000000', fontSize: 12, fontWeight: '600' }}>Repost</Text>
+            </Pressable>
+          )}
+          {!!item.productTags?.length && shopTagShown && (
           <Animated.View style={{ opacity: shopTagOpacity }}>
             <ShopTagPill
               tag={item.productTags[0]}
@@ -2179,7 +2249,8 @@ function SpotlightPageImpl({
               soldOut={tagSoldOut}
             />
           </Animated.View>
-        )}
+          )}
+        </View>}
       />
     </View>
   );
@@ -2187,7 +2258,8 @@ function SpotlightPageImpl({
 
 // Compares `engagement` by value and every callback by identity — see
 // lib/feedPageMemo.ts for why a like then re-renders only its own page.
-const SpotlightPage = React.memo(SpotlightPageImpl, spotlightPagePropsEqual);
+const SpotlightPage = React.memo(SpotlightPageImpl, (before, after) =>
+  before.headerClearance === after.headerClearance && spotlightPagePropsEqual(before, after));
 
 // CommentsModal replaced by navigation to /buyer-post-comments (see handleOpenComments).
 
@@ -2221,10 +2293,15 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     creator: post.authorName,
     handle: post.authorHandle,
     avatarColor: post.authorColor,
+    avatarUri: post.authorAvatarUri,
     initials: post.authorInitials,
     mediaUris: post.mediaUris,
     videoSource: post.contentType === 'video' ? pickPlaybackUri(post.hlsUrl, post.mediaUris[0], Platform.OS !== 'web') : undefined,
     videoPosterUri: post.thumbnailUri,
+    photoAspect: (() => {
+      const [w, h] = (post.aspectRatio ?? '').split(':').map(Number);
+      return w > 0 && h > 0 ? w / h : undefined;
+    })(),
     contentType: post.contentType === 'video' || post.contentType === 'slideshow' ? post.contentType : 'photo',
     caption: post.caption,
     hashtags: post.hashtags,
@@ -2339,15 +2416,22 @@ function buildPreviewShopProduct(
 //   Index 0 renders BuyerHighDemandPage; indices 1+ are regular SpotlightPage/LiveStreamPage items.
 //   getItemLayout is uniform for all items and uses the measured tab scene.
 
-export default function FeedScreen({
-  buyerMode = false,
-  showFashionPreview = false,
-  creatorFeed,
-}: {
+interface FeedScreenProps {
   buyerMode?: boolean;
   showFashionPreview?: boolean;
   creatorFeed?: CreatorFeedConfig;
-}) {
+}
+
+export default function FeedScreen(props: FeedScreenProps) {
+  const { userId } = useAuth();
+  return <FeedToastProvider key={userId ?? 'guest'}><FeedScreenContent {...props} /></FeedToastProvider>;
+}
+
+function FeedScreenContent({
+  buyerMode = false,
+  showFashionPreview = false,
+  creatorFeed,
+}: FeedScreenProps) {
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & { background?: string; surface?: string; card?: string; border?: string; text?: string; muted?: string; subtle?: string; };
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -2424,7 +2508,16 @@ export default function FeedScreen({
   // SpotlightPage's memo comparator only re-renders the page whose own
   // `engagement` changed instead of every mounted page.
   const engagementsRef = useRef(engagements);
+  const followPendingRef = useRef(new Set<string>());
   engagementsRef.current = engagements;
+  const actionAccountRef = useRef(userId);
+  actionAccountRef.current = userId;
+  useEffect(() => userId ? subscribePostEngagement(userId, (id, patch) => {
+    setEngagements(previous => {
+      if (!previous[id]) return previous;
+      return { ...previous, [id]: { ...previous[id], ...patch } };
+    });
+  }) : undefined, [userId]);
   // The feed's sound on/off choice — a single app-wide preference (not
   // per-post), persisted so it survives leaving and returning to the feed.
   const [soundOn, setSoundOn] = useState(false);
@@ -2459,7 +2552,6 @@ export default function FeedScreen({
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifs, setShowNotifs] = useState(false);
-  const [showRepostEducation, setShowRepostEducation] = useState(false);
   const [feedTab, setFeedTab] = useState<'following' | 'for-you'>('for-you');
   // `?tab=following` (the weekly followed-brands digest push) opens Home on
   // Following. Cleared once applied so the next push can select it again.
@@ -2617,6 +2709,19 @@ export default function FeedScreen({
       return;
     }
     const loadKey = feedTab;
+    if (isGuestFollowing(feedTab, userId)) {
+      // Not keyed into feedLoadKeyRef, so signing in reloads the real Following.
+      feedGenerationRef.current += 1;
+      feedLoadKeyRef.current = null;
+      feedHasMoreRef.current = false;
+      setFeedHasMore(false);
+      setSellerFeedPosts([]);
+      setFeedError(false);
+      setFeedLoading(false);
+      setFeedRefreshing(false);
+      setFeedLoadingMore(false);
+      return;
+    }
     // Switching back to a tab already loaded this session: its own list,
     // cursor and position were restored by switchFeedTab — no refetch (#149).
     if (initial && restoringTabRef.current === loadKey) {
@@ -2681,10 +2786,11 @@ export default function FeedScreen({
         else setFeedRefreshing(false);
       }
     }
-  }, [feedTab, creatorSource, creatorId, creatorStartPostId, creatorExactPost, isBuyerSurface]);
+  }, [feedTab, creatorSource, creatorId, creatorStartPostId, creatorExactPost, isBuyerSurface, userId]);
 
   const loadMoreFeed = useCallback(async () => {
     if (feedLoadingMoreRef.current || !feedHasMoreRef.current || feedLoading || feedRefreshing) return;
+    if (!(creatorSource && creatorId) && isGuestFollowing(feedTab, userId)) return;
     feedLoadingMoreRef.current = true;
     setFeedLoadingMore(true);
     const generation = feedGenerationRef.current;
@@ -2901,9 +3007,13 @@ export default function FeedScreen({
       sellerFeedPosts.forEach(item => {
         if (!next[item.id]) {
           next[item.id] = initialEngagement(item);
-        } else if (!repostPendingRef.current.has(item.id)) {
+        } else if (!(['like', 'save', 'repost'] as const).some(kind => postActionPending(userId ?? '', feedPostId(item.id), kind))) {
           next[item.id] = {
             ...next[item.id],
+            liked: item.likedByMe === true,
+            likes: item.likes,
+            saved: item.savedByMe === true,
+            saves: item.saves,
             reposted: item.repostedByMe === true,
             reposts: item.reposts,
           };
@@ -3191,9 +3301,11 @@ export default function FeedScreen({
   }
 
   const handleLike = useCallback(async (id: string): Promise<void> => {
-    if (!requireSignIn()) return;
+    if (!requireSignIn() || !userId || postActionPending(userId, feedPostId(id), 'like')) return;
+    if (!isUUIDId(feedPostId(id))) { showToast('Preview posts cannot be updated.', 'info'); return; }
     const snapshot = engagementsRef.current[id] ?? engagementFor(id);
     const willLike = !snapshot.liked;
+    if (willLike) haptic('like');
     // Optimistic update
     update(id, e => ({ liked: willLike, likes: willLike ? e.likes + 1 : Math.max(0, e.likes - 1) }));
     // Real post interaction — rollback on failure
@@ -3201,48 +3313,27 @@ export default function FeedScreen({
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(postId);
     if (isUUID) {
       try {
-        const { api: _api } = require('@/lib/api');
-        await _api.posts.interact(postId, { type: 'like', value: willLike ? 'add' : 'remove' });
-      } catch (error) {
-        if (isRetryableFailure(error)) {
-          // Offline/server outage — keep the optimistic state and replay once connectivity returns.
-          void enqueueEngagementRetry({ kind: 'like', targetId: postId, payload: { value: willLike ? 'add' : 'remove' } });
-        } else {
+        const patch = await persistPostAction({ api, account: userId, postId, kind: 'like', enabled: willLike, count: snapshot.likes });
+        if (actionAccountRef.current === userId) update(id, patch);
+      } catch {
+        if (actionAccountRef.current === userId) {
           update(id, () => ({ liked: snapshot.liked, likes: snapshot.likes }));
           showToast('Could not update like. Try again.', 'error');
         }
       }
     }
-  }, [engagementFor, showToast]);
+  }, [api, userId, engagementFor, showToast, requireSignIn]);
 
   const handleDoubleTapLike = useCallback((id: string) => {
-    setEngagements(prev => {
-      const e = prev[id] ?? engagementFor(id);
-      if (e.liked) return prev;
-      const postId = feedPostId(id);
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(postId)) {
-        // Same contract as handleLike: queue on outage, roll back + say so on a real failure.
-        const { api: _api } = require('@/lib/api');
-        Promise.resolve().then(() => _api.posts.interact(postId, { type: 'like', value: 'add' })).catch((error: unknown) => {
-          if (isRetryableFailure(error)) {
-            void enqueueEngagementRetry({ kind: 'like', targetId: postId, payload: { value: 'add' } });
-            return;
-          }
-          setEngagements(cur => {
-            const now = cur[id] ?? e;
-            return { ...cur, [id]: { ...now, liked: false, likes: Math.max(0, now.likes - 1) } };
-          });
-          showToast('Could not update like. Try again.', 'error');
-        });
-      }
-      return { ...prev, [id]: { ...e, liked: true, likes: e.likes + 1 } };
-    });
-  }, [engagementFor, requireSignIn, showToast]);
+    if (!(engagementsRef.current[id] ?? engagementFor(id)).liked) void handleLike(id);
+  }, [engagementFor, handleLike]);
 
   const handleSave = useCallback(async (id: string): Promise<void> => {
-    if (!requireSignIn()) return;
+    if (!requireSignIn() || !userId || postActionPending(userId, feedPostId(id), 'save')) return;
+    if (!isUUIDId(feedPostId(id))) { showToast('Preview posts cannot be updated.', 'info'); return; }
     const cur = engagementsRef.current[id] ?? engagementFor(id);
     const willSave = !cur.saved;
+    if (willSave) haptic('save');
     const snapshot = { saved: cur.saved, saves: cur.saves };
     // Optimistic update
     update(id, e => ({ saved: willSave, saves: willSave ? e.saves + 1 : Math.max(0, e.saves - 1) }));
@@ -3250,85 +3341,66 @@ export default function FeedScreen({
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(postId);
     if (isUUID) {
       try {
-        const { api: _api } = require('@/lib/api');
+        const item = itemsById.get(id);
+        const patch = await persistPostAction({ api, account: userId, postId, kind: 'save', enabled: willSave, count: cur.saves,
+          title: item?.caption || 'Post', subtitle: item?.creator, accentColor: item?.accentColor });
+        if (actionAccountRef.current !== userId) return;
+        update(id, patch);
         if (willSave) {
           // saved.save requires targetId + title (400 without one) — a post
           // has no "title" field of its own, so fall back through caption
           // then creator name the same way the saved-items list would want
           // to display it.
-          const item = itemsById.get(id);
-          const title = item?.caption?.trim() || `${item?.creator ?? 'Post'}'s post`;
-          await _api.buyer.saved.save({ type: 'post', targetId: postId, title, subtitle: item?.creator, accentColor: item?.accentColor });
           emitSaveHeartEvent({ type: 'toast', toast: savedPostToast({ ...item, id: postId }) });
         } else {
-          await _api.buyer.saved.remove(postId);
+          showToast('Removed from Saved', 'info');
         }
-      } catch (error) {
-        if (isRetryableFailure(error)) {
-          void enqueueEngagementRetry({ kind: 'save', targetId: postId, payload: { value: willSave ? 'add' : 'remove' } });
-        } else {
+      } catch {
+        if (actionAccountRef.current === userId) {
           update(id, () => ({ saved: snapshot.saved, saves: snapshot.saves }));
           showToast('Could not update save. Try again.', 'error');
         }
       }
     }
-  }, [engagementFor, itemsById, showToast, requireSignIn]);
-
-  const showRepostEducationOnce = useCallback(async () => {
-    const key = `bt:repost-education:${userId ?? 'preview'}:v1`;
-    try {
-      if (await AsyncStorage.getItem(key)) return;
-      await AsyncStorage.setItem(key, 'true');
-    } catch {
-      // The education sheet is still useful if device storage is unavailable;
-      // it may appear again on a later repost because persistence failed.
-    }
-    setShowRepostEducation(true);
-  }, [userId]);
+  }, [api, userId, engagementFor, itemsById, showToast, requireSignIn]);
 
   const handleRepost = useCallback(async (id: string): Promise<void> => {
-    if (!requireSignIn()) return;
+    if (!requireSignIn() || !userId || postActionPending(userId, feedPostId(id), 'repost')) return;
+    if (!isUUIDId(feedPostId(id))) { showToast('Preview posts cannot be updated.', 'info'); return; }
     if (repostPendingRef.current.has(id)) return;
     repostPendingRef.current.add(id);
     const snapshot = engagementsRef.current[id] ?? engagementFor(id);
     const willRepost = !snapshot.reposted;
+    if (willRepost) hapticLight();
     update(id, e => ({ reposted: willRepost, reposts: willRepost ? e.reposts + 1 : Math.max(0, e.reposts - 1) }));
     const postId = feedPostId(id);
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(postId);
     if (isUUID) {
       try {
-        const result = await api.posts.interact(postId, {
-          type: 'repost',
-          value: willRepost ? undefined : 'remove',
-        });
-        if ((result.action === 'added') !== willRepost) {
-          update(id, e => ({
-            reposted: result.action === 'added',
-            reposts: typeof result.count === 'number' ? result.count : e.reposts,
-          }));
+        const patch = await persistPostAction({ api, account: userId, postId, kind: 'repost', enabled: willRepost, count: snapshot.reposts });
+        if (actionAccountRef.current === userId) {
+          update(id, patch);
+          showToast(willRepost ? 'Reposted' : 'Repost removed', 'info');
         }
-        if (result.action === 'added') await showRepostEducationOnce();
-      } catch (error) {
-        if (isRetryableFailure(error)) {
-          void enqueueEngagementRetry({ kind: 'repost', targetId: postId, payload: { value: willRepost ? undefined : 'remove' } });
-          if (willRepost) await showRepostEducationOnce();
-        } else {
+      } catch {
+        if (actionAccountRef.current === userId) {
           update(id, () => ({ reposted: snapshot.reposted, reposts: snapshot.reposts }));
           showToast('Could not repost. Try again.', 'error');
         }
       }
-    } else if (willRepost) {
-      await showRepostEducationOnce();
     }
     repostPendingRef.current.delete(id);
-  }, [api, engagementFor, showRepostEducationOnce, showToast, requireSignIn]);
+  }, [api, userId, engagementFor, showToast, requireSignIn]);
 
   const handleFollow = useCallback(async (id: string): Promise<void> => {
-    if (!requireSignIn()) return;
+    if (!requireSignIn() || !userId) return;
     const item = sellerFeedPosts.find(post => post.id === id);
     if (!item?.sellerId) return;
     const sellerId = item.sellerId;
+    if (sellerId === userId || followPendingRef.current.has(sellerId)) return;
+    followPendingRef.current.add(sellerId);
     const wasFollowing = engagementsRef.current[id]?.following ?? false;
+    hapticFollow(!wasFollowing);
     // Optimistic — flip all posts by this seller
     setEngagements(prev => Object.fromEntries(Object.entries(prev).map(([postId, state]) => [
       postId,
@@ -3338,6 +3410,7 @@ export default function FeedScreen({
     ])));
     try {
       const state = await setSellerFollowing(sellerId, !wasFollowing);
+      if (actionAccountRef.current !== userId) return;
       setEngagements(prev => Object.fromEntries(Object.entries(prev).map(([postId, engagement]) => [
         postId,
         sellerFeedPosts.find(post => post.id === postId)?.sellerId === sellerId
@@ -3345,11 +3418,8 @@ export default function FeedScreen({
           : engagement,
       ])));
       if (feedTab === 'following' && !state.isFollowing) void loadFeed();
-    } catch (error) {
-      if (isRetryableFailure(error)) {
-        void enqueueEngagementRetry({ kind: 'follow', targetId: sellerId, payload: { value: wasFollowing ? 'unfollow' : undefined } });
-        return;
-      }
+    } catch {
+      if (actionAccountRef.current !== userId) return;
       // Rollback
       setEngagements(prev => Object.fromEntries(Object.entries(prev).map(([postId, engagement]) => [
         postId,
@@ -3358,14 +3428,17 @@ export default function FeedScreen({
           : engagement,
       ])));
       showToast('Could not update follow. Check your connection.', 'error');
+    } finally {
+      followPendingRef.current.delete(sellerId);
     }
-  }, [feedTab, loadFeed, sellerFeedPosts, showToast, requireSignIn]);
+  }, [userId, feedTab, loadFeed, sellerFeedPosts, showToast, requireSignIn]);
 
   // "Not interested" removes the post from this session's feed immediately
   // (a real, visible effect — not just a toast) and records the signal so
   // ranking can downweight similar posts going forward. Fire-and-forget:
   // the post is already gone from the feed either way.
   const handleNotInterested = useCallback((id: string, reason: NotInterestedReason = 'video') => {
+    if (!requireSignIn() || !userId) return;
     // "Don't recommend videos from <seller>" drops every post of theirs
     // already loaded in this session, not just the one long-pressed.
     setSellerFeedPosts(prev => {
@@ -3374,11 +3447,15 @@ export default function FeedScreen({
     });
     if (/^[0-9a-f-]{36}$/i.test(id)) {
       void api.posts.interact(id, { type: 'not_interested', value: reason }).catch((error) => {
-        if (isRetryableFailure(error)) void enqueueEngagementRetry({ kind: 'not_interested', targetId: id, payload: { value: reason } });
+        if (actionAccountRef.current !== userId) return;
+        // Restore authoritative server results rather than leave a failed
+        // preference looking saved or apply it later after a visible rollback.
+        void loadFeed();
+        showToast('Could not update your feed. Try again.', 'error');
       });
     }
     showToast('Post hidden', 'info');
-  }, [api, showToast]);
+  }, [api, userId, loadFeed, showToast, requireSignIn]);
 
   useEffect(() => {
     const sellerIds = [...new Set(sellerFeedPosts.map(post => post.sellerId).filter((id): id is string => !!id))];
@@ -3471,13 +3548,13 @@ export default function FeedScreen({
     }
   }, [activeIndex, displayItems]);
 
-  // Keep the videos after the mounted neighbour buffering + disk-cached
-  // (current, +1 mounted by the list, +2 by this hook). Native, signed-in only.
+  // Current±1 are the only player owners. Warm the next two videos' initial
+  // network bytes and posters without allocating any more native decoders.
   const preloadCandidates = useMemo(
     () => displayItems.map((entry) => {
-      const post = entry as { contentType?: string; videoSource?: VideoSource; mediaUris?: string[] };
+      const post = entry as { contentType?: string; videoSource?: VideoSource; mediaUris?: string[]; videoPosterUri?: string };
       return post.contentType === 'video'
-        ? { kind: 'video' as const, uri: remoteVideoUri(post.videoSource ?? post.mediaUris?.[0]) }
+        ? { kind: 'video' as const, uri: remoteVideoUri(post.videoSource ?? post.mediaUris?.[0]), posterUri: post.videoPosterUri }
         : { kind: 'other' as const, uri: null };
     }),
     [displayItems],
@@ -3485,7 +3562,7 @@ export default function FeedScreen({
   // "Use less cellular data" (#154): no videos fetched ahead of the one
   // playing — neither the warm preloads nor the neighbouring pages' buffers.
   const userDataSaver = useDataSaverSetting();
-  useFeedVideoPreload(preloadCandidates, activeIndex, Boolean(userId), userDataSaver);
+  useFeedVideoPreload(preloadCandidates, activeIndex, screenFocused && !showNotifs, userDataSaver);
 
   const viewabilityConfig = useRef(VERTICAL_PAGER_VIEWABILITY).current;
   // Buyer Home: chrome clearance for the rail/caption/scrub-bar, padded with
@@ -3498,7 +3575,7 @@ export default function FeedScreen({
     : Math.max(previewBottomInset, 8) + 14;
 
   return (
-    <FeedToastProvider>
+    <>
     <View
       style={[styles.container, { backgroundColor: palette.background ?? BG }]}
       onLayout={({ nativeEvent }) => {
@@ -3579,7 +3656,7 @@ export default function FeedScreen({
           of popping in — the list itself, not each cell, so the fade is one
           motion regardless of how many rows are mounted. */}
       <Animated.View style={[styles.feedContentFade, { opacity: feedContentOpacity }]}>
-      {viewportReady && <FlatList
+      {viewportReady && <ParentScrollGestureScope><FlatList
         ref={feedListRef}
         onScrollBeginDrag={collapseLiveTab}
         // The creator player remounts once its videos load so it opens at the tapped one.
@@ -3625,6 +3702,51 @@ export default function FeedScreen({
               <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: theme.muted }}>
                 No results for "{searchQuery}"
               </Text>
+            </View>
+          ) : !feedLoading && feedTab === 'following' && isBuyerSurface ? (
+            // Following empty (Mobbin following-2/3): "Trending creators"
+            // tall poster cards from real public posts + recommendations;
+            // falls back to the plain empty state when none exist.
+            <View style={{ width: pageWidth, height: pageHeight, justifyContent: 'center' }} testID="following-empty">
+              <FollowingTrendingCreators
+                enabled
+                viewerId={userId}
+                pageWidth={pageWidth}
+                focused={screenFocused && !shopSelection}
+                onOpenCreator={(c) => handleOpenCreator(trendingCreatorAsItem(c))}
+                onRequireSignIn={requireSignIn}
+                onFollowError={(message) => showToast(message, 'error')}
+                fallback={
+                <View style={{ width: pageWidth, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
+                  <Icon name="film" size={40} color={MUTED} />
+                  <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>
+                    {feedTab === 'following' ? 'No posts from followed sellers yet' : 'No posts yet'}
+                  </Text>
+                  <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20 }}>
+                    {feedTab === 'following' ? 'Follow sellers to build your Following feed' : 'Check back soon for new drops'}
+                  </Text>
+                  {feedTab === 'following' && (
+                    // Friends' entry point moved off the top bar (item: buyer
+                    // feed top-bar cleanup) — this is one of its two new homes,
+                    // right where a seller-less Following tab already points
+                    // the buyer to go find people to follow.
+                    <TouchableOpacity
+                      onPress={() => {
+                        router.navigate('/(buyer)/friends' as never);
+                      }}
+                      style={styles.findFriendsBtn}
+                      activeOpacity={0.8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Find friends"
+                      testID="buyer-following-find-friends"
+                    >
+                      <BuyerNavIcon name="friends" color={FG} size={18} strokeWidth={1.9} />
+                      <Text style={styles.findFriendsBtnText}>Find friends</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                }
+              />
             </View>
           ) : !feedLoading ? (
             <View style={{ width: pageWidth, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
@@ -3715,9 +3837,10 @@ export default function FeedScreen({
           return (
             <SpotlightPage
               item={spotlight}
+              headerClearance={topBarHeight}
               isActive={contentIndex === activeContentIndex && !showNotifs}
-              preload={!userDataSaver && Math.abs(contentIndex - activeContentIndex) === 1}
-              isFirstItem={contentIndex === 0}
+              preload={screenFocused && !showNotifs && !userDataSaver && Math.abs(contentIndex - activeContentIndex) === 1}
+              isFirstItem={contentIndex === activeContentIndex}
                 pageWidth={pageWidth}
               pageHeight={pageHeight}
               bottomClearance={bottomClearance}
@@ -3738,12 +3861,12 @@ export default function FeedScreen({
               // The mini product sheet keeps the video playing, muted (#139).
               soundOn={soundOn && !shopSelection}
               onToggleSound={toggleSound}
-              onFirstFramePainted={contentIndex === 0 ? handleFirstCellPainted : undefined}
+              onFirstFramePainted={contentIndex === activeContentIndex ? handleFirstCellPainted : undefined}
               reduceMotion={!!reduceMotion}
             />
           );
         }}
-      />}
+      /></ParentScrollGestureScope>}
       </Animated.View>
       {threadRefreshIndicator}
 
@@ -4067,46 +4190,6 @@ export default function FeedScreen({
 
       {/* Notifications now open the real /buyer-notifications screen instead of
           this hardcoded fake sheet — see the bell button's onPress above. */}
-      <Sheet
-        visible={showRepostEducation}
-        onClose={() => setShowRepostEducation(false)}
-        headerRight="close"
-        accessibilityLabel="About reposts"
-        testID="repost-education-sheet"
-        primaryAction={{ label: 'OK', onPress: () => setShowRepostEducation(false), accessibilityLabel: 'Got it' }}
-      >
-        <View style={styles.repostEducationPreview}>
-          <View style={styles.repostEducationPreviewMedia}>
-            <View style={styles.repostEducationPreviewBadge}>
-              <View style={styles.repostEducationPreviewAvatar}>
-                <Icon name="user" size={11} color="#FFFFFF" />
-              </View>
-              <Text style={styles.repostEducationPreviewBadgeText}>You reposted</Text>
-            </View>
-            <Icon name="more-horizontal" size={18} color="#FFFFFF99" style={styles.repostEducationPreviewMore} />
-            <View style={styles.repostEducationPreviewLines}>
-              <View style={styles.repostEducationPreviewLineShort} />
-              <View style={styles.repostEducationPreviewLineLong} />
-            </View>
-            <Icon name="corner-up-right" size={30} color="#FFFFFF99" style={styles.repostEducationPreviewShare} />
-          </View>
-        </View>
-        <Text style={styles.repostEducationTitle}>Introduce this post to others by reposting</Text>
-        <View style={styles.repostEducationPoint}>
-          <Icon name="users" size={22} color={FG} />
-          <Text style={styles.repostEducationPointText}>Your repost can appear to friends in their Thread.</Text>
-        </View>
-        <View style={styles.repostEducationPoint}>
-          <Icon name="repeat" size={22} color={FG} />
-          <Text style={styles.repostEducationPointText}>Use the Repost button again at any time to remove it.</Text>
-        </View>
-        <View style={styles.repostEducationPrivacy}>
-          <Icon name="lock" size={15} color={MUTED} />
-          <Text style={styles.repostEducationPrivacyText}>
-            Only mutual friends can see your profile on a repost.
-          </Text>
-        </View>
-      </Sheet>
       {shopSelection && (
         <ShopProductSheet
           selection={shopSelection}
@@ -4126,7 +4209,7 @@ export default function FeedScreen({
       )}
 
     </View>
-    </FeedToastProvider>
+    </>
   );
 }
 
@@ -4163,12 +4246,12 @@ const styles = StyleSheet.create({
     height: '100%', borderRadius: RADII.pill, overflow: 'hidden', backgroundColor: '#FFFFFF',
     shadowColor: '#fff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 4,
   },
-  scrubBubble: {
-    position: 'absolute', minWidth: 40, alignItems: 'center',
-    paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.sm,
-    backgroundColor: 'rgba(0,0,0,0.78)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
+  // TikTok scrub (Mobbin watch-7): large centered "00:06 / 00:10" above the bar.
+  scrubBubble: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  scrubBubbleText: {
+    color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.xxl, letterSpacing: 1, ...TABULAR_NUMS,
+    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
-  scrubBubbleText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, ...TABULAR_NUMS },
   scrubThumb: {
     position: 'absolute', top: '50%', width: 13, height: 13, borderRadius: 7,
     marginTop: -6.5, marginLeft: -6.5,

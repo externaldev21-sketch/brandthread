@@ -4,6 +4,8 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
+import { disconnectSafeStorageStream } from "../lib/disconnectSafeStorageStream";
+import { legacyFeedStreamTarget } from "../lib/feedVideoRenditions";
 import { promisify } from "node:util";
 import { db, posts, users } from "@workspace/db";
 import { eq, or, sql } from "drizzle-orm";
@@ -483,7 +485,7 @@ router.post("/compose-video", requireAuth, validateBody(composeVideoBody), async
         ? ",eq=saturation=1.12:contrast=1.04:brightness=0.02"
         : clips[index].filter === "cool" ? ",colorbalance=bs=.08"
           : clips[index].filter === "mono" ? ",hue=s=0" : "";
-      return `[${index}:v]scale=${OUTPUT_W}:${OUTPUT_H}:force_original_aspect_ratio=decrease,pad=${OUTPUT_W}:${OUTPUT_H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30${color},setpts=PTS/${speed}[v${index}]`;
+      return `[${index}:v]scale=${OUTPUT_W}:${OUTPUT_H}:force_original_aspect_ratio=increase,crop=${OUTPUT_W}:${OUTPUT_H},setsar=1,fps=30${color},setpts=PTS/${speed}[v${index}]`;
     });
     const audioFilters = inputs.map((_, index) => {
       const speed = validSpeed(clips[index].speed) ? clips[index].speed : 1;
@@ -652,15 +654,20 @@ router.get("/media/*path", async (req, res) => {
   if (!suffix || suffix.includes("..")) return res.status(404).end();
   try {
     const objectPath = `/objects/${suffix}`;
+    const streamRoot = suffix.match(/^(uploads\/feed-stream\/[a-f0-9]{64})\//)?.[1] ?? null;
     const [linkedPost] = await db
       .select({
         userId: posts.userId,
         postStatus: posts.postStatus,
         scheduledAt: posts.scheduledAt,
         visibility: posts.visibility,
+        mediaUrl: posts.mediaUrl,
       })
       .from(posts)
       .where(or(
+        ...(streamRoot ? [
+          sql`substring(${posts.videoHlsUrl} from '/api/(?:v1/)?posts/media/(uploads/feed-stream/[a-f0-9]{64})/master[.]m3u8$') = ${streamRoot}`,
+        ] : []),
         // Equality on the path after /api/posts/media/, served by
         // posts_media_path_expr_idx / posts_thumb_path_expr_idx (migration 112).
         // The regex literal must match those index expressions exactly.
@@ -678,6 +685,31 @@ router.get("/media/*path", async (req, res) => {
         )`,
       ))
       .limit(1);
+    if (!linkedPost) {
+      // Offline query caches can still contain the old URL after a backfill.
+      // Redirect only to a rendition belonging to a currently published post.
+      const legacyFile = await storage.getObjectEntityFile(streamRoot ? `/objects/${streamRoot}/720.mp4` : objectPath);
+      const [legacyMeta] = await legacyFile.getMetadata();
+      let target = legacyFeedStreamTarget(objectPath, legacyMeta.metadata?.feedVideoRenditionPath);
+      for (let hop = 0; target && hop < 6; hop++) {
+        const primary = target.replace(/\/(?:master\.m3u8|(?:480|720)\.mp4|(?:480|720)\/(?:index\.m3u8|segment\d{5}\.ts))$/, "/720.mp4");
+        const [canonical] = await db.select({
+          postStatus: posts.postStatus, scheduledAt: posts.scheduledAt, visibility: posts.visibility,
+        }).from(posts).where(sql`substring(${posts.mediaUrl} from '/api/(?:v1/)?posts/media/(.+)$') = ${primary.slice("/objects/".length)}`).limit(1);
+        if (canonical) {
+          const eligible = canonical.visibility?.isPublic !== false && (canonical.postStatus === "published" ||
+            (canonical.postStatus === "scheduled" && !!canonical.scheduledAt && canonical.scheduledAt.getTime() <= Date.now()));
+          if (!eligible) return res.status(404).end();
+          res.setHeader("Cache-Control", "no-store");
+          return res.redirect(307, `${req.baseUrl}/media/${target.slice("/objects/".length)}`);
+        }
+        // A device may skip several app/encoding versions while offline.
+        const previous = await storage.getObjectEntityFile(primary);
+        const [previousMeta] = await previous.getMetadata();
+        target = legacyFeedStreamTarget(target, previousMeta.metadata?.feedVideoRenditionPath);
+      }
+      return res.status(404).end();
+    }
     const due = linkedPost?.postStatus === "scheduled" &&
       !!linkedPost.scheduledAt &&
       linkedPost.scheduledAt.getTime() <= Date.now();
@@ -686,17 +718,23 @@ router.get("/media/*path", async (req, res) => {
     if (!linkedPost || !publiclyVisible) return res.status(404).end();
 
     // Promote a due scheduled object only at its first eligible public read.
-    if (due) await publishComposedMedia(linkedPost.userId, [objectPath]);
+    if (due) await publishComposedMedia(linkedPost.userId, [streamRoot ? `/objects/${streamRoot}/720.mp4` : objectPath]);
     const file = await storage.getObjectEntityFile(objectPath);
+    // Renditions and segments inherit the published video's ACL, not a
+    // blanket public bucket. This also keeps private uploads inaccessible.
+    const aclFile = streamRoot && objectPath !== `/objects/${streamRoot}/720.mp4`
+      ? await storage.getObjectEntityFile(`/objects/${streamRoot}/720.mp4`) : file;
     const allowed = await storage.canAccessObjectEntity({
-      objectFile: file, requestedPermission: ObjectPermission.READ,
+      objectFile: aclFile, requestedPermission: ObjectPermission.READ,
     });
     if (!allowed) return res.status(404).end();
     // Expo web and its API are served on separate preview origins. Only media
     // that passed the published-post and object-ACL checks is embeddable here;
     // keep the API's restrictive default for all other responses.
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-    if (await redirectToPublicMedia(res, objectPath)) return; // CDN / signed URL, not Express (BT-473)
+    // Relative HLS children must stay on the authorized API origin. Redirecting
+    // a playlist to one signed object makes its unsigned children fail 403.
+    if (!suffix.endsWith(".m3u8") && await redirectToPublicMedia(res, objectPath)) return;
     const [metadata] = await file.getMetadata();
     const size = Number(metadata.size ?? 0);
     if (!Number.isSafeInteger(size) || size <= 0) return res.status(404).end();
@@ -742,8 +780,9 @@ router.get("/media/*path", async (req, res) => {
     res.setHeader("Accept-Ranges", "bytes");
     res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Length", String(end - start + 1));
-    res.setHeader("Cache-Control", "public, max-age=3600");
-    await pipeline(file.createReadStream({ start, end }), res);
+    res.setHeader("Cache-Control", streamRoot
+      ? "public, max-age=31536000, immutable" : "public, max-age=3600");
+    await pipeline(disconnectSafeStorageStream(file.createReadStream({ start, end })), res);
     return;
   } catch (err) {
     req.log.warn({ err, suffix }, "Could not serve composed post media");

@@ -70,6 +70,8 @@ import {
 import { cappedList, cappedUnknown, jsonList, jsonValue, LIMITS, looseBody, optBoolish, optId, optText, validateBody } from "../middlewares/bodySchemas";
 import { z } from "@workspace/api-zod";
 import { pinnedAtByPostId, pinnedFirst } from "../lib/postPins";
+import { normalizeFeedVideoPath, createFeedVideoPoster } from "../lib/feedVideoEncoding";
+import { feedStreamMasterPath } from "../lib/feedVideoRenditions";
 
 const router = Router();
 
@@ -358,6 +360,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[], viewerId: stri
       clerkId: users.clerkId,
       displayName: users.displayName,
       brandName: users.brandName,
+      avatarUrl: sql<string | null>`coalesce(${users.profileImageUrl}, ${users.avatarUrl})`,
       verified: users.verified,
       verificationStatus: users.verificationStatus,
       activeStanding: users.activeStanding,
@@ -410,6 +413,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[], viewerId: stri
       seller: seller ? {
         displayName: seller.displayName,
         brandName: seller.brandName,
+        avatarUrl: seller.avatarUrl,
         verified: deriveSellerVerified(seller),
       } : null,
       taggedProducts: (tagsByPost[post.id] ?? []).map((tag) => ({
@@ -479,6 +483,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         cursorTs:    sql<string>`${posts.createdAt}::text`,
         displayName: users.displayName,
         brandName:   users.brandName,
+        avatarUrl: sql<string | null>`coalesce(${users.profileImageUrl}, ${users.avatarUrl})`,
         verified:    users.verified,
         verificationStatus: users.verificationStatus,
         activeStanding: users.activeStanding,
@@ -624,6 +629,7 @@ router.get("/feed", requireAuth, async (req, res) => {
       seller: {
         displayName: p.displayName,
         brandName:   p.brandName,
+        avatarUrl: p.avatarUrl,
         verified:    deriveSellerVerified(p),
       },
       taggedProducts: (tagsByPost[p.id] ?? []).map((t) => ({
@@ -703,7 +709,7 @@ async function publishPost(req: Request, res: Response) {
   const isBuyer = poster.accountType === "buyer";
 
   const {
-    mediaUrl: requestedMediaUrl, thumbnailUrl: requestedThumbnailUrl, mediaPath, thumbnailPath,
+    mediaUrl: requestedMediaUrl, thumbnailUrl: requestedThumbnailUrl, mediaPath: requestedMediaPath, thumbnailPath: requestedThumbnailPath,
     mediaPaths: requestedMediaPaths, slideOverlays: requestedSlideOverlays,
     mediaUrls, mediaType, aspectRatio, caption, hashtags, styleTags,
     sound, visibility, taggedProductIds, isDraft, scheduledAt, quotedPostId, surface: requestedSurface,
@@ -736,6 +742,13 @@ async function publishPost(req: Request, res: Response) {
     taggedUserIds?:     unknown;
   };
 
+  let mediaPath = requestedMediaPath;
+  // Older clients send the owned media URL instead of its object path.
+  if (!mediaPath && mediaType === "video") {
+    const suffix = requestedMediaUrl?.match(/\/api\/(?:v1\/)?posts\/media\/(uploads\/[A-Za-z0-9._/-]+)$/)?.[1];
+    if (suffix) mediaPath = `/objects/${suffix}`;
+  }
+  let thumbnailPath = requestedThumbnailPath;
   const restriction = await publishingRestriction(clerkId);
   if (restriction) return res.status(restriction.status).json(restriction.body);
 
@@ -954,7 +967,26 @@ async function publishPost(req: Request, res: Response) {
     const all = slideRecords.flatMap((sl) => [sl.path, sl.thumbnailPath]);
     if (new Set(all).size !== all.length) return res.status(400).json({ error: "slides must not reuse the same media" });
   }
+  try {
+    // Every publisher (buyer, seller and official) shares the same rendition
+    // policy, including video slides. Raw masters remain private and intact.
+    if (mediaType === "video" && mediaPath) {
+      mediaPath = await normalizeFeedVideoPath(mediaPath, clerkId);
+      if (!thumbnailPath && !requestedThumbnailUrl) thumbnailPath = await createFeedVideoPoster(mediaPath, clerkId);
+    }
+    for (const slide of slideRecords) {
+      if (slide.kind !== "video") continue;
+      slide.path = await normalizeFeedVideoPath(slide.path, clerkId);
+      slide.url = composedMediaUrl(req, slide.path);
+    }
+  } catch (err) {
+    req.log.error({ err }, "Could not prepare feed video");
+    return res.status(422).json({ error: "This video could not be prepared for playback. Try uploading it again.", code: "VIDEO_ENCODING_FAILED" });
+  }
   const singleVideo = slideRecords.length === 1 && slideRecords[0].kind === "video";
+  const streamMaster = feedStreamMasterPath(
+    singleVideo ? slideRecords[0].path : mediaType === "video" && mediaPath ? mediaPath : "",
+  );
   // A quote with no media of its own renders with the original's still image
   // so every existing post renderer keeps working.
   const quoteStill = quoteTarget && !requestedMediaUrl && !mediaPath &&
@@ -1036,6 +1068,10 @@ async function publishPost(req: Request, res: Response) {
     placeId: locationResult.placeId ?? null,
     userId:    authorId,
     mediaUrl,
+    ...(streamMaster ? {
+      videoHlsUrl: composedMediaUrl(req, streamMaster),
+      videoHlsStatus: "ready",
+    } : {}),
     thumbnailUrl: thumbnailUrl ?? null,
     mediaUrls: slideRecords.length > 0
       ? slideRecords.map((sl) => sl.url)
@@ -1391,6 +1427,30 @@ router.patch("/:id", requireAuth, validateBody(updatePostBody), async (req, res)
       return res.status(400).json({ error: "mediaType must be a non-empty string" });
     }
     updates.mediaType = body.mediaType;
+  }
+  const replacementVideo = updates.mediaUrl ?? updates.mediaUrls?.[0];
+  if ((updates.mediaUrl !== undefined || updates.mediaUrls !== undefined || updates.mediaType !== undefined) &&
+    (updates.mediaType ?? existing.mediaType) !== "video") {
+    updates.videoHlsUrl = null;
+    updates.videoHlsStatus = null;
+    updates.videoMuxAssetId = null;
+  }
+  if ((updates.mediaType ?? existing.mediaType) === "video" && replacementVideo) {
+    const suffix = replacementVideo.match(/\/api\/(?:v1\/)?posts\/media\/(uploads\/[A-Za-z0-9._/-]+)$/)?.[1];
+    if (suffix) {
+      try {
+        const path = await normalizeFeedVideoPath(`/objects/${suffix}`, clerkId);
+        updates.mediaUrl = composedMediaUrl(req, path);
+        updates.mediaUrls = [updates.mediaUrl];
+        const master = feedStreamMasterPath(path);
+        updates.videoHlsUrl = master ? composedMediaUrl(req, master) : null;
+        updates.videoHlsStatus = master ? "ready" : null;
+        updates.videoMuxAssetId = null;
+      } catch (err) {
+        req.log.error({ err }, "Could not prepare replacement feed video");
+        return res.status(422).json({ error: "This video could not be prepared for playback.", code: "VIDEO_ENCODING_FAILED" });
+      }
+    }
   }
   if (body.surface !== undefined) {
     if (!isPostSurface(body.surface)) return res.status(400).json({ error: "surface must be 'thread' or 'profile'" });
@@ -2056,8 +2116,9 @@ router.get("/:id", async (req, res) => {
     }
   }
 
-  const [sellerRows, tags, likeRows, repostRows, commentCounts] = await Promise.all([
-    db.select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified, username: users.username, isOfficial: users.isOfficialAccount })
+  const [sellerRows, tags, likeRows, repostRows, commentCounts, shareRows, saveRows, publicReadRows] = await Promise.all([
+    db.select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified, username: users.username, isOfficial: users.isOfficialAccount,
+      accountType: users.accountType, avatarUrl: sql<string | null>`coalesce(${users.profileImageUrl}, ${users.avatarUrl})` })
       .from(users).where(eq(users.clerkId, post.userId)).limit(1),
     db.select({
       productId: postTaggedProducts.productId,
@@ -2073,6 +2134,12 @@ router.get("/:id", async (req, res) => {
     db.select({ count: count() }).from(interactions)
       .where(and(eq(interactions.postId, id), eq(interactions.type, "repost"))),
     visibleCommentCounts([id]),
+    db.select({ count: count() }).from(interactions)
+      .where(and(eq(interactions.postId, id), eq(interactions.type, "share"))),
+    db.select({ count: count() }).from(savedItems)
+      .where(and(eq(savedItems.targetId, id), eq(savedItems.itemType, "post"))),
+    db.select({ id: posts.id }).from(posts)
+      .where(and(eq(posts.id, id), publicPostCondition(new Date()))).limit(1),
   ]);
 
   const minPriceByProduct = await productMinPrices(tags.map((t) => t.productId));
@@ -2086,6 +2153,10 @@ router.get("/:id", async (req, res) => {
     taggedProducts: tags.map((t) => ({ ...t, priceCents: minPriceByProduct[t.productId] ?? 0 })),
     likeCount:    post.visibility?.showLikeCount === false ? null : likeRows[0]?.count ?? 0,
     repostCount:  repostRows[0]?.count ?? 0,
+    sharesCount: shareRows[0]?.count ?? 0,
+    savesCount: saveRows[0]?.count ?? 0,
+    // A friend's buyer post is readable but is not public resharing material.
+    canReshareToStory: post.userId === viewerId || (sellerRows[0]?.accountType === "seller" && publicReadRows.length > 0),
     commentsCount: commentCounts.get(id) ?? 0,
   }], viewerId));
   return res.json(detail);
@@ -2220,6 +2291,11 @@ router.post("/:id/interact", requireAuth, rateLimit("post-interact"), validateBo
       if (hidden) void recordPostSignal(clerkId, id, "not_interested");
     } else {
       void recordPostSignal(clerkId, id, type, value ?? null);
+    }
+    if (type === "share") {
+      const [total] = await db.select({ count: count() }).from(interactions)
+        .where(and(eq(interactions.postId, id), eq(interactions.type, "share")));
+      return res.json({ action: "recorded", count: total.count });
     }
     return res.json({ action: "recorded" });
   }

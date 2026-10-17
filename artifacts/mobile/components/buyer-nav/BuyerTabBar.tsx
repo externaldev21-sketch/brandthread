@@ -24,7 +24,7 @@ import { tabBarSlideTargetY } from '@/lib/tabBarSlide';
 import { useTabBarHiddenByScreen } from '@/lib/tabBarVisibility';
 import { radius } from '@/constants/radii';
 import { captureGlideStart, offsetAt, pillCorrection, scaleAt, type BarGeometry } from './barModePill';
-import { WEB_NAV_AFTER_PRESS_MS, currentStretch } from '@/components/tab-bar/pillGlide';
+import { currentStretch } from '@/components/tab-bar/pillGlide';
 
 // The compact <-> regular capsule resize rides the pill's own spring
 // (INDICATOR_SPRING: critically damped, no overshoot, ~90% there by ~115ms)
@@ -169,7 +169,7 @@ export function BuyerTabBar({
   // before the tabPress event and the screen swap — see the hook's doc.
   const {
     x: indicatorX, target: indicatorTarget, origin: indicatorOrigin, peakStretch: indicatorStretch,
-    opacity: indicatorOpacity, press: pressIndicator, hide: hideIndicator, afterGlide,
+    opacity: indicatorOpacity, press: pressIndicator, hide: hideIndicator,
   } = useTabBarActiveIndex(activeIndex, reducedMotion, profileParkIndex);
 
   // 0 = regular, 1 = compact. Every animated style below reads this one
@@ -199,12 +199,7 @@ export function BuyerTabBar({
     onProfile.set(false);
     pressIndicator(index);
   }, [onProfile, pressIndicator]);
-  // When the Profile press also resizes the bar (from Home), it gets the same
-  // web hold-back as a pill glide (see useTabBarActiveIndex's afterGlide), so
-  // Profile's first render can't freeze the resize part-way on web.
-  const profileResizeAt = React.useRef(0);
   const pressProfile = React.useCallback(() => {
-    profileResizeAt.current = activeSlot === 'index' ? Date.now() : 0;
     onProfile.set(true);
     hideIndicator();
   }, [activeSlot, onProfile, hideIndicator]);
@@ -381,16 +376,10 @@ export function BuyerTabBar({
       return;
     }
     hapticTabChange();
-    if (routeName === 'profile') {
-      const wait = Platform.OS === 'web' && !reducedMotion
-        ? WEB_NAV_AFTER_PRESS_MS - (Date.now() - profileResizeAt.current)
-        : 0;
-      if (wait > 0) setTimeout(() => navigation.navigate(routeName as never), wait);
-      else navigation.navigate(routeName as never);
-      return;
-    }
-    afterGlide(() => navigation.navigate(routeName as never));
-  }, [activeRoute, activeIndex, navigation, state.routes, pressSlot, pressProfile, afterGlide, reducedMotion]);
+    // Feedback/glide already starts on press-in. Navigation must not wait for
+    // that animation; its geometry, spring and Profile origin stay unchanged.
+    navigation.navigate(routeName as never);
+  }, [activeRoute, activeIndex, navigation, state.routes, pressSlot, pressProfile]);
 
   const onLongPress = React.useCallback((routeName: string) => {
     const route = state.routes.find(candidate => candidate.name === routeName);

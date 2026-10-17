@@ -71,6 +71,22 @@ afterAll(async () => {
 });
 
 describe("saved collections route", () => {
+  it("persists the initial public choice atomically and keeps the private default", async () => {
+    auth.userId = buyer;
+    for (const isPublic of [true, false]) {
+      const response = await request("/api/buyer/collections", "POST", { name: "Tokyo", isPublic });
+      expect(response.status).toBe(201);
+      const collection = await json<{ id: string; isPublic: boolean }>(response);
+      createdCollectionIds.push(collection.id);
+      expect(collection.isPublic).toBe(isPublic);
+      const reloaded = await json<Array<{ id: string; isPublic: boolean }>>(await request("/api/buyer/collections"));
+      expect(reloaded.find(row => row.id === collection.id)?.isPublic).toBe(isPublic);
+    }
+    auth.userId = otherBuyer;
+    const others = await json<Array<{ id: string }>>(await request("/api/buyer/collections"));
+    expect(others.some(row => createdCollectionIds.includes(row.id))).toBe(false);
+  });
+
   it("creates, lists (with item counts), renames, toggles public, and deletes a collection", async () => {
     auth.userId = buyer;
 

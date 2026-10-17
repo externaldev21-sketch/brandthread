@@ -13,6 +13,10 @@ import { useSavedProductsSync } from '@/hooks/useSavedProduct';
 import { registerSaveHeartHost, type SaveHeartToast } from '@/lib/saved/saveHeartBus';
 import { savedProducts } from '@/lib/saved/savedProducts';
 import type { SavedProductDraft } from '@/lib/saved/savedProductsStore';
+import { useAuth } from '@clerk/expo';
+import { useApi } from '@/lib/api';
+import { publishPostEngagement } from '@/lib/postEngagement';
+import { RepostEducationHost } from '@/components/RepostEducationHost';
 
 const TOAST_MS = 4000;
 /** Height of the sticky Add to cart footer on product detail (before the bottom safe area). */
@@ -20,11 +24,17 @@ const DETAIL_FOOTER_H = 84;
 
 export function SaveHeartHost() {
   useSavedProductsSync();
+  const { userId } = useAuth();
+  const api = useApi();
+  const account = useRef(userId);
+  account.current = userId;
   const router = useRouter();
   const segments = useSegments() as string[];
   const insets = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
   const [toast, setToast] = useState<SaveHeartToast | null>(null);
+  const [toastFor, setToastFor] = useState(userId);
+  const [sheetFor, setSheetFor] = useState(userId);
   const [sheetDraft, setSheetDraft] = useState<SavedProductDraft | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   /** Non-product item (a saved post) the sheet is filing, with its thumbnail. */
@@ -35,25 +45,43 @@ export function SaveHeartHost() {
 
   const showToast = useCallback((next: SaveHeartToast) => {
     clearTimer();
+    setToastFor(userId);
     setToast(next);
     timer.current = setTimeout(() => setToast(null), TOAST_MS);
-  }, []);
+  }, [userId]);
 
   useEffect(() => registerSaveHeartHost((event) => {
     if (event.type === 'toast') {
       showToast(event.toast);
+    } else if (event.type === 'post-sheet') {
+      setSheetFor(userId);
+      clearTimer();
+      setToast(null);
+      setSheetDraft(null);
+      setSheetItem({ item: event.item, thumbnailUri: event.thumbnailUri });
+      setSheetOpen(true);
     } else {
+      setSheetFor(userId);
       clearTimer();
       setToast(null);
       setSheetItem(null);
       setSheetDraft(event.draft);
       setSheetOpen(true);
     }
-  }), [showToast]);
+  }), [showToast, userId]);
 
   useEffect(() => clearTimer, []);
+  useEffect(() => {
+    clearTimer();
+    setToast(null);
+    setSheetOpen(false);
+    setSheetItem(null);
+    setSheetDraft(null);
+  }, [userId]);
 
   const onToastAction = useCallback(() => {
+    if (toastFor !== userId) return;
+    setSheetFor(userId);
     const action = toast?.action;
     clearTimer();
     setToast(null);
@@ -71,7 +99,7 @@ export function SaveHeartHost() {
     } else {
       router.push('/sign-in' as never);
     }
-  }, [toast, router]);
+  }, [toast, toastFor, userId, router]);
 
   // Keep the toast clear of the floating buyer tab bar and of product
   // detail's sticky purchase footer; everywhere else the default applies.
@@ -82,16 +110,17 @@ export function SaveHeartHost() {
 
   return (
     <>
+      <RepostEducationHost />
       <Snackbar
         bottomOffset={bottomOffset}
-        visible={!!toast}
+        visible={!!toast && toastFor === userId}
         message={toast?.message ?? ''}
         thumbnailUri={toast?.thumbnailUri}
         actionLabel={toast?.actionLabel}
         onAction={toast?.action ? onToastAction : undefined}
       />
       <SaveToCollectionSheet
-        visible={sheetOpen}
+        visible={sheetOpen && sheetFor === userId}
         item={sheetDraft ? {
           type: 'product',
           targetId: sheetDraft.productId,
@@ -106,13 +135,23 @@ export function SaveHeartHost() {
             showToast({ message: collectionId ? 'Saved to collection' : 'Saved' });
             return;
           }
-          // Saved posts: Instagram's "Saved to <collection> · View" bar.
+          // Filing through a long press must update the feed/viewer as well
+          // as Saved. Re-read the server's live count; never invent a second save.
+          if (sheetItem?.item.type === 'post' && userId) {
+            const postId = sheetItem.item.targetId;
+            publishPostEngagement(userId, postId, { saved: true });
+            void api.posts.get(postId).then(post => {
+              if (account.current === userId) {
+                publishPostEngagement(userId, postId, { saved: true, saves: Number(post.savesCount ?? 0) });
+              }
+            }).catch(() => { /* Saved itself succeeded; the next feed read refreshes its count. */ });
+          }
           showToast(collectionId ? {
-            message: collectionName ? `Saved to ${collectionName}` : 'Saved to collection',
+            message: collectionName ? `Added to ${collectionName}` : 'Added to collection',
             thumbnailUri: sheetItem?.thumbnailUri,
             actionLabel: 'View',
             action: { kind: 'view-collection', collectionId },
-          } : { message: 'Saved', thumbnailUri: sheetItem?.thumbnailUri });
+          } : { message: 'Added to Favorites', thumbnailUri: sheetItem?.thumbnailUri });
         }}
       />
     </>

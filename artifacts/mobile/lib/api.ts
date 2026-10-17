@@ -4,6 +4,7 @@
  * Every request attaches the Clerk Bearer token supplied by getToken().
  */
 import type { RisingBrandsResponse } from '@/lib/risingBrands';
+import { isFeedMediaWrite } from './feedVideoPublish';
 import type { SizeChartData, SizeChartPreset, SizeChartTemplateSummary, SizeChartTemplateDetail } from '@/lib/sizeChartTypes';
 import { prepareImageForUpload, presetForUploadPath } from '@/lib/imageUploadPrep';
 import { sessionProgress, uploadResumeKey, uploadStrategy, withUploadRetry } from '@/lib/resumableUpload';
@@ -1616,7 +1617,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
   const freshGet = <T>(path: string) => request<T>(path, { method: 'GET', cache: 'no-store' }, getToken, false, getCacheScope);
   const quietGet = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope, false);
   const getText  = (path: string)   => request<string>(path, { method: 'GET' }, getToken, true, getCacheScope);
-  const post  = <T>(path: string, body: unknown) => request<T>(path, { method: 'POST',  body: JSON.stringify(body) }, getToken, false, getCacheScope);
+  const post  = <T>(path: string, body: unknown) => request<T>(path, { method: 'POST',  body: JSON.stringify(body) }, getToken, false, getCacheScope, true,
+    isFeedMediaWrite(path, body) ? EXPENSIVE_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
   /** POST with this install's id, for server-side "one per device" rules (trials). */
   const postWithInstallId = async <T>(path: string, body: unknown) => {
     const installId = await getInstallId().catch(() => null);
@@ -1625,7 +1627,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
   const postExpensive = <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'POST', body: JSON.stringify(body) }, getToken, false, getCacheScope, true, EXPENSIVE_REQUEST_TIMEOUT_MS);
   const put   = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT',   body: JSON.stringify(body) }, getToken, false, getCacheScope);
-  const patch = <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }, getToken, false, getCacheScope);
+  const patch = <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }, getToken, false, getCacheScope, true,
+    isFeedMediaWrite(path, body) ? EXPENSIVE_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
   const del   = <T>(path: string) => request<T>(path, { method: 'DELETE' }, getToken, false, getCacheScope);
 
   return {
@@ -3427,6 +3430,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Thread-feed posts — create with product tags, read, like/repost */
     posts: {
+      claimRepostEducation: () => post<{ show: boolean }>('/api/posts/repost-education/claim', {}),
       create: (body: {
         mediaUrl?: string; thumbnailUrl?: string; mediaPath?: string; thumbnailPath?: string;
         mediaPaths?: string[]; slideOverlays?: unknown;
@@ -3605,9 +3609,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       remove: (postId: string, commentId: string) =>
         del<{ ok: boolean }>(`/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`),
       like: (postId: string, commentId: string, liked: boolean) =>
-        post<{ liked: boolean; likesCount: number }>(
+        post<{ liked: boolean; likesCount: number; disliked?: boolean }>(
           `/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/like`,
           { liked },
+        ),
+      dislike: (postId: string, commentId: string, disliked: boolean) =>
+        post<{ disliked: boolean; liked: boolean; likesCount: number }>(
+          `/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/dislike`,
+          { disliked },
         ),
       /** Post owner only: pin a top-level comment (replaces any other pin). */
       pin: (postId: string, commentId: string) =>

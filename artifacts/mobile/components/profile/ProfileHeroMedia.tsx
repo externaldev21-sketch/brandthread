@@ -15,6 +15,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ProfileThread } from './ProfileThread';
+import { BG } from '@/lib/theme';
 
 export function ProfileHeroMedia({
   videoUri,
@@ -22,12 +23,15 @@ export function ProfileHeroMedia({
   active,
   height,
   posterOnly = false,
+  plain = false,
 }: {
   videoUri?: string | null;
   posterUri?: string | null;
   active: boolean;
   height: number;
   posterOnly?: boolean;
+  /** No media: a flat true-black hero (official account's unset cover), never the theme gradient. */
+  plain?: boolean;
 }) {
   const { theme } = useAppTheme();
   return (
@@ -36,6 +40,8 @@ export function ProfileHeroMedia({
         <HeroVideo uri={videoUri} posterUri={posterUri ?? null} active={active} />
       ) : posterUri ? (
         <CachedImage source={{ uri: posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+      ) : plain ? (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: BG }]} testID="profile-hero-plain" />
       ) : (
         <>
           <LinearGradient

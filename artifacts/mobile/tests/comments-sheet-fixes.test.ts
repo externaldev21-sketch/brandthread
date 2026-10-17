@@ -70,7 +70,7 @@ describe('No more "···" button in the row — long-press opens the menu', () 
 
 describe('Time and Reply share one baseline (the 6px-higher-Reply bug)', () => {
   it('the meta row centers its children with no extra per-item margin/padding, 4pt below the comment text', () => {
-    expect(comments).toContain("commentMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: 4 },");
+    expect(comments).toContain("commentMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: 4 },");
   });
 
   it('the Reply Pressable centers its own content instead of top-aligning inside its 44pt tap-target box', () => {

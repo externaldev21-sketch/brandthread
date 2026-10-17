@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
 import { db, users } from "@workspace/db";
-import { sql } from "drizzle-orm";
+import { and, sql } from "drizzle-orm";
+import { officialPostVisibleTo } from "../lib/postVisibility";
+import { optionalViewerId } from "../lib/safety";
 import { publicCoverFields, storefrontCoverUrl } from "../lib/profileCover";
 import { withStorefrontBannerAdopted } from "../lib/storefrontBanner";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -52,7 +54,7 @@ export async function profileLanding(req: Request, res: Response): Promise<void>
       coverImageUrl: users.coverImageUrl,
       coverMediaType: users.coverMediaType,
       coverVideoModerationStatus: users.coverVideoModerationStatus,
-    }).from(users).where(sql`lower(${users.username}) = ${username}`).limit(1);
+    }).from(users).where(and(sql`lower(${users.username}) = ${username}`, officialPostVisibleTo(optionalViewerId(req), users.clerkId))).limit(1);
 
     if (!profileRow || profileRow.deletedAt || profileRow.deletionRequestedAt || profileRow.suspendedAt || !profileRow.username || !profileRow.accountType) {
       res.status(404).send("Profile not found");

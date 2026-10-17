@@ -25,7 +25,7 @@ describe('buyer Thread chrome', () => {
   it('fits every Thread page to the measured tab scene, full-bleed with no bands', () => {
     expect(feed).toContain('const [viewportSize, setViewportSize]');
     expect(feed).toContain('const viewportReady = viewportSize.width > 0 && viewportSize.height > 0');
-    expect(feed).toContain('{viewportReady && <FlatList');
+    expect(feed).toContain('{viewportReady && <ParentScrollGestureScope><FlatList');
     expect(feed).toContain('width: pageWidth, height: pageHeight');
     // Uniform page layout lives in the shared pager config the feed spreads.
     expect(feed).toContain('{...verticalPagerListProps(pageHeight, displayItems.length)}');
@@ -38,8 +38,11 @@ describe('buyer Thread chrome', () => {
     // into black bands at the top/bottom.
     expect(feed).toContain('<PhotoCarousel');
     const carousel = readFileSync(resolve(process.cwd(), 'components/buyer-feed/PhotoCarousel.tsx'), 'utf8');
-    expect(carousel).toContain('contentFit="cover"');
-    expect(carousel).not.toContain('contentFit="contain"');
+    expect(carousel).toContain('ZoomablePhotoPager');
+    // Full-bleed blurred backdrop (cover) behind an uncropped contain foreground.
+    const slide = readFileSync(resolve(process.cwd(), 'components/media/PhotoSlide.tsx'), 'utf8');
+    expect(slide).toContain('contentFit="cover"');
+    expect(slide).toContain('contentFit="contain"');
     // Loading is a full-page shimmer, not a card with screen-colored bands.
     expect(feed).toContain('<ThreadPageSkeleton');
     expect(feed).not.toContain('<FeedSkeleton');

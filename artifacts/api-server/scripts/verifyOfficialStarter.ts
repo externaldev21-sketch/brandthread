@@ -17,7 +17,7 @@ async function main() {
     for (const url of [...post.mediaUrls ?? [], post.thumbnailUrl].filter(Boolean)) urls.add(url!);
   }
   for (const url of urls) {
-    const checksum = new URL(url).pathname.match(/\/official-starter\/([a-f0-9]{64})\./)?.[1];
+    const checksum = new URL(url).pathname.match(/\/(?:official-starter|feed-video-posters)\/(?:[a-f0-9]{16}\/)?([a-f0-9]{64})\./)?.[1];
     if (!checksum) throw new Error("A placeholder or non-imported media URL was found.");
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Media returned HTTP ${response.status}: ${new URL(url).pathname}`);

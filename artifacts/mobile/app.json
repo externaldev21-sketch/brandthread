@@ -35,6 +35,7 @@
         "applinks:www.brandthread.app"
       ],
       "infoPlist": {
+        "CADisableMinimumFrameDurationOnPhone": true,
         "UISupportedInterfaceOrientations~ipad": [
           "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationPortraitUpsideDown",

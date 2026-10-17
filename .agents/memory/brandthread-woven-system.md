@@ -20,3 +20,15 @@ description: The clean app-wide visual language that replaced the decorative Wov
 **Why:** The owner approved the broader crisp pass while explicitly rejecting its dimmed glow-outline change.
 
 **How to apply:** Preserve the original accent-colored hairlines when importing shared card changes. Keep the seller tab bar's swipe/glow implementation and appearance untouched.
+
+**Rule:** Threads/Following action rails are an explicit exception to the default native-icon guidance: use one cohesive filled-glyph family, white/silver controls and semantic red likes/follow badges. All five action counts must stay visible, including zero.
+
+**Why:** The owner rejected the mixed rail icons and requested TikTok/Reels-style professional filled controls, while explicitly protecting the system font, tab bars and seller glow. They later corrected the spacing to a compact rhythm and explicitly replaced the earlier hide-zero instruction with always-visible counts.
+
+**How to apply:** Keep feed and full-screen video/carousel actions visually consistent, with compact icon/count groups on one bottom-anchored axis in avatar, Like, Comment, Repost, Save, Share order. Never hide a zero count or substitute invented engagement. Do not apply this rail-specific exception as an app-wide icon or navigation redesign.
+
+**Rule:** Threads engagement flows use the supplied Mobbin TikTok iOS flows as direct layout and interaction references, not loose inspiration. Reskin them in Brandthread colors and system fonts; the additional rail Repost action is intentional.
+
+**Why:** The owner explicitly replaced the earlier rail specifications with the Mobbin references and rejected approximate interpretations.
+
+**How to apply:** Compare the actual reference screens when changing likes, comments, repost education, Favorites/collections or sharing. Keep authenticated screenshots distinct from public or isolated-component checks; do not invent contacts, comments or engagement to make a reference comparison look populated.

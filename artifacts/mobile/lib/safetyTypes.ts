@@ -33,6 +33,8 @@ export interface ThreadComment {
   author: ProfileSummary;
   likesCount: number;
   likedByMe: boolean;
+  /** Private to the signed-in viewer; never a public dislike count. */
+  dislikedByMe?: boolean;
   isMine: boolean;
   canDelete: boolean;
   /** Held by the content filter — visible only to its author until reviewed. */

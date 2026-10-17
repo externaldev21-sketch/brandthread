@@ -6,7 +6,8 @@
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Icon } from '@/components/ui/Icon';
@@ -32,6 +33,29 @@ type EarlyAccessStatus = {
   drop: { id: string; name: string; releaseAt: string; earlyAccessMinutes: number } | null;
   superfans: number; granted: number; allGranted: boolean;
 };
+
+const CustomerRow = React.memo(function CustomerRow({ customer: c, topBorder, colors, onOpen }: {
+  customer: SellerCustomer; topBorder: boolean; colors: ReturnType<typeof useColors>; onOpen: (id: string) => void;
+}) {
+  const location = customerLocation(c.address);
+  const tag = c.tags?.[0];
+  return (
+    <TouchableOpacity activeOpacity={0.7}
+      style={[styles.custRow, topBorder && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
+      onPress={() => onOpen(c.id)} accessibilityRole="button" testID="customer-row">
+      <View style={styles.nameLine}>
+        <Text style={[TEXT.headline, styles.custName, { color: colors.foreground }]} numberOfLines={1}>{c.name}</Text>
+        {tag ? <View style={styles.tagChip}><Text style={[TEXT.caption, { color: colors.mutedForeground }]} numberOfLines={1}>{tag}</Text></View> : null}
+      </View>
+      {location ? <Text style={[TEXT.footnote, { color: colors.mutedForeground }]} numberOfLines={1}>{location}</Text> : null}
+      <Text style={[TEXT.footnote, TABULAR, { color: colors.foreground }]} numberOfLines={1}>{customerSpendLine(c)}</Text>
+      {c.notes ? <View style={styles.noteLine}>
+        <Icon name="file-text" size={17} color={colors.mutedForeground} />
+        <Text style={[TEXT.footnote, { color: colors.mutedForeground, flex: 1 }]} numberOfLines={1}>{c.notes}</Text>
+      </View> : null}
+    </TouchableOpacity>
+  );
+});
 
 export default function CustomersScreen() {
   const colors = useColors();
@@ -122,9 +146,7 @@ export default function CustomersScreen() {
 
   // A–Z index (S5 #100): only for a long list sorted by name.
   const showIndex = sortBy === 'name' && !loading && !error && sortedCustomers.length >= INDEX_MIN_ROWS;
-  const scrollRef = useRef<ScrollView>(null);
-  const listTopRef = useRef(0);
-  const rowTopsRef = useRef<number[]>([]);
+  const scrollRef = useRef<FlashListRef<SellerCustomer>>(null);
   const firstRows = useMemo(
     () => firstRowByLetter(sortedCustomers.map((c) => c.name)),
     [sortedCustomers],
@@ -132,8 +154,12 @@ export default function CustomersScreen() {
   const jumpToLetter = useCallback((letter: IndexLetter) => {
     const row = rowForLetter(letter, firstRows, sortedCustomers.length);
     if (row === null) return;
-    scrollRef.current?.scrollTo({ y: listTopRef.current + (rowTopsRef.current[row] ?? 0), animated: false });
+    // Index-based scrolling also reaches recycled/unmounted rows.
+    void scrollRef.current?.scrollToIndex({ index: row, animated: false });
   }, [firstRows, sortedCustomers.length]);
+  const openCustomer = useCallback((id: string) => {
+    router.push(`/customer-orders?customerId=${encodeURIComponent(id)}` as never);
+  }, [router]);
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
@@ -142,13 +168,19 @@ export default function CustomersScreen() {
         actions={[{ icon: 'bar-chart-2', onPress: () => router.navigate('/(tabs)/analytics' as never), accessibilityLabel: 'View customer analytics' }]}
       />
       <View style={{ flex: 1 }}>
-      <ScrollView
+      <FlashList
         ref={scrollRef}
         style={{ flex: 1 }}
+        data={!loading && !error ? sortedCustomers : []}
+        keyExtractor={customer => customer.id}
+        maintainVisibleContentPosition={{ disabled: true }}
+        renderItem={({ item: customer, index }) => (
+          <CustomerRow customer={customer} topBorder={index > 0} colors={colors} onOpen={openCustomer} />
+        )}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 140, paddingHorizontal: 20, paddingRight: showIndex ? 32 : 20 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-      >
+        ListHeaderComponent={<>
         {/* Search + sort (Shopify: search field, sort button on its right) */}
         <View style={styles.searchRow}>
           <View style={[styles.searchWrap, { backgroundColor: FILL_ELEVATED }]}>
@@ -230,43 +262,9 @@ export default function CustomersScreen() {
             style={{ marginTop: 48 }}
             testID="customers-empty"
           />
-        ) : (
-          sortedCustomers.map((c, i) => {
-            const location = customerLocation(c.address);
-            const tag = c.tags?.[0];
-            return (
-              <TouchableOpacity
-                key={c.id}
-                activeOpacity={0.7}
-                onLayout={(e) => { rowTopsRef.current[i] = e.nativeEvent.layout.y; }}
-                style={[styles.custRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
-                onPress={() => router.push(`/customer-orders?customerId=${encodeURIComponent(c.id)}` as never)}
-                accessibilityRole="button"
-                testID="customer-row"
-              >
-                <View style={styles.nameLine}>
-                  <Text style={[TEXT.headline, styles.custName, { color: colors.foreground }]} numberOfLines={1}>{c.name}</Text>
-                  {tag ? (
-                    <View style={styles.tagChip}>
-                      <Text style={[TEXT.caption, { color: colors.mutedForeground }]} numberOfLines={1}>{tag}</Text>
-                    </View>
-                  ) : null}
-                </View>
-                {location ? (
-                  <Text style={[TEXT.footnote, { color: colors.mutedForeground }]} numberOfLines={1}>{location}</Text>
-                ) : null}
-                <Text style={[TEXT.footnote, TABULAR, { color: colors.foreground }]} numberOfLines={1}>{customerSpendLine(c)}</Text>
-                {c.notes ? (
-                  <View style={styles.noteLine}>
-                    <Icon name="file-text" size={17} color={colors.mutedForeground} />
-                    <Text style={[TEXT.footnote, { color: colors.mutedForeground, flex: 1 }]} numberOfLines={1}>{c.notes}</Text>
-                  </View>
-                ) : null}
-              </TouchableOpacity>
-            );
-          })
-        )}
-      </ScrollView>
+        ) : null}
+        </>}
+      />
       {showIndex ? <View pointerEvents="box-none" style={styles.indexWrap}><AlphabetScrubber onLetter={jumpToLetter} /></View> : null}
       </View>
       <OptionSheet

@@ -29,7 +29,8 @@ import {
   db, follows, interactions, postTaggedProducts, posts, products, productVariants, users,
 } from "@workspace/db";
 import { resolveToClerkId } from "./public";
-import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
+import { officialPostVisibleTo, publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
+import { isOfficialAuthor } from "../lib/officialSeed/config";
 import { taggedProductVisibleTo } from "../lib/productVisibility";
 import {
   authorInGoodStanding,
@@ -287,7 +288,7 @@ router.get("/users/:userId/videos", async (req, res) => {
         suspendedAt: users.suspendedAt,
       })
       .from(users)
-      .where(eq(users.clerkId, clerkId))
+      .where(and(eq(users.clerkId, clerkId), officialPostVisibleTo(viewerFrom(req), users.clerkId)))
       .limit(1);
     if (!owner || owner.suspendedAt) return res.status(404).json({ error: "Profile not found" });
 
@@ -324,7 +325,9 @@ router.get("/users/:userId/videos", async (req, res) => {
         .innerJoin(users, eq(users.clerkId, posts.userId))
         .where(where)
         // Pinned posts first, newest pin first (Pin to your profile; lib/postPins.ts).
-        .orderBy(pinnedFirst(posts.id), desc(posts.createdAt), asc(posts.id))
+        .orderBy(...(isOfficialAuthor(clerkId)
+          ? [desc(posts.createdAt), asc(posts.id)]
+          : [pinnedFirst(posts.id), desc(posts.createdAt), asc(posts.id)]))
         .limit(limit)
         .offset(offset),
     ]);

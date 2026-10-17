@@ -180,6 +180,7 @@
     "expo-video": "~57.0.5",
     "qrcode": "^1.5.4",
     "react": "19.2.3",
+    "react-freeze": "1.0.4",
     "react-native": "0.86.3",
     "react-native-agora": "^4.6.2",
     "react-native-callkeep": "4.3.16",

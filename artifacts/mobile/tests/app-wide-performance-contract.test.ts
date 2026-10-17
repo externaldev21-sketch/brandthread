@@ -27,4 +27,19 @@ describe('app-wide navigation work stays bounded', () => {
     expect(source).toContain('const value = useMemo(');
     expect(source).toContain('<Context.Provider value={value}>');
   });
+  it('isolates runtime hosts from route observers and mounts only one context menu', () => {
+    const root = read('app/_layout.tsx');
+    expect(root).toContain('const RootLayoutRuntime = React.memo(');
+    expect(root.match(/<ContextMenuHost\s*\/>/g)).toHaveLength(1);
+    const role = read('contexts/RoleContext.tsx');
+    expect(role).toContain('const setRole = useCallback(');
+    expect(role).toContain('const value = useMemo(');
+  });
+  it('virtualizes customer rows without measuring the whole dataset', () => {
+    const source = read('app/customers.tsx');
+    expect(source).toContain('<FlashList');
+    expect(source).toContain('const CustomerRow = React.memo(');
+    expect(source).toContain('scrollToIndex({ index: row');
+    expect(source).not.toContain('sortedCustomers.map((c, i)');
+  });
 });

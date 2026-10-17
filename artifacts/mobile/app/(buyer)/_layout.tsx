@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Tabs, usePathname } from 'expo-router';
+import { RetainedScene } from '@/components/RetainedScene';
 import { Platform, useWindowDimensions } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
@@ -123,6 +124,7 @@ function BuyerTabLayout() {
       // feeling on every tab tap. The memory cost is 5 always-attached
       // screens, which is cheap next to eliminating that reload.
       detachInactiveScreens={false}
+      screenLayout={({ children, navigation }) => <RetainedScene navigation={navigation} opaque>{children}</RetainedScene>}
       tabBar={(props) => <BuyerTabBar {...props} inboxBadgeCount={inboxBadgeCount} />}
       // A render crash in one tab shows a friendly per-tab fallback instead
       // of taking down the whole app; the root layout's ErrorBoundary is

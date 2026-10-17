@@ -4,6 +4,12 @@
  * haven't chatted with, no duplicates. Pure.
  */
 import type { Conversation, Friendship, AccountType } from '@/services/socialTypes';
+import { isOfficialAccountId } from '@/lib/officialAccount';
+
+function httpUri(...values: unknown[]): string | undefined {
+  const hit = values.find((v) => typeof v === 'string' && /^https?:\/\//.test(v));
+  return typeof hit === 'string' ? hit : undefined;
+}
 
 export type ShareTarget = {
   userId: string;
@@ -12,6 +18,10 @@ export type ShareTarget = {
   initials: string;
   color: string;
   accountType: AccountType;
+  /** Real profile photo when the API sent one; absent = initials. */
+  avatarUri?: string;
+  /** The official @brandthread account — always shows the bundled B mark. */
+  isOfficial?: boolean;
   /** Set when there's already a chat with this person — send straight into it. */
   conversationId?: string;
 };
@@ -38,12 +48,15 @@ export function recentShareTargets(
     out.push({
       userId: p.userId, name: p.name, handle: p.handle, initials: p.initials, color: p.color,
       accountType: p.accountType, conversationId: conv.id,
+      avatarUri: httpUri(p.avatarUri), isOfficial: isOfficialAccountId(p.userId),
     });
   }
   for (const f of friends) {
     if (seen.has(f.userId)) continue;
     seen.add(f.userId);
-    out.push({ userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color, accountType: 'buyer' });
+    out.push({ userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color, accountType: 'buyer',
+      avatarUri: httpUri((f as { avatarUri?: unknown }).avatarUri, (f as { avatarUrl?: unknown }).avatarUrl),
+      isOfficial: isOfficialAccountId(f.userId) });
   }
   return out.slice(0, max);
 }

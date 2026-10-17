@@ -4,6 +4,9 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { queryClient, queryPersister, setQueryKeyScope } from '@/lib/queryClient';
 import { warmBuyerTabs, warmSellerTabs } from '@/lib/appStartPrefetch';
 import { recordNavigationStart, recordShellInteractive } from '@/lib/perf';
+import { focusedNavigationKey, markNavigationCommit, markNavigationDispatch, markNavigationInput } from '@/lib/navigation/navigationTrace';
+import { RetainedScene } from '@/components/RetainedScene';
+import { prefetchRouteCode, scheduleRouteWarmup } from '@/lib/navigation/routeWarmup';
 import { PerfOverlay } from '@/components/dev/PerfOverlay';
 import { isGuestBrowseRoute, safeReturnTo } from '@/lib/guestRoutes';
 import { runAfterFirstPaint } from '@/lib/deferStartup';
@@ -31,7 +34,7 @@ import { tokenCache } from '@/lib/tokenCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { flushPendingBuyerOnboardingSync } from '@/lib/buyerOnboardingSync';
 import { flushPendingBuyerSurvey } from '@/lib/onboardingSurvey';
-import { RoleProvider } from '@/contexts/RoleContext';
+import { RoleProvider, useRole } from '@/contexts/RoleContext';
 import { ThreadPullProvider } from '@/contexts/ThreadPullTransitionContext';
 import { AppThemeProvider, useAppTheme, peekPersistedTheme } from '@/contexts/AppThemeContext';
 import { DisplayPrefsProvider } from '@/contexts/DisplayPrefsContext';
@@ -79,6 +82,7 @@ import { RevenueCatProvider } from '@/lib/revenueCat';
 import { registerGrantedPushToken, setSignedInAccountIds } from '@/lib/contextualPushPermission';
 import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts/FeatureFlagContext';
 import { SharedPhotoOverlay } from '@/components/sharedPhoto/SharedPhotoOverlay';
+import { PhotoZoomHost } from '@/components/media/PhotoZoomHost';
 import { UndoToastProvider } from '@/components/BrandthreadUI';
 import { CallSessionProvider } from '@/lib/calls/CallSessionContext';
 import { FirstRunTipsProvider } from '@/contexts/FirstRunTipsContext';
@@ -138,7 +142,7 @@ installConfirmationSheets();
 setRequestGuard(() => isSellerDevPreview());
 
 // A fast double tap must not push the same screen twice (polish #51).
-installPushGuard(globalRouter);
+installPushGuard(globalRouter, undefined, markNavigationDispatch);
 
 // Presentation routes must remain transparent so the active runtime shell is
 // visible behind cards, sheets, and full-screen modal content.
@@ -1337,11 +1341,8 @@ function MarketingPixelTracker() {
 
 function RootLayoutNav() {
   const segments = useSegments();
-  const router = useRouter();
-  const api = useApi();
-  const { userId } = useAuth();
+  const navigationKey = focusedNavigationKey(useRootNavigationState());
   const { isEnabled } = useFeatureFlags();
-  const handledNotificationIdsRef = useRef(new Set<string>());
   const route = segments[segments.length - 1] ?? '';
   const gatedRoutes: Partial<Record<string, FeatureFlagKey>> = {
     'design-ai-photoshoot': 'aiPhotoShoot',
@@ -1356,6 +1357,29 @@ function RootLayoutNav() {
     recordNavigationStart(pathname || '/', queryClient);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
+
+  useEffect(() => markNavigationCommit(pathname || '/'), [pathname, navigationKey]);
+
+  return <RootLayoutRuntime featurePaused={!!feature && !isEnabled(feature)} />;
+}
+
+// Route changes belong to the small observer above, not this entire tree of
+// notification, auth, consent and modal hosts. Context-consuming descendants
+// still receive their own navigation/auth/theme updates normally.
+const RootLayoutRuntime = React.memo(function RootLayoutRuntime({ featurePaused }: { featurePaused: boolean }) {
+  const router = useRouter();
+  const api = useApi();
+  const { userId } = useAuth();
+  const { role } = useRole();
+  const handledNotificationIdsRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!userId && !isBuyerDevPreview() && !isSellerDevPreview()) return;
+    let cancelWarmup = () => {};
+    const cancelPaint = runAfterFirstPaint(() => {
+      cancelWarmup = scheduleRouteWarmup(prefetchRouteCode, role);
+    });
+    return () => { cancelPaint(); cancelWarmup(); };
+  }, [role, userId]);
 
   // Cold-start fallback reading: the navigator has painted and settled.
   useEffect(() => runAfterFirstPaint(recordShellInteractive), []);
@@ -1456,7 +1480,7 @@ function RootLayoutNav() {
     };
   }, [api, router, userId]);
 
-  if (feature && !isEnabled(feature)) {
+  if (featurePaused) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 }}>
         <Text style={{ color: '#F5F5F7', fontFamily: FONT.bold, fontSize: 22, textAlign: 'center' }}>
@@ -1482,7 +1506,7 @@ function RootLayoutNav() {
   }
 
   return (
-    <View style={{ flex: 1, flexDirection: 'column' }}>
+    <View onTouchStart={markNavigationInput} style={{ flex: 1, flexDirection: 'column' }}>
       <View
         testID="expo-go-startup-ready"
         accessibilityLabel="Brandthread startup ready"
@@ -1496,7 +1520,6 @@ function RootLayoutNav() {
       <OfflineBanner />
       <ActionSheetHost />
       <PushPrePromptHost />
-      <ContextMenuHost />
       <SystemSurfacesBridge />
       <Pressable onPress={dismissKeyboardUnlessTextInput} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
@@ -1523,7 +1546,7 @@ function RootLayoutNav() {
       <ForceUpdateGate />
     </View>
   );
-}
+});
 
 // Route observers above must update on navigation. The static registration of
 // hundreds of screens must not be rebuilt with them on every tap.
@@ -1536,13 +1559,16 @@ const AppStack = React.memo(function AppStack() {
         // ErrorBoundary above. The (tabs)/(buyer) group layouts install their
         // own per-tab boundary (TabScreenErrorFallback).
         unstable_screenErrorBoundary={ScreenErrorFallback}
-        screenLayout={({ children, route, options }) => (
+        screenLayout={({ children, route, options, navigation }) => (
+          <RetainedScene navigation={navigation}>
           <IsolatedStackScene routeName={route.name} presentation={(options as { presentation?: string } | undefined)?.presentation}>
             {children}
           </IsolatedStackScene>
+          </RetainedScene>
         )}
         screenOptions={{
           headerShown: false,
+          freezeOnBlur: true,
           animation: 'ios_from_right',
           // Design-system push duration (constants/motion.ts SCREEN_PUSH_MS) —
           // Android honors this exactly; iOS uses its native, equivalent-feel push.
@@ -1923,6 +1949,7 @@ function RootLayout() {
                                     <SaveHeartHost />
                                     <ShareStoreSheetHost />
                                     <SharedPhotoOverlay />
+                                    <PhotoZoomHost />
                                   </FirstRunTipsProvider>
                                 </CallSessionProvider>
                               </ThreadPullProvider>

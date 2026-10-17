@@ -27,7 +27,7 @@
  */
 import { Router } from "express";
 import { and, asc, count, desc, eq, gt, inArray, lt, notInArray, or, sql } from "drizzle-orm";
-import { db, postCommentLikes, postCommentMedia, postComments, posts } from "@workspace/db";
+import { db, interactions, postCommentLikes, postCommentMedia, postComments, posts } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
@@ -64,6 +64,11 @@ const createCommentBody = looseBody({
   mediaId: cappedUnknown(200),
 });
 const likeCommentBody = looseBody({ liked: optBoolish });
+const dislikeCommentBody = looseBody({ disliked: optBoolish });
+// Private, account-owned feedback reuses the existing interaction store. It is
+// excluded from public post counts, and existing account erasure removes it.
+const COMMENT_DISLIKE = "comment_dislike";
+const REPOST_EDUCATION = "repost_education_seen";
 class MediaAlreadyUsedError extends Error {}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -83,6 +88,7 @@ export interface CommentView {
   author: ProfileSummary;
   likesCount: number;
   likedByMe: boolean;
+  dislikedByMe: boolean;
   isMine: boolean;
   canDelete: boolean;
   pendingReview: boolean;
@@ -252,7 +258,7 @@ router.get("/:postId/comments", async (req, res) => {
     });
 
     const ids = shown.map((c) => c.id);
-    const [likeRows, myLikeRows, profiles, totalRows, creatorLikeRows, mentionsByComment, mediaByComment] = await Promise.all([
+    const [likeRows, myLikeRows, profiles, totalRows, creatorLikeRows, mentionsByComment, mediaByComment, myDislikeRows] = await Promise.all([
       ids.length ? db.select({ commentId: postCommentLikes.commentId, n: count() })
         .from(postCommentLikes).where(inArray(postCommentLikes.commentId, ids))
         .groupBy(postCommentLikes.commentId) : Promise.resolve([]),
@@ -277,11 +283,15 @@ router.get("/:postId/comments", async (req, res) => {
         : Promise.resolve([]),
       mentionsForComments(ids),
       mediaForComments(ids),
+      ids.length && viewerId ? db.select({ commentId: interactions.value }).from(interactions)
+        .where(and(eq(interactions.postId, postId), eq(interactions.userId, viewerId),
+          eq(interactions.type, COMMENT_DISLIKE), inArray(interactions.value, ids))) : Promise.resolve([]),
     ]);
     const dayOne = await dayOneAmong(post.userId, shown.map((c) => c.authorId));
     const creatorLiked = new Set(creatorLikeRows.map((row) => row.commentId));
     const likes = new Map(likeRows.map((row) => [row.commentId, Number(row.n)]));
     const mine = new Set(myLikeRows.map((row) => row.commentId));
+    const disliked = new Set(myDislikeRows.map((row) => row.commentId));
 
     const toView = (comment: CommentRow): CommentView => ({
       id: comment.id,
@@ -295,6 +305,7 @@ router.get("/:postId/comments", async (req, res) => {
       },
       likesCount: likes.get(comment.id) ?? 0,
       likedByMe: mine.has(comment.id),
+      dislikedByMe: disliked.has(comment.id),
       isMine: !!viewerId && comment.authorId === viewerId,
       canDelete: !!viewerId && (comment.authorId === viewerId || post.userId === viewerId),
       pendingReview: comment.moderationStatus === "held",
@@ -387,7 +398,7 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
       && (c.authorId === viewerId || !matchesMutedWords(c.body, muted)));
 
     const ids = shown.map((c) => c.id);
-    const [likeRows, myLikeRows, profiles, mentionsByComment, mediaByComment] = await Promise.all([
+    const [likeRows, myLikeRows, profiles, mentionsByComment, mediaByComment, myDislikeRows] = await Promise.all([
       ids.length ? db.select({ commentId: postCommentLikes.commentId, n: count() })
         .from(postCommentLikes).where(inArray(postCommentLikes.commentId, ids))
         .groupBy(postCommentLikes.commentId) : Promise.resolve([]),
@@ -398,9 +409,13 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
       profilesById(shown.map((c) => c.authorId)),
       mentionsForComments(ids),
       mediaForComments(ids),
+      ids.length && viewerId ? db.select({ commentId: interactions.value }).from(interactions)
+        .where(and(eq(interactions.postId, postId), eq(interactions.userId, viewerId),
+          eq(interactions.type, COMMENT_DISLIKE), inArray(interactions.value, ids))) : Promise.resolve([]),
     ]);
     const likes = new Map(likeRows.map((row) => [row.commentId, Number(row.n)]));
     const mine = new Set(myLikeRows.map((row) => row.commentId));
+    const disliked = new Set(myDislikeRows.map((row) => row.commentId));
     const creatorLikedRows = ids.length ? await db.select({ commentId: postCommentLikes.commentId })
       .from(postCommentLikes)
       .where(and(inArray(postCommentLikes.commentId, ids), eq(postCommentLikes.userId, post.userId))) : [];
@@ -419,6 +434,7 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
       },
       likesCount: likes.get(comment.id) ?? 0,
       likedByMe: mine.has(comment.id),
+      dislikedByMe: disliked.has(comment.id),
       isMine: !!viewerId && comment.authorId === viewerId,
       canDelete: !!viewerId && (comment.authorId === viewerId || post.userId === viewerId),
       pendingReview: comment.moderationStatus === "held",
@@ -597,6 +613,7 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), validateBody
       author: profiles.get(authorId)!,
       likesCount: 0,
       likedByMe: false,
+      dislikedByMe: false,
       isMine: true,
       canDelete: true,
       pendingReview: held,
@@ -713,14 +730,10 @@ router.delete("/:postId/comments/:commentId/pin", requireAuth, async (req, res) 
   }
 });
 
-// ─── POST /api/posts/:postId/comments/:commentId/like ────────────────────────
-router.post("/:postId/comments/:commentId/like", requireAuth, validateBody(likeCommentBody), async (req, res) => {
-  const viewerId = (req as any).clerkUserId as string;
-  const postId = String(req.params.postId);
-  const commentId = String(req.params.commentId);
-  if (!UUID_RE.test(postId) || !UUID_RE.test(commentId)) return res.status(404).json({ error: "Comment not found" });
-  const liked = (req.body as { liked?: unknown })?.liked !== false;
-
+async function reactableComment(postId: string, commentId: string, viewerId: string) {
+  if (!UUID_RE.test(postId) || !UUID_RE.test(commentId)) return null;
+  const post = await loadPost(postId, viewerId);
+  if (!post || (post.userId !== viewerId && (await blockRelation(viewerId, post.userId)) !== "none")) return null;
   const [comment] = await db
     .select({ id: postComments.id, authorId: postComments.authorId })
     .from(postComments)
@@ -728,25 +741,74 @@ router.post("/:postId/comments/:commentId/like", requireAuth, validateBody(likeC
       eq(postComments.id, commentId),
       eq(postComments.postId, postId),
       eq(postComments.moderationStatus, "visible"),
+      or(eq(postComments.hiddenByOwner, false), eq(postComments.authorId, viewerId)),
     ))
     .limit(1);
-  if (!comment) return res.status(404).json({ error: "Comment not found" });
+  if (!comment) return null;
   if (comment.authorId !== viewerId && (await blockRelation(viewerId, comment.authorId)) !== "none") {
-    return res.status(404).json({ error: "Comment not found" });
+    return null;
   }
+  return comment;
+}
 
-  if (liked) {
-    const inserted = await db.insert(postCommentLikes).values({ commentId, userId: viewerId })
-      .onConflictDoNothing()
-      .returning({ commentId: postCommentLikes.commentId });
-    // Only a genuinely new like notifies the comment's author.
-    if (inserted.length > 0) void notifyCommentLike({ commentId, likerId: viewerId });
-  } else {
-    await db.delete(postCommentLikes)
-      .where(and(eq(postCommentLikes.commentId, commentId), eq(postCommentLikes.userId, viewerId)));
-  }
-  const [{ n }] = await db.select({ n: count() }).from(postCommentLikes).where(eq(postCommentLikes.commentId, commentId));
-  return res.json({ liked, likesCount: Number(n) });
+async function setCommentReaction(postId: string, commentId: string, viewerId: string, kind: "like" | "dislike", enabled: boolean) {
+  return db.transaction(async tx => {
+    // Like and dislike share one serialization boundary, including retries
+    // arriving on different API workers. Never commit both simultaneously.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`comment-reaction:${commentId}:${viewerId}`}))`);
+    const likeWhere = and(eq(postCommentLikes.commentId, commentId), eq(postCommentLikes.userId, viewerId));
+    const dislikeWhere = and(eq(interactions.postId, postId), eq(interactions.userId, viewerId),
+      eq(interactions.type, COMMENT_DISLIKE), eq(interactions.value, commentId));
+    let insertedLike = false;
+    if (kind === "like") {
+      if (enabled) {
+        await tx.delete(interactions).where(dislikeWhere);
+        const inserted = await tx.insert(postCommentLikes).values({ commentId, userId: viewerId })
+          .onConflictDoNothing().returning({ commentId: postCommentLikes.commentId });
+        insertedLike = inserted.length > 0;
+      } else await tx.delete(postCommentLikes).where(likeWhere);
+    } else {
+      await tx.delete(interactions).where(dislikeWhere);
+      if (enabled) {
+        await tx.delete(postCommentLikes).where(likeWhere);
+        await tx.insert(interactions).values({ postId, userId: viewerId, type: COMMENT_DISLIKE, value: commentId });
+      }
+    }
+    const myLikes = await tx.select({ id: postCommentLikes.commentId }).from(postCommentLikes).where(likeWhere);
+    const myDislikes = await tx.select({ id: interactions.id }).from(interactions).where(dislikeWhere);
+    const totals = await tx.select({ n: count() }).from(postCommentLikes).where(eq(postCommentLikes.commentId, commentId));
+    return { liked: myLikes.length > 0, disliked: myDislikes.length > 0, likesCount: Number(totals[0].n), insertedLike };
+  });
+}
+
+router.post("/:postId/comments/:commentId/like", requireAuth, validateBody(likeCommentBody), async (req, res) => {
+  const viewerId = (req as any).clerkUserId as string;
+  const postId = String(req.params.postId), commentId = String(req.params.commentId);
+  if (!(await reactableComment(postId, commentId, viewerId))) return res.status(404).json({ error: "Comment not found" });
+  const { insertedLike, ...reaction } = await setCommentReaction(postId, commentId, viewerId, "like", req.body.liked !== false);
+  if (insertedLike) void notifyCommentLike({ commentId, likerId: viewerId });
+  return res.json(reaction);
+});
+
+router.post("/:postId/comments/:commentId/dislike", requireAuth, rateLimit("comment"), validateBody(dislikeCommentBody), async (req, res) => {
+  const viewerId = (req as any).clerkUserId as string;
+  const postId = String(req.params.postId), commentId = String(req.params.commentId);
+  if (!(await reactableComment(postId, commentId, viewerId))) return res.status(404).json({ error: "Comment not found" });
+  const { insertedLike: _inserted, ...reaction } = await setCommentReaction(postId, commentId, viewerId, "dislike", req.body.disliked !== false);
+  return res.json(reaction);
+});
+
+router.post("/repost-education/claim", requireAuth, rateLimit("comment"), async (req, res) => {
+  const viewerId = (req as any).clerkUserId as string;
+  const show = await db.transaction(async tx => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`repost-education:${viewerId}`}))`);
+    const [previous] = await tx.select({ id: interactions.id }).from(interactions)
+      .where(and(eq(interactions.userId, viewerId), eq(interactions.type, REPOST_EDUCATION))).limit(1);
+    if (previous) return false;
+    await tx.insert(interactions).values({ userId: viewerId, type: REPOST_EDUCATION, value: "v1" });
+    return true;
+  });
+  return res.json({ show });
 });
 
 export default router;

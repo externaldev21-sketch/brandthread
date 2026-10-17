@@ -90,15 +90,18 @@ beforeAll(async () => {
   const [official] = await db.select({ clerkId: users.clerkId }).from(users).where(eq(users.clerkId, OFFICIAL_ACCOUNT_CLERK_ID));
   if (!official) throw new Error("migration 270 did not seed the official account");
 
-  const [{ default: postsRouter }, { default: publicRouter }, { default: feedRouter }] = await Promise.all([
-    import("../posts"), import("../public"), import("../feed"),
+  const [{ default: postsRouter }, { default: publicRouter }, { default: feedRouter }, { default: mediaRouter }, { default: socialRouter }, { profileLanding }] = await Promise.all([
+    import("../posts"), import("../public"), import("../feed"), import("../profile-media"), import("../social"), import("../profileLanding"),
   ]);
   const app = express();
   app.use(express.json());
   app.use((req: any, _res, next) => { const id = req.header("x-test-user-id"); if (id) req.clerkUserId = id; next(); });
   app.use("/api/posts", postsRouter);
   app.use("/api/public", publicRouter);
+  app.use("/api/public", mediaRouter);
   app.use("/api/feed", feedRouter);
+  app.use("/api/social", socialRouter);
+  app.get("/u/:username", profileLanding);
   await new Promise<void>((resolve) => { server = app.listen(0, "127.0.0.1", () => resolve()); });
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -174,6 +177,76 @@ describe("OFFICIAL_SEED_CONTENT_PUBLIC", () => {
     await setFlag(true);
     const asBuyer = await request(`/api/public/posts?ownerId=${OFFICIAL_ACCOUNT_CLERK_ID}`, newBuyerId);
     expect(asBuyer.body.map((p: any) => p.id)).toContain(postIds[0]);
+  });
+});
+
+describe("official profile identity and access", () => {
+  const paths = [
+    `/api/public/sellers/${OFFICIAL_ACCOUNT_CLERK_ID}`,
+    "/api/public/profiles/brandthread",
+    `/api/public/users/${OFFICIAL_ACCOUNT_CLERK_ID}/videos`,
+  ];
+
+  it("hides every direct profile entry when off, but allows admins", async () => {
+    await setFlag(false);
+    for (const path of paths) {
+      expect((await request(path, null)).status, path).toBe(404);
+      expect((await request(path, newBuyerId)).status, path).toBe(404);
+      expect((await request(path, adminId)).status, path).toBe(200);
+    }
+    expect((await fetch(`${base}/u/brandthread`)).status).toBe(404);
+    expect((await fetch(`${base}/u/brandthread`, { headers: { "x-test-user-id": adminId } })).status).toBe(200);
+  });
+
+  it("resolves the real official identity, empty cover and newest-first grid when on", async () => {
+    await setFlag(true);
+    const profile = await request("/api/public/profiles/brandthread", null);
+    expect(profile.body).toMatchObject({
+      username: "brandthread", displayName: "Brandthread",
+      bio: "The official Brandthread account.", isOfficial: true, verified: true,
+    });
+    const seller = await request(`/api/public/sellers/${profile.body.id}`, null);
+    expect(seller.body.profile).toMatchObject({
+      clerkId: OFFICIAL_ACCOUNT_CLERK_ID, coverVideoUrl: null, profileBanner: null,
+    });
+    const grid = await request(`/api/public/users/${profile.body.id}/videos?limit=50`, null);
+    expect(grid.status).toBe(200);
+    expect(grid.body.videos.length).toBeGreaterThan(0);
+    const times = grid.body.videos.map((p: any) => new Date(p.createdAt).getTime());
+    expect(times).toEqual([...times].sort((a, b) => b - a));
+    for (const row of grid.body.videos) expect(row.authorId ?? row.userId).toBe(OFFICIAL_ACCOUNT_CLERK_ID);
+  });
+
+  it("persists following across reads, is idempotent, and undoes it", async () => {
+    await setFlag(true);
+    const path = `/api/public/sellers/${OFFICIAL_ACCOUNT_CLERK_ID}`;
+    const before = (await request(path, null)).body.profile.followersCount;
+    try {
+      for (let n = 0; n < 2; n++) {
+        const follow = await request("/api/social/follow", newBuyerId, {
+          method: "POST", body: JSON.stringify({ userId: OFFICIAL_ACCOUNT_CLERK_ID }),
+        });
+        expect(follow.status).toBe(200);
+      }
+      expect((await request(path, oldBuyerId)).body.profile.followersCount).toBe(before + 1);
+    } finally {
+      expect((await request(`/api/social/follow/${OFFICIAL_ACCOUNT_CLERK_ID}`, newBuyerId, { method: "DELETE" })).status).toBe(200);
+    }
+    expect((await request(path, null)).body.profile.followersCount).toBe(before);
+  });
+
+  it("finds the real official account in search only when allowed", async () => {
+    await setFlag(true);
+    const on = await request("/api/public/search?q=brandthread", null);
+    expect(on.status).toBe(200);
+    expect(on.body.results).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: OFFICIAL_ACCOUNT_CLERK_ID, kind: "brand", handle: "@brandthread", isOfficial: true }),
+    ]));
+    await setFlag(false);
+    const off = await request("/api/public/search?q=brandthread", null);
+    expect(off.body.results.some((row: any) => row.id === OFFICIAL_ACCOUNT_CLERK_ID)).toBe(false);
+    const admin = await request("/api/public/search?q=brandthread", adminId);
+    expect(admin.body.results.some((row: any) => row.id === OFFICIAL_ACCOUNT_CLERK_ID)).toBe(true);
   });
 });
 

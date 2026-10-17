@@ -82,7 +82,7 @@
 - [Persistent seller navigation](persistent-seller-navigation.md) — the seller tab bar is app-shell navigation and remains visible on every signed-in seller route.
 - [Reference-app adaptation](reference-app-adaptation.md) — audit reference archives for useful micro-interactions as well as major flows; adapt them without replacing Brandthread’s layout.
 - [Canonical buyer checkout](canonical-buyer-checkout.md) — every buyer purchase source uses one Brandthread checkout, confirmation, purchase-detail, and rating journey.
-- [Expo video screenshot capture](expo-video-screenshot-capture.md) — static preview screenshots may show black hardware-video planes; verify bundled clips through player logs and extracted frames.
+- [Expo video screenshot capture](expo-video-screenshot-capture.md) — verify actual playback, not screenshots or SDK testIDs; effect setup must restore playback after Strict Mode cleanup.
 - [Expo stale preview bundles](expo-stale-preview-bundles.md) — if source checks pass but a phone still shows retired UI, clear Metro caches, restart Expo, and reload the open client.
 - [Friend-only repost identity](friend-only-repost-identity.md) — repost avatars are server-authorized for mutual buyer friends only; explicit add/remove and uniqueness keep state retry-safe.
 - [Native release fixtures](native-release-fixtures.md) — release runners use repository-owned lifecycle code; credentials stay in runner secrets and API failure controls stay buyer-scoped.
@@ -113,3 +113,6 @@
 - [Publish identifier storage](publish-identifier-storage.md) — UUID-shaped IDs can remain text-backed; preserve deployed storage contracts across ORM merges.
 - [First App Store launch](first-app-store-launch.md) — use static config and defer optional native surfaces, OTA and required monitoring until the wizard links/provisions the app.
 - [Official content boundary](official-content-boundary.md) — one shared official-account system; starter creator permissions remain pending, so production public visibility stays off.
+- [Feed media framing](feed-media-framing.md) — TikTok feed preserves LIVE/Cart/navigation; videos cover, photos contain with blur; feed zoom resets, viewer zoom stays.
+- [Feed video delivery](feed-video-delivery.md) — count speculative decoders, cap rather than inflate bitrate, authorize HLS children, and preserve cached URLs across backfills.
+- [Posts-first profiles](profile-posts-first.md) — all profile visits default to Posts; existing Products tabs remain second, with selection local to a visit.

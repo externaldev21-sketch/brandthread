@@ -48,6 +48,7 @@ import {
 } from '@/components/profile/ProfileControls';
 import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar';
 import { useSellerActivityUnread } from '@/hooks/useSellerActivityUnread';
+import { useProfilePostsDefault } from '@/hooks/useProfilePostsDefault';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
@@ -151,6 +152,7 @@ export default function ProfileScreen() {
   const sellerBarInset = useTabBarMetrics(2).occupiedHeight;
   const { isLoaded: authLoaded, userId } = useAuth();
   const [activeTab, setActiveTab] = useState<ContentTab>('Posts');
+  useProfilePostsDefault(setActiveTab, userId);
   const [shopProducts, setShopProducts] = useState<ShopProduct[]>([]);
   const [shopLoading, setShopLoading] = useState(false);
   const [shopError, setShopError] = useState(false);

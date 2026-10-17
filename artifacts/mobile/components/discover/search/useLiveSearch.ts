@@ -20,7 +20,7 @@ import { pickAvatarColor } from '@/lib/avatarColors';
 export const LIVE_SEARCH_DEBOUNCE_MS = 150;
 
 export type ProductResult = SearchProduct & { productId?: string; sellerId?: string; imageUri?: string | null };
-export type BrandResult = SearchBrand & { sellerId?: string; imageUri?: string | null };
+export type BrandResult = SearchBrand & { sellerId?: string; imageUri?: string | null; avatarUrl?: string | null; isOfficial?: boolean };
 export type VideoResult = SearchVideo;
 
 /** `&demo=1` only: the bundled preview catalog, matched like the live search. */

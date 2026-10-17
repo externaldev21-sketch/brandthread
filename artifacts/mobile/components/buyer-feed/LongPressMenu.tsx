@@ -38,7 +38,7 @@ export function LongPressMenu({
   visible, creator, isVideo, speedActive, onToggleSpeed,
   saved, onToggleSave, reposted, canRepost = true, onToggleRepost,
   onShare, onCopyLink, captions, canDownload = false, onDownload,
-  onNotInterested, onReport, onClose,
+  onNotInterested, onReport, onClose, clearMode, onToggleClearMode, photoAutoAdvance,
 }: {
   visible: boolean;
   /** Seller display name, read out by VoiceOver on the "Don't recommend" row. */
@@ -62,6 +62,11 @@ export function LongPressMenu({
   onNotInterested: (reason: NotInterestedReason) => void;
   onReport: () => void;
   onClose: () => void;
+  /** Clear mode hides all overlay chrome on the post. */
+  clearMode?: boolean;
+  onToggleClearMode?: () => void;
+  /** Photo carousels only: optional 3s auto-advance (default off). */
+  photoAutoAdvance?: { on: boolean; onToggle: () => void };
 }) {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -89,9 +94,15 @@ export function LongPressMenu({
   }
   if (isVideo) {
     topActions.push({
-      key: 'speed', icon: 'fast-forward', label: speedActive ? '2x speed on' : '2x speed',
+      key: 'speed', icon: 'fast-forward', label: speedActive ? 'Playback speed 2x' : 'Playback speed',
       active: speedActive, onPress: act(onToggleSpeed),
     });
+  }
+  if (!isVideo && photoAutoAdvance) {
+    topActions.push({ key: 'auto-advance', icon: 'play-circle', label: photoAutoAdvance.on ? 'Auto-advance on' : 'Auto-advance', active: photoAutoAdvance.on, onPress: act(photoAutoAdvance.onToggle) });
+  }
+  if (onToggleClearMode) {
+    topActions.push({ key: 'clear-mode', icon: 'maximize', label: clearMode ? 'Exit clear mode' : 'Clear mode', active: !!clearMode, onPress: act(onToggleClearMode) });
   }
 
   return (

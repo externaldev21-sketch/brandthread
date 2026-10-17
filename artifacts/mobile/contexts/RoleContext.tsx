@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDevWebPreviewRole, isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { useAuth } from '@clerk/expo';
@@ -75,16 +75,17 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     })();
   }, [previewRole, userId, authLoaded]);
 
-  async function setRole(r: UserRole) {
+  const setRole = useCallback(async (r: UserRole) => {
     if (previewRole) return;
     setRoleState(r);
     if (!r) return;
     const key = userId ? roleKeyForUser(userId) : null;
     if (key) await AsyncStorage.setItem(key, r);
-  }
+  }, [previewRole, userId]);
+  const value = useMemo(() => ({ role, setRole, isLoaded }), [role, setRole, isLoaded]);
 
   return (
-    <RoleContext.Provider value={{ role, setRole, isLoaded }}>
+    <RoleContext.Provider value={value}>
       {children}
     </RoleContext.Provider>
   );

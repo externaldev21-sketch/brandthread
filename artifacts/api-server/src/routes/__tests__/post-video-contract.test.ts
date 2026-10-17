@@ -6,6 +6,10 @@ const postsRoute = fs.readFileSync(path.resolve(__dirname, "..", "posts.ts"), "u
 const videoRoute = fs.readFileSync(path.resolve(__dirname, "..", "post-video.ts"), "utf8");
 
 describe("post video publication contract", () => {
+  it("does not bake letterboxing into newly composed video clips", () => {
+    expect(videoRoute).toContain("force_original_aspect_ratio=increase,crop=");
+    expect(videoRoute).not.toContain("force_original_aspect_ratio=decrease,pad=");
+  });
   it("preserves every owned photo when a slideshow also supplies its primary path", () => {
     expect(postsRoute).toContain('mediaType === "slideshow" && resolvedMediaPaths.length > 0');
     expect(postsRoute).toContain('resolvedMediaPaths.map((path) => composedMediaUrl(req, path))');

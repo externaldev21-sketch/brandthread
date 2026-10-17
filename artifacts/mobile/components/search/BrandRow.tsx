@@ -1,5 +1,5 @@
 import React from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT } from '@/lib/theme';
@@ -8,6 +8,7 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
+import { OFFICIAL_AVATAR_SOURCE } from '@/lib/officialAccount';
 
 export type SearchBrandRow = {
   id: string;
@@ -20,6 +21,10 @@ export type SearchBrandRow = {
    *  never fabricated. */
   verified?: boolean;
   followersLabel?: string;
+  /** Real brand photo from search (http/https only). */
+  imageUri?: string | null;
+  /** The official @brandthread account: always the bundled B logo. */
+  official?: boolean;
 };
 
 /**
@@ -42,9 +47,19 @@ export function BrandRow({ brand, onPress }: { brand: SearchBrandRow; onPress: (
       style={styles.row}
     >
       <Animated.View style={[styles.rowInner, { transform: [{ scale }] }]}>
-        <View style={[styles.avatar, { backgroundColor: brand.color }]}>
-          <Text style={styles.initials}>{brand.initials}</Text>
-        </View>
+        {brand.official ? (
+          <View style={[styles.avatar, styles.clip, { backgroundColor: theme.background }]}>
+            <Image source={OFFICIAL_AVATAR_SOURCE} style={styles.fill} resizeMode="cover" testID="brand-row-official-avatar" />
+          </View>
+        ) : brand.imageUri && /^https?:\/\//.test(brand.imageUri) ? (
+          <View style={[styles.avatar, styles.clip, { backgroundColor: brand.color }]}>
+            <Image source={{ uri: brand.imageUri }} style={styles.fill} resizeMode="cover" testID="brand-row-avatar-image" />
+          </View>
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: brand.color }]}>
+            <Text style={styles.initials}>{brand.initials}</Text>
+          </View>
+        )}
         <View style={{ flex: 1 }}>
           <View style={styles.nameRow}>
             <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{brand.name}</Text>
@@ -63,6 +78,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   row: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs + 2 },
   rowInner: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   avatar: { width: 44, height: 44, borderRadius: RADII.avatar, alignItems: 'center', justifyContent: 'center' },
+  clip: { overflow: 'hidden' },
+  fill: { width: '100%', height: '100%' },
   initials: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 15 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   name: { ...TYPE_SCALE.body, fontFamily: FONT.semibold },

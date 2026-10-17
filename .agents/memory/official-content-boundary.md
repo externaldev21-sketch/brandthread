@@ -15,6 +15,12 @@ Creator permission for the starter content is pending, especially Factorie. Keep
 
 **How to apply:** Never turn on production public visibility merely because the migration or development import succeeds.
 
+The official profile, search discovery and shared/deep profile links obey the same visibility boundary as its posts. Use the real silver B brand mark everywhere; an unset cover stays plain black, never another post's poster.
+
+**Why:** The owner requires one consistent official identity across entry points without exposing permission-pending content through a profile-link bypass.
+
+**How to apply:** Preserve real server counts and posts outside explicit demo mode, admin access when public visibility is off, and future uploaded covers without placeholder fallback media.
+
 Owner-authorized workspace imports should not require granting a human account platform-admin access.
 
 **Why:** The development database had no platform admins, but the owner had already authorized importing the starter media. Granting a person extra ongoing access would be unrelated to that authorization.

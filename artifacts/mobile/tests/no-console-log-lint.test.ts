@@ -1,9 +1,9 @@
 /**
  * Lint: no `console.log` in shipped app source.
  *
- * Production native bundles already strip console.log/info/debug via
- * babel-plugin-transform-remove-console (babel.config.js), but web/preview
- * builds and dev keep them, so stray debug logging leaks there. Diagnostics
+ * Production native and web bundles strip console.log/info/debug via
+ * babel-plugin-transform-remove-console (babel.config.js), while development
+ * keeps them, so stray debug logging leaks there. Diagnostics
  * that matter go through lib/monitoring (`addMonitoringBreadcrumb` /
  * `reportError`) or a `__DEV__`-guarded `console.warn`/`console.info`.
  *

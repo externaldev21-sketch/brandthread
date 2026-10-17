@@ -9,12 +9,10 @@
  *     `useCaching: true`, so whatever a player downloads lands in expo-video's
  *     LRU disk cache (native only; web ignores it) and a second view, a
  *     replay or a swipe back is served from disk.
- *  2. `VideoPreloadManager` keeps at most `maxWarm` extra, paused, muted
- *     players buffering the pages just beyond the ones that are already
- *     mounted (PRELOAD_AHEAD; currently 1, so only previous/current/next hold
- *     players and the manager stays idle unless that is raised). It releases
- *     any player whose page leaves the window and releases everything when the
- *     user leaves the feed, backgrounds the app, goes offline-saver, or signs out.
+ *  2. `VideoPreloadManager` bounds cancellable network handles (never native
+ *     decoders) for upcoming videos, looking across photo posts. It releases
+ *     handles that leave the window and releases everything when the
+ *     user leaves the feed, backgrounds the app, or goes offline-saver.
  *
  * Everything here is pure / injectable so it can be unit tested without the
  * native module. The React glue lives in hooks/useFeedVideoPreload.ts.
@@ -23,14 +21,13 @@ import type { VideoSource } from 'expo-video';
 
 /**
  * How many pages ahead of the active one should be warm (mounted + managed).
- * 1 = the next page only, which the list already mounts with a real, paused,
- * buffering player (`preload` on VideoVisual). That keeps at most three
- * decoders alive (previous, current, next); pages further ahead are still
- * served from the on-disk cache once seen. Raise it to warm extra players.
+ * Two upcoming videos, even when separated by photos. Immediate page
+ * neighbours already have mounted players; only the remaining candidates
+ * need extra warm handles. At most four video decoders are needed in total.
  */
-export const PRELOAD_AHEAD = 1;
+export const PRELOAD_AHEAD = 2;
 /** Hard ceiling on extra warm players the manager will ever hold. */
-export const MAX_WARM_PLAYERS = 2;
+export const MAX_WARM_PLAYERS = 3;
 /** Pages ahead that the feed list itself already mounts a player for. */
 export const MOUNTED_AHEAD = 1;
 /** Disk cache budget for feed videos. expo-video's default is 1 GB. */
@@ -50,19 +47,27 @@ export function isHlsUri(uri: string): boolean {
  * has one (https only) on iOS/Android, otherwise the original MP4. Web keeps
  * the MP4: only Safari plays HLS in a plain <video> element.
  */
+export function preferLowFeedRendition(connection?: { saveData?: boolean; effectiveType?: string; downlink?: number }): boolean {
+  return !!connection?.saveData || /^(slow-2g|2g|3g)$/.test(connection?.effectiveType ?? '')
+    || (typeof connection?.downlink === 'number' && connection.downlink > 0 && connection.downlink < 2);
+}
+
 export function pickPlaybackUri(hlsUrl: string | null | undefined, mp4Uri: string, native: boolean): string {
+  // Native AVPlayer/ExoPlayer adapts between 480/720 from the HLS master.
   if (native && typeof hlsUrl === 'string' && /^https:\/\//i.test(hlsUrl) && isHlsUri(hlsUrl)) return hlsUrl;
+  const connection = (globalThis as { navigator?: { connection?: { saveData?: boolean; effectiveType?: string; downlink?: number } } }).navigator?.connection;
+  if (!native && preferLowFeedRendition(connection) &&
+    /\/uploads\/feed-stream\/[a-f0-9]{64}\/720\.mp4(?:$|[?#])/.test(mp4Uri)) {
+    return mp4Uri.replace('/720.mp4', '/480.mp4');
+  }
   return mp4Uri;
 }
 
-/** How long to wait for onFirstFrameRender after playback is ready before revealing anyway. */
-export const FIRST_FRAME_FALLBACK_MS = 1200;
-
 /**
  * Whether the feed video should replace its poster. Only after playback
- * started, the player is ready, and a frame has really been painted (or the
- * first-frame event did not arrive within FIRST_FRAME_FALLBACK_MS, so a
- * platform that never emits it still shows the video).
+ * started, the player is ready, and a frame has really been painted.
+ * The old timeout field is accepted for compatibility, but never reveals
+ * an unpainted video.
  */
 export function shouldRevealVideo(state: {
   hasStarted: boolean;
@@ -70,7 +75,7 @@ export function shouldRevealVideo(state: {
   firstFrameRendered: boolean;
   firstFrameTimedOut: boolean;
 }): boolean {
-  return state.hasStarted && state.readyToPlay && (state.firstFrameRendered || state.firstFrameTimedOut);
+  return state.hasStarted && state.readyToPlay && state.firstFrameRendered;
 }
 
 const cachedSources = new Map<string, VideoSource>();
@@ -96,7 +101,7 @@ export function withVideoCaching(source: VideoSource, native: boolean): VideoSou
   return next;
 }
 
-export type PreloadCandidate = { kind: 'video' | 'other'; uri: string | null };
+export type PreloadCandidate = { kind: 'video' | 'other'; uri: string | null; posterUri?: string | null };
 
 /**
  * The remote video uris to hold warm beyond the pages the list already mounts:
@@ -110,13 +115,32 @@ export function planVideoPreload(
 ): string[] {
   if (!Number.isInteger(activeIndex) || activeIndex < 0) return [];
   const out: string[] = [];
-  for (let i = activeIndex + mountedAhead + 1; i <= activeIndex + ahead; i++) {
+  if (activeIndex >= items.length) return [];
+  let found = 0;
+  for (let i = activeIndex + 1; i < items.length && found < ahead; i++) {
     const item = items[i];
     if (!item || item.kind !== 'video' || !item.uri || !/^https?:\/\//i.test(item.uri)) continue;
+    found++;
+    if (i <= activeIndex + mountedAhead) continue;
     if (!out.includes(item.uri)) out.push(item.uri);
+  }
+  // Photos between videos must not prevent warming the previous video.
+  for (let i = activeIndex - 1; i >= 0; i--) {
+    const item = items[i];
+    if (item.kind !== 'video' || !item.uri || !/^https?:\/\//i.test(item.uri)) continue;
+    if (i < activeIndex - mountedAhead && !out.includes(item.uri)) out.push(item.uri);
+    break;
   }
   return out;
 }
+
+/** Low startup latency, with a short forward buffer instead of waiting for a
+ * large buffer before iOS starts. Used by both mounted and warm players. */
+export const FEED_VIDEO_BUFFER_OPTIONS = {
+  preferredForwardBufferDuration: 3,
+  waitsToMinimizeStalling: false,
+  minBufferForPlayback: 0.1,
+};
 
 /**
  * Best-effort "user asked the OS to save data". Only the web Network
@@ -131,6 +155,32 @@ export function detectDataSaver(nav: unknown = typeof navigator !== 'undefined' 
 }
 
 export type WarmHandle = { release: () => void };
+
+/** Fetch bytes, NOT a VideoPlayer/decoder. HLS warms the first low-bitrate
+ * segment; MP4 warms a bounded prefix. This warms transport/CDN caches, not
+ * a claim that JS fetch populates AVPlayer's private media cache. */
+export async function preloadVideoBytes(uri: string, signal: AbortSignal, fetcher: typeof fetch = fetch): Promise<void> {
+  const get = async (url: string, range = false) => {
+    const response = await fetcher(url, { signal, ...(range ? { headers: { Range: 'bytes=0-196607' } } : {}) });
+    if (!response.ok || (range && response.status !== 206)) {
+      await response.body?.cancel();
+      throw new Error(`Preload HTTP ${response.status}`);
+    }
+    return response;
+  };
+  if (!isHlsUri(uri)) { await (await get(uri, true)).arrayBuffer(); return; }
+  let playlist = uri;
+  for (let depth = 0; depth < 3; depth++) {
+    const text = await (await get(playlist)).text();
+    if (text.length > 256 * 1024) throw new Error('Oversized HLS playlist');
+    const child = text.split(/\r?\n/).map(s => s.trim()).find(s => s && !s.startsWith('#'));
+    if (!child) return;
+    const url = new URL(child, playlist).toString();
+    if (!/^https?:\/\//i.test(url)) throw new Error('Invalid HLS child URL');
+    if (!isHlsUri(url)) { await (await get(url)).arrayBuffer(); return; }
+    playlist = url;
+  }
+}
 
 export type VideoPreloadDeps = {
   createWarmPlayer: (uri: string) => WarmHandle;

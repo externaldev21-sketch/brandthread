@@ -18,7 +18,7 @@
  * drift out of step. No layout props are animated, only transforms/opacity.
  */
 import React, { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -43,6 +43,8 @@ const LIVE_EDGE_HEIGHT = 32;
  * edge) and its height. */
 export const LIVE_REST_WIDTH = 17;
 const LIVE_REST_HEIGHT = 50;
+const REST_LABEL_PADDING = 5;
+const REST_LABEL_CROSS_PADDING = 3;
 /** Gap between the expanded LIVE button and the pushed Cart. */
 const PUSH_GAP = 10;
 
@@ -100,10 +102,20 @@ export function LiveEdgeTab({
   onOpenLive: () => void;
 }) {
   const { progress, open, setOpen, collapse } = controller;
+  // Measure an unrotated, unconstrained copy, not the transformed tab's
+  // bounding box. Native font metrics and browser text zoom can differ.
+  const [labelSize, setLabelSize] = useState({ width: 0, height: 0 });
+  const measureLabel = useCallback(({ nativeEvent: { layout } }: LayoutChangeEvent) => {
+    const width = Math.ceil(layout.width), height = Math.ceil(layout.height);
+    setLabelSize(previous => previous.width === width && previous.height === height
+      ? previous : { width, height });
+  }, []);
+  const restHeight = Math.max(LIVE_REST_HEIGHT, labelSize.width + REST_LABEL_PADDING * 2);
+  const restWidth = Math.max(LIVE_REST_WIDTH, labelSize.height + REST_LABEL_CROSS_PADDING * 2);
   // The button box (LIVE_EDGE_WIDTH x LIVE_EDGE_HEIGHT) is centered on one
   // point that slides from the middle of the resting tab (flush on the edge)
   // to the middle of the expanded button.
-  const restCenterX = LIVE_REST_WIDTH / 2;
+  const restCenterX = restWidth / 2;
   const tuckedX = restCenterX - LIVE_EDGE_WIDTH / 2;
   const outX = leftInset + gutter;
   const travel = outX - tuckedX;
@@ -154,8 +166,8 @@ export function LiveEdgeTab({
       borderColor: interpolateColor(p, [0.1, 0.7], [TRANSPARENT, OUT_BORDER]),
       transform: [
         { rotate: `${-90 * (1 - p)}deg` },
-        { scaleX: interpolate(p, [0, 1], [LIVE_REST_HEIGHT / LIVE_EDGE_WIDTH, 1]) },
-        { scaleY: interpolate(p, [0, 1], [LIVE_REST_WIDTH / LIVE_EDGE_HEIGHT, 1]) },
+        { scaleX: interpolate(p, [0, 1], [restHeight / LIVE_EDGE_WIDTH, 1]) },
+        { scaleY: interpolate(p, [0, 1], [restWidth / LIVE_EDGE_HEIGHT, 1]) },
       ],
     };
   });
@@ -167,8 +179,8 @@ export function LiveEdgeTab({
       opacity: interpolate(p, [0, 0.3], [1, 0], Extrapolation.CLAMP),
       transform: [
         { rotate: `${-90 * (1 - p)}deg` },
-        { scaleX: interpolate(p, [0, 1], [1, LIVE_EDGE_WIDTH / LIVE_REST_HEIGHT]) },
-        { scaleY: interpolate(p, [0, 1], [1, LIVE_EDGE_HEIGHT / LIVE_REST_WIDTH]) },
+        { scaleX: interpolate(p, [0, 1], [1, LIVE_EDGE_WIDTH / restHeight]) },
+        { scaleY: interpolate(p, [0, 1], [1, LIVE_EDGE_HEIGHT / restWidth]) },
       ],
     };
   });
@@ -178,7 +190,10 @@ export function LiveEdgeTab({
   }));
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFill, styles.unclipped]} pointerEvents="box-none">
+      <View style={styles.labelMeasure} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Text style={styles.restLabel} maxFontSizeMultiplier={1} onLayout={measureLabel} testID="live-edge-label-measure">LIVE</Text>
+      </View>
       {open && (
         // Tap-outside catcher: closes and does NOT let the tap through.
         <Pressable
@@ -213,8 +228,13 @@ export function LiveEdgeTab({
               <Text style={styles.label} maxFontSizeMultiplier={1.2}>LIVE</Text>
             </Animated.View>
           </Animated.View>
-          <Animated.View style={[styles.restTab, restTabStyle]} pointerEvents="none">
-            <Text style={styles.restLabel} maxFontSizeMultiplier={1} numberOfLines={1}>LIVE</Text>
+          <Animated.View style={[styles.restTab, {
+            left: (LIVE_EDGE_WIDTH - restHeight) / 2,
+            width: restHeight,
+            height: restWidth,
+            top: (LIVE_EDGE_HEIGHT - restWidth) / 2,
+          }, restTabStyle]} pointerEvents="none" testID="live-edge-rest-tab">
+            <Text style={styles.restLabel} maxFontSizeMultiplier={1} testID="live-edge-rest-label">LIVE</Text>
           </Animated.View>
         </Animated.View>
       </GestureDetector>
@@ -265,11 +285,14 @@ export function LiveCartPush({
 }
 
 const styles = StyleSheet.create({
+  unclipped: { overflow: 'visible' },
+  labelMeasure: { position: 'absolute', left: 0, top: 0, flexDirection: 'row', opacity: 0 },
   pill: {
     position: 'absolute',
     left: 0,
     width: LIVE_EDGE_WIDTH,
     height: LIVE_EDGE_HEIGHT,
+    overflow: 'visible',
   },
   morph: {
     position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
@@ -284,10 +307,9 @@ const styles = StyleSheet.create({
   // edge is the inner side (rounded corners).
   restTab: {
     position: 'absolute',
-    left: (LIVE_EDGE_WIDTH - LIVE_REST_HEIGHT) / 2,
-    top: (LIVE_EDGE_HEIGHT - LIVE_REST_WIDTH) / 2,
-    width: LIVE_REST_HEIGHT,
-    height: LIVE_REST_WIDTH,
+    paddingHorizontal: REST_LABEL_PADDING,
+    paddingVertical: REST_LABEL_CROSS_PADDING,
+    overflow: 'visible',
     borderBottomLeftRadius: 6,
     borderBottomRightRadius: 6,
     backgroundColor: CREATE_CANVAS.live,
@@ -297,8 +319,11 @@ const styles = StyleSheet.create({
   restLabel: {
     color: ON_DARK,
     fontSize: 9.5,
+    lineHeight: 14,
     fontWeight: '800',
     letterSpacing: 0.8,
+    flexShrink: 0,
+    overflow: 'visible',
   },
   outContent: {
     position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,

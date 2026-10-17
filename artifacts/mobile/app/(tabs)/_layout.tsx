@@ -22,6 +22,7 @@
 
 import { useEffect, useRef } from 'react';
 import { Tabs, usePathname } from 'expo-router';
+import { RetainedScene } from '@/components/RetainedScene';
 import { Platform, useWindowDimensions } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -84,6 +85,7 @@ export default function TabLayout() {
       // See the buyer tab layout for why this is false: keeps every tab's
       // native view attached so switching is instant, never a remount.
       detachInactiveScreens={false}
+      screenLayout={({ children, navigation }) => <RetainedScene navigation={navigation} opaque>{children}</RetainedScene>}
       tabBar={() => null}
       // A render crash in one tab shows a friendly per-tab fallback instead
       // of taking down the whole app; the root layout's ErrorBoundary is

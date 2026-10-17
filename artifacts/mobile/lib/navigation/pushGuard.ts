@@ -54,7 +54,7 @@ interface GuardableRouter {
 const INSTALLED = Symbol.for('brandthread.pushGuard');
 
 /** Patch `router.push` / `router.navigate` once. Safe to call repeatedly. */
-export function installPushGuard(router: GuardableRouter | undefined, allow = createPushGuard()): void {
+export function installPushGuard(router: GuardableRouter | undefined, allow = createPushGuard(), onDispatch?: () => void): void {
   if (!router) return;
   const r = router as GuardableRouter & { [INSTALLED]?: true };
   if (r[INSTALLED]) return;
@@ -64,6 +64,7 @@ export function installPushGuard(router: GuardableRouter | undefined, allow = cr
     if (typeof original !== 'function') continue;
     r[method] = ((href: never, ...rest: never[]) => {
       if (!allow(href)) return undefined;
+      onDispatch?.();
       return original.call(router, href, ...rest);
     }) as NavFn;
   }

@@ -70,7 +70,12 @@ export interface PublicProfileDto {
 
 const PROD_ORIGIN = 'https://brandthread.app';
 
-async function fetchPublicProfile(username: string): Promise<PublicProfileDto> {
+/**
+ * `token` is optional: signed-out visitors send none (public read). A signed-in
+ * viewer forwards their Clerk session so the server's admin visibility
+ * exception (e.g. a hidden official account) applies to this lookup too.
+ */
+export async function fetchPublicProfile(username: string, token?: string | null): Promise<PublicProfileDto> {
   const apiBase =
     process.env.EXPO_PUBLIC_API_BASE_URL ??
     (process.env.EXPO_PUBLIC_DOMAIN
@@ -82,7 +87,10 @@ async function fetchPublicProfile(username: string): Promise<PublicProfileDto> {
   try {
     res = await fetch(
       `${apiBase}/api/v1/public/profiles/${encodeURIComponent(username)}`,
-      { headers: { Accept: 'application/json' }, signal: controller?.signal },
+      {
+        headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        signal: controller?.signal,
+      },
     );
   } finally {
     if (timer) clearTimeout(timer);
@@ -287,7 +295,10 @@ export default function PublicProfileRoute() {
     : params.username;
   const username = normalizeUsername(rawUsername);
 
-  const { isLoaded: authLoaded, isSignedIn } = useAuth();
+  const { isLoaded: authLoaded, isSignedIn, getToken } = useAuth();
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+  const generationRef = useRef(0);
 
   const [state, setState] = useState<ScreenState>({ kind: 'loading' });
   const mountRef = useRef(true);
@@ -298,13 +309,17 @@ export default function PublicProfileRoute() {
       setState({ kind: 'not_found', username: rawUsername ?? '' });
       return;
     }
+    // Wait for Clerk so a signed-in admin's lookup carries their token.
+    if (!authLoaded) return;
+    const generation = ++generationRef.current;
     setState({ kind: 'loading' });
     try {
-      const profile = await fetchPublicProfile(username);
-      if (!mountRef.current) return;
+      const token = isSignedIn ? await getTokenRef.current().catch(() => null) : null;
+      const profile = await fetchPublicProfile(username, token);
+      if (!mountRef.current || generation !== generationRef.current) return;
       setState({ kind: 'ready', profile });
     } catch (err: unknown) {
-      if (!mountRef.current) return;
+      if (!mountRef.current || generation !== generationRef.current) return;
       const status = (err as { status?: number })?.status ?? 0;
       if (status === 404) {
         setState({ kind: 'not_found', username });
@@ -315,7 +330,7 @@ export default function PublicProfileRoute() {
         });
       }
     }
-  }, [username, rawUsername]);
+  }, [username, rawUsername, authLoaded, isSignedIn]);
 
   useEffect(() => {
     mountRef.current = true;

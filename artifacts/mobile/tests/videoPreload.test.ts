@@ -29,12 +29,12 @@ describe('planVideoPreload', () => {
 
   it('never goes past current+2 and handles the end of the list', () => {
     expect(planVideoPreload(items, 4)).toEqual([]);
-    expect(planVideoPreload(items, 3, { mountedAhead: 0 })).toEqual(['https://cdn.test/v4.mp4']);
+    expect(planVideoPreload(items, 3, { mountedAhead: 0 })).toEqual(['https://cdn.test/v4.mp4', 'https://cdn.test/v2.mp4']);
   });
 
   it('skips photos, local files and duplicates', () => {
     const mixed: PreloadCandidate[] = [video(0), video(1), photo, video(3)];
-    expect(planVideoPreload(mixed, 0, { mountedAhead: 0 })).toEqual(['https://cdn.test/v1.mp4']);
+    expect(planVideoPreload(mixed, 0, { mountedAhead: 0 })).toEqual(['https://cdn.test/v1.mp4', 'https://cdn.test/v3.mp4']);
     expect(planVideoPreload([video(0), video(1), { kind: 'video', uri: 'file:///x.mp4' }], 0)).toEqual([]);
     expect(planVideoPreload([video(0), video(1), video(1), video(1)], 0, { mountedAhead: 0 })).toEqual(['https://cdn.test/v1.mp4']);
   });
@@ -83,10 +83,10 @@ describe('VideoPreloadManager', () => {
 
   it('keeps at most maxWarm players and never recreates a warm one', () => {
     const { manager, createWarmPlayer } = make();
-    manager.update(['a', 'b', 'c']);
-    expect(manager.warmUris).toEqual(['a', 'b']);
+    manager.update(['a', 'b', 'c', 'd']);
+    expect(manager.warmUris).toEqual(['a', 'b', 'c']);
     manager.update(['a', 'b']);
-    expect(createWarmPlayer).toHaveBeenCalledTimes(2);
+    expect(createWarmPlayer).toHaveBeenCalledTimes(3);
   });
 
   it('releases players that leave the window as the user scrolls', () => {
@@ -160,11 +160,15 @@ describe('HLS playback selection', () => {
 });
 
 describe('feed preload budget', () => {
-  it('keeps at most previous/current/next players by default (no extra warm players)', () => {
+  it('keeps the mounted previous/current/next plus one extra warm next video', () => {
     const items = [video(0), video(1), video(2), video(3)];
-    expect(PRELOAD_AHEAD).toBe(1);
-    expect(planVideoPreload(items, 0)).toEqual([]);
-    expect(planVideoPreload(items, 1)).toEqual([]);
+    expect(PRELOAD_AHEAD).toBe(2);
+    expect(planVideoPreload(items, 0)).toEqual(['https://cdn.test/v2.mp4']);
+    expect(planVideoPreload(items, 1)).toEqual(['https://cdn.test/v3.mp4']);
+  });
+  it('looks across photos for the next two and previous one videos', () => {
+    expect(planVideoPreload([video(0), photo, video(2), photo, video(4), photo, video(6)], 2))
+      .toEqual(['https://cdn.test/v4.mp4', 'https://cdn.test/v6.mp4', 'https://cdn.test/v0.mp4']);
   });
 });
 
@@ -178,7 +182,7 @@ describe('shouldRevealVideo', () => {
     expect(shouldRevealVideo({ ...base, hasStarted: false, firstFrameRendered: true })).toBe(false);
     expect(shouldRevealVideo({ ...base, readyToPlay: false, firstFrameRendered: true })).toBe(false);
   });
-  it('reveals after the fallback timeout when the platform never reports a first frame', () => {
-    expect(shouldRevealVideo({ ...base, firstFrameTimedOut: true })).toBe(true);
+  it('never replaces the poster with an unpainted video just because time passed', () => {
+    expect(shouldRevealVideo({ ...base, firstFrameTimedOut: true })).toBe(false);
   });
 });

@@ -95,7 +95,8 @@ describe('Entry points', () => {
     // components/buyer-feed/RightActionRail.tsx (PR #129's sizing rebuild
     // moved the rail's JSX out of app/(tabs)/feed.tsx into its own file).
     expect(feed).toContain('hostId={item.sellerId}');
-    expect(rightActionRail).toContain('<LiveHostRing hostId={hostId} size={38}');
+    expect(rightActionRail).toMatch(/\bAVATAR\s*=\s*48\b/);
+    expect(rightActionRail).toContain('<LiveHostRing hostId={hostId} size={AVATAR}');
     expect(feed).toContain('const liveStreamId = getLiveDirectory().streamFor(item.sellerId);');
   });
 
@@ -106,7 +107,7 @@ describe('Entry points', () => {
   });
 
   it('Messages rows ring live people and tapping the avatar opens their live', () => {
-    expect(inbox).toContain('<LiveHostRing hostId={participant.userId} hostName={participant.name} size={48} ringGap={2} pressToWatch>');
+    expect(inbox).toContain('<LiveHostRing hostId={participant.userId} hostName={participant.name} size={48} ringGap={-2} pressToWatch>');
     expect(inbox).toContain('<LiveHostRing hostId={row.authorId} hostName={row.name} size={64} ringGap={-2} pressToWatch>');
   });
 });

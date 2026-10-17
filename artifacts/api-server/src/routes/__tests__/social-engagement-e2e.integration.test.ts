@@ -20,7 +20,7 @@ import express from "express";
 import crypto from "node:crypto";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { eq, inArray, or } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import {
   db, users, posts, interactions, postComments, savedItems, notificationsFeed, follows, blocks,
   products, productVariants, orders, orderItems, postTaggedProducts, feedNotInterested,
@@ -73,6 +73,28 @@ async function newPost(values: Partial<typeof posts.$inferInsert> = {}) {
   postIds.push(post.id);
   return post.id;
 }
+
+describe("sharing posts to stories", () => {
+  it("allows a public seller post but does not republish a friend's buyer post", async () => {
+    const sellerPost = await newPost();
+    const publicDetail = await call("GET", `/api/posts/${sellerPost}`, A);
+    expect(publicDetail.status).toBe(200);
+    expect(publicDetail.body.canReshareToStory).toBe(true);
+    const buyerPost = await newPost({ userId: A });
+    const ownDetail = await call("GET", `/api/posts/${buyerPost}`, A);
+    expect(ownDetail.status).toBe(200);
+    expect(ownDetail.body.canReshareToStory).toBe(true);
+    const inserted = await db.insert(follows).values({ followerId: S, followingId: A })
+      .onConflictDoNothing().returning({ id: follows.followerId });
+    try {
+      const friendDetail = await call("GET", `/api/posts/${buyerPost}`, S);
+      expect(friendDetail.status).toBe(200);
+      expect(friendDetail.body.canReshareToStory).toBe(false);
+    } finally {
+      if (inserted.length) await db.delete(follows).where(and(eq(follows.followerId, S), eq(follows.followingId, A)));
+    }
+  });
+});
 
 beforeAll(async () => {
   await db.insert(users).values([
@@ -127,6 +149,37 @@ afterAll(async () => {
 });
 
 describe("Viewer engagement state is the server's, on every feed surface", () => {
+  it("follow and unfollow survive a fresh request instead of only changing the avatar badge", async () => {
+    try {
+      await call("DELETE", `/api/social/follow/${S}`, A);
+      expect((await call("POST", "/api/social/follow", A, { userId: S })).status).toBe(200);
+      expect((await call("GET", "/api/social/following", A)).body)
+        .toEqual(expect.arrayContaining([expect.objectContaining({ userId: S, isFollowing: true })]));
+      expect((await call("DELETE", `/api/social/follow/${S}`, A)).status).toBe(200);
+      expect((await call("GET", "/api/social/following", A)).body).toEqual([]);
+    } finally {
+      await call("POST", "/api/social/follow", A, { userId: S });
+    }
+  });
+  it("post detail refresh preserves save/share counts and explicit removals on every rail", async () => {
+    const id = await newPost({ mediaType: "video" });
+    await call("POST", `/api/posts/${id}/interact`, A, { type: "like", value: "add" });
+    await call("POST", `/api/posts/${id}/interact`, A, { type: "repost", value: "add" });
+    await call("POST", "/api/buyer/saved", A, { type: "post", targetId: id, title: "Rail" });
+    const share = await call("POST", `/api/posts/${id}/interact`, A, { type: "share" });
+    expect(share.body).toMatchObject({ action: "recorded", count: 1 });
+    expect((await call("GET", `/api/posts/${id}`, A)).body).toMatchObject({
+      likedByMe: true, repostedByMe: true, savedByMe: true,
+      likeCount: 1, repostCount: 1, savesCount: 1, sharesCount: 1,
+    });
+    await call("POST", `/api/posts/${id}/interact`, A, { type: "like", value: "remove" });
+    await call("POST", `/api/posts/${id}/interact`, A, { type: "repost", value: "remove" });
+    await call("DELETE", `/api/buyer/saved/${id}`, A);
+    expect((await call("GET", `/api/posts/${id}`, A)).body).toMatchObject({
+      likedByMe: false, repostedByMe: false, savedByMe: false,
+      likeCount: 0, repostCount: 0, savesCount: 0, sharesCount: 1,
+    });
+  });
   it("A's like/save/repost come back as A's state in Following feed, public feed, profile grid and post detail — and unlike really unlikes", async () => {
     const postId = await newPost({ mediaType: "video", mediaUrl: "https://example.test/eng.mp4" });
 

@@ -79,6 +79,8 @@ export interface SheetAction {
   testID?: string;
 }
 
+import { Icon as PlainSheetCloseIcon } from './Icon';
+
 export interface SheetProps {
   visible: boolean;
   /** Called on backdrop tap, close button, Escape (web), back (Android), and
@@ -86,9 +88,11 @@ export interface SheetProps {
   onClose: () => void;
   /** Left-aligned title. Omit for a chrome-free sheet (grabber only). */
   title?: string;
+  /** Opt-in centered title; existing sheets retain their left-aligned header. */
+  centerTitle?: boolean;
   /** What sits at the right of the title row. Defaults to a circular close
    *  button when there's a title. `done` shows a "Done" text button. */
-  headerRight?: 'close' | 'done' | 'none' | React.ReactNode;
+  headerRight?: 'close' | 'plain-close' | 'done' | 'none' | React.ReactNode;
   /** Optional left slot in the title row (e.g. a back chevron). */
   headerLeft?: React.ReactNode;
   /** "Done" press; defaults to `onClose`. */
@@ -170,7 +174,7 @@ export function SheetGrabber() {
 }
 
 export function Sheet({
-  visible, onClose, title, headerRight, headerLeft, onDone, primaryAction, secondaryAction, footer,
+  visible, onClose, title, centerTitle = false, headerRight, headerLeft, onDone, primaryAction, secondaryAction, footer,
   children, scrollable = true, padded = true, maxHeightRatio = 0.92, avoidKeyboard = true,
   testID, reduceMotion, accessibilityLabel, contentContainerStyle, detents = false,
 }: SheetProps) {
@@ -207,7 +211,14 @@ export function Sheet({
   const onScroll = useAnimatedScrollHandler(e => { scrollOffset.set(e.contentOffset.y); });
 
   const right = headerRight ?? (title ? 'close' : 'none');
-  const rightNode = right === 'close'
+  const rightNode = right === 'plain-close'
+    ? (
+      <PressableScale onPress={onClose} accessibilityRole="button" accessibilityLabel="Close"
+        style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+        <PlainSheetCloseIcon name="x" size={20} color={theme.text} />
+      </PressableScale>
+    )
+    : right === 'close'
     ? <SheetCloseButton onPress={onClose} />
     : right === 'done'
       ? (
@@ -288,8 +299,9 @@ export function Sheet({
                   {hasHeader ? (
                     <View style={styles.header}>
                       {headerLeft ? <View style={styles.headerLeft}>{headerLeft}</View> : null}
+                      {centerTitle && !headerLeft && rightNode ? <View style={{ width: 40 }} /> : null}
                       <Text
-                        style={[styles.title, { color: theme.text }]}
+                        style={[styles.title, { color: theme.text }, centerTitle && { textAlign: 'center' }]}
                         numberOfLines={1}
                         accessibilityRole="header"
                       >

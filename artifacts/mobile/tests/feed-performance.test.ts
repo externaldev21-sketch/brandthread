@@ -15,6 +15,11 @@ const live = readFileSync(resolve(__dirname, '../app/live.tsx'), 'utf8');
 const pageMemo = readFileSync(resolve(__dirname, '../lib/feedPageMemo.ts'), 'utf8');
 
 describe('Feed video list virtualization bounds', () => {
+  it('dismisses the startup poster for the selected active post, including deep links', () => {
+    expect(feed).toContain("onFirstFramePainted={contentIndex === activeContentIndex ? handleFirstCellPainted : undefined}");
+    expect(feed).toContain("if (firstFramePaintedRef.current || !onFirstFramePainted) return;");
+    expect(feed).toContain("bottomStripHeight={0}");
+  });
   it('caps how many pages (and video players) are ever mounted at once on native', () => {
     // Native keeps the tight cap (only ~3 pages ever mounted, decoding
     // videos off-screen is expensive there). Web renders the whole (small,
@@ -62,7 +67,7 @@ describe('Feed video list virtualization bounds', () => {
     // the round 3 PR description). `readyToPlay` (backed by the video
     // element's own `canplay`/readyState>=3 on web) confirms there is
     // actually something to paint before the poster comes down.
-    expect(feed).toContain("const videoVisible = shouldRevealVideo({ hasStarted, readyToPlay, firstFrameRendered, firstFrameTimedOut });");
+    expect(feed).toContain("const videoVisible = shouldRevealVideo({ hasStarted, readyToPlay, firstFrameRendered, firstFrameTimedOut: false });");
     expect(feed).toContain("const showPoster = Boolean(posterSource || posterUri) && !videoVisible;");
     expect(feed).toContain("onFirstFrameRender={() => setFirstFrameRendered(true)}");
     expect(feed).toContain("player.addListener('statusChange', ({ status }) => {");

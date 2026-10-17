@@ -3,9 +3,9 @@ import express from "express";
 import crypto from "node:crypto";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
-  blocks, commentMentions, db, notificationsFeed, postCommentLikes, postComments, posts, users,
+  blocks, commentMentions, db, interactions, notificationsFeed, postCommentLikes, postComments, posts, users,
 } from "@workspace/db";
 
 const published = vi.hoisted(() => ({ calls: [] as any[] }));
@@ -88,6 +88,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await db.delete(interactions).where(inArray(interactions.userId, userIds));
   await db.delete(notificationsFeed).where(inArray(notificationsFeed.userId, userIds));
   await db.delete(posts).where(eq(posts.id, postId));
   await db.delete(blocks).where(inArray(blocks.blockerId, userIds));
@@ -254,5 +255,82 @@ describe("comment sorting", () => {
     } finally {
       await db.delete(posts).where(eq(posts.id, sortPost));
     }
+  });
+});
+
+describe("private comment reactions", () => {
+  const react = (commentId: string, who: string | null, kind: "like" | "dislike", enabled: boolean) =>
+    call(`/api/posts/${postId}/comments/${commentId}/${kind}`, who, "POST", { [kind === "like" ? "liked" : "disliked"]: enabled });
+  const feedback = (commentId: string) => db.select().from(interactions).where(and(
+    eq(interactions.userId, alice), eq(interactions.type, "comment_dislike"), eq(interactions.value, commentId),
+  ));
+
+  it("persists dislike across reloads, keeps it private, deduplicates retries and removes it", async () => {
+    const created = await comment(bob, "Feedback persistence");
+    expect(created.status).toBe(201);
+    const id = created.body.comment.id;
+    expect((await react(id, alice, "dislike", true)).body).toMatchObject({ disliked: true, liked: false });
+    expect((await react(id, alice, "dislike", true)).status).toBe(200);
+    expect(await feedback(id)).toHaveLength(1);
+    const mine = (await list(alice)).body.comments.find((row: any) => row.id === id);
+    expect(mine.dislikedByMe).toBe(true);
+    expect(mine).not.toHaveProperty("dislikesCount");
+    expect((await list(carol)).body.comments.find((row: any) => row.id === id).dislikedByMe).toBe(false);
+    expect((await list(null)).body.comments.find((row: any) => row.id === id).dislikedByMe).toBe(false);
+    expect((await react(id, alice, "dislike", false)).body.disliked).toBe(false);
+    expect((await list(alice)).body.comments.find((row: any) => row.id === id).dislikedByMe).toBe(false);
+    expect(await feedback(id)).toHaveLength(0);
+  });
+
+  it("liking clears a dislike and disliking removes the viewer's like atomically", async () => {
+    const id = (await comment(bob, "Exclusive reactions")).body.comment.id;
+    await react(id, alice, "dislike", true);
+    expect((await react(id, alice, "like", true)).body).toMatchObject({ liked: true, disliked: false, likesCount: 1 });
+    expect(await feedback(id)).toHaveLength(0);
+    expect((await react(id, alice, "dislike", true)).body).toMatchObject({ disliked: true, liked: false, likesCount: 0 });
+    expect((await list(alice)).body.comments.find((row: any) => row.id === id))
+      .toMatchObject({ dislikedByMe: true, likedByMe: false, likesCount: 0 });
+  });
+
+  it("serializes opposing reactions from concurrent devices", async () => {
+    const id = (await comment(bob, "Concurrent feedback")).body.comment.id;
+    const results = await Promise.all([react(id, alice, "like", true), react(id, alice, "dislike", true)]);
+    expect(results.map(result => result.status)).toEqual([200, 200]);
+    const row = (await list(alice)).body.comments.find((item: any) => item.id === id);
+    expect(Number(row.likedByMe) + Number(row.dislikedByMe)).toBe(1);
+    const likes = await db.select().from(postCommentLikes).where(and(eq(postCommentLikes.commentId, id), eq(postCommentLikes.userId, alice)));
+    expect(likes.length + (await feedback(id)).length).toBe(1);
+  });
+
+  it("hydrates disliked replies both inline and in reply pagination", async () => {
+    const root = (await comment(bob, "Reply feedback root")).body.comment.id;
+    const reply = (await comment(carol, "Reply feedback", root)).body.comment.id;
+    expect((await react(reply, alice, "dislike", true)).status).toBe(200);
+    const inline = (await list(alice)).body.comments.find((row: any) => row.id === root);
+    expect(inline.replies.find((row: any) => row.id === reply).dislikedByMe).toBe(true);
+    const paged = await call(`/api/posts/${postId}/comments/${root}/replies`, alice);
+    expect(paged.status).toBe(200);
+    expect(paged.body.replies.find((row: any) => row.id === reply).dislikedByMe).toBe(true);
+  });
+
+  it("refuses unauthenticated, blocked and owner-hidden comment reactions", async () => {
+    const id = (await comment(bob, "Hidden feedback")).body.comment.id;
+    expect((await react(id, null, "dislike", true)).status).toBe(401);
+    const blocked = (await comment(blockedUser, "Blocked feedback")).body.comment.id;
+    expect((await react(blocked, alice, "dislike", true)).status).toBe(404);
+    await db.update(postComments).set({ hiddenByOwner: true }).where(eq(postComments.id, id));
+    expect((await react(id, alice, "dislike", true)).status).toBe(404);
+    expect((await react(id, alice, "like", true)).status).toBe(404);
+  });
+
+  it("claims the first-repost explainer once across devices, separately per account", async () => {
+    const path = "/api/posts/repost-education/claim";
+    expect((await call(path, null, "POST", {})).status).toBe(401);
+    const claims = await Promise.all([call(path, alice, "POST", {}), call(path, alice, "POST", {})]);
+    expect(claims.map(result => result.status)).toEqual([200, 200]);
+    expect(claims.filter(result => result.body.show)).toHaveLength(1);
+    expect((await call(path, alice, "POST", {})).body.show).toBe(false);
+    expect((await call(path, carol, "POST", {})).body.show).toBe(true);
+    await db.delete(interactions).where(and(inArray(interactions.userId, [alice, carol]), eq(interactions.type, "repost_education_seen")));
   });
 });

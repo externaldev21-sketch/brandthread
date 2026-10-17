@@ -21,7 +21,7 @@ const router = Router();
 router.use(requireAuth);
 
 const collectionIdParams = idParams("id");
-const createCollectionBody = bodyObject({ name: z.string().max(200).optional() });
+const createCollectionBody = bodyObject({ name: z.string().max(200).optional(), isPublic: z.boolean().optional() });
 const updateCollectionBody = bodyObject({
   name: z.string().max(200).nullish(),
   coverImageUrl: z.string().max(4_096).nullish(),
@@ -101,7 +101,7 @@ router.get("/:id/items", async (req, res) => {
 
 router.post("/", validateInput({ body: createCollectionBody }), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { name } = req.body as { name?: string };
+  const { name, isPublic = false } = req.body as { name?: string; isPublic?: boolean };
   if (!name || !name.trim()) return res.status(400).json({ error: "name required" });
 
   const [{ maxOrder } = { maxOrder: -1 }] = await db
@@ -110,7 +110,7 @@ router.post("/", validateInput({ body: createCollectionBody }), async (req, res)
     .where(eq(savedCollections.userId, userId));
 
   const [row] = await db.insert(savedCollections)
-    .values({ userId, name: name.trim(), sortOrder: maxOrder + 1 })
+    .values({ userId, name: name.trim(), sortOrder: maxOrder + 1, isPublic })
     .returning();
   return res.status(201).json((await withCovers(userId, [row]))[0]);
 });

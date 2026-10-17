@@ -654,6 +654,7 @@ export interface SellerThreadPost {
   authorHandle:      string;
   authorInitials:    string;
   authorColor:       string;
+  authorAvatarUri?:  string;
   sellerId:          string;
   brandId:           string;
   feedEligibility:   'thread_eligible';
@@ -760,7 +761,8 @@ export interface ApiPostRow {
   id: string;
   userId?: string | null;
   authorAccountType?: string | null;
-  seller?: { brandName?: string | null; displayName?: string | null; username?: string | null; isOfficial?: boolean | null } | null;
+  seller?: { brandName?: string | null; displayName?: string | null; username?: string | null; isOfficial?: boolean | null; avatarUrl?: string | null } | null;
+  authorAvatarUrl?: string | null;
   credit?: unknown;
   postStatus?: string | null;
   caption?: string | null;
@@ -855,6 +857,7 @@ function mapOwnedApiPost(p: ApiPostRow, userId: string): SellerThreadPost {
     authorHandle:    '@' + authorName.toLowerCase().replace(/[^a-z0-9]/g, ''),
     authorInitials:  authorName.slice(0, 2).toUpperCase(),
     authorColor:     pickAvatarColor(p.userId ?? userId),
+    authorAvatarUri: p.authorAvatarUrl ?? p.seller?.avatarUrl ?? undefined,
     sellerId:        p.userId ?? userId,
     brandId:         p.userId ?? userId,
     feedEligibility: 'thread_eligible',
@@ -2355,10 +2358,10 @@ export async function getCollections(): Promise<SavedCollection[]> {
 export async function getCollectionItems(collectionId: string): Promise<{ collection: SavedCollection; items: SavedItem[] }> {
   return serviceRequest(`/api/buyer/collections/${encodeURIComponent(collectionId)}/items`);
 }
-export async function createCollection(name: string): Promise<SavedCollection> {
+export async function createCollection(name: string, options?: { isPublic?: boolean }): Promise<SavedCollection> {
   const collection = await serviceRequest<SavedCollection>('/api/buyer/collections', {
     method: 'POST',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, ...(options?.isPublic !== undefined ? { isPublic: options.isPublic } : {}) }),
   });
   notify();
   return collection;

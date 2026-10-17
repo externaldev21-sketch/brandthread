@@ -100,6 +100,7 @@ import {
   isPreviewNotesEnabled, getPreviewNotesForTray, getPreviewMyNote, postPreviewNote,
 } from '@/lib/previewNotes';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { isOfficialAccountId } from '@/lib/officialAccount';
 import { EmptyState as QuietEmptyState, ScreenHeader, SectionHeader, SegmentTabs } from '@/components/reframe';
 import { IconButton } from '@/components/ui/IconButton';
 import { X_AVATAR, X_AVATAR_GAP, X_GUTTER, X_HAIRLINE, X_SPACE, X_TYPE, xColors } from '@/constants/reframe';
@@ -1292,7 +1293,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
                 left edge on live rows (Atelier Noire, Maison Vela, Kuro
                 Line) while non-live rows (no ring at all) rendered fine. */}
             <View style={s.avatarContainer}>
-              {conv.isOfficial ? (
+              {conv.isOfficial || isOfficialAccountId(participant.userId) ? (
                 <View style={[s.avatar48, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
                   <BrandthreadLogo size={24} />
                 </View>
@@ -1432,7 +1433,11 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
             testID={`inbox-request-row-${conv.id}`}
           >
             <View style={s.avatarContainer}>
-              {participant.avatarUri ? (
+              {isOfficialAccountId(participant.userId) ? (
+                <View style={[s.avatar48, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                  <BrandthreadLogo size={24} />
+                </View>
+              ) : participant.avatarUri ? (
                 <Image source={{ uri: participant.avatarUri }} style={s.avatar48} testID={`inbox-request-avatar-image-${conv.id}`} />
               ) : (
                 <View style={[s.avatar48, { backgroundColor: participant.color }]}>

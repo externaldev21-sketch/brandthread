@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Image,
   Linking,
   Platform,
   Pressable,
@@ -24,7 +25,9 @@ import {
   getConversations,
   sendMessage,
 } from '@/services/socialService';
-import { recentShareTargets, type ShareTarget } from '@/lib/shareRecents';
+import { SHARE_ROW_MAX, type ShareTarget } from '@/lib/shareRecents';
+import { allShareTargets } from '@/lib/shareContactSearch';
+import { ShareContactPicker, type ContactLoadStatus } from '@/components/ShareContactPicker';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -32,12 +35,15 @@ import { Sheet } from '@/components/ui/BottomSheet';
 import { useApi } from '@/lib/api';
 import { isUUID } from '@/lib/engagementUtils';
 import { buildPostUrl } from '@/lib/shareLinks';
+import { storyPostShareHref } from '@/lib/storyPostShare';
 import { quotePostHref } from '@/lib/quotePost';
 import { stitchHref } from '@/lib/fits';
 import { useRouter } from 'expo-router';
 import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { remixActionVisible, remixRoute } from '@/lib/remix';
+import { publishPostEngagement } from '@/lib/postEngagement';
+import { OFFICIAL_AVATAR_SOURCE, isOfficialAccountId } from '@/lib/officialAccount';
 
 interface ThreadShareSheetProps {
   visible: boolean;
@@ -47,15 +53,33 @@ interface ThreadShareSheetProps {
   productName?: string;
   mediaUri?: string;
   isVideo: boolean;
+  shareCount?: number;
   onClose: () => void;
   onReport: () => void;
   onNotInterested: () => void;
   onFeedback: (message: string, kind?: 'info' | 'error') => void;
+  /** Whether the signed-in viewer has already reposted this post. */
+  reposted?: boolean;
+  /** Persists the repost toggle; parent owns the repost state. */
+  onRepost?: () => Promise<void> | void;
+  /** Truthful reason supplied by the feed ranker, if any. */
+  recommendationReason?: string;
 }
+
+export const DEFAULT_RECOMMENDATION_REASON =
+  "This video is shown based on general activity on Brandthread, such as recent and popular posts. Brandthread doesn't have a more specific reason to show for this video.";
 
 type BusyAction = string | null;
 
-export function ThreadShareSheet({
+export function ThreadShareSheet(props: ThreadShareSheetProps) {
+  const { userId } = useAuth();
+  // Contacts, search text and pending sends belong to one Clerk identity.
+  // Remount before paint when sessions change, rather than clear private
+  // contact names in a later effect.
+  return <AccountThreadShareSheet key={userId ?? 'guest'} {...props} />;
+}
+
+function AccountThreadShareSheet({
   visible,
   postId,
   creator,
@@ -63,10 +87,14 @@ export function ThreadShareSheet({
   productName,
   mediaUri,
   isVideo,
+  shareCount = 0,
   onClose,
   onReport,
   onNotInterested,
   onFeedback,
+  reposted = false,
+  onRepost,
+  recommendationReason,
 }: ThreadShareSheetProps) {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
@@ -74,7 +102,12 @@ export function ThreadShareSheet({
   const api = useApi();
   const router = useRouter();
   // "Send to" row (#145): recent chats first, then friends (lib/shareRecents).
-  const [friends, setFriends] = useState<ShareTarget[]>([]);
+  const [allTargets, setAllTargets] = useState<ShareTarget[]>([]);
+  const friends = React.useMemo(() => allTargets.slice(0, SHARE_ROW_MAX), [allTargets]);
+  const [contactStatus, setContactStatus] = useState<ContactLoadStatus>('loading');
+  const [contactsReload, setContactsReload] = useState(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  useEffect(() => { if (!visible) setPickerOpen(false); }, [visible]);
   const { userId: myUserId } = useAuth();
   const [busy, setBusy] = useState<BusyAction>(null);
   const [savingProgress, setSavingProgress] = useState<number | null>(null);
@@ -94,10 +127,26 @@ export function ThreadShareSheet({
   // native share sheet. Fire-and-forget: this is analytics, not something
   // the share flow should ever block or fail on, and preview/demo posts
   // (non-UUID ids) have nothing to record against.
-  const recordShare = React.useCallback(() => {
-    if (!isUUID(postId)) return;
-    api.posts.interact(postId, { type: 'share' }).catch(() => {});
-  }, [api, postId]);
+  const accountRef = useRef(myUserId);
+  accountRef.current = myUserId;
+  React.useEffect(() => {
+    accountRef.current = myUserId;
+    return () => { accountRef.current = null; };
+  }, [myUserId]);
+  const recordShare = React.useCallback(async () => {
+    const owner = myUserId;
+    if (!isUUID(postId) || !owner || accountRef.current !== owner) return;
+    publishPostEngagement(owner, postId, { shares: shareCount + 1 });
+    try {
+      const result = await api.posts.interact(postId, { type: 'share' });
+      if (accountRef.current !== owner) return;
+      publishPostEngagement(owner, postId, { shares: result.count ?? shareCount + 1 });
+    } catch {
+      // Roll back the optimistic count for the account that made it.
+      publishPostEngagement(owner, postId, { shares: shareCount });
+      if (accountRef.current === owner) onFeedback('Shared, but the share count could not be updated.', 'error');
+    }
+  }, [api, postId, myUserId, shareCount, onFeedback]);
 
   // Shared out as the canonical https link (/p/:id) so it opens the app via
   // universal links and unfurls with Open Graph in other apps. Demo/preview
@@ -132,20 +181,22 @@ export function ThreadShareSheet({
 
   useEffect(() => {
     if (!visible) return;
+    setAllTargets([]);
+    // Signed out: no DM history to read (and never a protected call).
+    if (!myUserId) { setContactStatus('signed_out'); return; }
     let cancelled = false;
-    void Promise.all([
-      // Signed out: no DM history to read (and never a protected call).
-      myUserId ? getConversations().catch(() => []) : Promise.resolve([]),
-      getAcceptedFriends().catch(() => []),
-    ])
+    setContactStatus('loading');
+    void Promise.all([getConversations(), getAcceptedFriends()])
       .then(([conversations, accepted]) => {
-        if (!cancelled) setFriends(recentShareTargets(conversations, accepted, myUserId));
+        if (cancelled) return;
+        setAllTargets(allShareTargets(conversations, accepted, myUserId));
+        setContactStatus('ready');
       })
       .catch(() => {
-        if (!cancelled) setFriends([]);
+        if (!cancelled) setContactStatus('error');
       });
     return () => { cancelled = true; };
-  }, [visible, myUserId]);
+  }, [visible, myUserId, contactsReload]);
 
   async function runAction(name: string, action: () => Promise<void>) {
     if (actionInFlightRef.current) return;
@@ -162,6 +213,8 @@ export function ThreadShareSheet({
   }
 
   async function sendToFriend(friend: ShareTarget) {
+    const owner = myUserId;
+    if (!owner) { onFeedback('Sign in to send posts to friends.', 'error'); return; }
     await runAction(`friend:${friend.userId}`, async () => {
       // A recent chat already has a conversation: send straight into it.
       const conversation = friend.conversationId ? { id: friend.conversationId } : await createOrGetConversation({
@@ -175,6 +228,7 @@ export function ThreadShareSheet({
           accountType: 'buyer',
         },
       });
+      if (accountRef.current !== owner) return;
       await sendMessage(conversation.id, caption || `Shared ${creator}'s post`, {
         type: 'post',
         uri: postUrl,
@@ -182,9 +236,10 @@ export function ThreadShareSheet({
         subtitle: caption,
         meta: { postId },
       });
+      if (accountRef.current !== owner) return;
       onClose();
       onFeedback(`Sent to ${friend.name}`, 'info');
-      recordShare();
+      void recordShare();
     });
   }
 
@@ -192,8 +247,8 @@ export function ThreadShareSheet({
     await runAction('copy', async () => {
       await Clipboard.setStringAsync(postUrl);
       onClose();
-      onFeedback('Link copied', 'info');
-      recordShare();
+      onFeedback('Copied', 'info');
+      void recordShare();
     });
   }
 
@@ -204,21 +259,94 @@ export function ThreadShareSheet({
     await runAction(kind, async () => {
       const supported = await Linking.canOpenURL(url);
       if (!supported) {
-        await Share.share({ message: shareText, url: postUrl });
+        const result = await Share.share({ message: shareText, url: postUrl });
+        if (result.action === Share.dismissedAction) return;
       } else {
         await Linking.openURL(url);
       }
       onClose();
-      recordShare();
+      void recordShare();
     });
   }
 
   async function openMore() {
     await runAction('more', async () => {
-      await Share.share({ message: shareText, url: postUrl });
+      const result = await Share.share({ message: shareText, url: postUrl });
+      if (result.action === Share.dismissedAction) return;
       onClose();
-      recordShare();
+      void recordShare();
     });
+  }
+
+  async function toggleRepost() {
+    if (!onRepost) return;
+    if (!myUserId) { onFeedback('Sign in to repost.', 'error'); return; }
+    const owner = myUserId;
+    const wasReposted = reposted;
+    if (actionInFlightRef.current) return;
+    actionInFlightRef.current = true;
+    setBusy('repost');
+    try {
+      // Parent owns repost success/error toasts (its handler may catch and
+      // report failures itself), so the sheet only closes on resolve.
+      await onRepost();
+      if (accountRef.current !== owner) return;
+      onClose();
+    } catch {
+      if (accountRef.current === owner) {
+        onFeedback(wasReposted ? "Couldn't remove repost. Try again." : "Couldn't repost. Try again.", 'error');
+      }
+    } finally {
+      actionInFlightRef.current = false;
+      setBusy(null);
+    }
+  }
+
+  // Hands off only the post id; the story composer fetches the authoritative
+  // post (and its server-side canReshareToStory permission) itself.
+  function addToStory() {
+    if (!myUserId) { onFeedback('Sign in to add posts to your Story.', 'error'); return; }
+    const href = storyPostShareHref(postId);
+    if (!href) { onFeedback("This post can't be added to your Story.", 'error'); return; }
+    onClose();
+    router.push(href as never);
+  }
+
+  async function systemShare(name: string, message: string, notice?: string) {
+    await runAction(name, async () => {
+      const result = await Share.share({ message, url: postUrl });
+      if (result.action === Share.dismissedAction) return;
+      onClose();
+      if (notice) onFeedback(notice, 'info');
+      void recordShare();
+    });
+  }
+
+  async function shareToInstagram() {
+    // Instagram offers no public API for posting a link from another app, so
+    // hand off through the system share sheet (Instagram appears there when
+    // installed and accepts what it supports, e.g. DMs).
+    await systemShare(
+      'instagram',
+      shareText,
+      'Shared via your phone’s share sheet — pick Instagram there if it’s installed.',
+    );
+  }
+
+  function openMoreOptions() {
+    const options: { text: string; onPress: () => void; style?: 'cancel' }[] = [];
+    if (isUUID(postId)) {
+      options.push({ text: 'Quote', onPress: () => { onClose(); router.push(quotePostHref({ postId, author: creator, caption, thumb: isVideo ? undefined : mediaUri, mediaType: isVideo ? 'video' : 'photo' }) as never); } });
+    }
+    if (remixAllowed) options.push({ text: 'Remix', onPress: () => { onClose(); router.push(remixRoute(postId) as never); } });
+    if (isUUID(postId)) options.push({ text: 'Stitch', onPress: () => { onClose(); router.push(stitchHref(postId) as never); } });
+    options.push({ text: 'Other apps', onPress: () => { void systemShare('more', shareText); } });
+    options.push({ text: 'Cancel', style: 'cancel', onPress: () => {} });
+    Alert.alert('More', undefined, options);
+  }
+
+  function whyThisVideo() {
+    Alert.alert('Why this video', recommendationReason?.trim() || DEFAULT_RECOMMENDATION_REASON);
   }
 
   async function saveVideo() {
@@ -303,49 +431,71 @@ export function ThreadShareSheet({
       <Sheet
         visible={visible}
         onClose={onClose}
-        title="Share to"
+        title="Send to"
+        centerTitle
+        headerRight="plain-close"
         padded={false}
         accessibilityLabel="Share menu"
         testID="thread-share-sheet"
       >
-
+        {pickerOpen ? (
+          <ShareContactPicker
+            status={contactStatus}
+            targets={allTargets}
+            busyUserId={busy?.startsWith('friend:') ? busy.slice(7) : null}
+            onSend={target => void sendToFriend(target)}
+            onBack={() => setPickerOpen(false)}
+            onRetry={() => setContactsReload(n => n + 1)}
+          />
+        ) : (
+        <>
           <View style={styles.section}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.actionRow}
-            >
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionRow}>
+              {onRepost ? (
+                <ShareAction
+                  label={reposted ? 'Remove repost' : 'Repost'}
+                  icon="repeat"
+                  busy={busy === 'repost'}
+                  onPress={() => void toggleRepost()}
+                  highlighted={reposted}
+                />
+              ) : null}
+              <ShareAction label="Add to Story" icon="plus-circle" onPress={addToStory} />
               {friends.map(friend => (
                 <ShareAction
                   key={friend.userId}
                   label={friend.name.split(' ')[0]}
                   busy={busy === `friend:${friend.userId}`}
                   onPress={() => void sendToFriend(friend)}
-                  avatar={{ initials: friend.initials, color: friend.color }}
+                  avatar={{ initials: friend.initials, color: friend.color, uri: friend.avatarUri, official: friend.isOfficial || isOfficialAccountId(friend.userId) }}
                 />
               ))}
               <ShareAction
-                label="More friends"
+                label="More"
+                testID="thread-share-more-contacts"
                 icon="search"
-                onPress={() => {
-                  onClose();
-                  void Linking.openURL(ExpoLinking.createURL('/(buyer)/friends'));
-                }}
+                onPress={() => setPickerOpen(true)}
+              />
+              <ShareAction
+                label="Invite friends to chat"
+                icon="user-plus"
+                busy={busy === 'invite'}
+                onPress={() => void systemShare('invite', `Join me on Brandthread and check this out\n${postUrl}`)}
               />
             </ScrollView>
           </View>
 
           <View style={styles.divider} />
           <View style={styles.section}>
-            <View style={styles.actionRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionRow}>
               <ShareAction label="Copy link" icon="link-2" busy={busy === 'copy'} onPress={() => void copyLink()} />
-              <ShareAction label="Messages" icon="message-circle" busy={busy === 'sms'} onPress={() => void openExternal('sms')} />
+              <ShareAction label="SMS" icon="message-circle" busy={busy === 'sms'} onPress={() => void openExternal('sms')} />
               <ShareAction label="Email" icon="mail" busy={busy === 'email'} onPress={() => void openExternal('email')} />
-              <ShareAction label="More" icon="more-horizontal" busy={busy === 'more'} onPress={() => void openMore()} />
-            </View>
+              <ShareAction label="Instagram" icon="instagram" busy={busy === 'instagram'} onPress={() => void shareToInstagram()} />
+              <ShareAction label="More" icon="more-horizontal" busy={busy === 'more'} onPress={openMoreOptions} />
+            </ScrollView>
           </View>
 
-          <View style={styles.divider} />
           <View style={styles.section}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionRow}>
               <ShareAction label="Report" icon="flag" onPress={() => { onClose(); onReport(); }} muted />
@@ -353,31 +503,11 @@ export function ThreadShareSheet({
               {isVideo && mediaUri && downloadAllowed === true ? (
                 <ShareAction label="Save video" icon="download" onPress={() => void saveVideo()} muted />
               ) : null}
-              {isUUID(postId) ? (
-                <ShareAction
-                  label="Quote"
-                  icon="edit-3"
-                  onPress={() => {
-                    onClose();
-                    router.push(quotePostHref({ postId, author: creator, caption, thumb: isVideo ? undefined : mediaUri, mediaType: isVideo ? 'video' : 'photo' }) as never);
-                  }}
-                />
-              ) : null}
-              {remixAllowed ? (
-                <ShareAction label="Remix" icon="layers" onPress={() => { onClose(); router.push(remixRoute(postId) as never); }} muted />
-              ) : null}
-              {isUUID(postId) ? (
-                <ShareAction
-                  label="Stitch"
-                  icon="scissors"
-                  onPress={() => {
-                    onClose();
-                    router.push(stitchHref(postId) as never);
-                  }}
-                />
-              ) : null}
+              <ShareAction label="Why this video" icon="help-circle" onPress={whyThisVideo} muted />
             </ScrollView>
           </View>
+        </>
+        )}
       </Sheet>
 
       {savingProgress != null && (
@@ -409,13 +539,17 @@ function ShareAction({
   busy,
   muted,
   avatar,
+  highlighted,
+  testID,
 }: {
   label: string;
   icon?: IconName;
   onPress: () => void;
   busy?: boolean;
   muted?: boolean;
-  avatar?: { initials: string; color: string };
+  avatar?: { initials: string; color: string; uri?: string; official?: boolean };
+  highlighted?: boolean;
+  testID?: string;
 }) {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
@@ -426,13 +560,17 @@ function ShareAction({
       disabled={busy}
       accessibilityRole="button"
       accessibilityLabel={label}
-      testID={`thread-share-${label.toLowerCase().replace(/\s+/g, '-')}`}
+      testID={testID ?? `thread-share-${label.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      <View style={[styles.actionCircle, muted && styles.actionCircleMuted, avatar && { backgroundColor: avatar.color }]}>
-         {busy ? <ActivityIndicator color={theme.onAccent} /> : avatar ? (
+      <View style={[styles.actionCircle, muted && styles.actionCircleMuted, highlighted && { backgroundColor: theme.text }, avatar && { backgroundColor: avatar.color }]}>
+         {busy ? <ActivityIndicator color={theme.onAccent} /> : avatar?.official ? (
+          <Image source={OFFICIAL_AVATAR_SOURCE} style={styles.avatarImage} resizeMode="cover" testID="thread-share-official-avatar" />
+        ) : avatar?.uri ? (
+          <Image source={{ uri: avatar.uri }} style={styles.avatarImage} resizeMode="cover" testID="thread-share-avatar-image" />
+        ) : avatar ? (
           <Text style={styles.avatarText}>{avatar.initials}</Text>
         ) : (
-           <Icon name={icon ?? 'send'} size={22} color={theme.text} />
+           <Icon name={icon ?? 'send'} size={22} color={highlighted ? theme.background : theme.text} />
         )}
       </View>
       <Text style={styles.actionLabel} numberOfLines={2}>{label}</Text>
@@ -441,12 +579,13 @@ function ShareAction({
 }
 
 const makeStyles = (theme: { background: string; card: string; border: string; text: string; muted: string; surface: string; onAccent: string }) => StyleSheet.create({
-  section: { paddingHorizontal: 20, paddingVertical: 14 },
-  actionRow: { flexDirection: 'row', gap: 12 },
-  action: { width: 66, alignItems: 'center', gap: 7 },
-  actionCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border },
+  section: { paddingVertical: 8 },
+  actionRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 8 },
+  action: { width: 60, alignItems: 'center', gap: 6 },
+  actionCircle: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden', backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border },
   actionCircleMuted: { backgroundColor: theme.background },
-  actionLabel: { minHeight: 30, color: theme.muted, fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 13, textAlign: 'center' },
+  actionLabel: { minHeight: 28, color: theme.muted, fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 14, textAlign: 'center' },
+  avatarImage: { width: '100%', height: '100%' },
   avatarText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.sm },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: theme.border },
   progressWrap: { position: 'absolute', left: 0, right: 0, zIndex: 10000, backgroundColor: theme.background, paddingTop: 8 },

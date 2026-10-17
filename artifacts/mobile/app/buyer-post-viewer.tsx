@@ -6,20 +6,17 @@ import * as Haptics from 'expo-haptics';
  */
 import { track } from '@/lib/analytics';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
-import { buildPostUrl } from '@/lib/shareLinks';
 
 import { QuotedPostCard } from '@/components/social/QuotedPostCard';
 
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Share, Animated, useWindowDimensions, Platform, Alert, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, useWindowDimensions, Pressable } from 'react-native';
 
-import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { FontAwesome } from '@expo/vector-icons';
 
 import { Icon, type IconName } from '@/components/ui/Icon';
 
@@ -27,9 +24,12 @@ import { Button } from '@/components/ui/Button';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 
-import { haptics, haptic } from '@/lib/haptics';
+import { haptic, hapticFollow, hapticLight } from '@/lib/haptics';
+import { getSellerFollowStates, setSellerFollowing, subscribeSocial } from '@/services/socialService';
+import { useCommentCountDelta } from '@/lib/commentCountBus';
+import { TapHeartBurst } from '@/components/buyer-feed/TapHeartBurst';
 
 import { useVideoPlayer, VideoView } from 'expo-video';
 
@@ -45,10 +45,11 @@ import { BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RA
 
 import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
 
-import { getComments, likePost, repostPost, saveItem, getMyPosts, getPostById, updatePost, deletePost, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE, mapSlides } from '@/services/socialService';
+import { getComments, getMyPosts, getPostById, updatePost, deletePost, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE, mapSlides } from '@/services/socialService';
 
 import type { BuyerPost, Comment, PostSlide } from '@/services/socialTypes';
 import { PostCarousel } from '@/components/social/PostCarousel';
+import { ParentScrollGestureScope } from '@/components/media/ParentScrollGesture';
 
 import { getPreviewActivityPost } from '@/lib/previewActivity';
 
@@ -80,7 +81,12 @@ import { savedPostToast } from '@/lib/saved/savedPostToast';
 
 import { TranslatableCaption } from '@/components/translation/CaptionTranslation';
 
-import { minHitSlop } from '@/lib/hitSlop';
+import { persistPostAction, postActionPending, subscribePostEngagement, type PostAction, type PostEngagementPatch } from '@/lib/postEngagement';
+import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
+import { ThreadShareSheet } from '@/components/ThreadShareSheet';
+import { ThreadCommentsSheet } from './buyer-post-comments';
+import { OFFICIAL_AVATAR_SOURCE, isOfficialAccountId } from '@/lib/officialAccount';
+import { useReducedMotion } from 'react-native-reanimated';
 
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 
@@ -197,11 +203,27 @@ function publicPostToBuyerPost(raw: any): BuyerPost | null {
     mediaUrls: Array.isArray(raw.mediaUrls) ? raw.mediaUrls : [],
     slides: mapSlides(raw.slides),
     aspectRatio: raw.aspectRatio,
-    likesCount: Number(raw.likeCount ?? 0), commentsCount: 0, repostsCount: Number(raw.repostCount ?? 0),
-    likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
+    likesCount: Number(raw.likeCount ?? 0), commentsCount: Number(raw.commentsCount ?? 0), repostsCount: Number(raw.repostCount ?? 0),
+    likedByMe: raw.likedByMe === true, savedByMe: raw.savedByMe === true, repostedByMe: raw.repostedByMe === true,
+    isArchived: false, isDraft: false,
+    pinnedAt: raw.pinnedAt ?? null, location: raw.location ?? undefined, quotedPost: raw.quotedPost ?? undefined,
     createdAt: raw.createdAt, updatedAt: raw.updatedAt ?? raw.createdAt,
+  } as BuyerPost;
+}
+
+/** Server-only extras the BuyerPost shape doesn't carry. */
+type ServerExtras = { saves: number; shares: number; avatarUrl?: string; isOfficial: boolean; authorId?: string; authorAccountType?: string };
+function serverExtras(raw: any): ServerExtras {
+  return {
+    saves: Number(raw?.savesCount ?? 0),
+    shares: Number(raw?.sharesCount ?? 0),
+    avatarUrl: raw?.seller?.avatarUrl || raw?.seller?.profileImageUrl || undefined,
+    isOfficial: raw?.seller?.isOfficial === true || isOfficialAccountId(raw?.userId),
+    authorId: raw?.userId,
+    authorAccountType: raw?.seller?.accountType,
   };
 }
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Seller POSTs (and any post the buyer-social route doesn't cover) via the public post route. */
 async function loadPublicPost(api: ReturnType<typeof useApi>, id: string): Promise<BuyerPost | null> {
@@ -221,20 +243,6 @@ async function loadPublicPost(api: ReturnType<typeof useApi>, id: string): Promi
     };
   } catch { return null; }
 }
-// Engagement bar: 32pt-tall icon buttons spaced 8pt apart (SP.sm gap). Pad
-// each to 44pt tall; horizontally, split each 8pt gap between neighbours and
-// spend the free space on the outer edges / the flex spacer, so no slop ever
-// covers a neighbouring icon.
-const ENGAGE_V = minHitSlop({ height: 32 });
-const ENGAGE_SLOP = {
-  like: { ...ENGAGE_V, left: 10, right: 3 },    // 34pt wide, 16pt page gutter on the left
-  comment: { ...ENGAGE_V, left: 5, right: 5 },  // 34pt wide
-  repost: { ...ENGAGE_V, left: 4, right: 4 },   // 22pt wide, boxed in by 8pt gaps
-  save: { ...ENGAGE_V, left: 4, right: 18 },    // flex spacer on the right
-  report: { ...ENGAGE_V, left: 20, right: 2 },  // flex spacer on the left
-  share: { ...ENGAGE_V, left: 6, right: 16 },   // 16pt page gutter on the right
-};
-
 export default function BuyerPostViewer() {
   const { userId } = useAuth();
   const api = useApi();
@@ -287,10 +295,22 @@ export default function BuyerPostViewer() {
     }
   };
   const [comments, setComments] = useState<Comment[]>([]);
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
-  const [reposted, setReposted] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [eng, setEng] = useState<Required<Omit<PostEngagementPatch, never>>>({
+    liked: false, likes: 0, saved: false, saves: 0, reposted: false, reposts: 0, shares: 0,
+  });
+  const [extras, setExtras] = useState<ServerExtras | null>(null);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [following, setFollowing] = useState(false);
+  const followInFlight = useRef(false);
+  const [burstPoint, setBurstPoint] = useState<{ x: number; y: number } | null>(null);
+  const mediaTap = useRef<{ time: number; x: number; y: number } | null>(null);
+  const zoomActiveRef = useRef(false);
+  const zoomEndedAtRef = useRef(0);
+  const actionOwner = useRef(userId);
+  actionOwner.current = userId;
+  const [, bumpPending] = useState(0);
+  const reduceMotion = useReducedMotion() ?? false;
   const [editOpen, setEditOpen] = useState(false);
   const [editCaption, setEditCaption] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -308,8 +328,38 @@ export default function BuyerPostViewer() {
   const canPin = post !== null && !post.isDraft && (isOwner || (!!userId && post.authorId === userId));
   const fits = usePostFits({ postId: params.postId, isOwner });
 
+  const realPostId = params.postId && UUID_RE.test(params.postId) ? params.postId : null;
+
+  const applyPost = useCallback((found: BuyerPost, ex: ServerExtras | null) => {
+    setPost(found);
+    setExtras(ex);
+    setEng({
+      liked: found.likedByMe ?? false, likes: found.likesCount ?? 0,
+      reposted: found.repostedByMe ?? false, reposts: found.repostsCount ?? 0,
+      saved: found.savedByMe ?? false, saves: ex?.saves ?? 0, shares: ex?.shares ?? 0,
+    });
+  }, []);
+
   const loadPost = useCallback(async () => {
     let found: BuyerPost | null = null;
+    // Real posts: the server is the source of truth, so stale local
+    // getMyPosts state can never override fresh engagement.
+    if (realPostId) {
+      try {
+        const raw = await api.posts.get(realPostId);
+        const mapped = publicPostToBuyerPost(raw);
+        if (mapped) {
+          const ex = serverExtras(raw);
+          // Owner flag for my own posts: keep the local author identity.
+          if (mapped.authorId === userId || mapped.authorId === MY_USER_ID) mapped.authorId = MY_USER_ID;
+          track('post_viewed', { post_type: mapped.type });
+          applyPost(mapped, ex);
+          setEditCaption(mapped.caption);
+          setPostLoaded(true);
+          return;
+        }
+      } catch { /* fall through to friend/local lookups */ }
+    }
     try {
       const all = await getMyPosts();
       found = all.find(p => p.id === params.postId) ?? await getPostById(params.postId) ?? await loadPublicPost(api, params.postId);
@@ -325,26 +375,31 @@ export default function BuyerPostViewer() {
     found = found ?? previewPost(params.postId);
     if (found) {
       track('post_viewed', { post_type: found.type });
-      setPost(found);
-      setLiked(found.likedByMe ?? false);
-      setLikeCount(found.likesCount ?? 0);
-      setReposted(found.repostedByMe ?? false);
-      setSaved(found.savedByMe ?? false);
+      applyPost(found, null);
       setEditCaption(found.caption);
     }
     setPostLoaded(true);
-  }, [params.postId, api]);
+  }, [params.postId, api, realPostId, userId, applyPost]);
 
-  useEffect(() => {
-    loadPost();
+  // Load (and reload on every refocus) so returning from another screen
+  // shows fresh server engagement.
+  const loadPostRef = useRef(loadPost);
+  loadPostRef.current = loadPost;
+  useFocusEffect(useCallback(() => {
+    void loadPostRef.current();
     if (params.postId) {
       getComments(params.postId).then(setComments).catch(() => setComments([]));
     }
-  }, [loadPost, params.postId]);
+  }, [params.postId, userId]));
 
-  // Real posts (UUID ids) engage through the API with rollback; seeded
-  // preview posts keep the local store behaviour they always had.
-  const realPostId = params.postId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.postId) ? params.postId : null;
+  // Cross-screen sync: successful writes from the feed/other viewers.
+  useEffect(() => {
+    if (!userId || !realPostId) return;
+    return subscribePostEngagement(userId, (id, patch) => {
+      if (id !== realPostId) return;
+      setEng((prev) => ({ ...prev, ...patch }));
+    });
+  }, [userId, realPostId]);
 
   // One view per open — the same signal the main feed records, so the
   // owner's Content Analytics counts views from every surface.
@@ -352,85 +407,112 @@ export default function BuyerPostViewer() {
     if (userId && realPostId) void api.posts.interact(realPostId, { type: 'view' }).catch(() => {});
   }, [api, userId, realPostId]);
 
-  const handleLike = async () => {
-    
-    const wasLiked = liked;
-    const prevCount = likeCount;
-    const newLiked = !liked;
-    if (newLiked) haptic('like');
-    setLiked(newLiked);
-    setLikeCount(c => newLiked ? c + 1 : Math.max(0, c - 1));
-    if (!realPostId) {
-      if (params.postId) await likePost(params.postId);
-      return;
-    }
+  const engRef = useRef(eng);
+  engRef.current = eng;
+  const runAction = async (kind: PostAction) => {
+    if (!realPostId) return; // preview/demo posts have no server record
+    if (!userId) { router.push('/sign-in' as never); return; }
+    if (postActionPending(userId, realPostId, kind)) return;
+    const before = engRef.current;
+    const enabled = kind === 'like' ? !before.liked : kind === 'save' ? !before.saved : !before.reposted;
+    const count = kind === 'like' ? before.likes : kind === 'save' ? before.saves : before.reposts;
+    if (enabled && kind === 'like') haptic('like');
+    if (enabled && kind === 'save') haptic('save');
+    if (enabled && kind === 'repost') hapticLight();
+    // Optimistic, rolled back on failure.
+    setEng((prev) => ({
+      ...prev,
+      ...(kind === 'like' ? { liked: enabled, likes: Math.max(0, count + (enabled ? 1 : -1)) }
+        : kind === 'save' ? { saved: enabled, saves: Math.max(0, count + (enabled ? 1 : -1)) }
+          : { reposted: enabled, reposts: Math.max(0, count + (enabled ? 1 : -1)) }),
+    }));
+    bumpPending((n) => n + 1);
     try {
-      const result = await api.posts.interact(realPostId, { type: 'like', value: newLiked ? 'add' : 'remove' });
-      if (typeof result?.count === 'number') setLikeCount(result.count);
-    } catch {
-      setLiked(wasLiked);
-      setLikeCount(prevCount);
-      Alert.alert('Could not update like', 'Check your connection and try again.');
-    }
-  };
-
-  const handleRepost = async () => {
-    const wasReposted = reposted;
-    setReposted(!wasReposted);
-    if (!realPostId) {
-      if (params.postId) await repostPost(params.postId);
-      return;
-    }
-    try {
-      const result = await api.posts.interact(realPostId, { type: 'repost', value: wasReposted ? 'remove' : undefined });
-      setReposted(result?.action === 'added');
-    } catch (error) {
-      setReposted(wasReposted);
-      Alert.alert('Could not update repost', error instanceof Error && error.message ? error.message : 'Try again.');
-    }
-  };
-
-  const handleSaveToggle = async () => {
-    if (!saved) haptic('save');
-    if (!params.postId) return;
-    const wasSaved = saved;
-    setSaved(!wasSaved);
-    if (!realPostId) {
-      if (!wasSaved) await saveItem({ type: 'post', targetId: params.postId, title: caption || 'Post', accentColor: mediaColor1 });
-      return;
-    }
-    try {
-      if (wasSaved) {
-        await api.buyer.saved.remove(realPostId);
-      } else {
-        await api.buyer.saved.save({ type: 'post', targetId: realPostId, title: caption || 'Post', accentColor: mediaColor1 });
+      const patch = await persistPostAction({
+        api, account: userId, postId: realPostId, kind, enabled, count,
+        title: caption || 'Post', accentColor: mediaColor1,
+      });
+      if (actionOwner.current !== userId) return;
+      setEng((prev) => ({ ...prev, ...patch }));
+      if (kind === 'save' && enabled) {
         void requestContextualPushPermission(userId, api);
         emitSaveHeartEvent({ type: 'toast', toast: savedPostToast({
           id: realPostId, caption, creator: authorName, accentColor: mediaColor1,
           contentType: postType, mediaUris: post?.mediaUrls?.length ? post.mediaUrls : post?.mediaUrl ? [post.mediaUrl] : [],
         }) });
       }
+      if (kind === 'save' && !enabled) setPinToast('Removed from Saved');
+      if (kind === 'repost') setPinToast(enabled ? 'Reposted' : 'Repost removed');
     } catch {
-      setSaved(wasSaved);
-      Alert.alert(wasSaved ? 'Could not remove from saved' : 'Could not save', 'Check your connection and try again.');
+      if (actionOwner.current !== userId) return;
+      setEng(current => ({ ...current, ...(kind === 'like' ? { liked: before.liked, likes: before.likes }
+        : kind === 'save' ? { saved: before.saved, saves: before.saves }
+        : { reposted: before.reposted, reposts: before.reposts }) }));
+      setPinToast(kind === 'like' ? "Couldn't update like. Try again."
+        : kind === 'save' ? (enabled ? "Couldn't save. Try again." : "Couldn't remove from saved. Try again.")
+          : "Couldn't update repost. Try again.");
+    } finally {
+      bumpPending((n) => n + 1);
     }
   };
-
-  const handleShare = async () => {
-    const caption = post?.caption || params.postCaption || '';
-    const handle = post?.authorHandle ? `@${post.authorHandle}` : MY_HANDLE;
+  const handleLike = () => runAction('like');
+  const handleRepost = () => runAction('repost');
+  const handleSaveToggle = () => runAction('save');
+  const handleShare = () => { haptic('sheet'); setShareOpen(true); };
+  const openComments = () => { haptic('sheet'); setCommentsOpen(true); };
+  const actionsDisabled = !realPostId;
+  const creatorId = extras?.authorId ?? (post?.authorId === MY_USER_ID ? userId : post?.authorId);
+  useEffect(() => {
+    let active = true;
+    setFollowing(false);
+    const load = async () => {
+      if (!userId || !creatorId || creatorId === userId || followInFlight.current) return;
+      try {
+        const states = await getSellerFollowStates([creatorId]);
+        if (active && actionOwner.current === userId && !followInFlight.current) setFollowing(states.get(creatorId)?.isFollowing ?? false);
+      } catch { /* retain the last confirmed state on a read failure */ }
+    };
+    void load();
+    const unsubscribe = subscribeSocial(() => { void load(); });
+    return () => { active = false; unsubscribe(); };
+  }, [userId, creatorId]);
+  const handleFollow = async () => {
+    if (!userId) { router.push('/sign-in' as never); return; }
+    if (!creatorId || creatorId === userId || followInFlight.current) return;
+    followInFlight.current = true;
+    const previous = following;
+    setFollowing(!previous);
+    hapticFollow(!previous);
     try {
-      const link = post?.id ? buildPostUrl(post.id) : null;
-      const message = `${handle} on Brandthread: "${caption}"`;
-      const result = await Share.share(link
-        ? { message: Platform.OS === 'ios' ? message : `${message} ${link}`, url: link, title: 'Share Post' }
-        : { message, title: 'Share Post' });
-      // Count the share for the owner (share count + Content Analytics) only
-      // when the sheet actually shared, not on dismiss.
-      const dismissed = (result as any)?.action === 'dismissedAction';
-      if (realPostId && userId && !dismissed) void api.posts.interact(realPostId, { type: 'share' }).catch(() => {});
-    } catch {}
+      const result = await setSellerFollowing(creatorId, !previous);
+      if (actionOwner.current === userId) setFollowing(result.isFollowing);
+    } catch {
+      if (actionOwner.current === userId) { setFollowing(previous); setPinToast("Couldn't follow. Try again."); }
+    } finally { followInFlight.current = false; }
   };
+  const openCreator = () => {
+    if (!creatorId) return;
+    router.push((extras?.authorAccountType === 'seller'
+      ? `/buyer-seller-profile?sellerId=${encodeURIComponent(creatorId)}`
+      : `/buyer-profile?userId=${encodeURIComponent(creatorId)}`) as never);
+  };
+  const onMediaTap = (event: { nativeEvent: { locationX: number; locationY: number } }) => {
+    // Zoomed (or just reset by the carousel's own double tap): taps belong to zoom, never like.
+    if (zoomActiveRef.current || Date.now() - zoomEndedAtRef.current < 400) { mediaTap.current = null; return; }
+    const { locationX: x, locationY: y } = event.nativeEvent;
+    const now = Date.now(), previous = mediaTap.current;
+    mediaTap.current = { time: now, x, y };
+    if (!previous || now - previous.time > 280 || Math.hypot(previous.x - x, previous.y - y) > 30) return;
+    mediaTap.current = null;
+    if (!userId) { router.push('/sign-in' as never); return; }
+    if (!engRef.current.liked) void handleLike();
+    setBurstPoint({ x, y });
+  };
+
+  const onCarouselZoomChange = useCallback((zoomed: boolean) => {
+    zoomActiveRef.current = zoomed;
+    if (!zoomed) zoomEndedAtRef.current = Date.now();
+  }, []);
 
   const handleSaveCaption = async () => {
     if (!post) return;
@@ -459,7 +541,51 @@ export default function BuyerPostViewer() {
     ? post.slides
     : post && post.mediaUrls && post.mediaUrls.length > 1 && post.type !== 'video'
       ? post.mediaUrls.map((url) => ({ kind: 'photo' as const, url }))
-      : null;
+      // Single photos (incl. profile-opened) use the same zoomable pager.
+      : post && post.type !== 'video' && post.mediaUrl
+        ? [{ kind: 'photo' as const, url: post.mediaUrl }]
+        : null;
+  const isSinglePhoto = !!viewerSlides && viewerSlides.length === 1 && !(post?.slides && post.slides.length > 0);
+
+  const useRail = postType === 'video' || postType === 'slideshow' || (!!viewerSlides && !isSinglePhoto);
+  const isOfficial = extras?.isOfficial ?? isOfficialAccountId(post?.authorId);
+  const railPending = (k: PostAction) => !!userId && !!realPostId && postActionPending(userId, realPostId, k);
+  const commentDelta = useCommentCountDelta(params.postId ?? '', post?.commentsCount ?? 0);
+  const commentCount = Math.max(comments.length, post?.commentsCount ?? 0) + commentDelta;
+  const rail = useRail ? (
+    <RightActionRail
+      creator={authorName}
+      hostId={post?.authorId}
+      avatarColor={authorColor}
+      avatarUri={extras?.avatarUrl}
+      avatarSource={isOfficial ? OFFICIAL_AVATAR_SOURCE : undefined}
+      initials={authorInitials}
+      engagement={{ ...eng, following }}
+      commentsCount={commentCount}
+      shares={eng.shares}
+      saves={eng.saves}
+      onOpenCreator={openCreator}
+      onFollow={handleFollow}
+      isSelf={isOwner}
+      isOfficial={isOfficial}
+      onLike={() => { if (!railPending('like')) void handleLike(); }}
+      onOpenComments={openComments}
+      onRepost={() => { if (!railPending('repost')) void handleRepost(); }}
+      onSave={() => { if (!railPending('save')) void handleSaveToggle(); }}
+      onSaveLongPress={() => {
+        if (!post) return;
+        const toast = savedPostToast({ id: post.id, caption, creator: authorName, contentType: postType,
+          mediaUris: post.mediaUrls ?? (post.mediaUrl ? [post.mediaUrl] : []) });
+        if (toast.action?.kind === 'save-to-collection') {
+          emitSaveHeartEvent({ type: 'post-sheet', item: toast.action.item, thumbnailUri: toast.thumbnailUri });
+        }
+      }}
+      onShare={handleShare}
+      reduceMotion={reduceMotion}
+      style={s.rail}
+      testIdBase={params.postId ?? 'post'}
+    />
+  ) : null;
 
   const typeIcon: IconName =
     postType === 'photo' ? 'image' : postType === 'slideshow' ? 'layers' : 'video';
@@ -509,6 +635,7 @@ export default function BuyerPostViewer() {
       />
       {tileExpandOverlay}
 
+      <ParentScrollGestureScope>
       <Animated.ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
         showsVerticalScrollIndicator={false}
@@ -517,10 +644,15 @@ export default function BuyerPostViewer() {
         {/* Media display */}
         {viewerSlides ? (
           <View style={{ backgroundColor: BG }} testID="viewer-carousel">
-            <PostCarousel slides={viewerSlides} width={windowWidth} dotColor={FG} dotDim={MUTED} />
+            <Pressable onPress={onMediaTap} accessible={false}>
+              <PostCarousel slides={viewerSlides} width={windowWidth} dotColor={FG} dotDim={MUTED} postId={post?.id} mode="persistent" onZoomChange={onCarouselZoomChange} aspectRatio={post?.aspectRatio} />
+              <TapHeartBurst point={burstPoint} reduceMotion={reduceMotion} />
+            </Pressable>
+            {rail}
           </View>
         ) : (
-        <View style={s.media}>
+        <View style={[s.media, postType === 'video' && s.mediaTall]}>
+          <Pressable onPress={onMediaTap} style={{ flex: 1 }} accessible={false}>
           <PostMedia
             mediaUrl={post?.mediaUrl}
             type={postType}
@@ -530,6 +662,9 @@ export default function BuyerPostViewer() {
             onWatched={post?.type === 'video' ? handleVideoWatched : undefined}
             captions={overlaySegments}
           />
+          <TapHeartBurst point={burstPoint} reduceMotion={reduceMotion} />
+          </Pressable>
+          {rail}
         </View>
         )}
 
@@ -583,56 +718,29 @@ export default function BuyerPostViewer() {
           </Text>
         ) : null}
 
-        {/* Engagement bar */}
+        {/* Engagement bar — photo posts; video/slideshow use the rail above. */}
         <View style={s.engagementBar}>
-          <TouchableOpacity style={s.engageBtn} onPress={handleLike}>
-            <Icon name="heart" size={22} color={liked ? RED : FG} />
-            <Text style={[s.engageCount, liked && { color: RED }]}>{likeCount}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.engageBtn}
-            onPress={() => {
-              const qs = new URLSearchParams({
-                postId: params.postId ?? '',
-                postAuthorName: authorName,
-                postAuthorInitials: authorInitials,
-                postAuthorColor: authorColor,
-                postCaption: caption,
-                postMediaColor1: mediaColor1,
-                postMediaColor2: mediaColor2,
-                postType: postType,
-              }).toString();
-              router.push(`/buyer-post-comments?${qs}` as never);
-            }}
-          >
-            <Icon name="message-circle" size={22} color={FG} />
-            <Text style={s.engageCount}>{comments.length}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.engageBtn}
-            onPress={async () => {
-              // Explicit direction + rollback (handleRepost); this used to
-              // send "remove" for any post the viewer didn't own.
-              await handleRepost();
-            }}
-            accessibilityLabel={reposted ? 'Remove repost' : 'Repost'}
-          >
-            <Icon name="repeat" size={22} color={reposted ? PURPLE : FG} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.engageBtn}
-            onPress={async () => {
-              // Save AND unsave, with rollback (handleSaveToggle).
-              await handleSaveToggle();
-            }}
-            accessibilityLabel={saved ? 'Unsave post' : 'Save post'}
-          >
-            {/* Filled when saved (same treatment as the Friends feed) — in the
-                monochrome theme a colour change alone was invisible. */}
-            {saved
-              ? <FontAwesome name="bookmark" size={22} color={PURPLE} />
-              : <Icon name="bookmark" size={22} color={FG} />}
-          </TouchableOpacity>
+          {!useRail ? (
+            <>
+              <TouchableOpacity style={s.engageBtn} onPress={() => { void handleLike(); }} disabled={actionsDisabled}
+                accessibilityRole="button" accessibilityLabel={`${eng.liked ? 'Unlike' : 'Like'}, ${eng.likes} likes`} accessibilityState={{ checked: eng.liked, disabled: actionsDisabled }} testID="viewer-like">
+                <Icon name="heart" size={22} color={eng.liked ? RED : FG} />
+                <Text style={[s.engageCount, eng.liked && { color: RED }]}>{eng.likes}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.engageBtn} onPress={openComments} accessibilityRole="button" accessibilityLabel={`Comments, ${commentCount}`} testID="viewer-comments">
+                <Icon name="message-circle" size={22} color={FG} />
+                <Text style={s.engageCount}>{commentCount}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.engageBtn} onPress={() => { void handleRepost(); }} disabled={actionsDisabled}
+                accessibilityRole="button" accessibilityLabel={eng.reposted ? 'Remove repost' : 'Repost'} accessibilityState={{ checked: eng.reposted, disabled: actionsDisabled }} testID="viewer-repost">
+                <Icon name="repeat" size={22} color={eng.reposted ? PURPLE : FG} />
+              </TouchableOpacity>
+              <TouchableOpacity style={s.engageBtn} onPress={() => { void handleSaveToggle(); }} disabled={actionsDisabled}
+                accessibilityRole="button" accessibilityLabel={eng.saved ? 'Unsave post' : 'Save post'} accessibilityState={{ checked: eng.saved, disabled: actionsDisabled }} testID="viewer-save">
+                <Icon name="bookmark" size={22} color={eng.saved ? PURPLE : FG} />
+              </TouchableOpacity>
+            </>
+          ) : null}
           {captionTrack ? (
             <TouchableOpacity
               style={s.engageBtn}
@@ -657,9 +765,11 @@ export default function BuyerPostViewer() {
               <Icon name="flag" size={22} color={FG} />
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={s.engageBtn} onPress={handleShare} accessibilityLabel="Share post">
-            <Icon name="share-2" size={22} color={FG} />
-          </TouchableOpacity>
+          {!useRail ? (
+            <TouchableOpacity style={s.engageBtn} onPress={handleShare} accessibilityRole="button" accessibilityLabel="Share post" testID="viewer-share">
+              <Icon name="share-2" size={22} color={FG} />
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* Comments preview */}
@@ -708,6 +818,7 @@ export default function BuyerPostViewer() {
           </View>
         )}
       </Animated.ScrollView>
+      </ParentScrollGestureScope>
 
       {/* Edit caption sheet */}
       <Sheet
@@ -740,6 +851,46 @@ export default function BuyerPostViewer() {
         <Text style={s.modalDesc}>This will permanently remove the post from your profile. This cannot be undone.</Text>
       </Sheet>
       <PostOwnerSheet visible={ownerSheetOpen} onClose={() => setOwnerSheetOpen(false)} pinned={!!post?.pinnedAt} onTogglePin={() => { void togglePin(); }} onFitsOptions={fits.openMenu} />
+      <ThreadCommentsSheet
+        visible={commentsOpen}
+        postId={params.postId ?? ''}
+        postAuthorId={post?.authorId}
+        postAuthorName={authorName}
+        postCaption={caption}
+        onClose={() => setCommentsOpen(false)}
+      />
+      {post ? (
+        <ThreadShareSheet
+          visible={shareOpen}
+          postId={post.id}
+          creator={authorName}
+          caption={caption}
+          mediaUri={post.mediaUrl}
+          isVideo={postType === 'video'}
+          shareCount={eng.shares}
+          reposted={!!eng.reposted}
+          onRepost={handleRepost}
+          onClose={() => setShareOpen(false)}
+          onReport={() => {
+            setShareOpen(false);
+            router.push(`/buyer-report?targetType=post&targetId=${post.id}&targetLabel=${encodeURIComponent(caption || 'Post')}&targetUserId=${post.authorId ?? ''}` as never);
+          }}
+          onNotInterested={() => {
+            if (!userId || !post) { setPinToast('Sign in to customize your feed.'); return; }
+            const owner = userId;
+            void api.posts.interact(post.id, { type: 'not_interested', value: 'video' }).then(() => {
+              if (actionOwner.current === owner) {
+                setShareOpen(false);
+                setPinToast('Post hidden');
+                router.back();
+              }
+            }).catch(() => {
+              if (actionOwner.current === owner) setPinToast('Could not update your feed. Try again.');
+            });
+          }}
+          onFeedback={(message) => setPinToast(message)}
+        />
+      ) : null}
       <Snackbar visible={!!pinToast} message={pinToast ?? ''} onDismiss={() => setPinToast(null)} />
     </View>
   );
@@ -752,6 +903,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
   media: { width: '100%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  mediaTall: { aspectRatio: 9 / 16, backgroundColor: '#000' },
+  rail: { right: 10, bottom: 56 },
   authorRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingTop: SP.md, gap: 10 },
   avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontFamily: FONT.bold, fontSize: FS.sm, color: ON_DARK },

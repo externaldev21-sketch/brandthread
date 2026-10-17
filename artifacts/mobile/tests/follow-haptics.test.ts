@@ -125,10 +125,22 @@ const callsHelper = (src: string) => /\bhapticFollow\(/.test(src);
 const rendersSharedControl = (src: string) => SHARED_CONTROLS.some((c) => c.tag.test(src));
 
 describe('every follow entry point routes through hapticFollow', () => {
-  it('each shared follow control calls hapticFollow on tap', () => {
+  it('each shared follow control reaches exactly one hapticFollow owner on tap', () => {
     for (const { file } of SHARED_CONTROLS) {
       const src = readFileSync(join(ROOT, file), 'utf8');
-      expect(callsHelper(src), `${file} must call hapticFollow() in its follow onPress`).toBe(true);
+      if (file === 'components/buyer-feed/RightActionRail.tsx') {
+        // The rebuilt rail delegates its action to the account-scoped parent;
+        // firing here as well would produce two haptics for a single follow.
+        expect(src).toContain('await onFollow();');
+        expect(callsHelper(src)).toBe(false);
+        for (const parent of ['app/(tabs)/feed.tsx', 'app/buyer-post-viewer.tsx']) {
+          const owner = readFileSync(join(ROOT, parent), 'utf8');
+          expect(callsHelper(owner), `${parent} owns the rail follow haptic`).toBe(true);
+          expect(owner).toContain('onFollow=');
+        }
+      } else {
+        expect(callsHelper(src), `${file} must call hapticFollow() in its follow onPress`).toBe(true);
+      }
     }
   });
 

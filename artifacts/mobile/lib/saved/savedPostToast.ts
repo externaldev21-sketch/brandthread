@@ -32,9 +32,9 @@ export function savedPostThumbnail(post: SavedPostInfo): string | undefined {
 export function savedPostToast(post: SavedPostInfo): SaveHeartToast {
   const thumbnailUri = savedPostThumbnail(post);
   return {
-    message: 'Saved',
+    message: 'Added to Favorites',
     thumbnailUri,
-    actionLabel: 'Save to collection',
+    actionLabel: 'Manage',
     action: {
       kind: 'save-to-collection',
       thumbnailUri,

@@ -7,7 +7,7 @@
  * post. Purely additive and session-local — never persisted, never a
  * replacement for the real count the server eventually returns.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 type Listener = (postId: string, delta: number) => void;
 
@@ -25,13 +25,18 @@ export function getCommentCountDelta(postId: string): number {
 }
 
 /** Live delta for one post — 0 until `bumpCommentCount` is called for it. */
-export function useCommentCountDelta(postId: string): number {
-  const [delta, setDelta] = useState(() => getCommentCountDelta(postId));
+export function useCommentCountDelta(postId: string, serverCount?: number): number {
+  const [observed, setObserved] = useState(() => ({ postId, value: getCommentCountDelta(postId) }));
+  const delta = observed.postId === postId ? observed.value : getCommentCountDelta(postId);
+  const baseline = useRef({ postId, serverCount, delta: getCommentCountDelta(postId) });
+  if (baseline.current.postId !== postId || baseline.current.serverCount !== serverCount) {
+    baseline.current = { postId, serverCount, delta: getCommentCountDelta(postId) };
+  }
   useEffect(() => {
-    setDelta(getCommentCountDelta(postId));
-    const listener: Listener = (id, next) => { if (id === postId) setDelta(next); };
+    setObserved({ postId, value: getCommentCountDelta(postId) });
+    const listener: Listener = (id, next) => { if (id === postId) setObserved({ postId, value: next }); };
     listeners.add(listener);
     return () => { listeners.delete(listener); };
   }, [postId]);
-  return delta;
+  return serverCount === undefined ? delta : delta - baseline.current.delta;
 }

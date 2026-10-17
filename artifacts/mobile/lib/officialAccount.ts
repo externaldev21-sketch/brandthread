@@ -1,6 +1,6 @@
 /**
  * The official @brandthread account on the client: its avatar (the bundled
- * silver B logo — the account has no uploaded photo) and the creator-credit
+ * silver B logo (assets/images/brandthread-logo.png) — the account has no uploaded photo) and the creator-credit
  * line shown under official reposts of other creators' content.
  */
 import type { ImageSourcePropType } from 'react-native';

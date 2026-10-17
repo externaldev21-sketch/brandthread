@@ -15,6 +15,7 @@ import { ProductTile, GRID_CARD_ASPECT } from '@/components/search/ProductTile';
 import { VideoTile, VIDEO_TILE_ASPECT } from '@/components/search/VideoTile';
 import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
 import { BrandRow } from '@/components/search/BrandRow';
+import { isOfficialAccountId } from '@/lib/officialAccount';
 import { FilterSheet } from '@/components/search/FilterSheet';
 import { hapticSelection, hapticToggle } from '@/lib/haptics';
 import { FONT, GRID_MAX_WIDTH } from '@/lib/theme';
@@ -123,7 +124,7 @@ export function SearchResults({
     <PersonRow key={p.userId} person={p} loading={!!followPending[p.userId]} onPress={() => onPersonPress(p)} onToggleFollow={() => onToggleFollow(p)} />
   ));
   const brandRows = (items: BrandResult[]) => items.map((b) => (
-    <BrandRow key={b.id} brand={{ id: b.id, name: b.name, handle: b.handle ?? '', color: b.color, initials: b.initials }} onPress={() => onBrandPress(b)} />
+    <BrandRow key={b.id} brand={{ id: b.id, name: b.name, handle: b.handle ?? '', color: b.color, initials: b.initials, imageUri: b.imageUri ?? b.avatarUrl ?? null, official: b.isOfficial === true || isOfficialAccountId(b.sellerId ?? b.id) }} onPress={() => onBrandPress(b)} />
   ));
 
   function renderTab() {

@@ -23,6 +23,7 @@ import { LEVEL_LABEL } from '@/lib/membershipLevels';
 import { Alert, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { useProfilePostsDefault } from '@/hooks/useProfilePostsDefault';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { enqueueEngagementRetry, ensureEngagementRetryPump, isRetryableFailure } from '@/lib/engagementRetryQueue';
@@ -156,9 +157,12 @@ function toSellerView(profile: any, fallbackId: string): SellerView {
     category: profile?.category ?? undefined,
     initials: initialsOf(brandName),
     verified: profile?.verified === true,
-    isOfficial: profile?.isOfficial === true,
-    avatarUrl: httpOrNull(profile?.profileImageUrl) ?? httpOrNull(profile?.avatarUrl)
-      ?? (profile?.isOfficial === true ? officialAvatarUri() : null),
+    isOfficial: profile?.isOfficial === true || isOfficialAccountId(profile?.clerkId),
+    // The official account always wears the bundled app mark — its stored
+    // avatar URL may be stale or broken, and the mark must match feed/comments/share.
+    avatarUrl: (profile?.isOfficial === true || isOfficialAccountId(profile?.clerkId))
+      ? (officialAvatarUri() ?? httpOrNull(profile?.profileImageUrl) ?? httpOrNull(profile?.avatarUrl))
+      : (httpOrNull(profile?.profileImageUrl) ?? httpOrNull(profile?.avatarUrl)),
     bannerUrl: httpOrNull(profile?.bannerUrl),
     vacationMode: Boolean(profile?.vacationMode),
     vacationMessage: profile?.vacationMessage ?? undefined,
@@ -184,7 +188,7 @@ export default function SellerProfileScreen() {
   const routeSellerId = params.id ?? params.sellerId;
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
-  const { requireSignIn } = useSignInGate();
+  const { requireSignIn, goToSignIn } = useSignInGate();
   const layout = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
   // Clears the floating buyer tab bar when this screen is reached from the
   // buyer shell (viewing a brand's public profile); a no-op elsewhere.
@@ -248,13 +252,7 @@ export default function SellerProfileScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canonicalSellerId, isOwner, userId]);
   const caps = profileCapabilities('seller', mode);
-  // A visited store opens on its Products ("Shop") tab — what a shopper came
-  // for. The owner still lands on Posts. Only until the viewer picks a tab.
-  const tabPickedRef = useRef(false);
-  useEffect(() => {
-    // Wait for auth so an owner never flashes onto Shop while signing in.
-    if (!tabPickedRef.current && authLoaded && canonicalSellerId && mode === 'visitor') setActiveTab('Shop');
-  }, [authLoaded, canonicalSellerId, mode]);
+  useProfilePostsDefault(setActiveTab, `${routeSellerId ?? 'own'}:${userId ?? ''}`);
   // Lookbook (Store Settings): visitors get the full-screen editorial swipe
   // when the seller turned it on; the owner's "Preview lookbook" forces it.
   // A visitor can still open the full store page from inside it.
@@ -473,7 +471,13 @@ export default function SellerProfileScreen() {
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleFollow = useCallback(async () => {
-    if (followPending || !canonicalSellerId) return;
+    if (followPending || !canonicalSellerId || !authLoaded) return;
+    // The signed-out developer preview must not invent a follow on a real
+    // official account. A real identity is required for server persistence.
+    if (seller?.isOfficial && !userId && !isPreviewDemoMode()) {
+      goToSignIn();
+      return;
+    }
     if (!requireSignIn()) return;
     const previous = { isFollowing, followers };
     const next = !isFollowing;
@@ -498,7 +502,7 @@ export default function SellerProfileScreen() {
     } finally {
       setFollowPending(false);
     }
-  }, [canonicalSellerId, followPending, followers, isFollowing, requireSignIn]);
+  }, [authLoaded, canonicalSellerId, followPending, followers, goToSignIn, isFollowing, requireSignIn, seller?.isOfficial, userId]);
 
   const handleShare = useCallback(() => {
     if (!seller) return;
@@ -793,7 +797,7 @@ export default function SellerProfileScreen() {
         <FollowMorphButton
           following={isFollowing}
           onChange={handleFollow}
-          disabled={previewAsVisitor || followPending || !canonicalSellerId || !userId}
+          disabled={previewAsVisitor || followPending || !canonicalSellerId || !authLoaded || (!userId && !seller?.isOfficial)}
           followLabel={followsMe ? 'Follow back' : 'Follow'}
           followingLabel={followsMe ? 'Friends' : 'Following'}
           followingIcon={followsMe ? 'users' : undefined}
@@ -916,7 +920,10 @@ export default function SellerProfileScreen() {
         // looping, poster first); otherwise the latest video.
         hero={coverFlow.hasCover
           ? { videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl }
-          : { videoUri: firstVideo?.mediaUris[0] ?? null, posterUri: heroPoster }}
+          // The official account's blank cover is plain black, never a post.
+          : seller?.isOfficial
+            ? { videoUri: null, posterUri: null, plain: true }
+            : { videoUri: firstVideo?.mediaUris[0] ?? null, posterUri: heroPoster }}
         banner={banner}
         onAddBanner={isOwner && !previewAsVisitor ? bannerFlow.openSheet : undefined}
         bannerNote={bannerNote}
@@ -947,7 +954,7 @@ export default function SellerProfileScreen() {
         tabs={{
           items: CONTENT_TAB_ITEMS,
           active: activeTab,
-          onChange: (key) => { hapticSelection(); tabPickedRef.current = true; setActiveTab(key === 'Shop' || key === 'Tagged' ? key : 'Posts'); },
+          onChange: (key) => { hapticSelection(); setActiveTab(key === 'Shop' || key === 'Tagged' ? key : 'Posts'); },
         }}
         data={gridData}
         renderItem={renderTile}

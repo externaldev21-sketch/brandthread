@@ -34,6 +34,8 @@ import { isPlatformImpersonationHandle } from "../lib/storeIdentity";
 import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant } from "../lib/publicProfile";
 import { matchesMutedWords } from "../lib/contentModerator";
 import { officialPostVisibleTo, publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
+import { serveOfficialAvatar } from "../lib/officialSeed/avatar";
+import { OFFICIAL_ACCOUNT_CLERK_ID } from "../lib/officialSeed/config";
 import { attachCredits } from "../lib/officialSeed/credit";
 import { blockedUserIds, isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
 import { viewerPostStates } from "../lib/viewerPostState";
@@ -735,11 +737,14 @@ router.get("/search", async (req, res): Promise<void> => {
         displayName: users.displayName,
         brandName:   users.brandName,
         username:    users.username,
+        avatarUrl: sql<string | null>`coalesce(${users.profileImageUrl}, ${users.avatarUrl})`,
+        isOfficial: users.isOfficialAccount,
         relevance:   relevanceScore(sql`COALESCE(${users.brandName}, ${users.displayName}, ${users.username}, '')`, term),
       }).from(users).where(
         and(
           eq(users.accountType, "seller"),
-          eq(users.isSystemAccount, false),
+          or(eq(users.isSystemAccount, false), eq(users.clerkId, OFFICIAL_ACCOUNT_CLERK_ID)),
+          officialPostVisibleTo(viewerId, users.clerkId),
           isNull(users.suspendedAt),
           isNull(users.deletedAt), isNull(users.deletionRequestedAt),
           notBlockedWith(viewerId, users.clerkId),
@@ -895,6 +900,9 @@ router.get("/search", async (req, res): Promise<void> => {
         color:    hashColor(s.clerkId),
         initials: mkInitials(name),
         sellerId: s.clerkId,
+        avatarUrl: s.avatarUrl,
+        imageUri: s.avatarUrl,
+        isOfficial: s.isOfficial === true,
       });
     }
 
@@ -1514,6 +1522,8 @@ router.get("/brands/featured", async (req, res) => {
 
 // ─── GET /api/public/sellers/:sellerId — public seller storefront ─────────────
 // Accepts either users.clerkId or users.id (UUID) for backward-/forward-compatibility.
+router.get("/brandthread/avatar", serveOfficialAvatar);
+
 router.get("/sellers/:sellerId", async (req, res) => {
   const { sellerId } = req.params;
 
@@ -1550,7 +1560,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
       coverMediaType: users.coverMediaType,
     })
     .from(users)
-    .where(eq(users.clerkId, canonicalClerkId))
+    .where(and(eq(users.clerkId, canonicalClerkId), officialPostVisibleTo(optionalViewerId(req), users.clerkId)))
     .limit(1);
 
   if (!sellerRow) return res.status(404).json({ error: "Seller not found" });
@@ -2009,6 +2019,7 @@ router.get("/posts", async (req, res) => {
         creditName:  posts.creditName,
         displayName: users.displayName,
         brandName:   users.brandName,
+        avatarUrl: sql<string | null>`coalesce(${users.profileImageUrl}, ${users.avatarUrl})`,
         username:    users.username,
         isOfficialAccount: users.isOfficialAccount,
         verified:    users.verified,
@@ -2127,6 +2138,7 @@ router.get("/posts", async (req, res) => {
         displayName: p.displayName,
         brandName:   p.brandName,
         username:    p.username ?? null,
+        avatarUrl: p.avatarUrl,
         verified:    deriveSellerVerified(p),
         isOfficial:  p.isOfficialAccount === true,
       },
@@ -2277,7 +2289,7 @@ router.get("/profiles/:username", async (req, res) => {
       })
       .from(users)
       // Case-insensitive lookup using the normalized form.
-      .where(sql`lower(${users.username}) = ${normalized}`)
+      .where(and(sql`lower(${users.username}) = ${normalized}`, officialPostVisibleTo(optionalViewerId(req), users.clerkId)))
       .limit(1);
 
     // Not found.
@@ -2315,7 +2327,7 @@ router.get("/profiles/:username", async (req, res) => {
       }
     }
 
-    const verified = deriveSellerVerified(user as any);
+    const verified = user.isOfficialAccount === true || deriveSellerVerified(user as any);
 
     res.json({
       id:          user.id,

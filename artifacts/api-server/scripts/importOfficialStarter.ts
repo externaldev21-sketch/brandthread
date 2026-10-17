@@ -15,6 +15,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { ObjectStorageService } from "../src/lib/objectStorage";
 import { setObjectAclPolicy } from "../src/lib/objectAcl";
 import { OFFICIAL_ACCOUNT_CLERK_ID } from "../src/lib/officialSeed/config";
+import { OFFICIAL_AVATAR_API_PATH, storeOfficialAvatar } from "../src/lib/officialSeed/avatar";
 import { publishOfficialStarterPost } from "../src/routes/posts";
 import { releaseHeldContent } from "../src/lib/reportTargets";
 
@@ -96,8 +97,9 @@ async function main() {
       throw new Error("Official account migration must be applied before importing.");
     }
     const avatarBytes = await readFile(resolve("artifacts/mobile/assets/images/brandthread-logo.png"));
-    const avatar = await store(avatarBytes, "image/png", "png", true);
-    await db.update(users).set({ avatarUrl: `${origin}${avatar}` }).where(eq(users.clerkId, ownerId));
+    await storeOfficialAvatar(avatarBytes);
+    await db.update(users).set({ avatarUrl: `${origin}${OFFICIAL_AVATAR_API_PATH}`, profileImageUrl: null })
+      .where(eq(users.clerkId, ownerId));
     await mkdir(join(source, "posters"), { recursive: true });
     for (let i = 0; i < 12; i++) {
       const video = i < 10;
@@ -105,9 +107,21 @@ async function main() {
       const first = video ? join(source, "videos", videos[i]) : join(source, folder, "1.jpg");
       const bytes = await readFile(first);
       const primary = `/objects/uploads/official-starter/${hash(bytes)}.${video ? "mp4" : "jpg"}`;
+      let publishedPrimary = primary;
+      if (video) {
+        try {
+          const original = await storage.getObjectEntityFile(primary);
+          const [metadata] = await original.getMetadata();
+          if (typeof metadata.metadata?.feedVideoRenditionPath === "string") {
+            publishedPrimary = metadata.metadata.feedVideoRenditionPath;
+          }
+        } catch (error) {
+          if ((error as Error).name !== "ObjectNotFoundError") throw error;
+        }
+      }
       const [already] = await db.select({ id: posts.id, mediaPaths: posts.mediaPaths }).from(posts)
         .where(and(eq(posts.userId, ownerId),
-          eq(posts.mediaUrl, `${origin}/api/posts/media/${primary.replace(/^\/objects\//, "")}`))).limit(1);
+          eq(posts.mediaUrl, `${origin}/api/posts/media/${publishedPrimary.replace(/^\/objects\//, "")}`))).limit(1);
       if (already) {
         // Repair the legacy publisher's primary-only URL list without making
         // a second post. Object paths remain the ownership-checked source.

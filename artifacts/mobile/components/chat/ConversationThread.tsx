@@ -43,6 +43,7 @@ import { PressableScale, StatusBadge, useUndoToast } from '@/components/Brandthr
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { isOfficialAccountId } from '@/lib/officialAccount';
 import { Chip } from '@/components/ui/Chip';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticSuccessAction, hapticSelection, hapticDestructiveConfirm, hapticToggle, hapticFollow } from '@/lib/haptics';
@@ -810,6 +811,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   // the same way agentTyping is for the agent thread, just from the OTHER
   // human participant's own typing signal instead of a client-local flag.
   const isAgentConv = !!conv?.isOfficial || participant?.userId === BRANDTHREAD_AGENT_USER_ID;
+  // Avatar only: the official @brandthread account always wears the bundled B mark.
+  const showOfficialMark = isAgentConv || isOfficialAccountId(participant?.userId);
   const statusLine = isAgentConv
     ? (agentTyping ? 'typing…' : 'AI assistant')
     : (conv?.otherTyping ? 'typing…' : (participant?.isOnline ? 'Active now' : statusLineFor(participant)));
@@ -2135,10 +2138,12 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? 12 : 2 }]}>
           {!isOwn && (
             isLastInGroup ? (
-              isAgentConv ? (
+              showOfficialMark ? (
                 <View style={[s.msgAvatar, s.msgAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
                   <BrandthreadLogo size={16} />
                 </View>
+              ) : participant?.avatarUri ? (
+                <CachedImage source={{ uri: participant.avatarUri }} style={s.msgAvatar} />
               ) : (
                 <View style={[s.msgAvatar, { backgroundColor: msg.fromColor }]}>
                   <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
@@ -2190,10 +2195,12 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
             aligned with it (s.msgOuter is alignItems: 'flex-end'). */}
         {!isOwn && (
           isLastInGroup ? (
-            isAgentConv ? (
+            showOfficialMark ? (
               <View style={[s.msgAvatar, s.msgAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
                 <BrandthreadLogo size={16} />
               </View>
+            ) : participant?.avatarUri ? (
+              <CachedImage source={{ uri: participant.avatarUri }} style={s.msgAvatar} />
             ) : (
               <View style={[s.msgAvatar, { backgroundColor: msg.fromColor }]}>
                 <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
@@ -2539,10 +2546,12 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
             >
               {participant && (
                 <View style={s.headerAvatarWrap} testID="conversation-avatar">
-                  {isAgentConv ? (
+                  {showOfficialMark ? (
                     <View style={[s.headerAvatarCircle, s.headerAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
                       <BrandthreadLogo size={18} />
                     </View>
+                  ) : participant.avatarUri ? (
+                    <CachedImage source={{ uri: participant.avatarUri }} style={s.headerAvatarCircle} testID="conversation-avatar-image" />
                   ) : (
                     <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
                       <Text style={s.headerAvatarInitials}>{participant.initials}</Text>

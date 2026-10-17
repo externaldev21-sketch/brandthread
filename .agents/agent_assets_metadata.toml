@@ -201,3 +201,423 @@ mtime_ms = 1792179795345
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/3852bf3d-4583-43e5-aad8-023a3a975f79/5ee104bb-2962-4610-b2ed-d7436b6b682a"
 storage_version_token = "1792179831564205"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "804EdcV2dk63iSD3-NrK4"
+uri = "file://.local/merge-audit/feed-media/video-cover-4x3-390x844.jpg"
+type = "image"
+title = "390 × 844 — full-screen video cover"
+description = "Actual feed renderer playing a controlled 4:3, browser-compatible rendition of the real @galoreyyz clip. Centered cover fills the viewport. The stored H.264 upload was not altered for this capture."
+logical_id = "e95e4735-348b-4009-9022-6185768a80e2"
+content_hash = "sha256:67f350ead5f0424968e01e91706ad5a593344ab73e3644adbb134f46fa270458"
+size = 41781
+mtime_ms = 1792182443625
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/e95e4735-348b-4009-9022-6185768a80e2/ba71e1ee-68cc-4b56-acce-a36480097da3"
+storage_version_token = "1792182926273879"
+content_type = "image/jpeg"
+
+[[outputs]]
+id = "fR6asc33Uj69sxrlm0w1s"
+uri = "file://.local/merge-audit/feed-media/photo-390x844.jpg"
+type = "image"
+title = "390 × 844 — 4:5 photo with blurred backdrop"
+description = "Actual carousel renderer with a controlled 4:5 source fixture derived from the Rae Urban Sport upload. Contain preserves the supplied image ratio; the same-photo blurred backdrop fills the remaining space. Stored originals remain untouched."
+logical_id = "9b159121-4faf-4287-a40d-931437a49800"
+content_hash = "sha256:71590a3016dbdbe32e89cb24f9d0b9a3db0eeb527bf906b8b0cbdf4bed48a5c1"
+size = 67210
+mtime_ms = 1792182873260
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/9b159121-4faf-4287-a40d-931437a49800/2ae753be-ec24-44d2-abad-7d1b0c5c6d64"
+storage_version_token = "1792182926969523"
+content_type = "image/jpeg"
+
+[[outputs]]
+id = "rvQxnBDQJo_yEROCWlpFG"
+uri = "file://.local/merge-audit/feed-media/rail-rest-390x844.jpg"
+type = "image"
+title = "Action rail — rest"
+description = "390 × 844 browser capture. Zero counts are hidden; the unsaved bookmark is open."
+logical_id = "f46854c7-e9f2-45ee-9716-f7b11dee0e37"
+content_hash = "sha256:972d888e107d83a3650b1a28783cc3d6ce309173231cff64ea44867c1741d8af"
+size = 35973
+mtime_ms = 1792185698367
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/f46854c7-e9f2-45ee-9716-f7b11dee0e37/7f9c37fe-ab0c-40f5-a429-c1434f518b5d"
+storage_version_token = "1792185821774579"
+content_type = "image/jpeg"
+
+[[outputs]]
+id = "XJZ2hjTn0jJ1TOnig9W3P"
+uri = "file://.local/merge-audit/feed-media/rail-active-fixture-390x844.jpg"
+type = "image"
+title = "Liked, saved and reposted — visual fixture"
+description = "390 × 844 browser-only state fixture. No fake engagement was written to the app database; persistence is verified separately through API integration tests."
+logical_id = "b6a8bc0c-4e19-40cb-885c-ae2b127514c2"
+content_hash = "sha256:95de9aa029d3c9fd474b07628613d9466e0e4ec6ef8dea76d5ef0199fda49351"
+size = 37112
+mtime_ms = 1792185729083
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/b6a8bc0c-4e19-40cb-885c-ae2b127514c2/71d39913-3ade-4a27-8efa-258432ff9faf"
+storage_version_token = "1792185822778975"
+content_type = "image/jpeg"
+
+[[outputs]]
+id = "pF-c4PqrTT0npKlyjDxfe"
+uri = "file://.local/merge-audit/feed-media/rail-comments-390x844.jpg"
+type = "image"
+title = "Comments sheet"
+description = "390 × 844 anonymous-preview capture. The real comments endpoint loads and the video continues playing behind the dimmed sheet; posting requires sign-in."
+logical_id = "4b3dff60-bb19-40ee-b4a8-4c25e1adfe29"
+content_hash = "sha256:f77de9bfa57961b41142b74add9d813d488b4aaa970fde7aab6c2298edd2d050"
+size = 16226
+mtime_ms = 1792185700647
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/4b3dff60-bb19-40ee-b4a8-4c25e1adfe29/5034c741-92b1-4834-99f2-0f18bde16754"
+storage_version_token = "1792185825562660"
+content_type = "image/jpeg"
+
+[[outputs]]
+id = "jgTEykoxP4TtqJFmkkctU"
+uri = "file://.local/merge-audit/feed-media/rail-share-390x844.jpg"
+type = "image"
+title = "Share sheet"
+description = "390 × 844 anonymous-preview capture. Recent DM recipients and permitted video saving appear for eligible signed-in users."
+logical_id = "60f9fcfd-d305-4a0b-a339-df899b1a8615"
+content_hash = "sha256:807d2eac4d9fb7e69fb822f880fec833b95fd3b9726dc1e44949649485707db3"
+size = 21309
+mtime_ms = 1792185703531
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/60f9fcfd-d305-4a0b-a339-df899b1a8615/0cbc4bba-39f7-469c-8db9-49a40b4be62c"
+storage_version_token = "1792185826399149"
+content_type = "image/jpeg"
+
+[[outputs]]
+id = "IO-rwAuZQV52NHB00bQsl"
+uri = "file://.local/merge-audit/live-edge/header-live-2x-crop.png"
+type = "image"
+title = "LIVE header — 2× crop"
+description = "780 × 148 crop of the buyer feed header. The complete LIVE word is visible, centered in the thin red edge tab."
+logical_id = "c06f7653-0d36-4f0c-847a-41fef1e5568f"
+content_hash = "sha256:0e8d149c54045de738aa4affaa268ec3e3e5a25050a77362e14b0f940c3ff758"
+size = 7367
+mtime_ms = 1792186642648
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/c06f7653-0d36-4f0c-847a-41fef1e5568f/f955ad33-434b-4e68-a769-39de02e34ec7"
+storage_version_token = "1792186661255818"
+content_type = "image/png"
+
+[[outputs]]
+id = "KGdJzU9yOwu3QOckCGj18"
+uri = "file://.local/merge-audit/carousel/mid-swipe-390x844.png"
+type = "image"
+title = "Carousel: mid-swipe · 390×844"
+description = "Two real photos during a horizontal swipe, with the counter and dots updating."
+logical_id = "95187a75-93f8-4876-a45a-2c5079fd5094"
+content_hash = "sha256:af22f53c691bbc323ae2b79657593af3a0bbfdc7578d488e2aed3be36c4ffd1c"
+size = 459678
+mtime_ms = 1792189156013
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/95187a75-93f8-4876-a45a-2c5079fd5094/f4799ca9-8868-411a-9ff6-de98ebadfe51"
+storage_version_token = "1792189337494604"
+content_type = "image/png"
+
+[[outputs]]
+id = "VDM1EhK3kZ_RsS4uiFwBb"
+uri = "file://.local/merge-audit/carousel/pinch-zoom-390x844.png"
+type = "image"
+title = "Feed: lifted pinch zoom · 390×844"
+description = "The real photo zooms above the feed UI, then springs home on release."
+logical_id = "f6616662-862c-4ef6-8978-692de339dc5d"
+content_hash = "sha256:db607ecbd7133ff17fd093926bac0e45148cf0890843ac4cdbb9a61de676f866"
+size = 456613
+mtime_ms = 1792189157785
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/f6616662-862c-4ef6-8978-692de339dc5d/2d094308-ad39-4f7f-ad30-1abbe1b64efb"
+storage_version_token = "1792189338594131"
+content_type = "image/png"
+
+[[outputs]]
+id = "CZ-EzvXLNqnwWbGAtwrVi"
+uri = "file://.local/merge-audit/carousel/dots-jump-390x844.png"
+type = "image"
+title = "Carousel: dot selects photo 5 · 390×844"
+description = "Tapping a dot selects photo 5 of 6, with the photo at its natural ratio and the blurred backdrop."
+logical_id = "f75ad131-aabb-444c-b1c9-416604bafd4c"
+content_hash = "sha256:e9e4688e924c356b60bdc5e31e87cd6ec6e5db18c6ca675c3ad5d54660f68c45"
+size = 451245
+mtime_ms = 1792189159621
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/f75ad131-aabb-444c-b1c9-416604bafd4c/f7cba582-d99e-44e0-a006-a6697a343243"
+storage_version_token = "1792189339477776"
+content_type = "image/png"
+
+[[outputs]]
+id = "axkBj985TMDykcNGBSWby"
+uri = "file://.local/merge-audit/carousel/viewer-persistent-zoom-390x844.png"
+type = "image"
+title = "Viewer: zoom retained · 390×844"
+description = "The full-screen post viewer retains zoom after release and allows panning."
+logical_id = "5634d781-9f2d-4f71-b59f-56c74526befe"
+content_hash = "sha256:89c34ff474b3da3065aa625a99938c6f98bdd0426f876b2ef07fad47038e81f6"
+size = 295883
+mtime_ms = 1792189169413
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/5634d781-9f2d-4f71-b59f-56c74526befe/fbea34b4-e748-4fb8-8d45-ac9ccae99df7"
+storage_version_token = "1792189340274671"
+content_type = "image/png"
+
+[[outputs]]
+id = "ELzKbzVvKk2s1EGLFtRLE"
+uri = "file://.local/merge-audit/official-profile/profile-390x844.png"
+type = "image"
+title = "@brandthread profile — 390×844"
+description = "Real silver B, plain black cover, Official identity, real counts and enabled Follow. Browser capture, no demo data."
+logical_id = "42ada482-11b2-4c0e-8322-029fd106a4f1"
+content_hash = "sha256:79484bafe0535ba8c3e64ae00acb4cc32b10050f00cb6370da8a889f95449720"
+size = 61496
+mtime_ms = 1792191357348
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/42ada482-11b2-4c0e-8322-029fd106a4f1/e608b9c0-5c1b-4a62-87c0-9e54d7feb905"
+storage_version_token = "1792191431866047"
+content_type = "image/png"
+
+[[outputs]]
+id = "nUCeJRSekBDwOqJ9YRyW1"
+uri = "file://.local/merge-audit/official-profile/all-12-posts-390x844.png"
+type = "image"
+title = "@brandthread — all 12 real posts"
+description = "390×844 browser capture: 10 video posters and 2 six-photo carousels, newest first. All 12 tiles are fully visible."
+logical_id = "b9551894-c64f-4151-bd1b-1e1971f917f8"
+content_hash = "sha256:4100507b472df75a04c4b4624de3834bda2188ea78e4a2c900617efe59dbe136"
+size = 432111
+mtime_ms = 1792191358924
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/b9551894-c64f-4151-bd1b-1e1971f917f8/65e48f71-fc97-4af8-a021-90a48599694b"
+storage_version_token = "1792191432657037"
+content_type = "image/png"
+
+[[outputs]]
+id = "mN4CoFI3_dSYeQbdhxRGm"
+uri = "file://.local/performance/brandthread-navigation-performance.csv"
+type = "table"
+title = "Brandthread performance: 29-screen before/after comparison"
+description = "Nine tabs and twenty common screens, three samples each at 390×844. Includes JS stalls and regressions. Minified production-web navigation-settle measurements—not iPhone/Hermes first-paint results."
+logical_id = "b70d7ff8-8c1e-43f9-aaeb-20dd9e2cd9f9"
+content_hash = "sha256:62fd7f5e85b1a4ec08668a61383cdb6fe1376a033889c8994cef281398977612"
+size = 7498
+mtime_ms = 1792195393138
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/b70d7ff8-8c1e-43f9-aaeb-20dd9e2cd9f9/a789ef67-9786-491d-a20e-6df60c55d80a"
+storage_version_token = "1792195889453804"
+content_type = "text/csv"
+
+[[outputs]]
+id = "euaaF-fj_ISle6pVuCxbM"
+uri = "file://.local/performance/native-targets.csv"
+type = "table"
+title = "Performance acceptance — all 29 destinations"
+description = "Per-tab/per-screen results for ≤16ms feedback, <100ms cached layout, <300ms fresh layout, ≤50ms JS stalls, 60fps and 120fps. Native targets are UNVERIFIED and fail acceptance until device evidence exists; browser proxy timings are labeled separately."
+logical_id = "91930084-f297-4ac9-9a32-fab77ed1dd61"
+content_hash = "sha256:249f7be2fdc2322d4ad8e80d5431df04d89044097257c9ec77c75c22ba52b05a"
+size = 7180
+mtime_ms = 1792203795053
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/91930084-f297-4ac9-9a32-fab77ed1dd61/e5dfbf65-979c-4487-82b4-d2b1604e5a51"
+storage_version_token = "1792204054060767"
+content_type = "text/csv"
+
+[[outputs]]
+id = "NzmveqnZqQAVzYhGAPlwl"
+uri = "file://.local/performance/official-video-playback-results.csv"
+type = "table"
+title = "Playback checks for all 12 official posts"
+description = "All 12 pass delivery checks; all 10 videos decode and play in Chromium. Native iPhone playback and timing remain unverified."
+logical_id = "6d6c2966-e575-443f-b033-e89c14d31bf2"
+content_hash = "sha256:e13706d9396796e1e8fd8d0e740aba8ed7c71effa140022840e65cc7c2c17c43"
+size = 1249
+mtime_ms = 1792207170516
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/6d6c2966-e575-443f-b033-e89c14d31bf2/43f88139-9ee2-4094-b258-c46c017998b5"
+storage_version_token = "1792207758994632"
+content_type = "text/csv"
+
+[[outputs]]
+id = "DSt4enVPdWjsfIIqUXwlr"
+uri = "file://.local/performance/video-feed-playing-390x844.png"
+type = "image"
+title = "Threads feed playing at 390 × 844"
+description = "Actual uploaded H.264 video in the development web feed, not an iPhone capture or placeholder."
+logical_id = "1b97712c-2b89-49bb-8fe6-371372d1c7a1"
+content_hash = "sha256:782bbf80c6593f38eb485aa6e35f66f1da9e32ce1c2c1369f066f6292f2b573b"
+size = 233022
+mtime_ms = 1792207430064
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/1b97712c-2b89-49bb-8fe6-371372d1c7a1/a76ddeee-382f-43aa-ae29-5224aa2e46af"
+storage_version_token = "1792207760115782"
+content_type = "image/png"
+
+[[outputs]]
+id = "ILcpqRQANQyG5TdQCQSsa"
+uri = "file://.local/performance/rail-tiktok-comparison.png"
+type = "image"
+title = "Threads rail — Brandthread beside TikTok"
+description = "Actual 390×844 Brandthread web capture beside a proportionally scaled TikTok screenshot from https://blog.hootsuite.com/how-to-use-tiktok/. Brandthread retains its extra Repost action. Measured 32pt glyphs, 3pt count gap, 15pt group gap and 20pt avatar-to-Like gap; all five real counts show 0."
+logical_id = "0220695d-a1f0-480b-a45c-5bb4ca9676a6"
+content_hash = "sha256:abe5971529ef3e52cc555d86ccdc69785fe45bb2074059a673eda857eb8823c2"
+size = 953538
+mtime_ms = 1792210863921
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/0220695d-a1f0-480b-a45c-5bb4ca9676a6/5dcbde0b-9b0c-4647-9f71-d6fc5b3a7a9d"
+storage_version_token = "1792210915571806"
+content_type = "image/png"
+
+[[outputs]]
+id = "r8aAcrqHad88ie9GlFfCu"
+uri = "file://.local/performance/rail-photo-390x844.png"
+type = "image"
+title = "Photo carousel — compact action rail"
+description = "390×844 web capture showing the same compact rail and visible zero counts on a real @brandthread carousel."
+logical_id = "19974f3b-3224-4be7-acc7-7e9451f85ee4"
+content_hash = "sha256:8b383b6302b63aa854b07846fb2d0ca30fab152a1bd1d0ca5ed388cd7dc05aae"
+size = 449426
+mtime_ms = 1792210859265
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/19974f3b-3224-4be7-acc7-7e9451f85ee4/f1ccfe41-96f7-4e93-bbf4-668acbef9126"
+storage_version_token = "1792210916350199"
+content_type = "image/png"
+
+[[outputs]]
+id = "YwPQYcv42C_xyixYH7n8K"
+uri = "file://.local/performance/mobbin-evidence/rail-comparison.png"
+type = "image"
+title = "Threads rail · Brandthread vs TikTok"
+description = "390×844 public web capture beside the supplied Mobbin TikTok reference. Filled controls, compact spacing and real zero counts; signed-in like/repost states are not shown."
+logical_id = "8bee0b5a-d42a-4b15-9351-196ffc794d4a"
+content_hash = "sha256:c7415239eb7251e30674dfc717b5c10045eb9af06d06be20cf5d491788b2ba6e"
+size = 1093669
+mtime_ms = 1792215632992
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/8bee0b5a-d42a-4b15-9351-196ffc794d4a/f2d202ef-f374-4b3e-8231-e7ab8c3a5790"
+storage_version_token = "1792215710033971"
+content_type = "image/png"
+
+[[outputs]]
+id = "Je-JexBv4hGt1j8VuCT3i"
+uri = "file://.local/performance/mobbin-evidence/comments-comparison.png"
+type = "image"
+title = "Comments sheet · Brandthread vs TikTok"
+description = "Actual public comments sheet with zero real comments, beside Mobbin. The video continues playing behind it; authenticated composer and populated replies are not verified in this screenshot."
+logical_id = "63661d95-7b91-4530-b3a6-76955c7adbb1"
+content_hash = "sha256:79febfe42cd7a3d2ebec44146d3e6d288a378d8fdf4b547082ffe8a4bff6c845"
+size = 346009
+mtime_ms = 1792215635168
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/63661d95-7b91-4530-b3a6-76955c7adbb1/b0e89fa5-3c6b-4013-9dbf-740916d182c3"
+storage_version_token = "1792215710941745"
+content_type = "image/png"
+
+[[outputs]]
+id = "zYcLzar1gBHlwh1XT4Xxl"
+uri = "file://.local/performance/mobbin-evidence/favorites-comparison.png"
+type = "image"
+title = "New collection · Brandthread vs TikTok"
+description = "Actual New collection form at 390×844 beside Mobbin, with the 5/30 counter and Make public switch. Saving requires authentication; this capture does not claim a collection was created."
+logical_id = "02413c9f-09fd-453c-84e1-98833a38da25"
+content_hash = "sha256:49a7e114a21f14b64770e12462303e83d215249bcd5a84472b7e73edf08865bd"
+size = 423296
+mtime_ms = 1792215639560
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/02413c9f-09fd-453c-84e1-98833a38da25/bf9ff67f-bb70-4e7e-8904-2ca862df26df"
+storage_version_token = "1792215711777733"
+content_type = "image/png"
+
+[[outputs]]
+id = "sPhRPL1h1HHosJ6U2LUQI"
+uri = "file://.local/performance/mobbin-evidence/share-comparison.png"
+type = "image"
+title = "Share sheet · Brandthread vs TikTok"
+description = "Actual compact three-row Send to sheet beside Mobbin. Recent DM contacts and restricted downloads are not fabricated; authenticated delivery remains to be checked."
+logical_id = "f1beb3fd-b9f9-488c-884c-a167715357b9"
+content_hash = "sha256:add283a515584abae2b756c0fce7822d494ef5d408be5cb6d80678f8be8945f3"
+size = 569772
+mtime_ms = 1792215637320
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/f1beb3fd-b9f9-488c-884c-a167715357b9/2e1d13c1-72f5-4594-8b11-59106403ffb9"
+storage_version_token = "1792215712977142"
+content_type = "image/png"
+
+[[outputs]]
+id = "JLdO9XVsod32q7JfKyzyV"
+uri = "file://.local/performance/feed-layout-evidence/rest-comparison.png"
+type = "image"
+title = "Threads feed at rest"
+description = "390×844 live web capture beside the supplied TikTok iOS/Mobbin reference."
+logical_id = "5fa9fdf9-b437-44e9-bca4-54eb787a644b"
+content_hash = "sha256:74dfa2cc0ee8ead27cbc4108f0257be22c9f81bc764af5afb0d7d9022113e530"
+size = 1426950
+mtime_ms = 1792242911228
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/5fa9fdf9-b437-44e9-bca4-54eb787a644b/ed2c7e42-7490-454f-a6e9-f55c8aff7a11"
+storage_version_token = "1792243114872346"
+content_type = "image/png"
+
+[[outputs]]
+id = "dfjvEVdVkwJLgnFuXjCBg"
+uri = "file://.local/performance/feed-layout-evidence/mid-swipe-comparison.png"
+type = "image"
+title = "Threads feed during a swipe"
+description = "Actual held touch drag beside a frame from the Watching videos sequence."
+logical_id = "32b4a1d4-d7d3-4d94-8541-fe65ce0157d9"
+content_hash = "sha256:508261232e08e5e1e431463693232af6ac3d5cfb9f5fac53d5e26f65010cac33"
+size = 872513
+mtime_ms = 1792242912768
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/32b4a1d4-d7d3-4d94-8541-fe65ce0157d9/730eba72-f7dd-4c1b-ba4a-72c04e9e12fa"
+storage_version_token = "1792243115717329"
+content_type = "image/png"
+
+[[outputs]]
+id = "d-1DxL_6pMdqCYaKOX7r2"
+uri = "file://.local/performance/feed-layout-evidence/paused-comparison.png"
+type = "image"
+title = "Paused video"
+description = "Actual pause affordance beside the supplied Watching videos reference."
+logical_id = "3dd572c3-03dc-449f-be71-4addfdd9217e"
+content_hash = "sha256:3885661b3254609ff64dbac12cad20d8cdffa7d18b47f23f8527aa9c00f45ba1"
+size = 1432342
+mtime_ms = 1792242915912
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/3dd572c3-03dc-449f-be71-4addfdd9217e/221942d4-4d1b-4abf-b3ec-0351e3010891"
+storage_version_token = "1792243116583893"
+content_type = "image/png"
+
+[[outputs]]
+id = "xBjZNi-SY6GGAOLooitlt"
+uri = "file://.local/performance/feed-layout-evidence/long-press.png"
+type = "image"
+title = "Long-press video options"
+description = "Actual 390×844 app state. The supplied watching flow has no matching long-press menu frame."
+logical_id = "7a9f1f87-0eb9-4774-9206-731f4df96899"
+content_hash = "sha256:edd65a942608756e2431f084e91690b5b1b5e72fdf632ce47ca99bf4affee18a"
+size = 170054
+mtime_ms = 1792242917300
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/7a9f1f87-0eb9-4774-9206-731f4df96899/fa62a694-d12f-467f-b4ff-168397d6c55f"
+storage_version_token = "1792243117199674"
+content_type = "image/png"
+
+[[outputs]]
+id = "kyuHSHi-vaI_kCMmY9EdU"
+uri = "file://.local/performance/feed-layout-evidence/following-empty-comparison.png"
+type = "image"
+title = "Following: real creator preview"
+description = "Actual @brandthread card with one muted, playing video preview beside TikTok’s Trending creators reference."
+logical_id = "0fdc4a8a-970a-4b96-859c-c8f766664b96"
+content_hash = "sha256:15d35eff2c9607f9047c93bcdf8d0ff5bce25545cb999505bdec53295fed441b"
+size = 368214
+mtime_ms = 1792242921276
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/0fdc4a8a-970a-4b96-859c-c8f766664b96/e73bacd5-745b-4ceb-825d-4320e2427bb0"
+storage_version_token = "1792243117925038"
+content_type = "image/png"
+
+[[outputs]]
+id = "WomBj8oAA_IDKbAN_vgzy"
+uri = "file://.local/performance/rail-correction-comparison.png"
+type = "image"
+title = "Action rail — Brandthread beside TikTok"
+description = "Actual 390×844 web capture next to Mobbin’s Liking a video frame. Verified 59pt action rhythm, 16pt avatar gap, visible zero counts and Share/caption alignment."
+logical_id = "295b0c78-e40a-4c45-8985-188af2cd964b"
+content_hash = "sha256:330bc4bb2bef86ff12e1137df186906d693535f1917d383db6cefc16cd0e8e3a"
+size = 1258861
+mtime_ms = 1792243689792
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/295b0c78-e40a-4c45-8985-188af2cd964b/8d152725-48d2-4626-b6ec-41e32849e6d7"
+storage_version_token = "1792243773376218"
+content_type = "image/png"
+
+[[outputs]]
+id = "7ChMsakIQsgfK-fDjBNlg"
+uri = "file://.local/performance/rail-correction-390x844.png"
+type = "image"
+title = "Action rail — 390×844"
+description = "Unedited app screenshot with real post data and visible counts."
+logical_id = "e2ad0687-390c-4632-a27f-25e482a1848b"
+content_hash = "sha256:2b89cb8c8083b5693baeea1fe6e36c190e114154bf0ca3cd37501a13e6a59e72"
+size = 407693
+mtime_ms = 1792243688380
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/e2ad0687-390c-4632-a27f-25e482a1848b/e6763759-7e1f-456d-9bba-4a518e8dfad1"
+storage_version_token = "1792243774415466"
+content_type = "image/png"

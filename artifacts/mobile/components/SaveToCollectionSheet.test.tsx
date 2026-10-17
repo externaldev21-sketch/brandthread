@@ -97,3 +97,74 @@ describe('SaveToCollectionSheet orchestration', () => {
     expect(mockMoveSavedItemToCollection).not.toHaveBeenCalled();
   });
 });
+
+vi.mock('@clerk/expo', () => ({ useAuth: () => ({ userId: 'u1', isSignedIn: true }) }));
+vi.mock('@/components/BrandthreadUI', () => ({ HapticSwitch: () => null }));
+vi.mock('@/components/ui/BottomSheet', () => ({ Sheet: () => null }));
+vi.mock('@/components/ui/Icon', () => ({ Icon: () => null }));
+vi.mock('@/lib/haptics', () => ({ hapticError: vi.fn() }));
+
+describe('SaveToCollectionSheet real helpers', () => {
+  beforeEach(() => {
+    mockCreateCollection.mockReset(); mockSaveItem.mockReset(); mockMoveSavedItemToCollection.mockReset();
+  });
+
+  it('creates atomically with private default visibility and trims/caps name', async () => {
+    const { createAndFile } = await import('./SaveToCollectionSheet');
+    mockCreateCollection.mockResolvedValue({ id: 'c9', name: 'x' });
+    mockSaveItem.mockResolvedValue({}); mockMoveSavedItemToCollection.mockResolvedValue({});
+    await createAndFile(ITEM, '  ' + 'a'.repeat(40) + ' ', false, () => true);
+    expect(mockCreateCollection).toHaveBeenCalledWith('a'.repeat(30), { isPublic: false });
+    expect(mockMoveSavedItemToCollection).toHaveBeenCalledWith('prod_1', 'c9');
+  });
+
+  it('passes isPublic=true when toggled', async () => {
+    const { createAndFile } = await import('./SaveToCollectionSheet');
+    mockCreateCollection.mockResolvedValue({ id: 'c9', name: 'x' });
+    mockSaveItem.mockResolvedValue({}); mockMoveSavedItemToCollection.mockResolvedValue({});
+    await createAndFile(ITEM, 'Fits', true, () => true);
+    expect(mockCreateCollection).toHaveBeenCalledWith('Fits', { isPublic: true });
+  });
+
+  it('rejects empty names without any request', async () => {
+    const { createAndFile } = await import('./SaveToCollectionSheet');
+    await expect(createAndFile(ITEM, '   ', false, () => true)).rejects.toThrow();
+    expect(mockCreateCollection).not.toHaveBeenCalled();
+  });
+
+  it('stops filing when the account switches mid-flight', async () => {
+    const { fileItemInto, StaleAccountError } = await import('./SaveToCollectionSheet');
+    let current = true;
+    mockSaveItem.mockImplementation(async () => { current = false; return {}; });
+    await expect(fileItemInto(ITEM, 'c1', () => current)).rejects.toBeInstanceOf(StaleAccountError);
+    expect(mockMoveSavedItemToCollection).not.toHaveBeenCalled();
+  });
+
+  it('makes no request when signed out (no bound account)', async () => {
+    const { fileItemInto } = await import('./SaveToCollectionSheet');
+    await expect(fileItemInto(ITEM, null, () => false)).rejects.toThrow();
+    expect(mockSaveItem).not.toHaveBeenCalled();
+  });
+
+  it('retry after filing failure reuses the created collection (create called once)', async () => {
+    const { createAndFile } = await import('./SaveToCollectionSheet');
+    mockCreateCollection.mockResolvedValue({ id: 'c7', name: 'Fits' });
+    mockSaveItem.mockRejectedValueOnce(new Error('net')).mockResolvedValue({});
+    mockMoveSavedItemToCollection.mockResolvedValue({});
+    let pending: unknown = null;
+    await expect(createAndFile(ITEM, 'Fits', false, () => true, null, (c) => { pending = c; })).rejects.toThrow('net');
+    expect(pending).toEqual({ id: 'c7', name: 'Fits' });
+    const done = await createAndFile(ITEM, 'Fits', false, () => true, pending as never);
+    expect(done.id).toBe('c7');
+    expect(mockCreateCollection).toHaveBeenCalledTimes(1);
+    expect(mockMoveSavedItemToCollection).toHaveBeenCalledWith('prod_1', 'c7');
+  });
+
+  it('does not file into a created collection after an account switch', async () => {
+    const { createAndFile, StaleAccountError } = await import('./SaveToCollectionSheet');
+    let current = true;
+    mockCreateCollection.mockImplementation(async () => { current = false; return { id: 'c8', name: 'x' }; });
+    await expect(createAndFile(ITEM, 'x', false, () => current)).rejects.toBeInstanceOf(StaleAccountError);
+    expect(mockSaveItem).not.toHaveBeenCalled();
+  });
+});

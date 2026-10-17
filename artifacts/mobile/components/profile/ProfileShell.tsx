@@ -122,7 +122,7 @@ export interface ProfileShellProps<T> {
   tabsVariant?: 'labeled' | 'iconOnly';
   /** Directly under the tab bar, above the grid (e.g. a sub-filter for the active tab). */
   belowTabs?: React.ReactNode;
-  hero: { videoUri?: string | null; posterUri?: string | null };
+  hero: { videoUri?: string | null; posterUri?: string | null; plain?: boolean };
   /** TikTok-style profile banner; when set it replaces the hero / video header. */
   banner?: ProfileBanner | null;
   /**
@@ -507,7 +507,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
       {/* ── Hero ── */}
       <View style={[styles.hero, { height: heroHeight }]}>
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateY: heroTranslate }, { scale: heroScale }] }]}>
-          <ProfileHeroMedia videoUri={hero.videoUri} posterUri={hero.posterUri} active={heroActive} height={heroHeight} posterOnly={heroPosterOnly} />
+          <ProfileHeroMedia videoUri={hero.videoUri} posterUri={hero.posterUri} active={heroActive} height={heroHeight} posterOnly={heroPosterOnly} plain={!!hero.plain} />
         </Animated.View>
         <LinearGradient
           pointerEvents="none"

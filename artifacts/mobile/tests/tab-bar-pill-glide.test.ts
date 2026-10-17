@@ -116,9 +116,11 @@ describe('tab bar pill glide', () => {
     expect(buyerBar).toMatch(/const pressSlot = React\.useCallback\(\(index: number\) => \{\s*onProfile\.set\(false\);\s*pressIndicator\(index\);/);
   });
 
-  it('runs both bars\' tab navigation through afterGlide', () => {
+  it('preserves seller glide coordination without delaying buyer navigation', () => {
     expect(sellerBar).toMatch(/afterGlide\(\(\) => \{\s*if \(onPushedScreen/);
-    expect(buyerBar).toContain('afterGlide(() => navigation.navigate(routeName as never))');
+    expect(buyerBar).toContain('navigation.navigate(routeName as never)');
+    expect(buyerBar).not.toContain('afterGlide(');
+    expect(buyerBar).not.toContain('profileResizeAt');
     expect(parts).toContain("if (Platform.OS !== 'web' || reduceMotion)");
   });
 });

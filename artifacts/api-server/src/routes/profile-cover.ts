@@ -42,6 +42,7 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
+import { disconnectSafeStorageStream } from "../lib/disconnectSafeStorageStream";
 import { promisify } from "node:util";
 import { db, users } from "@workspace/db";
 import { eq, or, sql } from "drizzle-orm";
@@ -574,7 +575,7 @@ export function createProfileCoverRouter({
       res.setHeader("Content-Type", String(metadata.contentType ?? "application/octet-stream"));
       res.setHeader("Content-Length", String(end - start + 1));
       res.setHeader("Cache-Control", "public, max-age=3600");
-      await pipeline(file.createReadStream({ start, end }), res);
+      await pipeline(disconnectSafeStorageStream(file.createReadStream({ start, end })), res);
       return;
     } catch {
       if (res.headersSent) { res.destroy(); return; }

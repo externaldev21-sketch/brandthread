@@ -45,6 +45,7 @@ import { useProfileNote } from '@/components/profile/useProfileNote';
 import { ProfileStoriesRow } from '@/components/profile/ProfileStoriesRow';
 import { ProfileBrandsRow } from '@/components/profile/ProfileBrandsRow';
 import { useProfileBrands } from '@/hooks/useProfileBrands';
+import { useProfilePostsDefault } from '@/hooks/useProfilePostsDefault';
 import { highlightFromServer, type Highlight } from '@/lib/highlightsService';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
@@ -163,6 +164,7 @@ export default function BuyerOtherProfileScreen() {
   // from the owner's explicit "View as visitor" preview.
   const mode = resolveProfileMode({ viewerId: currentUserId, ownerId: canonicalReady ? canonicalUserId : null, previewAsVisitor });
   const [activeTab, setActiveTab] = useState<ContentTab>('Posts');
+  useProfilePostsDefault(setActiveTab, `${params.userId ?? ''}:${currentUserId ?? ''}`);
   const [snackbar, setSnackbar] = useState('');
   const devPreview = isBuyerDevPreview() || isSellerDevPreview();
   const tagged = useTaggedPosts(canonicalReady ? canonicalUserId : null, activeTab === 'Tagged' && !!currentUserId && !devPreview && !iBlockedThem);

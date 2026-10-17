@@ -28,3 +28,9 @@ Focus listeners must use the same navigation context instance as the active rout
 Capture development console errors as well as page exceptions during performance tests. React invalid nested-button warnings can create an Expo error overlay that intercepts subsequent navigation taps even without a page exception. Repeated locale formatting in large list grouping can also dominate CPU and garbage collection; reuse formatters and format per bucket rather than per record.
 
 **Why:** Browser profiling distinguished these preview-specific costs from network latency.
+
+Evaluate inactive-screen optimizations by return-navigation latency as well as background CPU. Do not retain a freezing strategy just because it suspends hidden work.
+
+**Why:** Production-web profiling found that suspension could trade background savings for a burst of layout measurements when a retained feed resumed. Native and browser retention costs were not interchangeable.
+
+**How to apply:** Compare cold, warm and first-return interactions on the same runtime and scenario. Keep native transition coordination separate from browser DOM retention, and report regressions rather than assuming freezing is always a speedup.

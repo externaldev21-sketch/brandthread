@@ -26,6 +26,7 @@ import {
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { useProfilePostsDefault } from '@/hooks/useProfilePostsDefault';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
@@ -299,6 +300,7 @@ export default function ProfileScreen() {
   const [savedItems, setSavedItems] = useStickyState<SavedItem[]>('buyerProfile:saved', []);
   const [, setPrivacySettings] = useState<PrivacySettings | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('Posts');
+  useProfilePostsDefault(setActiveTab, user?.id);
   const [refreshing, setRefreshing] = useState(false);
   const [avatarUri, setAvatarUri] = useStickyState<string | null>('buyerProfile:avatarUri', null);
   // Set only when the buyer has a moving profile picture — the poster frame

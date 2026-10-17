@@ -55,20 +55,76 @@ export interface RepostFriend {
 // used to hardcode its own clearance and drifted out of sync with this
 // block, letting the drag-time bubble render behind the sound/mute pill.
 export const CAPTION_BLOCK_HEIGHT = 56;
-// Captions show in full up to 3 lines; only longer ones get "more" (S5 #93).
+// Captions show 2 lines; longer ones get "more"/"less" (TikTok, Mobbin watch-1/2).
 // ~43 characters fill one line of this block on a 390pt phone.
-const CAPTION_LINES = 3;
-const CAPTION_MORE_CHARS = 43 * CAPTION_LINES;
+import { CAPTION_LINES, captionNeedsMore } from './captionLayout';
+export { captionNeedsMore } from './captionLayout';
 export const CAPTION_BLOCK_HEIGHT_WITH_REPOST = 92;
+
+/**
+ * Two-line caption with an explicit, always-visible "… more" control.
+ * A hidden copy of the full caption is laid out at the real width and
+ * font scale (onTextLayout); when it needs more than 2 lines, line 1 and
+ * the rest are drawn separately — the rest truncated to one line beside a
+ * separate "more" button, so truncation can never clip the control. The
+ * caption text itself is not a touch target (product links stay tappable).
+ * Before the first layout, a character heuristic decides overflow.
+ */
+export function CollapsibleCaption({ text, productMentions, onProductMention, expanded, onToggle, onLayout }: {
+  text: string;
+  productMentions?: PostProductMention[];
+  onProductMention?: (mention: PostProductMention) => void;
+  expanded: boolean;
+  onToggle: () => void;
+  onLayout?: (event: LayoutChangeEvent) => void;
+}) {
+  const [lines, setLines] = React.useState<string[] | null>(null);
+  React.useEffect(() => { setLines(null); }, [text]);
+  const overflow = lines ? lines.length > CAPTION_LINES : captionNeedsMore(text);
+  const first = lines && lines.length > CAPTION_LINES ? lines[0] : null;
+  const rest = first != null ? text.slice(first.length) : null;
+  const spans = (t: string) => <CaptionSpans text={t} productMentions={productMentions} onProductMention={onProductMention} />;
+  const toggle = (label: string) => (
+    <Text onPress={onToggle} style={styles.moreText} suppressHighlighting accessibilityRole="button"
+      accessibilityLabel={expanded ? 'Collapse caption' : 'Expand caption'} testID="caption-more">{label}</Text>
+  );
+  return (
+    <View style={styles.captionWrap} testID="caption-text" onLayout={onLayout}>
+      <View style={styles.captionMeasure} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Text style={styles.caption} onTextLayout={(e) => setLines(e.nativeEvent.lines.map(l => l.text))}
+          testID="caption-measure">{text}</Text>
+      </View>
+      {!overflow ? (
+        <Text style={styles.caption}>{spans(text)}</Text>
+      ) : expanded ? (
+        <Text style={styles.caption}>{spans(text)} {toggle('less')}</Text>
+      ) : first != null && rest != null ? (
+        <>
+          <Text style={[styles.caption, styles.captionLine]} numberOfLines={1}>{spans(first)}</Text>
+          <View style={styles.captionLastRow}>
+            <Text style={[styles.caption, styles.captionLine, styles.captionRest]} numberOfLines={1} ellipsizeMode="tail">{spans(rest)}</Text>
+            {toggle('more')}
+          </View>
+        </>
+      ) : (
+        <View style={styles.captionLastRow}>
+          <Text style={[styles.caption, styles.captionLine, styles.captionRest]} numberOfLines={CAPTION_LINES} ellipsizeMode="tail">{spans(text)}</Text>
+          {toggle('more')}
+        </View>
+      )}
+    </View>
+  );
+}
 
 export function CaptionBlock({
   creator, verified, caption, sound, soundOn, onToggleSound, remixCredit,
-  friendReposts, hasRepostIdentity, repostLabel, onOpenRepostIdentity,
+  friendReposts, selfRepost, hasRepostIdentity, repostLabel, onOpenRepostIdentity,
   captionExpanded, onToggleCaptionExpanded,
   onOpenCreator,
   onPressInCreator,
   style,
   onHeightChange,
+  onCaptionBottomOffsetChange,
   topSlot,
   belowCaptionSlot,
   sponsored,
@@ -79,7 +135,10 @@ export function CaptionBlock({
   onProductMention,
   official,
   credit,
+  location,
 }: {
+  /** Tagged place, shown as a pill above the creator name (Mobbin watch-1/2). */
+  location?: string;
   creator: string;
   verified: boolean;
   caption: string;
@@ -89,6 +148,8 @@ export function CaptionBlock({
   remixCredit?: string | null;
   onToggleSound: () => void;
   friendReposts: RepostFriend[];
+  /** The viewer's own identity is safe; other avatars remain friend-authorized. */
+  selfRepost?: { avatarUri?: string; name?: string };
   hasRepostIdentity: boolean;
   repostLabel: string;
   onOpenRepostIdentity: () => void;
@@ -106,6 +167,8 @@ export function CaptionBlock({
    *  this measured height, not the nominal constants, to actually guarantee
    *  no overlap. */
   onHeightChange?: (height: number) => void;
+  /** Measured distance from the caption text's last line to this block's bottom. */
+  onCaptionBottomOffsetChange?: (offset: number) => void;
   /** Rendered as the first item of this stack, above the creator name, with
    *  an 8px gap below it — see the module comment above. `undefined` when
    *  this post has no tagged product (no leftover gap in that case). */
@@ -128,8 +191,16 @@ export function CaptionBlock({
   credit?: { label: string; onPress?: () => void };
 }) {
   const [blockWidth, setBlockWidth] = React.useState(0);
+  const [blockHeight, setBlockHeight] = React.useState(0);
+  const [captionLayout, setCaptionLayout] = React.useState<{ y: number; height: number } | null>(null);
+  React.useEffect(() => {
+    if (captionLayout && blockHeight > 0) {
+      onCaptionBottomOffsetChange?.(Math.max(0, blockHeight - captionLayout.y - captionLayout.height));
+    }
+  }, [blockHeight, captionLayout, onCaptionBottomOffsetChange]);
   const handleLayout = (e: LayoutChangeEvent) => {
     setBlockWidth(e.nativeEvent.layout.width);
+    setBlockHeight(e.nativeEvent.layout.height);
     onHeightChange?.(e.nativeEvent.layout.height);
   };
   // Pads each control's real tap area up to 44x44 without changing its
@@ -140,9 +211,11 @@ export function CaptionBlock({
   // style would visibly enlarge the pill).
   const repostHit = useHitAreaBoost();
   const creatorHit = useHitAreaBoost();
-  const captionHit = useHitAreaBoost();
   const soundHit = useHitAreaBoost();
   const translation = useCaptionTranslation(caption);
+  const repostPeople: RepostFriend[] = selfRepost
+    ? [{ userId: 'viewer', displayName: selfRepost.name ?? 'You', avatarUrl: selfRepost.avatarUri }, ...friendReposts]
+    : friendReposts;
   return (
     <Animated.View
       style={[styles.root, hasRepostIdentity && styles.rootWithRepost, style]}
@@ -162,7 +235,7 @@ export function CaptionBlock({
         >
           <View style={styles.repostIdentity}>
             <View style={styles.repostAvatarStack}>
-              {friendReposts.slice(0, 3).map((friend, index) => (
+              {repostPeople.slice(0, 3).map((friend, index) => (
                 <View
                   key={friend.userId}
                   style={[styles.repostAvatar, { marginLeft: index === 0 ? 0 : -7, zIndex: 3 - index }]}
@@ -178,7 +251,7 @@ export function CaptionBlock({
                   )}
                 </View>
               ))}
-              {friendReposts.length === 0 && (
+              {repostPeople.length === 0 && (
                 <View style={[styles.repostAvatar, styles.repostAvatarFallback]}>
                   <Icon name="repeat" size={12} color={ON_DARK} />
                 </View>
@@ -187,6 +260,13 @@ export function CaptionBlock({
             <Text style={styles.repostIdentityText} numberOfLines={1}>{repostLabel}</Text>
           </View>
         </TouchableOpacity>
+      )}
+
+      {!!location && (
+        <View style={styles.locationPill} testID="caption-location" accessibilityLabel={`Location: ${location}`}>
+          <Icon name="map-pin" size={12} color={ON_DARK} />
+          <Text style={styles.locationText} numberOfLines={1}>{location}</Text>
+        </View>
       )}
 
       <TouchableOpacity
@@ -220,22 +300,17 @@ export function CaptionBlock({
         <Text style={styles.postLabel} numberOfLines={1} testID="post-label">{postLabel}</Text>
       )}
 
-      <TouchableOpacity
-        style={[captionHit.boostStyle, styles.leftAligned]}
-        onLayout={captionHit.onLayout}
-        onPress={() => caption.length > CAPTION_MORE_CHARS && onToggleCaptionExpanded()}
-        activeOpacity={caption.length > CAPTION_MORE_CHARS ? 0.7 : 1}
-        accessibilityRole={caption.length > CAPTION_MORE_CHARS ? 'button' : 'text'}
-        accessibilityLabel={caption.length > CAPTION_MORE_CHARS ? (captionExpanded ? 'Collapse caption' : 'Expand caption') : undefined}
-        hitSlop={{ top: 4, bottom: 4 }}
-      >
-        <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : CAPTION_LINES}>
-          <CaptionSpans text={translation.text} productMentions={translation.text === caption ? productMentions : []} onProductMention={onProductMention} />
-          {caption.length > CAPTION_MORE_CHARS && (
-            <Text style={styles.moreText}>{captionExpanded ? '  less' : '  more'}</Text>
-          )}
-        </Text>
-      </TouchableOpacity>
+      <CollapsibleCaption
+        text={translation.text}
+        productMentions={translation.text === caption ? productMentions : []}
+        onProductMention={onProductMention}
+        expanded={captionExpanded}
+        onToggle={onToggleCaptionExpanded}
+        onLayout={e => {
+          const { y, height } = e.nativeEvent.layout;
+          setCaptionLayout(old => old?.y === y && old.height === height ? old : { y, height });
+        }}
+      />
 
       <TranslationLink translation={translation} style={styles.translationLink} />
       {!!belowCaptionSlot && <View style={styles.belowCaptionWrap}>{belowCaptionSlot}</View>}
@@ -344,13 +419,19 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   caption: {
-    fontSize: 15, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 8,
+    fontSize: 15, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 0,
     lineHeight: 19, letterSpacing: 0.1,
     // ~38 characters a line at 14pt — a comfortable reading measure.
     maxWidth: 280,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
-  moreText: { fontFamily: FONT.bold, color: ON_DARK },
+  moreText: { fontFamily: FONT.bold, fontSize: 15, lineHeight: 19, color: ON_DARK, marginLeft: 4,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  captionWrap: { alignSelf: 'stretch', maxWidth: 280, marginBottom: 8 },
+  captionMeasure: { position: 'absolute', left: 0, right: 0, top: 0, opacity: 0, marginBottom: 0 },
+  captionLine: { marginBottom: 0 },
+  captionLastRow: { flexDirection: 'row', alignItems: 'flex-end' },
+  captionRest: { flexShrink: 1 },
   translationLink: {
     alignSelf: 'flex-start', marginTop: -4, marginBottom: 8, color: ON_DARK,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
@@ -365,6 +446,11 @@ const styles = StyleSheet.create({
   iconTextShadow: {
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
+  locationPill: {
+    alignSelf: 'flex-start', maxWidth: '100%', height: 26, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 8, borderRadius: RADII.chip, backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  locationText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
   remixRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -2, marginBottom: 6 },
   soundRow: {
     height: 24, flexDirection: 'row', alignItems: 'center', gap: 6,

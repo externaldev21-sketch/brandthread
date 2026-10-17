@@ -1,6 +1,7 @@
 import { rewriteToCdn } from './cdnUrl';
 import { randomUUID } from 'crypto';
 import { Readable } from 'stream';
+import { disconnectSafeStorageStream } from './disconnectSafeStorageStream';
 import { File, Storage } from '@google-cloud/storage';
 
 import {
@@ -98,7 +99,7 @@ export class ObjectStorageService {
     const aclPolicy = await getObjectAclPolicy(file);
     const isPublic = aclPolicy?.visibility === 'public';
 
-    const nodeStream = file.createReadStream();
+    const nodeStream = disconnectSafeStorageStream(file.createReadStream());
     const webStream = Readable.toWeb(nodeStream) as ReadableStream;
 
     const headers: Record<string, string> = {
@@ -151,6 +152,17 @@ export class ObjectStorageService {
   }
 
   /** Store a validated private upload without exposing a client-direct write URL. */
+  async uploadObjectEntityFromFile(localPath: string, contentType: string, objectPath: string): Promise<string> {
+    if (!objectPath.startsWith("/objects/") || objectPath.includes("..")) throw new Error("Invalid object path");
+    const fullPath = `${this.getPrivateObjectDir().replace(/\/$/, "")}/${objectPath.slice("/objects/".length)}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    await objectStorageClient.bucket(bucketName).upload(localPath, {
+      destination: objectName, resumable: false,
+      metadata: { contentType, cacheControl: "private, max-age=0" },
+    });
+    return objectPath;
+  }
+
   async createObjectEntityFromBuffer(
     contents: Buffer,
     contentType: string,

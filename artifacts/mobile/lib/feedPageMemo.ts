@@ -14,6 +14,7 @@ export type FeedEngagement = {
   liked: boolean; likes: number;
   saved: boolean; saves: number;
   reposted: boolean; reposts: number;
+  shares?: number;
   following: boolean;
   comments?: readonly unknown[];
 };
@@ -24,6 +25,7 @@ export function engagementEqual(a: FeedEngagement | undefined, b: FeedEngagement
   return a.liked === b.liked && a.likes === b.likes
     && a.saved === b.saved && a.saves === b.saves
     && a.reposted === b.reposted && a.reposts === b.reposts
+    && a.shares === b.shares
     && a.following === b.following && (a.comments?.length ?? 0) === (b.comments?.length ?? 0);
 }
 
