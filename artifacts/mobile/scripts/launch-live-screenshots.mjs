@@ -23,6 +23,7 @@ import {
   DEFAULT_BUILD_DIR, MOBILE_ROOT, WORK_DIR, buildPreviewWeb, openContext, openScreen, serveBuild,
 } from './store-screenshots/harness.mjs';
 import { ensureDemoImages } from './store-screenshots/demo-images.mjs';
+import { respond } from './store-screenshots/demo-data.mjs';
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
@@ -53,10 +54,12 @@ async function tap(page, testId, { optional = false, timeout = 6000 } = {}) {
 }
 
 async function visible(page, testId, timeout = 8000) {
-  return page.getByTestId(testId).first().waitFor({ state: 'visible', timeout }).then(() => true).catch(() => false);
+  const ids = Array.isArray(testId) ? testId : [testId];
+  const sel = ids.map((id) => `[data-testid="${id}"]`).join(',');
+  return page.locator(sel).first().waitFor({ state: 'visible', timeout }).then(() => true).catch(() => false);
 }
 
-async function open(browser, origin, images, role, target, { demo = false, configured = true, summary = null } = {}) {
+async function open(browser, origin, images, role, target, { demo = false, configured = true, summary = null, adult = false } = {}) {
   const device = { viewport: VIEWPORT, scale: 2, isMobile: true, userAgent: UA };
   const { context, page, activity } = await openContext(browser, { device, role, origin, images });
   page.on('pageerror', (e) => problems.push(`[pageerror ${target}] ${e.message.slice(0, 160)}`));
@@ -73,14 +76,35 @@ async function open(browser, origin, images, role, target, { demo = false, confi
   await context.route('**/api/**live/status', (route) => json(route, configured
     ? { streaming: { available: true, code: null }, replays: { available: false, code: 'REPLAYS_NOT_CONFIGURED' } }
     : { streaming: { available: false, code: 'LIVE_NOT_CONFIGURED' }, replays: { available: false, code: 'REPLAYS_NOT_CONFIGURED' } }));
+  // An adult account, so go-live's age check passes in a buyer-role session.
+  if (adult) await context.route('**/api/**auth/me', (route) => json(route, { ...respond({ method: 'GET', path: '/api/auth/me', role }), ageBand: '18_plus' }));
   if (summary) await context.route('**/api/**live/*/summary', (route) => json(route, { summary }));
   await openScreen(page, activity, origin, role, target, {
     extraQuery: demo ? '&demo=1' : '',
     beforeNavigate: async () => { if (demo) await page.evaluate(() => localStorage.setItem('bt_preview_demo', '1')); },
   });
   await page.waitForTimeout(2500);
+  // The first client-side push can land before the router has settled
+  // (heavier with demo=1); retry until the target screen is on top.
+  const marker = MARKERS[target.split('?')[0]];
+  for (let i = 0; marker && i < 5 && !(await visible(page, marker, 1500)); i++) {
+    const url = `${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}${demo ? '&demo=1' : ''}`;
+    await page.evaluate((u) => {
+      history.pushState(history.state, '', u);
+      window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+    }, url);
+    await page.waitForTimeout(2000);
+  }
+  if (marker && !(await visible(page, marker, 1000))) problems.push(`${target} never opened (${marker} missing)`);
   return { context, page };
 }
+
+const MARKERS = {
+  '/live-feed': 'live-feed-screen',
+  '/live': 'live-screen',
+  '/seller-go-live': ['go-live-setup', 'go-live-not-configured'],
+  '/seller-live-summary': 'seller-live-summary',
+};
 
 async function buyer(browser, origin, images) {
   console.log('Buyer');
@@ -158,7 +182,10 @@ async function buyer(browser, origin, images) {
 
 async function seller(browser, origin, images) {
   console.log('Seller');
-  let { context, page } = await open(browser, origin, images, 'seller', '/seller-go-live', { configured: false });
+  // The signed-out seller preview blocks every API call by design, so the
+  // status check (and its "not set up" answer) runs in a session whose API
+  // is reachable; the screen itself doesn't depend on the role.
+  let { context, page } = await open(browser, origin, images, 'buyer', '/seller-go-live', { configured: false, adult: true });
   await shot(page, 's01-go-live-not-configured');
   await context.close();
 
@@ -171,11 +198,12 @@ async function seller(browser, origin, images) {
   await tap(page, 'go-live-thumbnail');
   await page.waitForTimeout(700);
   await shot(page, 's03-add-photos-sheet');
-  await page.keyboard.press('Escape');
-  await page.getByText('Cancel', { exact: true }).last().click().catch(() => {});
-  await page.waitForTimeout(500);
+  // The sheet's own Cancel row (the footer has a Cancel too).
+  await page.getByRole('button', { name: 'Cancel' }).last().click().catch(() => {});
+  await page.waitForTimeout(700);
   await tap(page, 'go-live-add-products');
   if (await visible(page, 'live-products-sheet')) {
+    await page.waitForTimeout(1500);
     const add = page.locator('[data-testid^="live-shop-action-"]');
     const count = Math.min(await add.count(), 2);
     for (let i = 0; i < count; i++) { await add.nth(i).click(); await page.waitForTimeout(200); }

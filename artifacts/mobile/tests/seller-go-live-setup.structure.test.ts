@@ -21,7 +21,8 @@ describe('Go live: Create your show (Whatnot)', () => {
     expect(source).toContain("text: 'Upload Photo'");
     expect(source).toContain("text: 'Take Photo'");
     expect(source).toContain("(api as any).products?.list?.()");
-    expect(source).toContain("provider.id === 'preview' && isPreviewDemoMode()");
+    expect(source).toContain('if (catalog.length === 0) void loadCatalog();');
+    expect(source).toContain('isLivePreviewDemo()');
     expect(source).toContain('toggleFeaturedProduct');
     expect(source).toContain('testID="go-live-next"');
   });

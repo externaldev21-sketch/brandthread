@@ -180,7 +180,7 @@ function ChatRow({ msg, onLongPress }: { msg: LiveChatMessage; onLongPress?: (m:
           {msg.kind === 'host' && <Text style={styles.hostTag}> Host </Text>}
         </Text>
         <Text style={styles.chatText} numberOfLines={3}>
-          {msg.kind === 'purchase' ? `bought ${msg.text}` : msg.text}
+          {msg.text}
         </Text>
       </View>
       </Pressable>

@@ -137,7 +137,7 @@ export function LiveProductsSheet({
                   <Text style={[styles.price, { color: theme.text }, TABULAR_NUMS]}>{formatCents(p.priceCents)}</Text>
                   <Pressable
                     onPress={() => { hapticLight(); action.onPress(); }}
-                    style={[styles.rowBtn, { backgroundColor: action.selected ? theme.text : theme.cardElevated }]}
+                    style={[styles.rowBtn, action.selected ? { backgroundColor: theme.text } : { borderWidth: 1, borderColor: theme.border }]}
                     accessibilityRole="button"
                     accessibilityLabel={`${action.label}: ${p.name}`}
                     testID={`live-shop-action-${p.productId}`}

@@ -10,8 +10,7 @@
  */
 import { useEffect, useState } from 'react';
 import { serviceRequest } from '@/lib/serviceConfig';
-import { isPreviewDemoMode } from '@/lib/devPreview';
-import { getLiveStreamProvider } from './liveProvider';
+import { isLivePreviewDemo } from './liveProvider';
 import type { LiveAvailabilityStatus } from './liveAvailability';
 
 export type LiveAvailabilityState = 'loading' | 'available' | 'unavailable' | 'unknown';
@@ -26,7 +25,7 @@ export function liveStateFromStatus(status: LiveAvailabilityStatus | null | unde
 async function loadLiveAvailability(): Promise<LiveAvailabilityState> {
   // `?bt_preview=…&demo=1` plays the bundled preview shows, which need no
   // server keys — the same opt-in every other preview dataset uses.
-  if (getLiveStreamProvider().id === 'preview' && isPreviewDemoMode()) return 'available';
+  if (isLivePreviewDemo()) return 'available';
   try {
     return liveStateFromStatus(await serviceRequest<LiveAvailabilityStatus>('/api/live/status', {}, false));
   } catch {

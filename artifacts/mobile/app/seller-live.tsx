@@ -44,8 +44,7 @@ import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { loadAgoraModule } from '@/lib/agoraAvailability';
 import { hapticLight, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
-import { isPreviewDemoMode } from '@/lib/devPreview';
-import { getLiveStreamProvider } from '@/lib/live/liveProvider';
+import { getLiveStreamProvider, isLivePreviewDemo } from '@/lib/live/liveProvider';
 import { productsFromTags } from '@/lib/live/apiLiveProvider';
 import type { LiveChatMessage, LiveHost, LiveProduct } from '@/lib/live/types';
 
@@ -84,7 +83,7 @@ export default function SellerLiveScreen() {
   const topInset = useHeaderTopInset();
   const api = useApi();
   const { user } = useUser();
-  const preview = getLiveStreamProvider().id === 'preview' && isPreviewDemoMode();
+  const preview = isLivePreviewDemo();
 
   const [viewerCount, setViewerCount] = useState(0);
   const [comments, setComments] = useState<LiveChatMessage[]>([]);

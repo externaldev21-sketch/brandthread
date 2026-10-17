@@ -42,8 +42,7 @@ import { LiveNotice } from '@/components/live/LiveNotice';
 import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
 import { formatCents } from '@/lib/money';
 import { hapticLight, hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
-import { isPreviewDemoMode } from '@/lib/devPreview';
-import { getLiveStreamProvider } from '@/lib/live/liveProvider';
+import { getLiveStreamProvider, isLivePreviewDemo } from '@/lib/live/liveProvider';
 import { useLiveAvailability } from '@/lib/live/useLiveAvailability';
 import type { LiveProduct } from '@/lib/live/types';
 import {
@@ -81,27 +80,31 @@ function SellerGoLiveFlow() {
   const [showPicker, setShowPicker] = useState(false);
   const [notice, setNotice] = useState('');
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadCatalog = useCallback(async () => {
+    setCatalogLoading(true);
     const provider = getLiveStreamProvider();
-    // `?bt_preview=seller&demo=1` has no API: offer the preview shows' items
-    // (the same opt-in every preview dataset uses). Real accounts always get
-    // their own catalog.
-    const load: Promise<CatalogProduct[]> = provider.id === 'preview' && isPreviewDemoMode()
-      ? provider.listLive().then(list => {
+    try {
+      // `?bt_preview=seller&demo=1` has no API: offer the preview shows'
+      // items (the same opt-in every preview dataset uses). Real accounts
+      // always get their own catalog.
+      if (isLivePreviewDemo()) {
         const seen = new Map<string, CatalogProduct>();
-        for (const p of list.flatMap(st => st.products)) {
+        for (const p of (await provider.listLive()).flatMap(st => st.products)) {
           if (!seen.has(p.productId)) seen.set(p.productId, { id: p.productId, name: p.name, priceCents: p.priceCents, imageUrl: p.imageUri ?? null });
         }
-        return [...seen.values()];
-      })
-      : (api as any).products?.list?.().then((r: any) => (Array.isArray(r) ? r : r?.products ?? []));
-    Promise.resolve(load)
-      .then(list => { if (!cancelled) setCatalog(list ?? []); })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setCatalogLoading(false); });
-    return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        setCatalog([...seen.values()]);
+      } else {
+        const r = await (api as any).products?.list?.();
+        setCatalog(Array.isArray(r) ? r : r?.products ?? []);
+      }
+    } catch {
+      // Keep what we had; opening the picker again retries.
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, [api]);
+
+  useEffect(() => { void loadCatalog(); }, [loadCatalog]);
 
   const toggleFeaturedProduct = useCallback((productId: string) => {
     hapticSelection();
@@ -231,7 +234,7 @@ function SellerGoLiveFlow() {
           </View>
         ))}
         <Pressable
-          onPress={() => { hapticLight(); setShowPicker(true); }}
+          onPress={() => { hapticLight(); setShowPicker(true); if (catalog.length === 0) void loadCatalog(); }}
           style={[styles.addRow, { borderColor: theme.border }]}
           accessibilityRole="button"
           testID="go-live-add-products"
@@ -303,7 +306,7 @@ function CameraCheck({ title, coverUrl, featured, scheduledLiveId, onBack }: {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
   const [showShop, setShowShop] = useState(false);
-  const previewDemo = getLiveStreamProvider().id === 'preview' && isPreviewDemoMode();
+  const previewDemo = isLivePreviewDemo();
   const canBroadcastHere = Platform.OS !== 'web' || previewDemo;
 
   useEffect(() => {

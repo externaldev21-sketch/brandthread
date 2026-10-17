@@ -36,6 +36,12 @@ const BOOT_PREVIEW = isLivePreviewMode();
 // fake live streams.
 const BOOT_DEMO = BOOT_PREVIEW && isPreviewDemoMode();
 
+/** `?bt_preview=…&demo=1`: the bundled preview shows, latched at boot like
+ *  the provider itself (expo-router drops the query on the first push). */
+export function isLivePreviewDemo(): boolean {
+  return getLiveStreamProvider().id === 'preview' && !instanceEmpty;
+}
+
 function shouldUseLocalPreview(): boolean {
   return BOOT_PREVIEW || isLivePreviewMode();
 }
@@ -51,14 +57,21 @@ function createProvider(): LiveStreamProvider {
     // rendering screens that show LIVE rings can't load).
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { previewLiveMedia } = require('./previewLiveMedia') as typeof import('./previewLiveMedia');
-    return createPreviewLiveProvider({ media: previewLiveMedia, forceEmpty: previewForcesEmpty() });
+    instanceEmpty = previewForcesEmpty();
+    return createPreviewLiveProvider({ media: previewLiveMedia, forceEmpty: instanceEmpty });
   }
   return createApiLiveProvider();
 }
 
 let instance: LiveStreamProvider | null = null;
+/** Whether the current preview instance was created without `&demo=1`. */
+let instanceEmpty = false;
 
 export function getLiveStreamProvider(): LiveStreamProvider {
+  // This module can first load after expo-router has already dropped the
+  // boot query (the seller preview never imports it at boot), so an empty
+  // preview instance is rebuilt the moment `&demo=1` is actually in effect.
+  if (instance?.id === 'preview' && instanceEmpty && isPreviewDemoMode()) instance = null;
   instance ??= createProvider();
   return instance;
 }
