@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SectionError } from '@/components/InlineFeedback';
+import { Button } from '@/components/ui/Button';
 import { useApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/freelancer';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -161,9 +162,7 @@ export default function MetafieldDefinitionsScreen() {
             <Text style={[s.emptyText, { color: colors.mutedForeground }]}>
               Add a field to store extra details, like fabric or care instructions.
             </Text>
-            <TouchableOpacity style={[s.primaryBtn, { backgroundColor: colors.primary }]} onPress={openNew}>
-              <Text style={[s.primaryBtnText, { color: colors.primaryForeground }]}>Add field</Text>
-            </TouchableOpacity>
+            <Button label="Add field" icon="plus" size="small" onPress={openNew} style={{ marginTop: SP.sm }} />
           </View>
         ) : (
           <View style={[s.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -252,14 +251,8 @@ export default function MetafieldDefinitionsScreen() {
                 </TouchableOpacity>
               )}
               <View style={{ flex: 1 }} />
-              <TouchableOpacity onPress={() => setFormOpen(false)} style={[s.secondaryBtn, { borderColor: colors.border }]}>
-                <Text style={[s.secondaryBtnText, { color: colors.foreground }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={save} disabled={saving} style={[s.primaryBtn, { backgroundColor: colors.primary, marginTop: 0, opacity: saving ? 0.7 : 1 }]}>
-                {saving
-                  ? <ActivityIndicator size="small" color={colors.primaryForeground} />
-                  : <Text style={[s.primaryBtnText, { color: colors.primaryForeground }]}>Save</Text>}
-              </TouchableOpacity>
+              <Button label="Cancel" variant="secondary" size="compact" onPress={() => setFormOpen(false)} />
+              <Button label="Save" size="compact" onPress={save} loading={saving} disabled={saving} />
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -283,13 +276,9 @@ const s = StyleSheet.create({
   fieldLabel: { fontSize: 12, fontFamily: FONT.medium, marginTop: SP.md, marginBottom: 6 },
   input: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: FONT.regular },
   typeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  typeChip: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 6 },
+  typeChip: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 6 },
   typeChipText: { fontSize: 12, fontFamily: FONT.medium },
   sheetActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SP.lg },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   deleteText: { fontSize: FS.sm, fontFamily: FONT.semibold },
-  primaryBtn: { borderRadius: RADIUS.sm, paddingHorizontal: 18, paddingVertical: 11, alignItems: 'center', justifyContent: 'center', marginTop: SP.sm },
-  primaryBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
-  secondaryBtn: { borderRadius: RADIUS.sm, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10 },
-  secondaryBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
 });

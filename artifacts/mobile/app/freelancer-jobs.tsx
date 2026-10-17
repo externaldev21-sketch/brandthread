@@ -338,7 +338,7 @@ export default function FreelancerJobsScreen() {
       </ScrollView>
 
       <Modal visible={!!rateJob} transparent animationType="fade" onRequestClose={() => setRateJob(null)}>
-        <View style={[styles.rateOverlay, { backgroundColor: `${colors.background}CC`, paddingTop: insets.top + SP.lg, paddingBottom: insets.bottom + SP.lg }]}>
+        <View style={[styles.rateOverlay, { backgroundColor: `${colors.background}CC`, paddingBottom: insets.bottom + SP.lg }]}>
           <View style={styles.rateCard}>
             <Text style={styles.rateTitle}>Rate {rateJob?.freelancerName ?? 'this freelancer'}</Text>
             <Text style={styles.jobSub} numberOfLines={1}>{rateJob?.title}</Text>

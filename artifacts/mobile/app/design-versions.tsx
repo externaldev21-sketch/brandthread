@@ -199,7 +199,7 @@ export default function DesignVersionsScreen() {
       {/* Version preview — renders the snapshot's own layers */}
       <Modal visible={!!previewing} transparent animationType="fade" onRequestClose={() => setPreviewing(null)}>
         <Pressable
-          style={[styles.previewOverlay, { backgroundColor: `${theme.background}E6`, paddingTop: insets.top + SP.md, paddingBottom: insets.bottom + SP.md }]}
+          style={[styles.previewOverlay, { backgroundColor: `${theme.background}E6`, paddingBottom: insets.bottom + SP.md }]}
           onPress={() => setPreviewing(null)}
           accessibilityRole="button"
           accessibilityLabel="Close preview"
