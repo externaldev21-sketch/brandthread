@@ -46,9 +46,8 @@ describe('live moderation screens', () => {
     expect(src).toContain('LiveCommentActionsSheet');
   });
 
-  it('buyer-live does not end the stream when a co-host (non-host uid) goes offline', () => {
-    const src = read('app/buyer-live.tsx');
-    expect(src).toContain('hostUidRef');
-    expect(src).toMatch(/onUserOffline[\s\S]*hostUidRef\.current/);
+  it('the viewer does not end the stream when a co-host (non-host uid) goes offline', () => {
+    const src = read('components/live/LiveRtcVideo.tsx');
+    expect(src).toMatch(/onUserOffline[\s\S]*rtc\.hostUid == null \|\| uid === rtc\.hostUid/);
   });
 });

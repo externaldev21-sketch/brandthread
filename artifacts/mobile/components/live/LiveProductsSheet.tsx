@@ -29,8 +29,10 @@ export interface LiveProductAction {
 }
 
 export function LiveProductsSheet({
-  visible, products, pinnedProductId, onBuy, actionFor, onClose, codes = [], appliedCode = null, onApplyCode,
+  visible, products, pinnedProductId, onBuy, actionFor, onClose, codes = [], appliedCode = null, onApplyCode, emptyText,
 }: {
+  /** Shown when there are no products at all. */
+  emptyText?: string;
   visible: boolean;
   hostName?: string;
   products: LiveProduct[];
@@ -111,7 +113,7 @@ export function LiveProductsSheet({
           <Text style={[styles.section, { color: theme.text }]}>Products ({products.length})</Text>
           {shown.length === 0 && (
             <Text style={[styles.meta, { color: theme.muted, paddingVertical: SP.md }]}>
-              {products.length === 0 ? 'No items in this show yet.' : 'No items match your search.'}
+              {products.length === 0 ? emptyText ?? 'No items in this show yet.' : 'No items match your search.'}
             </Text>
           )}
           {shown.map(p => {

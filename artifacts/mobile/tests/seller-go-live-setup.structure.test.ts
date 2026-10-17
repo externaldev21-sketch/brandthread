@@ -2,67 +2,81 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const source = readFileSync(resolve(process.cwd(), 'app/seller-go-live.tsx'), 'utf8');
-const liveScreen = readFileSync(resolve(process.cwd(), 'app/seller-live.tsx'), 'utf8');
+const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
+const source = read('app/seller-go-live.tsx');
+const liveScreen = read('app/seller-live.tsx');
+const summary = read('app/seller-live-summary.tsx');
 
-describe('Go Live setup screen (camera-first)', () => {
-  it('opens straight onto a full-bleed front camera preview', () => {
+describe('Go live: Create your show (Whatnot)', () => {
+  it('says LIVE isn\'t available yet before the seller fills anything in when the server has no Agora key', () => {
+    expect(source).toContain("availability === 'unavailable'");
+    expect(source).toContain('LIVE_NOT_CONFIGURED_TITLE');
+    expect(source).toContain('testID="go-live-not-configured"');
+  });
+
+  it('asks for a title (with its count), a thumbnail and the products to pin, then Cancel / Next', () => {
+    expect(source).toContain('placeholder="Add a title…"');
+    expect(source).toContain('Show title ({title.length}/{TITLE_MAX})*');
+    expect(source).toContain("showActionSheet('Add Photos'");
+    expect(source).toContain("text: 'Upload Photo'");
+    expect(source).toContain("text: 'Take Photo'");
+    expect(source).toContain("(api as any).products?.list?.()");
+    expect(source).toContain("provider.id === 'preview' && isPreviewDemoMode()");
+    expect(source).toContain('toggleFeaturedProduct');
+    expect(source).toContain('testID="go-live-next"');
+  });
+
+  it('uploads the thumbnail and sends it, the title and the products to /api/live/start', () => {
+    expect(source).toContain('(api as any).products.uploadImage(');
+    expect(source).toContain('(api as any).live.start({');
+    expect(source).toContain('thumbnailUrl: coverUrl ?? undefined');
+    expect(source).toContain('productTags: featured.map(p => ({');
+  });
+});
+
+describe('Go live: camera check (Whatnot pre-show)', () => {
+  it('opens on a full-bleed front camera with flip, mic and shop, then one Start show pill', () => {
     expect(source).toContain("useState<'front' | 'back'>('front')");
     expect(source).toContain('<CameraView');
     expect(source).toContain('facing={facing}');
-    expect(source).toContain('StyleSheet.absoluteFill');
+    expect(source).toContain("enableTorch={facing === 'back' && torch}");
+    expect(source).toContain('testID="go-live-flip"');
+    expect(source).toContain('testID="go-live-mic"');
+    expect(source).toContain('testID="go-live-start"');
   });
 
-  it('requests camera and microphone permission as soon as the screen opens', () => {
+  it('asks for camera + microphone and offers Settings when they were denied for good', () => {
     expect(source).toContain('useCameraPermissions()');
     expect(source).toContain('useMicrophonePermissions()');
-    expect(source).toContain('requestCameraPermission()');
-    expect(source).toContain('requestMicPermission()');
-  });
-
-  it('shows a clean allow/settings prompt instead of a broken screen when permissions are denied', () => {
     expect(source).toContain('Allow camera');
     expect(source).toContain('Linking.openSettings()');
     expect(source).toContain('canAskAgain === false');
   });
 
-  it('provides a close button, camera flip, and flash toggle only on the back camera', () => {
-    expect(source).toContain("accessibilityLabel=\"Close\"");
-    expect(source).toContain('flipCamera');
-    expect(source).toContain("facing === 'back' &&");
-    expect(source).toContain('enableTorch={facing === \'back\' && torch}');
+  it('never starts a broadcast from the web build (the camera check still works there)', () => {
+    expect(source).toContain("const canBroadcastHere = Platform.OS !== 'web' || previewDemo;");
   });
 
-  it('keeps title required and description optional, with Go Live disabled until title is filled', () => {
-    expect(source).toContain('placeholder="Add a title…"');
-    expect(source).toContain('placeholder="Add a description (optional)…"');
-    expect(source).toContain('disabled={starting || !title.trim()}');
-  });
-
-  it('degrades gracefully on web instead of showing a broken camera view', () => {
-    expect(source).toContain("Platform.OS === 'web'");
-    expect(source).toContain('NativeOnlyFeature');
-  });
-
-  it('passes title, description, and the chosen camera into the live broadcast flow', () => {
-    expect(source).toContain('(api as any).live.start({');
-    expect(source).toContain('title: title.trim()');
-    expect(source).toContain("description: description.trim() || undefined");
+  it('hands the chosen camera and mic into the broadcast', () => {
     expect(source).toContain("pathname: '/seller-live'");
     expect(source).toContain('facing,');
-  });
-
-  it('matches the broadcast camera to whichever camera was already previewing', () => {
+    expect(source).toContain("mic:         micOn ? 'on' : 'off'");
     expect(liveScreen).toContain("params.facing === 'front'");
     expect(liveScreen).toContain('engine.switchCamera()');
   });
+});
 
-  it('lets a seller feature products from their own catalog before going live, not only mid-broadcast', () => {
-    // Previously only seller-live.tsx (mid-broadcast) could tag products;
-    // /api/live/start already accepted productTags but setup never sent any.
-    expect(source).toContain('setShowProductPicker(true)');
-    expect(source).toContain("(api as any).products?.list?.()");
-    expect(source).toContain('toggleFeaturedProduct');
-    expect(source).toContain('productTags: featuredProducts.map(p => ({');
+describe('Live controls and summary', () => {
+  it('pins / unpins items, confirms before ending, and lands on the summary', () => {
+    expect(liveScreen).toContain('(api as any).live.pin(params.streamId, productId)');
+    expect(liveScreen).toContain("label: 'Unpin'");
+    expect(liveScreen).toContain("showActionSheet('End show?'");
+    expect(liveScreen).toContain("pathname: '/seller-live-summary'");
+  });
+
+  it('shows only the server\'s own numbers after the show', () => {
+    expect(summary).toContain('(api as any).live.summary(streamId)');
+    expect(summary).toContain('PEAK VIEWERS');
+    expect(summary).toContain('TOTAL VIEWERS');
   });
 });

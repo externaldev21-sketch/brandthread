@@ -338,6 +338,8 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // Opened from Go Live setup (no tab bar there); keep it consistent.
   'seller-schedule-live',
   'seller-live',
+  // Post-show summary the broadcast hands off to.
+  'seller-live-summary',
   // Live moderation / co-host screens are pushed over the broadcast (and the
   // invite screen turns into the co-host's full-screen camera once accepted).
   'live-moderation',
@@ -1552,6 +1554,7 @@ const AppStack = React.memo(function AppStack() {
         {/* Live Shopping */}
         <Stack.Screen name="seller-go-live" options={() => ({ headerShown: false, animation: consumeAnimationOverride('slide_from_bottom'), presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT })} />
         <Stack.Screen name="seller-live"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', gestureEnabled: false, contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="seller-live-summary" options={{ headerShown: false, animation: 'fade', presentation: 'fullScreenModal', gestureEnabled: false, contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-live"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="live"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="live-moderation"    options={{ headerShown: false, animation: 'ios_from_right', contentStyle: OPAQUE_SCREEN_CONTENT }} />
