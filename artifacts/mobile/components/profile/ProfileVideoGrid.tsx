@@ -121,7 +121,8 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
     });
   }, [onPress, item, index]);
   const handleLongPress = useCallback(() => onLongPress?.(item, index), [onLongPress, item, index]);
-  const metric = item.kind === 'video' && typeof item.viewsCount === 'number'
+  // A "▶ 0" badge reads as broken, not as data — no count until there is one.
+  const metric = item.kind === 'video' && typeof item.viewsCount === 'number' && item.viewsCount > 0
     ? { icon: 'play' as const, value: formatCompactCount(item.viewsCount) }
     : typeof item.likesCount === 'number' && item.likesCount > 0
       ? { icon: 'heart' as const, value: formatCompactCount(item.likesCount) }

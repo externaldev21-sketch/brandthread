@@ -473,12 +473,14 @@ describe('buyer profile tabs', () => {
     }
   });
 
-  it('owner mode: adds Tagged next to the private tabs and offers View as visitor in the ... menu', async () => {
+  it('owner mode: Posts · Reposts · Saved · Liked, and the ... menu holds Edit, Share, Orders and View as visitor', async () => {
     renderer = await renderScreen();
-    for (const tab of ['Posts', 'Tagged', 'Saved', 'Liked', 'Orders']) {
-      expect(renderer.root.findAll(
-        node => node.props.accessibilityRole === 'tab' && node.props.accessibilityLabel === `${tab} tab`,
-      ).length, tab).toBeGreaterThan(0);
+    const tabLabels = renderer.root.findAll(
+      node => node.props.accessibilityRole === 'tab' && typeof node.props.onPress === 'function',
+    ).map((node) => node.props.accessibilityLabel);
+    expect([...new Set(tabLabels)]).toEqual(['Posts tab', 'Reposts tab', 'Saved tab', 'Liked tab']);
+    for (const key of ['edit', 'share', 'orders', 'view-as-visitor']) {
+      expect(renderer.root.findAll(node => node.props.testID === `profile-menu-sheet-${key}`).length, key).toBeGreaterThan(0);
     }
     // The menu mounts its rows on first open (shared MenuSheet), so open it
     // the way a user does: the ... button.
@@ -495,10 +497,7 @@ describe('buyer profile tabs', () => {
 
   it('renders all four tabs, each selectable', async () => {
     renderer = await renderScreen();
-
-    // Posts / Saved / Liked / Orders — Orders is a top-level icon tab again,
-    // the Published/Drafts/Orders segmented control was removed.
-    for (const tab of ['Posts', 'Saved', 'Liked', 'Orders']) {
+    for (const tab of ['Posts', 'Reposts', 'Saved', 'Liked']) {
       const matches = renderer.root.findAll(
         node => node.props.accessibilityRole === 'tab' && node.props.accessibilityLabel === `${tab} tab`,
       );
@@ -534,31 +533,21 @@ describe('buyer profile tabs', () => {
     ).length).toBeGreaterThan(0);
   });
 
-  it('shows the buyer\'s orders on the Orders tab, each opening its own detail page', async () => {
-    getBuyerOrdersWithStatusMock.mockResolvedValue({
-      orders: [
-        {
-          id: 'order-active', orderNumber: 'BT-2001', sellerId: 's1', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
-          status: 'shipped', paymentStatus: 'paid', fulfillmentStatus: 'fulfilled',
-          lineItems: [{ productName: 'Cargo Jacket', variant: 'M', quantity: 1, unitPriceCents: 12000 }],
-          shippingAddress: { name: '', line1: '', city: '', state: '', zip: '', country: 'US' },
-          payment: { subtotalCents: 12000, shippingTotalCents: 0, taxTotalCents: 0, totalCents: 12000 },
-          isPreOrder: false, hasReturnRequest: false, createdAt: '2026-01-01T00:00:00.000Z',
-        },
-      ],
-      fromCache: false,
-    });
-
+  it('opens Orders from the ... menu (no Orders tab any more)', async () => {
     renderer = await renderScreen();
-    await pressTab(renderer, 'Orders');
+    const row = renderer.root.findAll(
+      node => node.props.testID === 'profile-menu-sheet-orders' && typeof node.props.onPress === 'function',
+    )[0];
+    await act(async () => { row.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/orders');
+  });
 
+  it('has no bell (Activity is a tab) and no "Buyer" role chip', async () => {
+    renderer = await renderScreen();
+    expect(renderer.root.findAll(node => node.props.accessibilityLabel === 'Notifications')).toHaveLength(0);
     expect(renderer.root.findAll(
-      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('BT-2001'),
-    ).length).toBeGreaterThan(0);
-
-    const card = renderer.root.findByProps({ accessibilityLabel: 'Order BT-2001, shipped' });
-    await act(async () => { card.props.onPress(); });
-    expect(routerMock.push).toHaveBeenCalledWith('/buyer-order-detail?id=order-active');
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children) === 'Buyer',
+    )).toHaveLength(0);
   });
 
   it('keeps every hard-required action wired: account switcher, edit profile, connections', async () => {
@@ -688,7 +677,7 @@ describe('buyer profile tabs', () => {
   it('offers "Share your first thread" when the buyer has no posts', async () => {
     getMyPostsMock.mockResolvedValue([]);
     renderer = await renderScreen();
-    const cta = renderer.root.findByProps({ testID: 'empty-state-action' });
+    const cta = renderer.root.findByProps({ testID: 'profile-empty-state-action' });
     expect(textContent(cta.props.children)).toContain('Share your first thread');
     await act(async () => { cta.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith('/create-post?accountType=buyer');
@@ -843,9 +832,12 @@ describe('buyer profile — Instagram layout', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/buyer-highlights-manager?edit=hl_1');
   });
 
-  it('uses icon-only tabs with the label kept for accessibility', async () => {
+  it('labels each tab and shows its count once known', async () => {
+    getMyPostsMock.mockResolvedValue([
+      { id: 'post-1', mediaUrl: 'https://example.com/post-1.jpg', type: 'photo', isArchived: false, isDraft: false, authorName: 'Ava', authorInitials: 'AB', authorColor: '#111', caption: 'Fit check', mediaColors: ['#111', '#222'] },
+    ]);
     renderer = await renderScreen();
     const postsTab = renderer.root.findAll((node) => node.props.accessibilityRole === 'tab' && node.props.accessibilityLabel === 'Posts tab')[0];
-    expect(postsTab.findAll((node) => (node.type as unknown) === 'Text' && textContent(node.props.children) === 'Posts')).toHaveLength(0);
+    expect(postsTab.findAll((node) => (node.type as unknown) === 'Text' && textContent(node.props.children) === 'Posts 1').length).toBeGreaterThan(0);
   });
 });

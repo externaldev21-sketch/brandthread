@@ -93,6 +93,8 @@ import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/Pro
 import { buyerOwnMenuItems } from '@/components/profile/buyerProfileMenu';
 import { MenuSheet } from '@/components/ui/MenuSheet';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
+import { useRepostedPosts } from '@/components/profile/useRepostedPosts';
+import { ProfileStickyHeader, PROFILE_STICKY_HEADER_HEIGHT } from '@/components/profile/ProfileStickyHeader';
 import { taggedItemHref } from '@/services/profileService';
 import { radius } from '@/constants/radii';
 import { subscribeThreadCashChanged } from '@/lib/threadCashEvents';
@@ -111,11 +113,12 @@ import { WrappedProfileCard } from '@/components/closet/WrappedProfileCard';
 const PREVIEW_NAME = 'Ava Buyer';
 const PREVIEW_HANDLE = '@ava';
 
-const TABS = ['Posts', 'Closet', 'Tagged', 'Saved', 'Liked', 'Orders'] as const;
+const TABS = ['Posts', 'Reposts', 'Closet', 'Tagged', 'Saved', 'Liked', 'Orders'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_ITEMS: ProfileTab[] = [
   { key: 'Posts', label: 'Posts', icon: 'grid' },
+  { key: 'Reposts', label: 'Reposts', icon: 'repeat' },
   // Digital Closet: every delivered piece, plus outfits built from them.
   { key: 'Closet', label: 'Closet', icon: 'layers' },
   { key: 'Tagged', label: 'Tagged', icon: 'tag' },
@@ -149,7 +152,7 @@ function CompactWalletChip({ balanceLabel, onPress, onLongPress, theme }: {
       hitSlop={4}
       style={[topBarStyles.walletChip, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
     >
-      <ThreadCashBillIcon size={16} />
+      <Icon name="credit-card" size={16} color={theme.text} />
       <Text style={[topBarStyles.walletText, { color: theme.text }]} numberOfLines={1}>{balanceLabel}</Text>
     </PressableScale>
   );
@@ -367,6 +370,7 @@ export default function ProfileScreen() {
   // Owner mode: private saved / liked / orders / Thread Cash are this screen's alone.
   const caps = profileCapabilities('buyer', 'owner');
   const tagged = useTaggedPosts(user?.id, activeTab === 'Tagged' && !!user?.id && !isBuyerDevPreview());
+  const reposts = useRepostedPosts(user?.id, activeTab === 'Reposts' && !!user?.id && !isBuyerDevPreview());
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [postSheet, setPostSheet] = useState<BuyerPost | null>(null);
   const [pinSnackbar, setPinSnackbar] = useState('');
@@ -742,8 +746,8 @@ export default function ProfileScreen() {
       const publishedRows: ListRow[] = published.map((post) => ({ kind: 'post' as const, post, item: gridItemFromBuyerPost(post) }));
       return draftsCount > 0 ? [{ kind: 'draftsTile' as const, count: draftsCount }, ...publishedRows] : publishedRows;
     }
-    if (activeTab === 'Tagged') {
-      return tagged.items.map((entry) => ({
+    if (activeTab === 'Tagged' || activeTab === 'Reposts') {
+      return (activeTab === 'Reposts' ? reposts.items : tagged.items).map((entry) => ({
         kind: 'tagged' as const,
         source: entry.source,
         authorId: entry.authorId,
@@ -767,11 +771,11 @@ export default function ProfileScreen() {
     // Liked has no backing data yet — a clean empty slot rather than
     // inventing engagement history.
     return [];
-  }, [activeTab, posts, savedItems, myOrders, tagged.items, closetView, closetPieces, closetOutfits]);
+  }, [activeTab, posts, savedItems, myOrders, tagged.items, reposts.items, closetView, closetPieces, closetOutfits]);
 
   const closetOutfitColumns = 2;
   const closetOutfitWidth = Math.floor((layout.columnWidth - (closetOutfitColumns - 1)) / closetOutfitColumns);
-  const numColumns = activeTab === 'Posts' || activeTab === 'Tagged' ? layout.gridColumns
+  const numColumns = activeTab === 'Posts' || activeTab === 'Tagged' || activeTab === 'Reposts' ? layout.gridColumns
     : activeTab === 'Closet' ? (closetView === 'outfits' ? closetOutfitColumns : layout.gridColumns)
     : activeTab === 'Saved' ? savedColumns : 1;
 
@@ -931,7 +935,6 @@ export default function ProfileScreen() {
           theme={theme}
         />
       ) : null}
-      <ProfileTopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" />
       <ProfileTopBarIcon
         name="more-horizontal"
         onPress={(event) => { setMenuAnchor(anchorFromEvent(event)); setMenuOpen(true); }}
@@ -1006,7 +1009,6 @@ export default function ProfileScreen() {
       />
       {/* Below the banner the profile continues as before: chip, bio, link. */}
       <View style={topBarStyles.bannerBelow} testID="profile-banner-below">
-        <View style={topBarStyles.bannerChips}><ProfileChip label="Buyer" icon="user" /></View>
         {profileMeta}
       </View>
 
@@ -1014,6 +1016,7 @@ export default function ProfileScreen() {
       {/* ── Story Highlights: circles + "New" ── */}
       <View style={styles.highlightsWrap} testID="profile-highlights">
         <ProfileStoriesRow
+          size="sm"
           items={highlightItems}
           onNew={() => { router.push('/buyer-highlights-manager?create=1' as any); }}
           onPressItem={(item) => {
@@ -1039,7 +1042,7 @@ export default function ProfileScreen() {
       ) : null}
 
       <View style={styles.tabsBlock}>
-        <ProfileTabs tabs={TAB_ITEMS} active={activeTab} onChange={handleTabPress} variant="iconOnly" />
+        <ProfileTabs tabs={TAB_ITEMS} active={activeTab} onChange={handleTabPress} />
       </View>
       {activeTab === 'Closet' && closetPieces.length > 0 ? (
         <ClosetSubBar
@@ -1075,6 +1078,7 @@ export default function ProfileScreen() {
           // the scroll the CTA sits fully clear of the bar, on any header
           // height, not just a fixed constant.
           <ProfileGridPlaceholder
+            quiet
             loading={loading}
             error={false}
             onRetry={loadData}

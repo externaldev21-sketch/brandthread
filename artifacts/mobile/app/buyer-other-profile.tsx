@@ -43,6 +43,7 @@ import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import { resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
 import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 import { useProfileNote } from '@/components/profile/useProfileNote';
+import { ProfileTopBarIcon } from '@/components/profile/ProfileTopBar';
 import { ProfileStoriesRow } from '@/components/profile/ProfileStoriesRow';
 import { ProfileBrandsRow } from '@/components/profile/ProfileBrandsRow';
 import { useProfileBrands } from '@/hooks/useProfileBrands';
@@ -51,7 +52,7 @@ import { highlightFromServer, type Highlight } from '@/lib/highlightsService';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import {
-  ProfileButton, ProfileChip, ProfileGlassButton, type ProfileStat, type ProfileTab,
+  InteractionLayer, ProfileButton, ProfileChip, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
@@ -565,7 +566,6 @@ export default function BuyerOtherProfileScreen() {
           handle: displayHandle,
           initials: displayInitials,
           avatarUrl: profile?.avatarUrl ?? null,
-          roleLabel: 'Buyer',
           pronouns: profile?.pronouns ?? null,
         }}
         avatar={storyIds.length > 0
@@ -581,13 +581,16 @@ export default function BuyerOtherProfileScreen() {
             videoUri: videos.posts.find((post) => post.contentType === 'video')?.mediaUris[0] ?? null,
             posterUri: gridItems.find((item) => item.posterUri)?.posterUri ?? null,
           }}
-        topLeft={<ProfileGlassButton icon="arrow-left" onPress={goBack} accessibilityLabel="Go back" />}
+        // Dev's one profile layout (avatar + stats row, name below), collapsed
+        // to its content when there is no video; plain icons, no circles.
+        headerVariant="video"
+        topLeft={<ProfileTopBarIcon name="arrow-left" onPress={goBack} accessibilityLabel="Go back" />}
         // No inbox shortcut here: that is the owner's own messages, not part of
         // someone else's profile. The "..." opens Share / Mute / Report / Block.
         topRight={(
-          <ProfileGlassButton
-            icon="more-horizontal"
-            onPress={() => setMoreSheetOpen(true)}
+          <ProfileTopBarIcon
+            name="more-horizontal"
+            onPress={() => { hapticSelection(); setMoreSheetOpen(true); }}
             accessibilityLabel="Profile options"
             testID="buyer-other-profile-more"
           />
@@ -598,6 +601,7 @@ export default function BuyerOtherProfileScreen() {
             {highlights.length > 0 ? (
               <View testID="other-profile-highlights">
                 <ProfileStoriesRow
+                  size="sm"
                   items={highlights.map((h) => ({ id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor, imageUri: h.coverUrl ?? null }))}
                   onPressItem={(item) => {
                     router.push({ pathname: '/buyer-story-viewer' as any, params: { highlightId: item.id } });
@@ -611,9 +615,13 @@ export default function BuyerOtherProfileScreen() {
         stats={stats}
         statsLoading={!apiLoaded}
         actions={actions}
-        tabsVariant="iconOnly"
+        stickyHeader={{
+          left: <ProfileTopBarIcon name="arrow-left" onPress={goBack} accessibilityLabel="Go back" />,
+          right: <ProfileTopBarIcon name="more-horizontal" onPress={() => { hapticSelection(); setMoreSheetOpen(true); }} accessibilityLabel="Profile options" />,
+        }}
         tabs={{
-          items: CONTENT_TAB_ITEMS,
+          // Labeled, with the post count once it is known.
+          items: CONTENT_TAB_ITEMS.map((tab) => ({ ...tab, count: tab.key === 'Posts' ? videos.total : undefined })),
           active: activeTab,
           onChange: (key) => setActiveTab(key === 'Tagged' ? 'Tagged' : 'Posts'),
         }}
@@ -625,6 +633,7 @@ export default function BuyerOtherProfileScreen() {
         ListEmptyComponent={
           loadFailed && apiLoaded ? (
             <ProfileGridPlaceholder
+              quiet
               loading={false}
               error
               onRetry={() => { setApiLoaded(false); void loadProfile(); }}
@@ -645,6 +654,7 @@ export default function BuyerOtherProfileScreen() {
             />
           ) : activeTab === 'Tagged' ? (
             <ProfileGridPlaceholder
+              quiet
               loading={!apiLoaded || tagged.loading}
               error={tagged.error}
               onRetry={() => { void tagged.reload(); }}
@@ -656,6 +666,7 @@ export default function BuyerOtherProfileScreen() {
             />
           ) : (
             <ProfileGridPlaceholder
+              quiet
               loading={!apiLoaded || (!iBlockedThem && videos.loading)}
               error={videos.error}
               onRetry={() => { void videos.reload(); }}

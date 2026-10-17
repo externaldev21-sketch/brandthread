@@ -73,8 +73,9 @@ import { ListRow } from '@/components/ui/ListRow';
 import { haptics, hapticLight, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import { FoundingSellerBadge, foundingSellerNumberOf } from '@/components/profile/FoundingSellerBadge';
+import { ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar';
 import {
-  ProfileButton, ProfileChip, ProfileGlassButton, type ProfileStat, type ProfileTab,
+  ProfileButton, ProfileChip, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { isOfficialAccountId, officialAvatarUri } from '@/lib/officialAccount';
@@ -725,7 +726,7 @@ export default function SellerProfileScreen() {
     return (
       <View style={[styles.errorRoot, { paddingTop: headerTopInset + SP.sm }]}>
         <View style={styles.errorBar}>
-          <ProfileGlassButton icon="arrow-left" onPress={goBack} accessibilityLabel="Go back" />
+          <ProfileTopBarIcon name="arrow-left" onPress={goBack} accessibilityLabel="Go back" />
         </View>
         <EmptyState
           icon="alert-triangle"
@@ -930,29 +931,40 @@ export default function SellerProfileScreen() {
         coverAffordance={isOwner ? (
           <CoverHeroAffordance hasCover={coverFlow.hasCover} busy={coverFlow.busy} onAdd={coverFlow.startAdd} onManage={coverFlow.openManage} />
         ) : undefined}
-        topLeft={<ProfileGlassButton icon="arrow-left" onPress={goBack} accessibilityLabel="Go back" />}
+        // Dev's one profile layout (avatar + stats row, name below) — the
+        // same header as the own profiles, collapsed to its content when
+        // there is no video. Plain icons, no dark circles.
+        headerVariant="video"
+        topLeft={<ProfileTopBarIcon name="arrow-left" onPress={goBack} accessibilityLabel="Go back" />}
         topRight={(
-          <>
+          <ProfileTopBarIconRow>
             {caps.showInbox ? (
-              <ProfileGlassButton icon="message-circle" onPress={handleOpenInbox} accessibilityLabel="Inbox" />
+              <ProfileTopBarIcon name="message-circle" onPress={handleOpenInbox} accessibilityLabel="Inbox" />
             ) : null}
-            <ProfileGlassButton
-              icon="more-horizontal"
-              onPress={(event) => { setMenuAnchor(anchorFromEvent(event)); setMenuOpen(true); }}
+            <ProfileTopBarIcon
+              name="more-horizontal"
+              onPress={() => { hapticLight(); setMenuOpen(true); }}
               accessibilityLabel="More options"
               testID="seller-profile-more"
             />
-          </>
+          </ProfileTopBarIconRow>
         )}
+        stickyHeader={{
+          left: <ProfileTopBarIcon name="arrow-left" onPress={goBack} accessibilityLabel="Go back" />,
+          right: <ProfileTopBarIcon name="more-horizontal" onPress={() => { hapticLight(); setMenuOpen(true); }} accessibilityLabel="More options" />,
+        }}
         meta={meta}
         stats={stats}
         statsLoading={profileLoading}
         actions={actions}
         extras={canonicalSellerId ? <BrandDropsCard sellerId={canonicalSellerId} sellerName={brandName} /> : null}
-        tabsVariant="iconOnly"
         belowTabs={activeTab === 'Shop' ? <StoreBundlesRow sellerId={canonicalSellerId} /> : undefined}
         tabs={{
-          items: CONTENT_TAB_ITEMS,
+          // Labeled, with counts where the number is already known.
+          items: CONTENT_TAB_ITEMS.map((tab) => ({
+            ...tab,
+            count: tab.key === 'Posts' ? videosCount : tab.key === 'Shop' ? productsCount : undefined,
+          })),
           active: activeTab,
           onChange: (key) => { hapticSelection(); setActiveTab(key === 'Shop' || key === 'Tagged' ? key : 'Posts'); },
         }}
@@ -971,6 +983,7 @@ export default function SellerProfileScreen() {
               else void videos.reload({ fresh: true });
             }}
             layout={layout}
+            quiet
             icon={(tabEmpty?.icon ?? videosEmpty.icon) as never}
             title={tabEmpty?.title ?? videosEmpty.title}
             description={tabEmpty

@@ -3806,6 +3806,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Posts where someone tagged this profile (the profile "Tagged" tab). */
       tagged: (userId: string, limit = 30, offset = 0) =>
         get<any[]>(`/api/social/profile/${encodeURIComponent(userId)}/tagged?limit=${limit}&offset=${offset}`),
+      /** Public posts this profile reposted (the profile "Reposts" tab). Same row shape as `tagged`. */
+      reposts: (userId: string, limit = 30, offset = 0) =>
+        get<any[]>(`/api/social/profile/${encodeURIComponent(userId)}/reposts?limit=${limit}&offset=${offset}`),
       profilePosts: (userId: string, limit = 30, offset = 0) =>
         get<any[]>(`/api/social/profile/${encodeURIComponent(userId)}/posts?limit=${limit}&offset=${offset}`),
       friendActivity: (limit = 30, offset = 0) =>

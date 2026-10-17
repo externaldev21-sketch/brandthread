@@ -10,7 +10,7 @@ import crypto from "node:crypto";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { inArray, or } from "drizzle-orm";
-import { db, follows, postUserTags, posts, stories, storyMentions, productVariants, products, reviews, users } from "@workspace/db";
+import { db, follows, interactions, postUserTags, posts, stories, storyMentions, productVariants, products, reviews, users } from "@workspace/db";
 import { PRIVATE_PROFILE_KEYS } from "../../lib/publicProfile";
 
 vi.mock("../../middlewares/requireAuth", () => ({
@@ -77,7 +77,12 @@ beforeAll(async () => {
   ]).returning({ id: posts.id });
   const [byBuyer] = await db.insert(posts).values({ userId: buyer, mediaUrl: "https://example.test/t.jpg", caption: "tagging the brand" }).returning({ id: posts.id });
   await db.insert(postUserTags).values({ postId: byBuyer.id, taggedUserId: seller });
-  void taggingPost;
+  // Reposts tab: the buyer reposted the seller's public post and quote-
+  // reposted it too (a quote is the buyer's own post, so it is not listed).
+  await db.insert(interactions).values([
+    { userId: buyer, postId: taggingPost.id, type: "repost" },
+    { userId: visitor, postId: taggingPost.id, type: "repost", value: "quote" },
+  ]);
   const soon = new Date(Date.now() + 3_600_000);
   const storyRows = await db.insert(stories).values([
     { authorId: buyer, authorName: "PP Buyer", media: [{ imageUri: "https://example.test/s1.jpg" }], expiresAt: soon },
@@ -221,6 +226,20 @@ describe("Tagged tab", () => {
   it("resolves the users.id alias and is empty for an untagged account", async () => {
     expect(await get(`/api/social/profile/${sellerUuid}/tagged`, visitor).then((r) => r.json())).toHaveLength(2);
     expect(await get(`/api/social/profile/${buyer}/tagged`, visitor).then((r) => r.json())).toEqual([]);
+  });
+});
+
+describe("Reposts tab", () => {
+  it("lists public posts the profile reposted, as the same minimal card as Tagged", async () => {
+    const rows = await get(`/api/social/profile/${buyer}/reposts`, visitor).then((r) => r.json()) as any[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ authorId: seller, caption: "hello", source: "post" });
+    expectPublicOnly(rows);
+  });
+
+  it("leaves out quote reposts and resolves the users.id alias", async () => {
+    expect(await get(`/api/social/profile/${visitor}/reposts`, visitor).then((r) => r.json())).toEqual([]);
+    expect(await get(`/api/social/profile/${buyerUuid}/reposts`, visitor).then((r) => r.json())).toHaveLength(1);
   });
 });
 
