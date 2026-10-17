@@ -1488,15 +1488,16 @@ export default function BuyerConversationScreen() {
         text: 'Archive conversation',
         onPress: async () => {
           // A seeded preview conversation has no real backend record to
-          // archive against (archiveConversation() re-fetches the real
-          // conversation list first, which would 401 with no signed-in
-          // user) — just navigate back.
+          // archive against (PATCH /api/conversations/:id/archive would 401
+          // with no signed-in user) — just navigate back.
           if (conv && !isPreviewConversationId(conv.id)) {
             try {
               const { archiveConversation } = await import('@/services/socialService');
-              await archiveConversation(conv.id);
-            } catch {
-              // Best-effort — the conversation simply stays un-archived.
+              await archiveConversation(conv.id, true);
+            } catch (e) {
+              // Stay on the thread so the failure is visible, not a fake success.
+              Alert.alert('Couldn’t archive', apiErrorMessage(e, 'Please try again.'));
+              return;
             }
           }
           goBackOr(router);
@@ -1597,9 +1598,13 @@ export default function BuyerConversationScreen() {
       setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, deletedForMe: true } : m)));
       return;
     }
-    deleteMessageForMe(conv.id, msg.id)
-      .then(() => getMessages(conv.id).then(setMessages))
-      .catch(() => {});
+    // Persisted server-side (hidden for me only), so it stays gone after a
+    // refetch. Optimistic, restored with a real error if the request fails.
+    setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, deletedForMe: true } : m)));
+    deleteMessageForMe(conv.id, msg.id).catch((e) => {
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, deletedForMe: false } : m)));
+      Alert.alert('Couldn’t delete message', apiErrorMessage(e, 'Please try again.'));
+    });
   }
 
   function sheetReport() {

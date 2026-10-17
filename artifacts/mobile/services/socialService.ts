@@ -1350,12 +1350,22 @@ export async function addReaction(conversationId: string, messageId: string, emo
     notify();
   }
 }
+/** Message long-press > "Delete for me". Persisted server-side
+ *  (DELETE /api/conversations/:id/messages/:messageId/for-me) so it stays
+ *  gone after a refetch; the other participant still sees the message.
+ *  Throws on failure — the cache is only touched once the server agrees. */
 export async function deleteMessageForMe(conversationId: string, messageId: string): Promise<void> {
   const k = K();
-  const msgKey = k.messages(conversationId);
-  const msgs = await getMessages(conversationId, k);
-  const idx = msgs.findIndex(m => m.id === messageId);
-  if (idx >= 0) { msgs[idx] = { ...msgs[idx], deletedForMe: true }; await save(msgKey, msgs); notify(); }
+  await serviceRequest<{ ok: boolean }>(
+    `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/for-me`,
+    { method: 'DELETE' },
+  );
+  if (_socialUserId === k.userId) {
+    const msgKey = k.messages(conversationId);
+    const msgs = await load<Message[]>(msgKey, []);
+    await save(msgKey, msgs.filter(m => m.id !== messageId));
+    notify();
+  }
 }
 export async function markConversationRead(conversationId: string): Promise<void> {
   const k = K();
@@ -1364,10 +1374,41 @@ export async function markConversationRead(conversationId: string): Promise<void
   const updated = convs.map(c => c.id === conversationId ? { ...c, unreadCount: 0 } : c);
   await save(k.conversations, updated); notify();
 }
-export async function archiveConversation(conversationId: string): Promise<void> {
+/** Inbox Archive / Unarchive. Per-viewer and persisted server-side
+ *  (PATCH /api/conversations/:id/archive), so an archived chat stays archived
+ *  after the inbox refetches. A new incoming message unarchives it again
+ *  (server-side). Throws on failure. */
+export async function archiveConversation(conversationId: string, archived = true): Promise<boolean> {
   const k = K();
-  const convs = await getConversations(k);
-  await save(k.conversations, convs.map(c => c.id === conversationId ? { ...c, isArchived: true } : c)); notify();
+  const result = await serviceRequest<{ ok: boolean; isArchived: boolean }>(
+    `/api/conversations/${encodeURIComponent(conversationId)}/archive`,
+    { method: 'PATCH', body: JSON.stringify({ archived }) },
+  );
+  const isArchived = result.isArchived === true;
+  if (_socialUserId === k.userId) {
+    const convs = await load<Conversation[]>(k.conversations, []);
+    await save(k.conversations, convs.map(c => c.id === conversationId ? { ...c, isArchived } : c));
+    notify();
+  }
+  return isArchived;
+}
+
+/** Inbox swipe > Delete: delete the chat for ME only
+ *  (DELETE /api/conversations/:id/for-me). It leaves my inbox and its
+ *  history is hidden for me; the other person keeps the whole thread, and a
+ *  new message from them brings the chat back. Throws on failure. */
+export async function deleteConversationForMe(conversationId: string): Promise<void> {
+  const k = K();
+  await serviceRequest<{ ok: boolean }>(
+    `/api/conversations/${encodeURIComponent(conversationId)}/for-me`,
+    { method: 'DELETE' },
+  );
+  if (_socialUserId === k.userId) {
+    const convs = await load<Conversation[]>(k.conversations, []);
+    await save(k.conversations, convs.filter(c => c.id !== conversationId));
+    await save(k.messages(conversationId), []);
+    notify();
+  }
 }
 
 /** Search-in-chat (chat details > Search): this conversation's own message

@@ -21,7 +21,11 @@ import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { subscribeConversationReadFailure } from '@/lib/conversationReadEvents';
-import { markConversationRead, archiveConversation, muteUser, setConversationPinned } from '@/services/socialService';
+import {
+  markConversationRead, archiveConversation, deleteConversationForMe, muteConversation, setConversationPinned,
+} from '@/services/socialService';
+import { isConversationMuted } from '@/lib/inboxFilter';
+import { apiErrorMessage } from '@/lib/safety';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import {
   isPreviewInboxEnabled, getSellerPreviewConversations,
@@ -56,6 +60,8 @@ interface ConvView {
   updatedAt: string;
   isPinned?: boolean;
   isArchived?: boolean;
+  /** Chat mute (PATCH /api/conversations/:id/mute); absent = not muted. */
+  mutedUntil?: string;
   // New every-role-pair DM/message-request routing: a buyer with no
   // follow-back and no real paid order now lands in the seller's Requests
   // tab too, same isRequest/requestedBy shape buyer<->buyer already used —
@@ -164,6 +170,8 @@ export default function SellerInboxScreen() {
   const { showUndo } = useUndoToast();
 
   const [activeTab, setActiveTab] = useState<InboxTab>('inbox');
+  // Archived chats view, opened from the "Archived chats" row in the list.
+  const [showArchived, setShowArchived] = useState(false);
   // Requests deleted (or "Delete all"-ed) in this session sit in a ~4s undo
   // window (lib/pendingRequestDeletes.ts) before the real delete actually
   // fires — see app/(buyer)/inbox.tsx's identical pendingDeleteIds state for
@@ -363,7 +371,9 @@ export default function SellerInboxScreen() {
   function longPressConversation(c: ConvView) {
     hapticDestructiveConfirm();
     showActionSheet('Options', undefined, [
-      { text: 'Archive', onPress: () => swipeArchiveConversation(c), style: 'destructive' },
+      c.isArchived
+        ? { text: 'Unarchive', onPress: () => setArchived(c, false) }
+        : { text: 'Archive', onPress: () => setArchived(c, true), style: 'destructive' },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
@@ -399,27 +409,55 @@ export default function SellerInboxScreen() {
     }
   }
 
+  // Swipe > Mute / Unmute: the real per-chat mute (same endpoint as Chat
+  // details > Mute, "until I turn it back on"), which is what suppresses
+  // this chat's notifications — not a person-level mute.
   async function swipeMuteConversation(c: ConvView) {
-    const other = otherParticipant(c);
-    if (!other) return;
+    const nextMuted = !isConversationMuted(c);
+    setConvs((current) => current.map((row) => (row.id === c.id
+      ? { ...row, mutedUntil: nextMuted ? '9999-12-31T00:00:00.000Z' : undefined } : row)));
+    if (isSellerPreviewConversationId(c.id)) return;
     try {
-      await muteUser({
-        userId: other.userId, name: other.name, handle: other.handle,
-        initials: other.initials, color: other.color,
-      });
-    } catch {
-      Alert.alert('Couldn’t mute', 'Please try again.');
+      const until = await muteConversation(c.id, nextMuted ? -1 : null);
+      setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, mutedUntil: until ?? undefined } : row)));
+    } catch (e) {
+      setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, mutedUntil: c.mutedUntil } : row)));
+      Alert.alert(nextMuted ? 'Couldn’t mute' : 'Couldn’t unmute', apiErrorMessage(e, 'Please try again.'));
     }
   }
 
-  async function swipeArchiveConversation(c: ConvView) {
-    setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, isArchived: true } : row)));
+  // Archive / Unarchive: per-viewer, persisted server-side (a new message
+  // from the buyer unarchives it). Archived chats are listed behind the
+  // "Archived chats" row at the bottom of the inbox.
+  async function setArchived(c: ConvView, archived: boolean) {
+    setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, isArchived: archived } : row)));
     if (isSellerPreviewConversationId(c.id)) return;
     try {
-      await archiveConversation(c.id);
-    } catch {
-      setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, isArchived: false } : row)));
-      Alert.alert('Couldn’t archive', 'Please try again.');
+      await archiveConversation(c.id, archived);
+    } catch (e) {
+      setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, isArchived: c.isArchived } : row)));
+      Alert.alert(archived ? 'Couldn’t archive' : 'Couldn’t unarchive', apiErrorMessage(e, 'Please try again.'));
+    }
+  }
+
+  // Swipe > Delete: deletes the chat for the seller only — the buyer keeps
+  // it, and a new message from them brings it back. Never a hard delete.
+  async function swipeDeleteConversation(c: ConvView) {
+    const other = otherParticipant(c);
+    const confirmed = await confirmDestructiveActionSheet({
+      title: 'Delete chat?',
+      message: `This deletes the chat and its messages for you only. ${other?.name || other?.handle || 'The buyer'} will still see them.`,
+      confirmLabel: 'Delete for me',
+    });
+    if (!confirmed) return;
+    hapticDestructiveConfirm();
+    setConvs((current) => current.filter((row) => row.id !== c.id));
+    if (isSellerPreviewConversationId(c.id)) return;
+    try {
+      await deleteConversationForMe(c.id);
+    } catch (e) {
+      setConvs((current) => (current.some((row) => row.id === c.id) ? current : [...current, c]));
+      Alert.alert('Couldn’t delete chat', apiErrorMessage(e, 'Please try again.'));
     }
   }
 
@@ -521,12 +559,12 @@ export default function SellerInboxScreen() {
       },
       {
         key: 'mute',
-        label: 'Mute',
-        icon: 'bell-off',
+        label: isConversationMuted(item) ? 'Unmute' : 'Mute',
+        icon: isConversationMuted(item) ? 'bell' : 'bell-off',
         color: theme.cardElevated,
         textColor: theme.muted,
         onPress: () => swipeMuteConversation(item),
-        accessibilityLabel: `Mute ${other.name || other.handle || 'buyer'}`,
+        accessibilityLabel: `${isConversationMuted(item) ? 'Unmute' : 'Mute'} conversation with ${other.name || other.handle || 'buyer'}`,
       },
       {
         key: 'delete',
@@ -534,8 +572,8 @@ export default function SellerInboxScreen() {
         icon: 'trash-2',
         color: theme.cardElevated,
         textColor: theme.error,
-        onPress: () => swipeArchiveConversation(item),
-        accessibilityLabel: `Delete conversation with ${other.name || other.handle || 'buyer'}`,
+        onPress: () => swipeDeleteConversation(item),
+        accessibilityLabel: `Delete conversation with ${other.name || other.handle || 'buyer'} for you`,
       },
     ];
 
@@ -654,9 +692,12 @@ export default function SellerInboxScreen() {
   }
 
   const queryLower = query.trim().toLowerCase();
+  const archivedCount = convs.filter((c) => c.isArchived && !c.isRequest).length;
+  useEffect(() => { if (showArchived && archivedCount === 0) setShowArchived(false); }, [showArchived, archivedCount]);
   const visibleConvs = useMemo(() => convs
     .filter((c) => {
-      if (c.isArchived || c.isRequest || pendingDeleteIds.has(c.id)) return false;
+      if (c.isRequest || pendingDeleteIds.has(c.id)) return false;
+      if (showArchived ? !c.isArchived : c.isArchived) return false;
       if (!queryLower) return true;
       const other = otherParticipant(c);
       const haystack = [other?.name, other?.handle, c.lastMessage, c.contextOrderNumber, c.contextProductName]
@@ -664,7 +705,7 @@ export default function SellerInboxScreen() {
       return haystack.includes(queryLower);
     })
     .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)),
-  [convs, queryLower, pendingDeleteIds]);
+  [convs, queryLower, pendingDeleteIds, showArchived]);
 
   const requestConvs = useMemo(() => convs.filter((c) =>
     c.isRequest === true && !c.isArchived && !pendingDeleteIds.has(c.id)
@@ -677,9 +718,29 @@ export default function SellerInboxScreen() {
 
   const inboxRows = useMemo(() => mergeInboxRows(
     visibleConvs,
-    joinedCommunities.filter((c) => communityMatchesQuery(c, queryLower)),
+    // Community group chats aren't archivable, so they stay out of the Archived view.
+    showArchived ? [] : joinedCommunities.filter((c) => communityMatchesQuery(c, queryLower)),
     { getKey: (c) => c.id, getTs: (c) => c.lastMessageTs, isPinned: (c) => !!c.isPinned },
-  ), [visibleConvs, joinedCommunities, queryLower]);
+  ), [visibleConvs, joinedCommunities, queryLower, showArchived]);
+
+  // Entry point to archived chats (and back), reusing the Requests header
+  // row's text styles rather than adding new chrome.
+  const archivedToggleRow = showArchived || archivedCount > 0 ? (
+    <View style={s.requestsHeaderRow}>
+      <Text style={s.requestsHeaderText}>
+        {showArchived ? 'Archived chats' : `Archived chats (${archivedCount})`}
+      </Text>
+      <PressableScale
+        onPress={() => setShowArchived((v) => !v)}
+        accessibilityRole="button"
+        accessibilityLabel={showArchived ? 'Back to inbox' : 'Show archived chats'}
+        testID="seller-inbox-archived-toggle"
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Text style={s.requestsDeleteAll}>{showArchived ? 'Back to inbox' : 'Show'}</Text>
+      </PressableScale>
+    </View>
+  ) : null;
 
   return (
     <View style={s.root}>
@@ -770,11 +831,20 @@ export default function SellerInboxScreen() {
         </View>
       ) : inboxRows.length === 0 ? (
         <View style={s.centerFill}>
-          <EmptyState
-            icon="search"
-            title="No matches"
-            message="Try a different name, handle, or order number."
-          />
+          {queryLower ? (
+            <EmptyState
+              icon="search"
+              title="No matches"
+              message="Try a different name, handle, or order number."
+            />
+          ) : (
+            <EmptyState
+              icon="message-circle"
+              title="No chats in your inbox"
+              message="Archived chats come back here when the buyer sends a new message."
+            />
+          )}
+          {archivedToggleRow}
         </View>
       ) : (
         <FlashList
@@ -786,6 +856,8 @@ export default function SellerInboxScreen() {
           }
           contentContainerStyle={{ paddingBottom: insets.bottom + SP.lg }}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={showArchived ? archivedToggleRow : undefined}
+          ListFooterComponent={showArchived ? undefined : archivedToggleRow}
         />
       )}
       <FirstRunTip
