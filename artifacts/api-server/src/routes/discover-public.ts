@@ -115,7 +115,9 @@ router.get("/", async (req, res) => {
 
     const base: Array<SQL | undefined> = [publicPostCondition(new Date(), viewerId), notBlockedWith(viewerId, posts.userId), hasStill];
     if (kind === "fits") {
-      base.push(sql`EXISTS (SELECT 1 FROM ${users} u WHERE u.clerk_id = ${posts.userId} AND u.account_type = 'buyer')`);
+      // "posts"."user_id" spelled out: drizzle renders a bare "user_id" in a
+      // single-table select, which inside this subquery must not bind to u.
+      base.push(sql`EXISTS (SELECT 1 FROM ${users} u WHERE u.clerk_id = "posts"."user_id" AND u.account_type = 'buyer')`);
     }
 
     const rankedIds = kind === "forYou" ? await rankedIdsForToday() : [];

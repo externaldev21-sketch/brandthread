@@ -43,9 +43,10 @@ function DiscoverTileViewImpl({
 }) {
   const [attempt, setAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  useEffect(() => { setAttempt(0); setFailed(false); }, [post.imageUri]);
+  useEffect(() => { setAttempt(0); setFailed(false); setLoaded(false); }, [post.imageUri]);
 
   const handleError = useCallback(() => {
     const delay = TILE_RETRY_DELAYS_MS[attempt];
@@ -62,7 +63,9 @@ function DiscoverTileViewImpl({
       accessibilityRole="button"
       accessibilityLabel={`${post.authorName}${post.caption ? `: ${post.caption}` : ''}`}
       testID={`discover-tile-${post.id}`}
-      style={[styles.tile, { width, height }]}
+      // The neutral fill only shows while loading; once the image is in, a
+      // photo's own letterboxing ("contain") reads as page black, not grey bars.
+      style={[styles.tile, { width, height }, loaded && styles.loaded]}
     >
       {post.imageUri && !failed ? (
         // Tiles are 3:4, matching how photos are now saved (cropped by the
@@ -72,12 +75,13 @@ function DiscoverTileViewImpl({
         <CachedImage
           key={attempt}
           source={{ uri: post.imageUri }}
-          style={styles.image}
+          style={[styles.image, loaded && styles.loaded]}
           contentFit={post.media === 'photo' ? 'contain' : 'cover'}
           cachePolicy="memory-disk"
           recyclingKey={post.id}
           placeholder={TILE_PLACEHOLDER_BLURHASH}
           transition={120}
+          onLoad={() => setLoaded(true)}
           onError={handleError}
           testID={`discover-tile-image-${post.id}`}
         />
@@ -130,6 +134,7 @@ export function DiscoverTileSkeleton({ width, height }: { width: number; height:
 const styles = StyleSheet.create({
   tile: { overflow: 'hidden', backgroundColor: TILE_PLACEHOLDER_COLOR },
   image: { width: '100%', height: '100%', backgroundColor: TILE_PLACEHOLDER_COLOR },
+  loaded: { backgroundColor: 'transparent' },
   fallback: { alignItems: 'center', justifyContent: 'center' },
   glyphWrap: { position: 'absolute', top: 6, right: 6 },
   stat: { position: 'absolute', left: 6, bottom: 5, flexDirection: 'row', alignItems: 'center', gap: 3 },
