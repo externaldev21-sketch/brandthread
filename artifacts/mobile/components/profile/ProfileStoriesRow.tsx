@@ -14,6 +14,10 @@ import { InteractionLayer } from './ProfileControls';
 
 const CELL = 72;
 const CIRCLE = 62;
+// `size="sm"`: Instagram's own-profile highlights — smaller circles and
+// labels, so the rail reads as one quiet row (even with only "New" in it).
+const CELL_SM = 64;
+const CIRCLE_SM = 54;
 
 export interface ProfileStoryItem {
   id: string;
@@ -29,13 +33,20 @@ export function ProfileStoriesRow({
   onNew,
   newLabel = 'New',
   onPressItem,
+  size = 'md',
 }: {
   items: ProfileStoryItem[];
   onNew?: () => void;
   newLabel?: string;
   onPressItem: (item: ProfileStoryItem) => void;
+  size?: 'md' | 'sm';
 }) {
   const { theme } = useAppTheme();
+  const sm = size === 'sm';
+  const cell = sm ? styles.cellSm : styles.cell;
+  const press = sm ? [styles.press, styles.pressSm] : styles.press;
+  const circle = sm ? [styles.circle, styles.circleSm] : styles.circle;
+  const label = sm ? [styles.label, styles.labelSm] : styles.label;
   return (
     <ScrollView
       horizontal
@@ -44,20 +55,20 @@ export function ProfileStoriesRow({
       accessibilityLabel="Highlights"
     >
       {onNew ? (
-        <View style={styles.cell}>
+        <View style={cell}>
           <PressableScale
             onPress={onNew}
             accessibilityRole="button"
             accessibilityLabel="New highlight"
             testID="profile-story-new"
-            style={styles.press}
+            style={press}
           >
             {(state) => (
               <>
-                <View style={[styles.circle, styles.newCircle, { borderColor: theme.border, backgroundColor: theme.cardGlass }]}>
-                  <Feather name="plus" size={20} color={theme.text} />
+                <View style={[circle, styles.newCircle, { borderColor: theme.border, backgroundColor: theme.cardGlass }]}>
+                  <Feather name="plus" size={sm ? 18 : 20} color={theme.text} />
                 </View>
-                <Text style={[styles.label, { color: theme.muted }]} numberOfLines={1}>{newLabel}</Text>
+                <Text style={[label, { color: theme.muted }]} numberOfLines={1}>{newLabel}</Text>
                 <InteractionLayer state={state as { pressed: boolean }} radius={12} theme={theme} />
               </>
             )}
@@ -65,12 +76,12 @@ export function ProfileStoriesRow({
         </View>
       ) : null}
       {items.map((item) => (
-        <View key={item.id} style={styles.cell}>
+        <View key={item.id} style={cell}>
           <PressableScale
             onPress={() => onPressItem(item)}
             accessibilityRole="button"
             accessibilityLabel={`${item.label} highlight`}
-            style={styles.press}
+            style={press}
           >
             {(state) => (
               <>
@@ -79,10 +90,10 @@ export function ProfileStoriesRow({
                     theme accent here would misread as "unread" on every
                     saturated theme, so highlights use the same neutral
                     border every other profile chrome does. */}
-                <View style={[styles.circle, { borderColor: theme.border, backgroundColor: item.coverColor ?? theme.cardElevated }]}>
+                <View style={[circle, { borderColor: theme.border, backgroundColor: item.coverColor ?? theme.cardElevated }]}>
                   {item.imageUri ? <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" recyclingKey={item.id} /> : item.emoji ? <Text style={styles.emoji}>{item.emoji}</Text> : <Feather name="star" size={18} color={theme.text} />}
                 </View>
-                <Text style={[styles.label, { color: theme.muted }]} numberOfLines={1}>{item.label}</Text>
+                <Text style={[label, { color: theme.muted }]} numberOfLines={1}>{item.label}</Text>
                 <InteractionLayer state={state as { pressed: boolean }} radius={12} theme={theme} />
               </>
             )}
@@ -104,4 +115,8 @@ const styles = StyleSheet.create({
   newCircle: { borderStyle: 'dashed' },
   emoji: { fontSize: 22 },
   label: { width: CELL, textAlign: 'center', fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 14 },
+  cellSm: { width: CELL_SM },
+  pressSm: { width: CELL_SM, gap: 4 },
+  circleSm: { width: CIRCLE_SM, height: CIRCLE_SM, borderRadius: CIRCLE_SM / 2, borderWidth: 1 },
+  labelSm: { width: CELL_SM, fontSize: 11, lineHeight: 13 },
 });

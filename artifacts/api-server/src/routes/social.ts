@@ -758,6 +758,60 @@ router.get("/profile/:userId/tagged", async (req, res) => {
   res.json(merged);
 });
 
+// ─── GET /api/social/profile/:userId/reposts ─────────────────────────────────
+// The profile "Reposts" tab: public posts this account reposted, newest
+// repost first (quote reposts are excluded — they are the account's own
+// posts). Same visibility rules and row shape as the Tagged tab above.
+router.get("/profile/:userId/reposts", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const page = parsePagination(req.query, { limit: 30 });
+  if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const other = await resolveToClerkId(req.params.userId);
+  if (!other) { res.status(404).json({ error: "User not found" }); return; }
+  if (other !== myId && (await blockRelation(myId, other)) !== "none") {
+    res.status(404).json({ error: "User not found" }); return;
+  }
+  if (other !== myId && !(await viewerCanSeeContent(myId, other))) { res.json([]); return; }
+  const { limit, offset } = page.data;
+  const rows = await db.select({
+    id: posts.id,
+    userId: posts.userId,
+    mediaUrl: posts.mediaUrl,
+    thumbnailUrl: posts.thumbnailUrl,
+    mediaType: posts.mediaType,
+    caption: posts.caption,
+    repostedAt: interactions.createdAt,
+    authorName: users.displayName,
+    authorUsername: users.username,
+  }).from(interactions)
+    .innerJoin(posts, eq(posts.id, interactions.postId))
+    .innerJoin(users, eq(users.clerkId, posts.userId))
+    .where(and(
+      eq(interactions.userId, other),
+      eq(interactions.type, "repost"),
+      sql`${interactions.value} IS DISTINCT FROM 'quote'`,
+      publicPostCondition(new Date(), myId),
+      notBlockedWith(myId, posts.userId),
+    ))
+    .orderBy(desc(interactions.createdAt))
+    .limit(limit)
+    .offset(offset);
+  const items = rows.map((r) => ({
+    id: r.id,
+    authorId: r.userId,
+    authorName: r.authorName ?? null,
+    authorUsername: r.authorUsername ?? null,
+    mediaUrl: r.mediaUrl,
+    thumbnailUrl: r.thumbnailUrl ?? null,
+    mediaType: r.mediaType,
+    caption: r.caption ?? null,
+    createdAt: r.repostedAt,
+    source: "post" as const,
+  }));
+  setPaginationHeaders(res, page.data, items.length);
+  res.json(items);
+});
+
 router.get("/friends/activity", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "30"), 10) || 30, 1), 50);

@@ -8,11 +8,13 @@
  *    (`ProfileVideoHeader`); with no video the same layout sits on the plain
  *    background;
  *  - Posts · Followers · Following as number-over-label columns;
- *  - Edit profile · Share profile · discover-people (shared `Button`);
- *  - Story Highlights row (circles + "New");
+ *  - Edit profile · Share profile · discover-people (shared `Button`; Edit
+ *    and Share are also in the ••• menu, with Orders);
+ *  - Story Highlights row (small circles + "New");
  *  - the Thread Cash streak card;
- *  - icon-only tabs with an underline (Posts / Saved / Liked / Orders) over a
- *    3-column, 1pt-gutter, 4:5 grid.
+ *  - labeled tabs with counts (Posts / Reposts / Saved / Liked) over a
+ *    3-column, 1pt-gutter, 4:5 grid;
+ *  - a compact sticky bar (the @handle) once the top bar scrolls away.
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
@@ -41,9 +43,6 @@ import { CachedImage } from '@/components/CachedImage';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { AccountSwitcherSheet } from '@/components/AccountSwitcherSheet';
 import { loadBuyerProfile } from '@/lib/buyerProfile';
-import { getBuyerOrdersWithStatus } from '@/services/orderService';
-import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
-import type { BuyerOrderView } from '@/services/orderTypes';
 import type {
   BuyerSocialProfile, BuyerPost, SavedItem, PrivacySettings,
 } from '@/services/socialTypes';
@@ -51,9 +50,8 @@ import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileMeta } from '@/components/profile/ProfileShell';
-import { ProfileChip, ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
+import { ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
 import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar';
-import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { ProfileVideoHeader, useHeroPosterOnly } from '@/components/profile/ProfileVideoHeader';
 import { ProfileStoryAvatar } from '@/components/profile/ProfileStoryAvatar';
 import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
@@ -75,7 +73,8 @@ import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
-import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
+import { useRepostedPosts } from '@/components/profile/useRepostedPosts';
+import { PROFILE_STICKY_HEADER_HEIGHT, ProfileStickyHeader } from '@/components/profile/ProfileStickyHeader';
 import { taggedItemHref } from '@/services/profileService';
 import { radius } from '@/constants/radii';
 
@@ -87,15 +86,15 @@ import { radius } from '@/constants/radii';
 const PREVIEW_NAME = 'Ava Buyer';
 const PREVIEW_HANDLE = '@ava';
 
-const TABS = ['Posts', 'Tagged', 'Saved', 'Liked', 'Orders'] as const;
+// Four labeled tabs (Dev): Orders lives in the ••• menu (and the ≡ menu).
+const TABS = ['Posts', 'Reposts', 'Saved', 'Liked'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_ITEMS: ProfileTab[] = [
   { key: 'Posts', label: 'Posts', icon: 'grid' },
-  { key: 'Tagged', label: 'Tagged', icon: 'tag' },
+  { key: 'Reposts', label: 'Reposts', icon: 'repeat' },
   { key: 'Saved', label: 'Saved', icon: 'bookmark' },
   { key: 'Liked', label: 'Liked', icon: 'heart' },
-  { key: 'Orders', label: 'Orders', icon: 'package' },
 ];
 
 function savedTypeIcon(type: string): keyof typeof Feather.glyphMap {
@@ -207,7 +206,8 @@ function CompactWalletChip({ balanceLabel, onPress, onLongPress, theme }: {
       hitSlop={4}
       style={[topBarStyles.walletChip, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
     >
-      <ThreadCashBillIcon size={16} />
+      {/* Monochrome mark (Dev): the green bill read as off-brand here. */}
+      <Feather name="dollar-sign" size={14} color={theme.text} />
       <Text style={[topBarStyles.walletText, { color: theme.text }]} numberOfLines={1}>{balanceLabel}</Text>
     </PressableScale>
   );
@@ -237,37 +237,6 @@ const SavedCell = React.memo(function SavedCell({
   );
 });
 
-const OrderRow = React.memo(function OrderRow({ order, theme, onPress }: {
-  order: BuyerOrderView; theme: AppThemePreset; onPress: (order: BuyerOrderView) => void;
-}) {
-  const handlePress = useCallback(() => onPress(order), [onPress, order]);
-  return (
-    <PressableScale
-      style={[cellStyles.orderCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-      onPress={handlePress}
-      activeOpacity={0.85}
-      accessibilityRole="button"
-      accessibilityLabel={`Order ${order.orderNumber}, ${order.status.replace(/_/g, ' ')}`}
-    >
-      {order.lineItems[0]?.imageUri ? (
-        <CachedImage source={{ uri: order.lineItems[0].imageUri }} style={cellStyles.orderCardImage} contentFit="cover" />
-      ) : (
-        <View style={[cellStyles.orderCardImage, cellStyles.orderCardImagePlaceholder, { backgroundColor: theme.cardElevated }]}>
-          <Feather name="shopping-bag" size={ICON.md} color={theme.muted} />
-        </View>
-      )}
-      <View style={cellStyles.orderCardBody}>
-        <Text style={[cellStyles.orderCardSeller, { color: theme.text }]} numberOfLines={1}>{order.sellerName}</Text>
-        <Text style={[cellStyles.orderCardMeta, { color: theme.muted }]} numberOfLines={1}>
-          {order.orderNumber} · {order.lineItems.length} item{order.lineItems.length === 1 ? '' : 's'}
-        </Text>
-        <OrderStatusTimeline status={order.status} compact />
-      </View>
-      <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
-    </PressableScale>
-  );
-});
-
 const DraftsFolderTile = React.memo(function DraftsFolderTile({
   count, width, height, theme, onPress,
 }: {
@@ -293,9 +262,8 @@ const DraftsFolderTile = React.memo(function DraftsFolderTile({
 
 type ListRow =
   | { kind: 'post'; item: ProfileGridItem; post: BuyerPost }
-  | { kind: 'tagged'; item: ProfileGridItem; authorId: string; authorName: string | null; source: 'post' | 'story' }
+  | { kind: 'repost'; item: ProfileGridItem; authorId: string; authorName: string | null; source: 'post' | 'story' }
   | { kind: 'saved'; saved: SavedItem }
-  | { kind: 'order'; order: BuyerOrderView }
   // Instagram-style folder tile — first cell of the Posts grid, only when
   // there's at least one draft. Opens the drafts list; does not filter the
   // grid in place (there is no second tab/pill row on this screen anymore).
@@ -357,7 +325,6 @@ export default function ProfileScreen() {
   // just shows a static avatar (feed, chat, calls) never needs to know this
   // exists; only the profile header plays it.
   const [avatarVideoUri, setAvatarVideoUri] = useState<string | null>(null);
-  const [myOrders, setMyOrders] = useState<BuyerOrderView[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [threadCashBalanceCents, setThreadCashBalanceCents] = useState(0);
@@ -380,7 +347,9 @@ export default function ProfileScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   // Owner mode: private saved / liked / orders / Thread Cash are this screen's alone.
   const caps = profileCapabilities('buyer', 'owner');
-  const tagged = useTaggedPosts(user?.id, activeTab === 'Tagged' && !!user?.id && !isBuyerDevPreview());
+  const reposts = useRepostedPosts(user?.id, activeTab === 'Reposts' && !!user?.id && !isBuyerDevPreview());
+  // Compact sticky bar once the top bar has scrolled off (#65).
+  const [stickyVisible, setStickyVisible] = useState(false);
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [postSheet, setPostSheet] = useState<BuyerPost | null>(null);
 
@@ -410,24 +379,21 @@ export default function ProfileScreen() {
     }
     setLoadError(false);
     void loadCounts();
-    // getSavedItems() and getBuyerOrdersWithStatus() are real, backend-less-
-    // in-preview network calls with no preview branch of their own (unlike
+    // getSavedItems() is a real, backend-less-in-preview network call with
+    // no preview branch of its own (unlike
     // getMyProfile/getPrivacySettings/loadBuyerProfile, which only ever read
     // local storage, and getMyPosts, which already checks isBuyerDevPreview()
-    // internally) — skip them here in dev-preview (including a Clerk-
+    // internally) — skip it here in dev-preview (including a Clerk-
     // stubbed audit/e2e session, which still reports a truthy user.id) so
     // they never log a console 404, same as app/seller-inbox.tsx's fix.
     const devPreview = isBuyerDevPreview();
     try {
-      const [p, po, sv, pr, bp, ordersResult] = await Promise.all([
+      const [p, po, sv, pr, bp] = await Promise.all([
         getMyProfile(),
         getMyPosts(),
         devPreview ? Promise.resolve([]) : getSavedItems(),
         getPrivacySettings(),
         loadBuyerProfile(),
-        devPreview
-          ? Promise.resolve({ orders: [] as BuyerOrderView[], fromCache: true })
-          : getBuyerOrdersWithStatus(user.id).catch(() => ({ orders: [] as BuyerOrderView[], fromCache: true })),
       ]);
       if (accountRef.current !== user?.id) return;
       setProfile(p);
@@ -436,7 +402,6 @@ export default function ProfileScreen() {
       setPrivacySettings(pr);
       setAvatarUri(bp.avatarUri || null);
       setAvatarVideoUri(bp.avatarVideoUri || null);
-      setMyOrders(ordersResult.orders);
     } catch (error) {
       setLoadError(true);
       setProfile(null);
@@ -490,7 +455,9 @@ export default function ProfileScreen() {
     scrollYRef.current = event.nativeEvent.contentOffset.y;
     const next = event.nativeEvent.contentOffset.y < Math.max(heroHeight, 1);
     setHeroOnScreen((prev) => (prev === next ? prev : next));
-  }, [heroHeight]);
+    const sticky = event.nativeEvent.contentOffset.y > topPad + PROFILE_STICKY_HEADER_HEIGHT;
+    setStickyVisible((prev) => (prev === sticky ? prev : sticky));
+  }, [heroHeight, topPad]);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -572,11 +539,6 @@ export default function ProfileScreen() {
     hapticSelection();
     setActiveTab(tab as Tab);
   }, []);
-
-  const handleOrdersPress = useCallback((order: BuyerOrderView) => {
-    hapticSelection();
-    router.push(`/buyer-order-detail?id=${order.id}` as never);
-  }, [router]);
 
   // ── Post sheet ──
   const handlePostLongPress = useCallback((item: ProfileGridItem) => {
@@ -670,9 +632,9 @@ export default function ProfileScreen() {
       const publishedRows: ListRow[] = published.map((post) => ({ kind: 'post' as const, post, item: gridItemFromBuyerPost(post) }));
       return draftsCount > 0 ? [{ kind: 'draftsTile' as const, count: draftsCount }, ...publishedRows] : publishedRows;
     }
-    if (activeTab === 'Tagged') {
-      return tagged.items.map((entry) => ({
-        kind: 'tagged' as const,
+    if (activeTab === 'Reposts') {
+      return reposts.items.map((entry) => ({
+        kind: 'repost' as const,
         source: entry.source,
         authorId: entry.authorId,
         authorName: entry.authorName,
@@ -686,13 +648,12 @@ export default function ProfileScreen() {
       }));
     }
     if (activeTab === 'Saved') return savedItems.map((saved) => ({ kind: 'saved' as const, saved }));
-    if (activeTab === 'Orders') return myOrders.map((order) => ({ kind: 'order' as const, order }));
     // Liked has no backing data yet — a clean empty slot rather than
     // inventing engagement history.
     return [];
-  }, [activeTab, posts, savedItems, myOrders, tagged.items]);
+  }, [activeTab, posts, savedItems, reposts.items]);
 
-  const numColumns = activeTab === 'Posts' || activeTab === 'Tagged' ? layout.gridColumns : activeTab === 'Saved' ? savedColumns : 1;
+  const numColumns = activeTab === 'Posts' || activeTab === 'Reposts' ? layout.gridColumns : activeTab === 'Saved' ? savedColumns : 1;
 
   // Posts/Saved force the FlatList above to remount (new `key`, since a
   // live FlatList can't change numColumns) — restore the offset it had
@@ -733,7 +694,7 @@ export default function ProfileScreen() {
         />
       );
     }
-    if (item.kind === 'tagged') {
+    if (item.kind === 'repost') {
       return (
         <ProfileVideoTile
           item={item.item}
@@ -747,12 +708,11 @@ export default function ProfileScreen() {
         />
       );
     }
-    if (item.kind === 'order') return <OrderRow order={item.order} theme={theme} onPress={handleOrdersPress} />;
     return <SavedCell item={item.saved} size={savedCellSize} theme={theme} onPress={handleSavedTap} />;
-  }, [handleDraftsTilePress, handleOrdersPress, handlePostLongPress, handlePostTap, handleSavedTap, layout.tileHeight, layout.tileWidth, savedCellSize, theme]);
+  }, [handleDraftsTilePress, handlePostLongPress, handlePostTap, handleSavedTap, layout.tileHeight, layout.tileWidth, savedCellSize, theme]);
 
   const keyForRow = useCallback((row: ListRow) => (
-    row.kind === 'draftsTile' ? 'drafts-tile' : row.kind === 'post' ? row.post.id : row.kind === 'tagged' ? `t-${row.item.id}` : row.kind === 'order' ? row.order.id : row.saved.id
+    row.kind === 'draftsTile' ? 'drafts-tile' : row.kind === 'post' ? row.post.id : row.kind === 'repost' ? `r-${row.item.id}` : row.saved.id
   ), []);
 
   // One table decides every tab's empty copy + CTA (own profile → CTA).
@@ -805,6 +765,14 @@ export default function ProfileScreen() {
     { key: 'likes', label: 'Likes', value: formatCompactCount(totalLikes) },
   ];
 
+  // Labeled tabs with a count wherever the number is already loaded.
+  const tabItems: ProfileTab[] = TAB_ITEMS.map((tab) => ({
+    ...tab,
+    count: tab.key === 'Posts' ? publishedPosts.length
+      : tab.key === 'Saved' ? savedItems.length
+      : undefined,
+  }));
+
   const highlightItems: ProfileStoryItem[] = highlights.map((h) => ({
     id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor, imageUri: h.coverUrl ?? null,
   }));
@@ -827,7 +795,6 @@ export default function ProfileScreen() {
             theme={theme}
           />
         ) : null}
-        <ProfileTopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" />
         <ProfileTopBarIcon
           name="more-horizontal"
           onPress={() => { hapticLight(); setMenuOpen(true); }}
@@ -872,7 +839,6 @@ export default function ProfileScreen() {
         )}
         name={displayName}
         handle={displayHandle && displayHandle !== displayName ? displayHandle : null}
-        chip={<ProfileChip label="Buyer" icon="user" />}
         meta={(profile?.bio || profile?.website || profile?.location) ? (
           <ProfileMeta
             bio={profile?.bio}
@@ -925,6 +891,7 @@ export default function ProfileScreen() {
       {/* ── Story Highlights: circles + "New" ── */}
       <View style={styles.highlightsWrap} testID="profile-highlights">
         <ProfileStoriesRow
+          size="sm"
           items={highlightItems}
           onNew={() => { hapticSelection(); router.push('/buyer-highlights-manager?create=1' as any); }}
           onPressItem={(item) => {
@@ -943,7 +910,7 @@ export default function ProfileScreen() {
       ) : null}
 
       <View style={styles.tabsBlock}>
-        <ProfileTabs tabs={TAB_ITEMS} active={activeTab} onChange={handleTabPress} variant="iconOnly" />
+        <ProfileTabs tabs={tabItems} active={activeTab} onChange={handleTabPress} />
       </View>
     </View>
   );
@@ -979,6 +946,7 @@ export default function ProfileScreen() {
             action={emptyAction}
             actionStyle="text"
             alignTop={activeTab === 'Posts'}
+            quiet
           />
         )}
         showsVerticalScrollIndicator={false}
@@ -989,6 +957,8 @@ export default function ProfileScreen() {
         onRefresh={onRefresh}
       />
       </ProfileEmptyAreaContext.Provider>
+
+      <ProfileStickyHeader visible={stickyVisible} topPad={topPad} title={displayHandle || displayName} />
 
       <CoverCoachmarkSheet
         visible={coverFlow.coachmarkVisible}
@@ -1003,7 +973,9 @@ export default function ProfileScreen() {
         title={displayName}
         onClose={() => setMenuOpen(false)}
         items={[
+          { key: 'edit', icon: 'edit-3', label: 'Edit profile', onPress: () => router.push('/(buyer)/edit-profile') },
           caps.showShare && { key: 'share', icon: 'share-2', label: 'Share profile', onPress: handleShareProfile },
+          { key: 'orders', icon: 'package', label: 'Orders', onPress: () => router.push('/(buyer)/orders' as never) },
           caps.showViewAsVisitor && user?.id && {
             key: 'view-as-visitor', icon: 'eye', label: 'View as visitor',
             onPress: () => router.push(viewAsVisitorHref('buyer', user.id) as never),
@@ -1075,16 +1047,6 @@ const cellStyles = StyleSheet.create({
   draftsTile: { borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
   draftsTitle: { fontFamily: FONT.semibold, fontSize: FS.sm },
   draftsCount: { fontFamily: FONT.regular, fontSize: FS.xs },
-  orderCard: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm,
-    marginHorizontal: SP.md, marginVertical: SP.xs,
-  },
-  orderCardImage: { width: 52, height: 52, borderRadius: RADIUS.sm },
-  orderCardImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  orderCardBody: { flex: 1, gap: 2 },
-  orderCardSeller: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  orderCardMeta: { fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: 2 },
 });
 
 const sheetStyles = StyleSheet.create({

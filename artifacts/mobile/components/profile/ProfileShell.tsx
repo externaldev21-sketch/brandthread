@@ -59,6 +59,7 @@ import { useLiveStreamForHost, useOpenLive } from '@/lib/live/useLiveDirectory';
 import { ProfileVideoHeader } from './ProfileVideoHeader';
 import { ProfileStoryAvatar } from './ProfileStoryAvatar';
 import { avatarGeometry, PROFILE_VIDEO_HEADER_AVATAR_SIZE } from './profileAvatarGeometry';
+import { PROFILE_STICKY_HEADER_HEIGHT, ProfileStickyHeader } from './ProfileStickyHeader';
 /** Compact sticky header height below the status bar. */
 const COMPACT_BAR = 64;
 
@@ -81,8 +82,9 @@ export interface ProfileIdentity {
   /** A moving profile picture — when set, plays instead of the static `avatarUrl` (its poster frame) in the video-header own-profile avatar. */
   avatarVideoUrl?: string | null;
   verified?: boolean;
-  /** "Seller" / "Buyer" — shown as a chip beside the handle. */
-  roleLabel: string;
+  /** "Seller" — shown as a chip beside the handle. Omitted (buyers) or a
+   *  verified account (the check already says it) → no role chip. */
+  roleLabel?: string;
   /** `headerVariant="video"` only: more chips stacked directly under the
    *  role chip, same height and style (e.g. the owner's plan chip). */
   extraChips?: Array<{ label: string; icon?: keyof typeof Feather.glyphMap }>;
@@ -153,6 +155,9 @@ export interface ProfileShellProps<T> {
   renderFloating?: (bottom: number) => React.ReactNode;
   /** Height a floating tab bar occupies at the bottom (including the home indicator). */
   bottomInset?: number;
+  /** `headerVariant="video"` only: a solid compact bar (handle/name, plus
+   *  these slots, e.g. back / •••) fades in once the header scrolls away. */
+  stickyHeader?: { left?: React.ReactNode; right?: React.ReactNode };
 }
 
 export function ProfileShell<T>(props: ProfileShellProps<T>) {
@@ -160,7 +165,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
     testID, identity, avatar, hero, coverAffordance, topLeft, topRight, meta, isOwnProfile = false, walletChip, stats, statsLoading, belowStats, actions, extras,
     tabs, section, data, renderItem, keyExtractor, numColumns = 1, listKey,
     ListEmptyComponent, ListFooterComponent, onEndReached, refreshing = false, onRefresh,
-    renderFloating, bottomInset = 0, headerVariant = 'hero', tabsVariant = 'labeled', belowTabs,
+    renderFloating, bottomInset = 0, headerVariant = 'hero', tabsVariant = 'labeled', belowTabs, stickyHeader,
   } = props;
   const isVideoHeader = headerVariant === 'video';
   const { theme } = useAppTheme();
@@ -182,6 +187,10 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const [viewportHeight, setViewportHeight] = useState(layout.windowHeight);
   const [tabsHeight, setTabsHeight] = useState(0);
   const [videoHeroHeight, setVideoHeroHeight] = useState(0);
+  const [stickyVisible, setStickyVisible] = useState(false);
+  // One chip at most: the role, and only when it adds something.
+  const roleChipLabel = identity.verified ? null : identity.roleLabel || null;
+  const roleChipIcon = roleChipLabel === 'Seller' ? 'shopping-bag' as const : 'user' as const;
 
   useFocusEffect(useCallback(() => {
     setFocused(true);
@@ -213,9 +222,14 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
       lastOffsetRef.current = value;
       const next = isVideoHeader ? value < Math.max(videoHeroHeight, 1) : value < heroHeight - 40;
       setHeroOnScreen((prev) => (prev === next ? prev : next));
+      if (isVideoHeader && stickyHeader) {
+        // The top bar (inset + ~44pt) has scrolled off → show the compact bar.
+        const sticky = value > headerTopInset + PROFILE_STICKY_HEADER_HEIGHT;
+        setStickyVisible((prev) => (prev === sticky ? prev : sticky));
+      }
     });
     return () => scrollY.removeListener(id);
-  }, [scrollY, heroHeight, isVideoHeader, videoHeroHeight]);
+  }, [scrollY, heroHeight, isVideoHeader, videoHeroHeight, stickyHeader, headerTopInset]);
 
   // ── Preserve scroll position across an in-screen tab switch ─────────────
   // `listKey` changes when a tab needs a different `numColumns` (FlatList
@@ -397,7 +411,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
       nameAccessory={identity.verified ? <Feather name="check-circle" size={16} color={ON_DARK} accessibilityLabel="Verified" /> : null}
       handle={identity.handle ?? null}
       chips={[
-        <ProfileChip key="role" size="sm" label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} />,
+        ...(roleChipLabel ? [<ProfileChip key="role" size="sm" label={roleChipLabel} icon={roleChipIcon} />] : []),
         ...(identity.extraChips ?? []).map((c) => <ProfileChip key={c.label} size="sm" label={c.label} icon={c.icon} />),
       ]}
       meta={meta}
@@ -469,7 +483,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
           <View style={styles.handleRow}>
             {identity.handle ? <Text style={styles.handle} numberOfLines={1}>{identity.handle}</Text> : null}
             {identity.pronouns ? <Text style={styles.handleSoft} numberOfLines={1}>({identity.pronouns})</Text> : null}
-            <ProfileChip label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} />
+            {roleChipLabel ? <ProfileChip label={roleChipLabel} icon={roleChipIcon} /> : null}
           </View>
         </Animated.View>
       </View>
@@ -535,6 +549,16 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
           ) : undefined}
         />
         </ProfileEmptyAreaContext.Provider>
+
+        {isVideoHeader && stickyHeader ? (
+          <ProfileStickyHeader
+            visible={stickyVisible}
+            topPad={topPad}
+            title={identity.handle || identity.name}
+            left={stickyHeader.left}
+            right={stickyHeader.right}
+          />
+        ) : null}
 
         {/* Compact sticky header — fades in once the hero scrolls away */}
         {isVideoHeader ? null : (<>
