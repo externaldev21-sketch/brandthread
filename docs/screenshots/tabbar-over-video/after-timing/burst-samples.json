@@ -1,0 +1,1448 @@
+{
+  "presses": [
+    {
+      "route": "discover",
+      "down": 23780.300000000745,
+      "visible": 23927.400000002235
+    },
+    {
+      "route": "inbox",
+      "down": 24098.699999999255,
+      "visible": 24205.199999999255
+    },
+    {
+      "route": "activity",
+      "down": 24381.300000000745,
+      "visible": 24473.800000000745
+    },
+    {
+      "route": "index",
+      "down": 24632.60000000149,
+      "visible": 24781.699999999255
+    },
+    {
+      "route": "discover",
+      "down": 24931.5,
+      "visible": 25069.400000002235
+    },
+    {
+      "route": "activity",
+      "down": 25231.800000000745,
+      "visible": 25301.60000000149
+    },
+    {
+      "route": "inbox",
+      "down": 25465.199999999255,
+      "visible": 25547.199999999255
+    },
+    {
+      "route": "index",
+      "down": 25715.300000000745,
+      "visible": 25845.5
+    },
+    {
+      "route": "activity",
+      "down": 25999.60000000149,
+      "visible": 26140.800000000745
+    },
+    {
+      "route": "discover",
+      "down": 26298.199999999255,
+      "visible": 26371.699999999255
+    }
+  ],
+  "samples": [
+    {
+      "t": 23744.496,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 23761.1,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 23777.8,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 23794.4,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 23927.8,
+      "pill": {
+        "x": 14.0114,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 23944.4,
+      "pill": {
+        "x": 60.9945,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 23961.1,
+      "pill": {
+        "x": 67.274,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 23977.8,
+      "pill": {
+        "x": 71.5253,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 23994.5,
+      "pill": {
+        "x": 74.3042,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24011.2,
+      "pill": {
+        "x": 76.0841,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24027.8,
+      "pill": {
+        "x": 77.2063,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24044.5,
+      "pill": {
+        "x": 77.902,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24061.1,
+      "pill": {
+        "x": 78.3343,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24077.8,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24094.4,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 24111.1,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24194.4,
+      "pill": {
+        "x": 83.0214,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24211.1,
+      "pill": {
+        "x": 130.304,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24227.8,
+      "pill": {
+        "x": 136.832,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24244.5,
+      "pill": {
+        "x": 141.233,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24261.1,
+      "pill": {
+        "x": 144.115,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24277.8,
+      "pill": {
+        "x": 145.955,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24294.4,
+      "pill": {
+        "x": 147.126,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24311.1,
+      "pill": {
+        "x": 147.852,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24327.8,
+      "pill": {
+        "x": 148.304,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24344.4,
+      "pill": {
+        "x": 149,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24361.1,
+      "pill": {
+        "x": 149,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24377.8,
+      "pill": {
+        "x": 149,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 24394.4,
+      "pill": {
+        "x": 149,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24461.1,
+      "pill": {
+        "x": 153.673,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24494.4,
+      "pill": {
+        "x": 200.767,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24511.1,
+      "pill": {
+        "x": 211.422,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24527.8,
+      "pill": {
+        "x": 214.238,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24544.4,
+      "pill": {
+        "x": 216.042,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24561.1,
+      "pill": {
+        "x": 217.174,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24577.8,
+      "pill": {
+        "x": 217.886,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24594.4,
+      "pill": {
+        "x": 218.324,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24611.1,
+      "pill": {
+        "x": 219,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24627.8,
+      "pill": {
+        "x": 219,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24644.4,
+      "pill": {
+        "x": 180.5,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24761.1,
+      "pill": {
+        "x": 169.559,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 24777.7,
+      "pill": {
+        "x": 40.3147,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 24794.4,
+      "pill": {
+        "x": 29.4499,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 24811.1,
+      "pill": {
+        "x": 22.0633,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 24827.7,
+      "pill": {
+        "x": 17.2201,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 24844.4,
+      "pill": {
+        "x": 14.1259,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 24861.1,
+      "pill": {
+        "x": 12.1567,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 24877.8,
+      "pill": {
+        "x": 10.9284,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 24894.4,
+      "pill": {
+        "x": 10.1701,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 24911.1,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 24927.8,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 24944.4,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25061.1,
+      "pill": {
+        "x": 13.6733,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25077.8,
+      "pill": {
+        "x": 60.7667,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25094.4,
+      "pill": {
+        "x": 67.1493,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25111.1,
+      "pill": {
+        "x": 71.4221,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25127.8,
+      "pill": {
+        "x": 74.2376,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25144.4,
+      "pill": {
+        "x": 76.0417,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25161.1,
+      "pill": {
+        "x": 77.1745,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25177.7,
+      "pill": {
+        "x": 77.8856,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25194.4,
+      "pill": {
+        "x": 78.3221,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25211,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25227.8,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 25244.4,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25294.4,
+      "pill": {
+        "x": 87.9484,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25311.1,
+      "pill": {
+        "x": 167.308,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25327.7,
+      "pill": {
+        "x": 184.675,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25344.4,
+      "pill": {
+        "x": 196.7,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25361.1,
+      "pill": {
+        "x": 204.811,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25377.7,
+      "pill": {
+        "x": 210.099,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25394.4,
+      "pill": {
+        "x": 213.463,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25411,
+      "pill": {
+        "x": 215.597,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25427.7,
+      "pill": {
+        "x": 216.919,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25444.4,
+      "pill": {
+        "x": 217.739,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25461,
+      "pill": {
+        "x": 219,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 25477.7,
+      "pill": {
+        "x": 187.5,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25544.3,
+      "pill": {
+        "x": 185.183,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25561.1,
+      "pill": {
+        "x": 159.206,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25577.7,
+      "pill": {
+        "x": 155.622,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25594.4,
+      "pill": {
+        "x": 153.237,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25611,
+      "pill": {
+        "x": 151.664,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25627.7,
+      "pill": {
+        "x": 150.66,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25644.4,
+      "pill": {
+        "x": 150.022,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25661.1,
+      "pill": {
+        "x": 149.624,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25677.7,
+      "pill": {
+        "x": 149.378,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25694.3,
+      "pill": {
+        "x": 149,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25711.1,
+      "pill": {
+        "x": 149,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25727.8,
+      "pill": {
+        "x": 110.5,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25827.7,
+      "pill": {
+        "x": 101.814,
+        "opacity": 1
+      },
+      "path": "/inbox"
+    },
+    {
+      "t": 25844.3,
+      "pill": {
+        "x": 29.3098,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25861.1,
+      "pill": {
+        "x": 22.2439,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25877.7,
+      "pill": {
+        "x": 17.4276,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25894.3,
+      "pill": {
+        "x": 14.313,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25911,
+      "pill": {
+        "x": 12.3108,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25927.7,
+      "pill": {
+        "x": 11.0377,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25944.4,
+      "pill": {
+        "x": 10.2443,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25961.1,
+      "pill": {
+        "x": 9.75468,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25977.7,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 25994.3,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/"
+    },
+    {
+      "t": 26011,
+      "pill": {
+        "x": 9,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26127.7,
+      "pill": {
+        "x": 19.3944,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26161.1,
+      "pill": {
+        "x": 161.636,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26177.6,
+      "pill": {
+        "x": 195.119,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26194.4,
+      "pill": {
+        "x": 203.885,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26211,
+      "pill": {
+        "x": 209.626,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26227.7,
+      "pill": {
+        "x": 213.21,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26244.3,
+      "pill": {
+        "x": 215.462,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26261.1,
+      "pill": {
+        "x": 216.847,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26277.7,
+      "pill": {
+        "x": 219,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26294.3,
+      "pill": {
+        "x": 219,
+        "opacity": 1
+      },
+      "path": "/activity"
+    },
+    {
+      "t": 26311.1,
+      "pill": {
+        "x": 180.5,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26361.1,
+      "pill": {
+        "x": 171.42,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26377.7,
+      "pill": {
+        "x": 107.364,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26394.4,
+      "pill": {
+        "x": 97.8786,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26411.1,
+      "pill": {
+        "x": 91.2324,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26427.7,
+      "pill": {
+        "x": 86.7824,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26444.4,
+      "pill": {
+        "x": 83.8954,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26461,
+      "pill": {
+        "x": 82.0364,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26477.7,
+      "pill": {
+        "x": 80.8714,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26494.3,
+      "pill": {
+        "x": 80.1413,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26511,
+      "pill": {
+        "x": 79.6936,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26527.6,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26544.4,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26561,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26577.6,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26594.3,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26611,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26627.7,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26644.3,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26661,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26677.6,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26694.4,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26711,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26727.6,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26744.3,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26761,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26777.7,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26794.4,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26811,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26827.7,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26844.4,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26861,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26877.6,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26894.3,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26911,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26927.7,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26944.3,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26961,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26977.7,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 26994.4,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27011,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27027.6,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27044.3,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27061,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27077.6,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27094.3,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27111,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27127.7,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27144.3,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27160.9,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27177.7,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27194.3,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27211,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27227.6,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27244.3,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27261,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27277.7,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27294.3,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27311,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27327.6,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27344.3,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27361,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27377.7,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    },
+    {
+      "t": 27394.3,
+      "pill": {
+        "x": 79,
+        "opacity": 1
+      },
+      "path": "/discover"
+    }
+  ]
+}

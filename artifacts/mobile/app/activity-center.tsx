@@ -39,6 +39,7 @@ import { Icon } from '@/components/ui/Icon';
 
 import { useFocusEffect, useRouter, useSegments } from 'expo-router';
 
+import { useFocusEffectAfterPaint } from '@/hooks/useFocusEffectAfterPaint';
 import { useUser } from '@clerk/expo';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -806,8 +807,10 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
 
   // Runs on focus, and periodically while focused (no websocket/SSE layer —
   // see watchActivityRealtime's own comment).
+  // After the screen has painted, and skipped when a fast tab burst only
+  // passes through Activity (hooks/useFocusEffectAfterPaint.ts).
   const loadedOnce = useRef(false);
-  useFocusEffect(useCallback(() => {
+  useFocusEffectAfterPaint(useCallback(() => {
     void loadFirstPage(loadedOnce.current ? 'focus' : 'initial');
     void loadSuggested();
     void reloadTrending();

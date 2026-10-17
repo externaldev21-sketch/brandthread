@@ -689,8 +689,14 @@ export default function ProductsScreen() {
   useFocusEffect(useCallback(() => {
     const requested = params.filter;
     const valid: ProductFilter[] = ['all', 'active', 'draft', 'scheduled', 'archived', 'pre-order', 'pre-made', 'low-stock', 'out-of-stock'];
-    if (requested && valid.includes(requested)) setFilter(requested);
-  }, [params.filter]));
+    if (requested && valid.includes(requested)) {
+      setFilter(requested);
+      // Consume the deep link: left in place, every later return to this
+      // tab (a plain tab switch) re-forced the link's filter over whatever
+      // the seller picked since, and reloaded the list.
+      router.setParams({ filter: undefined } as never);
+    }
+  }, [params.filter, router]));
 
   // useFocusEffect also re-runs while focused whenever loadProducts changes
   // (filter or search), so a separate mount effect would load everything twice.

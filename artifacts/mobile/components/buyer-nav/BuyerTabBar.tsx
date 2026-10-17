@@ -14,9 +14,11 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticTabChange } from '@/lib/haptics';
 import { useActivityUnreadCount } from '@/components/ActivityBellButton';
 import {
-  TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarSlot, CrossfadeNavIcon, tabIconColor,
+  TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarMediaLift, TabBarSlot, CrossfadeNavIcon, tabIconColor,
   useTabBarActiveIndex, INDICATOR_SPRING,
 } from '@/components/tab-bar/TabBarParts';
+import { useHoldToSwitch } from '@/components/tab-bar/useHoldToSwitch';
+import { useQuickAccountSwitch } from '@/contexts/QuickAccountSwitchContext';
 import { BuyerNavIcon, type BuyerNavIconName } from './BuyerNavIcon';
 import { COMPACT_ICON_SCALE, COMPACT_ICON_STROKE_SCALE, useBuyerTabBarMetrics } from './buyerTabBarMetrics';
 import { TAB_BAR_SLIDE_EASING, TAB_BAR_SLIDE_MS } from '@/constants/motion';
@@ -357,11 +359,18 @@ export function BuyerTabBar({
 
   const openRoute = React.useCallback((routeName: string) => {
     const route = state.routes.find(candidate => candidate.name === routeName);
-    const focused = activeRoute === routeName;
+    // Compare against where the navigator is *going*, not the last committed
+    // `state` this bar rendered with: during a rapid burst a tap on the tab
+    // that's still on screen (but already being navigated away from) must
+    // still navigate back to it, and a second tap on the tab already
+    // requested must not queue a duplicate navigation.
+    const latest = navigation.getState?.() ?? state;
+    const focused = (latest.routes[latest.index]?.name ?? activeRoute) === routeName;
     if (focused) {
-      // Re-tapping the active tab: let its screen jump back to the top
-      // (useScrollToTop listens for this event). Nothing else changes.
-      if (route) navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+      // A re-tap on the tab that's settled on screen: no navigation, no
+      // haptic — just the standard tabPress, which the screens' own
+      // useScrollToTop (hooks/useScrollReset.ts) turns into scroll-to-top.
+      if (route && activeRoute === routeName) navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
       return;
     }
     const event = route
@@ -379,7 +388,19 @@ export function BuyerTabBar({
     // Feedback/glide already starts on press-in. Navigation must not wait for
     // that animation; its geometry, spring and Profile origin stay unchanged.
     navigation.navigate(routeName as never);
-  }, [activeRoute, activeIndex, navigation, state.routes, pressSlot, pressProfile]);
+  }, [activeRoute, activeIndex, navigation, state, pressSlot, pressProfile]);
+
+  // Hold Profile to switch accounts (components/tab-bar/HoldRing.tsx): a
+  // plain tap still opens Profile (the circle's own onPress); a completed
+  // ring switches to the other account. No `onLongPress` on the circle —
+  // it would swallow the tap.
+  const { quickSwitch } = useQuickAccountSwitch();
+  const profileHold = useHoldToSwitch({
+    onComplete: quickSwitch,
+    // Touch-down hid the pill eagerly (Profile isn't a pill slot); a hold
+    // that didn't open Profile puts it back on the tab still on screen.
+    onHoldRelease: () => { if (activeIndex >= 0) pressIndicator(activeIndex); },
+  });
 
   const onLongPress = React.useCallback((routeName: string) => {
     const route = state.routes.find(candidate => candidate.name === routeName);
@@ -435,7 +456,12 @@ export function BuyerTabBar({
           capsuleAnimatedStyle,
         ]}
       >
-        <TabBarGlass theme={theme} radius={radius.bar} />
+        {/* `progress` is 1 exactly while the bar is compact over the Threads
+            feed's full-bleed video, 0 everywhere else — so the denser
+            backing and the lift shadow only exist over video and fade in
+            and out with the same capsule transition. */}
+        <TabBarMediaLift radius={radius.bar} overMedia={progress} />
+        <TabBarGlass theme={theme} radius={radius.bar} overMedia={progress} />
 
         <Animated.View style={[StyleSheet.absoluteFill, styles.pillLayer, pillCorrectionStyle]}>
         <TabBarIndicator
@@ -507,8 +533,9 @@ export function BuyerTabBar({
         selected={profileFocused}
         onPress={() => openRoute('profile')}
         onPressIn={pressProfile}
-        onLongPress={() => onLongPress('profile')}
+        hold={profileHold}
         testID="buyer-tab-profile"
+        overMedia={progress}
       >
         <Animated.View style={circleIconScaleStyle}>
           <BuyerNavIcon

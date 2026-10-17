@@ -104,6 +104,8 @@ import {
   isPreviewNotesEnabled, getPreviewNotesForTray, getPreviewMyNote, postPreviewNote,
 } from '@/lib/previewNotes';
 import { BrandthreadAvatar } from '@/components/branding/BrandthreadAvatar';
+import { keepIfSame } from '@/lib/keepIfSame';
+import { useFocusEffectAfterPaint } from '@/hooks/useFocusEffectAfterPaint';
 import { isOfficialAccountId } from '@/lib/officialAccount';
 import { EmptyState as QuietEmptyState, ScreenHeader, SectionHeader, SegmentTabs } from '@/components/reframe';
 import { IconButton } from '@/components/ui/IconButton';
@@ -655,7 +657,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     }
   }, [loadData]);
 
-  useFocusEffect(useCallback(() => {
+  useFocusEffectAfterPaint(useCallback(() => {
     loadData();
     loadSuggested();
     loadStoryTray();

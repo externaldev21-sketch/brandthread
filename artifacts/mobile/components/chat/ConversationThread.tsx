@@ -43,6 +43,8 @@ import { PressableScale, StatusBadge, useUndoToast } from '@/components/Brandthr
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
 import { BrandthreadAvatar } from '@/components/branding/BrandthreadAvatar';
+import { keepIfSame } from '@/lib/keepIfSame';
+import { useFocusEffectAfterPaint } from '@/hooks/useFocusEffectAfterPaint';
 import { isOfficialAccountId } from '@/lib/officialAccount';
 import { Chip } from '@/components/ui/Chip';
 import { Snackbar } from '@/components/ui/Snackbar';
@@ -653,7 +655,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       setMessaging({ blockedByMe: !!safety?.blockedByMe, unavailable: !!safety?.unavailable });
       if (loadedConv) {
         const msgs = await getMessages(loadedConv.id);
-        setMessages(msgs);
+        setMessages(prev => keepIfSame(prev, msgs));
 
         if (!hasComputedUnreadRef.current) {
           hasComputedUnreadRef.current = true;
@@ -673,7 +675,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     }
   }, [params.id, params.participantId, userId, isSeller]);
 
-  useFocusEffect(useCallback(() => {
+  useFocusEffectAfterPaint(useCallback(() => {
     loadData();
   }, [loadData]));
 

@@ -29,6 +29,8 @@ import { useTabBarHiddenByScreen } from '@/lib/tabBarVisibility';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticLight, hapticTabChange } from '@/lib/haptics';
+import { useHoldToSwitch } from '@/components/tab-bar/useHoldToSwitch';
+import { useQuickAccountSwitch } from '@/contexts/QuickAccountSwitchContext';
 import { BuyerNavIcon, type BuyerNavIconName } from '@/components/buyer-nav/BuyerNavIcon';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import {
@@ -263,6 +265,18 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
     opacity: indicatorOpacity, press: pressIndicator, afterGlide,
   } = useTabBarActiveIndex(activeIndex, reducedMotion);
 
+  // Hold the Profile tab to switch accounts — same gesture as the buyer
+  // bar's Profile circle (components/tab-bar/HoldRing.tsx). A plain tap
+  // still opens Profile (the slot's own onPress). Only this slot: the
+  // Studio circle's own gestures are untouched.
+  const { quickSwitch } = useQuickAccountSwitch();
+  const profileHold = useHoldToSwitch({
+    onComplete: quickSwitch,
+    // Touch-down sent the pill to Profile eagerly; a hold that didn't
+    // open it puts the pill back on the tab still on screen.
+    onHoldRelease: () => { if (activeIndex >= 0) pressIndicator(activeIndex); },
+  });
+
   const [newOrderCount, setNewOrderCount] = useState(() =>
     getSellerOrderBadgeCount(userId),
   );
@@ -469,6 +483,7 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
                 }
                 onPress={onPress}
                 onPressIn={() => pressIndicator(index)}
+                hold={tabDef.name === 'profile' ? profileHold : undefined}
                 testID={`seller-tab-${tabDef.name}`}
                 badge={showOrderBadge ? <TabBarBadge count={newOrderCount} theme={theme} /> : null}
                 pillTarget={indicatorTarget}
