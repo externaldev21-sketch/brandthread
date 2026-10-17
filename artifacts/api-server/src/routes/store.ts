@@ -807,6 +807,21 @@ router.get("/site/:slug", async (req, res): Promise<void> => {
   res.send(html);
 });
 
+// GET /api/store/public/:slug — public storefront (no auth)
+router.get("/public/:slug", async (req, res): Promise<void> => {
+  const { slug } = req.params;
+  const [sf] = await db
+    .select()
+    .from(storefronts)
+    .where(eq(storefronts.slug, slug))
+    .limit(1);
+  if (!sf || sf.status !== "published") { res.status(404).json({ error: "Store not found" }); return; }
+  // Never leak the password hash, preview-link state or private settings.
+  // Builder collections/pages/navigation: published items only, products resolved.
+  res.json({ ...toPublicStorefront(sf), ...(await safePublicBuilderData(sf.ownerId, sf)) });
+});
+
+// Everything below requires a signed-in seller. Public routes must stay above.
 router.use(requireAuth);
 
 // ─── Helper — get or create storefront for a seller ──────────────────────────
@@ -1276,20 +1291,6 @@ router.delete("/share-preview", async (req, res): Promise<void> => {
     })
     .where(eq(storefronts.id, sf.id));
   res.json({ ok: true, revokedAt: new Date().toISOString() });
-});
-
-// GET /api/store/public/:slug — public storefront (no auth)
-router.get("/public/:slug", async (req, res): Promise<void> => {
-  const { slug } = req.params;
-  const [sf] = await db
-    .select()
-    .from(storefronts)
-    .where(eq(storefronts.slug, slug))
-    .limit(1);
-  if (!sf || sf.status !== "published") { res.status(404).json({ error: "Store not found" }); return; }
-  // Never leak the password hash, preview-link state or private settings.
-  // Builder collections/pages/navigation: published items only, products resolved.
-  res.json({ ...toPublicStorefront(sf), ...(await safePublicBuilderData(sf.ownerId, sf)) });
 });
 
 export default router;

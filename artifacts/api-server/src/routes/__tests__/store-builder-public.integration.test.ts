@@ -18,7 +18,11 @@ const OTHER = `sbp-other-${suffix}`;
 const SLUG = `sbp-${suffix}`;
 
 vi.mock("../../middlewares/requireAuth", () => ({
-  requireAuth: (req: any, _res: any, next: any) => { req.clerkUserId = OWNER; next(); },
+  requireAuth: (req: any, res: any, next: any) => {
+    // Simulate a signed-out visitor so public routes can be checked for auth ordering.
+    if (req.headers["x-test-signed-out"]) { res.status(401).json({ error: "Unauthorized" }); return; }
+    req.clerkUserId = OWNER; next();
+  },
 }));
 
 let server: Server;
@@ -111,5 +115,15 @@ describe("builder state on the live store", () => {
     await call("PUT", "/", { collections: [], pages: [], navigation: [] });
     const site = await call("GET", `/site/${SLUG}`);
     expect(site.text).toContain('<a href="#">Shop</a>');
+  });
+
+  it("serves GET /public/:slug to signed-out visitors (registered before requireAuth)", async () => {
+    const res = await fetch(`${base}/api/store/public/${SLUG}`, { headers: { "x-test-signed-out": "1" } });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.slug).toBe(SLUG);
+    expect(body.storePasswordHash).toBeUndefined();
+    const owner = await fetch(`${base}/api/store`, { headers: { "x-test-signed-out": "1" } });
+    expect(owner.status).toBe(401);
   });
 });
