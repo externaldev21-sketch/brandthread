@@ -13,6 +13,7 @@ import {
   runAgentWelcomeBackfill,
   canSendProactiveNudge,
   recordProactiveNudge,
+  BUYER_WELCOME_STEPS,
 } from "../brandthreadAgent";
 
 const TEST_BUYER = `agent-welcome-buyer-${process.pid}`;
@@ -52,9 +53,16 @@ describe("createWelcomeConversationOnce", () => {
     const msgs = await db.select().from(messages)
       .where(eq(messages.conversationId, result.conversationId))
       .orderBy(messages.createdAt);
-    expect(msgs.length).toBe(3);
+    // 3-5 short lines, buyer-tailored, no emoji.
+    expect(msgs.length).toBeGreaterThanOrEqual(3);
+    expect(msgs.length).toBeLessThanOrEqual(5);
     expect(msgs.every((m) => m.senderId === BRANDTHREAD_AGENT_CLERK_ID)).toBe(true);
-    expect(msgs[0].body).toContain("welcome to Brandthread");
+    expect(msgs[0].body).toContain("Brandthread");
+    const buyerText = msgs.map((m) => m.body).join(" ");
+    expect(buyerText).toMatch(/Threads/);
+    expect(buyerText).toMatch(/Discover/);
+    expect(buyerText).toMatch(/LIVE/);
+    expect(buyerText).not.toMatch(/\p{Extended_Pictographic}/u);
     const last = msgs[msgs.length - 1];
     expect(last.attachment).toMatchObject({ type: "quick_replies" });
     expect(JSON.parse((last.attachment as any).meta.optionsJson).length).toBeGreaterThan(0);
@@ -72,7 +80,11 @@ describe("createWelcomeConversationOnce", () => {
       .where(eq(messages.conversationId, result.conversationId))
       .orderBy(messages.createdAt);
     const allText = msgs.map((m) => m.body).join(" ");
-    expect(allText).toMatch(/listing|Go live|payouts|Shopify/i);
+    expect(allText).toMatch(/Store Builder/);
+    expect(allText).toMatch(/LIVE/);
+    expect(allText).toMatch(/payouts/i);
+    expect(allText).toMatch(/Manufacturer/);
+    expect(allText).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 
   it("is idempotent: calling it twice never creates a second conversation or duplicate messages", async () => {
@@ -94,7 +106,7 @@ describe("createWelcomeConversationOnce", () => {
     expect(convRows).toHaveLength(1);
 
     const msgs = await db.select().from(messages).where(eq(messages.conversationId, first.conversationId));
-    expect(msgs).toHaveLength(3); // still exactly the one welcome batch, not six
+    expect(msgs).toHaveLength(BUYER_WELCOME_STEPS.length); // still exactly the one welcome batch, not two
   });
 
   it("is idempotent under concurrent calls (race-safe via the ledger's primary key)", async () => {

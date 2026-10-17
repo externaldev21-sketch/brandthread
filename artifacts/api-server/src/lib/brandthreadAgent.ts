@@ -20,9 +20,9 @@ import { logger } from "./logger";
  *  `participantUserId` (artifacts/mobile/lib/previewInboxData.ts) so real and
  *  preview data agree on the same id. */
 export const BRANDTHREAD_AGENT_CLERK_ID = "brandthread-agent";
-export const BRANDTHREAD_AGENT_NAME = "Brandthread Agent";
-export const BRANDTHREAD_AGENT_HANDLE = "@brandthread";
-export const BRANDTHREAD_AGENT_INITIALS = "BT";
+export const BRANDTHREAD_AGENT_NAME = "Brandthread";
+export const BRANDTHREAD_AGENT_HANDLE = "@brandthread_agent";
+export const BRANDTHREAD_AGENT_INITIALS = "B";
 export const BRANDTHREAD_AGENT_COLOR = "#0A0A0B";
 export const AGENT_CONVERSATION_TYPE = "brandthread_agent";
 
@@ -51,32 +51,48 @@ export interface WelcomeStep {
    *  path. (The *live* chat reply path additionally sets `agentTypingUntil`
    *  — see brandthread-agent.ts.) */
   delaySeconds: number;
+  /** Optional deep-link card that rides on this step's message. */
+  attachment?: { type: "agent_card"; title: string; subtitle?: string; meta: Record<string, string> };
 }
 
+// Clean, short, no emoji — Dev's black/white/silver tone. Every feature named
+// here exists in the app (see ASSISTANT_LINKS in brandthreadAssistant.ts).
 export const BUYER_WELCOME_STEPS: WelcomeStep[] = [
-  { text: "yo, welcome to Brandthread 👋", delaySeconds: 0 },
-  { text: "I'm the Brandthread Agent, here 24/7 if you wanna talk fits, find brands, or figure anything out", delaySeconds: 3 },
-  { text: "want me to show you how Thread Cash works?", delaySeconds: 6 },
+  { text: "Hi, I'm Brandthread. Welcome in.", delaySeconds: 0 },
+  { text: "Threads is your feed of drops and posts from independent brands. Tap any tagged piece to shop it.", delaySeconds: 2 },
+  { text: "Use Discover to find new brands, save what you love into collections, and catch brands selling LIVE.", delaySeconds: 4 },
+  { text: "Ask me anything about the app, any time.", delaySeconds: 6 },
 ];
 
 export const SELLER_WELCOME_STEPS: WelcomeStep[] = [
-  { text: "yo, welcome to Brandthread 👋", delaySeconds: 0 },
-  { text: "I'm the Brandthread Agent — here 24/7 for listing products, going live, payouts, or pulling in your Shopify catalog", delaySeconds: 3 },
-  { text: "want me to walk you through your first listing?", delaySeconds: 6 },
+  { text: "Hi, I'm Brandthread. Let's get your store moving.", delaySeconds: 0 },
+  { text: "Start in Store Builder, then add your first products and post them to the feed.", delaySeconds: 2 },
+  { text: "Go LIVE to sell in real time. Orders and payouts live in your dashboard.", delaySeconds: 4 },
+  {
+    text: "Need production? The Manufacturer Hub connects you with makers. For deeper questions about your numbers, Brandthread AI has your store data.",
+    delaySeconds: 6,
+    attachment: {
+      type: "agent_card",
+      title: "Open Brandthread AI",
+      subtitle: "Ask anything about your brand.",
+      meta: { cardKind: "link", deepLink: "/ai-brain" },
+    },
+  },
+  { text: "Ask me anything about the app, any time.", delaySeconds: 8 },
 ];
 
 export const BUYER_WELCOME_QUICK_REPLIES: AgentQuickReply[] = [
-  { label: "Show me Thread Cash", value: "Show me how Thread Cash works" },
-  { label: "Find me brands", value: "Find me some brands I'd like" },
-  { label: "How do I sell?", value: "How do I start selling on Brandthread?" },
-  { label: "Just vibing", value: "Just vibing, no questions right now" },
+  { label: "How do I post?", value: "How do I post?" },
+  { label: "Find brands", value: "Find brands" },
+  { label: "What's LIVE?", value: "What's LIVE?" },
+  { label: "How do saves work?", value: "How do saves work?" },
 ];
 
 export const SELLER_WELCOME_QUICK_REPLIES: AgentQuickReply[] = [
-  { label: "List a product", value: "How do I list my first product?" },
-  { label: "Go Live", value: "How does Go Live work?" },
-  { label: "Payouts", value: "How do payouts work?" },
-  { label: "Import from Shopify", value: "How do I import my Shopify catalog?" },
+  { label: "Set up my store", value: "Set up my store" },
+  { label: "How do I post?", value: "How do I post?" },
+  { label: "What's LIVE?", value: "What's LIVE?" },
+  { label: "How do payouts work?", value: "How do payouts work?" },
 ];
 
 export function welcomeStepsFor(accountType: string | null | undefined): WelcomeStep[] {
@@ -150,7 +166,7 @@ export interface CreateWelcomeResult {
 }
 
 /**
- * Creates (once) the welcome conversation + 2-3 staggered welcome messages
+ * Creates (once) the welcome conversation + 4-5 staggered welcome messages
  * for a user. Safe to call more than once for the same user — the second
  * call is a no-op thanks to the `agent_conversations` primary-key-on-userId
  * ledger, which also makes concurrent calls race-safe (the loser's insert is
@@ -232,7 +248,7 @@ export async function createWelcomeConversationOnce(
       // Quick replies ride along on the final welcome message only.
       attachment: isLast && quickReplies.length > 0
         ? composeQuickRepliesAttachment(quickReplies)
-        : null,
+        : step.attachment ?? null,
       createdAt,
     });
     lastText = step.text;
