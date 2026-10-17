@@ -53,6 +53,6 @@ describe('story camera flash placement', () => {
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(rail).toMatch(/\{hasPermission && \(\s*<TouchableOpacity\s*style=\{styles\.railBtn\}/);
-    expect(rail).toContain("<Feather name={flash === 'off' ? 'zap-off' : 'zap'} size={20} color={flash === 'on' ? '#FBBF24' : ON_DARK} />");
+    expect(rail).toContain("name={flash === 'off' ? 'zap-off' : 'zap'} size={20} color={flash === 'on' ? '#FBBF24' : ON_DARK}");
   });
 });

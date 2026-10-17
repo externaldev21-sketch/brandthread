@@ -16,7 +16,7 @@ import {
 } from '@/lib/profileExtras';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, ListRow, StickyBottomCTA } from '@/components/ui';
-import { hapticError, hapticSuccess } from '@/lib/haptics';
+import { haptic } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -114,9 +114,9 @@ export default function BuyerPersonalDetails() {
 
   async function handleSave() {
     if (saving) return;
-    if (!fields.name.trim()) { hapticError(); setError({ field: null, message: 'Name is required.' }); return; }
+    if (!fields.name.trim()) { haptic('error'); setError({ field: null, message: 'Name is required.' }); return; }
     if (!isValidUsername(fields.username)) {
-      hapticError();
+      haptic('error');
       setError({ field: 'username', message: 'Letters, numbers and underscores only (3–30 characters).' });
       return;
     }
@@ -142,12 +142,12 @@ export default function BuyerPersonalDetails() {
         saveBuyerProfile({ ...local, ...next }),
         updateMyProfile(next),
       ]);
-      hapticSuccess();
+      haptic('save');
       setSaved(next);
       setHasChanges(false);
       goBackOr(router);
     } catch (err) {
-      hapticError();
+      haptic('error');
       setError(profileSaveErrorMessage(err));
     } finally {
       setSaving(false);

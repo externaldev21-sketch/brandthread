@@ -9,7 +9,7 @@
 import type { Request } from "express";
 import { getAuth } from "@clerk/express";
 import { and, eq, inArray, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
-import { blocks, db, mutedWords, reports, userMutes, userRestrictions, users } from "@workspace/db";
+import { accountMutes, blocks, db, mutedWords, reports, userMutes, userRestrictions, users } from "@workspace/db";
 import type { ModerationCategory } from "./contentModerator";
 import { randomUUID } from "node:crypto";
 import { notifyModerators } from "./moderation/alerts";
@@ -90,9 +90,13 @@ export type MuteKind = "posts" | "stories";
 export function notMutedBy(viewerId: string | null | undefined, authorColumn: SQLWrapper, kind: MuteKind = "posts"): SQL | undefined {
   if (!viewerId) return undefined;
   const flag = kind === "stories" ? sql`um.mute_stories` : sql`um.mute_posts`;
+  const legacyFlag = kind === "stories" ? sql`am.mute_stories` : sql`am.mute_posts`;
   return sql`NOT EXISTS (
     SELECT 1 FROM user_mutes um
     WHERE um.muter_id = ${viewerId} AND um.muted_id = ${authorColumn} AND ${flag}
+  ) AND NOT EXISTS (
+    SELECT 1 FROM account_mutes am
+    WHERE am.user_id = ${viewerId} AND am.muted_user_id = ${authorColumn} AND ${legacyFlag}
   )`;
 }
 
@@ -106,7 +110,9 @@ export async function mutedUserIds(viewerId: string | null | undefined, kind: Mu
       eq(userMutes.muterId, viewerId),
       kind === "stories" ? eq(userMutes.muteStories, true) : eq(userMutes.mutePosts, true),
     ));
-  return new Set(rows.map((row) => row.mutedId).filter((id) => id !== viewerId));
+  const legacy = await db.select({ mutedId: accountMutes.mutedUserId }).from(accountMutes)
+    .where(and(eq(accountMutes.userId, viewerId), kind === "stories" ? eq(accountMutes.muteStories, true) : eq(accountMutes.mutePosts, true)));
+  return new Set([...rows, ...legacy].map((row) => row.mutedId).filter((id) => id !== viewerId));
 }
 
 /**

@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+}));
 
 const store = new Map<string, string>();
 const { serviceRequest } = vi.hoisted(() => ({ serviceRequest: vi.fn() }));
@@ -7,10 +11,16 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
     getItem: vi.fn((key: string) => Promise.resolve(store.get(key) ?? null)),
     setItem: vi.fn((key: string, value: string) => { store.set(key, value); return Promise.resolve(); }),
+    removeItem: vi.fn((key: string) => { store.delete(key); return Promise.resolve(); }),
   },
 }));
-vi.mock('react-native', () => ({ AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) } }));
 vi.mock('./serviceConfig', () => ({ serviceRequest }));
+// AppState's CommonJS native bridge cannot run in Node. Exercise the real
+// queue/replay logic here; lifecycle scheduling belongs to the native pump.
+vi.mock('./engagementRetryQueue', async (importOriginal) => ({
+  ...await importOriginal<typeof import('./engagementRetryQueue')>(),
+  startEngagementRetryQueuePump: vi.fn(() => () => {}),
+}));
 
 import { ApiError } from './networkNotice';
 import {

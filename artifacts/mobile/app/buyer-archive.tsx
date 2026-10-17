@@ -1,3 +1,4 @@
+import { Icon as Feather } from '@/components/ui/Icon';
 /**
  * Archive — shows posts the owner has archived and lets them restore or delete.
  * Tap navigates to the post viewer; long-press opens a restore/delete action sheet.
@@ -87,13 +88,12 @@ export default function BuyerArchive() {
     setRefreshing(false);
   }, [loadData]);
 
-  const handleRestore = async () => {
-    if (!selectedPost || busy) return;
-    const post = selectedPost;
+  const restoreArchivedPost = async (post: typeof selectedPost) => {
+    if (!post || busy) return;
     setBusy(true);
     try {
       await unarchivePost(post.id);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptic('save');
       setSelectedPost(null);
       setArchivedPosts(prev => prev.filter(p => p.id !== post.id));
       await loadData();
@@ -105,13 +105,13 @@ export default function BuyerArchive() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!selectedPost || busy) return;
-    const post = selectedPost;
+  const handleRestore = () => restoreArchivedPost(selectedPost);
+  const deleteArchivedPost = async (post: typeof selectedPost) => {
+    if (!post || busy) return;
     setBusy(true);
     try {
       await deletePost(post.id);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      haptic('select');
       setSelectedPost(null);
       setArchivedPosts(prev => prev.filter(p => p.id !== post.id));
       await loadData();
@@ -128,6 +128,8 @@ export default function BuyerArchive() {
     if (type === 'slideshow') return 'layers';
     return 'video';
   };
+
+  const handleDelete = () => deleteArchivedPost(selectedPost);
 
   function renderPost({ item }: { item: BuyerPost }) {
     const qs = new URLSearchParams({
@@ -147,8 +149,8 @@ export default function BuyerArchive() {
         onLongPress={() => {
           haptic('longPress');
           showActionSheet(item.caption || 'Archived post', undefined, [
-            { text: 'Restore to profile', onPress: () => { void handleRestore(item); } },
-            { text: 'Delete permanently', style: 'destructive', onPress: () => { void handleDelete(item); } },
+            { text: 'Restore to profile', onPress: () => { void restoreArchivedPost(item); } },
+            { text: 'Delete permanently', style: 'destructive', onPress: () => { void deleteArchivedPost(item); } },
             { text: 'Cancel', style: 'cancel' },
           ]);
         }}

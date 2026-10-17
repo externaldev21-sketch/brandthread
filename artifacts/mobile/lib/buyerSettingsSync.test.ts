@@ -91,6 +91,6 @@ describe('upload quality', () => {
   });
 
   it('defaults group adds to the server default', () => {
-    expect(DEFAULT_BUYER_SETTINGS.groupAdds).toBe('everyone');
+    expect(DEFAULT_BUYER_SETTINGS.groupAdds).toBe('friends');
   });
 });

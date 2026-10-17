@@ -62,24 +62,20 @@ describe('mutes', () => {
     expect(JSON.parse(store[MUTES])).toHaveLength(0);
   });
 
-  it('copies pre-server local mutes up once, then the server list wins', async () => {
+  it('keeps the server authoritative without resurrecting a stale mute mirror', async () => {
     store[MUTES] = JSON.stringify([
       { id: 'a', mutedUserId: 'local_only', mutedUserName: 'L', mutedUserHandle: '', mutedUserInitials: '', mutedUserColor: '#222', createdAt: '' },
     ]);
-    request
-      .mockResolvedValueOnce({ mutes: [serverPerson('srv')] })                       // GET
-      .mockResolvedValueOnce({ userId: 'local_only' })                               // POST migration
-      .mockResolvedValueOnce({ mutes: [serverPerson('srv'), serverPerson('local_only')] }); // GET again
+    request.mockResolvedValueOnce({ mutes: [serverPerson('srv')] });
     const rows = await getMutedUsers();
-    expect(rows.map((r) => r.mutedUserId).sort()).toEqual(['local_only', 'srv']);
-    expect(request.mock.calls[1][0]).toBe('/api/safety/mutes');
-    expect(JSON.parse(request.mock.calls[1][1].body)).toEqual({ userId: 'local_only' });
-    expect(store['bt:social:user_1:mutes:migrated:v1']).toBe('true');
+    expect(rows.map((r) => r.mutedUserId)).toEqual(['srv']);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
 
     // Next load: no re-upload; offline falls back to the mirror.
     request.mockResolvedValueOnce({ mutes: [serverPerson('srv')] });
     expect((await getMutedUsers()).map((r) => r.mutedUserId)).toEqual(['srv']);
-    expect(request).toHaveBeenCalledTimes(4);
+    expect(request).toHaveBeenCalledTimes(2);
     request.mockRejectedValueOnce(new Error('offline'));
     expect((await getMutedUsers()).map((r) => r.mutedUserId)).toEqual(['srv']);
   });
@@ -98,13 +94,19 @@ describe('restrict', () => {
 
 describe('privacy settings', () => {
   it('loads enforced values from the server and saves only server keys through PATCH /api/auth/privacy', async () => {
-    request.mockResolvedValueOnce({ dmPrivacy: 'requests', isPrivate: false, settings: { searchable: false, whoCanSeeFriendsList: 'everyone' } });
+    let settings = { searchable: false, whoCanSeeFriendsList: 'everyone', readReceiptsEnabled: true };
+    request.mockImplementation(async (path: string, init?: { method?: string; body?: string }) => {
+      if (path === '/api/auth/privacy') {
+        if (init?.method === 'PATCH') settings = { ...settings, ...JSON.parse(init.body!).settings };
+        return { dmPrivacy: 'requests', isPrivate: false, settings };
+      }
+      return { settings: { socialPrivacy: settings }, updatedAt: '2026-10-17T00:00:00Z' };
+    });
     const loaded = await getPrivacySettings();
     expect(loaded).toMatchObject({ searchable: false, whoCanSeeFriendsList: 'everyone', profileVisibility: 'public' });
 
-    request.mockResolvedValueOnce({ dmPrivacy: 'requests', isPrivate: false, settings: { searchable: true, readReceiptsEnabled: false } });
     const saved = await updatePrivacySettings({ readReceiptsEnabled: false, searchable: true, contactDiscovery: true });
-    const [path, init] = request.mock.calls[1];
+    const [path, init] = request.mock.calls.find(([path, init]) => path === '/api/auth/privacy' && init?.method === 'PATCH')!;
     expect(path).toBe('/api/auth/privacy');
     expect(init.method).toBe('PATCH');
     expect(JSON.parse(init.body)).toEqual({ settings: { readReceiptsEnabled: false, searchable: true } });

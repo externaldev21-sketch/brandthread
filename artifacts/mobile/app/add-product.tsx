@@ -1,3 +1,4 @@
+import { Icon as Feather } from '@/components/ui/Icon';
 import { apiErrorMessage } from '@/lib/safety';
 import { CachedImage as Image } from '@/components/CachedImage';
 

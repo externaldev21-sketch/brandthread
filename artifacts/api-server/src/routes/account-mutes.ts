@@ -16,7 +16,7 @@
  */
 import { Router } from "express";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { db, accountMutes, users } from "@workspace/db";
+import { db, accountMutes, userMutes, users } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { resolveToClerkId } from "./public";
@@ -63,15 +63,26 @@ router.post("/", rateLimit("mutation"), async (req, res) => {
     muteStories: body.stories !== false,
     muteMessages: body.messages !== false,
   };
-  await db.insert(accountMutes).values({ userId: myId, mutedUserId: target, ...options })
-    .onConflictDoUpdate({ target: [accountMutes.userId, accountMutes.mutedUserId], set: options });
+  await db.transaction(async tx => {
+    await tx.insert(accountMutes).values({ userId: myId, mutedUserId: target, ...options })
+      .onConflictDoUpdate({ target: [accountMutes.userId, accountMutes.mutedUserId], set: options });
+    if (options.mutePosts || options.muteStories) {
+      await tx.insert(userMutes).values({ muterId: myId, mutedId: target, mutePosts: options.mutePosts, muteStories: options.muteStories })
+        .onConflictDoUpdate({ target: [userMutes.muterId, userMutes.mutedId], set: { mutePosts: options.mutePosts, muteStories: options.muteStories } });
+    } else {
+      await tx.delete(userMutes).where(and(eq(userMutes.muterId, myId), eq(userMutes.mutedId, target)));
+    }
+  });
   res.json({ ok: true, mutedUserId: target, posts: options.mutePosts, stories: options.muteStories, messages: options.muteMessages });
 });
 
 router.delete("/:userId", rateLimit("mutation"), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const target = (await resolveToClerkId(req.params.userId as string)) ?? (req.params.userId as string);
-  await db.delete(accountMutes).where(and(eq(accountMutes.userId, myId), eq(accountMutes.mutedUserId, target)));
+  await db.transaction(async tx => {
+    await tx.delete(accountMutes).where(and(eq(accountMutes.userId, myId), eq(accountMutes.mutedUserId, target)));
+    await tx.delete(userMutes).where(and(eq(userMutes.muterId, myId), eq(userMutes.mutedId, target)));
+  });
   res.json({ ok: true });
 });
 

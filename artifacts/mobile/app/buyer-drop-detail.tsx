@@ -428,7 +428,7 @@ export default function BuyerDropDetail() {
         ? await api.publicDrops.unsubscribe(dropId)
         : await api.publicDrops.subscribe(dropId);
       setSubscribed(result.subscribed);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptic('save');
     } catch (error) {
       const copy = dropAlertErrorCopy(error);
       Alert.alert(copy.title, copy.message);
@@ -455,7 +455,7 @@ export default function BuyerDropDetail() {
     if (!isLive) {
       // Upcoming drop: open the product page with "drops on <date>" context
       // (purchase buttons stay held there until launch).
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      haptic('select');
       router.push(buyerProductHref(product, { releaseAt: targetReleaseAt ?? null, name: drop?.name ?? null }) as never);
       return;
     }

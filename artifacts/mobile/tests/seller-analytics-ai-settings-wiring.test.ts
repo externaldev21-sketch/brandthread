@@ -11,7 +11,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store: Record<string, string> = {};
 vi.mock('@react-native-async-storage/async-storage', () => ({
@@ -40,7 +40,7 @@ import {
 } from '@/services/analyticsService';
 import { metricTiles } from '@/lib/analyticsMetricTiles';
 import { describeMetaReachEstimate } from '@/services/metaAdsService';
-import { confirmationFor, getAISettings, saveAISettings } from '@/services/aiService';
+import { confirmationFor, getAISettings, pushAISettings, syncAISettingsFromServer } from '@/services/aiService';
 import { DEFAULT_AI_SETTINGS } from '@/services/aiTypes';
 import { normalizeCustomerPrivacy } from '@/lib/customerPrivacy';
 import { DATE_RANGE_OPTIONS, COMPARISON_OPTIONS } from '@/services/analyticsTypes';
@@ -48,6 +48,7 @@ import { DATE_RANGE_OPTIONS, COMPARISON_OPTIONS } from '@/services/analyticsType
 const ROOT = resolve(__dirname, '..');
 const read = (rel: string) => readFileSync(resolve(ROOT, rel), 'utf8');
 const filter = { dateRange: DATE_RANGE_OPTIONS[2], comparison: COMPARISON_OPTIONS[0], groupBy: 'daily' as const };
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 beforeEach(() => {
   request.mockReset();
@@ -60,7 +61,7 @@ describe('More menu (items 23, 53)', () => {
     expect(more).toMatch(/label: 'Customers'[^\n]*route: '\/customers'/);
     expect(more).not.toMatch(/route: '\/customer-accounts'/);
     expect(read('lib/sellerControlCenter.ts')).toMatch(/id: 'customers'[^\n]*route: '\/customers'/);
-    expect(read('app/customers.tsx')).toContain("serviceRequest<ApiCustomer[]>(url)");
+    expect(read('app/customers.tsx')).toContain("serviceRequest<SellerCustomer[]>(url)");
   });
   it('Integrations opens the integrations list, not Klaviyo directly', () => {
     expect(more).toMatch(/label: 'Integrations'[^\n]*route: '\/integrations' \}/);
@@ -71,10 +72,14 @@ describe('More menu (items 23, 53)', () => {
 describe('Analytics reports list (item 25)', () => {
   it('links every analytics report screen and only real routes', () => {
     const hrefs = ANALYTICS_REPORTS.map(r => r.href);
-    for (const name of ['sales', 'profit', 'store', 'products', 'customers', 'marketing', 'production']) {
+    for (const name of ['profit', 'store', 'customers', 'marketing', 'production']) {
       expect(hrefs).toContain(`/analytics-${name}`);
     }
-    for (const href of hrefs) expect(existsSync(resolve(ROOT, `app${href}.tsx`))).toBe(true);
+    // Sales and products already live in the consolidated real-data reports,
+    // rather than the retired standalone analytics-sales/products routes.
+    expect(hrefs).toContain('/analytics-reports?report=advanced');
+    expect(hrefs).toContain('/analytics-reports?report=product-stats');
+    for (const href of hrefs) expect(existsSync(resolve(ROOT, `app${href.split('?')[0]}.tsx`))).toBe(true);
   });
 });
 
@@ -124,7 +129,7 @@ describe('report services (items 24, 25, 26)', () => {
     expect(s.funnel).toEqual([]);
   });
   it('surfaces shop clicks per post on Content analytics and push results on Marketing', () => {
-    expect(read('app/analytics-content.tsx')).toContain('getPostShopClicks');
+    expect(read('components/analytics/reports/ContentReport.tsx')).toContain('getPostShopClicks');
     expect(read('services/sellerInsightsService.ts')).toContain("'/api/analytics/post-clicks'");
     expect(read('app/analytics-marketing.tsx')).toContain('getPushNotificationResults');
   });
@@ -147,21 +152,27 @@ describe('Meta reach estimate (item 28)', () => {
 
 describe('AI Settings (item 40)', () => {
   it('loads from and saves to the server', async () => {
-    request.mockResolvedValueOnce({ settings: { ...DEFAULT_AI_SETTINGS, enabled: false } });
-    const s = await getAISettings({ fresh: true });
-    expect(request.mock.calls[0][0]).toBe('/api/ai/settings');
-    expect(s.enabled).toBe(false);
-    expect(s.dataSources.orders).toBe(true);
+    vi.stubEnv('EXPO_PUBLIC_API_BASE_URL', 'https://api.test');
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      settings: { ...DEFAULT_AI_SETTINGS, enabled: false }, updatedAt: '2026-10-17T00:00:00Z',
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const s = await syncAISettingsFromServer('test-token');
+    expect(fetchMock.mock.calls[0][0]).toBe('https://api.test/api/v1/ai/settings');
+    expect(s?.enabled).toBe(false);
+    expect(s?.dataSources.orders).toBe(true);
 
-    request.mockResolvedValueOnce({ settings: { ...DEFAULT_AI_SETTINGS, confirmSending: false } });
-    const saved = await saveAISettings({ ...DEFAULT_AI_SETTINGS, confirmSending: false });
-    expect(request.mock.calls[1][0]).toBe('/api/ai/settings');
-    expect(request.mock.calls[1][1].method).toBe('PUT');
-    expect(saved.confirmSending).toBe(false);
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 200 }));
+    expect(await pushAISettings({ ...DEFAULT_AI_SETTINGS, confirmSending: false }, 'test-token')).toBe(true);
+    expect(fetchMock.mock.calls[1][1]?.method).toBe('PUT');
+    expect((await getAISettings()).confirmSending).toBe(false);
+    expect(Object.keys(store).filter(k => k.includes('pending'))).toHaveLength(0);
   });
-  it('a failed save throws instead of pretending it saved', async () => {
-    request.mockRejectedValueOnce(new Error('offline'));
-    await expect(saveAISettings(DEFAULT_AI_SETTINGS)).rejects.toThrow('offline');
+  it('a failed server save reports false and retains the offline outbox', async () => {
+    vi.stubEnv('EXPO_PUBLIC_API_BASE_URL', 'https://api.test');
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockRejectedValueOnce(new Error('offline')));
+    expect(await pushAISettings(DEFAULT_AI_SETTINGS, 'test-token')).toBe(false);
+    expect(Object.keys(store).some(k => k.includes('pending'))).toBe(true);
   });
   it('confirmations follow the four toggles', () => {
     const base = { type: 'apply' as const, title: 'Publish the summer drop', description: '', isDestructive: false, requiresConfirmation: false };
@@ -178,7 +189,7 @@ describe('AI Settings (item 40)', () => {
     expect(confirmationFor(sensitive, { ...DEFAULT_AI_SETTINGS, confirmSensitiveActions: false })).toBeNull();
   });
   it('assistant entry points honour "Enable AI assistant"', () => {
-    expect(read('app/ai-brain.tsx')).toContain('testID="ai-disabled-banner"');
+    expect(read('services/aiService.ts')).toContain('if (!settings.enabled)');
     expect(read('components/AIBrainFAB.tsx')).toContain('if (!aiEnabled) return null;');
   });
 });

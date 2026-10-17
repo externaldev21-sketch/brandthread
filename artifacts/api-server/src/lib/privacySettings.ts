@@ -13,7 +13,7 @@
  *   nobody / only_me    — only the owner
  */
 import { inArray, sql, type SQL, type SQLWrapper } from "drizzle-orm";
-import { db, stories, users } from "@workspace/db";
+import { db, stories, users, userSettings } from "@workspace/db";
 import { z } from "@workspace/api-zod";
 import { viewerRelations } from "./storyAccess";
 
@@ -59,16 +59,57 @@ export function resolveAccountPrivacy(raw: unknown): AccountPrivacy {
   return out;
 }
 
+export function accountPrivacyFromAppSettings(raw: unknown): Partial<AccountPrivacy> {
+  if (!raw || typeof raw !== "object") return {};
+  const root = raw as Record<string, unknown>;
+  const candidate: Record<string, unknown> = { ...((root.socialPrivacy as Record<string, unknown>) ?? {}) };
+  if (root.storyReplies !== undefined) candidate.whoCanReplyToStories = root.storyReplies === "off" ? "nobody" : root.storyReplies;
+  if (root.readReceipts !== undefined) candidate.readReceiptsEnabled = root.readReceipts;
+  if (root.activityStatus !== undefined) candidate.activityStatusVisible = root.activityStatus;
+  const patch: Partial<AccountPrivacy> = {};
+  for (const key of ACCOUNT_PRIVACY_KEYS) {
+    const parsed = accountPrivacySchema.shape[key].safeParse(candidate[key]);
+    if (parsed.success) (patch as Record<string, unknown>)[key] = parsed.data;
+  }
+  return patch;
+}
+
+type SettingsTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Keep the existing account settings/outbox and the reviewed privacy API on one value. */
+export async function mirrorAccountPrivacy(tx: SettingsTx, userId: string, patch: Partial<AccountPrivacy>): Promise<void> {
+  if (!Object.keys(patch).length) return;
+  const aliases: Record<string, unknown> = {};
+  if (patch.whoCanReplyToStories !== undefined) aliases.storyReplies = patch.whoCanReplyToStories === "nobody" ? "off" : patch.whoCanReplyToStories;
+  if (patch.readReceiptsEnabled !== undefined) aliases.readReceipts = patch.readReceiptsEnabled;
+  if (patch.activityStatusVisible !== undefined) aliases.activityStatus = patch.activityStatusVisible;
+  await tx.insert(userSettings).values({ userId, settings: { ...aliases, socialPrivacy: patch }, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: userSettings.userId,
+      set: {
+        settings: sql`COALESCE(${userSettings.settings}, '{}'::jsonb) || ${JSON.stringify(aliases)}::jsonb
+          || jsonb_build_object('socialPrivacy', COALESCE(${userSettings.settings}->'socialPrivacy', '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb)`,
+        updatedAt: new Date(),
+      },
+    });
+}
+
 export async function privacySettingsFor(userIds: string[]): Promise<Map<string, AccountPrivacy>> {
   const unique = [...new Set(userIds.filter(Boolean))];
   const out = new Map<string, AccountPrivacy>();
   if (unique.length === 0) return out;
   const rows = await db
-    .select({ clerkId: users.clerkId, privacySettings: users.privacySettings })
+    .select({ clerkId: users.clerkId, privacySettings: users.privacySettings, readReceipts: users.readReceiptsEnabled, activityStatus: users.showActivityStatus })
     .from(users)
     .where(inArray(users.clerkId, unique))
     .limit(unique.length);
-  for (const row of rows) out.set(row.clerkId, resolveAccountPrivacy(row.privacySettings));
+  const legacyRows = await db.select().from(userSettings).where(inArray(userSettings.userId, unique));
+  const legacy = new Map(legacyRows.map(row => [row.userId, accountPrivacyFromAppSettings(row.settings)]));
+  for (const row of rows) {
+    const privacy = resolveAccountPrivacy({ ...legacy.get(row.clerkId), ...row.privacySettings });
+    out.set(row.clerkId, { ...privacy, readReceiptsEnabled: privacy.readReceiptsEnabled && row.readReceipts !== false,
+      activityStatusVisible: privacy.activityStatusVisible && row.activityStatus !== false });
+  }
   for (const id of unique) if (!out.has(id)) out.set(id, { ...DEFAULT_ACCOUNT_PRIVACY });
   return out;
 }
@@ -121,8 +162,16 @@ export async function ownerAllows(key: AudienceKey, ownerId: string, viewerId: s
 }
 
 /** SQL predicate on a users row: the account has not turned off "Appear in search". */
-export function userIsSearchable(privacyColumn: SQLWrapper = users.privacySettings): SQL {
-  return sql`(${privacyColumn}->>'searchable') IS DISTINCT FROM 'false'`;
+export function userIsSearchable(
+  privacyColumn: SQLWrapper = users.privacySettings,
+  userIdColumn: SQLWrapper = users.clerkId,
+): SQL {
+  // Older accounts stored this choice in account settings. Missing newer JSON
+  // must not make an account searchable again before they next edit Privacy.
+  return sql`COALESCE(${privacyColumn}->>'searchable', (
+    SELECT legacy_privacy.settings->'socialPrivacy'->>'searchable'
+    FROM ${userSettings} legacy_privacy WHERE legacy_privacy.user_id = ${userIdColumn}
+  ), 'true') <> 'false'`;
 }
 
 /** Whether `userId` shares read receipts / activity status (defaults on). */
@@ -169,8 +218,12 @@ export async function storyReplyDenial(senderId: string, attachments: unknown[])
   for (const row of rows) {
     if (row.authorId === senderId) continue;
     if (row.repliesDisabled || row.replyPerm === "off") return denied;
-    const audience = (await privacySettingsOf(row.authorId)).whoCanReplyToStories;
-    const effective = stricterReplyPerm(row.replyPerm, audience === "nobody" ? "off" : audience);
+    const audience = row.replyPerm == null
+      ? (await privacySettingsOf(row.authorId)).whoCanReplyToStories : null;
+    // New stories store the resolved per-story choice. An explicit choice
+    // must not subsequently be replaced by the account's creation default.
+    const effective = asReplyPerm(row.replyPerm)
+      ?? (audience === "nobody" ? "off" : audience ?? "everyone");
     if (effective === "off") return denied;
     if (effective === "friends" && !(await viewerRelations(senderId, [row.authorId])).followedBy.has(row.authorId)) return denied;
   }

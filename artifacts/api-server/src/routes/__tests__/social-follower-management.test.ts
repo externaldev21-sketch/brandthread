@@ -21,7 +21,7 @@ const state = vi.hoisted(() => ({
   deletedNotifications: [] as any[],
 }));
 
-vi.mock("@workspace/db", () => {
+vi.mock("@workspace/db", async (importOriginal) => {
   const tableStub = (name: string) => new Proxy({}, {
     get: (_t, prop) => (typeof prop === "string" ? `${name}.${prop}` : undefined),
   });
@@ -55,6 +55,7 @@ vi.mock("@workspace/db", () => {
   };
 
   return {
+    ...await importOriginal<typeof import("@workspace/db")>(),
     users: tableStub("users"),
     follows: tableStub("follows"),
     stories: tableStub("stories"),

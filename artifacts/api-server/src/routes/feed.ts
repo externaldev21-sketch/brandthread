@@ -148,8 +148,8 @@ router.get("/for-you", requireAuth, async (req, res) => {
   try {
     // The ranking is cached for a short TTL, so a person muted since it was
     // built is dropped here too (candidate generation also excludes them).
-    const [rankedAll, muted] = await Promise.all([getForYouFeed(userId), mutedUserIds(userId, "posts")]);
-    const visibleRanked = muted.size === 0 ? rankedAll : rankedAll.filter((i) => i.isLive || !muted.has(i.sellerId));
+    const [rankedAll, mutedCreators] = await Promise.all([getForYouFeed(userId), mutedUserIds(userId, "posts")]);
+    const visibleRanked = mutedCreators.size === 0 ? rankedAll : rankedAll.filter((i) => i.isLive || !mutedCreators.has(i.sellerId));
     const ranked = await withoutSuggestedWhenSnoozed(userId, visibleRanked, item => item.sellerId);
     const slice = ranked.slice(offset, offset + limit);
     setPaginationHeaders(res, page.data, slice.length, ranked.length);

@@ -1,3 +1,4 @@
+import { haptic as emitHaptic } from '@/lib/haptics';
 import { hapticDestructiveConfirm, hapticToggle, haptics, haptic } from '@/lib/haptics';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -460,7 +461,7 @@ export default function BuyerNotifications() {
       setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: !n.isRead } : n));
       return;
     }
-    if (haptic) hapticToggle();
+    if (haptic) emitHaptic('select');
     try {
       if (notif.isRead) {
         await markNotificationUnread(notif.id);

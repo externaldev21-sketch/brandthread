@@ -40,11 +40,12 @@ const state = vi.hoisted(() => ({
 // Drizzle table objects are only ever passed *through* our own `select`
 // stub below (never introspected by it), so plain opaque stand-ins are
 // enough for every table `../social` imports.
-vi.mock("@workspace/db", () => {
+vi.mock("@workspace/db", async (importOriginal) => {
   const tableStub = (name: string) => new Proxy({}, {
     get: (_t, prop) => (typeof prop === "string" ? `${name}.${prop}` : undefined),
   });
   return {
+    ...await importOriginal<typeof import("@workspace/db")>(),
     users: tableStub("users"),
     follows: tableStub("follows"),
     stories: tableStub("stories"),

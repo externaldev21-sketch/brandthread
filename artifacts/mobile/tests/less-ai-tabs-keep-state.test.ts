@@ -30,7 +30,8 @@ describe('89: no loader between tabs', () => {
   });
 
   it('a failed background refresh keeps the list on screen', () => {
-    expect(products).toContain('if (!silent) setProducts([]);');
+    expect(products).not.toContain('if (!silent) setProducts([]);');
+    expect(products).toContain('const silent = loadedKeyRef.current === key;');
   });
 });
 

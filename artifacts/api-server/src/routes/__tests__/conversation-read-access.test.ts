@@ -30,7 +30,7 @@ vi.mock("drizzle-orm", () => ({
   }),
 }));
 
-vi.mock("@workspace/db", () => {
+vi.mock("@workspace/db", async (importOriginal) => {
   const table = (name: string) => new Proxy({ name }, {
     get: (target, key) => key in target ? target[key as keyof typeof target] : String(key),
   });
@@ -47,6 +47,7 @@ vi.mock("@workspace/db", () => {
   const accountMutes = table("accountMutes");
 
   return new Proxy({
+    ...await importOriginal<typeof import("@workspace/db")>(),
     db: {
       select: () => ({
         from: (selectedTable: unknown) => ({

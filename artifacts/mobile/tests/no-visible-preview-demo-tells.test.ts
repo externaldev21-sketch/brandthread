@@ -62,6 +62,9 @@ describe('no visible preview/demo tells in the dev preview bypass', () => {
       const alertRe = /Alert\.alert\(\s*['"]([^'"]*)['"]/g;
       let m: RegExpExecArray | null;
       while ((m = alertRe.exec(src))) {
+        // A seller's expiring public store-preview link is a real product
+        // feature, not a development-preview session label.
+        if (m[1] === 'Revoke preview link?') continue;
         if (/\b(preview|demo)\b/i.test(m[1])) {
           offenders.push(`${path.relative(MOBILE_ROOT, full)}: Alert.alert('${m[1]}', ...)`);
         }

@@ -133,7 +133,7 @@ describe('buyerSettings sync', () => {
   it('legacy device-wide settings go to the first signed-in account only', async () => {
     store[LEGACY_SETTINGS] = JSON.stringify({ ...DEFAULT_BUYER_SETTINGS, reduceMotion: true });
     signIn('user_a');
-    request.mockResolvedValueOnce({ settings: {}, updatedAt: null });
+    request.mockResolvedValue({ settings: {}, updatedAt: null });
     expect((await loadBuyerSettings()).reduceMotion).toBe(true);
     expect(store[LEGACY_SETTINGS]).toBeUndefined();
     signIn('user_b');
@@ -232,7 +232,7 @@ describe('socialService privacy + blocks', () => {
     signIn('user_a');
     request.mockResolvedValueOnce({ settings: {}, updatedAt: null });
     await updatePrivacySettings({ whoCanMention: 'nobody', whoCanMessageMe: 'followers_only' });
-    const [path, init] = request.mock.calls[0];
+    const [path, init] = request.mock.calls.find(([path, init]) => path === '/api/me/settings' && init?.method === 'PATCH')!;
     expect(path).toBe('/api/me/settings');
     const body = JSON.parse(init.body);
     expect(body.socialPrivacy.whoCanMention).toBe('nobody');

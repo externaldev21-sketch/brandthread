@@ -21,6 +21,12 @@ vi.mock("@clerk/express", () => ({
   clerkClient: {},
 }));
 
+// Helper behavior is exercised here; distributed rate limits have their own
+// tests and must not make later cases depend on earlier requests.
+vi.mock("../../middlewares/rateLimit", () => ({
+  rateLimit: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
+
 vi.mock("../../lib/nativeEntitlements", () => ({
   getEffectiveEntitlement: vi.fn(async () => ({ planId: "starter", provider: "none" })),
 }));

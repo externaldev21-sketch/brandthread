@@ -1,3 +1,4 @@
+import { Icon as Feather } from '@/components/ui/Icon';
 /**
  * Your Activity — real engagement counts and recent history: posts, saved
  * items and reposts (social / saved-items services), likes and comments
@@ -14,7 +15,6 @@ import { useAuth } from '@clerk/expo';
 import { FONT, ICON } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { getMyPosts, getSavedItems } from '@/services/socialService';
-import { useApi } from '@/lib/api';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, ErrorState, ListRow, SkeletonBlock, SkeletonLine } from '@/components/ui';

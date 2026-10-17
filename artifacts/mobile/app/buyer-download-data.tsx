@@ -1,3 +1,4 @@
+import { Icon as Feather } from '@/components/ui/Icon';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 
@@ -80,7 +81,7 @@ export default function BuyerDownloadData() {
         data: JSON.stringify(data, null, 2),
       }, 'Download my Brandthread data');
       if (!delivered) {
-        hapticError();
+        haptic('error');
         setError(EXPORT_NO_SHARE_SHEET);
         return;
       }

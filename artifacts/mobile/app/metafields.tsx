@@ -1,3 +1,4 @@
+import { haptic } from '@/lib/haptics';
 /**
  * Brandthread — Metafields
  * Shows real counts of custom field definitions per resource type; each row
@@ -95,7 +96,7 @@ function MetafieldsScreenContent() {
                   <TouchableOpacity
                     key={def.key}
                     onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      haptic('select');
                       router.push(`/metafield-definitions?resource=${encodeURIComponent(def.key)}&label=${encodeURIComponent(def.label)}` as never);
                     }}
                     activeOpacity={0.7}

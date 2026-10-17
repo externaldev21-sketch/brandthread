@@ -18,6 +18,7 @@ import { FILL_ELEVATED, FONT, TEXT } from '@/lib/theme';
 import { SPACING } from '@/constants/spacing';
 import { radius } from '@/constants/radii';
 import { COUNTRIES } from '@/lib/addressRegions';
+import { STORE_ACCENT_COLORS } from '@/lib/storeSetup';
 
 export interface ChoiceOption { value: string; label: string; description?: string; icon?: IconName }
 
@@ -220,8 +221,11 @@ function StorePreview({ brandName, username, logoUri }: { brandName: string; use
 export function BuildingStoreStep({
   brandName, username, building, buildError, onRetryBuild, logoUri, sampleStyle, onSampleStyle,
   onGenerate, generating, sampleError, sampleUnavailable, onDone, finishing, showLogoSample = true,
+  selectedAccent, onAccent,
 }: {
   brandName: string;
+  selectedAccent?: string;
+  onAccent?: (color: string) => void;
   username: string;
   building: boolean;
   buildError?: string | null;
@@ -248,6 +252,17 @@ export function BuildingStoreStep({
           {building ? 'Building your store' : 'Your store is ready'}
         </Text>
         <StorePreview brandName={brandName} username={username} logoUri={logoUri} />
+        {onAccent ? (
+          <View style={{ flexDirection: 'row', gap: SPACING.md, justifyContent: 'center', marginTop: SPACING.md }} testID="onboarding-store-accent">
+            {STORE_ACCENT_COLORS.map(color => (
+              <Pressable key={color} onPress={() => onAccent(color)} accessibilityRole="radio"
+                accessibilityLabel={`Store accent ${color}`} accessibilityState={{ selected: selectedAccent === color }}
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: color,
+                  borderWidth: selectedAccent === color ? 3 : 1, borderColor: palette.foreground }}
+              />
+            ))}
+          </View>
+        ) : null}
         {building ? (
           <View style={styles.buildingRow}>
             <ActivityIndicator color={palette.foreground} />

@@ -579,7 +579,7 @@ export async function cacheStorefrontLocally(mutate: (store: Storefront) => void
   const store = await getStorefront({ refreshRemote: false });
   mutate(store);
   store.lastEditedAt = new Date().toISOString();
-  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+  await AsyncStorage.setItem(await storefrontStorageKey(), JSON.stringify(store));
   return store;
 }
 
@@ -834,6 +834,7 @@ export class StoreSaveError extends Error {
 }
 
 async function commitBuilderList(store: Storefront, key: BuilderListKey): Promise<Storefront> {
+  const storeKey = await storefrontStorageKey();
   // The signed-out web demo (demo=1) has no server account — keep it local.
   if (!(await inDemoMode())) {
     try {
@@ -844,7 +845,7 @@ async function commitBuilderList(store: Storefront, key: BuilderListKey): Promis
     store.builderSync = { ...store.builderSync, [key]: true };
   }
   store.lastEditedAt = new Date().toISOString();
-  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+  await AsyncStorage.setItem(storeKey, JSON.stringify(store));
   return store;
 }
 
@@ -852,6 +853,7 @@ async function loadBuilderList<K extends BuilderListKey>(
   key: K,
   onLocal?: (list: Storefront[K]) => void,
 ): Promise<Storefront[K]> {
+  const storeKey = await storefrontStorageKey();
   const store = await getStorefront({ refreshRemote: false });
   onLocal?.(store[key]);
   if (await inDemoMode()) return store[key];
@@ -874,7 +876,7 @@ async function loadBuilderList<K extends BuilderListKey>(
   const normalized = normalizeBuilderList(key, remoteList) as Storefront[K];
   store[key] = (key === 'menus' && (normalized as StoreMenu[]).length === 0 ? defaultMenus() : normalized) as Storefront[K];
   store.builderSync = { ...store.builderSync, [key]: true };
-  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+  await AsyncStorage.setItem(storeKey, JSON.stringify(store));
   return store[key];
 }
 
@@ -1225,7 +1227,7 @@ export async function generateAISuggestions(): Promise<Storefront> {
       .map(s => ({ ...s, id: uid('sug'), dismissed: false, applied: false, createdAt: now })),
   ].slice(-30);
   store.lastEditedAt = now;
-  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+  await AsyncStorage.setItem(await storefrontStorageKey(), JSON.stringify(store));
   return store;
 }
 
@@ -1258,7 +1260,7 @@ export async function applyAISuggestion(id: string): Promise<{ storefront: Store
   }
   sug.applied = true;
   store.lastEditedAt = new Date().toISOString();
-  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+  await AsyncStorage.setItem(await storefrontStorageKey(), JSON.stringify(store));
   return { storefront: store };
 }
 

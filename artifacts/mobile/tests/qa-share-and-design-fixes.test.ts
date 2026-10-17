@@ -91,13 +91,15 @@ describe('QA-0135 recent design projects', () => {
     expect(recentProjectSources([])).toEqual([]);
   });
 
-  it('the screen has no hard-coded projects and hides the option when empty', () => {
+  it('uses the existing real Brand Assets picker rather than hard-coded projects', () => {
     const src = read('app/design-prompt-edit.tsx');
     expect(src).not.toContain('RECENT_PROJECTS');
     expect(src).not.toContain('Summer Drop Hoodie');
     expect(src).not.toContain('mock://project/');
-    expect(src).toContain('recentProjects.length > 0 &&');
-    expect(src).toContain('showActionSheet(');
+    expect(src).toContain('await getBrandAssets()');
+    expect(src).toContain('if (images.length === 0)');
+    expect(src).toContain('No saved images yet');
+    expect(src).toContain('setImageUri');
   });
 });
 

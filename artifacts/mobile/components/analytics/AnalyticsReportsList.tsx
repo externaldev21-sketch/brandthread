@@ -25,6 +25,7 @@ export const ANALYTICS_REPORTS: { label: string; icon: IconName; href: string; b
   { label: 'Advanced analytics', icon: 'trending-up', href: '/analytics-reports?report=advanced', badge: 'GROWTH' },
   { label: 'Customer cohorts and lifetime value', icon: 'users', href: '/analytics-reports?report=cohorts', badge: 'GROWTH' },
   { label: 'Store performance', icon: 'shopping-bag', href: '/analytics-store' },
+  { label: 'Customers', icon: 'users', href: '/analytics-customers' },
   { label: 'Profit', icon: 'dollar-sign', href: '/analytics-profit' },
   { label: 'Marketing', icon: 'trending-up', href: '/analytics-marketing' },
   { label: 'Production', icon: 'layers', href: '/analytics-production' },

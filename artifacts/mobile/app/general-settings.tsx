@@ -1,3 +1,4 @@
+import { haptic } from '@/lib/haptics';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native';
 
@@ -88,9 +89,9 @@ export default function GeneralSettingsScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Resources</Text>
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <ExternalRow icon="git-merge" label="Change log" onPress={() => { haptic(); router.push('/changelog' as never); }} colors={colors} />
-            <ExternalRow icon="help-circle" label="Brandthread Help Center" onPress={() => { haptic(); router.push('/help' as never); }} colors={colors} />
-            <ExternalRow icon="code" label="Hire a Brandthread Partner" onPress={() => { haptic(); router.push('/freelancer-jobs' as never); }} colors={colors} last />
+            <ExternalRow icon="git-merge" label="Change log" onPress={() => { haptic('select'); router.push('/changelog' as never); }} colors={colors} />
+            <ExternalRow icon="help-circle" label="Brandthread Help Center" onPress={() => { haptic('select'); router.push('/help' as never); }} colors={colors} />
+            <ExternalRow icon="code" label="Hire a Brandthread Partner" onPress={() => { haptic('select'); router.push('/freelancer-jobs' as never); }} colors={colors} last />
           </View>
         </View>
       </ScrollView>

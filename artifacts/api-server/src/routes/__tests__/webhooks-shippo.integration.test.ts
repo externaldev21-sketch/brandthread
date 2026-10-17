@@ -218,7 +218,6 @@ describe("POST /api/webhooks/shippo without a configured secret", () => {
   }
 
   it("does not trust a forged DELIVERED: it applies what Shippo reports for the number on file", async () => {
-    delete process.env.SHIPPO_WEBHOOK_SECRET;
     getTrack.mockResolvedValue({ tracking_status: { status: "TRANSIT", status_date: "2026-10-01T10:00:00Z" } });
 
     const response = await post(forged("DELIVERED"), null);
@@ -232,7 +231,6 @@ describe("POST /api/webhooks/shippo without a configured secret", () => {
   });
 
   it("acks without changing anything when Shippo can't confirm the status", async () => {
-    delete process.env.SHIPPO_WEBHOOK_SECRET;
     getTrack.mockRejectedValue(new Error("shippo down"));
 
     const response = await post(forged("DELIVERED"), null);
@@ -243,7 +241,6 @@ describe("POST /api/webhooks/shippo without a configured secret", () => {
   });
 
   it("applies a real delivery once Shippo confirms it", async () => {
-    delete process.env.SHIPPO_WEBHOOK_SECRET;
     getTrack.mockResolvedValue({ tracking_status: { status: "DELIVERED", status_date: "2026-10-02T10:00:00Z" } });
 
     const response = await post(forged("DELIVERED"), null);

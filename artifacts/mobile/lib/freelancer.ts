@@ -60,8 +60,6 @@ export function tenthsToStars(tenths: number | null | undefined): number {
   return Math.max(1, Math.min(5, Math.round(tenths / 10)));
 }
 
-const GENERIC_ERROR_FALLBACK = 'Something went wrong. Try again.';
-
 /**
  * Human-readable message from an api.ts error. Never surfaces the raw
  * "API 4xx: ..." wire format, a 5xx/infra message, or this app's own

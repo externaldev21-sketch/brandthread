@@ -20,7 +20,7 @@ const s = vi.hoisted(() => ({
   notifications: [] as any[],
 }));
 
-vi.mock("@workspace/db", () => {
+vi.mock("@workspace/db", async (importOriginal) => {
   const table = (name: string) => new Proxy({}, {
     get: (_t, p) => (p === "__name" ? name : typeof p === "string" ? `${name}.${p}` : undefined),
   });
@@ -44,6 +44,7 @@ vi.mock("@workspace/db", () => {
   };
   const tag = (name: string) => { const t: any = named(name); return new Proxy(t, { get: (x, p) => (p === "__tag" ? name : x[p]) }); };
   return {
+    ...await importOriginal<typeof import("@workspace/db")>(),
     db: {
       select: vi.fn(() => chain(() => s.selects.shift() ?? [])),
       transaction: vi.fn(async (cb: any) => cb(tx)),

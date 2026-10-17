@@ -21,7 +21,7 @@ describe("migration 119 enforcement wiring", () => {
   it("snoozed viewers get followed accounts only from both suggested sources", () => {
     expect(src("public.ts")).toMatch(/const followedOnly = !ownerId && viewerId && await suggestedPostsSnoozed\(viewerId\)/);
     expect(src("public.ts")).toMatch(/ownerId \? eq\(posts\.userId, ownerId\) : undefined,\n\s+followedOnly,/);
-    expect(src("feed.ts")).toContain("await withoutSuggestedWhenSnoozed(userId, await getForYouFeed(userId), (item) => item.sellerId)");
+    expect(src("feed.ts")).toContain("await withoutSuggestedWhenSnoozed(userId, visibleRanked, item => item.sellerId)");
   });
 
   it("pending tags stay off the Tagged tab, the mentions rail and mention notifications", () => {

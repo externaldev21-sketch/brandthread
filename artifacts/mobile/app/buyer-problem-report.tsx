@@ -16,7 +16,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/ui/Icon';
 
-import { useUser } from '@clerk/expo';
 import { apiErrorMessage } from '@/lib/safety';
 import { ScreenHeader } from '@/components/ScreenHeader';
 

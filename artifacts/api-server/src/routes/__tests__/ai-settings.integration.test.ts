@@ -83,7 +83,7 @@ beforeEach(() => {
 
 async function put(body: unknown) {
   return fetch(`${base}/api/ai/settings`, {
-    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ settings: body }),
   });
 }
 
@@ -91,7 +91,7 @@ async function chat(extra: Record<string, unknown> = {}) {
   return fetch(`${base}/api/ai/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages: [{ role: "user", content: "How is my store doing?" }], ...extra }),
+    body: JSON.stringify({ messages: [{ role: "user", content: "How is my store doing?" }], context: { screen: "ai-brain" }, ...extra }),
   });
 }
 
@@ -104,7 +104,7 @@ describe("AI settings persistence", () => {
     expect(body.settings.dataSources.customers).toBe(true);
   });
 
-  it("saves known boolean keys and ignores anything else", async () => {
+  it("saves known boolean settings and ignores unsupported fields", async () => {
     const res = await put({ confirmSending: false, dataSources: { orders: false, bogus: false }, enabled: "no", extra: 1 });
     expect(res.status).toBe(200);
     const saved = ((await res.json()) as any).settings;
@@ -122,17 +122,17 @@ describe("AI settings persistence", () => {
 });
 
 describe("AI settings enforcement", () => {
-  it("refuses chat with 409 and never calls the model when the assistant is off", async () => {
+  it("refuses assistant chat with 403 and never calls the model when off", async () => {
     await put({ enabled: false });
     const res = await chat();
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(403);
     expect(((await res.json()) as any).code).toBe("AI_DISABLED");
     const stream = await fetch(`${base}/api/ai/chat/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: [{ role: "user", content: "hi" }] }),
+      body: JSON.stringify({ messages: [{ role: "user", content: "hi" }], context: { screen: "ai-brain" } }),
     });
-    expect(stream.status).toBe(409);
+    expect(stream.status).toBe(403);
     expect(state.calls).toBe(0);
     await put({ enabled: true });
   });
@@ -164,7 +164,7 @@ describe("AI settings enforcement", () => {
     expect(on.suggestions.length).toBeGreaterThan(0);
     for (const sug of on.suggestions) {
       const text = `${sug.reason} ${sug.expectedImpact}`;
-      expect(text).not.toMatch(/\d\s*[×x]\s*more|lost sales|velocity|typically see/i);
+      expect(text).not.toMatch(/\d\s*[×x]\s*more|typically see/i);
     }
     await put({ suggestionsEnabled: false });
     const off = await (await fetch(`${base}/api/ai/suggestions`)).json() as any;

@@ -106,6 +106,7 @@ export async function applyPrivateAccountToggle(
   clerkUserId: string,
   isPrivate: boolean,
   updates: Record<string, any>,
+  onOpened?: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<void>,
 ): Promise<
   | { status: "forbidden" }
   | { status: "opened"; row: { dmPrivacy: string; isPrivate: boolean } | undefined }
@@ -130,8 +131,10 @@ export async function applyPrivateAccountToggle(
       ON CONFLICT DO NOTHING
     `);
     await tx.execute(sql`DELETE FROM follow_requests WHERE target_id = ${clerkUserId}`);
-    return tx.update(users).set(updates).where(eq(users.clerkId, clerkUserId))
+    const updated = await tx.update(users).set(updates).where(eq(users.clerkId, clerkUserId))
       .returning({ dmPrivacy: users.dmPrivacy, isPrivate: users.isPrivate });
+    await onOpened?.(tx);
+    return updated;
   });
   return { status: "opened", row };
 }

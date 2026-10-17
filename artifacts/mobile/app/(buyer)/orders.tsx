@@ -1,3 +1,5 @@
+import { formatCents } from '@/lib/money';
+import { Icon as Feather } from '@/components/ui/Icon';
 import { openContextMenu } from '@/lib/contextMenu';
 
 import { copyText } from '@/lib/shareActions';
@@ -293,7 +295,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onTra
             hitSlop={ORDER_ACTION_HIT_SLOP}
             accessibilityRole="button"
             accessibilityLabel="Track shipment"
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onTrack(order.id); }}
+            onPress={() => { haptic('select'); onTrack(order.id); }}
           >
             <Icon name="map-pin" size={12} color={theme.secondary} />
             <Text style={[styles.actionBtnText, { color: theme.secondary }]}>Track Shipment</Text>

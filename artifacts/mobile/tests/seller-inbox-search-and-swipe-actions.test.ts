@@ -32,7 +32,8 @@ describe('seller inbox: search', () => {
   });
 
   it('never filters out unread/read state — only archived/request rows and the search query', () => {
-    expect(src).toContain('if (conv.isArchived || conv.isRequest || pendingDeleteIds.has(conv.id)) return false;');
+    expect(src).toContain('conv.isRequest || pendingDeleteIds.has(conv.id) || !conversationMatchesInboxFilter(conv, inboxFilter)');
+    expect(src).toContain("useState<InboxFilter>('all')");
   });
 });
 

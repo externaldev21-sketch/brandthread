@@ -96,9 +96,38 @@ export async function getAISettings(): Promise<AISettings> {
   }
 }
 
+const settingsListeners = new Set<(settings: AISettings) => void>();
+
+export function subscribeAISettings(listener: (settings: AISettings) => void): () => void {
+  settingsListeners.add(listener);
+  return () => { settingsListeners.delete(listener); };
+}
+
 /** Writes the device cache only. Use pushAISettings() to sync to the account. */
 export async function saveAISettings(settings: AISettings): Promise<void> {
-  await AsyncStorage.setItem(await settingsKey(), JSON.stringify(normalizeAISettings(settings)));
+  const normalized = normalizeAISettings(settings);
+  const key = await settingsKey();
+  await AsyncStorage.setItem(key, JSON.stringify(normalized));
+  if (key !== await settingsKey()) return;
+  for (const listener of settingsListeners) listener(normalized);
+}
+
+export function confirmationFor(
+  card: Pick<AIActionCard, 'type' | 'title' | 'description' | 'isDestructive' | 'requiresConfirmation'>,
+  settings: Pick<AISettings, 'confirmSensitiveActions' | 'confirmDestructiveActions' | 'confirmPublishing' | 'confirmSending'>,
+): { title: string; message: string; destructive: boolean } | null {
+  const text = `${card.title} ${card.description ?? ''}`.toLowerCase();
+  if (card.isDestructive && settings.confirmDestructiveActions) {
+    return { title: 'Apply action', message: `Apply "${card.title}"? This cannot be undone.`, destructive: true };
+  }
+  if ((card.type === 'schedule' || /\b(publish|go live|make (it )?live)\b/.test(text)) && settings.confirmPublishing) {
+    return { title: 'Publish?', message: `"${card.title}" will make this visible to buyers.`, destructive: false };
+  }
+  if (/\b(send|email|message|notify|push)\b/.test(text) && settings.confirmSending) {
+    return { title: 'Send?', message: `"${card.title}" will send to your customers or followers.`, destructive: false };
+  }
+  return card.requiresConfirmation && settings.confirmSensitiveActions
+    ? { title: 'Apply action', message: `Apply "${card.title}"?`, destructive: false } : null;
 }
 
 /**

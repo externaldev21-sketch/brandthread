@@ -4,21 +4,20 @@ import { describe, expect, it } from 'vitest';
 
 const source = readFileSync(path.resolve(__dirname, '../app/onboarding.tsx'), 'utf8');
 
-describe('onboarding "Never miss what matters" step', () => {
-  it('Continue requests notification permission for both flows before advancing', () => {
-    expect(source).toMatch(/requestOnboardingPushPermission\(user\?\.id, api\)/);
-    expect(source).toContain('void enableNotificationsAndContinue(BUYER_STEP_INDEX.SUCCESS)');
-    expect(source).toContain('void enableNotificationsAndContinue(SELLER_STEP_INDEX.SUCCESS)');
+describe('contextual notification permission stays outside onboarding', () => {
+  it('neither signup flow requests native permission', () => {
+    expect(source).not.toContain('requestOnboardingPushPermission');
+    expect(source).not.toContain('requestPermissionsAsync');
   });
 
-  it('always advances, even when the request fails or is denied', () => {
-    const fn = source.slice(source.indexOf('async function enableNotificationsAndContinue'));
-    const body = fn.slice(0, fn.indexOf('\n  }\n') + 4);
-    expect(body).toMatch(/finally \{[\s\S]*transitionTo\(next, 1\)/);
+  it('finishes the account without awaiting notification permission', () => {
+    expect(source).toContain('api.auth.completeOnboarding');
+    expect(source).not.toContain('enableNotificationsAndContinue');
   });
 
-  it('"Not now" still skips without prompting', () => {
-    expect(source).toContain('onSkip={() => transitionTo(BUYER_STEP_INDEX.SUCCESS, 1)}');
-    expect(source).toContain('onSkip={() => transitionTo(SELLER_STEP_INDEX.SUCCESS, 1)}');
+  it('keeps the normal buyer and seller destinations without a push step', () => {
+    expect(source).toContain("router.replace('/(buyer)/'");
+    expect(source).toContain("router.replace('/(tabs)/'");
+    expect(source).not.toContain('<NotificationsStep');
   });
 });

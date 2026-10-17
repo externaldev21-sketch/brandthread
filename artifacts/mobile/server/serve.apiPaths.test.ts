@@ -24,7 +24,8 @@ describe("api-owned public paths", () => {
   });
 
   it("leaves app routes to the web app", () => {
-    for (const p of ["/", "/live", "/live/abc", "/u/janedoe", "/invite/ABC", "/l", "/g", "/bio", "/legal", "/changelog"]) {
+    expect(isApiOwnedPath("/u/janedoe")).toBe(true);
+    for (const p of ["/", "/live", "/live/abc", "/invite/ABC", "/l", "/g", "/bio", "/legal", "/changelog"]) {
       expect(isApiOwnedPath(p), p).toBe(false);
     }
   });

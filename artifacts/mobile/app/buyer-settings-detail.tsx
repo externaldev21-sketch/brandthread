@@ -234,9 +234,24 @@ export default function BuyerSettingsDetail() {
   }, [api, section, settings]);
   const onVersionTap = useInternalDevMenuGesture();
   const [sensitivePicker, setSensitivePicker] = useState(false);
+  const resetRecommendations = useCallback(() => {
+    if (previewOnly) {
+      Alert.alert('Sign in to reset recommendations', 'Your recommendations follow your account.');
+      return;
+    }
+    Alert.alert('Reset recommendations?', 'Your feed will learn from what you watch next.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Reset', style: 'destructive', onPress: () => {
+        void api.meSettings.resetRecommendations()
+          .then(() => Alert.alert('Recommendations reset'))
+          .catch(() => Alert.alert("Couldn't reset recommendations", 'Try again.'));
+      } },
+    ]);
+  }, [api, previewOnly]);
   const items = useMemo(() => settings ? cfg.items(settings, router, remote, display, { onVersionTap }).map(item =>
-    item.label === 'Sensitive content' ? { ...item, action: () => setSensitivePicker(true) } : item
-  ) : [], [cfg, settings, router, remote, display, onVersionTap]);
+    item.label === 'Sensitive content' ? { ...item, action: () => setSensitivePicker(true) }
+      : /^Reset (suggested content|recommendations)$/.test(item.label) ? { ...item, action: resetRecommendations } : item
+  ) : [], [cfg, settings, router, remote, display, onVersionTap, resetRecommendations]);
 
   return <View style={styles.page}>
     <ScreenHeader title={cfg.title} variant="push" onBack={() => goBackOr(router, '/buyer-settings')} />

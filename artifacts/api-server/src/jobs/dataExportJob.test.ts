@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
-vi.mock("@workspace/db", () => ({
+vi.mock("@workspace/db", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@workspace/db")>(),
   db: {},
   users: {},
   dataExportJobs: {},

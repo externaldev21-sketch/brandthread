@@ -54,6 +54,7 @@ export interface OnboardingDraft {
   goals: string[];
   country: string;
   selectedThemeId: string;
+  selectedAccent?: string;
 }
 
 const SECRET_KEYS = ['password', 'confirmPassword', 'code', 'verificationCode'];

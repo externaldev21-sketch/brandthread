@@ -224,7 +224,7 @@ export default function FreelancerJobsScreen() {
     ]);
   };
   const openRating = (job: FreelancerJob) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptic('select');
     setRateJob(job);
     setRateStars(tenthsToStars(job.review?.ratingTenths));
     setRateComment(job.review?.comment ?? '');
@@ -239,11 +239,11 @@ export default function FreelancerJobsScreen() {
     setRateSaving(true);
     try {
       await api.freelancerJobs.review(rateJob.id, { rating: rateStars, comment: rateComment.trim() || undefined });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptic('save');
       setRateJob(null);
       await load();
     } catch (e) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptic('error');
       Alert.alert('Rating not saved', apiErrorMessage(e));
     } finally {
       setRateSaving(false);
@@ -496,7 +496,7 @@ export default function FreelancerJobsScreen() {
               {RATING_STARS.map((n) => (
                 <TouchableOpacity
                   key={n}
-                  onPress={() => { Haptics.selectionAsync(); setRateStars(n); }}
+                  onPress={() => { haptic('select'); setRateStars(n); }}
                   hitSlop={6}
                   accessibilityRole="button"
                   accessibilityLabel={`${n} star${n > 1 ? 's' : ''}`}

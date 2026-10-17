@@ -41,7 +41,7 @@ export default function FirstRunTipsSettingsScreen() {
 
   async function toggleSkipAll(value: boolean) {
     if (savingSkipAll) return;
-    hapticLight();
+    haptic('select');
     setError('');
     setSavingSkipAll(true);
     try {

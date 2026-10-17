@@ -24,6 +24,7 @@ export default function SecurityScreen() {
   }
 
   const accountRows: Array<{ title: string; subtitle?: string; label: string; route: string }> = [
+    { title: 'Team activity', label: 'View', route: '/team-activity' },
     { title: 'Password', label: 'Change', route: '/change-password' },
     { title: 'Email address', label: 'Change', route: '/change-email' },
     { title: 'Two-factor authentication', subtitle: 'App and backup codes', label: 'Manage', route: '/login-methods' },

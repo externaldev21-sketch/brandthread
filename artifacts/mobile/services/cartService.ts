@@ -1423,6 +1423,8 @@ export async function createProblemReport(params: {
   description: string;
   evidenceUris: string[];
   contactedSeller: boolean;
+  contactEmail?: string;
+  contactName?: string;
 }): Promise<BuyerProblemReport> {
   const k = keys();
   const problems = await loadProblems(k);
@@ -1472,6 +1474,8 @@ export async function createProblemReport(params: {
       evidenceUrls: params.evidenceUris.filter(isRemote).slice(0, 10),
       localEvidenceCount: params.evidenceUris.filter(u => !isRemote(u)).length,
       contactedSeller: params.contactedSeller,
+      ...(params.contactEmail ? { contactEmail: params.contactEmail } : {}),
+      ...(params.contactName ? { contactName: params.contactName } : {}),
     }),
   });
   if (res?.ticket?.id) {

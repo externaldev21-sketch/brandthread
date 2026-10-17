@@ -59,7 +59,7 @@ async function resumeSubscriptionAfterRestore(clerkUserId: string, log: { warn: 
   }
 }
 import { z } from "@workspace/api-zod";
-import { accountPrivacyPatchSchema, resolveAccountPrivacy } from "../lib/privacySettings";
+import { accountPrivacyPatchSchema, mirrorAccountPrivacy, privacySettingsOf } from "../lib/privacySettings";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
 import { cappedList, cappedUnknown, looseBody } from "../middlewares/bodySchemas";
 import {
@@ -1287,7 +1287,7 @@ router.get("/privacy", requireAuth, async (req, res) => {
     showActivityStatus: user?.showActivityStatus ?? true,
     showSavesToFollowers: user?.showSavesToFollowers ?? true,
     canBePrivate: user?.accountType === "buyer",
-    settings: resolveAccountPrivacy(user?.privacySettings),
+    settings: await privacySettingsOf(clerkUserId),
   });
 });
 
@@ -1307,17 +1307,24 @@ router.patch("/privacy", requireAuth, validateRequest({ body: privacyBodySchema 
   }
 
   const updates: Record<string, any> = { updatedAt: new Date() };
+  const privacyPatch = { ...settings,
+    ...(readReceipts !== undefined ? { readReceiptsEnabled: readReceipts } : {}),
+    ...(showActivityStatus !== undefined ? { activityStatusVisible: showActivityStatus } : {}),
+  };
   if (dmPrivacy !== undefined) updates.dmPrivacy = dmPrivacy;
   if (readReceipts !== undefined) updates.readReceiptsEnabled = readReceipts;
   if (showActivityStatus !== undefined) updates.showActivityStatus = showActivityStatus;
   if (showSavesToFollowers !== undefined) updates.showSavesToFollowers = showSavesToFollowers;
-  if (settings !== undefined && Object.keys(settings).length > 0) {
+  if (Object.keys(privacyPatch).length > 0) {
     // Merge only the keys sent, so two screens saving different keys never clobber each other.
-    updates.privacySettings = sql`COALESCE(${users.privacySettings}, '{}'::jsonb) || ${JSON.stringify(settings)}::jsonb`;
+    updates.privacySettings = sql`COALESCE(${users.privacySettings}, '{}'::jsonb) || ${JSON.stringify(privacyPatch)}::jsonb`;
+    if (typeof privacyPatch.readReceiptsEnabled === "boolean") updates.readReceiptsEnabled = privacyPatch.readReceiptsEnabled;
+    if (typeof privacyPatch.activityStatusVisible === "boolean") updates.showActivityStatus = privacyPatch.activityStatusVisible;
   }
 
   if (isPrivate !== undefined) {
-    const outcome = await applyPrivateAccountToggle(clerkUserId, isPrivate, updates);
+    const outcome = await applyPrivateAccountToggle(clerkUserId, isPrivate, updates,
+      tx => mirrorAccountPrivacy(tx, clerkUserId, privacyPatch));
     if (outcome.status === "forbidden") {
       res.status(403).json({ error: "Only buyer accounts can be private.", code: "PRIVATE_NOT_ALLOWED" });
       return;
@@ -1328,17 +1335,21 @@ router.patch("/privacy", requireAuth, validateRequest({ body: privacyBodySchema 
       res.json({
         dmPrivacy: outcome.row?.dmPrivacy ?? "requests",
         isPrivate: outcome.row?.isPrivate ?? false,
-        settings: resolveAccountPrivacy(after?.privacySettings),
+        settings: await privacySettingsOf(clerkUserId),
       });
       return;
     }
   }
 
-  const [updated] = await db
+  const [updated] = await db.transaction(async tx => {
+    const rows = await tx
     .update(users)
     .set(updates)
     .where(eq(users.clerkId, clerkUserId))
     .returning({ dmPrivacy: users.dmPrivacy, isPrivate: users.isPrivate, readReceipts: users.readReceiptsEnabled, showActivityStatus: users.showActivityStatus, showSavesToFollowers: users.showSavesToFollowers, privacySettings: users.privacySettings });
+    await mirrorAccountPrivacy(tx, clerkUserId, privacyPatch);
+    return rows;
+  });
 
   res.json({
     dmPrivacy: updated?.dmPrivacy ?? "requests",
@@ -1346,7 +1357,7 @@ router.patch("/privacy", requireAuth, validateRequest({ body: privacyBodySchema 
     readReceipts: updated?.readReceipts ?? true,
     showActivityStatus: updated?.showActivityStatus ?? true,
     showSavesToFollowers: updated?.showSavesToFollowers ?? true,
-    settings: resolveAccountPrivacy(updated?.privacySettings),
+    settings: await privacySettingsOf(clerkUserId),
   });
 });
 

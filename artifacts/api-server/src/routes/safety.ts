@@ -18,7 +18,7 @@
  */
 import { Router } from "express";
 import { and, asc, count, desc, eq } from "drizzle-orm";
-import { db, mutedWords, userMutes, userRestrictions } from "@workspace/db";
+import { db, mutedWords, userMutes, userRestrictions, accountMutes } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { profilesById } from "../lib/safety";
@@ -111,7 +111,12 @@ router.get("/mutes", async (req, res) => {
     .where(eq(userMutes.muterId, myId))
     .orderBy(desc(userMutes.createdAt))
     .limit(MAX_PERSON_LIST);
-  res.json({ mutes: await personRows(rows) });
+  const legacy = await db.select({ userId: accountMutes.mutedUserId, mutePosts: accountMutes.mutePosts,
+    muteStories: accountMutes.muteStories, createdAt: accountMutes.createdAt })
+    .from(accountMutes).where(eq(accountMutes.userId, myId)).limit(MAX_PERSON_LIST);
+  const combined = [...new Map([...legacy, ...rows].map(row => [row.userId, row])).values()]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, MAX_PERSON_LIST);
+  res.json({ mutes: await personRows(combined) });
 });
 
 router.post("/mutes", async (req, res) => {
@@ -128,10 +133,15 @@ router.post("/mutes", async (req, res) => {
   }
   const target = await resolveTarget(body.userId, myId);
   if ("error" in target) return res.status(target.status).json({ error: target.error });
-  const [row] = await db.insert(userMutes)
-    .values({ muterId: myId, mutedId: target.id, mutePosts, muteStories })
-    .onConflictDoUpdate({ target: [userMutes.muterId, userMutes.mutedId], set: { mutePosts, muteStories } })
-    .returning();
+  const row = await db.transaction(async tx => {
+    const [saved] = await tx.insert(userMutes)
+      .values({ muterId: myId, mutedId: target.id, mutePosts, muteStories })
+      .onConflictDoUpdate({ target: [userMutes.muterId, userMutes.mutedId], set: { mutePosts, muteStories } })
+      .returning();
+    await tx.insert(accountMutes).values({ userId: myId, mutedUserId: target.id, mutePosts, muteStories })
+      .onConflictDoUpdate({ target: [accountMutes.userId, accountMutes.mutedUserId], set: { mutePosts, muteStories } });
+    return saved!;
+  });
   return res.status(201).json({
     userId: row.mutedId, mutePosts: row.mutePosts, muteStories: row.muteStories, createdAt: row.createdAt.toISOString(),
   });
@@ -141,7 +151,10 @@ router.delete("/mutes/:userId", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const raw = String(req.params.userId);
   const target = (await resolveToClerkId(raw)) ?? raw;
-  await db.delete(userMutes).where(and(eq(userMutes.muterId, myId), eq(userMutes.mutedId, target)));
+  await db.transaction(async tx => {
+    await tx.delete(userMutes).where(and(eq(userMutes.muterId, myId), eq(userMutes.mutedId, target)));
+    await tx.delete(accountMutes).where(and(eq(accountMutes.userId, myId), eq(accountMutes.mutedUserId, target)));
+  });
   return res.json({ ok: true });
 });
 

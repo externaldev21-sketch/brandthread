@@ -41,6 +41,7 @@ let loadPromise: Promise<void> | null = null;
 /** Account whose queue is in memory; a different signed-in account reloads its own. */
 let loadedScope: string | null = null;
 let executor: ((action: QueuedEngagementAction) => Promise<void>) | null = null;
+let globalFallbackExecutor: ((action: QueuedEngagementAction) => Promise<boolean>) | null = null;
 let processing = false;
 // Per-kind handlers used while no screen executor is registered (e.g. a
 // follow queued from a profile screen while the feed isn't mounted).
@@ -126,6 +127,11 @@ export function setEngagementRetryExecutor(fn: ((action: QueuedEngagementAction)
   executor = fn;
 }
 
+/** App-wide replay handles only actions it understands, without replacing a screen's executor. */
+export function setFallbackEngagementRetryExecutor(fn: ((action: QueuedEngagementAction) => Promise<boolean>) | null): void {
+  globalFallbackExecutor = fn;
+}
+
 /** Replays `kind` when no screen executor is registered. */
 export function setEngagementRetryFallback(
   kind: EngagementActionKind,
@@ -172,11 +178,12 @@ export async function enqueueEngagementRetry(action: Pick<QueuedEngagementAction
 export async function processEngagementRetryQueue(): Promise<void> {
   await load();
   if (processing || queue.length === 0) return;
-  if (!executor && fallbacks.size === 0) return;
+  if (!executor && fallbacks.size === 0 && !globalFallbackExecutor) return;
   processing = true;
   const scope = loadedScope;
   try {
     const active = executor;
+    const globalFallback = globalFallbackExecutor;
     const owner = currentOwner();
     const remaining: QueuedEngagementAction[] = [];
     for (const action of queue) {
@@ -188,12 +195,16 @@ export async function processEngagementRetryQueue(): Promise<void> {
       const run = fallbacks.get(action.kind) ?? active;
       // Not replayable right now (no handler, or another account is signed
       // in): keep it for later, untouched.
-      if (!run || (action.ownerId && action.ownerId !== owner)) {
+      if ((!run && !globalFallback) || (action.ownerId && action.ownerId !== owner)) {
         remaining.push(action);
         continue;
       }
       try {
-        await run(action);
+        if (run) await run(action);
+        else if (!(await globalFallback!(action))) {
+          remaining.push(action);
+          continue;
+        }
       } catch (error) {
         if (isRetryableFailure(error) && action.attempts + 1 < MAX_ATTEMPTS) {
           remaining.push({ ...action, attempts: action.attempts + 1 });
@@ -246,6 +257,7 @@ export function __resetEngagementRetryQueueForTests(): void {
   loadPromise = null;
   loadedScope = null;
   executor = null;
+  globalFallbackExecutor = null;
   processing = false;
   fallbacks.clear();
   ownerResolver = null;

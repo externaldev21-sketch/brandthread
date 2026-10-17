@@ -1,3 +1,4 @@
+import { haptic } from '@/lib/haptics';
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
 
@@ -103,7 +104,7 @@ export default function StoreAiImproveScreen() {
         router.push(result.navigateTo as never);
         return;
       }
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptic('save');
       await load();
     } catch (e) {
       Alert.alert("Couldn't apply", e instanceof Error ? e.message : 'Please try again.');

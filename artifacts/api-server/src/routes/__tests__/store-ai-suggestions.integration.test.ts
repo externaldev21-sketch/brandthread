@@ -8,7 +8,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
-import { db, products, storefronts } from "@workspace/db";
+import { db, products, storefronts, users } from "@workspace/db";
 
 const state = vi.hoisted(() => ({
   owner: "",
@@ -50,6 +50,12 @@ async function post(path: string) {
 }
 
 beforeAll(async () => {
+  await db.insert(users).values({
+    clerkId: state.owner,
+    name: "Store AI test seller",
+    email: `${state.owner}@example.test`,
+    accountType: "seller",
+  }).onConflictDoNothing();
   process.env.AI_INTEGRATIONS_OPENAI_API_KEY = "test-key";
   process.env.AI_INTEGRATIONS_OPENAI_BASE_URL = "http://openai.test";
   await db.insert(storefronts).values({

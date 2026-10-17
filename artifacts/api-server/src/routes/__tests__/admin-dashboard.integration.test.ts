@@ -257,7 +257,7 @@ describe("featured on Discover", () => {
     expect((await post(ADMIN, "/admin/featured", { kind: "thread", targetId: postId })).status).toBe(201);
 
     const pub = await (await get(null, "/public/featured")).json();
-    expect(pub.brands).toContainEqual({ userId: SELLER, label: "Staff pick" });
+    expect(pub.brands).toContainEqual(expect.objectContaining({ userId: SELLER, label: "Staff pick" }));
     expect(pub.threads.map((t: any) => t.postId)).toContain(postId);
 
     await patch(ADMIN, `/admin/featured/${id}`, { active: false });

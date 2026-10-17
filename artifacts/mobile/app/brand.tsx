@@ -183,7 +183,7 @@ export default function BrandScreen() {
       setNameError('Describe your brand in a few words first.');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptic('save');
     setIsGenerating(true);
     setNameError(null);
     try {
@@ -210,7 +210,7 @@ export default function BrandScreen() {
         uri: `data:image/png;base64,${logoImages[selectedLogo]}`,
         tags: ['ai-generated', 'logo'],
       });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptic('save');
       Alert.alert('Logo saved', 'Saved to Brand Assets. To show it on your store, upload it as your store logo.', [
         { text: 'Not now', style: 'cancel' },
         { text: 'Store branding', onPress: () => router.push('/store-setup-brand' as never) },
@@ -440,7 +440,7 @@ export default function BrandScreen() {
         <TouchableOpacity
           style={[styles.connectBtn, { backgroundColor: colors.primary }]}
           activeOpacity={0.8}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/store-domain' as never); }}
+          onPress={() => { haptic('select'); router.push('/store-domain' as never); }}
         >
           <Text style={[styles.connectText, { color: colors.primaryForeground }]}>{domain ? 'Manage Domain' : 'Connect Domain'}</Text>
         </TouchableOpacity>

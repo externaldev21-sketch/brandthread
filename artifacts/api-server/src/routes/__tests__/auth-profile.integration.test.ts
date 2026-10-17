@@ -130,7 +130,7 @@ describe("PATCH /api/auth/profile", () => {
       styleBadge: { label: "Archive Fashion", emoji: "🎞️", enabled: true },
     });
 
-    const tooLong = await patchProfile({ pronouns: "x".repeat(31) });
+    const tooLong = await patchProfile({ pronouns: "x".repeat(41) });
     expect(tooLong.status).toBe(400);
     const badBadge = await patchProfile({ styleBadge: { label: "x".repeat(25), emoji: "", enabled: true } });
     expect(badBadge.status).toBe(400);

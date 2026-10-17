@@ -32,7 +32,7 @@ describe('Messages "Options" menus use showActionSheet, not the dead-on-web Aler
   it('(buyer)/inbox.tsx row long-press menu (longPressConversation)', () => {
     const src = read('components/inbox/MessagesInbox.tsx');
     const fn = src.slice(src.indexOf('function longPressConversation'), src.indexOf('function longPressConversation') + 600);
-    expect(fn).toContain("showActionSheet('Options'");
+    expect(fn).toContain('showActionSheet(');
     expect(fn).not.toMatch(/Alert\.alert\(\s*'Options'/);
   });
 

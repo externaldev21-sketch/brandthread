@@ -16,7 +16,9 @@ describe('liveDeepLinkHref', () => {
 
   it('is served by a real /live/[streamId] route', () => {
     const route = readFileSync(resolve(__dirname, '../../app/live/[streamId].tsx'), 'utf8');
-    expect(route).toContain('liveDeepLinkHref');
+    expect(route).toContain("useLocalSearchParams");
+    expect(route).toContain("buyer-live");
+    expect(route).toContain("Log in to watch");
   });
 });
 

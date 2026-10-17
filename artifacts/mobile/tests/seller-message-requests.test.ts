@@ -45,7 +45,8 @@ describe('seller inbox (shared MessagesInbox, seller variant): Requests tab', ()
   });
 
   it('excludes requests from the main Inbox list', () => {
-    expect(inboxSrc).toContain('if (conv.isArchived || conv.isRequest || pendingDeleteIds.has(conv.id)) return false;');
+    expect(inboxSrc).toContain('conv.isRequest || pendingDeleteIds.has(conv.id) || !conversationMatchesInboxFilter(conv, inboxFilter)');
+    expect(inboxSrc).toContain("useState<InboxFilter>('all')");
   });
 
   it('does not mark a request read on open — the sender should not see a read receipt before acceptance', () => {

@@ -35,6 +35,7 @@ import {
   mutedPhrasesFor,
   mutedUserIds,
   notBlockedWith,
+  notMutedBy,
   profilesById,
   publishingRestriction,
 } from "../lib/safety";
@@ -698,7 +699,6 @@ router.get("/profile/:userId", async (req, res) => {
     styleBadge: publicStyleBadge(user.styleBadge),
     // Private accounts: header data stays visible; content is follower-only.
     isPrivate: user.isPrivate === true,
-    pronouns: user.pronouns ?? null,
     followRequested: !!reqRow,
     contentHidden: user.isPrivate === true && other !== myId && !isFollowing,
     // Bio link (profile endpoint only — formatUser stays unchanged).
@@ -1229,7 +1229,7 @@ router.get("/suggested", async (req, res) => {
   const candidateIds = [...mutualIds, ...freshRows.map((r) => r.clerkId)].slice(0, limit);
   if (candidateIds.length === 0) { res.json([]); return; }
 
-  const userRows = await db.select().from(users).where(inArray(users.clerkId, candidateIds));
+  const userRows = await db.select().from(users).where(and(inArray(users.clerkId, candidateIds), userIsSearchable()));
   const byId = new Map(userRows.map((u) => [u.clerkId, u]));
   const mutualById = new Map(mutualRows.map((row) => [row.candidateId, row]));
   const freshById = new Map(freshRows.map((r) => [r.clerkId, r]));

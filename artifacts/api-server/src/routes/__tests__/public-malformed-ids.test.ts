@@ -16,14 +16,14 @@ vi.mock("@clerk/express", () => ({ getAuth: () => ({ userId: null }) }));
 vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (req: any, _res: unknown, next: () => void) => { req.clerkUserId = "viewer"; next(); },
 }));
-vi.mock("@workspace/db", () => {
+vi.mock("@workspace/db", async (importOriginal) => {
   const table = new Proxy({}, { get: (_t, key) => String(key) });
   const fail = () => {
     dbCalls.count += 1;
     throw new Error('invalid input syntax for type uuid: "demo"');
   };
   const db = { select: fail, insert: fail, delete: fail, update: fail, execute: fail };
-  return new Proxy({ db, readDb: db }, {
+  return new Proxy({ ...await importOriginal<typeof import("@workspace/db")>(), db, readDb: db }, {
     get: (target, key) => (key in target ? (target as any)[key] : table),
   });
 });

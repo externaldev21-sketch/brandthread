@@ -110,6 +110,8 @@ import { BirthdayStep, CodeStep, EmailStep, PasswordStep, TermsStep, dobToWheelD
 import { BrandNameStep, NameStep, PhotoStep, UsernameStep, WelcomeUserStep } from '@/components/onboarding/steps/ProfileSteps';
 
 import { BRAND_STAGE_OPTIONS, BuildingStoreStep, ChoiceCardsStep, LocationStep, SELLER_GOAL_OPTIONS } from '@/components/onboarding/steps/SellerSteps';
+import { STORE_ACCENT_COLORS } from '@/lib/storeSetup';
+import { dataUrlToLocalFile } from '@/lib/aiToolMedia';
 
 import type { WheelDate } from '@/components/onboarding/steps/WheelDatePicker';
 import { PlanStep } from '@/components/onboarding/steps/PlanStep';
@@ -301,6 +303,7 @@ export default function OnboardingScreen() {
   )), []);
   const [brandName, setBrandName] = useState('');
   const [brandStage, setBrandStage] = useState('');
+  const [selectedAccent, setSelectedAccent] = useState(STORE_ACCENT_COLORS[0]!);
   const [goals, setGoals] = useState<string[]>([]);
   const [country, setCountry] = useState(defaultCountry);
 
@@ -393,6 +396,7 @@ export default function OnboardingScreen() {
     setSurvey(sanitizeDraftSurvey(draft.survey));
     setBrandName(draft.brandName);
     setBrandStage(draft.brandStage);
+    if (draft.selectedAccent && STORE_ACCENT_COLORS.includes(draft.selectedAccent)) setSelectedAccent(draft.selectedAccent);
     setGoals(draft.goals);
     if (draft.country) setCountry(draft.country);
     setStepId(resumeAt);
@@ -510,9 +514,10 @@ export default function OnboardingScreen() {
       goals,
       country,
       selectedThemeId: theme.id,
+      selectedAccent,
       ...overrides,
     };
-  }, [flow, selectedFlow, fullName, stepId, authMethod, accountReady, user?.id, email, username, dob, referralCode, photoUri, styleInterests, survey, brandName, brandStage, goals, country, theme.id]);
+  }, [flow, selectedFlow, fullName, stepId, authMethod, accountReady, user?.id, email, username, dob, referralCode, photoUri, styleInterests, survey, brandName, brandStage, goals, country, theme.id, selectedAccent]);
 
   const persistDraft = useCallback(async (overrides?: Partial<OnboardingDraft>) => {
     if (deviceProbeEnabled || isDevWebPreviewUser) return;
@@ -968,6 +973,11 @@ export default function OnboardingScreen() {
           console.error('[seller-onboarding] referral save failed', { message: error instanceof Error ? error.message : String(error) });
         });
       }
+      await api.seller.setStoreAccent(selectedAccent);
+      if (sampleUri) {
+        const uri = await dataUrlToLocalFile(sampleUri, 'onboarding-logo');
+        await api.seller.uploadLogo({ uri, mimeType: 'image/png' });
+      }
       await api.auth.completeOnboarding('seller');
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
@@ -982,10 +992,9 @@ export default function OnboardingScreen() {
       await AsyncStorage.multiRemove([userDraftKey(profile.clerkId)!, PENDING_DRAFT_KEY]);
       void registerGrantedPushToken(profile.clerkId, api);
       api.ai.brandMemoryRebuild().catch(() => {});
-      // The plan step only records a choice; hand off to the real subscribe
-      // screen (Stripe Checkout on web, store purchase on iOS/Android) with that
-      // plan preselected. "Not now" there continues to the dashboard.
-      router.replace({ pathname: '/plans', params: { fromOnboarding: 'true' } } as never);
+      // Keep the approved dashboard-billing flow. The saved plan choice is
+      // available when the seller explicitly opens billing from the dashboard.
+      router.replace('/(tabs)/' as never);
     } catch (error) {
       setFinishing(false);
       console.error('[seller-onboarding] save failed', { message: error instanceof Error ? error.message : String(error) });
@@ -1246,6 +1255,8 @@ export default function OnboardingScreen() {
         return (
           <BuildingStoreStep
             showLogoSample={false}
+            selectedAccent={selectedAccent}
+            onAccent={setSelectedAccent}
             brandName={brandName.trim()}
             username={username}
             building={building || (!built && !buildError)}

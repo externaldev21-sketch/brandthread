@@ -1,3 +1,4 @@
+import { Icon as Feather } from '@/components/ui/Icon';
 /**
  * Design Versions — /design-versions?projectId=<id>
  *

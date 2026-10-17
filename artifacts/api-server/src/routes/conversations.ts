@@ -1465,7 +1465,7 @@ router.delete("/:id/for-me", async (req, res) => {
 
   const hiddenAt = new Date();
   await db.update(conversationParticipants)
-    .set({ hiddenAt, unreadCount: 0, archivedAt: null, pinnedAt: null })
+    .set({ hiddenAt, historyClearedAt: hiddenAt, unreadCount: 0, archivedAt: null, pinnedAt: null })
     .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
 
   return res.json({ ok: true, hiddenAt: hiddenAt.toISOString() });

@@ -91,7 +91,7 @@ export default function BlockedAndMutedScreen() {
   }
 
   async function unmute(record: MuteRecord) {
-    hapticToggle();
+    haptics.select();
     try {
       await unmuteUser(record.mutedUserId);
       setMuted((prev) => prev.filter((row) => row.id !== record.id));

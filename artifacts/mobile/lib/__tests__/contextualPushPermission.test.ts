@@ -64,7 +64,7 @@ describe('requestOnboardingPushPermission', () => {
     const outcome = await requestOnboardingPushPermission('user_1', api);
     expect(h.requestPermissionsAsync).toHaveBeenCalledOnce();
     expect(h.getExpoPushTokenAsync).toHaveBeenCalledWith({ projectId: 'proj-123' });
-    expect(api.push.register).toHaveBeenCalledWith({ token: 'ExponentPushToken[abc]', platform: 'expo' });
+    expect(api.push.register).toHaveBeenCalledWith({ token: 'ExponentPushToken[abc]', platform: 'expo', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
     expect(outcome).toEqual({ status: 'granted', registration: { ok: true, token: 'ExponentPushToken[abc]' } });
     expect(await getLastPushRegistrationIssue()).toBeNull();
   });

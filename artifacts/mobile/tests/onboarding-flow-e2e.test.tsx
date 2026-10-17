@@ -70,6 +70,8 @@ const {
     },
     seller: {
       saveOnboardingData: vi.fn(record('seller.saveOnboardingData')),
+      setStoreAccent: vi.fn(record('seller.setStoreAccent')),
+      uploadLogo: vi.fn(record('seller.uploadLogo')),
     },
     ai: {
       brandMemoryRebuild: vi.fn(async () => ({ fields: {} })),

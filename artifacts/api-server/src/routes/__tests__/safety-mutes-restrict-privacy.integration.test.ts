@@ -347,6 +347,7 @@ describe("privacy settings", () => {
 
     const [story] = await db.insert(stories).values({
       authorId: PRIV, authorName: "Privy", media: [{ imageUri: "https://cdn.test/p.jpg" }],
+      privacyReplyPerm: "off",
       expiresAt: new Date(Date.now() + 3_600_000),
     }).returning({ id: stories.id });
     const { storyReplyDenial } = await import("../../lib/privacySettings");
@@ -354,6 +355,9 @@ describe("privacy settings", () => {
     expect(await storyReplyDenial(VIEWER, [attachment])).toMatch(/story replies/);
     expect(await storyReplyDenial(PRIV, [attachment])).toBeNull();
     await call("/api/auth/privacy", { method: "PATCH", user: PRIV, body: { settings: { whoCanReplyToStories: "everyone" } } });
+    // An explicit per-story choice wins over a later account-default change.
+    expect(await storyReplyDenial(VIEWER, [attachment])).toMatch(/story replies/);
+    await db.update(stories).set({ privacyReplyPerm: "everyone" }).where(eq(stories.id, story.id));
     expect(await storyReplyDenial(VIEWER, [attachment])).toBeNull();
   });
 });

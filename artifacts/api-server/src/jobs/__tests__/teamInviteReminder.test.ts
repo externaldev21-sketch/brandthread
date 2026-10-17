@@ -20,7 +20,8 @@ const state = vi.hoisted(() => ({
   infoMessages: [] as Array<{ fields: Record<string, unknown>; message: string }>,
 }));
 
-vi.mock("drizzle-orm", () => ({
+vi.mock("drizzle-orm", async (importOriginal) => ({
+  ...await importOriginal<typeof import("drizzle-orm")>(),
   and: (...conditions: unknown[]) => conditions,
   eq: (...values: unknown[]) => values,
   gte: (...values: unknown[]) => values,
@@ -30,7 +31,7 @@ vi.mock("drizzle-orm", () => ({
   or: (...conditions: unknown[]) => conditions,
 }));
 
-vi.mock("@workspace/db", () => {
+vi.mock("@workspace/db", async (importOriginal) => {
   const columns = new Proxy({}, { get: (_target, key) => String(key) });
   const activeLease = () =>
     state.reminderClaimedAt &&
@@ -43,6 +44,7 @@ vi.mock("@workspace/db", () => {
   });
 
   return {
+    ...await importOriginal<typeof import("@workspace/db")>(),
     db: {
       select: () => ({
         from: () => ({

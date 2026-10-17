@@ -2381,16 +2381,8 @@ export async function getMutedUsers(k: SocialKeys = K()): Promise<MuteRecord[]> 
   try {
     const remote = await serviceRequest<{ mutes: ServerPerson[] }>('/api/safety/mutes');
     let rows = Array.isArray(remote?.mutes) ? remote.mutes : [];
-    if ((await AsyncStorage.getItem(k.mutesMigrated).catch(() => null)) !== 'true') {
-      const moved = await migrateLocalPeople(
-        local.map((m) => m.mutedUserId), new Set(rows.map((r) => r.userId)), k.mutesMigrated,
-        (userId) => serviceRequest('/api/safety/mutes', { method: 'POST', body: JSON.stringify({ userId }) }, false),
-      );
-      if (moved.length > 0) {
-        const again = await serviceRequest<{ mutes: ServerPerson[] }>('/api/safety/mutes');
-        rows = Array.isArray(again?.mutes) ? again.mutes : rows;
-      }
-    }
+    // This integration already had server-owned mutes. Its device mirror
+    // must not resurrect an account unmuted on another device.
     const colorById = new Map(local.map((m) => [m.mutedUserId, m.mutedUserColor]));
     const mirrored: MuteRecord[] = rows.map((r) => ({
       id: r.userId, mutedUserId: r.userId, mutedUserName: r.name, mutedUserHandle: r.handle,
@@ -2703,9 +2695,14 @@ function mergeServerPrivacy(base: PrivacySettings, remote: ServerPrivacyResponse
 export async function getPrivacySettings(k: SocialKeys = K()): Promise<PrivacySettings> {
   const stored = await getCachedAccountPrivacySettings(k);
   const cached = { ...DEFAULT_PRIVACY_SETTINGS, ...stored };
-  if (!canSyncSocialServer()) return cached;
+  if (!canSyncSocialServer() || k.userId !== _socialUserId) return cached;
+  // A failed offline write is still the user's pending intent. Don't replace
+  // it with a successful read of the older server value.
+  if (await AsyncStorage.getItem(privacyPendingKey(k)).catch(() => null) === '1') return cached;
   try {
-    await uploadLegacyPrivacyOnce(k, stored);
+    // These preferences already have a server-backed account cache and an
+    // explicit offline outbox. Never upload a normalized cache as "legacy"
+    // choices: defaults or another device's stale mirror could overwrite the server.
     const remote = await serviceRequest<ServerPrivacyResponse>('/api/auth/privacy');
     const next = mergeServerPrivacy(cached, remote);
     if (_socialUserId === k.userId) await save(k.privacy, next);
@@ -2713,29 +2710,6 @@ export async function getPrivacySettings(k: SocialKeys = K()): Promise<PrivacySe
   } catch {
     return cached;
   }
-}
-/**
- * Before these settings were server-backed they lived only on the phone. The
- * first sync uploads whatever this device had stored, so an update doesn't
- * silently reset someone's choices to the server defaults. Best effort: a
- * 4xx (e.g. a value the server no longer accepts) counts as done.
- */
-async function uploadLegacyPrivacyOnce(k: SocialKeys, stored: Partial<PrivacySettings>): Promise<void> {
-  const flagKey = `${k.privacy}:server-synced:v1`;
-  if (await load<boolean>(flagKey, false)) return;
-  const settings: Partial<Pick<PrivacySettings, ServerPrivacyKey>> = {};
-  for (const key of SERVER_PRIVACY_KEYS) {
-    if (stored[key] !== undefined) (settings as any)[key] = stored[key];
-  }
-  if (Object.keys(settings).length > 0) {
-    try {
-      await serviceRequest('/api/auth/privacy', { method: 'PATCH', body: JSON.stringify({ settings }) }, false);
-    } catch (error) {
-      const status = (error as { status?: number } | null)?.status;
-      if (!(typeof status === 'number' && status >= 400 && status < 500)) return; // retry next load
-    }
-  }
-  await save(flagKey, true);
 }
 /** Save privacy-screen settings to the server (throws on failure), then refresh the cache. */
 export async function updatePrivacySettings(updates: Partial<PrivacySettings>): Promise<PrivacySettings> {

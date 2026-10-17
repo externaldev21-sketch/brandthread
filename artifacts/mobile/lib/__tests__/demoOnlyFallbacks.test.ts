@@ -36,12 +36,12 @@ describe('services/aiBrandMemory.ts rebuildBrandMemory', () => {
   beforeEach(() => { demo.on = false; });
 
   it('throws (so the screen shows its rebuild-failed alert) instead of saving invented defaults outside demo', async () => {
-    await expect(rebuildBrandMemory(null)).rejects.toThrow();
+    await expect(rebuildBrandMemory()).rejects.toThrow();
   });
 
   it('still fills the sample brand profile under demo=1', async () => {
     demo.on = true;
-    const memory = await rebuildBrandMemory(null);
+    const memory = await rebuildBrandMemory();
     expect(memory.brandVoice.value).toMatch(/Confident/);
     expect(memory.brandVoice.enabled).toBe(true);
   });

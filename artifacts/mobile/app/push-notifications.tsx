@@ -10,7 +10,7 @@ import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { hapticToggle } from '@/lib/haptics';
+import { haptic } from '@/lib/haptics';
 import { ListRow } from '@/components/ui/ListRow';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -46,7 +46,7 @@ export default function PushNotificationsScreen() {
   useEffect(() => { load(); }, [load]);
 
   async function toggleMaster(value: boolean) {
-    hapticToggle();
+    haptic('select');
     const prior = pushEnabled;
     setPushEnabled(value);
     try {
@@ -59,7 +59,7 @@ export default function PushNotificationsScreen() {
   }
 
   async function toggle(key: string, value: boolean) {
-    hapticToggle();
+    haptic('select');
     const prior = categories;
     setCategories({ ...categories, [key]: value });
     try {

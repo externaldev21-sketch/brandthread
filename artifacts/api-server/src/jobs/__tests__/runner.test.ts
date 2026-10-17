@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@workspace/db", () => ({ pool: {} }));
+vi.mock("@workspace/db", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@workspace/db")>(), pool: {},
+}));
 vi.mock("../../lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 // The real job modules pull in the whole app; only the runner logic is under test.
 vi.mock("../../lib/communityPush", () => ({ startCommunityPushJob: vi.fn() }));
@@ -76,9 +78,9 @@ describe("background job runner", () => {
     expect(backgroundJobsEnabled({ BACKGROUND_JOBS: "on" })).toBe(true);
   });
 
-  it("covers all 25 jobs that used to start in index.ts", () => {
-    expect(SINGLETON_JOBS.length + PER_INSTANCE_JOBS.length).toBe(25);
+  it("covers all 44 integrated background jobs without duplicate names", () => {
+    expect(SINGLETON_JOBS.length + PER_INSTANCE_JOBS.length).toBe(44);
     const names = [...SINGLETON_JOBS, ...PER_INSTANCE_JOBS].map(([n]) => n);
-    expect(new Set(names).size).toBe(25);
+    expect(new Set(names).size).toBe(44);
   });
 });

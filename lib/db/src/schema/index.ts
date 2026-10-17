@@ -79,8 +79,6 @@ export const users = pgTable('users', {
   // Buyer / unified profile fields
   displayName: text('display_name'),
   bio: text('bio'),
-  // Free-text pronouns shown on the public profile (migration 271).
-  pronouns: text('pronouns'),
   // Buyer "Style badge" pill ({ label, emoji, enabled }); null = never set (migration 271).
   styleBadge: jsonb('style_badge').$type<{ label: string; emoji: string; enabled: boolean }>(),
   profileImageUrl: text('profile_image_url'),
@@ -1267,6 +1265,23 @@ export const blocks = pgTable('blocks', {
 
 // ─── Conversations & Messages (buyer ↔ seller DM) ────────────────────────────
 
+export const userMutes = pgTable('user_mutes', {
+  muterId: text('muter_id').notNull(),
+  mutedId: text('muted_id').notNull(),
+  mutePosts: boolean('mute_posts').notNull().default(true),
+  muteStories: boolean('mute_stories').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({ pk: primaryKey({ columns: [t.muterId, t.mutedId] }) }));
+
+export const userRestrictions = pgTable('user_restrictions', {
+  restrictorId: text('restrictor_id').notNull(),
+  restrictedId: text('restricted_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.restrictorId, t.restrictedId] }),
+  restrictedIdx: index('user_restrictions_restricted_id_idx').on(t.restrictedId),
+}));
+
 export const conversations = pgTable('conversations', {
   id:                 uuid('id').primaryKey().defaultRandom(),
   type:               text('type').notNull().default('buyer_to_seller'),
@@ -1769,12 +1784,22 @@ export const postTaggedProducts = pgTable('post_tagged_products', {
 // ─── People tags ("Tagged" tab) ───────────────────────────────────────────────
 // A post author tagging another account. The tagged account's profile "Tagged"
 // tab lists these posts. `source_type` leaves room for story tags.
+export const messageHidden = pgTable('message_hidden', {
+  messageId: uuid('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.messageId, table.userId] }),
+  userIdx: index('message_hidden_user_idx').on(table.userId),
+}));
+
 export const postUserTags = pgTable('post_user_tags', {
   id:           uuid('id').primaryKey().defaultRandom(),
   postId:       uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
   taggedUserId: text('tagged_user_id').notNull(), // Clerk user ID of the tagged account
   /** 'approved' | 'pending' (tagged account has "Manually approve tags" on; migration 119). */
   status:       text('status').notNull().default('approved'),
+  notifiedAt: timestamp('notified_at', { withTimezone: true }),
   createdAt:    timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   taggedIdx: index('post_user_tags_tagged_idx').on(table.taggedUserId, table.createdAt),
@@ -3060,7 +3085,7 @@ export const adClicks = pgTable('ad_clicks', {
   viewerCreatedIdx:   index('ad_clicks_viewer_created_idx').on(table.viewerId, table.createdAt),
 }));
 export * from './sellerPaymentSettings';
-export * from './sellerSettings';
+export { loginAlertSessions } from './userAppSettings';
 export * from './sellerMessaging';
 export * from './aiCredits';
 export * from './liveModeration';

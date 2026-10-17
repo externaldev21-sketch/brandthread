@@ -1,3 +1,7 @@
+import {
+  INBOX_FILTERS, inboxFilterLabel, conversationMatchesInboxFilter, communityMatchesInboxFilter,
+  type InboxFilter,
+} from '@/lib/inboxFilter';
 import { radius as ControlRadius } from '@/constants/radii';
 /**
  * MessagesInbox — the ONE Messages inbox, shared by the buyer Messages tab
@@ -679,9 +683,10 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   // optionally filtered by the search bar, pinned threads (e.g. the official
   // Brandthread Agent welcome thread — see the isPinned comment on
   // Conversation in services/socialTypes.ts) always sorted first.
+  const [inboxFilter, setInboxFilter] = useState<InboxFilter>('all');
   const filteredConvs = conversations
     .filter(conv => {
-      if (conv.isArchived || conv.isRequest || pendingDeleteIds.has(conv.id)) return false;
+      if (conv.isRequest || pendingDeleteIds.has(conv.id) || !conversationMatchesInboxFilter(conv, inboxFilter)) return false;
       if (messagesSearchLower) {
         const participant = participantOf(conv);
         const haystack = [
@@ -700,7 +705,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   const { communities: joinedCommunities, toggleMute: toggleCommunityMute } = useInboxCommunities();
   const inboxRows = mergeInboxRows(
     filteredConvs,
-    joinedCommunities.filter(c => communityMatchesQuery(c, messagesSearchLower)),
+    joinedCommunities.filter(c => communityMatchesInboxFilter(c, inboxFilter) && communityMatchesQuery(c, messagesSearchLower)),
     { getKey: c => c.id, getTs: c => c.lastMessageTs, isPinned: c => !!c.isPinned },
   );
 
@@ -1200,7 +1205,14 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     // preview — no dialog, no honest "not available" state, nothing. Use
     // the screen's existing snackbar (already the pattern for every other
     // inbox affordance above) so the tap always gives real feedback.
-    showSnackbar('Message filters — coming soon');
+    const archivedCount = conversations.filter(c => c.isArchived && !c.isRequest).length;
+    showActionSheet('Filter messages', `Showing: ${inboxFilterLabel(inboxFilter)}`, [
+      ...INBOX_FILTERS.map(f => ({
+        text: f.key === 'archived' && archivedCount > 0 ? `${f.label} (${archivedCount})` : f.label,
+        onPress: () => { setInboxFilter(f.key); setActiveTab('inbox'); },
+      })),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────────
@@ -1858,8 +1870,8 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
         >
           <View>
-            {messagesSearchLower || loadError ? renderEmptyState() : renderInboxEmptyState()}
-            {!messagesSearchLower && !loadError && renderSuggestedSection()}
+            {messagesSearchLower || loadError || inboxFilter !== 'all' ? renderEmptyState() : renderInboxEmptyState()}
+            {!messagesSearchLower && !loadError && inboxFilter === 'all' && renderSuggestedSection()}
           </View>
         </ScrollView>
       ) : (
@@ -1875,7 +1887,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
             keyboardDismissMode="on-drag"
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            ListFooterComponent={!messagesSearchLower ? renderSuggestedSection : undefined}
+            ListFooterComponent={!messagesSearchLower && inboxFilter === 'all' ? renderSuggestedSection : undefined}
           />
         </View>
       )}

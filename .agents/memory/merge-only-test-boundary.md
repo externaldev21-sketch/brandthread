@@ -20,3 +20,15 @@ A passing API test command does not establish that Drizzle prepared the isolated
 **Why:** The Drizzle subprocess emitted interactive-prompt errors while the wrapper's exit-code check accepted completion and the suites passed against an existing test schema. Exit status alone did not establish successful schema preparation.
 
 **How to apply:** Keep merge verification scoped to the requested changes; defer deterministic, fail-closed test-schema bootstrap to a separate task. Any test-harness repair must retain isolated-database safety and never reset development or production data.
+
+Baseline comparisons must use the baseline's matching workspace schema, not current workspace packages reached through pnpm symlinks.
+
+**Why:** Running older API tests against the newer DB module produced misleading baseline failures. A source archive alone did not isolate the dependency graph.
+
+**How to apply:** Resolve shared DB imports to the archived schema when comparing revisions. Verify the temporary baseline still exists before reusing it; keep reports in ignored workspace storage.
+
+Do not import already server-backed privacy or mute caches as though they were untouched device-only preferences.
+
+**Why:** Older upstream changes assumed those preferences were local-only. Re-uploading a normalized cache could restore an unmute or privacy choice that another device had already changed.
+
+**How to apply:** Preserve explicit pending-write outboxes, but let current server state win over device mirrors. Bridge legacy server records into the new schema rather than re-uploading cached defaults.

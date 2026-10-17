@@ -11,12 +11,15 @@ const read = (p: string) => readFileSync(resolve(__dirname, '..', p), 'utf8');
 describe('finance statement download (item 14)', () => {
   const finance = read('app/finance.tsx');
   it('fetches the CSV with the seller session instead of opening an unauthenticated URL', () => {
-    expect(finance).toContain('api.finance.statementCsv()');
-    expect(finance).toContain('saveExportFile(');
+    expect(finance).toContain('await fetchStatementCsv({');
+    expect(finance).toContain('token: await getToken()');
+    expect(finance).toContain('headers: storeContextHeaders()');
+    expect(finance).toContain('saveCsvFile(');
     expect(finance).not.toContain('Linking.openURL(url)');
   });
   it('shows a real error instead of failing silently', () => {
-    expect(finance).toContain("Couldn't download statement");
+    expect(finance).toContain('setStatementError(statementErrorLabel(err))');
+    expect(finance).toContain('<RetryRow label={statementError}');
     expect(finance).not.toContain('/* ignore */');
   });
   it('exposes an authenticated text fetch for the statement', () => {

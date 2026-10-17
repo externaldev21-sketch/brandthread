@@ -1,3 +1,4 @@
+import { haptic } from '@/lib/haptics';
 import * as Haptics from 'expo-haptics';
 /**
  * Story composer — camera-first, modeled on Instagram/Snapchat's story-creation
@@ -1225,7 +1226,7 @@ export default function StoryComposer() {
   };
 
   const openCameraSettings = () => {
-    hapticLight();
+    haptic('select');
     Alert.alert('Camera settings', undefined, [
       { text: cameraSettings.gridLines ? 'Hide grid lines' : 'Show grid lines', onPress: () => toggleCameraSetting('gridLines') },
       { text: cameraSettings.mirrorFront ? 'Don’t mirror front camera' : 'Mirror front camera', onPress: () => toggleCameraSetting('mirrorFront') },
@@ -1298,7 +1299,7 @@ export default function StoryComposer() {
           <TouchableOpacity
             style={styles.camIconBtn}
             onPress={openCameraSettings}
-            accessibilityLabel="Camera settings"
+            accessibilityLabel="Story settings"
             accessibilityRole="button"
           >
             <Icon name="settings" size={22} color={ON_DARK} />
@@ -1739,7 +1740,7 @@ export default function StoryComposer() {
 
   // "…" — only tools that actually work here (it used to say "coming soon").
   const openMoreTools = () => {
-    hapticLight();
+    haptic('select');
     const tools: { text: string; onPress: () => void; style?: 'destructive' }[] = [];
     if (media?.kind === 'photo' && !isReshare) tools.push({ text: 'Crop', onPress: () => setCropPending(true) });
     tools.push({ text: 'Mention someone', onPress: () => setMentionPickerOpen(true) });
@@ -1833,7 +1834,7 @@ export default function StoryComposer() {
           <TouchableOpacity style={styles.camIconBtn} onPress={() => { setStickerSheetOpen(true); }} accessibilityLabel="Add sticker" accessibilityRole="button">
             <Icon name="smile" size={20} color={ON_DARK} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.camIconBtn} onPress={() => { hapticLight(); setDrawOpen((v) => !v); }} accessibilityLabel="Draw" accessibilityRole="button">
+          <TouchableOpacity style={styles.camIconBtn} onPress={() => { haptic('select'); setDrawOpen((v) => !v); }} accessibilityLabel="Draw" accessibilityRole="button">
             <Icon name="edit-2" size={20} color={drawOpen ? theme.accent : ON_DARK} />
           </TouchableOpacity>
           <TouchableOpacity

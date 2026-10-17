@@ -577,7 +577,7 @@ export default function DiscoverScreen() {
           onOpen={safetyMenuOpen ?? undefined}
           onNotInterested={() => removePostFromLists(menuPost.authorId, menuPost.id)}
           onMute={() => {
-            const target = safetyMenuPost;
+            const target = menuPost;
             muteUser({
               userId: target.authorId,
               name: target.authorName,

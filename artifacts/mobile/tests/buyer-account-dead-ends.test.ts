@@ -127,7 +127,7 @@ describe('item 111: invite code failure', () => {
     expect(src).not.toContain("'------'");
     expect(src).toContain("Couldn't load your invite code");
     expect(src).toContain('disabled={!invite}');
-    expect(src).toContain('showToast(INVITE_UNAVAILABLE)');
+    expect(src).toMatch(/if \(!invite\) \{ showToast\(/);
     expect(src).toContain("Couldn't load your invite stats");
   });
 });

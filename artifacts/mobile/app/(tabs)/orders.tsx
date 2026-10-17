@@ -1,3 +1,4 @@
+import { Icon as Feather } from '@/components/ui/Icon';
 /**
  * Brandthread — Seller Orders Tab
  * Shopify-pattern layout: persistent search row, status pills, date-grouped divider rows.
@@ -1082,10 +1083,10 @@ export default function OrdersScreen() {
   // exactly which orders failed (and why) instead of a blanket error.
   const runBulkAction = useCallback(async (actionLabel: string, fn: (id: string) => Promise<unknown>) => {
     if (isPreviewMode) {
-      Alert.alert('Preview', 'Bulk actions are not available in the preview.');
+      Alert.alert('Sign in to continue', 'Bulk actions need a signed-in seller account.');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptic('select');
     const byId = new Map(orders.map(o => [o.id, o]));
     const result = await runBulk(selectedIds, fn, {
       label: id => byId.get(id)?.orderNumber ?? id.slice(0, 8),

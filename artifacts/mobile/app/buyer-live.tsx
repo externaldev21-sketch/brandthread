@@ -67,9 +67,6 @@ import { Snackbar } from '@/components/ui/Snackbar';
 
 import Composer from '@/components/ui/Composer';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
-import { useLiveModeration } from '@/lib/live/useLiveModeration';
-import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
-import { radius } from '@/constants/radii';
 import {
   LIVE_VIDEO_CONNECT_TIMEOUT_MS,
   canRetryLiveVideo,

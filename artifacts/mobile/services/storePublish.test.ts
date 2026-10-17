@@ -22,12 +22,13 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 
 vi.mock('@/lib/api', () => ({ api: { store: storeApi } }));
 
-import { getStorefront, publishStore, unpublishStore } from './storeService';
+import { getStorefront, publishStore, unpublishStore, storefrontStorageKey } from './storeService';
 
-const STORE_KEY = 'bt:store:v1';
+let STORE_KEY: string;
 
 async function seedPublishableStore() {
   await getStorefront();
+  STORE_KEY = await storefrontStorageKey();
   const s = JSON.parse(mem.get(STORE_KEY)!);
   s.settings.storeName = 'Nova Goods';
   s.domains = [{ id: 'd1', subdomain: 'nova', isPrimary: true }];

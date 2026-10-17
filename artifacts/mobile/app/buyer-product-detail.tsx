@@ -85,6 +85,7 @@ import { LaunchCountdown } from '@/components/products/LaunchCountdown';
 
 import { useProductDraw } from '@/hooks/useProductDraw';
 import { closesLabel, drawFooter } from '@/lib/drawPhase';
+import { dropsOnLabel, upcomingDropRelease } from '@/lib/dropProductContext';
 import { PreOrderShipBy } from '@/components/products/PreOrderShipBy';
 
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
@@ -926,7 +927,7 @@ export default function BuyerProductDetailScreen() {
   const { theme, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM, BORDER_ACTIVE, BORDER_FOCUS, GRAD_PRIMARY, SHADOW_PURPLE } = useChrome();
   const s = makeStyles(theme);
   const wl = makeWaitlistStyles(theme);
-  const { productId, sourcePostId, sourceTagId, editVariantId, editCartItemId, src, localPreview } = useLocalSearchParams<{
+  const { productId, sourcePostId, sourceTagId, editVariantId, editCartItemId, src, localPreview, dropReleaseAt, dropName } = useLocalSearchParams<{
     productId?: string;
     /** "1": the seller's "Preview as buyer" for a product stored only on this device. */
     localPreview?: string;
@@ -935,8 +936,17 @@ export default function BuyerProductDetailScreen() {
     editVariantId?: string;
     editCartItemId?: string;
     src?: string;
+    dropReleaseAt?: string;
+    dropName?: string;
   }>();
   const router = useRouter();
+  const [dropNow, setDropNow] = useState(Date.now);
+  const dropsAt = upcomingDropRelease(typeof dropReleaseAt === 'string' ? dropReleaseAt : null, dropNow);
+  useEffect(() => {
+    if (!dropsAt) return;
+    const timer = setTimeout(() => setDropNow(Date.now()), Math.min(2_147_483_647, Math.max(1, dropsAt.getTime() - Date.now() + 1)));
+    return () => clearTimeout(timer);
+  }, [dropsAt]);
   const stockInfo = useStockInfo(productId);
   const pathname = usePathname();
   const { push, back } = useThreadPull();
@@ -2173,11 +2183,11 @@ export default function BuyerProductDetailScreen() {
           />
         ) : (
           <Button
-            label={allSelected && !inStock ? 'Sold out' : `Add to bag · ${formatCents(variantPrice)}`}
+            label={dropsAt ? `Drops ${dropsOnLabel(dropsAt)}` : allSelected && !inStock ? 'Sold out' : `Add to bag · ${formatCents(variantPrice)}`}
             variant="primary"
             onPress={handleAddToCart}
             loading={addingToCart}
-            disabled={!!sellerPreview || addingToCart || launching || (allSelected && !inStock)}
+            disabled={!!dropsAt || !!sellerPreview || addingToCart || launching || (allSelected && !inStock)}
             accessibilityLabel={!allSelected ? 'Add to bag. Select a size first' : !inStock ? 'Out of stock' : 'Add to bag'}
             fullWidth
             style={s.bagBtn}
@@ -2208,7 +2218,7 @@ export default function BuyerProductDetailScreen() {
       {/* Buy now / Reserve keep their place in the bar, as the secondary
           action under Add to bag. */}
       <View style={s.actionBarSecondRow}>
-        {productDraw.draw ? null : sellerPreview ? (<Button label="Not for sale yet" onPress={() => {}} disabled fullWidth testID="product-seller-preview-buy" />) : product.isPreOrder ? (
+        {dropsAt ? <Text style={s.vacationText}>{dropName ? `${dropName} · ` : ''}Drops {dropsOnLabel(dropsAt)}</Text> : productDraw.draw ? null : sellerPreview ? (<Button label="Not for sale yet" onPress={() => {}} disabled fullWidth testID="product-seller-preview-buy" />) : product.isPreOrder ? (
           <Button
             label={reserved ? 'Reserved ✓' : 'Reserve (No Charge)'}
             onPress={handleReserve}

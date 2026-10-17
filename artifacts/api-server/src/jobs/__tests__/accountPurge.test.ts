@@ -13,14 +13,15 @@ const state = vi.hoisted(() => ({
   cancelError: null as unknown,
 }));
 
-vi.mock("drizzle-orm", () => {
+vi.mock("drizzle-orm", async (importOriginal) => {
   const passthrough = (...args: unknown[]) => args;
-  return { and: passthrough, asc: passthrough, eq: passthrough, isNotNull: passthrough, lte: passthrough };
+  return { ...await importOriginal<typeof import("drizzle-orm")>(), and: passthrough, asc: passthrough, eq: passthrough, isNotNull: passthrough, lte: passthrough };
 });
 
-vi.mock("@workspace/db", () => {
+vi.mock("@workspace/db", async (importOriginal) => {
   const columns = new Proxy({}, { get: (_t, key) => String(key) });
   return {
+    ...await importOriginal<typeof import("@workspace/db")>(),
     users: columns,
     db: {
       select: () => ({ from: () => ({ where: () => ({ orderBy: () => ({ limit: async () => state.due }) }) }) }),

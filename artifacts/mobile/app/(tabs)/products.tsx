@@ -56,7 +56,6 @@ import { Product, ProductFilter } from '@/services/productTypes';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { apiErrorMessage } from '@/lib/safety';
 import { buildCsv, exportCsvFile } from '@/lib/csvExport';
-import { FormInput } from '@/components/BrandthreadUI';
 import { SheetRise } from '@/components/motion/SheetRise';
 
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';

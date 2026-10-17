@@ -3801,7 +3801,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             count: number;
           };
           /** Public profile extras; styleBadge is present only when the owner enabled it. */
-          pronouns?: string | null; styleBadge?: { label: string; emoji: string } | null;
+          styleBadge?: { label: string; emoji: string } | null;
         }>(`/api/social/profile/${encodeURIComponent(userId)}`),
       /** Posts where someone tagged this profile (the profile "Tagged" tab). */
       tagged: (userId: string, limit = 30, offset = 0) =>

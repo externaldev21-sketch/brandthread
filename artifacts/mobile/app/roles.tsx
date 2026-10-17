@@ -1,3 +1,4 @@
+import { haptic as emitHaptic } from '@/lib/haptics';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
 import { useColors } from '@/hooks/useColors';
@@ -49,17 +50,14 @@ export default function RolesScreen() {
 
   const visibleRoles = useMemo(() => filterRoles(roles, query, filter), [roles, query, filter]);
 
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
 
   function openFilter() {
-    haptic();
+    emitHaptic('select');
     setFilterSheetOpen(true);
   }
 
   function toggleSearch() {
-    haptic();
+    emitHaptic('select');
     if (searchOpen) setQuery('');
     setSearchOpen(!searchOpen);
   }
@@ -71,7 +69,7 @@ export default function RolesScreen() {
         rightElement={
           <View style={styles.headerActions}>
             <TouchableOpacity
-              onPress={() => { haptic(); router.push('/team' as never); }}
+              onPress={() => { emitHaptic('select'); router.push('/team' as never); }}
               activeOpacity={0.7}
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
               accessibilityLabel="Invite a team member"
@@ -80,7 +78,7 @@ export default function RolesScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
-                haptic();
+                emitHaptic('select');
                 Alert.alert('Roles', 'Permissions are enforced per role on the server — team members only see and do what their role allows.', [
                   { text: 'Manage team', onPress: () => router.push('/team' as never) },
                   { text: 'OK', style: 'cancel' },
@@ -99,7 +97,7 @@ export default function RolesScreen() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.toolbarRow}>
           <TouchableOpacity
-            onPress={filter === 'all' ? openFilter : () => { haptic(); setFilter('all'); }}
+            onPress={filter === 'all' ? openFilter : () => { emitHaptic('select'); setFilter('all'); }}
             activeOpacity={0.7}
             style={[styles.allPill, { backgroundColor: colors.secondary, flexDirection: 'row', alignItems: 'center', gap: 6 }]}
             accessibilityRole="button"
@@ -161,7 +159,7 @@ export default function RolesScreen() {
             <TouchableOpacity
               key={role.name}
               onPress={() => {
-                haptic();
+                emitHaptic('select');
                 router.push(`/users?role=${role.key ?? role.name.toLowerCase()}` as never);
               }}
               activeOpacity={0.7}
@@ -184,7 +182,7 @@ export default function RolesScreen() {
             Learn more about{' '}
             <Text
               style={{ textDecorationLine: 'underline' }}
-              onPress={() => { haptic(); setLearnMoreOpen(v => !v); }}
+              onPress={() => { emitHaptic('select'); setLearnMoreOpen(v => !v); }}
               accessibilityRole="button"
             >
               roles

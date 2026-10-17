@@ -104,7 +104,11 @@ describe('report screens', () => {
     expect(read('app/_layout.tsx')).toContain('<Stack.Screen name="analytics-reports"');
     const route = read('app/analytics-reports.tsx');
     const keys = ['product-stats', 'content', 'audience', 'goals', 'export', 'advanced', 'cohorts'];
-    expect(ANALYTICS_REPORTS.map(r => r.href)).toEqual(keys.map(k => `/analytics-reports?report=${k}`));
+    expect(ANALYTICS_REPORTS.map(r => r.href)).toEqual([
+      ...keys.map(k => `/analytics-reports?report=${k}`),
+      '/analytics-store', '/analytics-customers',
+      '/analytics-profit', '/analytics-marketing', '/analytics-production',
+    ]);
     for (const k of keys) expect(route).toMatch(new RegExp(`'?${k}'?: \\w+Report`));
     expect(ANALYTICS_REPORTS.filter(r => r.badge).map(r => r.href)).toEqual(['/analytics-reports?report=export', '/analytics-reports?report=advanced', '/analytics-reports?report=cohorts']);
     expect(read('app/(tabs)/analytics.tsx')).toContain('<AnalyticsReportsList />');

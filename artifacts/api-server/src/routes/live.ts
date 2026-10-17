@@ -133,7 +133,15 @@ function randomChannelName(): string {
 }
 
 // ─── POST /api/live/start ─────────────────────────────────────────────────────
-router.post("/start", requireAuth, hostPlan, validateBody(startLiveBody), async (req, res) => {
+router.post("/start", requireAuth, (_req, res, next) => {
+  // A missing streaming provider is a configuration error, not a billing
+  // lookup failure. Keep the plan gate for every configured start request.
+  if (!isLiveStreamingConfigured()) {
+    res.status(503).json({ error: LIVE_NOT_CONFIGURED_MESSAGE, code: LIVE_NOT_CONFIGURED_CODE });
+    return;
+  }
+  next();
+}, hostPlan, validateBody(startLiveBody), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   if (await denyIfAgeRestricted(sellerId, res)) return;
   const { title, description, thumbnailUrl, productTags = [], scheduledLiveId } = req.body;

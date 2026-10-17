@@ -23,7 +23,6 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { radius } from '@/constants/radii';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { apiErrorMessage } from '@/lib/safety';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

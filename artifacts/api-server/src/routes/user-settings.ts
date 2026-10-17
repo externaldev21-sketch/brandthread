@@ -4,11 +4,11 @@
  * PATCH /api/me/settings — shallow merge of allowlisted keys (see lib/userSettings.ts)
  */
 import { Router } from "express";
-import { db, userSettings } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, userSettings, users } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
+import { accountPrivacyFromAppSettings, mirrorAccountPrivacy } from "../lib/privacySettings";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
-import { resolveUserAppSettings } from "../lib/userAppSettings";
 import { resetRecommendations } from "../lib/userAppSettingsStore";
 import {
   mergeUserSettings, parseUserSettingsPatch, storedSizeOk, toUserSettingsDto,
@@ -22,7 +22,9 @@ router.get("/", async (req, res) => {
   try {
     const [row] = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
     const dto = toUserSettingsDto(row);
-    res.json({ ...dto, settings: { ...dto.settings, ...resolveUserAppSettings(dto.settings) } });
+    // Preserve the generic KV wire contract (including {} on first load).
+    // Policy consumers and typed settings clients resolve their own defaults.
+    res.json(dto);
   } catch (err) {
     (req as any).log?.error?.({ err }, "user settings read failed");
     res.status(500).json({ error: "Couldn't load your settings. Try again." });
@@ -38,13 +40,29 @@ router.patch("/", rateLimit("mutation"), async (req, res) => {
   }
   try {
     const result = await db.transaction(async (tx) => {
+      const privacyPatch = accountPrivacyFromAppSettings(parsed.patch);
+      if (Object.keys(privacyPatch).length) {
+        await tx.select({ id: users.id }).from(users).where(eq(users.clerkId, userId)).limit(1).for("update");
+      }
       const [existing] = await tx.select().from(userSettings)
         .where(eq(userSettings.userId, userId)).limit(1).for("update");
       const settings = mergeUserSettings(existing?.settings ?? {}, parsed.patch);
       if (!storedSizeOk(settings)) return null;
+      if (Object.keys(privacyPatch).length) {
+        await tx.update(users).set({
+          privacySettings: sql`COALESCE(${users.privacySettings}, '{}'::jsonb) || ${JSON.stringify(privacyPatch)}::jsonb`,
+          ...(privacyPatch.readReceiptsEnabled !== undefined ? { readReceiptsEnabled: privacyPatch.readReceiptsEnabled } : {}),
+          ...(privacyPatch.activityStatusVisible !== undefined ? { showActivityStatus: privacyPatch.activityStatusVisible } : {}),
+        }).where(eq(users.clerkId, userId));
+      }
       const updatedAt = new Date();
       const [row] = await tx.insert(userSettings).values({ userId, settings, updatedAt })
         .onConflictDoUpdate({ target: userSettings.userId, set: { settings, updatedAt } }).returning();
+      await mirrorAccountPrivacy(tx, userId, privacyPatch);
+      if (Object.keys(privacyPatch).length) {
+        const [merged] = await tx.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
+        return merged;
+      }
       return row;
     });
     if (!result) {
@@ -52,7 +70,7 @@ router.patch("/", rateLimit("mutation"), async (req, res) => {
       return;
     }
     const dto = toUserSettingsDto(result);
-    res.json({ ...dto, settings: { ...dto.settings, ...resolveUserAppSettings(dto.settings) } });
+    res.json(dto);
   } catch (err) {
     (req as any).log?.error?.({ err }, "user settings save failed");
     res.status(500).json({ error: "Couldn't save your settings. Try again." });

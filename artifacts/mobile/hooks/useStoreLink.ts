@@ -6,7 +6,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform, Share } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
-import { useApi } from '@/lib/api';
+import { API_BASE_URL, useApi } from '@/lib/api';
+import { resolveShareStoreLink } from '@/lib/storefrontUrl';
+import { BRANDTHREAD_ORIGIN } from '@/lib/shareProfile';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
 import { saveImageToCameraRoll } from '@/lib/aiToolMedia';
@@ -39,12 +41,14 @@ export function useStoreLink(): StoreLinkState {
   const api = useApi();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<{ username: string | null; brandName: string | null } | null>(null);
+  const [storefront, setStorefront] = useState<{ slug?: string | null; status?: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
     let cancelled = false;
+    setStorefront(null);
     // The signed-out web preview can't call the API; it shows the one preview
     // identity every other seller screen uses (lib/previewIdentity).
     if (isSellerDevPreview()) {
@@ -55,8 +59,12 @@ export function useStoreLink(): StoreLinkState {
       return;
     }
     api.seller.getProfile()
-      .then((p) => {
+      .then(async (p) => {
         if (!cancelled) setProfile({ username: p.username ?? null, brandName: p.brandName ?? p.displayName ?? null });
+        if (!sellerStoreLink(p.username)) {
+          const record = await api.store.get();
+          if (!cancelled) setStorefront(record);
+        }
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -65,7 +73,9 @@ export function useStoreLink(): StoreLinkState {
 
   useEffect(() => () => { timers.current.forEach(clearTimeout); }, []);
 
-  const url = sellerStoreLink(profile?.username);
+  const url = sellerStoreLink(profile?.username) ?? resolveShareStoreLink({
+    username: null, storefront, apiBaseUrl: API_BASE_URL, shareOrigin: BRANDTHREAD_ORIGIN,
+  }).url;
   // Ticks "Share your store" on the dashboard checklist (server-side, so it
   // follows the seller across devices). Best effort; never blocks the share.
   const markShared = useCallback(() => {

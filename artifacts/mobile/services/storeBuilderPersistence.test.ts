@@ -23,7 +23,7 @@ vi.mock('@/lib/devPreview', () => ({ isPreviewDemoMode: () => mocks.demo }));
 import {
   createCollection, getCollections, getMenus, getPages, updateMenu,
   generateAISuggestions, applyAISuggestion, getStorefront, StoreSaveError,
-  AISuggestionsUnavailableError,
+  AISuggestionsUnavailableError, storefrontStorageKey,
 } from './storeService';
 
 beforeEach(() => {
@@ -68,7 +68,7 @@ describe('collections / pages / menus persist to the server', () => {
   it('uploads phone-only lists made before server sync, once', async () => {
     const legacy = await getStorefront({ refreshRemote: false });
     legacy.pages = [{ id: 'old', type: 'about', title: 'About', slug: 'about', content: '', status: 'published', createdAt: '', updatedAt: '' }];
-    mocks.storage.set('bt:store:v1', JSON.stringify(legacy));
+    mocks.storage.set(await storefrontStorageKey(), JSON.stringify(legacy));
     await getPages();
     expect(mocks.save).toHaveBeenCalledWith({ pages: [expect.objectContaining({ id: 'old' })] });
     mocks.save.mockClear();

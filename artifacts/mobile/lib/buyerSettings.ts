@@ -149,8 +149,8 @@ export function useBuyerSettings(): BuyerSettingsState {
 }
 
 export const REDUCED_UPLOAD_QUALITY = 0.6;
-export function uploadQuality(highQuality = 1): number {
-  return getBuyerSettingsSnapshot().highQualityUploads ? highQuality : Math.min(highQuality, REDUCED_UPLOAD_QUALITY);
+export function uploadQuality(highQuality = 1, settings: Pick<BuyerSettingsState, 'highQualityUploads'> = getBuyerSettingsSnapshot()): number {
+  return settings.highQualityUploads ? highQuality : Math.min(highQuality, REDUCED_UPLOAD_QUALITY);
 }
 
 type Key = keyof BuyerSettingsState;

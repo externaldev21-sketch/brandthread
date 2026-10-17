@@ -25,7 +25,7 @@ import { z } from "@workspace/api-zod";
 export const USER_APP_SETTINGS_DEFAULTS = {
   readReceipts: true,
   activityStatus: true,
-  groupAdds: "everyone" as "everyone" | "friends",
+  groupAdds: "friends" as "everyone" | "friends",
   storyReplies: "everyone" as "everyone" | "friends" | "off",
   hideLikeCounts: false,
   personalizedRecommendations: true,
@@ -72,8 +72,15 @@ export function resolveUserAppSettings(stored: unknown): UserAppSettings {
   const out: UserAppSettings = { ...USER_APP_SETTINGS_DEFAULTS };
   if (!stored || typeof stored !== "object" || Array.isArray(stored)) return out;
   const shape = userAppSettingsPatchSchema.shape;
+  const legacy = (stored as Record<string, unknown>).socialPrivacy;
+  const privacy = legacy && typeof legacy === 'object' ? legacy as Record<string, unknown> : {};
+  const aliases: Record<string, unknown> = {
+    storyReplies: privacy.whoCanReplyToStories === 'nobody' ? 'off' : privacy.whoCanReplyToStories,
+    readReceipts: privacy.readReceiptsEnabled,
+    activityStatus: privacy.activityStatusVisible,
+  };
   for (const key of Object.keys(USER_APP_SETTINGS_DEFAULTS) as (keyof UserAppSettings)[]) {
-    const raw = (stored as Record<string, unknown>)[key];
+    const raw = (stored as Record<string, unknown>)[key] ?? aliases[key];
     if (raw === undefined) continue;
     const parsed = shape[key].safeParse(raw);
     if (parsed.success && parsed.data !== undefined) (out as Record<string, unknown>)[key] = parsed.data;

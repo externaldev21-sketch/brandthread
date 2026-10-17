@@ -15,7 +15,9 @@ import { quoteFromSchedule } from '@/lib/feeSchedule';
 import { shareInvoice, invoiceFromSellerOrder } from '@/lib/invoice';
 import { OrderGiftNote } from '@/components/orders/OrderGiftNote';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert, ActivityIndicator, Modal, Image } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, ActivityIndicator, Modal, Image, Linking } from 'react-native';
+import { Sheet } from '@/components/ui/BottomSheet';
+import { mapTrackingEvents, resolveTrackingUrl } from '@/lib/sellerOrderTracking';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -196,7 +198,8 @@ export function adaptApiOrder(raw: any): Order {
         fulfillmentGroupId: groupId,
         carrier:           raw.carrier ?? undefined,
         trackingNumber:    raw.trackingNumber,
-        trackingEvents:    [],
+        trackingEvents:    mapTrackingEvents(raw.trackingEvents),
+        trackingUrl: resolveTrackingUrl(raw.trackingUrl, raw.carrier, raw.trackingNumber) ?? undefined,
         isDemo:            false,
         shippedAt:         raw.shippedAt ?? undefined,
         trackingStatus:    raw.trackingStatus ?? undefined,
@@ -631,6 +634,7 @@ function DeliveryStatusSheet({ visible, order, onClose, onSave }: {
  */
 export default function OrderDetailScreen({ orderId, embedded = false }: { orderId?: string; embedded?: boolean } = {}) {
   const [showPackingSlip, setShowPackingSlip] = useState(false);
+  const [showTracking, setShowTracking] = useState(false);
   const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   const params = useLocalSearchParams<{ id: string; tab?: string; refund?: string }>();
@@ -1182,6 +1186,8 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
                 {trackingStatusLabel(order.trackingStatus) ? (
                   <Text style={s.trackingLabel}>{[trackingStatusLabel(order.trackingStatus), order.estimatedDelivery ? `Est. ${fmt(`${order.estimatedDelivery}T12:00:00`)}` : null].filter(Boolean).join(', ')}</Text>
                 ) : null}
+                <Button label="View tracking" variant="secondary" size="small"
+                  onPress={() => setShowTracking(true)} testID="order-view-tracking" />
               </View>
             ) : null}
             {group.items.map((li, i) => (
@@ -1376,6 +1382,21 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
       />
       </React.Suspense>}
 
+      <Sheet visible={showTracking} onClose={() => setShowTracking(false)} title="Tracking">
+        {(order?.shipments ?? []).map(shipment => (
+          <View key={shipment.id} style={{ gap: SP.md }}>
+            <Text style={s.trackingValue} selectable>{[shipment.carrier, shipment.trackingNumber].filter(Boolean).join(' · ')}</Text>
+            {shipment.trackingEvents.length ? shipment.trackingEvents.map((event, index) => (
+              <View key={`${event.timestamp}-${index}`}>
+                <Text style={s.trackingValue}>{event.description}</Text>
+                <Text style={s.trackingLabel}>{[event.location, fmtStamp(event.timestamp)].filter(Boolean).join(' · ')}</Text>
+              </View>
+            )) : <Text style={s.trackingLabel}>Tracking updates will appear when the carrier scans your parcel.</Text>}
+            {shipment.trackingUrl ? <Button label="Open carrier tracking" variant="secondary"
+              onPress={() => { void Linking.openURL(shipment.trackingUrl!).catch(() => Alert.alert("Couldn't open tracking", 'Try again.')); }} /> : null}
+          </View>
+        ))}
+      </Sheet>
       {order && showPackingSlip ? <PackingSlipSheet visible orders={[order]} onClose={() => setShowPackingSlip(false)} /> : null}
       <RefundSheet
         visible={refundOpen}

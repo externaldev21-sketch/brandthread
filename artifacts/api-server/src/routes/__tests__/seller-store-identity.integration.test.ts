@@ -190,7 +190,9 @@ describe("POST /onboarding/data", () => {
   it("keeps the seller's goals on the storefront for the setup checklist", async () => {
     // seller_goals is added by the router's startup migration; make sure it exists.
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS seller_goals JSONB`);
-    const r = await call("POST", "/onboarding/data", { goals: ["Ship orders", "Grow sales", 7], brandStage: "launched" });
+    const invalid = await call("POST", "/onboarding/data", { goals: ["Ship orders", 7], brandStage: "launched" });
+    expect(invalid.status).toBe(400);
+    const r = await call("POST", "/onboarding/data", { goals: ["Ship orders", "Grow sales"], brandStage: "launched" });
     expect(r.status).toBe(200);
     const [sf] = await db.select().from(storefronts).where(eq(storefronts.ownerId, me)).limit(1);
     expect((sf.onboarding as any).goals).toEqual(["Ship orders", "Grow sales"]);

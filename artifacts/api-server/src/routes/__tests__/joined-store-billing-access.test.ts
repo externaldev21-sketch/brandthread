@@ -24,14 +24,15 @@ vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
-vi.mock("drizzle-orm", () => ({
+vi.mock("drizzle-orm", async (importOriginal) => ({
+  ...await importOriginal<typeof import("drizzle-orm")>(),
   and: (...conditions: unknown[]) => conditions,
   asc: (value: unknown) => value,
   desc: (value: unknown) => value,
   eq: (...values: unknown[]) => values,
 }));
 
-vi.mock("@workspace/db", () => {
+vi.mock("@workspace/db", async (importOriginal) => {
   const columns = new Proxy({}, { get: (_target, key) => String(key) });
   const membershipQuery = {
     from: () => ({
@@ -58,6 +59,7 @@ vi.mock("@workspace/db", () => {
   };
 
   return {
+    ...await importOriginal<typeof import("@workspace/db")>(),
     db: {
       select: (fields: Record<string, unknown> | undefined) =>
         fields && Object.prototype.hasOwnProperty.call(fields, "onboardingComplete")

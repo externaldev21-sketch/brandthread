@@ -1,3 +1,4 @@
+import { restrictUser } from '@/services/socialService';
 import { haptics, hapticLight, hapticSelection, hapticSuccess } from '@/lib/haptics';
 /**
  * A buyer's profile as seen by a VISITOR — the same ProfileShell as every

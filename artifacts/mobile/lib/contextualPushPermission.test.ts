@@ -9,6 +9,9 @@ const notifications = vi.hoisted(() => ({
 const platform = vi.hoisted(() => ({ OS: 'ios' }));
 
 vi.mock('react-native', () => ({ Platform: platform }));
+vi.mock('expo-constants', () => ({
+  default: { easConfig: { projectId: 'test-project' } },
+}));
 vi.mock('expo-notifications', () => notifications);
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
