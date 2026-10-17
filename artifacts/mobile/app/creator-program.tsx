@@ -4,9 +4,9 @@
  * Overview (earnings, codes per brand, share links) and Payouts (Stripe
  * account status + history).
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Platform, Linking, ActivityIndicator, TextInput, Share } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import * as Clipboard from 'expo-clipboard';
@@ -65,6 +65,13 @@ export default function CreatorProgramScreen() {
   }, [api, previewOnly]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  // Stripe payout onboarding sends creators back here (?payouts=returned|refresh).
+  const { payouts: payoutsReturn } = useLocalSearchParams<{ payouts?: string }>();
+  useEffect(() => {
+    if (payoutsReturn === 'refresh') setNote('That payout setup link expired. Tap set up payouts to continue.');
+    else if (payoutsReturn === 'returned') setNote('Payout details received. Status updates once Stripe finishes checking them.');
+  }, [payoutsReturn]);
 
   const copy = async (text: string, what: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

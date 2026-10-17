@@ -27,6 +27,7 @@ import type { ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import { ThreadCashBill, ThreadCashBillStack, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 
 function historyLabel(entry: ThreadCashEntry): string {
   switch (entry.source) {
@@ -124,6 +125,8 @@ type Styles = ReturnType<typeof makeStyles>;
 
 export default function ThreadCashScreen() {
   const router = useRouter();
+  // Spending is built but ships behind the OFF-by-default flag (see docs/payments/thread-cash-checkout-todo.md).
+  const spendAtCheckout = useFeatureFlag('threadCashCheckoutDiscount');
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const api = useApi();
@@ -224,7 +227,9 @@ export default function ThreadCashScreen() {
                 </Text>
               )}
               <Text style={styles.balanceHint}>
-                Thread Cash isn't money — it can't be cashed out or transferred for cash. Use it toward purchases in the app.
+                {spendAtCheckout
+                  ? "Thread Cash isn't money — it can't be cashed out or transferred for cash. Use it toward purchases in the app."
+                  : "Thread Cash isn't money — it can't be cashed out or transferred for cash. Spending it at checkout is coming soon; your balance is saved until then."}
               </Text>
             </BrandthreadCard>
 

@@ -21,6 +21,7 @@ import { buildAuthorizeUrl } from "../lib/shopify/oauth";
 import { ShopifyAdminClient } from "../lib/shopify/adminClient";
 import { encryptSecret, decryptSecret } from "../lib/shopifyCrypto";
 import { importShopifyProducts } from "../lib/shopify/productImport";
+import { registerWebhooksForConnection } from "../lib/shopify/webhooks";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -158,8 +159,14 @@ router.post("/fulfillment/enable", requireRole("staff"), async (req, res) => {
     res.status(409).json({ error: "needs_upgrade", needsUpgrade: true, message: "Re-connect Shopify to grant order permissions" });
     return;
   }
+  // Without the webhooks, Shopify tracking/cancellations never come back, so
+  // don't report fulfillment as on unless they are registered.
+  const webhookError = await registerWebhooksForConnection(row);
+  if (webhookError && row.connectionType === "oauth") {
+    res.status(502).json({ error: webhookError }); return;
+  }
   await db.update(shopifyConnections).set({ fulfillmentEnabled: true, updatedAt: new Date() }).where(eq(shopifyConnections.id, row.id));
-  res.json({ ok: true, fulfillmentEnabled: true });
+  res.json({ ok: true, fulfillmentEnabled: true, ...(webhookError ? { warning: webhookError } : {}) });
 });
 
 // POST /api/shopify/fulfillment/disable

@@ -10,9 +10,14 @@ import { db, shopifyConnections, shopifyOauthStates } from "@workspace/db";
 import { verifyQueryHmac, exchangeCodeForToken } from "../lib/shopify/oauth";
 import { normalizeShopDomain, isValidShopDomain, hasFulfillmentScopes } from "../lib/shopify/constants";
 import { encryptSecret } from "../lib/shopifyCrypto";
+import { registerWebhooksForConnection } from "../lib/shopify/webhooks";
 import { logger } from "../lib/logger";
 
 const router = Router();
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}
 
 function resultPage(status: "success" | "error", message: string): string {
   // A tiny static page: the mobile app opens the authorize URL in an
@@ -83,7 +88,13 @@ router.get("/", async (req, res) => {
       });
     }
 
-    res.send(resultPage("success", `Your Shopify store ${shopDomain} is now connected to Brandthread.`));
+    // Subscribe to fulfillment/cancel/uninstall events so tracking syncs back.
+    const [saved] = await db.select().from(shopifyConnections).where(eq(shopifyConnections.ownerId, stateRow.ownerId)).limit(1);
+    const webhookError = saved ? await registerWebhooksForConnection(saved) : null;
+    res.send(resultPage(
+      "success",
+      `Your Shopify store ${escapeHtml(shopDomain)} is now connected to Brandthread.${webhookError ? ` ${escapeHtml(webhookError)}` : ""}`,
+    ));
   } catch (err) {
     logger.error({ err, shopDomain }, "Shopify OAuth callback failed");
     res.status(500).send(resultPage("error", "Something went wrong finishing the connection. Please try again."));

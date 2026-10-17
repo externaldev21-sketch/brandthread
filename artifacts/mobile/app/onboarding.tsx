@@ -2437,7 +2437,10 @@ export default function OnboardingScreen() {
       await AsyncStorage.multiRemove([PENDING_FLOW_KEY, PENDING_USERNAME_KEY]);
       void registerGrantedPushToken(profile.clerkId, api);
       api.ai.brandMemoryRebuild().catch(() => {});
-      router.replace('/(tabs)/' as never);
+      // The plan step only records a choice; hand off to the real subscribe
+      // screen (Stripe Checkout on web, store purchase on iOS/Android) with that
+      // plan preselected. "Not now" there continues to the dashboard.
+      router.replace({ pathname: '/plans', params: { fromOnboarding: 'true' } } as never);
     } catch (error) {
       setFinishing(false);
       console.error('[seller-onboarding] save failed', {

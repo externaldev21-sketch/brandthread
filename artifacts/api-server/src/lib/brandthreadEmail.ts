@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { logger } from "./logger";
+import { isEmailSuppressed } from "./emailSuppression";
 
 const DEFAULT_FROM = "Brandthread <no-reply@brandthread.app>";
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -185,6 +186,16 @@ export async function sendBrandthreadEmail({
   if (credentials.mode === "none") {
     logger.warn({ subject }, "Brandthread email skipped because Resend is not configured");
     return false;
+  }
+
+  // Hard-bounced / spam-complaint addresses (Resend webhook) are never mailed again.
+  try {
+    if (await isEmailSuppressed(recipient)) {
+      logger.info({ subject }, "Brandthread email skipped because the recipient is suppressed");
+      return false;
+    }
+  } catch (err) {
+    logger.warn({ err }, "Email suppression check failed; sending anyway");
   }
 
   const mailFrom = process.env.MAIL_FROM?.trim();

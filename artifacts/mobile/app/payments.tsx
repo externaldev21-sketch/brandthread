@@ -408,14 +408,21 @@ export default function PaymentsScreen() {
 
   // Buy now, pay later (Klarna / Afterpay) opt-in. The row only exists when
   // the platform has it switched on.
+  // A failed load shows a retry row instead of silently hiding the setting.
   const [bnpl, setBnpl] = useState<{ enabled: boolean; available: boolean } | null>(null);
-  useEffect(() => {
-    let active = true;
+  const [bnplLoadError, setBnplLoadError] = useState(false);
+  const bnplRequest = useRef(0);
+  const loadBnpl = useCallback(() => {
+    const request = ++bnplRequest.current;
+    setBnplLoadError(false);
     api.sellerPaymentSettings.get()
-      .then((value) => { if (active) setBnpl({ enabled: value.bnplEnabled, available: value.bnplAvailable }); })
-      .catch(() => { if (active) setBnpl(null); });
-    return () => { active = false; };
+      .then((value) => { if (request === bnplRequest.current) setBnpl({ enabled: value.bnplEnabled, available: value.bnplAvailable }); })
+      .catch(() => { if (request === bnplRequest.current) { setBnpl(null); setBnplLoadError(true); } });
   }, [api]);
+  useEffect(() => {
+    loadBnpl();
+    return () => { bnplRequest.current += 1; };
+  }, [loadBnpl]);
   const toggleBnpl = useCallback(async (next: boolean) => {
     setBnpl((prev) => (prev ? { ...prev, enabled: next } : prev));
     try {
@@ -493,11 +500,17 @@ export default function PaymentsScreen() {
             <ListRow
               icon="clock"
               title="Buy now, pay later"
-              subtitle="Klarna and Afterpay at checkout"
+              // Native checkout takes cards and Apple Pay / Google Pay only; Klarna /
+              // Afterpay are offered on web checkout (buyer-checkout.tsx).
+              subtitle="Klarna and Afterpay on web checkout · not yet in the iPhone or Android app"
               toggle={{ value: bnpl.enabled, onChange: toggleBnpl }}
               style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 14 }}
               testID="seller-bnpl-toggle"
             />
+          ) : bnplLoadError ? (
+            <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 14, paddingVertical: 10 }}>
+              <RetryRow label="Couldn't load buy now, pay later settings" onRetry={loadBnpl} />
+            </View>
           ) : null}
         </View>
 

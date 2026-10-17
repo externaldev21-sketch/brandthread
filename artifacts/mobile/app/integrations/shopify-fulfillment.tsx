@@ -23,6 +23,7 @@ export default function ShopifyFulfillmentScreen() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<{
     connected: boolean; shopDomain?: string; fulfillmentEnabled: boolean; fulfillmentEligible: boolean;
+    lastError?: string | null;
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [shopDomain, setShopDomain] = useState('');
@@ -66,6 +67,7 @@ export default function ShopifyFulfillmentScreen() {
         setTimeout(load, 4000);
         return;
       }
+      if (res.warning) Alert.alert('Tracking sync not set up', String(res.warning));
       await load();
     } catch (err: any) {
       Alert.alert('Could not update fulfillment', String(err?.message ?? 'Please try again.'));
@@ -100,6 +102,9 @@ export default function ShopifyFulfillmentScreen() {
               <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
                 {status?.connected ? `Connected to ${status.shopDomain}` : 'Not connected'}
               </Text>
+              {status?.connected && status.lastError ? (
+                <Text style={[styles.cardSub, { color: colors.destructive }]}>{status.lastError}</Text>
+              ) : null}
             </View>
             <HapticSwitch
               value={Boolean(status?.fulfillmentEnabled)}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Linking, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -21,6 +21,7 @@ import type { FinanceTransactionRow } from '@/lib/previewFinance';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { saveExportFile } from '@/lib/saveExportFile';
 
 function fmtDate(iso: string | number) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -110,10 +111,26 @@ export default function FinanceScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Fetch with the seller's session, then save/share it. Opening the URL in a
+  // browser sent no auth and failed silently.
+  const [downloadingStatement, setDownloadingStatement] = useState(false);
   const handleDownloadStatement = async () => {
-    const BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
-    const url  = `${BASE}/api/finance/statement.csv`;
-    try { await Linking.openURL(url); } catch { /* ignore */ }
+    if (downloadingStatement) return;
+    if (skipProtectedReads) {
+      Alert.alert('Not available in preview', 'Statements download from your live Stripe account.');
+      return;
+    }
+    setDownloadingStatement(true);
+    try {
+      const csv = await api.finance.statementCsv();
+      const date = new Date().toISOString().slice(0, 10);
+      const shared = await saveExportFile({ filename: `brandthread-statement-${date}.csv`, mimeType: 'text/csv', encoding: 'utf8', data: csv });
+      if (!shared) Alert.alert("Couldn't share statement", "Sharing isn't available on this device.");
+    } catch (e: any) {
+      Alert.alert("Couldn't download statement", e?.message ?? 'Please check your connection and try again.');
+    } finally {
+      setDownloadingStatement(false);
+    }
   };
 
   // Build overview cards from real data

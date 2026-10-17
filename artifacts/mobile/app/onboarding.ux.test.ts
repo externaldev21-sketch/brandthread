@@ -94,9 +94,15 @@ describe("v7 step order: Welcome opener, then AccountType, then path-specific au
     expect(source).toContain("chooseHeadline");
   });
 
-  it("buyer success routes to thread-explainer, seller to tabs", () => {
+  it("buyer success routes to thread-explainer, seller to the real subscribe screen", () => {
     expect(source).toContain("router.replace('/thread-explainer'");
-    expect(source).toContain("router.replace('/(tabs)/'");
+    // The plan step only records a choice; finishing hands off to /plans
+    // (Stripe Checkout / store purchase), whose "Not now" goes to the tabs.
+    expect(source).toContain("router.replace({ pathname: '/plans', params: { fromOnboarding: 'true' } }");
+    const plans = readFileSync(path.resolve(__dirname, "./plans.tsx"), "utf8");
+    expect(plans).toContain("const isOnboarding = fromOnboarding === 'true';");
+    expect(plans).toContain("'onboarding_selected_plan'");
+    expect(plans).toContain("router.replace('/(tabs)/'");
   });
 
   it("style interests carry emoji and solid-fill selected chip with checkmark", () => {
