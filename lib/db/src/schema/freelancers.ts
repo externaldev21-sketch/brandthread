@@ -26,6 +26,9 @@ export const freelancers = pgTable('freelancers', {
   isActive:            boolean('is_active').notNull().default(true),
   totalJobsCompleted:  integer('total_jobs_completed').notNull().default(0),
   avgRatingTenths:     integer('avg_rating_tenths').notNull().default(0), // 0 = unrated; 10–50 = 1.0–5.0
+  // Number of reviews behind avgRatingTenths (migration 286). Both are
+  // recomputed from freelancer_reviews of completed jobs on every review.
+  reviewCount:         integer('review_count').notNull().default(0),
   createdAt:           timestamp('created_at').defaultNow().notNull(),
   updatedAt:           timestamp('updated_at').defaultNow().notNull(),
 });
@@ -53,7 +56,8 @@ export const freelancerJobs = pgTable('freelancer_jobs', {
   freelancerIdx: index('freelancer_jobs_freelancer_idx').on(table.freelancerId),
 }));
 
-// Reviews — schema only for now (no UI in this iteration).
+// Reviews — one per completed job, written by the hirer via
+// POST /api/freelancer-jobs/:id/review.
 export const freelancerReviews = pgTable('freelancer_reviews', {
   id:             uuid('id').primaryKey().defaultRandom(),
   jobId:          uuid('job_id').notNull().unique().references(() => freelancerJobs.id, { onDelete: 'cascade' }),

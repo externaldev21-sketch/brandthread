@@ -20,15 +20,15 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
-  AnalyticsSkeleton, HeaderPillButton, ProgressBar, SectionTitle, StatTileRow,
+  AnalyticsSkeleton, HeaderPillButton, SectionTitle, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
+import { formatCents } from '@/lib/money';
+import { metricTiles } from '@/lib/analyticsMetricTiles';
 
 function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
   const colors = useColors();
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
-  const onTimeColor = mfr.delayRate <= 10 ? colors.success : mfr.delayRate <= 20 ? colors.warning : colors.destructive;
-  const qcColor     = mfr.qualityIssueRate <= 2 ? colors.success : mfr.qualityIssueRate <= 4 ? colors.warning : colors.destructive;
   return (
     <TouchableOpacity
       onPress={() => { Haptics.selectionAsync(); router.push(`/manufacturer-profile?id=${mfr.manufacturerId}` as never); }}
@@ -41,35 +41,19 @@ function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={s.mfrName}>{mfr.name}</Text>
-          <Text style={s.mfrSub}>{mfr.productsProduced} products · {mfr.totalUnits.toLocaleString()} units</Text>
+          <Text style={s.mfrSub}>{mfr.productsProduced} order{mfr.productsProduced !== 1 ? 's' : ''} · {mfr.totalUnits.toLocaleString()} units</Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={s.mfrSpend}>${mfr.totalSpend.toLocaleString()}</Text>
-          <Text style={s.mfrUnitCost}>${mfr.avgUnitCost}/unit avg</Text>
+          <Text style={s.mfrSpend}>{formatCents(mfr.totalSpendCents)}</Text>
+          {mfr.avgUnitCostCents !== null && <Text style={s.mfrUnitCost}>{formatCents(mfr.avgUnitCostCents)}/unit avg</Text>}
         </View>
       </View>
-      <View style={s.mfrStats}>
-        <View style={s.mfrStat}>
-          <Text style={[s.mfrStatValue, { color: onTimeColor }]}>{100 - mfr.delayRate}%</Text>
-          <Text style={s.mfrStatLabel}>On-time</Text>
-        </View>
-        <View style={s.mfrStat}>
-          <Text style={s.mfrStatValue}>{mfr.avgLeadTimeDays}d</Text>
-          <Text style={s.mfrStatLabel}>Lead time</Text>
-        </View>
-        <View style={s.mfrStat}>
-          <Text style={[s.mfrStatValue, { color: qcColor }]}>{100 - mfr.qualityIssueRate}%</Text>
-          <Text style={s.mfrStatLabel}>QC pass</Text>
-        </View>
-        <View style={s.mfrStat}>
-          <Text style={[s.mfrStatValue, { color: mfr.sampleApprovalRate >= 90 ? colors.success : colors.warning }]}>{mfr.sampleApprovalRate}%</Text>
-          <Text style={s.mfrStatLabel}>Sample ok</Text>
-        </View>
-      </View>
-      {mfr.delayRate > 10 && (
-        <View style={s.mfrWarning}>
-          <Feather name="alert-triangle" size={12} color={colors.warning} />
-          <Text style={s.mfrWarningText}>Higher-than-target delay rate</Text>
+      {mfr.avgLeadTimeDays !== null && (
+        <View style={s.mfrStats}>
+          <View style={s.mfrStat}>
+            <Text style={s.mfrStatValue}>{mfr.avgLeadTimeDays}d</Text>
+            <Text style={s.mfrStatLabel}>Avg. order-to-delivery</Text>
+          </View>
         </View>
       )}
       <View style={s.mfrFooter}>
@@ -136,7 +120,7 @@ export default function AnalyticsProductionScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
-      {!data ? (
+      {!data || (data.activeJobs.value === 0 && data.manufacturers.length === 0 && data.totalSpend.value === 0) ? (
         <EmptyState icon="tool" title="No production jobs yet" description="Production stats will show once you run a job." style={{ marginTop: SP.lg }} />
       ) : (
         <>
@@ -144,39 +128,16 @@ export default function AnalyticsProductionScreen() {
           <SectionTitle>Production Overview</SectionTitle>
           <StatTileRow
             scroll
-            items={[
-              { key: 'active', label: data.activeJobs.label, value: data.activeJobs.formatted },
-              { key: 'units', label: data.unitsInProduction.label, value: data.unitsInProduction.formatted },
-              { key: 'value', label: data.productionValue.label, value: data.productionValue.formatted },
-              { key: 'lead', label: data.avgLeadTimeDays.label, value: data.avgLeadTimeDays.formatted },
-              { key: 'sample', label: data.avgSampleTimeDays.label, value: data.avgSampleTimeDays.formatted },
-              { key: 'ontime', label: data.onTimeCompletionRate.label, value: data.onTimeCompletionRate.formatted },
-              { key: 'delayed', label: data.delayedJobs.label, value: data.delayedJobs.formatted },
-              { key: 'qc', label: data.qcFailureRate.label, value: data.qcFailureRate.formatted },
-              { key: 'unitcost', label: data.avgUnitCost.label, value: data.avgUnitCost.formatted },
-            ]}
+            items={metricTiles([
+              ['active', data.activeJobs],
+              ['units', data.unitsInProduction],
+              ['value', data.productionValue],
+              ['spend', data.totalSpend],
+              ['lead', data.avgLeadTimeDays],
+              ['sample', data.avgSampleTimeDays],
+              ['unitcost', data.avgUnitCost],
+            ])}
           />
-
-          {/* On-time gauge */}
-          <View style={s.gaugeCard}>
-            <View style={s.gaugeHeader}>
-              <Text style={s.gaugeTitle}>On-Time Completion</Text>
-              <Text style={[s.gaugeValue, { color: data.onTimeCompletionRate.value >= 80 ? colors.success : colors.warning }]}>
-                {data.onTimeCompletionRate.formatted}
-              </Text>
-            </View>
-            <ProgressBar
-              pct={data.onTimeCompletionRate.value}
-              color={data.onTimeCompletionRate.value >= 80 ? colors.success : colors.warning}
-              height={10}
-            />
-            {data.delayedJobs.value > 0 && (
-              <View style={s.gaugeWarning}>
-                <Feather name="alert-circle" size={12} color={colors.destructive} />
-                <Text style={s.gaugeWarningText}>{data.delayedJobs.value} job{data.delayedJobs.value !== 1 ? 's' : ''} delayed</Text>
-              </View>
-            )}
-          </View>
 
           {/* Manufacturer performance */}
           <SectionTitle note="Calculated only from your recorded production activity.">Manufacturer Performance</SectionTitle>

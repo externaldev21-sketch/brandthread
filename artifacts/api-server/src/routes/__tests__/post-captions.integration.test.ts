@@ -107,6 +107,7 @@ describe("flag and env gating", () => {
       const res = await request(path, { method, body: method === "GET" || method === "DELETE" ? undefined : "{}" });
       expect(res.status, `${method} ${path}`).toBe(503);
       expect(res.body.code).toBe("CAPTIONS_UNAVAILABLE");
+      expect(res.body.reason).toBe("CAPTIONS_DISABLED");
     }
   });
 
@@ -118,6 +119,8 @@ describe("flag and env gating", () => {
       const res = await request(`/api/posts/${videoId}/captions`);
       expect(res.status).toBe(503);
       expect(res.body.code).toBe("CAPTIONS_UNAVAILABLE");
+      expect(res.body.reason).toBe("CAPTIONS_NOT_CONFIGURED");
+      expect(res.body.error).toMatch(/set up yet/);
     } finally {
       process.env.AI_INTEGRATIONS_OPENAI_API_KEY = keep;
     }

@@ -9,7 +9,14 @@ import { Card, CardDivider, SectionTitle } from '@/components/analytics/Analytic
 
 /** Mobbin reference: Shopify Analytics "Reports" rows above the overview. */
 export const ANALYTICS_REPORTS: { label: string; icon: keyof typeof Feather.glyphMap; href: string; badge?: string }[] = [
+  { label: 'Sales', icon: 'dollar-sign', href: '/analytics-sales' },
+  { label: 'Profit and payouts', icon: 'pie-chart', href: '/analytics-profit' },
+  { label: 'Store traffic', icon: 'bar-chart-2', href: '/analytics-store' },
+  { label: 'Top products', icon: 'award', href: '/analytics-products' },
   { label: 'Product stats', icon: 'shopping-bag', href: '/analytics-product-stats' },
+  { label: 'Marketing', icon: 'trending-up', href: '/analytics-marketing' },
+  { label: 'Production', icon: 'tool', href: '/analytics-production' },
+  { label: 'Customers', icon: 'user-check', href: '/analytics-customers', badge: 'PRO' },
   { label: 'Threads and videos', icon: 'play-circle', href: '/analytics-content' },
   { label: 'Audience', icon: 'users', href: '/analytics-audience' },
   { label: 'Goals', icon: 'target', href: '/analytics-goals' },

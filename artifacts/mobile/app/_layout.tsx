@@ -1593,6 +1593,8 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="seller-giveaways" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-giveaway-create" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-giveaway-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-ip-cases" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-counter-notice" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="giveaway" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drop-create"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drop-preview"      options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1628,6 +1630,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="users"              options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="roles"              options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="security"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="team-activity"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="general-settings"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="push-notifications" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="biometric-unlock"   options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1681,6 +1684,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="locations"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="languages"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="metafields"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="metafield-definitions" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="mobile-app-builder" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="orders"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="checkout"           options={{ headerShown: false, animation: 'ios_from_right' }} />

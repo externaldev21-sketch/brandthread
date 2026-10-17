@@ -6,7 +6,8 @@
  *   PATCH  /api/posts/:id/captions/:language    owner: edit segment text
  *   DELETE /api/posts/:id/captions/:language    owner: remove a track
  * Every endpoint answers 503 CAPTIONS_UNAVAILABLE while the `autoCaptions` flag
- * is off or the OpenAI integration keys are missing.
+ * is off (reason CAPTIONS_DISABLED) or the OpenAI integration keys are missing
+ * (reason CAPTIONS_NOT_CONFIGURED).
  */
 import { Router, type Request, type Response } from "express";
 import { and, eq } from "drizzle-orm";
@@ -16,8 +17,9 @@ import { rateLimit } from "../middlewares/rateLimit";
 import { publicPostCondition } from "../lib/postVisibility";
 import { isBlockedEitherWay, optionalViewerId } from "../lib/safety";
 import {
-  captionsAvailable, cleanCaptionText, generateCaptionsForPost, segmentsToVtt,
+  captionsUnavailableReason, cleanCaptionText, generateCaptionsForPost, segmentsToVtt,
   MAX_SEGMENTS, MAX_SEGMENT_TEXT,
+  type CaptionsUnavailableReason,
 } from "../lib/captions";
 import { evaluateContent } from "../lib/contentModerator";
 
@@ -25,11 +27,20 @@ const router = Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LANG_RE = /^[a-z]{2,3}$/;
 
-function unavailable(res: Response) {
-  return res.status(503).json({
-    error: "Captions are not available right now.",
-    code: "CAPTIONS_UNAVAILABLE",
-  });
+const UNAVAILABLE_COPY: Record<CaptionsUnavailableReason, { reason: string; error: string }> = {
+  not_configured: { reason: "CAPTIONS_NOT_CONFIGURED", error: "Auto captions aren't set up yet." },
+  disabled: { reason: "CAPTIONS_DISABLED", error: "Auto captions aren't turned on yet." },
+};
+
+/**
+ * Answers 503 CAPTIONS_UNAVAILABLE (with a `reason`) and returns true when
+ * captions are off; returns false when the request may proceed.
+ */
+async function refuseIfUnavailable(res: Response): Promise<boolean> {
+  const why = await captionsUnavailableReason();
+  if (!why) return false;
+  res.status(503).json({ ...UNAVAILABLE_COPY[why], code: "CAPTIONS_UNAVAILABLE" });
+  return true;
 }
 
 function trackJson(row: typeof postCaptions.$inferSelect, postId: string) {
@@ -62,7 +73,7 @@ async function ownedVideo(req: Request, res: Response) {
 
 // Registered before the generic `/:language` routes so "generate" is not read as a language.
 router.post("/:id/captions/generate", requireAuth, rateLimit("expensive"), async (req, res) => {
-  if (!(await captionsAvailable())) return unavailable(res);
+  if (await refuseIfUnavailable(res)) return;
   const post = await ownedVideo(req, res);
   if (!post) return;
   if (post.mediaType !== "video") {
@@ -80,7 +91,7 @@ router.post("/:id/captions/generate", requireAuth, rateLimit("expensive"), async
 });
 
 router.get("/:id/captions", async (req, res) => {
-  if (!(await captionsAvailable())) return unavailable(res);
+  if (await refuseIfUnavailable(res)) return;
   const id = param(req.params.id);
   if (!UUID_RE.test(id)) return res.status(404).json({ error: "Post not found" });
   const viewerId = optionalViewerId(req);
@@ -100,7 +111,7 @@ router.get("/:id/captions", async (req, res) => {
 });
 
 router.get("/:id/captions/:language", async (req, res) => {
-  if (!(await captionsAvailable())) return unavailable(res);
+  if (await refuseIfUnavailable(res)) return;
   const id = param(req.params.id);
   const raw = param(req.params.language);
   const wantsVtt = raw.endsWith(".vtt");
@@ -129,7 +140,7 @@ router.get("/:id/captions/:language", async (req, res) => {
 });
 
 router.patch("/:id/captions/:language", requireAuth, async (req, res) => {
-  if (!(await captionsAvailable())) return unavailable(res);
+  if (await refuseIfUnavailable(res)) return;
   const post = await ownedVideo(req, res);
   if (!post) return;
   const language = param(req.params.language);
@@ -172,7 +183,7 @@ router.patch("/:id/captions/:language", requireAuth, async (req, res) => {
 });
 
 router.delete("/:id/captions/:language", requireAuth, async (req, res) => {
-  if (!(await captionsAvailable())) return unavailable(res);
+  if (await refuseIfUnavailable(res)) return;
   const post = await ownedVideo(req, res);
   if (!post) return;
   const language = param(req.params.language);

@@ -58,10 +58,22 @@ async function captionsFlagEnabled(): Promise<boolean> {
   return value;
 }
 
+export type CaptionsUnavailableReason = "not_configured" | "disabled";
+
+/**
+ * Why captions are off, or null when they're available. "not_configured":
+ * AI_INTEGRATIONS_OPENAI_BASE_URL / AI_INTEGRATIONS_OPENAI_API_KEY missing
+ * (needs Dev); "disabled": keys present but the `autoCaptions` flag is off.
+ * Never throws.
+ */
+export async function captionsUnavailableReason(): Promise<CaptionsUnavailableReason | null> {
+  if (!captionsEnvConfigured()) return "not_configured";
+  return (await captionsFlagEnabled()) ? null : "disabled";
+}
+
 /** True only when the flag is on AND the AI env keys exist. Never throws. */
 export async function captionsAvailable(): Promise<boolean> {
-  if (!captionsEnvConfigured()) return false;
-  return captionsFlagEnabled();
+  return (await captionsUnavailableReason()) === null;
 }
 
 // ─── VTT ──────────────────────────────────────────────────────────────────────

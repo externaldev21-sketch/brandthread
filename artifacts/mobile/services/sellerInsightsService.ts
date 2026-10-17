@@ -124,6 +124,29 @@ export async function getContentStats(range: InsightRange): Promise<ContentStats
   if (m) return previewInsights(range, m).content;
   return serviceRequest<ContentStats>(`/api/analytics/insights/content?${q(range)}`, {}, false);
 }
+/** One post's Shop-button clicks (GET /api/analytics/post-clicks, all time, top 20). */
+export interface PostShopClicks {
+  postId: string;
+  caption: string | null;
+  thumbnailUrl: string | null;
+  clicks: number;
+  uniqueClickers: number;
+  lastClickedAt: string | null;
+}
+export async function getPostShopClicks(): Promise<PostShopClicks[]> {
+  // Preview has no seeded per-post click log, so it shows the honest empty state.
+  if (previewMode()) return [];
+  const rows = await serviceRequest<any[]>('/api/analytics/post-clicks', {}, false);
+  return (Array.isArray(rows) ? rows : []).map((r) => ({
+    postId: String(r.post_id ?? ''),
+    caption: typeof r.caption === 'string' ? r.caption : null,
+    // The poster frame only — media_url can be a video file, not an image.
+    thumbnailUrl: typeof r.thumbnail_url === 'string' && r.thumbnail_url ? r.thumbnail_url : null,
+    clicks: Number(r.click_count) || 0,
+    uniqueClickers: Number(r.unique_clickers) || 0,
+    lastClickedAt: r.last_clicked_at ? String(r.last_clicked_at) : null,
+  }));
+}
 export async function getAudienceStats(range: InsightRange): Promise<AudienceStats> {
   const m = previewMode();
   if (m) return previewInsights(range, m).audience;

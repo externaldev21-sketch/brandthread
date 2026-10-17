@@ -5,7 +5,7 @@
 
 import { shareInvoice, invoiceFromSellerOrder } from '@/lib/invoice';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal, TouchableOpacity, Linking } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +24,7 @@ import { quoteFromSchedule } from '@/lib/feeSchedule';
 import { adaptReturnRow, itemsTotalCents, returnReasonLabel as returnRequestReasonLabel, statusLabel as returnRequestStatusLabel, type ReturnView } from '@/lib/returns';
 import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
+import { mapTrackingEvents, resolveTrackingUrl, trackingStatusText } from '@/lib/sellerOrderTracking';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { getInitials } from '@/lib/format';
@@ -177,7 +178,8 @@ export function adaptApiOrder(raw: any): Order {
         fulfillmentGroupId: groupId,
         carrier:           raw.carrier ?? undefined,
         trackingNumber:    raw.trackingNumber,
-        trackingEvents:    [],
+        trackingEvents:    mapTrackingEvents(raw.trackingEvents),
+        trackingUrl:       resolveTrackingUrl(raw.trackingUrl, raw.carrier, raw.trackingNumber) ?? undefined,
         isDemo:            false,
         shippedAt:         raw.shippedAt ?? undefined,
         trackingStatus:    raw.trackingStatus ?? undefined,
@@ -916,7 +918,7 @@ export default function OrderDetailScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onShipSome={() => setShowShipItems(true)} onCancelPress={() => setShowCancelModal(true)} onMessageBuyer={handleMessageBuyer} messagingBuyer={messagingBuyer} router={router} reload={() => load(generationRef.current)} onAddTrackingQuick={handleAddTrackingQuick} />}
+        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onShipSome={() => setShowShipItems(true)} onCancelPress={() => setShowCancelModal(true)} onMessageBuyer={handleMessageBuyer} messagingBuyer={messagingBuyer} router={router} reload={() => load(generationRef.current)} onAddTrackingQuick={handleAddTrackingQuick} onShowTracking={(sid) => setTrackingModalShipmentId(sid)} />}
         {activeTab === 'customer'    && <CustomerTab order={order} />}
         {activeTab === 'payment'     && <PaymentTab order={order} />}
         {activeTab === 'fulfillment' && <FulfillmentTab order={order} trackingForms={trackingForms} setTrackingForms={setTrackingForms} onAddTracking={handleAddTracking} onMarkShipped={handleMarkShipped} onUpdateTracking={handleUpdateTracking} updatingTracking={updatingTracking} onShowTracking={(sid) => setTrackingModalShipmentId(sid)} router={router} />}
@@ -995,7 +997,14 @@ export default function OrderDetailScreen() {
             <Text style={s.modalTitle}>Tracking Events</Text>
             {trackingModal && (
               <>
-                <Text style={s.modalSubtitle}>{trackingModal.carrier} · {trackingModal.trackingNumber}</Text>
+                <Text style={s.modalSubtitle}>{[trackingModal.carrier, trackingModal.trackingNumber].filter(Boolean).join(' · ')}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SP.xs, marginVertical: SP.sm }}>
+                  <StatusBadge label={trackingStatusText(trackingModal.trackingStatus)} variant={trackingModal.trackingStatus === 'delivered' ? 'success' : trackingModal.trackingStatus === 'exception' || trackingModal.trackingStatus === 'returned_to_sender' ? 'error' : 'info'} />
+                  {trackingModal.estimatedDelivery ? <Text style={s.trackingEvTime}>Est. delivery {fmtTime(trackingModal.estimatedDelivery)}</Text> : null}
+                </View>
+                {trackingModal.trackingEvents.length === 0 && (
+                  <Text style={s.trackingEvLoc}>No carrier scans recorded yet. Scans appear here once the carrier picks up the package.</Text>
+                )}
                 {trackingModal.trackingEvents.map(ev => (
                   <View key={ev.id} style={s.trackingEventRow}>
                     <View style={[s.trackingDot, { backgroundColor: timelineColor(ev.status, theme) }]} />
@@ -1007,6 +1016,17 @@ export default function OrderDetailScreen() {
                   </View>
                 ))}
               </>
+            )}
+            {trackingModal?.trackingUrl && (
+              <PrimaryButton
+                label={`Track on ${trackingModal.carrier || 'carrier'} site`}
+                icon="external-link"
+                onPress={() => {
+                  const url = trackingModal.trackingUrl!;
+                  Linking.openURL(url).catch(() => Alert.alert('Couldn’t open tracking', 'Open this link in your browser: ' + url));
+                }}
+                style={{ marginTop: SP.md }}
+              />
             )}
             <SecondaryButton label="Close" onPress={() => setTrackingModalShipmentId(null)} style={{ marginTop: SP.md }} />
           </View>
@@ -1020,7 +1040,7 @@ export default function OrderDetailScreen() {
 // TAB: OVERVIEW
 // ═══════════════════════════════════════════════════════
 
-function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped, onShipSome, onCancelPress, onMessageBuyer, messagingBuyer, router, reload, onAddTrackingQuick }: {
+function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped, onShipSome, onCancelPress, onMessageBuyer, messagingBuyer, router, reload, onAddTrackingQuick, onShowTracking }: {
   order: Order;
   onMarkProcessing: () => void;
   onMarkReadyToShip: () => void;
@@ -1032,6 +1052,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
   router: ReturnType<typeof useRouter>;
   reload: () => void;
   onAddTrackingQuick: (carrier: string, trackingNumber: string) => Promise<void>;
+  onShowTracking: (shipmentId: string) => void;
 }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
@@ -1183,7 +1204,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         {!order.autoRefundedAt && order.status === 'shipped' && (
           <View style={s.actionCol}>
             {order.shipments[0]?.trackingNumber && (
-              <SecondaryButton label="View Tracking" onPress={() => Alert.alert('Tracking', order.shipments[0].trackingNumber ?? '')} icon="map-pin" />
+              <SecondaryButton label="View Tracking" onPress={() => onShowTracking(order.shipments[0].id)} icon="map-pin" />
             )}
             <Text style={s.readOnlyNote}>{DELIVERY_CONFIRMED_BY_NOTE}</Text>
           </View>
@@ -1655,11 +1676,11 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                   <BrandthreadCard key={sh.id} style={s.shipmentCard}>
                     <View style={s.shipmentHeader}>
                       <Text style={s.shipmentCarrier}>{sh.carrier}</Text>
-                      {sh.trackingStatus && <StatusBadge label={sh.trackingStatus.replace(/_/g, ' ')} variant={sh.trackingStatus === 'delivered' ? 'success' : 'info'} />}
+                      {sh.trackingStatus && <StatusBadge label={trackingStatusText(sh.trackingStatus)} variant={sh.trackingStatus === 'delivered' ? 'success' : 'info'} />}
                     </View>
                     {sh.trackingNumber && <Text style={s.trackingNum}>{sh.trackingNumber}</Text>}
                     {sh.trackingEvents.length > 0 && (
-                      <Text style={s.latestEvent}>{sh.trackingEvents[sh.trackingEvents.length - 1].description}</Text>
+                      <Text style={s.latestEvent}>{sh.trackingEvents[0].description}</Text>
                     )}
                     <PressableScale
                       onPress={() => { hapticPrimaryAction(); onShowTracking(sh.id); }}

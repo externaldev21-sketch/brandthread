@@ -17,6 +17,8 @@ import { parseDecimalToCents } from '@/lib/money';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { radius } from '@/constants/radii';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { apiErrorMessage } from '@/lib/safety';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -139,6 +141,7 @@ export default function ShippingScreen() {
 
   const [zones, setZones] = useState<ShippingZone[]>([]);
   const [zonesLoading, setZonesLoading] = useState(true);
+  const [setupLoadError, setSetupLoadError] = useState<string | null>(null);
   const [shipFromCountry, setShipFromCountry] = useState('US');
   const [shipFromDraft, setShipFromDraft] = useState('US');
   const [shipFromEditing, setShipFromEditing] = useState(false);
@@ -162,16 +165,22 @@ export default function ShippingScreen() {
   const loadShipping = useCallback(() => {
     setZonesLoading(true);
     Promise.all([
-      api.shippingZones.list().catch(() => []),
-      api.shippingZones.getSettings().catch(() => ({ shipFromCountry: 'US' })),
-      api.packagePresets.list().catch(() => ({ presets: [] })),
-      api.shippingRates.list().catch(() => []),
+      api.shippingZones.list(),
+      api.shippingZones.getSettings(),
+      api.packagePresets.list(),
+      api.shippingRates.list(),
     ]).then(([zoneRows, settings, presetRes, rateRows]) => {
       setZones(Array.isArray(zoneRows) ? zoneRows : []);
       setShipFromCountry(settings?.shipFromCountry ?? 'US');
       setShipFromDraft(settings?.shipFromCountry ?? 'US');
       setPresets(Array.isArray(presetRes?.presets) ? presetRes.presets : []);
       setLegacyRates(Array.isArray(rateRows) ? rateRows : []);
+      setSetupLoadError(null);
+    }).catch((e) => {
+      // Never show a failed load as "no zones / no presets": that reads as
+      // "your setup is gone" and pushes sellers to rebuild it. Keep whatever
+      // was loaded before and show an error with retry instead.
+      setSetupLoadError(apiErrorMessage(e, 'Check your connection and try again.'));
     }).finally(() => setZonesLoading(false));
   }, [api]);
 
@@ -534,6 +543,17 @@ export default function ShippingScreen() {
         )}
       </View>
 
+      {setupLoadError && !zonesLoading ? (
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 24 }]}>
+          <ErrorState
+            message="Couldn't load your shipping setup"
+            onRetry={loadShipping}
+          />
+          <Text style={[styles.emptyText, { color: colors.mutedForeground, textAlign: 'center', paddingHorizontal: 16, paddingBottom: 16 }]}>
+            {setupLoadError} Your zones, rates and packages have not been changed.
+          </Text>
+        </View>
+      ) : (<>
       {/* Ship-from country */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Ship From</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, padding: 14 }]}>
@@ -738,6 +758,7 @@ export default function ShippingScreen() {
           ))
         )}
       </View>
+      </>)}
     </ScrollView>
 
     {/* ── Zone editor sheet ────────────────────────────────────────────────── */}

@@ -44,6 +44,21 @@ export function ratingLabel(tenths: number | null | undefined): string | null {
   return (tenths / 10).toFixed(1);
 }
 
+/** "Rating" / "1 review" / "12 reviews" — the stat label under the rating. */
+export function reviewCountLabel(count: number | null | undefined): string {
+  if (!count || count <= 0) return 'Rating';
+  return count === 1 ? '1 review' : `${count} reviews`;
+}
+
+/** Stars a hirer can pick when rating a freelancer (server accepts 1–5). */
+export const RATING_STARS = [1, 2, 3, 4, 5] as const;
+
+/** Stored tenths (10–50) → whole stars for the rating picker (0 = none yet). */
+export function tenthsToStars(tenths: number | null | undefined): number {
+  if (!tenths || tenths <= 0) return 0;
+  return Math.max(1, Math.min(5, Math.round(tenths / 10)));
+}
+
 const GENERIC_ERROR_FALLBACK = 'Something went wrong. Try again.';
 
 /**

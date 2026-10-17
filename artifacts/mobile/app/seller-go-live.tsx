@@ -25,6 +25,10 @@ import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { useAgeStatus } from '@/lib/ageGate';
 import { AgeRestrictedScreen } from '@/components/age/AgeNotices';
 import { radius } from '@/constants/radii';
+import {
+  LIVE_NOT_CONFIGURED_BODY, LIVE_NOT_CONFIGURED_TITLE, REPLAYS_NOT_ENABLED_NOTE,
+  isLiveNotConfiguredError, liveStartErrorMessage, type LiveAvailabilityStatus,
+} from '@/lib/live/liveAvailability';
 
 const FG = '#FFFFFF';
 const GLASS = 'rgba(0,0,0,0.5)';
@@ -64,6 +68,18 @@ function SellerGoLiveNativeScreen() {
   const [title, setTitle] = useState(typeof launch.title === 'string' ? launch.title : '');
   const [description, setDescription] = useState('');
   const [starting, setStarting] = useState(false);
+  // GET /api/live/status: show "not set up yet" before the seller fills the
+  // form. A failed status call never blocks (null = unknown, try to start).
+  const [availability, setAvailability] = useState<LiveAvailabilityStatus | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (api as any).live.status?.()
+      .then((r: LiveAvailabilityStatus) => { if (!cancelled) setAvailability(r ?? null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const liveNotConfigured = availability?.streaming?.available === false;
+  const replaysOff = availability?.replays?.available === false;
 
   // ── Products to feature ──
   // Tagging previously only happened mid-broadcast (seller-live.tsx's
@@ -161,7 +177,15 @@ function SellerGoLiveNativeScreen() {
         },
       } as any);
     } catch (e: any) {
-      Alert.alert('Could not start live', e?.message ?? 'Please check your connection and try again.');
+      if (isLiveNotConfiguredError(e)) {
+        setAvailability(prev => ({
+          streaming: { available: false, code: 'LIVE_NOT_CONFIGURED' },
+          replays: prev?.replays ?? { available: false, code: 'REPLAYS_NOT_CONFIGURED' },
+        }));
+        Alert.alert(LIVE_NOT_CONFIGURED_TITLE, LIVE_NOT_CONFIGURED_BODY);
+      } else {
+        Alert.alert('Could not start live', liveStartErrorMessage(e));
+      }
     } finally {
       setStarting(false);
     }
@@ -171,6 +195,30 @@ function SellerGoLiveNativeScreen() {
   const micGranted = micPermission?.granted ?? false;
   const camBlocked = cameraPermission !== null && !cameraPermission?.granted && cameraPermission?.canAskAgain === false;
   const micBlocked = micPermission !== null && !micPermission?.granted && micPermission?.canAskAgain === false;
+
+  // ─── Not set up gate (no Agora account configured on the server) ─────────
+  if (liveNotConfigured) {
+    return (
+      <View style={[s.permRoot, { paddingTop: headerTopInset, paddingBottom: insets.bottom + 24 }]} testID="go-live-not-configured">
+        <TouchableOpacity onPress={() => goBackOr(router)} style={[s.closeBtn, { top: headerTopInset + 8 }]} accessibilityLabel="Close">
+          <Feather name="x" size={22} color={FG} />
+        </TouchableOpacity>
+        <View style={s.permBox}>
+          <View style={s.permIconWrap}>
+            <Feather name="radio" size={30} color="rgba(255,255,255,0.7)" />
+          </View>
+          <Text style={s.permTitle}>{LIVE_NOT_CONFIGURED_TITLE}</Text>
+          <Text style={s.permSub}>{LIVE_NOT_CONFIGURED_BODY}</Text>
+          <TouchableOpacity
+            style={[s.permBtn, { backgroundColor: theme.accent }]}
+            onPress={() => goBackOr(router)}
+          >
+            <Text style={[s.permBtnText, { color: theme.onAccent }]}>Got it</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   // ─── Permissions gate ────────────────────────────────────────────────────
   if (permissionsRequested && (!camGranted || !micGranted)) {
@@ -296,6 +344,10 @@ function SellerGoLiveNativeScreen() {
             <Text style={s.featureProductsText}>Schedule for later</Text>
             <Feather name="chevron-right" size={15} color="rgba(255,255,255,0.6)" />
           </TouchableOpacity>
+
+          {replaysOff ? (
+            <Text style={s.permCancel} testID="go-live-replays-off">{REPLAYS_NOT_ENABLED_NOTE}</Text>
+          ) : null}
 
           <Animated.View style={{ transform: [{ scale: goLiveScale }] }}>
             <TouchableOpacity

@@ -18,6 +18,8 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, Sparkline, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
+import { formatCents } from '@/lib/money';
+import { metricTiles } from '@/lib/analyticsMetricTiles';
 
 export default function AnalyticsProfitScreen() {
   const colors = useColors();
@@ -29,6 +31,7 @@ export default function AnalyticsProfitScreen() {
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [loadError,  setLoadError]  = useState(false);
+  const [payoutError, setPayoutError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [tab,        setTab]        = useState<'profit' | 'payout'>('profit');
   const requestUser = useRef<string | null>(null);
@@ -41,15 +44,17 @@ export default function AnalyticsProfitScreen() {
     try {
       const f = filter ?? await getFilterState();
       if (!filter) setFilter(f);
-      const [p, pay] = await Promise.all([getProfitAnalytics(f), getPayoutAnalytics()]);
-      if (requestUser.current !== requestedUser) return;
-      setProfit(p); setPayout(pay);
-      setLoadError(false);
-    } catch (err) {
+      // Profit (orders + recorded costs) and payouts (live Stripe balance)
+      // load independently: a missing Stripe account must not hide profit.
+      const [p, pay] = await Promise.allSettled([getProfitAnalytics(f), getPayoutAnalytics()]);
       if (requestUser.current !== requestedUser) return;
       // A failed fetch must never be indistinguishable from "not synced
       // yet" — never render this as a genuine $0 profit/payout state.
-      setLoadError(true);
+      if (p.status === 'fulfilled') { setProfit(p.value); setLoadError(false); } else setLoadError(true);
+      if (pay.status === 'fulfilled') { setPayout(pay.value); setPayoutError(false); } else setPayoutError(true);
+    } catch (err) {
+      if (requestUser.current !== requestedUser) return;
+      setLoadError(true); setPayoutError(true);
     } finally { setLoading(false); setRefreshing(false); }
   }, [filter, authLoaded, userId]);
 
@@ -95,9 +100,11 @@ export default function AnalyticsProfitScreen() {
           <View style={s.heroCard}>
             <Text style={s.heroEst}>Estimated</Text>
             <Text style={s.heroValue}>{profit.estimatedProfit.formatted}</Text>
-            <Text style={[s.heroMargin, { color: colors.success }]}>{profit.profitMargin.formatted} margin</Text>
-            <Text style={s.heroDisclaimer}>Cost estimates may differ from actual figures</Text>
-            <Sparkline points={profit.profitChart} color={colors.success} />
+            {profit.profitMargin && (
+              <Text style={[s.heroMargin, { color: colors.success }]}>{profit.profitMargin.formatted} margin</Text>
+            )}
+            <Text style={s.heroDisclaimer}>Sales minus refunds, fees and the costs recorded in Brandthread. Product and packaging costs aren{'\u2019'}t included.</Text>
+            {profit.netRevenueChart.length > 1 && <Sparkline points={profit.netRevenueChart} color={colors.success} />}
           </View>
 
           {/* Waterfall */}
@@ -121,7 +128,7 @@ export default function AnalyticsProfitScreen() {
                           ? { color: colors.destructive }
                           : { color: colors.success },
                     ]}>
-                      {item.isDeduction ? `−$${Math.abs(item.amount).toLocaleString()}` : `$${item.amount.toLocaleString()}`}
+                      {isTotal ? profit.estimatedProfit.formatted : item.isDeduction ? `−${formatCents(item.amountCents)}` : formatCents(item.amountCents)}
                     </Text>
                   </View>
                 </View>
@@ -132,22 +139,22 @@ export default function AnalyticsProfitScreen() {
           {/* Key metrics */}
           <SectionTitle>Key Metrics</SectionTitle>
           <StatTileRow
-            items={[
-              { key: 'gross', label: profit.grossRevenue.label, value: profit.grossRevenue.formatted, changePct: profit.grossRevenue.changePct },
-              { key: 'net',   label: profit.netRevenue.label,   value: profit.netRevenue.formatted,   changePct: profit.netRevenue.changePct },
-              { key: 'margin', label: profit.profitMargin.label, value: profit.profitMargin.formatted, changePct: profit.profitMargin.changePct },
-            ]}
+            items={metricTiles([
+              ['gross', profit.grossRevenue],
+              ['net', profit.netRevenue],
+              ['margin', profit.profitMargin],
+            ])}
           />
         </>
       )}
 
-      {tab === 'payout' && !payout && loadError && (
+      {tab === 'payout' && !payout && payoutError && (
         <View style={{ marginTop: SP.xl, alignItems: 'center' }}>
           <RetryRow label="Couldn't load payout balance" onRetry={() => load()} />
         </View>
       )}
 
-      {tab === 'payout' && !payout && !loadError && (
+      {tab === 'payout' && !payout && !payoutError && (
         <EmptyState icon="dollar-sign" title="No payout data yet" description="We'll show balances once your sales and payouts sync." style={{ marginTop: SP.lg }} />
       )}
 
@@ -160,23 +167,19 @@ export default function AnalyticsProfitScreen() {
                 <Text style={s.payoutLabel}>Available Balance</Text>
                 <Text style={s.payoutValue}>{payout.availableBalance.formatted}</Text>
               </View>
-              <View style={s.nextPayoutBadge}>
-                <Text style={s.nextPayoutDate}>Next payout</Text>
-                <Text style={s.nextPayoutAmt}>{payout.nextPayoutAmount.formatted}</Text>
-                <Text style={s.nextPayoutDate}>{payout.nextPayoutDate}</Text>
-              </View>
+              {payout.nextPayoutAmount && (
+                <View style={s.nextPayoutBadge}>
+                  <Text style={s.nextPayoutDate}>Next payout</Text>
+                  <Text style={s.nextPayoutAmt}>{payout.nextPayoutAmount.formatted}</Text>
+                  {!!payout.nextPayoutDate && <Text style={s.nextPayoutDate}>{payout.nextPayoutDate}</Text>}
+                </View>
+              )}
             </View>
           </View>
 
           <Card>
             {[
-              { label: 'Pending Balance',         value: payout.pendingBalance.formatted,         note: '' },
-              { label: 'Held Funds',              value: payout.heldFunds.formatted,              note: '' },
-              { label: 'Total Paid Out',          value: payout.totalPaidOut.formatted,           note: '' },
-              { label: 'Manufacturer Allocation', value: payout.manufacturerAllocation.formatted, note: 'est.' },
-              { label: 'Shipping Allocation',     value: payout.shippingAllocation.formatted,     note: 'est.' },
-              { label: 'Dispute Holds',           value: payout.disputeHolds.formatted,           note: '' },
-              { label: 'Refund Impact',           value: payout.refundImpact.formatted,           note: '' },
+              { label: 'Pending Balance', value: payout.pendingBalance.formatted, note: 'Still settling in Stripe' },
             ].map((row, i) => (
               <View key={row.label}>
                 {i > 0 && <CardDivider />}
@@ -191,7 +194,7 @@ export default function AnalyticsProfitScreen() {
             ))}
           </Card>
           <Text style={s.payoutDisclaimer}>
-            Payout figures are estimates. Actual amounts are confirmed by your payment provider.
+            Balances come from your Stripe account. See Payouts for history and cash-out.
           </Text>
         </>
       )}

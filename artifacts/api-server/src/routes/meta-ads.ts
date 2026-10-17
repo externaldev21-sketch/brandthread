@@ -16,6 +16,7 @@
  * PATCH  /meta-ads/campaigns/:id                        — edit a draft, or budget/endTime on a live campaign
  * GET    /meta-ads/campaigns/:id/preview                — inline creative preview (no persisted object)
  * POST   /meta-ads/campaigns/:id/launch                 — launch onto Meta (idempotent, see metaAdsLaunch.ts)
+ * GET    /meta-ads/campaigns/:id/reach-estimate          — Meta's own delivery_estimate for the draft
  * POST   /meta-ads/campaigns/:id/refresh-insights        — pull + upsert latest insights
  * POST   /meta-ads/campaigns/:id/pause                   — pause on Meta + locally
  * POST   /meta-ads/campaigns/:id/resume                  — resume on Meta + locally
@@ -33,6 +34,7 @@ import {
   MetaGraphError,
   exchangeCodeForToken,
   generatePreviews,
+  getDeliveryEstimate,
   getInsights,
   getLongLivedToken,
   getMe,
@@ -45,7 +47,7 @@ import {
   updateCampaignStatus,
   sendConversionEvent,
 } from "../lib/metaGraph";
-import { launchCampaign, LaunchError } from "../lib/metaAdsLaunch";
+import { buildTargeting, launchCampaign, LaunchError, OBJECTIVE_TO_OPTIMIZATION_GOAL } from "../lib/metaAdsLaunch";
 
 const router = Router();
 router.use(requireAuth);
@@ -411,15 +413,18 @@ const OBJECTIVE_TO_META: Record<string, string> = {
 };
 
 /**
- * Rough, budget-only reach estimate — NOT from Meta's `delivery_estimate`
- * edge. Meta's real delivery estimate needs a fully-formed targeting spec and
- * an existing ad set, which doesn't exist yet at draft-creation time here.
- * TODO: once a draft has a target ad set, wire the real
- * `/act_.../delivery_estimate` edge for a live number.
+ * Daily spend Meta's delivery estimate is read at: a daily budget as-is; a
+ * lifetime budget spread evenly over its scheduled days (or treated as one
+ * day's spend when no end date is set yet).
  */
-function estimateReach(budgetCents: number): { low: number; high: number } {
-  const dollars = budgetCents / 100;
-  return { low: Math.floor(dollars * 40), high: Math.floor(dollars * 90) };
+export function dailySpendCentsFor(campaign: {
+  budgetType: string; budgetCents: number; startTime: Date | null; endTime: Date | null;
+}, now = new Date()): number {
+  if (campaign.budgetType !== "lifetime") return campaign.budgetCents;
+  if (!campaign.endTime) return campaign.budgetCents;
+  const start = campaign.startTime ?? now;
+  const days = Math.max(1, Math.ceil((campaign.endTime.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)));
+  return Math.round(campaign.budgetCents / days);
 }
 
 async function findOwnedCampaign(id: string, owner: string) {
@@ -486,7 +491,9 @@ router.post("/campaigns", express.json({ limit: "32kb" }), async (req, res) => {
     })
     .returning();
 
-  res.status(201).json({ campaign: created, estimatedReach: estimateReach(budgetCents) });
+  // Reach comes from Meta's own delivery estimate via
+  // GET /campaigns/:id/reach-estimate — never a budget-only formula.
+  res.status(201).json({ campaign: created });
 });
 
 router.get("/campaigns", async (req, res) => {
@@ -599,10 +606,62 @@ router.patch("/campaigns/:id", express.json({ limit: "32kb" }), async (req, res)
     .where(and(eq(metaCampaigns.id, campaign.id), eq(metaCampaigns.sellerId, owner)))
     .returning();
 
-  res.json({
-    campaign: updated,
-    ...(updated.budgetCents !== undefined ? { estimatedReach: estimateReach(updated.budgetCents) } : {}),
-  });
+  res.json({ campaign: updated });
+});
+
+// ─── GET /campaigns/:id/reach-estimate ──────────────────────────────────────
+// Meta's own reach estimate (the ad account's delivery_estimate edge) for the
+// draft's targeting, objective and budget. When there is no connected ad
+// account, the server has no Meta credentials, or Meta can't estimate this
+// audience, it answers 200 { estimate: { available: false, reason } } so the
+// app shows "estimate unavailable" instead of a made-up range.
+
+router.get("/campaigns/:id/reach-estimate", async (req, res) => {
+  const owner = sellerId(req);
+  const campaign = await findOwnedCampaign(req.params.id, owner);
+  if (!campaign) {
+    res.status(404).json({ error: "Campaign not found" });
+    return;
+  }
+  const unavailable = (reason: string) => res.json({ estimate: { available: false, reason } });
+  const account = await loadConnectedAccount(owner);
+  if (!account || account.status !== "connected" || !account.accessTokenEncrypted || !account.adAccountId) {
+    unavailable("Connect a Meta ad account to see Meta's reach estimate.");
+    return;
+  }
+  let accessToken: string;
+  try {
+    accessToken = decryptToken(account.accessTokenEncrypted);
+  } catch {
+    unavailable("Meta Ads isn't configured on this server yet.");
+    return;
+  }
+  const dailySpendCents = dailySpendCentsFor(campaign);
+  try {
+    const estimate = await getDeliveryEstimate(accessToken, account.adAccountId, {
+      targeting: buildTargeting(campaign),
+      optimizationGoal: OBJECTIVE_TO_OPTIMIZATION_GOAL[campaign.objective] ?? "LINK_CLICKS",
+      dailySpendCents,
+    });
+    if (!estimate.ready || estimate.dailyReach === null) {
+      unavailable("Meta hasn't produced a reach estimate for this audience yet. Try again in a moment.");
+      return;
+    }
+    res.json({
+      estimate: {
+        available: true,
+        source: "meta",
+        dailyReach: estimate.dailyReach,
+        dailySpendCents,
+        audienceSizeLower: estimate.audienceSizeLower,
+        audienceSizeUpper: estimate.audienceSizeUpper,
+        currency: account.adAccountCurrency ?? null,
+      },
+    });
+  } catch (err) {
+    req.log?.warn?.({ err }, "Meta delivery estimate failed");
+    unavailable(err instanceof MetaGraphError ? err.userMessage : "Meta's reach estimate is unavailable right now.");
+  }
 });
 
 router.get("/campaigns/:id/preview", async (req, res) => {

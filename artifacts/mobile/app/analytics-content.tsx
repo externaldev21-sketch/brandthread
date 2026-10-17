@@ -16,7 +16,7 @@ import { Card, CardDivider, PillTabs, SectionTitle, StatRow } from '@/components
 import { InsightFrame } from '@/components/analytics/InsightFrame';
 import { InsightLineChart, KpiGrid, RankedRow } from '@/components/analytics/InsightCharts';
 import { useSellerInsight } from '@/hooks/useSellerInsight';
-import { DEFAULT_INSIGHT_RANGE, getContentStats, type ContentPost, type InsightRange } from '@/services/sellerInsightsService';
+import { DEFAULT_INSIGHT_RANGE, getContentStats, getPostShopClicks, type ContentPost, type InsightRange } from '@/services/sellerInsightsService';
 
 type Sort = 'views' | 'likes' | 'revenue';
 const TYPE_LABEL = { video: 'Video', slideshow: 'Slideshow', image: 'Photo' } as const;
@@ -33,12 +33,14 @@ export default function AnalyticsContentScreen() {
   const [range, setRange] = useState<InsightRange>(DEFAULT_INSIGHT_RANGE);
   const [sort, setSort] = useState<Sort>('views');
   const { data, loading, error, reload } = useSellerInsight(() => getContentStats(range), [range]);
+  // Shop-button clicks per post (all time) — the existing post-clicks report.
+  const shopClicks = useSellerInsight(() => getPostShopClicks(), []);
 
   const t = data?.totals;
   const hasData = !!data && (data.totals.views > 0 || data.posts.length > 0 || data.totals.followerGrowth > 0);
   const posts = data ? sortPosts(data.posts, sort).slice(0, 20) : [];
   return (
-    <InsightFrame title="Content Analytics" loading={loading && !data} error={error && !data} onRetry={reload} onRefresh={reload} range={range} onRangeChange={setRange}>
+    <InsightFrame title="Content Analytics" loading={loading && !data} error={error && !data} onRetry={reload} onRefresh={() => { void reload(); void shopClicks.reload(); }} range={range} onRangeChange={setRange}>
       {!data ? null : !hasData ? (
         <EmptyState
           icon="video"
@@ -78,6 +80,31 @@ export default function AnalyticsContentScreen() {
             <StatRow label="Profile visits from posts" value={formatCompactCount(t!.profileVisits)} />
             {t!.avgWatchSeconds !== null && (<><CardDivider /><StatRow label="Average watch time" value={`${t!.avgWatchSeconds}s`} /></>)}
           </Card>
+
+          <SectionTitle note="All time, from the Shop button on each post.">Shop clicks by post</SectionTitle>
+          {shopClicks.error && !shopClicks.data ? (
+            <Card><Text style={s.empty}>Couldn{'\u2019'}t load shop clicks. Pull to refresh.</Text></Card>
+          ) : !shopClicks.data ? null : shopClicks.data.length === 0 ? (
+            <Card><Text style={s.empty}>No shop clicks on your posts yet.</Text></Card>
+          ) : (
+            <Card>
+              {shopClicks.data.map((p, i) => (
+                <View key={p.postId}>
+                  {i > 0 && <CardDivider />}
+                  <RankedRow
+                    rank={i + 1}
+                    thumbnailUrl={p.thumbnailUrl}
+                    icon="shopping-bag"
+                    title={p.caption || 'Untitled post'}
+                    subtitle={`${formatCompactCount(p.uniqueClickers)} ${p.uniqueClickers === 1 ? 'person' : 'people'}`}
+                    value={formatCompactCount(p.clicks)}
+                    valueLabel={p.clicks === 1 ? 'click' : 'clicks'}
+                    onPress={() => router.push(`/post-analytics?id=${encodeURIComponent(p.postId)}` as never)}
+                  />
+                </View>
+              ))}
+            </Card>
+          )}
 
           <SectionTitle>Top posts</SectionTitle>
           <PillTabs

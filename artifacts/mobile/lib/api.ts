@@ -33,6 +33,8 @@ import type {
 } from '@/lib/checkoutPayment';
 import { classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsError';
 import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
+import type { LiveAvailabilityStatus } from '@/lib/live/liveAvailability';
+import type { CounterNoticeInput, SellerIpCase } from '@/lib/counterNotice';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 import type { GiftCard, GiftCardHistoryEntry, GiftCardSettings, GiftCardStoreInfo } from '@/lib/giftCards';
@@ -863,6 +865,20 @@ export interface MetaCampaign {
   updatedAt: string;
 }
 
+/** GET /api/meta-ads/campaigns/:id/reach-estimate — Meta's own delivery estimate. */
+export type MetaReachEstimate =
+  | {
+      available: true;
+      source: 'meta';
+      /** People Meta estimates the ad reaches per day at dailySpendCents. */
+      dailyReach: number;
+      dailySpendCents: number;
+      audienceSizeLower: number | null;
+      audienceSizeUpper: number | null;
+      currency: string | null;
+    }
+  | { available: false; reason: string };
+
 export interface MetaCampaignInsights {
   spendCents: number;
   impressions: number;
@@ -909,6 +925,8 @@ export interface Freelancer {
   isActive: boolean;
   totalJobsCompleted: number;
   avgRatingTenths: number | null;
+  /** Reviews behind avgRatingTenths (0 = unrated). */
+  reviewCount?: number;
   /** Freelancer has begun Connect onboarding — hireable. */
   hasConnectedAccount: boolean;
   /** Connect account fully verified (charges + payouts enabled). */
@@ -939,6 +957,19 @@ export interface FreelancerJob {
   hirerName?: string;
   hirerAvatarUrl?: string | null;
   serviceType?: string;
+  /** The hirer's rating of this job (hirer views only), null until rated. */
+  review?: { ratingTenths: number; comment: string } | null;
+}
+
+export type FreelancerSort = 'rating' | 'jobs' | 'rate_asc' | 'rate_desc' | 'newest';
+
+export interface FreelancerReview {
+  id: string;
+  ratingTenths: number;
+  comment: string;
+  createdAt: string;
+  reviewerName: string;
+  reviewerAvatarUrl: string | null;
 }
 
 export interface LocalUserProfile {
@@ -1121,7 +1152,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     // ── Live replays + Live tips (PR: live-replays-profile-tips) ──────────────
     liveReplays: {
       bySeller: (sellerId: string, opts: { limit?: number; offset?: number } = {}) =>
-        get<{ replays: LiveReplay[]; hasMore: boolean }>(
+        get<{ replays: LiveReplay[]; hasMore: boolean; recordingEnabled?: boolean }>(
           `/api/live-replays/by-seller/${encodeURIComponent(sellerId)}?limit=${opts.limit ?? 30}&offset=${opts.offset ?? 0}`,
         ),
       get: (streamId: string) => get<{ replay: LiveReplay }>(`/api/live-replays/${encodeURIComponent(streamId)}`),
@@ -1284,6 +1315,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       sizeChart: (body: unknown) =>
         postExpensive<{ unit: 'cm' | 'in'; note: string; rows: Record<string, string | number>[]; sizeChart: { columns: string[]; rows: { size: string; values: string[] }[]; unit: 'inches' | 'cm'; notes?: string } }>('/api/ai-helpers/size-chart', body),
       save: (body: unknown) => post<{ saved: true }>('/api/ai-helpers/save', body),
+      /** Five AI brand name ideas from a short description (free text tool). */
+      brandNames: (body: { description: string; style?: string }) =>
+        postExpensive<{ names: string[] }>('/api/ai-helpers/brand-names', body),
     },
     products: {
       list:           ()                       => get('/api/products'),
@@ -1328,6 +1362,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ caseReference: string; statusToken: string; status: string }>('/api/ip-cases', body),
       status: (caseReference: string, token: string) =>
         get<{ caseReference: string; status: string }>(`/api/ip-cases/${encodeURIComponent(caseReference)}/status?token=${encodeURIComponent(token)}`),
+      /** Seller: own listings taken down after an IP report. */
+      mine: () => get<{ cases: SellerIpCase[] }>('/api/ip-cases/seller/mine'),
+      /** Seller: DMCA counter-notice (every 17 U.S.C. § 512(g)(3) element). */
+      counterNotice: (caseReference: string, body: CounterNoticeInput) =>
+        post<{ ok: true; counterNoticeStatus: 'received' }>(`/api/ip-cases/seller/${encodeURIComponent(caseReference)}/counter-notice`, body),
     },
     orders: {
       list:           ()                       => quietGet('/api/orders'),
@@ -2490,6 +2529,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       metafieldCounts:      () => get<{ counts: Record<string, number> }>('/api/seller/metafields'),
       metafieldsByResource: (resource: string) => get<any>(`/api/seller/metafields/${encodeURIComponent(resource)}`),
       createMetafield:      (body: Record<string, any>) => post<any>('/api/seller/metafields', body),
+      updateMetafield:      (id: string, body: Record<string, any>) => patch<any>(`/api/seller/metafields/${encodeURIComponent(id)}`, body),
       deleteMetafield:      (id: string) => del<any>(`/api/seller/metafields/${encodeURIComponent(id)}`),
       // ─ Settings (language, preferences) ──────────────────────────────────
       getSettings:          () => get<{ settings: Record<string, any> }>('/api/seller/settings'),
@@ -3230,6 +3270,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       list: () => get<{ giveaways: any[] }>('/api/seller/giveaways'),
       get: (id: string) => get<any>(`/api/seller/giveaways/${encodeURIComponent(id)}`),
       create: (body: unknown) => post<any>('/api/seller/giveaways', body),
+      update: (id: string, body: unknown) => patch<any>(`/api/seller/giveaways/${encodeURIComponent(id)}`, body),
       rulesTemplate: (query: string) => get<{ rulesText: string }>(`/api/seller/giveaways/rules-template?${query}`),
       end: (id: string) => post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/end`, {}),
       cancel: (id: string) => post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/cancel`, {}),
@@ -3620,6 +3661,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     live: {
       start:          (data: { title: string; description?: string; productTags?: any[]; thumbnailUrl?: string; scheduledLiveId?: string }) =>
         post<any>('/api/live/start', data),
+      /** Env-gated availability: streaming (Agora app) and replays (Cloud Recording). */
+      status:         () => get<LiveAvailabilityStatus>('/api/live/status'),
       active:         () => get<{ streams: any[] }>('/api/live/active'),
       get:            (id: string) => get<{ stream: any }>(`/api/live/${encodeURIComponent(id)}`),
       join:           (id: string) => trackAfter(post<any>(`/api/live/${encodeURIComponent(id)}/join`, {}), [['live_joined']]),
@@ -3698,8 +3741,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Freelancer marketplace (Community tab). */
     freelancers: {
-      list: (filters?: { serviceType?: string; minRate?: number; maxRate?: number; available?: boolean }) => {
+      list: (filters?: { serviceType?: string; minRate?: number; maxRate?: number; available?: boolean; sort?: FreelancerSort }) => {
         const params = new URLSearchParams();
+        if (filters?.sort)            params.set('sort', filters.sort);
         if (filters?.serviceType)     params.set('serviceType', filters.serviceType);
         if (filters?.minRate != null) params.set('minRate', String(filters.minRate));
         if (filters?.maxRate != null) params.set('maxRate', String(filters.maxRate));
@@ -3708,6 +3752,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         return get<{ freelancers: Freelancer[] }>(`/api/freelancers${qs ? `?${qs}` : ''}`);
       },
       get:        (id: string) => get<{ freelancer: Freelancer }>(`/api/freelancers/${encodeURIComponent(id)}`),
+      reviews:    (id: string) => get<{ reviews: FreelancerReview[] }>(`/api/freelancers/${encodeURIComponent(id)}/reviews`),
       me:         () => get<{ freelancer: Freelancer | null }>('/api/freelancers/me'),
       apply:      (body: { serviceType: string; hourlyRateCents: number; bio?: string; skillTags?: string[]; portfolioUrls?: string[] }) =>
         post<{ freelancer: Freelancer }>('/api/freelancers/apply', body),
@@ -3912,9 +3957,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Interest/audience search for targeting (e.g. type='adinterest'). */
       targetingSearch: (q: string, type: string = 'adinterest') =>
         get<{ results: MetaTargetingResult[] }>(`/api/meta-ads/targeting-search?q=${encodeURIComponent(q)}&type=${encodeURIComponent(type)}`),
-      /** Create a campaign draft. Returns the draft plus an estimated reach range. */
+      /** Create a campaign draft. Reach comes from reachEstimate(), never a budget formula. */
       createCampaign: (body: MetaCampaignDraftInput) =>
-        post<{ campaign: MetaCampaign; estimatedReach: { low: number; high: number } }>('/api/meta-ads/campaigns', body),
+        post<{ campaign: MetaCampaign }>('/api/meta-ads/campaigns', body),
+      /** Meta's own reach estimate for a saved draft; { available: false, reason } when Meta can't give one. */
+      reachEstimate: (id: string) =>
+        get<{ estimate: MetaReachEstimate }>(`/api/meta-ads/campaigns/${encodeURIComponent(id)}/reach-estimate`),
       /** Update the editable subset of a draft (or a rejected campaign being fixed). */
       updateCampaign: (id: string, body: Partial<MetaCampaignDraftInput>) =>
         patch<{ campaign: MetaCampaign }>(`/api/meta-ads/campaigns/${encodeURIComponent(id)}`, body),
@@ -4125,6 +4173,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       complete:    (id: string) => patch<{ job: FreelancerJob; payout: { amountCents: number; transferId: string | null } }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/complete`, {}),
       cancel:      (id: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/cancel`, {}),
       syncPayment: (id: string) => post<{ job: FreelancerJob; paymentStatus: string }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/sync-payment`, {}),
+      /** Hirer rates the freelancer on a completed job (1–5 stars, half stars ok). Re-posting edits. */
+      review:      (id: string, body: { rating: number; comment?: string }) =>
+        post<{ review: { ratingTenths: number; comment: string }; freelancer: { id: string; avgRatingTenths: number; reviewCount: number } }>(
+          `/api/freelancer-jobs/${encodeURIComponent(id)}/review`, body),
     },
     /** Age gate: the DOB is sent once, reduced to a band server-side, and never stored. */
     ageGate: {

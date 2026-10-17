@@ -14,8 +14,8 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
-import { getMarketingAnalytics, getFilterState } from '@/services/analyticsService';
-import { MarketingAnalytics, CampaignAnalytics, InfluencerAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { getMarketingAnalytics, getFilterState, getPushNotificationResults } from '@/services/analyticsService';
+import { MarketingAnalytics, CampaignAnalytics, InfluencerAnalytics, AnalyticsFilterState, PushNotificationResults } from '@/services/analyticsTypes';
 import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -58,12 +58,14 @@ function CampaignRow({ c }: { c: CampaignAnalytics }) {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={s.rowTitle} numberOfLines={1}>{c.name}</Text>
-        <Text style={s.rowMeta}>{c.recipients.toLocaleString()} sent · {c.orders} orders</Text>
+        <Text style={s.rowMeta}>{c.recipients.toLocaleString()} recipients · {c.delivered.toLocaleString()} delivered</Text>
       </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={s.rowValue}>{formatCents(c.revenueCents)}</Text>
-        <Text style={[s.rowSub, { color: colors.success }]}>{formatCents(c.revenuePerRecipientCents)}/rec.</Text>
-      </View>
+      {(c.opens !== null || c.clicks !== null) && (
+        <View style={{ alignItems: 'flex-end' }}>
+          {c.opens !== null && <Text style={s.rowValue}>{c.opens.toLocaleString()} opens</Text>}
+          {c.clicks !== null && <Text style={[s.rowSub, { color: colors.mutedForeground }]}>{c.clicks.toLocaleString()} clicks</Text>}
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -74,7 +76,7 @@ function InfluencerRow({ inf }: { inf: InfluencerAnalytics }) {
   return (
     <View style={s.rowItem}>
       <View style={s.avatar}>
-        <Text style={s.avatarInitial}>{inf.name.slice(1, 2).toUpperCase()}</Text>
+        <Text style={s.avatarInitial}>{inf.name.replace(/^@/, '').slice(0, 1).toUpperCase()}</Text>
       </View>
       <View style={{ flex: 1 }}>
         <Text style={s.rowTitle}>{inf.name}</Text>
@@ -82,7 +84,7 @@ function InfluencerRow({ inf }: { inf: InfluencerAnalytics }) {
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={s.rowValue}>{formatCents(inf.revenueCents)}</Text>
-        <Text style={[s.rowSub, { color: inf.returnOnCost >= 5 ? colors.success : colors.warning }]}>{inf.returnOnCost}× ROC</Text>
+        <Text style={[s.rowSub, { color: colors.mutedForeground }]}>{formatCents(inf.commissionCents)} commission</Text>
       </View>
     </View>
   );
@@ -98,6 +100,8 @@ export default function AnalyticsMarketingScreen() {
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [loadError,  setLoadError]  = useState(false);
+  const [push,       setPush]       = useState<PushNotificationResults | null>(null);
+  const [pushError,  setPushError]  = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const requestUser = useRef<string | null>(null);
 
@@ -109,9 +113,11 @@ export default function AnalyticsMarketingScreen() {
     try {
       const f = filter ?? await getFilterState();
       if (!filter) setFilter(f);
-      const next = await getMarketingAnalytics(f);
+      const [next, pushResults] = await Promise.allSettled([getMarketingAnalytics(f), getPushNotificationResults()]);
       if (requestUser.current !== requestedUser) return;
-      setData(next);
+      if (pushResults.status === 'fulfilled') { setPush(pushResults.value); setPushError(false); } else setPushError(true);
+      if (next.status === 'rejected') throw next.reason;
+      setData(next.value);
       setLoadError(false);
     } catch (err) {
       if (requestUser.current !== requestedUser) return;
@@ -126,7 +132,7 @@ export default function AnalyticsMarketingScreen() {
     if (authLoaded && userId) { setLoading(true); load(); }
   }, [authLoaded, userId]); // load reads the current filter
 
-  const totalMarketing = data?.marketingRevenue.value ?? 1;
+  const totalMarketing = data?.marketingRevenue.value ?? 0;
 
   return (
     <View style={{ flex: 1 }}>
@@ -171,17 +177,16 @@ export default function AnalyticsMarketingScreen() {
           {/* Revenue by channel */}
           <SectionTitle>Revenue by Channel</SectionTitle>
           <Card padded>
-            <RevenueBar label="Email"      valueCents={data.emailRevenue.value}      totalCents={totalMarketing} color={colors.primary} />
-            <RevenueBar label="Discounts"  valueCents={data.discountRevenue.value}   totalCents={totalMarketing} color={colors.warning} />
-            <RevenueBar label="SMS"        valueCents={data.smsRevenue.value}        totalCents={totalMarketing} color={colors.success} />
-            <RevenueBar label="Automation" valueCents={data.automationRevenue.value} totalCents={totalMarketing} color={colors.info} />
-            <RevenueBar label="Influencers" valueCents={data.influencerRevenue.value} totalCents={totalMarketing} color={colors.warning} />
-            <RevenueBar label="Referrals"  valueCents={data.referralRevenue.value}   totalCents={totalMarketing} color={colors.info} />
-            <View style={s.recoveredRow}>
-              <Feather name="refresh-cw" size={13} color={colors.success} />
-              <Text style={s.recoveredText}>Abandoned cart recovered:</Text>
-              <Text style={[s.recoveredAmount, { color: colors.success }]}>{data.abandonedCheckoutRecovered.formatted}</Text>
-            </View>
+            {data.channels.map((ch, i) => (
+              <RevenueBar
+                key={ch.key}
+                label={ch.label}
+                valueCents={ch.revenueCents}
+                totalCents={totalMarketing}
+                color={i % 2 === 0 ? colors.warning : colors.info}
+              />
+            ))}
+            <Text style={s.recoveredText}>Paid orders that used a discount code or a creator link. An order using both counts once in the total.</Text>
           </Card>
 
           {/* Campaigns */}
@@ -199,10 +204,34 @@ export default function AnalyticsMarketingScreen() {
             </Card>
           )}
 
-          {/* Influencers */}
-          <SectionTitle>Influencer Performance</SectionTitle>
+          {/* Push notification results (GET /api/analytics/notifications) */}
+          <SectionTitle note="All time, across every push your store has sent.">Push Notification Results</SectionTitle>
+          {push ? (
+            <Card>
+              {[
+                { label: 'Sent', value: push.sent },
+                { label: 'Delivered to device', value: push.received },
+                { label: 'Opened', value: push.opened },
+                { label: 'Tapped', value: push.tapped },
+                { label: 'Failed to send', value: push.providerErrors },
+              ].map((item, i) => (
+                <View key={item.label}>
+                  {i > 0 && <CardDivider />}
+                  <View style={s.simpleRow}>
+                    <Text style={s.simpleLabel}>{item.label}</Text>
+                    <Text style={s.simpleValue}>{item.value.toLocaleString()}</Text>
+                  </View>
+                </View>
+              ))}
+            </Card>
+          ) : pushError ? (
+            <Card><View style={s.simpleRow}><Text style={s.simpleLabel}>Couldn{'\u2019'}t load push results. Pull to refresh.</Text></View></Card>
+          ) : null}
+
+          {/* Creator program */}
+          <SectionTitle>Creator Performance</SectionTitle>
           {data.influencers.length === 0 ? (
-            <EmptyState icon="users" title="No influencer activity yet" description="Influencer performance will appear once a partnership drives sales." />
+            <EmptyState icon="users" title="No creator sales yet" description="Creator performance appears once a creator link or code drives a sale." />
           ) : (
             <Card>
               {data.influencers.map((inf, i) => (
@@ -214,25 +243,6 @@ export default function AnalyticsMarketingScreen() {
             </Card>
           )}
 
-          {/* Referral */}
-          <SectionTitle>Referral Program</SectionTitle>
-          <Card>
-            {[
-              { label: 'Shares',             value: data.referral.shares.toLocaleString() },
-              { label: 'Clicks',             value: data.referral.clicks.toLocaleString() },
-              { label: 'Referred Customers', value: data.referral.referredCustomers.toLocaleString() },
-              { label: 'Revenue',            value: formatCents(data.referral.revenueCents) },
-              { label: 'Rewards Issued',     value: formatCents(data.referral.rewardsIssuedCents) },
-            ].map((item, i) => (
-              <View key={item.label}>
-                {i > 0 && <CardDivider />}
-                <View style={s.simpleRow}>
-                  <Text style={s.simpleLabel}>{item.label}</Text>
-                  <Text style={s.simpleValue}>{item.value}</Text>
-                </View>
-              </View>
-            ))}
-          </Card>
         </>
       )}
 
