@@ -45,6 +45,7 @@ yarn-error.*
 
 .env
 .store-screenshots/
+.bundle-check/
 .onboarding-walkthrough/
 scripts/onboarding-walkthrough/output/
 scratch/

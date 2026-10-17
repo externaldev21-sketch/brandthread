@@ -16,6 +16,8 @@
     "update:production": "node scripts/eas-update.js --channel production",
     "update:rollback": "eas update:rollback",
     "screenshots": "node scripts/store-screenshots/capture.mjs",
+    "screenshots:frame": "node scripts/store-screenshots/frame.mjs",
+    "check:bundle-size": "node scripts/bundle-size.mjs",
     "test:layout-audit": "node tests/layout-audit.spec.ts",
     "audit:half-done": "node scripts/audit/half-done-audit.mjs",
     "audit:dead-ui": "node scripts/audit-dead-ui.mjs --ci",
