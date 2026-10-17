@@ -25,7 +25,11 @@ export default function ListingSizeScreen() {
   function toggle(size: string) {
     updateListing(prev => {
       const picked = prev.sizes.some(sz => sz.size === size);
-      if (picked) return { sizes: prev.sizes.filter(sz => sz.size !== size) };
+      if (picked) {
+        const rest = prev.sizes.filter(sz => sz.size !== size);
+        // Back to one size: its count becomes the listing's quantity again.
+        return rest.length === 1 ? { sizes: rest, quantity: rest[0].quantity || 1 } : { sizes: rest };
+      }
       // Keep the list in the option order (S, M, L…), not tap order.
       const next = [...prev.sizes, { size, quantity: prev.sizes.length === 0 ? prev.quantity || 1 : 1 }];
       return { sizes: next.sort((a, b) => options.indexOf(a.size) - options.indexOf(b.size)) };

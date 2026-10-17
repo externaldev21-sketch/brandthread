@@ -121,7 +121,7 @@ describe('Sell an item form', () => {
 
   it('shows the Vinted field rows in order with Depop’s Save to drafts / Preview bar', async () => {
     renderer = await render();
-    const rows = renderer.root.findAll(n => n.type === 'FormRow').map(n => n.props.label);
+    const rows = renderer.root.findAll(n => (n.type as unknown) === 'FormRow').map(n => n.props.label);
     expect(rows).toEqual(['Category', 'Brand', 'Size', 'Condition', 'Colours', 'Material (recommended)', 'Price', 'Shipping']);
     expect(renderer.root.findByProps({ testID: 'add-product-save-draft' }).props.label).toBe('Save to drafts');
     expect(renderer.root.findByProps({ testID: 'add-product-preview' }).props.label).toBe('Preview');
@@ -180,7 +180,7 @@ describe('Sell an item form', () => {
         condition: 'good', priceStr: '40',
       });
     });
-    const note = renderer.root.findAll(n => n.type === 'Note').map(n => n.props.children);
+    const note = renderer.root.findAll(n => (n.type as unknown) === 'Note').map(n => n.props.children);
     expect(note[0]).toMatch(/^You’ll earn \$\d+\.\d\d after fees\.$/);
     await act(async () => { renderer!.root.findByProps({ testID: 'add-product-preview' }).props.onPress(); });
     expect(routerPushMock).toHaveBeenCalledWith('/listing/preview');
