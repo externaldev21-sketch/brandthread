@@ -14,6 +14,7 @@ import { Card, ListRow, Button, OptionSheet, OptionSheetOption } from '@/compone
 import { getPrivacySettings, updatePrivacySettings } from '@/services/socialService';
 import { PrivacySettings, AudienceOption, DmPrivacy } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+import { CONTACT_SYNC_ENABLED } from '@/lib/contactSyncFlag';
 
 const AUDIENCE_LABEL: Record<AudienceOption, string> = {
   everyone: 'Everyone',
@@ -240,14 +241,20 @@ export default function BuyerPrivacySettings() {
             subtitle="Let others find your profile in search"
             toggle={{ value: settings.searchable, onChange: v => update('searchable', v) }}
           />
-          <View style={styles.divider} />
-          <ListRow
-            icon="phone"
-            title="Contact discovery"
-            subtitle="Find friends from contacts (no contacts uploaded without permission)"
-            subtitleNumberOfLines={2}
-            toggle={{ value: settings.contactDiscovery, onChange: v => update('contactDiscovery', v) }}
-          />
+          {/* Contact sync is feature-flagged (default off) — the same flag
+              that gates the "Find from contacts" row and screen. */}
+          {CONTACT_SYNC_ENABLED ? (
+            <>
+              <View style={styles.divider} />
+              <ListRow
+                icon="phone"
+                title="Contact discovery"
+                subtitle="Find friends from contacts (no contacts uploaded without permission)"
+                subtitleNumberOfLines={2}
+                toggle={{ value: settings.contactDiscovery, onChange: v => update('contactDiscovery', v) }}
+              />
+            </>
+          ) : null}
         </Card>
 
         {/* MESSAGES */}

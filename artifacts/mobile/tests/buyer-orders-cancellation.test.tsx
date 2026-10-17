@@ -5,8 +5,9 @@ import type { BuyerOrderView } from '@/services/orderTypes';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const { getBuyerOrdersWithStatusMock, routerMock } = vi.hoisted(() => ({
+const { getBuyerOrdersWithStatusMock, getBuyerReturnsMock, routerMock } = vi.hoisted(() => ({
   getBuyerOrdersWithStatusMock: vi.fn(),
+  getBuyerReturnsMock: vi.fn(),
   routerMock: { push: vi.fn() },
 }));
 
@@ -183,6 +184,14 @@ vi.mock('@/services/orderService', () => ({
   getBuyerOrdersWithStatus: getBuyerOrdersWithStatusMock,
 }));
 
+// Pulled in transitively (reorder flow → cart); the native module isn't
+// available under Vitest. This suite failed to load without it.
+vi.mock('expo-crypto', () => ({ randomUUID: () => 'test-uuid' }));
+
+vi.mock('@/services/buyerReturnsService', () => ({
+  getBuyerReturns: getBuyerReturnsMock,
+}));
+
 import BuyerOrdersScreen from '@/app/(buyer)/orders';
 
 const baseOrder: BuyerOrderView = {
@@ -319,5 +328,79 @@ describe('buyer order cancellation banner', () => {
       node => (node.type as unknown) === 'Text'
         && textContent(node.props.children).includes('buyer_requested'),
     )).toHaveLength(0);
+  });
+});
+describe('buyer orders Returns tab and Track Shipment (items 108, 109)', () => {
+  let renderer: ReactTestRenderer | undefined;
+
+  beforeEach(() => {
+    getBuyerOrdersWithStatusMock.mockReset();
+    getBuyerReturnsMock.mockReset();
+    routerMock.push.mockReset();
+  });
+
+  afterEach(async () => {
+    if (renderer) {
+      await act(async () => { renderer?.unmount(); });
+      renderer = undefined;
+    }
+  });
+
+  async function openReturnsTab(r: ReactTestRenderer) {
+    const chip = r.root.findAll(node => (node.type as unknown) === 'FilterChip' && node.props.label === 'Returns')[0];
+    await act(async () => {
+      chip.props.onPress();
+      await flushPromises();
+    });
+  }
+
+  it('loads the buyer returns from the server and opens the return status screen', async () => {
+    getBuyerOrdersWithStatusMock.mockResolvedValue({ orders: [baseOrder], error: null });
+    getBuyerReturnsMock.mockResolvedValue([{
+      id: 'ret-1', orderId: 'order-1', orderNumber: 'BT-1001', buyerId: 'buyer-1', sellerId: 'seller-1',
+      buyerName: 'Buyer', sellerName: 'Demo Seller', status: 'approved', reason: 'other', notes: '',
+      evidenceUrls: [], items: [], refundAmountCents: null, orderTotalCents: 4200, sellerResponse: null,
+      createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-02T00:00:00.000Z',
+    }]);
+
+    renderer = await renderScreen();
+    expect(getBuyerReturnsMock).not.toHaveBeenCalled();
+    await openReturnsTab(renderer);
+
+    expect(getBuyerReturnsMock).toHaveBeenCalledTimes(1);
+    const card = renderer.root.findAll(node => (node.type as unknown) === 'TouchableOpacity'
+      && typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith('Return for order BT-1001'))[0];
+    expect(card).toBeTruthy();
+    await act(async () => { card.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/return-detail?returnId=ret-1');
+  });
+
+  it('shows an error with retry when returns fail to load', async () => {
+    getBuyerOrdersWithStatusMock.mockResolvedValue({ orders: [baseOrder], error: null });
+    getBuyerReturnsMock.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce([]);
+
+    renderer = await renderScreen();
+    await openReturnsTab(renderer);
+
+    const errorState = renderer.root.findAll(node => (node.type as unknown) === 'EmptyState' && node.props.title === "Couldn't load your returns.")[0];
+    expect(errorState).toBeTruthy();
+    await act(async () => {
+      errorState.props.action.onPress();
+      await flushPromises();
+    });
+    expect(getBuyerReturnsMock).toHaveBeenCalledTimes(2);
+    expect(renderer.root.findAll(node => (node.type as unknown) === 'EmptyState' && node.props.title === 'No returns')).toHaveLength(1);
+  });
+
+  it('Track Shipment opens the tracking screen, View Order Details opens the order', async () => {
+    getBuyerOrdersWithStatusMock.mockResolvedValue({
+      orders: [{ ...baseOrder, status: 'shipped', cancellationReason: null, trackingNumber: '1Z999', trackingCarrier: 'UPS', trackingStatus: 'in_transit' }],
+      error: null,
+    });
+    renderer = await renderScreen();
+    const track = renderer.root.findAll(node => (node.type as unknown) === 'TouchableOpacity' && node.props.accessibilityLabel === 'Track shipment')[0];
+    await act(async () => { track.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/buyer-order-tracking?id=order-1');
+    expect(routerMock.push).not.toHaveBeenCalledWith('/buyer-order-detail?id=order-1');
   });
 });

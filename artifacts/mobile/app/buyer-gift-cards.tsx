@@ -1,7 +1,8 @@
 /**
  * Gift cards in the buyer's wallet: what they own and can spend (each at its
  * own store), the ones they bought for someone else, and a field to add a
- * code. Reached from Menu, Gift cards. Balances come only from the server.
+ * code (or just check its balance first). Reached from Menu, Gift cards.
+ * Balances come only from the server.
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -19,7 +20,7 @@ import { FONT, FS, SP } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { PREVIEW_CARDS } from '@/lib/giftCardsPreview';
-import { giftCardMask, giftCardStatusLabel, type GiftCard, type GiftCardHistoryEntry } from '@/lib/giftCards';
+import { giftCardBalanceCheckSummary, giftCardMask, giftCardStatusLabel, type GiftCard, type GiftCardHistoryEntry } from '@/lib/giftCards';
 
 const HISTORY_LABEL: Record<GiftCardHistoryEntry['type'], string> = {
   issue: 'Added', redeem: 'Held at checkout', settle: 'Used on an order', release: 'Returned, checkout not completed',
@@ -38,6 +39,9 @@ export default function BuyerGiftCardsScreen() {
   const [code, setCode] = useState('');
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  // Item 119: check a code's balance without adding it (POST /api/gift-cards/lookup).
+  const [checking, setChecking] = useState(false);
+  const [balanceResult, setBalanceResult] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [history, setHistory] = useState<GiftCardHistoryEntry[]>([]);
 
@@ -73,6 +77,22 @@ export default function BuyerGiftCardsScreen() {
       setAddError(err instanceof ApiError && err.status < 500 ? err.message : 'We couldn’t check that code. Check your connection and try again.');
     } finally {
       setAdding(false);
+    }
+  }
+
+  async function checkBalance() {
+    const trimmed = code.trim();
+    if (!trimmed || checking || preview) return;
+    setChecking(true);
+    setAddError(null);
+    setBalanceResult(null);
+    try {
+      const result = await api.giftCards.lookup(trimmed);
+      setBalanceResult(giftCardBalanceCheckSummary(result.card, result.storeName));
+    } catch (err) {
+      setAddError(err instanceof ApiError && err.status < 500 ? err.message : 'We couldn’t check that balance. Check your connection and try again.');
+    } finally {
+      setChecking(false);
     }
   }
 
@@ -123,7 +143,7 @@ export default function BuyerGiftCardsScreen() {
           <CheckoutField
             label="Add a gift card"
             value={code}
-            onChangeText={next => { setCode(next.toUpperCase()); if (addError) setAddError(null); }}
+            onChangeText={next => { setCode(next.toUpperCase()); if (addError) setAddError(null); if (balanceResult) setBalanceResult(null); }}
             error={addError ?? undefined}
             showError
             placeholder="Enter code"
@@ -134,7 +154,22 @@ export default function BuyerGiftCardsScreen() {
             style={{ flex: 1, marginBottom: 0 }}
             testID="gift-cards-code"
           />
-          <Button label="Add" variant="secondary" size="small" loading={adding} disabled={!code.trim() || preview} onPress={() => void add()} style={s.add} />
+          <Button label="Add" variant="secondary" size="small" loading={adding} disabled={!code.trim() || preview || checking} onPress={() => void add()} style={s.add} />
+        </View>
+        <View style={s.checkRow}>
+          <Button
+            label="Check balance"
+            variant="tertiary"
+            size="small"
+            icon="search"
+            loading={checking}
+            disabled={!code.trim() || preview || adding}
+            onPress={() => void checkBalance()}
+            testID="gift-cards-check-balance"
+          />
+          {balanceResult ? (
+            <Text style={s.balanceResult} accessibilityLiveRegion="polite" testID="gift-cards-balance-result">{balanceResult}</Text>
+          ) : null}
         </View>
 
         {loading ? (
@@ -171,7 +206,9 @@ export default function BuyerGiftCardsScreen() {
 
 function makeStyles(ck: CheckoutColors) {
   return StyleSheet.create({
-    addRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginBottom: SP.lg },
+    addRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginBottom: SP.xs },
+    checkRow: { alignItems: 'flex-start', gap: SP.xs, marginBottom: SP.lg },
+    balanceResult: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
     add: { marginTop: 25, minWidth: 84 },
     center: { alignItems: 'center', paddingTop: SP.xl, gap: SP.xs },
     emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text },

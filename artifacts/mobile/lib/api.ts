@@ -39,6 +39,12 @@ import type { GiftCard, GiftCardHistoryEntry, GiftCardSettings, GiftCardStoreInf
 import type { MentionPerson, Story, StoryMentionItem, StoryStickerState } from '@/services/socialTypes';
 import type { LiveModerationState, LiveCohostCandidate, LiveCohostInvite, LiveCohostPerson } from '@/lib/live/moderationTypes';
 
+/** GET /api/buyer/activity (item 110). */
+export interface BuyerActivityResponse {
+  likes: { total: number; items: Array<{ postId: string; authorId: string; authorName: string; caption: string | null; likedAt: string }> };
+  comments: { total: number; items: Array<{ id: string; postId: string; authorId: string; authorName: string; body: string; isReply: boolean; createdAt: string }> };
+}
+
 /** Server story highlight (GET /api/social/highlights/*). */
 export interface ServerHighlight {
   id: string; userId: string; title: string;
@@ -1719,6 +1725,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         ),
     },
     buyer: {
+      /** Your Activity: my own likes and comments (20 most recent each, exact totals). */
+      activity: () => freshGet<BuyerActivityResponse>('/api/buyer/activity'),
       /** Saved sizes / preferences. GET returns defaults when nothing is saved; update is a partial merge (null clears a size). */
       preferences: {
         get: () => get<BuyerPreferences>('/api/buyer/preferences'),
@@ -3770,6 +3778,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       summary: () =>
         get<{ totalImpressions: number; spentCentsThisMonth: number; activeCount: number }>('/api/boosts/summary'),
     },
+    /** Admin-curated "Featured on Discover" picks (public, read-only). */
+    publicFeatured: {
+      list: () => get<PublicFeaturedPicks>('/api/public/featured'),
+    },
     /** Featured brand slots on Discover (seller purchase flow; /active is public). */
     featuredSlots: {
       active: () => get<{ label: 'Featured'; brands: FeaturedBrand[] }>('/api/featured-slots/active'),
@@ -3972,6 +3984,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ status: 'paid' | 'processing' | 'unpaid'; card: GiftCard; code: string | null }>(
           `/api/gift-cards/purchase/${encodeURIComponent(giftCardId)}/confirm`, {}),
       claim: (code: string) => post<{ card: GiftCard; storeName: string }>('/api/gift-cards/claim', { code }),
+      /** Balance of a card by code, without adding it to the wallet (rate limited). */
+      lookup: (code: string) => post<{ card: GiftCard; storeName: string }>('/api/gift-cards/lookup', { code }),
       mine: () => freshGet<{ cards: GiftCard[]; totalCents: number }>('/api/gift-cards/mine'),
       get: (id: string) =>
         get<{ card: GiftCard; history: GiftCardHistoryEntry[] }>(`/api/gift-cards/mine/${encodeURIComponent(id)}`),
@@ -4234,6 +4248,14 @@ export interface PlacePage { place: PlaceInfo; postCount: number; sort: 'top' | 
 
 // ─── Promotions (featured slots + admin approval) ─────────────────────────────
 export type FeaturedBrand = { slotId: string; sellerId: string; name: string; imageUrl: string | null; verified: boolean };
+/** GET /api/public/featured — admin "Featured on Discover" picks. */
+export type PublicFeaturedPicks = {
+  brands: Array<{ userId: string; label: string | null; name?: string; imageUrl?: string | null; verified?: boolean }>;
+  threads: Array<{
+    postId: string; label: string | null; authorId?: string; caption?: string | null;
+    mediaType?: string; thumbnailUrl?: string | null;
+  }>;
+};
 export type FeaturedSlot = {
   id: string; placement: string; durationDays: number; priceCents: number;
   startsAt: string; endsAt: string; status: string;

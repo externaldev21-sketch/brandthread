@@ -15,6 +15,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { hapticSelection } from '@/lib/haptics';
+import { dropAlertErrorCopy } from '@/lib/dropAlertError';
 import { FONT, FS, SP } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
@@ -69,8 +70,9 @@ export function DropsCalendar({ drops }: { drops: CalendarDropRow[] }) {
           undo: async () => { await api.publicDrops.unsubscribe(drop.id); set(drop.id, false); },
         });
       }
-    } catch {
-      Alert.alert('Could not update alert', 'Check your connection and try again.');
+    } catch (error) {
+      const copy = dropAlertErrorCopy(error, 'tap the bell again');
+      Alert.alert(copy.title, copy.message);
     } finally {
       setPending((p) => ({ ...p, [drop.id]: false }));
     }
