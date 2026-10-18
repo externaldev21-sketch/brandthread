@@ -621,3 +621,17 @@ mtime_ms = 1792243688380
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/e2ad0687-390c-4632-a27f-25e482a1848b/e6763759-7e1f-456d-9bba-4a518e8dfad1"
 storage_version_token = "1792243774415466"
 content_type = "image/png"
+
+[[outputs]]
+id = "41dvEmiocRdBdJHSnXT5e"
+uri = "file://.local/merge-audit/ui-completion/brandthread-ui-comparisons.html"
+type = "html"
+title = "390×844 PR screenshot comparisons"
+description = "Approved PR targets beside the current fresh buyer and seller previews, including the restored B logo and measured 16px trial inset."
+logical_id = "1f9a34fd-7f11-4769-9024-780e621dcd3e"
+content_hash = "sha256:7332b7fed0bbce59b8dcae32db0e37f34ecbfc8bd451d2734e4714fd94443b2a"
+size = 2828580
+mtime_ms = 1792292859344
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/1f9a34fd-7f11-4769-9024-780e621dcd3e/577af322-7e85-48f9-afe0-aa95e9b44d45"
+storage_version_token = "1792292997039388"
+content_type = "text/html"
