@@ -12,6 +12,7 @@
  *  - ListRow / RadioRow: hairline rows                     — Depop "Interest" / Etsy
  */
 import React, { forwardRef } from 'react';
+import { MEDIA } from '@/lib/theme';
 import {
   ActivityIndicator,
   Platform,
@@ -37,7 +38,7 @@ const HIT = { top: 10, bottom: 10, left: 10, right: 10 };
 
 /** Neutral grey for disabled / secondary fills, derived from the theme. */
 function fillFor(theme: Theme) {
-  return theme.text === '#FFFFFF' || theme.text.toLowerCase() === '#ffffff' ? '#1C1C1E' : '#EFEFEF';
+  return theme.text.toUpperCase() === MEDIA.foreground ? '#1C1C1E' : '#EFEFEF';
 }
 
 // ─── Screen frame ────────────────────────────────────────────────────────────

@@ -15,7 +15,7 @@ describe('Thread video sharing flow', () => {
   it('provides real recipient, external share, moderation, and download actions', () => {
     for (const label of [
       'Copy link',
-      'SMS',
+      'Messages',
       'Email',
       'Instagram',
       'More',

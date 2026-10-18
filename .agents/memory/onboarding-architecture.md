@@ -13,7 +13,7 @@ Keep branded first-run entry and the canonical onboarding route; legacy account-
 
 **Why:** Divergent legacy entry paths can bypass the approved onboarding or lose the selected role.
 
-**How to apply:** Route create-account entry through onboarding Account Type, never the legacy standalone route. Preserve the pending role across Clerk redirects, and require an owner-matched buyer role before showing the Thread explainer.
+**How to apply:** Route create-account entry through the canonical onboarding controller, never the legacy standalone account-type questionnaire. The approved launch flow chooses role after shared identity/personalization questions; preserve any selected role through an interrupted handoff, and require an owner-matched buyer role before showing the Thread explainer.
 
 Onboarding completion is a final server-authoritative transition shared by buyer and seller flows. Required profile/brand writes must succeed first; only then may the server persist completion and the client bind local routing state to the Clerk user.
 
@@ -32,3 +32,9 @@ Onboarding welcome footage needs separate native and browser-compatible delivery
 **Why:** Expo's web preview returned 200 and `video/mp4` for an H.264 clip but its browser reported no supported streams; the native fallback host did not serve that clip. A web-compatible encoding played, while native needed the clip available as an app asset.
 
 **How to apply:** Verify playback with decoded dimensions and advancing time, not merely an HTTP response or a screenshot. Keep the native asset small and preserve first-run access when offline or Reduce Motion is enabled.
+
+Incompatible question layouts must not reuse a persisted draft format version, even if an incoming branch considers that version new.
+
+**Why:** Parallel onboarding work reused the same version for different step layouts. Treating matching integers as compatible can restore the wrong question or role.
+
+**How to apply:** Compare the stored step identities and ownership contract when integrating another flow. Give an incompatible layout a new format version and resume at a valid signed-in profile question rather than interpreting the old numeric position.

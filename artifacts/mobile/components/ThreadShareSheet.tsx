@@ -46,6 +46,8 @@ import { remixActionVisible, remixRoute } from '@/lib/remix';
 import { publishPostEngagement } from '@/lib/postEngagement';
 import { OFFICIAL_AVATAR_SOURCE, isOfficialAccountId } from '@/lib/officialAccount';
 import { isDarkColor, shareTileWidth, SHARE_TILE_DARK } from '@/lib/shareSheetGrid';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface ThreadShareSheetProps {
   visible: boolean;
@@ -314,6 +316,19 @@ function AccountThreadShareSheet({
     router.push(href as never);
   }
 
+  async function openWhatsApp() {
+    await runAction('whatsapp', async () => {
+      try {
+        await Linking.openURL(`whatsapp://send?text=${encodeURIComponent(postUrl)}`);
+      } catch {
+        const result = await Share.share({ message: postUrl, url: postUrl });
+        if (result.action === Share.dismissedAction) return;
+      }
+      void recordShare();
+      onClose();
+    });
+  }
+
   async function systemShare(name: string, message: string, notice?: string) {
     await runAction(name, async () => {
       const result = await Share.share({ message, url: postUrl });
@@ -452,7 +467,7 @@ function AccountThreadShareSheet({
         ) : (
         <>
           <View style={styles.section}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionRow} testID="thread-share-row-people">
               {onRepost ? (
                 <ShareAction
                   label={reposted ? 'Remove repost' : 'Repost'}
@@ -492,11 +507,11 @@ function AccountThreadShareSheet({
           <View style={styles.section}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionRow}>
               <ShareAction label="Copy link" icon="link-2" busy={busy === 'copy'} onPress={() => void copyLink()} />
-              <ShareAction label="SMS" icon="message-circle" busy={busy === 'sms'} onPress={() => void openExternal('sms')} />
-              <ShareAction label="WhatsApp" icon="message-circle" onPress={() => { void Linking.openURL(`https://wa.me/?text=${encodeURIComponent(postUrl)}`).catch(() => onFeedback('Could not open WhatsApp', 'error')); }} />
-              <ShareAction label="Snapchat" icon="share-2" onPress={() => void openMore()} />
+              <ShareAction label="Messages" platform="messages" busy={busy === 'sms'} onPress={() => void openExternal('sms')} />
+              <ShareAction label="WhatsApp" platform="whatsapp" busy={busy === 'whatsapp'} onPress={() => void openWhatsApp()} />
+              <ShareAction label="Snapchat" platform="snapchat" onPress={() => void openMore()} />
               <ShareAction label="Email" icon="mail" busy={busy === 'email'} onPress={() => void openExternal('email')} />
-              <ShareAction label="Instagram" icon="instagram" busy={busy === 'instagram'} onPress={() => void shareToInstagram()} />
+              <ShareAction label="Instagram" platform="instagram" busy={busy === 'instagram'} onPress={() => void shareToInstagram()} />
               <ShareAction label="More" icon="more-horizontal" busy={busy === 'more'} onPress={openMoreOptions} />
             </ScrollView>
           </View>
@@ -537,9 +552,31 @@ function AccountThreadShareSheet({
   );
 }
 
+type SharePlatform = 'messages' | 'whatsapp' | 'instagram' | 'snapchat';
+
+function PlatformMark({ platform }: { platform: SharePlatform }) {
+  const { theme } = useAppTheme();
+  const fill = platformStyles.fill;
+  switch (platform) {
+    case 'messages':
+      return <View style={[fill, { backgroundColor: '#34C759' }]}><Ionicons name="chatbubble" size={24} color={theme.text} /></View>;
+    case 'whatsapp':
+      return <View style={[fill, { backgroundColor: '#25D366' }]}><FontAwesome name="whatsapp" size={28} color={theme.text} /></View>;
+    case 'instagram':
+      return <LinearGradient colors={['#FEDA75', '#FA7E1E', '#D62976', '#962FBF', '#4F5BD5']} start={{ x: 0, y: 1 }} end={{ x: 1, y: 0 }} style={fill}><FontAwesome name="instagram" size={26} color={theme.text} /></LinearGradient>;
+    case 'snapchat':
+      return <View style={[fill, { backgroundColor: '#FFFC00' }]}><FontAwesome name="snapchat-ghost" size={24} color={theme.background} /></View>;
+  }
+}
+
+const platformStyles = StyleSheet.create({
+  fill: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+});
+
 function ShareAction({
   label,
   icon,
+  platform,
   onPress,
   busy,
   muted,
@@ -549,6 +586,7 @@ function ShareAction({
 }: {
   label: string;
   icon?: IconName;
+  platform?: SharePlatform;
   onPress: () => void;
   busy?: boolean;
   muted?: boolean;
@@ -575,7 +613,7 @@ function ShareAction({
           <Image source={{ uri: avatar.uri }} style={styles.avatarImage} resizeMode="cover" testID="thread-share-avatar-image" />
         ) : avatar ? (
           <Text style={styles.avatarText}>{avatar.initials}</Text>
-        ) : (
+        ) : platform ? <PlatformMark platform={platform} /> : (
            <Icon name={icon ?? 'send'} size={22} color={highlighted ? theme.background : theme.text} />
         )}
       </View>

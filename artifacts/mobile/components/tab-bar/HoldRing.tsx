@@ -13,6 +13,7 @@
  * Reanimated-driven strokeDashoffset, so the draw runs on the UI thread.
  */
 import React from 'react';
+import { MEDIA } from '@/lib/theme';
 import { StyleSheet } from 'react-native';
 import Animated, { useAnimatedProps, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
@@ -23,8 +24,8 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 const RING_OUTSET = 3;
 const RING_STROKE = 2;
 const GLOW_STROKE = 6;
-const RING_COLOR = 'rgba(255, 255, 255, 0.96)';
-const GLOW_COLOR = 'rgba(226, 232, 240, 0.32)';
+const RING_COLOR = MEDIA.holdRing;
+const GLOW_COLOR = MEDIA.holdGlow;
 
 /** A rounded-rect outline that starts at top-center and runs clockwise, and
  *  its exact length (for the dash). */

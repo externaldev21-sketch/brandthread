@@ -49,7 +49,9 @@ describe('quote UI structure', () => {
 
   it('share sheet adds a Quote item only for real (uuid) posts and keeps existing items', () => {
     const src = read('components/ThreadShareSheet.tsx');
-    expect(src).toMatch(/isUUID\(postId\) \? \(\s*<ShareAction\s+label="Quote"/);
+    // The approved share grid moves Quote into More, preserving its UUID gate.
+    expect(src).toMatch(/if \(isUUID\(postId\)\) \{\s*options\.push\(\{ text: 'Quote'/);
+    expect(src).toContain('quotePostHref(postId)');
     for (const label of ['Copy link', 'Messages', 'Email', 'More', 'Report', 'Save video']) {
       expect(src).toContain(`label="${label}"`);
     }

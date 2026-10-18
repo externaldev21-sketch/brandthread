@@ -126,6 +126,10 @@ export const MEDIA = {
   scrim: 'rgba(0,0,0,0.55)',
   backdrop: '#000000',
   onFg: '#000000',
+  holdRing: 'rgba(255, 255, 255, 0.96)',
+  holdGlow: 'rgba(226, 232, 240, 0.32)',
+  softWhite: 'rgba(255, 255, 255, 0.16)',
+  pickerScrim: 'rgba(0,0,0,0.55)',
   metal: {
     mid: '#B8B8B8',
     highlight: '#F2F2F2',

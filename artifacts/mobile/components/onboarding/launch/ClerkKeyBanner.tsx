@@ -6,6 +6,7 @@
  * and never shows any part of a key.
  */
 import React, { useEffect, useState } from 'react';
+import { MEDIA } from '@/lib/theme';
 import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { serviceRequest } from '@/lib/serviceConfig';
@@ -27,7 +28,7 @@ export function ClerkKeyBanner({ forceInvalid = false }: { forceInvalid?: boolea
   if (!__DEV__ || !(invalid || forceInvalid)) return null;
   return (
     <View testID="clerk-key-invalid-banner" accessibilityRole="alert" style={s.banner}>
-      <Feather name="alert-triangle" size={16} color="#000000" />
+      <Feather name="alert-triangle" size={16} color={MEDIA.background} />
       <Text style={s.text}>
         <Text style={s.bold}>Dev only: Clerk rejected CLERK_SECRET_KEY (clerk_key_invalid).</Text>
         {' '}Sign-up and log-in won’t work. Paste the Secret key from the same Clerk instance as the publishable key (sk_test_ with pk_test_, sk_live_ with pk_live_) into the server env and restart.
@@ -41,6 +42,6 @@ const s = StyleSheet.create({
     flexDirection: 'row', gap: 10, alignItems: 'flex-start',
     backgroundColor: '#FFD580', marginHorizontal: 16, marginBottom: 8, padding: 12, borderRadius: 8,
   },
-  text: { flex: 1, color: '#000000', fontSize: 13, lineHeight: 18 },
+  text: { flex: 1, color: MEDIA.background, fontSize: 13, lineHeight: 18 },
   bold: { fontWeight: '700' },
 });

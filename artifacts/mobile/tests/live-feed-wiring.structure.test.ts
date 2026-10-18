@@ -38,12 +38,12 @@ describe('LIVE route', () => {
     for (const piece of ['<LiveHostRow', '<LiveTopRight', '<LiveChatList', '<LiveProductCard', '<LiveRail', '<LiveHeartLayer', '<LiveChatInput', '<LiveRtcVideo']) {
       expect(live).toContain(piece);
     }
-    expect(overlays).toContain('placeholder="Add comment..."');
+    expect(overlays).toContain('placeholder="Say something..."');
     expect(overlays).toContain('Follow');
     expect(overlays).toContain('LIVE');
-    // Chat shows only the last ~5 messages, fading upward.
+    // Chat bounds visible rows and animates each arriving message.
     expect(overlays).toContain('messages.slice(-LIVE_CHAT_VISIBLE)');
-    expect(overlays).toContain('const FADE = [');
+    expect(overlays).toContain('opacity: enter');
   });
 
   it('Buy opens the existing Shop sheet; the bag opens the product list', () => {

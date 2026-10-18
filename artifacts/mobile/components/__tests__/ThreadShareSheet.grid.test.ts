@@ -60,7 +60,8 @@ describe('Share sheet grid (#34, #35)', () => {
 
   it('keeps a Repost slot first in the people row', () => {
     const row = source.indexOf('thread-share-row-people');
-    expect(source.indexOf("label={reposted ? 'Reposted' : 'Repost'}", row)).toBeGreaterThan(row);
-    expect(source.indexOf("label={reposted ? 'Reposted' : 'Repost'}", row)).toBeLessThan(source.indexOf('friends.map', row));
+    expect(row).toBeGreaterThan(-1);
+    expect(source.indexOf("label={reposted ? 'Remove repost' : 'Repost'}", row)).toBeGreaterThan(row);
+    expect(source.indexOf("label={reposted ? 'Remove repost' : 'Repost'}", row)).toBeLessThan(source.indexOf('friends.map', row));
   });
 });

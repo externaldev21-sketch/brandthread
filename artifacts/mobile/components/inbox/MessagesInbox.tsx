@@ -459,19 +459,21 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       const others = rows.filter(r => !r.isMe);
       const mine = rows.find(r => r.isMe);
       setMyStoryId(mine?.storyIds?.[mine.storyIds.length - 1] ?? null);
-      setStoryTrayRows(others.map(r => ({
+      setStoryTrayRows(prev => keepIfSame(prev, others.map(r => ({
         authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
         color: r.authorColor, avatarUri: r.avatarUrl ?? undefined,
         storyId: r.storyIds[r.storyIds.length - 1] ?? null, storyIds: [...r.storyIds].reverse(), seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
-      })));
+      }))));
       // Resolve the real (media-bearing) Story objects so the viewer — which
       // reads its queue purely from local storage — can actually show them.
       const fetches: Promise<Story[]>[] = [];
       if (mine) fetches.push(api.social.myStories().catch(() => []) as Promise<Story[]>);
       for (const o of others) fetches.push(api.social.storiesForUser(o.authorId).catch(() => []) as Promise<Story[]>);
       const fetched = (await Promise.all(fetches)).flat();
+      if (accountRef.current !== userId) return;
       if (fetched.length) cacheStoriesForViewer(fetched).catch(() => {});
     } catch {
+      if (accountRef.current !== userId) return;
       if (isPreviewStoriesEnabled()) {
         setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
           authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
@@ -483,10 +485,9 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
           PREVIEW_MY_STORY,
           ...getPreviewStoryTrayRows().map(r => getPreviewStoryFor(r.authorId)).filter((s): s is Story => !!s),
         ]).catch(() => {});
-      } else {
-        setStoryTrayRows([]);
-        setMyStoryId(null);
       }
+      // A failed refresh must not erase this account's cached story tray.
+      // Account switches are reset by the owner-scoped state above.
     }
   }, [userId, api, isPreviewSession, sellerFreshPreview]);
 

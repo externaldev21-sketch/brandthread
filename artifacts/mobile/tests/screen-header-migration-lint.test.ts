@@ -122,6 +122,8 @@ function rendersModal(source: string): boolean {
 // 01Cdzzzi (s-v) are migrating these onto ScreenHeader — delete a file's line
 // here in the same change that migrates it.
 const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
+  'app/onboarding.tsx', // Approved LaunchFrame owns the per-question back/progress header.
+  'app/seller-live-summary.tsx', // Approved end-of-show hero and Done footer, not a page-title header.
   // The approved Bag redesign uses its shared BagHeader, not ScreenHeader.
   'app/(buyer)/cart.tsx',
   'app/(buyer)/discover-feed.tsx',
@@ -140,7 +142,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/automation.tsx', // redirect-only route
   // Renders the shared components/chat/ConversationThread.tsx (own chat header).
   'app/buyer-conversation.tsx',
-  'app/buyer-live.tsx',
   'app/buyer-product-detail.tsx',
   'app/buyer-story-create.tsx',
   'app/buyer-story-viewer.tsx',
@@ -153,7 +154,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   // Editor chrome copied from Linktree's design editor: back, undo/redo, Cancel + Save.
   'app/store-design.tsx',
   'app/forgot-password.tsx',
-  'app/live-feed.tsx',
   'app/live.tsx',
   'app/manufacturer.tsx',
   'app/privacy.tsx',

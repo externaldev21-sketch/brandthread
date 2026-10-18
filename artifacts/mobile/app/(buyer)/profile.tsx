@@ -113,18 +113,15 @@ import { WrappedProfileCard } from '@/components/closet/WrappedProfileCard';
 const PREVIEW_NAME = 'Ava Buyer';
 const PREVIEW_HANDLE = '@ava';
 
-const TABS = ['Posts', 'Reposts', 'Closet', 'Tagged', 'Saved', 'Liked', 'Orders'] as const;
-type Tab = typeof TABS[number];
+const TABS = ['Posts', 'Reposts', 'Saved', 'Liked'] as const;
+// Existing Closet, Tagged and Orders views remain reachable outside the tab strip.
+type Tab = typeof TABS[number] | 'Closet' | 'Tagged' | 'Orders';
 
 const TAB_ITEMS: ProfileTab[] = [
   { key: 'Posts', label: 'Posts', icon: 'grid' },
   { key: 'Reposts', label: 'Reposts', icon: 'repeat' },
-  // Digital Closet: every delivered piece, plus outfits built from them.
-  { key: 'Closet', label: 'Closet', icon: 'layers' },
-  { key: 'Tagged', label: 'Tagged', icon: 'tag' },
   { key: 'Saved', label: 'Saved', icon: 'bookmark' },
   { key: 'Liked', label: 'Liked', icon: 'heart' },
-  { key: 'Orders', label: 'Orders', icon: 'package' },
 ];
 
 function savedTypeIcon(type: string): IconName {
@@ -503,13 +500,15 @@ export default function ProfileScreen() {
   const listRef = useRef<FlatList<ListRow> | null>(null);
   // Banner mode: at rest at the top, the banner runs up behind the status bar.
   const [bannerCoversTop, setBannerCoversTop] = useState(true);
+  const [profileStickyVisible, setProfileStickyVisible] = useState(false);
   const handleScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
     scrollYRef.current = event.nativeEvent.contentOffset.y;
+    setProfileStickyVisible(event.nativeEvent.contentOffset.y > topPad + PROFILE_STICKY_HEADER_HEIGHT);
     const next = event.nativeEvent.contentOffset.y < Math.max(heroHeight, 1);
     setHeroOnScreen((prev) => (prev === next ? prev : next));
     const covers = bannerCoversStatusBar(event.nativeEvent.contentOffset.y);
     setBannerCoversTop((prev) => (prev === covers ? prev : covers));
-  }, [heroHeight]);
+  }, [heroHeight, topPad]);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -1042,7 +1041,15 @@ export default function ProfileScreen() {
       ) : null}
 
       <View style={styles.tabsBlock}>
-        <ProfileTabs tabs={TAB_ITEMS} active={activeTab} onChange={handleTabPress} />
+        <ProfileTabs
+          tabs={TAB_ITEMS.map(tab => ({
+            ...tab,
+            count: tab.key === 'Posts' ? publishedPosts.length : tab.key === 'Saved' ? savedItems.length : undefined,
+          }))}
+          variant="labeled"
+          active={activeTab}
+          onChange={handleTabPress}
+        />
       </View>
       {activeTab === 'Closet' && closetPieces.length > 0 ? (
         <ClosetSubBar
@@ -1090,6 +1097,7 @@ export default function ProfileScreen() {
             action={emptyAction}
             actionStyle="text"
             alignTop={activeTab === 'Posts'}
+            quiet
           />
         )}
         showsVerticalScrollIndicator={false}
@@ -1100,6 +1108,11 @@ export default function ProfileScreen() {
         onRefresh={onRefresh}
       />
       </ProfileEmptyAreaContext.Provider>
+      <ProfileStickyHeader
+        visible={profileStickyVisible && focused}
+        topPad={topPad}
+        title={displayHandle ? `@${displayHandle.replace(/^@/, '')}` : displayName}
+      />
 
       <ClosetProofCard
         piece={proofPiece}
@@ -1137,7 +1150,11 @@ export default function ProfileScreen() {
           onViewAsVisitor: caps.showViewAsVisitor && user?.id
             ? () => router.push(viewAsVisitorHref('buyer', user.id) as never)
             : null,
-        })}
+        }).concat([
+          { key: 'orders', label: 'Orders', icon: 'package', onPress: () => router.push('/buyer-orders' as never) },
+          { key: 'closet', label: 'Closet', icon: 'layers', onPress: () => router.push('/closet' as never) },
+          { key: 'tagged', label: 'Tagged posts', icon: 'tag', onPress: () => handleTabPress('Tagged') },
+        ])}
       />
 
       <ShareProfileSheet

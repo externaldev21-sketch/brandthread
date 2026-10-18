@@ -39,7 +39,7 @@ import { useApi } from '@/hooks/useApi';
 import { getHandle } from '@/lib/accountSwitcherHelpers';
 import { isBuyerDevPreview, isSellerDevPreview, setDevWebPreviewRole } from '@/lib/devPreview';
 import { pickNextAccount } from '@/lib/holdToSwitch';
-import { FONT } from '@/lib/theme';
+import { FONT, MEDIA } from '@/lib/theme';
 
 type QuickSwitchContextValue = {
   /** Run on a completed hold: switch to the next account, or open the sheet. */
@@ -200,11 +200,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: MEDIA.softWhite,
     maxWidth: 280,
   },
   avatar: { width: 26, height: 26, borderRadius: 13 },
-  avatarFallback: { backgroundColor: 'rgba(255, 255, 255, 0.16)', alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 12 },
-  handle: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 14 },
+  avatarFallback: { backgroundColor: MEDIA.softWhite, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { color: MEDIA.foreground, fontFamily: FONT.bold, fontSize: 12 },
+  handle: { color: MEDIA.foreground, fontFamily: FONT.semibold, fontSize: 14 },
 });

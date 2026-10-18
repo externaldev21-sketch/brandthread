@@ -7,6 +7,7 @@
  *         https://mobbin.com/screens/29a6cf9e-6c19-46f8-8b27-f387df675e40
  */
 import React from 'react';
+import { MEDIA } from '@/lib/theme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -44,7 +45,7 @@ export function WelcomeScreen({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const signup = mode === 'signup';
-  const band = theme.text.toUpperCase() === '#FFFFFF' ? '#141414' : '#F2F2F2';
+  const band = theme.text.toUpperCase() === MEDIA.foreground ? '#141414' : '#F2F2F2';
   const link = (label: string, route: string) => (
     <Text style={[s.legalLink, { color: theme.text }]} onPress={() => router.push(route as never)} accessibilityRole="link" suppressHighlighting>
       {label}

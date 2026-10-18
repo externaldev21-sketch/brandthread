@@ -23,6 +23,7 @@
  *                       https://mobbin.com/screens/f10440c9-2c15-407c-a8ba-fe2f23d4323e
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { MEDIA } from '@/lib/theme';
 import {
   ActivityIndicator,
   Image,
@@ -208,8 +209,8 @@ export function PhotoScreen({
   const insets = useSafeAreaInsets();
   const [sheet, setSheet] = useState(false);
   const [pickError, setPickError] = useState('');
-  const placeholderBg = theme.text.toUpperCase() === '#FFFFFF' ? '#2A2A2C' : '#D6DBE1';
-  const placeholderFg = theme.text.toUpperCase() === '#FFFFFF' ? '#5A5A5E' : '#F4F5F7';
+  const placeholderBg = theme.text.toUpperCase() === MEDIA.foreground ? '#2A2A2C' : '#D6DBE1';
+  const placeholderFg = theme.text.toUpperCase() === MEDIA.foreground ? '#5A5A5E' : '#F4F5F7';
 
   async function pick(source: 'library' | 'camera') {
     setSheet(false);
@@ -359,7 +360,7 @@ export function BrandsScreen({
   const q = query.trim().toLowerCase();
   const rest = brands.filter((b) => !picked.has(b.sellerId) && (!q || b.name.toLowerCase().includes(q)));
   const toggle = (b: DiscoverBrand) => onChange(picked.has(b.sellerId) ? selected.filter((x) => x.sellerId !== b.sellerId) : [...selected, b]);
-  const searchBg = theme.text.toUpperCase() === '#FFFFFF' ? '#1C1C1E' : '#F0F0F0';
+  const searchBg = theme.text.toUpperCase() === MEDIA.foreground ? '#1C1C1E' : '#F0F0F0';
 
   return (
     <OnbScreen
@@ -678,7 +679,7 @@ const s = StyleSheet.create({
   avatar: { width: 168, height: 168, borderRadius: 84, overflow: 'hidden', alignItems: 'center' },
   avatarHead: { width: 58, height: 58, borderRadius: 29, marginTop: 30 },
   avatarBody: { width: 120, height: 120, borderRadius: 60, marginTop: 10 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+  backdrop: { flex: 1, backgroundColor: MEDIA.pickerScrim },
   sheet: {
     borderTopLeftRadius: 16, borderTopRightRadius: 16, borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: GUTTER, paddingTop: 8,
