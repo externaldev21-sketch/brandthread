@@ -290,12 +290,13 @@ function AccountThreadShareSheet({
     if (actionInFlightRef.current) return;
     actionInFlightRef.current = true;
     setBusy('repost');
+    // Close before the first-repost education sheet opens.
+    onClose();
     try {
       // Parent owns repost success/error toasts (its handler may catch and
       // report failures itself), so the sheet only closes on resolve.
       await onRepost();
       if (accountRef.current !== owner) return;
-      onClose();
     } catch {
       if (accountRef.current === owner) {
         onFeedback(wasReposted ? "Couldn't remove repost. Try again." : "Couldn't repost. Try again.", 'error');

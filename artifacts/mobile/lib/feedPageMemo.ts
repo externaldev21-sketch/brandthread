@@ -54,6 +54,9 @@ export type SpotlightPageMemoProps = {
   onNotInterested?: unknown;
   onVideoWatched?: unknown;
   onToggleSound?: unknown;
+  onOpenShare?: unknown;
+  onPausedChange?: unknown;
+  onChromeHiddenChange?: unknown;
   reduceMotion?: boolean;
 };
 
@@ -80,6 +83,9 @@ export function spotlightPagePropsEqual(prev: SpotlightPageMemoProps, next: Spot
     && prev.onOpenCreator === next.onOpenCreator
     && prev.onNotInterested === next.onNotInterested
     && prev.onVideoWatched === next.onVideoWatched
+    && prev.onOpenShare === next.onOpenShare
+    && prev.onPausedChange === next.onPausedChange
+    && prev.onChromeHiddenChange === next.onChromeHiddenChange
     && prev.onToggleSound === next.onToggleSound
     && prev.reduceMotion === next.reduceMotion;
 }

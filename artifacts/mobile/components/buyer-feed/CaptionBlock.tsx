@@ -2,12 +2,13 @@ import * as Haptics from 'expo-haptics';
 /**
  * Buyer Threads Home feed — bottom-left info block.
  *
- * Repost identity (when present) → @handle + verified badge → 2-line
- * caption with a "more" expand → sound line. Sized and positioned per
- * Mobbin's TikTok For You references gathered for this rebuild: username
- * ~17pt bold, caption ~14.5pt/2 lines with a bold "more", a small
- * pill-shaped sound row below — see the PR description for the full
- * measurement list.
+ * Repost identity (only when it's true) → name + verified check → 2-line
+ * caption with a "more" expand. No sound line: the sound lives on the
+ * rail's spinning disc, like TikTok. The caller pins `bottom` to one fixed
+ * anchor above the progress line and the block grows upward from it, so it
+ * sits in the same place on every post (video or slideshow) and never
+ * measures itself to position anything. Tight TikTok rhythm (Mobbin,
+ * 390x844): 16/20 name, 4pt, 14/18 caption.
  *
  * `topSlot` (resting-pill redesign): the Shop tag pill (components/
  * buyer-feed/ShopSideTab.tsx's `ShopTagPill`) renders here again — back at
@@ -57,8 +58,8 @@ export interface RepostFriend {
 export const CAPTION_BLOCK_HEIGHT = 56;
 // Captions show 2 lines; longer ones get "more"/"less" (TikTok, Mobbin watch-1/2).
 // ~43 characters fill one line of this block on a 390pt phone.
-import { CAPTION_LINES, captionNeedsMore } from './captionLayout';
-export { captionNeedsMore } from './captionLayout';
+import { captionNeedsMore, clampCaption } from './captionClamp';
+export { captionNeedsMore } from './captionClamp';
 export const CAPTION_BLOCK_HEIGHT_WITH_REPOST = 92;
 
 /**
@@ -71,49 +72,22 @@ export const CAPTION_BLOCK_HEIGHT_WITH_REPOST = 92;
  * Before the first layout, a character heuristic decides overflow.
  */
 export function CollapsibleCaption({ text, productMentions, onProductMention, expanded, onToggle, onLayout }: {
-  text: string;
-  productMentions?: PostProductMention[];
-  onProductMention?: (mention: PostProductMention) => void;
-  expanded: boolean;
-  onToggle: () => void;
-  onLayout?: (event: LayoutChangeEvent) => void;
+ text: string; productMentions?: PostProductMention[]; onProductMention?: (mention: PostProductMention) => void;
+ expanded: boolean; onToggle: () => void; onLayout?: (event: LayoutChangeEvent) => void;
 }) {
-  const [lines, setLines] = React.useState<string[] | null>(null);
-  React.useEffect(() => { setLines(null); }, [text]);
-  const overflow = lines ? lines.length > CAPTION_LINES : captionNeedsMore(text);
-  const first = lines && lines.length > CAPTION_LINES ? lines[0] : null;
-  const rest = first != null ? text.slice(first.length) : null;
-  const spans = (t: string) => <CaptionSpans text={t} productMentions={productMentions} onProductMention={onProductMention} />;
-  const toggle = (label: string) => (
-    <Text onPress={onToggle} style={styles.moreText} suppressHighlighting accessibilityRole="button"
-      accessibilityLabel={expanded ? 'Collapse caption' : 'Expand caption'} testID="caption-more">{label}</Text>
-  );
-  return (
-    <View style={styles.captionWrap} testID="caption-text" onLayout={onLayout}>
-      <View style={styles.captionMeasure} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Text style={styles.caption} onTextLayout={(e) => setLines(e.nativeEvent.lines.map(l => l.text))}
-          testID="caption-measure">{text}</Text>
-      </View>
-      {!overflow ? (
-        <Text style={styles.caption}>{spans(text)}</Text>
-      ) : expanded ? (
-        <Text style={styles.caption}>{spans(text)} {toggle('less')}</Text>
-      ) : first != null && rest != null ? (
-        <>
-          <Text style={[styles.caption, styles.captionLine]} numberOfLines={1}>{spans(first)}</Text>
-          <View style={styles.captionLastRow}>
-            <Text style={[styles.caption, styles.captionLine, styles.captionRest]} numberOfLines={1} ellipsizeMode="tail">{spans(rest)}</Text>
-            {toggle('more')}
-          </View>
-        </>
-      ) : (
-        <View style={styles.captionLastRow}>
-          <Text style={[styles.caption, styles.captionLine, styles.captionRest]} numberOfLines={CAPTION_LINES} ellipsizeMode="tail">{spans(text)}</Text>
-          {toggle('more')}
-        </View>
-      )}
-    </View>
-  );
+ const more = captionNeedsMore(text);
+ return <View style={styles.captionWrap} testID="caption-text" onLayout={onLayout}>
+  <Text style={styles.caption} numberOfLines={expanded ? undefined : 2}>
+   <CaptionSpans text={expanded ? text : clampCaption(text)} productMentions={productMentions} onProductMention={onProductMention} />
+   {more && <Text onPress={onToggle} style={styles.moreText} accessibilityRole="button" accessibilityLabel={expanded ? 'Collapse caption' : 'Expand caption'} testID="caption-more">{expanded ? ' less' : '… more'}</Text>}
+  </Text>
+ </View>;
+}
+function creditText(label: string): string { return label.replace(/^(?:videos?|photos?):\s*/i, '').replace(/^via\s+/i, '').trim(); }
+function dedupeCreditCaption(caption: string, label?: string): string {
+ if (!label) return caption;
+ const normalize = (v: string) => creditText(v).replace(/^@/, '').toLowerCase();
+ return caption.split('\n').filter(line => normalize(line) !== normalize(label) && !/^\s*(?:via\s+)?(?:photographer\s+)?unknown(?:\s+creator)?\s*$/i.test(line)).join('\n').trim();
 }
 
 export function CaptionBlock({
@@ -142,11 +116,11 @@ export function CaptionBlock({
   creator: string;
   verified: boolean;
   caption: string;
-  sound: string;
-  soundOn: boolean;
+  sound?: string;
+  soundOn?: boolean;
   /** "Remix of @handle" — credits the original video under the creator name. */
   remixCredit?: string | null;
-  onToggleSound: () => void;
+  onToggleSound?: () => void;
   friendReposts: RepostFriend[];
   /** The viewer's own identity is safe; other avatars remain friend-authorized. */
   selfRepost?: { avatarUri?: string; name?: string };
@@ -204,11 +178,11 @@ export function CaptionBlock({
     onHeightChange?.(e.nativeEvent.layout.height);
   };
   // Pads each control's real tap area up to 44x44 without changing its
-  // visual footprint — see useHitAreaBoost's doc comment. `soundHit` and
-  // `repostHit` apply to controls with a painted pill background, so their
-  // boost lands on an outer, unstyled wrapper around the unchanged visual
-  // pill rather than on the pill itself (growing padding on the pill's own
-  // style would visibly enlarge the pill).
+  // visual footprint — see useHitAreaBoost's doc comment. `repostHit`
+  // applies to a control with a painted pill background, so its boost lands
+  // on an outer, unstyled wrapper around the unchanged visual pill rather
+  // than on the pill itself (growing padding on the pill's own style would
+  // visibly enlarge the pill).
   const repostHit = useHitAreaBoost();
   const creatorHit = useHitAreaBoost();
   const soundHit = useHitAreaBoost();
@@ -216,11 +190,13 @@ export function CaptionBlock({
   const repostPeople: RepostFriend[] = selfRepost
     ? [{ userId: 'viewer', displayName: selfRepost.name ?? 'You', avatarUrl: selfRepost.avatarUri }, ...friendReposts]
     : friendReposts;
+  const visibleCredit = credit && credit.label.trim() && !/\bunknown\b/i.test(credit.label) ? { ...credit, label: `via ${creditText(credit.label)}` } : undefined;
   return (
     <Animated.View
-      style={[styles.root, hasRepostIdentity && styles.rootWithRepost, style]}
+      style={[styles.root, style]}
       pointerEvents="box-none"
       onLayout={handleLayout}
+      testID="caption-block"
     >
       {!!topSlot && <View style={styles.topSlotWrap}>{topSlot}</View>}
       {hasRepostIdentity && (
@@ -270,8 +246,8 @@ export function CaptionBlock({
       )}
 
       <TouchableOpacity
-        style={[creatorHit.boostStyle, styles.leftAligned]}
-        onLayout={creatorHit.onLayout}
+        style={styles.leftAligned}
+        hitSlop={8}
         activeOpacity={0.8}
         onPress={() => {  onOpenCreator(); }}
         onPressIn={onPressInCreator}
@@ -285,7 +261,6 @@ export function CaptionBlock({
               clip's silver dress). The same text shadow as the rest of
               this block keeps it legible on light and dark video alike. */}
           {verified && <VerifiedBadge onMedia style={[styles.iconTextShadow, { marginLeft: 4 }]} />}
-          {official && <Text style={styles.sponsoredLabel} accessibilityLabel="Official Brandthread account" testID="caption-official-badge">Official</Text>}
           {sponsored && <Text style={styles.sponsoredLabel} accessibilityLabel="Sponsored">Sponsored</Text>}
         </View>
       </TouchableOpacity>
@@ -301,7 +276,7 @@ export function CaptionBlock({
       )}
 
       <CollapsibleCaption
-        text={translation.text}
+        text={official ? dedupeCreditCaption(translation.text, credit?.label) : translation.text}
         productMentions={translation.text === caption ? productMentions : []}
         onProductMention={onProductMention}
         expanded={captionExpanded}
@@ -314,42 +289,21 @@ export function CaptionBlock({
 
       <TranslationLink translation={translation} style={styles.translationLink} />
       {!!belowCaptionSlot && <View style={styles.belowCaptionWrap}>{belowCaptionSlot}</View>}
-      {credit ? (
+      {visibleCredit ? (
         <TouchableOpacity
-          onPress={credit.onPress}
-          disabled={!credit.onPress}
+          onPress={visibleCredit.onPress}
+          disabled={!visibleCredit.onPress}
           activeOpacity={0.7}
           hitSlop={{ top: 6, bottom: 6 }}
-          accessibilityRole={credit.onPress ? 'link' : 'text'}
-          accessibilityLabel={credit.onPress ? `${credit.label}. Opens their profile` : credit.label}
+          accessibilityRole={visibleCredit.onPress ? 'link' : 'text'}
+          accessibilityLabel={visibleCredit.onPress ? `${visibleCredit.label}. Opens their profile` : visibleCredit.label}
           testID="caption-credit"
         >
-          <Text style={[styles.credit, credit.onPress && styles.creditLink]} numberOfLines={1}>{credit.label}</Text>
+          <Text style={styles.credit} numberOfLines={1}>{visibleCredit.label}</Text>
         </TouchableOpacity>
       ) : null}
 
-      <TouchableOpacity
-        style={soundHit.boostStyle}
-        onLayout={soundHit.onLayout}
-        onPress={onToggleSound}
-        activeOpacity={0.75}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityRole="button"
-        accessibilityLabel={soundOn ? 'Mute sound' : 'Unmute sound'}
-        accessibilityState={{ checked: soundOn }}
-      >
-        <View style={styles.soundRow}>
-          <Icon name="music" size={12} color={`${ON_DARK}E6`} style={styles.iconTextShadow} />
-          <SoundMarquee
-            text={sound}
-            active={soundActive}
-            reduceMotion={reduceMotion}
-            textStyle={styles.soundText}
-            // Pill padding (9 + 9), the note glyph (12) and its gap (6).
-            maxWidth={Math.max(0, blockWidth - 36)}
-          />
-        </View>
-      </TouchableOpacity>
+
     </Animated.View>
   );
 }
@@ -367,7 +321,7 @@ const styles = StyleSheet.create({
   // maxWidth 75% (less-AI pass, V3): the stack never runs under the right
   // action rail, whatever the screen width.
   root: {
-    position: 'absolute', left: 16, right: 84, maxWidth: '75%', bottom: 26, minHeight: CAPTION_BLOCK_HEIGHT,
+    position: 'absolute', left: 16, right: 84, maxWidth: '75%', bottom: 26,
     justifyContent: 'flex-end',
   },
   // useHitAreaBoost centers a boosted control's content (alignItems:
@@ -375,7 +329,7 @@ const styles = StyleSheet.create({
   // name and a short caption to the middle of the stack on web. These rows
   // must stay left-aligned like the rest of the stack.
   leftAligned: { alignItems: 'stretch' },
-  rootWithRepost: { minHeight: CAPTION_BLOCK_HEIGHT_WITH_REPOST },
+  rootWithRepost: {},
   // 8px gap above the creator name (or repost row) below it — see the
   // module comment's `topSlot` note.
   topSlotWrap: { marginBottom: 8 },
@@ -397,13 +351,13 @@ const styles = StyleSheet.create({
   // alignSelf: 'stretch' — useHitAreaBoost centres its child when it pads a
   // short tap target, which centred the name and let a long one spill past
   // both screen edges; stretching keeps it left-aligned and ellipsized.
-  creatorRow: { alignSelf: 'stretch', minHeight: 30, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  creatorRow: { alignSelf: 'stretch', minHeight: 20, marginBottom: 4, flexDirection: 'row', alignItems: 'center', gap: 7 },
   // Shared legibility shadow for every text overlay in this block (name,
   // caption, sound) plus the verified badge glyph — strong enough to hold
   // up against a bright/high-key clip (e.g. Maison Vela's silver dress),
   // where the old, lighter shadow washed out to nearly nothing.
   creatorName: {
-    fontSize: 16, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
+    fontSize: 16, lineHeight: 20, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   sponsoredLabel: {
@@ -418,8 +372,8 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   caption: {
-    fontSize: 15, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 0,
-    lineHeight: 19, letterSpacing: 0.1,
+    fontSize: 14, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 0,
+    lineHeight: 18, letterSpacing: 0.1,
     // ~38 characters a line at 14pt — a comfortable reading measure.
     maxWidth: 280,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
@@ -436,7 +390,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   credit: {
-    fontSize: 12.5, fontFamily: FONT.medium, color: `${ON_DARK}CC`, marginTop: -2, marginBottom: 8,
+    fontSize: 13, fontFamily: FONT.regular, color: `${ON_DARK}CC`, marginTop: -2, marginBottom: 8,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   creditLink: { fontFamily: FONT.semibold, color: ON_DARK },

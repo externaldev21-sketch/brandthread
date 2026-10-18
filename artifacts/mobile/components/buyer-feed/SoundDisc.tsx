@@ -35,8 +35,8 @@ export function SoundDisc({ avatarUri, avatarSource, initials, sound, spinning, 
   }, [spin, rot]);
   const aStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${rot.value}deg` }] }));
   return (
-    <Pressable onPress={onPress} hitSlop={6} style={styles.hit} accessibilityRole="button"
-      accessibilityLabel={`Sound: ${sound}. ${soundOn ? 'Mute' : 'Unmute'}`} accessibilityState={{ checked: soundOn }} testID={testID}>
+    <View style={styles.hit} accessible accessibilityRole="image"
+      accessibilityLabel={`Sound: ${sound}`} testID={testID}>
       <Animated.View style={[styles.disc, aStyle]}>
         <View style={styles.inner}>
           {avatarSource ? <CachedImage source={avatarSource} style={styles.fill} contentFit="cover" />
@@ -44,12 +44,12 @@ export function SoundDisc({ avatarUri, avatarSource, initials, sound, spinning, 
             : <Text style={styles.initials}>{initials.slice(0, 2)}</Text>}
         </View>
       </Animated.View>
-    </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  hit: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  hit: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   disc: {
     width: SOUND_DISC_SIZE, height: SOUND_DISC_SIZE, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#1C1C1E', borderWidth: 6, borderColor: '#2C2C2E',

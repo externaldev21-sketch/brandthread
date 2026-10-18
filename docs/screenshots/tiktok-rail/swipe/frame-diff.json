@@ -1,0 +1,454 @@
+{
+  "frames": 193,
+  "framesWithRail": 193,
+  "maxShiftPt": 0,
+  "reference": {
+    "avatar": {
+      "x": 336,
+      "y": 373,
+      "w": 48,
+      "h": 48
+    },
+    "like": {
+      "x": 336,
+      "y": 446,
+      "w": 48,
+      "h": 48
+    },
+    "comment": {
+      "x": 336,
+      "y": 511,
+      "w": 48,
+      "h": 48
+    },
+    "save": {
+      "x": 336,
+      "y": 576,
+      "w": 48,
+      "h": 48
+    },
+    "share": {
+      "x": 336,
+      "y": 641,
+      "w": 48,
+      "h": 48
+    },
+    "disc": {
+      "x": 336,
+      "y": 706,
+      "w": 48,
+      "h": 40
+    },
+    "caption": {
+      "x": 12,
+      "y": 668,
+      "w": 298,
+      "h": 84
+    },
+    "tabbar": {
+      "x": 0,
+      "y": 762,
+      "w": 390,
+      "h": 58
+    },
+    "progress": {
+      "x": 16,
+      "y": 758,
+      "w": 358,
+      "h": 2
+    },
+    "captionText": {
+      "x": 12,
+      "y": 734,
+      "w": 251,
+      "h": 18
+    }
+  },
+  "posts": [
+    "preview-fashion-01",
+    "preview-fashion-02",
+    "preview-fashion-03",
+    "preview-fashion-04",
+    "preview-fashion-05",
+    "preview-fashion-06",
+    "preview-fashion-07",
+    "preview-fashion-08",
+    "preview-fashion-09",
+    "preview-fashion-10",
+    "post_demo_slideshow",
+    "post_demo_photo",
+    "post_demo_buyer",
+    "post_demo_4",
+    "post_demo_5",
+    "preview-fashion-01__loop1",
+    "preview-fashion-02__loop1",
+    "preview-fashion-03__loop1"
+  ],
+  "glyphPixelCheck": {
+    "framesChecked": 40,
+    "worstShareOfGlyphPixelsUnchanged": 1.0,
+    "method": "white glyph pixels of Like/Comment/Save/Share in the first saved frame; share of them still white in every other saved frame (mid-scroll and settled)"
+  },
+  "perFrame": [
+    [
+      "123-preview-fashion-10-scroll1.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "125-post_demo_slideshow-scroll3.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "127-post_demo_slideshow-scroll5.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "129-post_demo_slideshow-scroll7.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "130-post_demo_slideshow-settled.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "132-post_demo_slideshow-scroll1.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "134-post_demo_photo-scroll3.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "136-post_demo_photo-scroll5.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "138-post_demo_photo-scroll7.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "139-post_demo_photo-settled.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "141-post_demo_photo-scroll1.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "143-post_demo_buyer-scroll3.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "145-post_demo_buyer-scroll5.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "147-post_demo_buyer-scroll7.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "148-post_demo_buyer-settled.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "150-post_demo_buyer-scroll1.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "152-post_demo_4-scroll3.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "154-post_demo_4-scroll5.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "156-post_demo_4-scroll7.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "157-post_demo_4-settled.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "159-post_demo_4-scroll1.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "161-post_demo_5-scroll3.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "163-post_demo_5-scroll5.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "165-post_demo_5-scroll7.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "166-post_demo_5-settled.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "168-post_demo_5-scroll1.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "170-preview-fashion-01__loop1-scroll3.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "172-preview-fashion-01__loop1-scroll5.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "174-preview-fashion-01__loop1-scroll7.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "175-preview-fashion-01__loop1-settled.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "177-preview-fashion-01__loop1-scroll1.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "179-preview-fashion-02__loop1-scroll3.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "181-preview-fashion-02__loop1-scroll5.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "183-preview-fashion-02__loop1-scroll7.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "184-preview-fashion-02__loop1-settled.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "186-preview-fashion-02__loop1-scroll1.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "188-preview-fashion-03__loop1-scroll3.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "190-preview-fashion-03__loop1-scroll5.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "192-preview-fashion-03__loop1-scroll7.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ],
+    [
+      "193-preview-fashion-03__loop1-settled.png",
+      {
+        "like": 1.0,
+        "comment": 1.0,
+        "save": 1.0,
+        "share": 1.0
+      }
+    ]
+  ]
+}

@@ -125,7 +125,7 @@ import { ThreadCommentsSheet } from '@/app/buyer-post-comments';
 
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 
-import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useBuyerTabBarInset, useBuyerTabBarMetrics, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 import { Sheet } from '@/components/ui/BottomSheet';
 
@@ -140,7 +140,9 @@ import { getVideoFeedPage, loadExactCreatorVideoReplay, loadVideoFeedThrough } f
 
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 
-import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
+import { RAIL_RIGHT, RAIL_DISC_TO_PROGRESS, RightActionRail } from '@/components/buyer-feed/RightActionRail';
+import { PausedPlayIcon } from '@/components/buyer-feed/PausedPlayIcon';
+import { useFeedSound } from '@/hooks/useFeedSound';
 import { TapHeartBurst } from '@/components/buyer-feed/TapHeartBurst';
 import { persistPostAction, postActionPending, subscribePostEngagement } from '@/lib/postEngagement';
 
@@ -226,7 +228,9 @@ const THREAD_PAGE_SIZE = 30;
 //     sound row) — see the PR description for the exact numbers; this was
 //     tuned from the code's own layout constants, not a rendered screen.
 //   - CAPTION_BOTTOM_GAP: >=12pt from the sound line to the bar's top.
-const CAPTION_BOTTOM_GAP = 10;
+const CAPTION_BOTTOM_GAP = 8;
+const SCRUB_TAB_GAP = 7;
+const PROGRESS_LINE_HEIGHT = 2;
 // Less-AI pass (V1): the rail's bottom is aligned to the caption block's
 // last line — the share count's baseline sits on the sound line's baseline
 // (TikTok For You, Mobbin:
@@ -555,7 +559,6 @@ function mentionShopTarget(item: SpotlightItem, mention: PostProductMention): [S
   return [{ ...item, productTags: [tag] }, tag];
 }
 
-const SOUND_PREF_KEY = 'bt:feed-sound-on:v1';
 
 // Demo clips are fetched on demand from public/demo-media (or a CDN), never
 // bundled into the app — see lib/demoMedia.ts.
@@ -1141,12 +1144,12 @@ function formatPlaybackTime(totalSeconds: number): string {
  * bottom-left caption/sound stack, passed in by the caller, which already
  * knows CaptionBlock's real height). A fixed offset is how this bug
  * happened in the first place: the bubble used to hug the thumb at a
- * hand-picked `bottom: 22`, which put it squarely behind CaptionBlock's
- * sound/mute pill (CaptionBlock renders after this bar, so it painted on
- * top) whenever a drag showed the bubble. Deriving the clearance from
- * CaptionBlock's actual exported height (`CAPTION_BLOCK_HEIGHT`/
- * `_WITH_REPOST`, see components/buyer-feed/CaptionBlock.tsx) instead of a
- * second hand-tuned number means the two can't drift apart again. */
+ * hand-picked `bottom: 22`, which put it squarely behind the caption block
+ * (CaptionBlock renders after this bar, so it painted on top) whenever a
+ * drag showed the bubble. Deriving the clearance from CaptionBlock's real
+ * height instead of a second hand-tuned number means the two can't drift
+ * apart. (Only this drag bubble uses the measured height; the caption and
+ * rail positions are fixed constants.) */
 function ScrubProgressBar({
   player, progress, bottom, chromeTop, externallyPaused = false, onScrubbingChange,
 }: {
@@ -1635,8 +1638,9 @@ function LiveVideoVisual({
           nativeControls={false}
           onFirstFrameRender={() => setFirstFrameRendered(true)}
         />
-        <Animated.View style={[styles.pauseOverlay, { opacity: pauseOverlayOpacity }]} pointerEvents="none" testID="feed-pause-glyph">
-          <FontAwesome name="play" size={72} color={ON_DARK} style={styles.pauseGlyph} />
+        {/* Stays up for as long as the video is paused, gone on resume. */}
+        <Animated.View style={[styles.pauseOverlay, { opacity: pauseOverlayOpacity }]} pointerEvents="none" testID="feed-paused-icon">
+          <PausedPlayIcon />
         </Animated.View>
       </View>
       {captions && isActive ? (
@@ -1706,7 +1710,7 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange, onFirstImagePa
 // presentational components to them below.
 
 function SpotlightPageImpl({
-  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, headerClearance = 0, videoFrameInset, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, onVideoWatched, soundOn, onToggleSound, onFirstFramePainted, reduceMotion = false,
+  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, headerClearance = 0, videoFrameInset, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, onVideoWatched, soundOn, onPausedChange, onChromeHiddenChange, onOpenShare, onFirstFramePainted, reduceMotion = false,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -1720,6 +1724,8 @@ function SpotlightPageImpl({
   isFirstItem?: boolean;
   pageWidth: number;
   pageHeight: number;
+  /** The progress line's distance from the page bottom — the one fixed
+   *  anchor the scrubber and caption hang off (see SCRUB_TAB_GAP). */
   bottomClearance: number;
   /** Measured overlay header bottom: clear-mode exit must remain tappable. */
   headerClearance?: number;
@@ -1744,17 +1750,22 @@ function SpotlightPageImpl({
   onOpenCreator: (item: SpotlightItem) => void;
   engagement: EngagementState | undefined;
   onLike: (id: string) => Promise<void>;
-  onDoubleTapLike: (id: string) => void;
   onSave: (id: string) => Promise<void>;
   onRepost: (id: string) => Promise<void>;
   onFollow: (id: string) => Promise<void>;
   onOpenComments: (id: string) => void;
+  onDoubleTapLike: (id: string) => void;
   onShopTag: (item: SpotlightItem, tag: SpotlightProductTag) => void;
   onNotInterested: (id: string, reason?: NotInterestedReason) => void;
   onVideoWatched: (id: string) => void;
-  /** Whether the app-wide feed sound preference is on. */
+  /** Feed sound (always on; on web, on after the first gesture — see useFeedSound). */
   soundOn: boolean;
-  onToggleSound: () => void;
+  /** The rail's animation values — the rail renders once above the pager
+   *  (ThreadRailOverlay), and double-tap-to-like bumps its heart. */
+  onOpenShare: (id: string) => void;
+  /** Tells the feed when the active post is paused, so the rail's disc stops. */
+  onPausedChange?: (id: string, paused: boolean) => void;
+  onChromeHiddenChange?: (id: string, hidden: boolean) => void;
   /** Only passed for the very first feed item — see `VideoVisualProps`. */
   onFirstFramePainted?: () => void;
   /** Gates the follow badge's rotate/color-fill/fade sub-steps. */
@@ -1776,9 +1787,7 @@ function SpotlightPageImpl({
   /** Pause while the buyer is holding down on the left/center of the video — distinct from the tap-to-toggle `paused` above, so releasing always resumes rather than fighting a manual pause. */
   /** 2x while holding the right side of the video. */
   const [speedActive, setSpeedActive] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(false);
-  useEffect(() => { if (!isActive) { setCommentsOpen(false); setShareOpen(false); } }, [isActive]);
+
   const [captionExpanded, setCaptionExpanded] = useState(false);
   useEffect(() => { if (!isActive) setCaptionExpanded(false); }, [isActive]);
   // Shop tag pill's shared expand/collapse state — see ShopSideTab.tsx's
@@ -1865,6 +1874,7 @@ function SpotlightPageImpl({
   const [clearMode, setClearMode] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
   const chromeStyle = clearModeChromeStyle(clearMode || scrubbing);
+  useEffect(() => { if (isActive) onChromeHiddenChange?.(item.id, clearMode || scrubbing); }, [item.id, isActive, clearMode, scrubbing, onChromeHiddenChange]);
   const [photoAutoAdvance, setPhotoAutoAdvance] = usePhotoAutoAdvance();
   const openCreatorRef = useRef(() => onOpenCreator(item));
   openCreatorRef.current = () => onOpenCreator(item);
@@ -1887,6 +1897,9 @@ function SpotlightPageImpl({
   React.useEffect(() => () => {
     if (pauseTimer.current) clearTimeout(pauseTimer.current);
   }, []);
+
+  useEffect(() => { if (!isActive) setPaused(false); }, [isActive]);
+  useEffect(() => { if (isActive) onPausedChange?.(item.id, paused || holdPaused); }, [item.id, isActive, paused, holdPaused, onPausedChange]);
 
   /** Double-tap heart: appears where the second tap landed, pops once
    *  (0.6 -> 1.1 -> 1), holds, fades. No particles, no second burst. */
@@ -1972,19 +1985,13 @@ function SpotlightPageImpl({
                 posterPriority={isFirstItem ? 'high' : undefined}
                 fallbackColor={item.accentColor}
                 immersive={immersive}
-                // V6: on the video's very bottom edge, just above the tab
-                // bar's top pixel (the creator player has no tab bar, so
-                // it keeps the chrome line).
-                progressBottom={immersive
-                  ? (hasTabBar && videoFrameInset != null ? videoFrameInset + PROGRESS_ABOVE_BAR - 1 : bottomClearance)
-                  : undefined}
-                // Drag-time scrub bubble must clear the WHOLE caption/sound
+                progressBottom={immersive ? bottomClearance : undefined}
+                // Drag-time scrub bubble must clear the WHOLE caption
                 // stack (see ScrubProgressBar's comment) — its top edge is
                 // this same bottomClearance anchor plus CAPTION_BOTTOM_GAP
                 // plus the stack's *measured* height (captionBlockHeight,
-                // from CaptionBlock's onHeightChange below — the nominal
-                // CAPTION_BLOCK_HEIGHT constants are minimums only, real
-                // content routinely renders taller), plus a small margin.
+                // from CaptionBlock's onHeightChange below), plus a small
+                // margin. This moves only the bubble, never the caption.
                 chromeTop={immersive
                   ? bottomClearance + CAPTION_BOTTOM_GAP + captionBlockHeight + 8
                   : undefined}
@@ -2056,92 +2063,9 @@ function SpotlightPageImpl({
           the whole video, not just the small caption-stack box the pill
           itself renders inside. */}
 
-      {/* ─ Right action rail (components/buyer-feed/RightActionRail) ─
-          bottom: bottomClearance + RAIL_BOTTOM_GAP, not bare bottomClearance
-          — see the RAIL_BOTTOM_GAP/CAPTION_BOTTOM_GAP comment above. Sizing
-          ported from dev PR #129; icon shadows from PR #122. Sound toggle
-          lives in the caption block (CaptionBlock's sound row) instead of a
-          rail-mounted disc — matches dev's #129 rail exactly. */}
-      <RightActionRail
-        style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP, right: 8 + insets.right }]}
-        shareBottom={bottomClearance + CAPTION_BOTTOM_GAP + captionBottomOffset}
-        creator={item.creator}
-        hostId={item.sellerId}
-        avatarColor={item.avatarColor}
-        avatarUri={item.avatarUri}
-        isOfficial={item.official}
-        isSelf={!!railViewerId && item.sellerId === railViewerId}
-        avatarSource={item.official ? OFFICIAL_AVATAR_SOURCE : undefined}
-        initials={item.initials}
-        accentColor={item.accentColor}
-        engagement={engagement}
-        commentsCount={(item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta}
-        shares={engagement?.shares ?? item.shares}
-        saves={item.saves}
-        onOpenCreator={() => { onOpenCreator(item); }}
-        onPressInCreator={() => prefetchCreatorProfile(item)}
-        onFollow={() => onFollow(item.id)}
-        onLike={async () => { await onLike(item.id); }}
-        onOpenComments={() => { haptic('sheet'); setCommentsOpen(true); }}
-        onRepost={() => onRepost(item.id)}
-        onSave={() => onSave(item.id)}
-        onSaveLongPress={() => {
-          const toast = savedPostToast({ ...item, id: feedPostId(item.id) });
-          if (toast.action?.kind === 'save-to-collection') {
-            emitSaveHeartEvent({ type: 'post-sheet', item: toast.action.item, thumbnailUri: toast.thumbnailUri });
-          }
-        }}
-        onShare={() => setShareOpen(true)}
-        testIdBase={item.id}
-        reduceMotion={reduceMotion}
-        footerSlot={item.contentType === 'video' ? (
-          <SoundDisc
-            avatarUri={item.avatarUri}
-            avatarSource={item.official ? OFFICIAL_AVATAR_SOURCE : undefined}
-            initials={item.initials}
-            sound={item.sound}
-            spinning={isActive}
-            reduceMotion={reduceMotion}
-            soundOn={soundOn}
-            onPress={onToggleSound}
-            testID={`sound-disc-${item.id}`}
-          />
-        ) : undefined}
-      />
-
-      <ThreadCommentsSheet
-        visible={commentsOpen && isActive}
-        postId={feedPostId(item.id)}
-        postAuthorId={item.sellerId}
-        postAuthorName={item.creator}
-        postCaption={item.caption}
-        onClose={() => setCommentsOpen(false)}
-      />
-      <ThreadShareSheet
-        visible={shareOpen}
-        postId={item.id}
-        creator={item.creator}
-        caption={item.caption}
-        productName={item.productName}
-        mediaUri={item.mediaUris[0]}
-        isVideo={item.contentType === 'video'}
-        shareCount={engagement?.shares ?? item.shares}
-        reposted={!!engagement?.reposted}
-        onRepost={() => onRepost(item.id)}
-        recommendationReason={item.sponsored
-          ? 'This is a paid promotion.'
-          : 'You are viewing a post in the Threads feed. Posts can include accounts you follow and posts available to you.'}
-        onClose={() => setShareOpen(false)}
-        onReport={() => openReport({
-          targetType: item.contentType === 'video' ? 'video' : 'post',
-          targetId: item.id,
-          label: 'Post',
-          ownerId: item.sellerId,
-          ownerName: item.creator,
-        })}
-        onNotInterested={() => onNotInterested(item.id)}
-        onFeedback={showToast}
-      />
+      {/* The right action rail and its share sheet render once above the
+          pager (ThreadRailOverlay in FeedScreen), not per cell, so they
+          never move while swiping. */}
 
       <LongPressMenu
         visible={menuOpen}
@@ -2154,7 +2078,7 @@ function SpotlightPageImpl({
         reposted={engagement?.reposted === true}
         canRepost={item.allowReposts !== false}
         onToggleRepost={() => { void onRepost(item.id); }}
-        onShare={() => setShareOpen(true)}
+        onShare={() => onOpenShare(item.id)}
         onCopyLink={postUrl ? () => {
           void Clipboard.setStringAsync(postUrl).then(
             () => {
@@ -2181,10 +2105,21 @@ function SpotlightPageImpl({
         onClose={() => setMenuOpen(false)}
       />
 
-      {/* ─ Bottom-left overlay: creator, caption, sound (components/buyer-feed/CaptionBlock) ─
-          bottom: bottomClearance + CAPTION_BOTTOM_GAP, not bare
-          bottomClearance — same reason as the rail above. The shop tag is
-          the ShopSideTab rendered above instead of a CaptionBlock slot. */}
+      {/* Bottom legibility fade, under the caption (not over it) so the name
+          and caption stay pure white on light clips. */}
+      {immersive && (
+        <LinearGradient
+          pointerEvents="none"
+          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.42)', 'rgba(0,0,0,0.6)']}
+          locations={[0, 0.35, 0.7, 1]}
+          style={[styles.bottomScrim, { height: 260 }]}
+          testID="caption-scrim"
+        />
+      )}
+
+      {/* ─ Bottom-left overlay: Shop pill, creator, caption (components/buyer-feed/CaptionBlock) ─
+          One fixed anchor for every post: CAPTION_BOTTOM_GAP above the
+          progress line (bottomClearance). */}
       <CaptionBlock
         style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}
         onCaptionBottomOffsetChange={setCaptionBottomOffset}
@@ -2208,9 +2143,6 @@ function SpotlightPageImpl({
             : undefined,
         } : undefined}
         caption={item.caption}
-        sound={item.sound}
-        soundOn={soundOn}
-        onToggleSound={onToggleSound}
         friendReposts={friendReposts}
         selfRepost={engagement?.reposted ? { avatarUri: railViewer?.imageUrl, name: railViewer?.fullName ?? 'You' } : undefined}
         hasRepostIdentity={hasRepostIdentity}
@@ -2259,6 +2191,68 @@ function SpotlightPageImpl({
 // lib/feedPageMemo.ts for why a like then re-renders only its own page.
 const SpotlightPage = React.memo(SpotlightPageImpl, (before, after) =>
   before.headerClearance === after.headerClearance && spotlightPagePropsEqual(before, after));
+
+// ─── Right action rail, rendered once above the pager ─────────────────────────
+
+/**
+ * The rail (and its share sheet) for whichever post is on screen. Rendered
+ * ONCE as an overlay above the pager instead of inside every page, so it
+ * physically never moves during a swipe: when the active post changes, the
+ * avatar, follow badge, like/save state and counts swap in place with no
+ * animation. Its position is one constant (`bottom`), the same for every
+ * post type.
+ */
+function ThreadRailOverlay({
+  item, engagement, bottom, paused, reduceMotion, shareOpen, onOpenShare, onCloseShare,
+  onLike, onSave, onRepost, onFollow, onOpenCreator, onNotInterested,
+}: {
+  item: SpotlightItem; engagement: EngagementState | undefined; bottom: number;
+  paused: boolean; reduceMotion: boolean; shareOpen: boolean;
+  onOpenShare: (id: string) => void; onCloseShare: () => void;
+  onLike: (id: string) => Promise<void>; onSave: (id: string) => Promise<void>;
+  onRepost: (id: string) => Promise<void>; onFollow: (id: string) => Promise<void>;
+  onOpenComments: (id: string) => void;
+  onOpenCreator: (item: SpotlightItem) => void; onNotInterested: (id: string) => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const { userId } = useAuth();
+  const focused = useIsFocused();
+  const appActive = useAppActive();
+  const { openReport } = useReportSheet();
+  const { showToast } = useFeedToast();
+  const commentCountDelta = useCommentCountDelta(feedPostId(item.id));
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  useEffect(() => { setCommentsOpen(false); onCloseShare(); }, [item.id]);
+  const report = () => openReport({ targetType: item.contentType === 'video' ? 'video' : 'post',
+    targetId: feedPostId(item.id), label: 'Post', ownerId: item.sellerId, ownerName: item.creator });
+  return <>
+    <RightActionRail
+      style={{ bottom, right: RAIL_RIGHT + insets.right }} creator={item.creator} hostId={item.sellerId}
+      avatarColor={item.avatarColor} avatarUri={item.avatarUri} avatarSource={item.official ? OFFICIAL_AVATAR_SOURCE : undefined}
+      isOfficial={item.official} isSelf={!!userId && item.sellerId === userId} initials={item.initials}
+      engagement={engagement} commentsCount={(item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta}
+      shares={engagement?.shares ?? item.shares} saves={item.saves}
+      onOpenCreator={() => onOpenCreator(item)} onPressInCreator={() => prefetchCreatorProfile(item)}
+      onFollow={() => onFollow(item.id)} onLike={() => onLike(item.id)}
+      onOpenComments={() => { haptic('sheet'); setCommentsOpen(true); }}
+      onSave={() => onSave(item.id)} onSaveLongPress={() => {
+        const toast = savedPostToast({ ...item, id: feedPostId(item.id) });
+        if (toast.action?.kind === 'save-to-collection') emitSaveHeartEvent({ type: 'post-sheet', item: toast.action.item, thumbnailUri: toast.thumbnailUri });
+      }}
+      onShare={() => onOpenShare(item.id)} testIdBase={item.id} reduceMotion={reduceMotion}
+      footerSlot={<SoundDisc avatarUri={item.avatarUri} avatarSource={item.official ? OFFICIAL_AVATAR_SOURCE : undefined}
+        initials={item.initials} sound={item.sound} spinning={focused && appActive && item.contentType === 'video' && !paused}
+        reduceMotion={reduceMotion} soundOn onPress={() => {}} testID={`sound-disc-${item.id}`} />}
+    />
+    <ThreadCommentsSheet visible={commentsOpen} postId={feedPostId(item.id)} postAuthorId={item.sellerId}
+      postAuthorName={item.creator} postCaption={item.caption} onClose={() => setCommentsOpen(false)} />
+    <ThreadShareSheet visible={shareOpen} postId={feedPostId(item.id)} creator={item.creator} caption={item.caption}
+      productName={item.productName} mediaUri={item.mediaUris[0]} isVideo={item.contentType === 'video'}
+      shareCount={engagement?.shares ?? item.shares} reposted={!!engagement?.reposted} onRepost={() => onRepost(item.id)}
+      recommendationReason={item.sponsored ? 'This is a paid promotion.' : 'You are viewing a post in the Threads feed. Posts can include accounts you follow and posts available to you.'}
+      onClose={onCloseShare} onReport={report} onNotInterested={() => onNotInterested(item.id)} onFeedback={showToast} />
+  </>;
+}
 
 // CommentsModal replaced by navigation to /buyer-post-comments (see handleOpenComments).
 
@@ -2490,6 +2484,12 @@ function FeedScreenContent({
   // "line" the immersive video frame stops at. See videoFrameInset's doc
   // comment on SpotlightPageImpl for why the two must stay separate.
   const buyerBarTopInset = useBuyerTabBarTopInset('compact');
+  // The compact capsule is the regular one scaled down about its centre
+  // (BuyerTabBar's capsuleAnimatedStyle), so its visible top edge sits half
+  // the height difference below the compact layout's barTopInset.
+  const regularBarMetrics = useBuyerTabBarMetrics(1, 'regular');
+  const compactBarMetrics = useBuyerTabBarMetrics(1, 'compact');
+  const buyerBarVisualTop = buyerBarTopInset + (regularBarMetrics.capsuleHeight - compactBarMetrics.capsuleHeight) / 2;
   const router = useRouter();
   const { userId, isLoaded: authLoaded } = useAuth();
   // Guests browse the feed; like/save/repost/follow prompt sign-in (returnTo).
@@ -2513,18 +2513,16 @@ function FeedScreenContent({
       return { ...previous, [id]: { ...previous[id], ...patch } };
     });
   }) : undefined, [userId]);
-  // The feed's sound on/off choice — a single app-wide preference (not
-  // per-post), persisted so it survives leaving and returning to the feed.
-  const [soundOn, setSoundOn] = useState(false);
-  useEffect(() => {
-    AsyncStorage.getItem(SOUND_PREF_KEY).then(v => { if (v === 'on') setSoundOn(true); }).catch(() => {});
-  }, []);
-  const toggleSound = useCallback(() => {
-    setSoundOn(prev => {
-      const next = !prev;
-      AsyncStorage.setItem(SOUND_PREF_KEY, next ? 'on' : 'off').catch(() => {});
-      return next;
-    });
+  // Sound is always on (no mute control) — see hooks/useFeedSound.ts.
+  const soundOn = useFeedSound();
+  const [hiddenRailFor, setHiddenRailFor] = useState<string | null>(null);
+  const handleChromeHiddenChange = useCallback((id: string, hidden: boolean) => { setHiddenRailFor(prev => hidden ? id : prev === id ? null : prev); }, []);
+  const [sharePostId, setSharePostId] = useState<string | null>(null);
+  const handleOpenShare = useCallback((id: string) => setSharePostId(id), []);
+  // Which post is paused right now (tap/hold), so the rail's disc stops with it.
+  const [pausedPostId, setPausedPostId] = useState<string | null>(null);
+  const handlePausedChange = useCallback((id: string, isPaused: boolean) => {
+    setPausedPostId(prev => (isPaused ? id : prev === id ? null : prev));
   }, []);
   const [showGestureGuide, setShowGestureGuide] = useState(false);
   // Measured height of the absolutely-positioned top bar overlay (status
@@ -3572,6 +3570,16 @@ function FeedScreenContent({
   const bottomClearance = isBuyerSurface
     ? buyerBarInset
     : Math.max(previewBottomInset, 8) + 14;
+  // The progress line (its bottom edge, from the page bottom): SCRUB_TAB_GAP
+  // above the floating tab bar's visible top on Buyer Home. The scrubber,
+  // caption and rail all hang off this one value, so none of them depends on
+  // the post.
+  const progressLine = isBuyerSurface ? buyerBarVisualTop + SCRUB_TAB_GAP : bottomClearance;
+  const activeItem = displayItems[activeIndex];
+  const activeSpotlight = activeItem && !isDemandPageItem(activeItem as FeedItem) && !isJustDroppedItem(activeItem)
+    && !isLiveStreamItem(activeItem as SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem) && 'contentType' in activeItem
+    ? activeItem as SpotlightItem
+    : null;
 
   return (
     <>
@@ -3841,24 +3849,26 @@ function FeedScreenContent({
               isFirstItem={contentIndex === activeContentIndex}
                 pageWidth={pageWidth}
               pageHeight={pageHeight}
-              bottomClearance={bottomClearance}
+              bottomClearance={progressLine}
               videoFrameInset={isBuyerSurface ? buyerBarTopInset : undefined}
               immersive={isBuyerSurface}
               hasTabBar={!isCreatorFeed}
               onOpenCreator={handleOpenCreator}
               engagement={engagements[spotlight.id] ?? initialEngagement(spotlight)}
               onLike={handleLike}
-              onDoubleTapLike={handleDoubleTapLike}
               onSave={handleSave}
               onRepost={handleRepost}
               onFollow={handleFollow}
               onOpenComments={handleOpenComments}
+              onDoubleTapLike={handleDoubleTapLike}
+              onOpenShare={handleOpenShare}
+              onPausedChange={handlePausedChange}
+              onChromeHiddenChange={handleChromeHiddenChange}
               onShopTag={handleShopTag}
               onNotInterested={handleNotInterested}
               onVideoWatched={handleVideoWatched}
               // The mini product sheet keeps the video playing, muted (#139).
-              soundOn={soundOn && !shopSelection}
-              onToggleSound={toggleSound}
+              soundOn={soundOn}
               onFirstFramePainted={contentIndex === activeContentIndex ? handleFirstCellPainted : undefined}
               reduceMotion={!!reduceMotion}
             />
@@ -3939,6 +3949,31 @@ function FeedScreenContent({
             </>
           )}
         </>
+      )}
+
+      {/* ─ Right action rail: one instance above the pager, bound to the
+          active post (see ThreadRailOverlay), at one fixed position — the
+          disc's bottom RAIL_DISC_TO_PROGRESS above the progress line. */}
+      {viewportReady && activeSpotlight && !liveTabActive && (
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: hiddenRailFor === activeSpotlight.id ? 0 : feedContentOpacity }]} pointerEvents={hiddenRailFor === activeSpotlight.id ? "none" : "box-none"}>
+          <ThreadRailOverlay
+            item={activeSpotlight}
+            engagement={engagements[activeSpotlight.id] ?? initialEngagement(activeSpotlight)}
+            bottom={progressLine + PROGRESS_LINE_HEIGHT + RAIL_DISC_TO_PROGRESS}
+            shareOpen={sharePostId === activeSpotlight.id}
+            onOpenShare={handleOpenShare}
+            onCloseShare={() => setSharePostId(null)}
+            paused={pausedPostId === activeSpotlight.id}
+            reduceMotion={!!reduceMotion}
+            onLike={handleLike}
+            onSave={handleSave}
+            onRepost={handleRepost}
+            onFollow={handleFollow}
+            onOpenComments={handleOpenComments}
+            onOpenCreator={handleOpenCreator}
+            onNotInterested={handleNotInterested}
+          />
+        </Animated.View>
       )}
 
       {/* ─ Top bar overlay ─ */}

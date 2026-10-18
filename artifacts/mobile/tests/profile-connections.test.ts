@@ -52,7 +52,7 @@ describe('feed player reuse from profiles', () => {
   });
 
   it('opens the right profile from the rail / name, and returns to the profile inside its own player', () => {
-    expect(feed).toContain('onOpenCreator(item);');
+    expect(feed).toContain('onOpenCreator={() => onOpenCreator(item)}');
     expect(feed).toContain("accountType: item.authorAccountType ?? 'seller'");
     expect(feed).toContain("creatorSource === 'creator' && creatorId && item.sellerId === creatorId && router.canGoBack()");
     // The friend-repost link used to pass `id`, which buyer-other-profile ignores.
