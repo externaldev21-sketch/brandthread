@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useApi } from '@/hooks/useApi';
 
-import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
@@ -259,7 +259,7 @@ export default function SellerHomeCommerceDashboard({
   const analyticsUserId = sellerPreview ? userId ?? PREVIEW_ANALYTICS_USER : userId;
   // Scroll content must end ABOVE the floating bar — tab bar height + bottom
   // safe inset + 16 (shared helper, same rule app-wide).
-  const tabBarClearance = useTabBarClearance(2); // seller bar: Studio + AI side circles
+  const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
   const scrollResetRef = useScrollReset<ScrollView>();
   const firstWeek = useFirstWeek();
 
@@ -882,14 +882,14 @@ export default function SellerHomeCommerceDashboard({
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background ?? SCREEN_BG }]}>
-      {/* Clip above the floating bar even mid-scroll; viewport reserve plus
-          end padding together equal the shared tab-bar clearance. */}
+      {/* Keep the viewport full-height; reserve the floating bar and 24pt
+          inside the scroll content so every section remains reachable. */}
       <ScrollView
         ref={scrollResetRef}
         testID="seller-dashboard-scroll"
         accessibilityLabel="Seller dashboard scroll"
-        style={[styles.scrollView, { marginBottom: Math.max(0, tabBarClearance - SP.md) }]}
-        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12, paddingBottom: SP.md }]}
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12, paddingBottom: tabBarMetrics.occupiedHeight + 24 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />

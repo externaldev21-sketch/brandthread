@@ -4,10 +4,11 @@ import { describe, expect, it } from 'vitest';
 const source = readFileSync(new URL('../components/SellerHomeCommerceDashboard.tsx', import.meta.url), 'utf8');
 
 describe('seller dashboard tab-bar clearance', () => {
-  it('uses the shared seller metrics to reserve the scroll viewport, not just its last item', () => {
-    expect(source).toContain('useTabBarClearance(2)');
-    expect(source).toContain('marginBottom: Math.max(0, tabBarClearance - SP.md)');
-    expect(source).toContain('paddingBottom: SP.md');
+  it('keeps the full scroll viewport and pads the content by the seller bar plus 24', () => {
+    expect(source).toContain('useTabBarMetrics(2)');
+    expect(source).toContain('style={styles.scrollView}');
+    expect(source).not.toContain('marginBottom: Math.max(0, tabBarClearance - SP.md)');
+    expect(source).toContain('paddingBottom: tabBarMetrics.occupiedHeight + 24');
   });
 
   it('does not require a per-screen navigator for the development preview', () => {

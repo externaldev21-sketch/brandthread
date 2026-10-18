@@ -635,3 +635,31 @@ mtime_ms = 1792292859344
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/1f9a34fd-7f11-4769-9024-780e621dcd3e/577af322-7e85-48f9-afe0-aa95e9b44d45"
 storage_version_token = "1792292997039388"
 content_type = "text/html"
+
+[[outputs]]
+id = "OjGanhooucwPPpH1701mo"
+uri = "file://.local/merge-audit/seller-two-after.png"
+type = "image"
+title = "Seller Dashboard — 390×844"
+description = "Visible silver B logo and complete second row of stat cards."
+logical_id = "5700e473-007a-4a0a-902f-9f09f2aaff8e"
+content_hash = "sha256:c26ac63dd29a500bbfed791e0d04624d44494dcc9836736488b2968a5680f16b"
+size = 45926
+mtime_ms = 1792295393512
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/5700e473-007a-4a0a-902f-9f09f2aaff8e/86442cbd-1bd6-4bbb-9208-e8bd0f42de8b"
+storage_version_token = "1792295424647295"
+content_type = "image/png"
+
+[[outputs]]
+id = "QCvqNzy1NxxvKzuGUZI4m"
+uri = "file://.local/merge-audit/seller-two-bottom.png"
+type = "image"
+title = "Dashboard scroll end — 390×844"
+description = "Reached by scrolling; final content clears the floating tab bar."
+logical_id = "b4939473-d40c-4513-a8c9-6aea52f8a228"
+content_hash = "sha256:899bc0d7cf86a51c3f719b7ee237c38dfbe8fa3d072a98720c69c97a31795006"
+size = 46131
+mtime_ms = 1792295395952
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/b4939473-d40c-4513-a8c9-6aea52f8a228/0de6a669-b8bc-460c-aecf-9fdac70eb28b"
+storage_version_token = "1792295425305282"
+content_type = "image/png"

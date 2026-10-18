@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Image as BrandMarkImage, StyleSheet, View } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -46,7 +46,6 @@ import {
 import { getSellerOrderBadgeCount } from '@/lib/sellerOrderBadge';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { countRealOrders, maybeRequestStoreReview } from '@/lib/storeReviewPrompt';
-import { Image as BrandMarkImage } from 'expo-image';
 import { BRANDTHREAD_AVATAR_SOURCE } from '@/constants/branding';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import { radius } from '@/constants/radii';
@@ -511,9 +510,8 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
       >
         <BrandMarkImage
           source={BRANDTHREAD_AVATAR_SOURCE}
-          style={{ width: metrics.iconSize + 3, height: metrics.iconSize + 3, borderRadius: (metrics.iconSize + 3) / 2 }}
-          contentFit="contain"
-          transition={0}
+          style={{ width: metrics.circleSize - 16, height: metrics.circleSize - 16, borderRadius: (metrics.circleSize - 16) / 2 }}
+          resizeMode="contain"
           accessibilityLabel="Brandthread logo"
           testID="seller-ai-brandthread-mark"
         />
