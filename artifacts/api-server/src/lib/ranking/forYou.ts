@@ -13,8 +13,9 @@
  *     for sellers/styles the buyer has skipped or marked not-interested.
  *  4. Diversity: no same seller twice in a row, lives interleaved at a fixed
  *     cadence (owner's rule: feed is mostly videos with lives mixed in).
- *  5. Freshness + no-repeat: posts the buyer already saw recently (tracked via
- *     `view` events) are excluded from being re-served.
+ *  5. Freshness: posts the buyer already saw recently (tracked via `view`/
+ *     `skip` events) are ranked after every unseen post, never removed, so
+ *     the feed never runs dry (rankUnseenFirst).
  *  6. Exploration: a small fixed fraction of slots are reserved for
  *     candidates outside the buyer's top affinity match, so the feed doesn't
  *     collapse into a filter bubble and cold-start / taste-drift recovers.
@@ -270,6 +271,32 @@ export function diversifyFeed<T extends { sellerId: string; isLive: boolean }>(
   }
 
   return result;
+}
+
+/**
+ * Seen posts are deprioritized, never hidden: everything the buyer hasn't
+ * seen comes first (score order, diversified, with exploration slots), then
+ * everything they have seen, in score order too. With a small catalogue
+ * (~12 posts) hiding seen posts emptied the feed; this way it never runs
+ * dry, TikTok-style. `scored` must already be sorted by score, descending.
+ */
+export function rankUnseenFirst<T extends { id: string; sellerId: string; isLive: boolean }>(
+  scored: T[],
+  seenIds: ReadonlySet<string>,
+  opts: { topSlice?: number; liveInterleaveEvery?: number; explorationEvery?: number; shuffle?: (pool: T[]) => T[] } = {},
+): T[] {
+  const topSlice = opts.topSlice ?? 60;
+  const shuffle = opts.shuffle ?? ((pool: T[]) => [...pool].sort(() => Math.random() - 0.5));
+  const unseen = scored.filter((c) => c.isLive || !seenIds.has(c.id));
+  const seen = scored.filter((c) => !c.isLive && seenIds.has(c.id));
+  const diversity = { liveInterleaveEvery: opts.liveInterleaveEvery, explorationEvery: opts.explorationEvery };
+  const unseenRanked = diversifyFeed(unseen.slice(0, topSlice), {
+    ...diversity,
+    // Exploration pool: unseen candidates outside the top slice.
+    explorationPool: shuffle(unseen.slice(topSlice)).slice(0, 20),
+  });
+  const seenRanked = diversifyFeed(seen.slice(0, topSlice), diversity);
+  return [...unseenRanked, ...seenRanked];
 }
 
 export function isCacheFresh(computedAt: Date, staleMs: number = CACHE_STALE_MS): boolean {
@@ -541,24 +568,35 @@ async function notInterestedPostIds(userId: string): Promise<Set<string>> {
   return new Set(rows.map((r) => r.postId));
 }
 
-async function recentlySeenPostIds(userId: string): Promise<Set<string>> {
+/**
+ * Posts the buyer viewed or skipped recently — ranked after unseen posts
+ * (rankUnseenFirst), never removed. An explicit "not interested" still hides
+ * the post (`notInterested`).
+ */
+async function recentlySeenPostIds(userId: string): Promise<{ seen: Set<string>; notInterested: Set<string> }> {
   const since = new Date(Date.now() - RECENTLY_SEEN_WINDOW_MS);
   const rows = await db
-    .select({ postId: interactions.postId })
+    .select({ postId: interactions.postId, type: interactions.type })
     .from(interactions)
     .where(and(
       eq(interactions.userId, userId),
       inArray(interactions.type, ["view", "skip", "not_interested"]),
       gte(interactions.createdAt, since),
     ));
-  return new Set(rows.map((r) => r.postId).filter((id): id is string => !!id));
+  const seen = new Set<string>();
+  const notInterested = new Set<string>();
+  for (const r of rows) {
+    if (!r.postId) continue;
+    (r.type === "not_interested" ? notInterested : seen).add(r.postId);
+  }
+  return { seen, notInterested };
 }
 
 /** Computes a fresh For You ranking for one buyer and returns the ranked, diversified list (unpaginated). */
 export async function computeForYouRankingForUser(userId: string): Promise<ForYouResultItem[]> {
   const now = Date.now();
 
-  const [cfg, hiddenIds, profile, followRows, blockedRows, seenIds] = await Promise.all([
+  const [cfg, hiddenIds, profile, followRows, blockedRows, recent] = await Promise.all([
     getRankingConfig(),
     notInterestedPostIds(userId),
     loadOrSeedProfile(userId),
@@ -573,8 +611,10 @@ export async function computeForYouRankingForUser(userId: string): Promise<ForYo
 
   const [posts_, lives] = await Promise.all([candidatePosts(userId, followedIds), liveCandidates()]);
 
+  // Seen posts stay eligible (ranked last, see rankUnseenFirst); only blocks
+  // and explicit "not interested" remove a post.
   const eligible = [...posts_, ...lives].filter(
-    (c) => !blockedSet.has(c.sellerId) && !seenIds.has(c.id) && !hiddenIds.has(c.id),
+    (c) => !blockedSet.has(c.sellerId) && !hiddenIds.has(c.id) && !recent.notInterested.has(c.id),
   );
 
   const engagement = await loadPostEngagement(
@@ -590,13 +630,7 @@ export async function computeForYouRankingForUser(userId: string): Promise<ForYo
 
   scored.sort((a, b) => b.score - a.score);
 
-  // Exploration pool: candidates outside the top slice but not already filtered out.
-  const TOP_SLICE = 60;
-  const explorationPool = scored.slice(TOP_SLICE).sort(() => Math.random() - 0.5).slice(0, 20);
-  const topRanked = scored.slice(0, TOP_SLICE);
-
-  const diversified = diversifyFeed(topRanked, {
-    explorationPool,
+  const diversified = rankUnseenFirst(scored, recent.seen, {
     liveInterleaveEvery: cfg.liveInterleaveEvery,
     explorationEvery: cfg.explorationEvery,
   });

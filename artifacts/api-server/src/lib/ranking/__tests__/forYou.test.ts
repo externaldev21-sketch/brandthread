@@ -8,6 +8,7 @@ import {
   applyRecencyDecay,
   scoreCandidate,
   diversifyFeed,
+  rankUnseenFirst,
   isCacheFresh,
   engagementQuality,
   mergePreferenceStyleAffinity,
@@ -361,5 +362,37 @@ describe("survey preference seeding", () => {
     const match = scoreCandidate(base, {}, affinity, {}, now, cfg);
     const miss = scoreCandidate({ ...base, styleTags: ["formal"] }, {}, affinity, {}, now, cfg);
     expect(match).toBeGreaterThan(miss);
+  });
+});
+
+describe("rankUnseenFirst (seen posts are deprioritized, never hidden)", () => {
+  const post = (i: number) => ({ id: `p${i}`, sellerId: `s${i % 4}`, isLive: false });
+  const twelve = Array.from({ length: 12 }, (_, i) => post(i + 1)); // already in score order
+  const noShuffle = <T,>(pool: T[]) => pool;
+
+  it("a buyer who watched 10 of the 12 posts still gets all 12, unseen first", () => {
+    const seen = new Set(twelve.slice(0, 10).map((p) => p.id));
+    const ranked = rankUnseenFirst(twelve, seen, { shuffle: noShuffle });
+    expect(ranked).toHaveLength(12);
+    expect(new Set(ranked.map((p) => p.id))).toEqual(new Set(twelve.map((p) => p.id)));
+    expect(ranked.slice(0, 2).map((p) => p.id).sort()).toEqual(["p11", "p12"]);
+    expect(ranked.slice(2).every((p) => seen.has(p.id))).toBe(true);
+  });
+
+  it("keeps serving everything when every post has been seen", () => {
+    const ranked = rankUnseenFirst(twelve, new Set(twelve.map((p) => p.id)), { shuffle: noShuffle });
+    expect(ranked).toHaveLength(12);
+  });
+
+  it("orders the seen tail by rank (same-seller spacing aside)", () => {
+    const seen = new Set(twelve.map((p) => p.id));
+    const ranked = rankUnseenFirst(twelve, seen, { shuffle: noShuffle });
+    expect(ranked[0].id).toBe("p1");
+  });
+
+  it("lives are never treated as seen", () => {
+    const live = { id: "live1", sellerId: "sL", isLive: true };
+    const ranked = rankUnseenFirst([...twelve, live], new Set(["live1"]), { shuffle: noShuffle });
+    expect(ranked.map((p) => p.id)).toContain("live1");
   });
 });

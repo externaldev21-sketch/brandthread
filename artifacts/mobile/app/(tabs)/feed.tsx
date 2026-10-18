@@ -97,6 +97,7 @@ import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { RAIL_DISC_TO_PROGRESS, RAIL_RIGHT, RightActionRail, type RailAnims } from '@/components/buyer-feed/RightActionRail';
 import { PausedPlayIcon } from '@/components/buyer-feed/PausedPlayIcon';
 import { useFeedSound } from '@/hooks/useFeedSound';
+import { finishedVideoIds, loadFinishedVideos, markVideoFinished, reachedEnd, unseenFirst } from '@/lib/finishedVideos';
 import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer-feed/ShopSideTab';
@@ -1031,6 +1032,8 @@ type VideoVisualProps = {
   isActive: boolean;
   paused: boolean;
   onWatched?: () => void;
+  /** Playback reached the end (once per mount) — orders this post after unseen ones next time. */
+  onFinished?: () => void;
   muted?: boolean;
   posterUri?: string;
   posterSource?: ImageSourcePropType;
@@ -1173,6 +1176,7 @@ function LiveVideoVisual({
   isActive,
   paused,
   onWatched,
+  onFinished,
   muted = false,
   posterUri,
   posterSource,
@@ -1259,14 +1263,21 @@ function LiveVideoVisual({
   React.useEffect(() => {
     if (readyToPlay) reportFirstFramePainted();
   }, [readyToPlay, reportFirstFramePainted]);
+  const lastTimeRef = useRef(0);
+  const finishedRef = useRef(false);
   React.useEffect(() => {
     if (progressBottom == null || !isActive) return undefined;
     const subscription = player.addListener('timeUpdate', ({ currentTime }) => {
       const duration = player.duration;
       setProgress(duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0);
+      if (!finishedRef.current && reachedEnd(lastTimeRef.current, currentTime, duration)) {
+        finishedRef.current = true;
+        onFinished?.();
+      }
+      lastTimeRef.current = currentTime;
     });
     return () => subscription.remove();
-  }, [isActive, player, progressBottom]);
+  }, [isActive, player, progressBottom, onFinished]);
   const isScreenFocused = useIsFocused();
   useMeaningfulVideoWatch(player, isActive && !paused && isScreenFocused, onWatched);
   React.useEffect(() => {
@@ -1534,6 +1545,8 @@ function SpotlightPageImpl({
     if (holdTimer.current) clearTimeout(holdTimer.current);
   }, []);
 
+  const onVideoFinished = useCallback(() => markVideoFinished(item.id), [item.id]);
+
   // TikTok: swiping away from a paused video and back plays it again.
   React.useEffect(() => {
     if (!isActive) setPaused(false);
@@ -1636,6 +1649,7 @@ function SpotlightPageImpl({
                 preload={preload}
                 paused={paused || holdPaused}
                 onWatched={() => onVideoWatched(item.id)}
+                onFinished={onVideoFinished}
                 rate={speedActive ? 2 : 1}
                 muted={!soundOn}
                 posterUri={item.videoPosterUri}
@@ -2307,9 +2321,16 @@ export default function FeedScreen({
       const page = await getThreadPostsPage(initialCursor, THREAD_PAGE_SIZE, feedTab);
       if (feedGenerationRef.current !== generation) return;
       const rows = page.posts;
-      const mapped = (Array.isArray(rows) ? rows : [])
-        .map(mapSellerPost)
-        .filter((p): p is SpotlightItem => p !== null);
+      await loadFinishedVideos();
+      if (feedGenerationRef.current !== generation) return;
+      // Videos already watched to the end go after the unseen ones — never
+      // hidden, so a small catalogue never empties out.
+      const mapped = unseenFirst(
+        (Array.isArray(rows) ? rows : [])
+          .map(mapSellerPost)
+          .filter((p): p is SpotlightItem => p !== null),
+        finishedVideoIds(),
+      );
       setSellerFeedPosts(mapped);
       setCachedFeedPosts(loadKey, mapped);
       feedCursorRef.current = page.cursor;
@@ -2344,9 +2365,12 @@ export default function FeedScreen({
         : await getThreadPostsPage(cursor, THREAD_PAGE_SIZE, feedTab);
       if (feedGenerationRef.current !== generation) return;
       const rows = page.posts;
-      const mapped = (Array.isArray(rows) ? rows : [])
+      const mappedPage = (Array.isArray(rows) ? rows : [])
         .map(mapSellerPost)
         .filter((p): p is SpotlightItem => p !== null);
+      // A creator's own player keeps their order; the feeds put videos
+      // already watched to the end after the unseen ones (never hidden).
+      const mapped = creatorSource && creatorId ? mappedPage : unseenFirst(mappedPage, finishedVideoIds());
 
       setSellerFeedPosts(prev => {
         const existingIds = new Set(prev.map(item => item.id));
@@ -2597,9 +2621,12 @@ export default function FeedScreen({
   const canLoopFeed = !searchQuery.trim() && !feedHasMore && filteredContentItems.length > 1 && !isCreatorFeed;
   const displayItems: FeedItem[] = useMemo(() => {
     const base = filteredContentItems as FeedItem[];
+    // Repeats show unseen videos first, then the ones already watched — every
+    // post stays in every repeat, so the loop never thins out.
+    const repeatBase = canLoopFeed ? unseenFirst(base as { id: string }[], finishedVideoIds()) as FeedItem[] : base;
     const content = canLoopFeed
       ? Array.from({ length: FEED_LOOP_REPEAT }, (_, cycle) => (
-          cycle === 0 ? base : base.map(item => ({ ...item, id: `${item.id}__loop${cycle}` }))
+          cycle === 0 ? base : repeatBase.map(item => ({ ...item, id: `${item.id}__loop${cycle}` }))
         )).flat()
       : base;
     if (!buyerMode) return content;
