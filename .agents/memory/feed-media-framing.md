@@ -30,3 +30,11 @@ The latest approved rail design supersedes the earlier rail brief: Repost lives 
 **Why:** The owner explicitly approved this newer design over earlier interpretations. Older branches must not restore a Repost rail button, hidden zeros, per-post rail jumps or sound toggles.
 
 **How to apply:** Apply reviewed visual changes on top of the current playback, HLS, carousel and persistence internals; do not replace those internals with an older implementation.
+
+## Watched-post availability
+
+Watched videos stay in Threads/Following: unseen posts rank first, followed by watched posts. Watch history must never remove posts from fresh pages, pagination or repeat loops, on either client or server.
+
+**Why:** Hiding completed videos made the small official catalogue shrink to its two photo carousels. The owner approved ordering watched posts later instead of hiding them.
+
+**How to apply:** Preserve explicit not-interested, block, privacy and mute exclusions; do not confuse those intentional visibility controls with watch-history ordering.

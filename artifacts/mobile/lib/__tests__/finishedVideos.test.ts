@@ -12,7 +12,7 @@ vi.mock('@react-native-async-storage/async-storage', () => {
 
 import {
   FINISHED_VIDEOS_TTL_MS, finishedVideoIds, loadFinishedVideos, markVideoFinished,
-  pruneFinished, reachedEnd, withoutFinished,
+  pruneFinished, reachedEnd, unseenFirst,
 } from '../finishedVideos';
 
 describe('pruneFinished', () => {
@@ -23,13 +23,13 @@ describe('pruneFinished', () => {
   });
 });
 
-describe('withoutFinished', () => {
+describe('unseenFirst', () => {
   const items = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
-  it('removes finished posts', () => {
-    expect(withoutFinished(items, new Set(['b'])).map((i) => i.id)).toEqual(['a', 'c']);
+  it('ranks finished posts after unseen ones without removing them', () => {
+    expect(unseenFirst(items, new Set(['b'])).map((i) => i.id)).toEqual(['a', 'c', 'b']);
   });
-  it('never empties a page', () => {
-    expect(withoutFinished(items, new Set(['a', 'b', 'c']))).toBe(items);
+  it('keeps every post in rank order when all have been watched', () => {
+    expect(unseenFirst(items, new Set(['a', 'b', 'c']))).toEqual(items);
   });
 });
 

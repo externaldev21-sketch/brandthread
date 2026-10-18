@@ -145,7 +145,6 @@ import { PausedPlayIcon } from '@/components/buyer-feed/PausedPlayIcon';
 import { useFeedSound } from '@/hooks/useFeedSound';
 import { TapHeartBurst } from '@/components/buyer-feed/TapHeartBurst';
 import { persistPostAction, postActionPending, subscribePostEngagement } from '@/lib/postEngagement';
-
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 import { PollCard } from '@/components/social/PollCard';
 import { ShopTagPill } from '@/components/buyer-feed/ShopSideTab';
@@ -163,7 +162,7 @@ import { buildPostUrl } from '@/lib/shareLinks';
 import * as Clipboard from 'expo-clipboard';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 
-import { finishedVideoIds, loadFinishedVideos, markVideoFinished, reachedEnd, withoutFinished } from '@/lib/finishedVideos';
+import { finishedVideoIds, loadFinishedVideos, markVideoFinished, reachedEnd, unseenFirst } from '@/lib/finishedVideos';
 
 import { useDataSaverSetting } from '@/hooks/useDataSaverSetting';
 import { useProductSoldOut } from '@/hooks/useProductSoldOut';
@@ -265,12 +264,6 @@ const FEED_LOOP_REPEAT = 6;
 // Product tag chip appears this long after a video becomes active (#138).
 const SHOP_TAG_DELAY_MS = 1000;
 
-/** Finished-video ids to filter out, minus the one currently on screen. */
-function servedAgainExcept(activeId: string | null): Set<string> {
-  const ids = finishedVideoIds();
-  if (activeId) ids.delete(activeId.replace(/__loop\d+$/, ''));
-  return ids;
-}
 /** Double-tap heart glyph size (pt). */
 const HEART_BURST_SIZE = 110;
 /** How many posts ahead of the visible one get their images warmed (item 90). */
@@ -1811,7 +1804,7 @@ function SpotlightPageImpl({
     }, SHOP_TAG_DELAY_MS);
     return () => clearTimeout(timer);
   }, [isActive, item.productTags?.length, reduceMotion, shopTagOpacity]);
-  const onVideoFinished = useCallback(() => markVideoFinished(feedPostId(item.id)), [item.id]);
+  const onVideoFinished = useCallback(() => markVideoFinished(item.id), [item.id]);
   // Real sold-out state for the tagged product chip (V10) — asked only for
   // the active page and its neighbours, cached per product.
   const tagSoldOut = useProductSoldOut(item.productTags?.[0]?.productId, isActive || preload);
@@ -2753,12 +2746,13 @@ function FeedScreenContent({
       const rows = page.posts;
       await loadFinishedVideos();
       if (feedGenerationRef.current !== generation) return;
-      // Videos already watched to the end are not served again (#147).
-      const mapped = withoutFinished(
+      // Videos already watched to the end go after the unseen ones — never
+      // hidden, so a small catalogue never empties out.
+      const mapped = unseenFirst(
         (Array.isArray(rows) ? rows : [])
           .map(mapSellerPost)
           .filter((p): p is SpotlightItem => p !== null),
-        servedAgainExcept(activePostIdRef.current),
+        finishedVideoIds(),
       );
       setSellerFeedPosts(mapped);
       setCachedFeedPosts(loadKey, mapped);
@@ -2800,9 +2794,9 @@ function FeedScreenContent({
       const mappedPage = (Array.isArray(rows) ? rows : [])
         .map(mapSellerPost)
         .filter((p): p is SpotlightItem => p !== null);
-      // A creator's own player shows all their videos; the feeds skip
-      // ones already watched to the end (#147).
-      const mapped = creatorSource && creatorId ? mappedPage : withoutFinished(mappedPage, finishedVideoIds());
+      // A creator's own player keeps their order; the feeds put videos
+      // already watched to the end after the unseen ones (never hidden).
+      const mapped = creatorSource && creatorId ? mappedPage : unseenFirst(mappedPage, finishedVideoIds());
 
       setSellerFeedPosts(prev => {
         const existingIds = new Set(prev.map(item => item.id));
@@ -3137,9 +3131,9 @@ function FeedScreenContent({
     && filteredContentItems.length > 0 && feedEndBrands.length > 0;
   const displayItems: FeedItem[] = useMemo(() => {
     const base = feedAds.items as FeedItem[];
-    // Repeats skip videos already watched to the end when anything else is
-    // left to show (#147); the loop itself still never dead-ends.
-    const repeatBase = canLoopFeed ? withoutFinished(base.filter(item => !isSponsoredFeedItem(item)), finishedVideoIds()) as FeedItem[] : base;
+    // Keep every real post in repeat pages, unseen first. Sponsored slots
+    // remain first-pass only rather than being duplicated on every loop.
+    const repeatBase = canLoopFeed ? unseenFirst(base.filter(item => !isSponsoredFeedItem(item)), finishedVideoIds()) as FeedItem[] : base;
     const endPage: FeedItem[] = showFeedEnd ? [{_isFeedEnd: true, id: "feed-end-recommendations", brands: feedEndBrands}] : [];
     const content = canLoopFeed
       ? Array.from({ length: FEED_LOOP_REPEAT }, (_, cycle) => (

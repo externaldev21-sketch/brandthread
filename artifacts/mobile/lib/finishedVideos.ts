@@ -1,15 +1,18 @@
 /**
- * Videos the viewer has already watched to the end (polish #147: "don't
- * re-serve finished videos"). Kept on device: the ranked For You on the
- * server already skips recently viewed posts, but the feed's other sources
- * (cached pages, the public list, the never-ending loop) don't, so the feed
- * filters these out of fresh pages and puts them last when it loops.
+ * Videos the viewer has already watched to the end. Kept on device and used
+ * to ORDER the Threads feed, never to filter it: unseen posts first, then
+ * the ones already watched, each group in its ranked order. With a small
+ * catalogue (~12 posts) hiding finished videos made the feed empty out
+ * ("my videos are disappearing"), so finished posts always stay in the feed
+ * and the feed never runs dry, TikTok-style. The server's For You ranking
+ * does the same (api-server lib/ranking/forYou.ts `rankUnseenFirst`).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const FINISHED_VIDEOS_KEY = 'bt:feed-finished-videos:v1';
 /** Long enough to cover a few days of scrolling, small enough to stay cheap. */
 export const FINISHED_VIDEOS_MAX = 400;
+/** How long a finished video counts as "seen" for ordering. It is never hidden. */
 export const FINISHED_VIDEOS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type FinishedMap = Record<string, number>;
@@ -24,15 +27,21 @@ export function pruneFinished(map: FinishedMap, now: number, max = FINISHED_VIDE
   );
 }
 
+/** Feed ids of a looped repeat carry a `__loopN` suffix; seen-tracking uses the real post id. */
+export function basePostId(id: string): string {
+  return id.replace(/__loop\d+$/, '');
+}
+
 /**
- * Removes finished posts from a freshly fetched page. If every post on the
- * page was finished, the page is returned as is so the feed never goes
- * blank. Pure.
+ * Unseen posts first, then finished ones, each group keeping its incoming
+ * (ranked) order. Every post is kept — nothing is ever dropped. Pure.
  */
-export function withoutFinished<T extends { id: string }>(items: T[], finished: ReadonlySet<string>): T[] {
+export function unseenFirst<T extends { id: string }>(items: T[], finished: ReadonlySet<string>): T[] {
   if (finished.size === 0) return items;
-  const fresh = items.filter((item) => !finished.has(item.id));
-  return fresh.length > 0 ? fresh : items;
+  const unseen: T[] = [];
+  const seen: T[] = [];
+  for (const item of items) (finished.has(basePostId(item.id)) ? seen : unseen).push(item);
+  return seen.length === 0 ? items : [...unseen, ...seen];
 }
 
 /** True once playback has reached the end, or wrapped around from it. */
@@ -59,15 +68,16 @@ export function loadFinishedVideos(): Promise<FinishedMap> {
   return loading;
 }
 
-/** Synchronous snapshot for filtering; empty until the first load resolves. */
+/** Synchronous snapshot for ordering; empty until the first load resolves. */
 export function finishedVideoIds(): Set<string> {
   return new Set(Object.keys(memory ?? {}));
 }
 
 export function markVideoFinished(id: string): void {
+  const postId = basePostId(id);
   void loadFinishedVideos().then((map) => {
-    if (map[id]) return;
-    memory = pruneFinished({ ...map, [id]: Date.now() }, Date.now());
+    if (map[postId]) return;
+    memory = pruneFinished({ ...map, [postId]: Date.now() }, Date.now());
     void AsyncStorage.setItem(FINISHED_VIDEOS_KEY, JSON.stringify(memory)).catch(() => {});
   });
 }
