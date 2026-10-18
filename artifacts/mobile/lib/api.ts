@@ -8,6 +8,7 @@ import { isFeedMediaWrite } from './feedVideoPublish';
 import type { SizeChartData, SizeChartPreset, SizeChartTemplateSummary, SizeChartTemplateDetail } from '@/lib/sizeChartTypes';
 import { prepareImageForUpload, presetForUploadPath } from '@/lib/imageUploadPrep';
 import { sessionProgress, uploadResumeKey, uploadStrategy, withUploadRetry } from '@/lib/resumableUpload';
+import type { LiveAvailabilityStatus, LiveShowSummary } from '@/lib/live/liveAvailability';
 import { useAuth } from '@clerk/expo';
 import type { LaunchChecklistResponse } from '@/lib/launchChecklist';
 import type { FriendsSaved } from '@/lib/friendsSaved';
@@ -52,7 +53,6 @@ import type {
 } from '@/lib/checkoutPayment';
 import { classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsError';
 import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
-import type { LiveAvailabilityStatus } from '@/lib/live/liveAvailability';
 import type { CounterNoticeInput, SellerIpCase } from '@/lib/counterNotice';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { FirstWeekState } from '@/lib/firstWeek';
@@ -4879,6 +4879,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** HTTP presence fallback — only used when the WebSocket can't connect (see lib/live/useLiveSocket.ts). */
       heartbeat:      (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/heartbeat`, {}),
       end:            (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/end`, {}),
+      /** Host-only post-show numbers (duration, peak/total viewers, comments, products). */
+      summary:        (id: string) => get<{ summary: LiveShowSummary }>(`/api/live/${encodeURIComponent(id)}/summary`),
       updateProducts: (id: string, productTags: any[]) =>
         patch<any>(`/api/live/${encodeURIComponent(id)}/products`, { productTags }),
       comment:        (id: string, data: { message: string; displayName?: string; avatarUrl?: string }) =>

@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 const read = (p: string) => readFileSync(resolve(__dirname, '..', p), 'utf8');
 const live = read('app/live.tsx');
 const overlays = read('components/live/LiveOverlays.tsx');
-const empty = read('components/live/LiveEmptyState.tsx');
+const empty = read('components/live/LiveShowsGrid.tsx');
 const feed = read('app/(tabs)/feed.tsx');
 const layout = read('app/_layout.tsx');
 const inbox = read('components/inbox/MessagesInbox.tsx');
@@ -34,13 +34,13 @@ describe('LIVE route', () => {
     expect(feed).toContain('export function VideoVisual(props: VideoVisualProps)');
   });
 
-  it('has every overlay piece: host pill, close, viewer stack, chat, pinned product, rail, hearts, comment pill', () => {
-    for (const piece of ['<LiveHostPill', '<LiveViewerStack', '<LiveChatList', '<LivePinnedProductCard', '<LiveRail', '<LiveHeartLayer', '<LiveCommentBar', 'testID="live-close"']) {
+  it('has the unified host, audience, chat, product, rail and native-video overlays', () => {
+    for (const piece of ['<LiveHostRow', '<LiveTopRight', '<LiveChatList', '<LiveProductCard', '<LiveRail', '<LiveHeartLayer', '<LiveChatInput', '<LiveRtcVideo']) {
       expect(live).toContain(piece);
     }
     expect(overlays).toContain('placeholder="Add comment..."');
-    expect(overlays).toContain('<Text style={styles.followText}>Follow</Text>');
-    expect(overlays).toContain('<Text style={styles.liveBadgeText}>LIVE</Text>');
+    expect(overlays).toContain('Follow');
+    expect(overlays).toContain('LIVE');
     // Chat shows only the last ~5 messages, fading upward.
     expect(overlays).toContain('messages.slice(-LIVE_CHAT_VISIBLE)');
     expect(overlays).toContain('const FADE = [');
@@ -53,10 +53,10 @@ describe('LIVE route', () => {
   });
 
   it('never renders a blank page: loading, then pager or the empty state', () => {
-    expect(live).toContain('<LiveEmptyState');
-    expect(empty).toContain('No one&apos;s live right now');
-    expect(empty).toContain("'Remind me'");
-    expect(empty).toContain('Creators to follow');
+    expect(live).toContain('<LiveNotice');
+    expect(empty).toContain("No one's live right now");
+    expect(empty).toContain('provider.setReminder(id, on)');
+    expect(empty).toContain('LIVE_NOT_CONFIGURED_BUYER_BODY');
   });
 
   it('animates an ended stream out before removing it', () => {
@@ -90,10 +90,11 @@ describe('Entry points', () => {
     expect(feed).not.toContain('testID="buyer-home-live"');
     expect(feed).not.toContain('LiveEdgeTab');
     expect(feed).toContain('<LiveNowList');
-    expect(liveNow).toContain('getLiveStreamProvider().listLive()');
-    expect(liveNow).toContain('openLive({ streamId: item.id, hostId: item.host.id })');
-    // Nobody live: one quiet line, never sample cards.
-    expect(liveNow).toContain('No one&apos;s live right now');
+    expect(liveNow).toContain('<LiveShowsGrid');
+    expect(liveNow).toContain('openLive({ streamId: stream.id, hostId: stream.host.id })');
+    const directory = read('components/live/LiveShowsGrid.tsx');
+    expect(directory).toContain('provider.listLive()');
+    expect(directory).toContain("No one's live right now");
   });
 
   it('feed rail avatars wear the LIVE ring and open the stream', () => {

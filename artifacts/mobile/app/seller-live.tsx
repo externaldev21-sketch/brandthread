@@ -1,139 +1,108 @@
-import { roomAnnouncement } from '@/lib/live/roomAnnouncement';
-import * as Haptics from 'expo-haptics';
 /**
- * Seller Live — active broadcast screen.
- * Uses react-native-agora in host mode. Gracefully degrades when native
- * Agora SDK is unavailable (Expo Go / web preview).
+ * Seller Live — the host's own show while it's on air. Same overlay as the
+ * buyer's viewer (components/live/LiveOverlays.tsx, Whatnot's show screen
+ * https://mobbin.com/flows/ed55f754-472f-46f8-914b-ce7cb7345c7b) so the host
+ * sees what buyers see, with the host's controls in the same places:
+ *
+ *   top-left   you · LIVE and the running time
+ *   top-right  viewer count · X to end the show ("End show?" confirm)
+ *   right      More (codes, moderation, co-host, mic) · Flip · Shop
+ *   bottom     chat (tap a message to pin / remove / mute / ban) ·
+ *              "Say something..." · the pinned item with Unpin
+ *
+ * Shop is Whatnot's shop list: the show's items first with Pin / Pinned,
+ * then the rest of your catalog with Add. Ending goes to the post-show
+ * summary (app/seller-live-summary.tsx).
+ *
+ * Broadcasts through react-native-agora in host mode. Without the native
+ * SDK (web / Expo Go) the camera still previews via expo-camera, and in the
+ * preview (`?bt_preview=seller&demo=1` only) chat / viewers / items come
+ * from the local preview provider instead of the API.
  */
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Platform, ActivityIndicator } from 'react-native';
-
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-
 import { useLocalSearchParams, useRouter } from 'expo-router';
-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { Icon } from '@/components/ui/Icon';
-
-import { haptics, haptic } from '@/lib/haptics';
-
-import { Feather } from '@expo/vector-icons';
-
-
-import { useApi } from '@/lib/api';
-
+import { LinearGradient } from 'expo-linear-gradient';
+import { CameraView } from 'expo-camera';
 import { useUser } from '@clerk/expo';
-
-import { FILL_ELEVATED, FONT, FS, SP, RADIUS, FG, TEXT_SECONDARY } from '@/lib/theme';
-
-import { useAppTheme } from '@/contexts/AppThemeContext';
-
+import { useApi } from '@/lib/api';
+import { FONT, FS, MEDIA } from '@/lib/theme';
+import { formatCents } from '@/lib/money';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
-
-import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-
-import { useScrollToEndOnContentChange } from '@/hooks/useScrollToEndOnContentChange';
-
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
-
-import Composer from '@/components/ui/Composer';
-import { LIVE_RED } from '@/components/live/LiveAvatarRing';
-
 import { LiveCodesHostSheet } from '@/components/live/LiveCodesHostSheet';
-
 import { useLiveModeration } from '@/lib/live/useLiveModeration';
-
 import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
-
 import { LiveCommentActionsSheet, type CommentAction, type CommentActionTarget } from '@/components/live/LiveCommentActionsSheet';
-
-import { radius } from '@/constants/radii';
-
+import {
+  LiveChatInput, LiveChatList, LiveHostRow, LiveProductCard, LiveRail, LiveTopRight,
+} from '@/components/live/LiveOverlays';
+import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { loadAgoraModule } from '@/lib/agoraAvailability';
-import { useLiveAuction } from '@/lib/live/useLiveAuction';
-import { LiveAuctionCard } from '@/components/live/LiveAuctionCard';
-import { LiveAuctionHostSheet } from '@/components/live/LiveAuctionHostSheet';
-import { cancelLiveAuction } from '@/services/liveAuctionsService';
-
-import { LiveCohostSplit } from '@/components/live/LiveCohostSplit';
-
-import { LivePurchaseToast, useLivePurchaseToasts } from '@/components/live/LivePurchaseToast';
-
-import type { LiveCohostPerson } from '@/lib/live/moderationTypes';
-import { endLiveStreamActivity, startLiveStreamActivity, updateLiveStreamActivity } from '@/lib/nativeSystem';
-
-import { crispPx } from '@/lib/crispPixel';
-
-import { formatMoney } from '@/lib/format';
+import { hapticLight, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
+import { getLiveStreamProvider, isLivePreviewDemo } from '@/lib/live/liveProvider';
+import { productsFromTags } from '@/lib/live/apiLiveProvider';
+import type { LiveChatMessage, LiveHost, LiveProduct } from '@/lib/live/types';
 
 // ─── Agora SDK (native-only, gracefully skipped on web/Expo Go) ───────────────
 const AgoraModule = loadAgoraModule();
 
 interface Comment { id: string; user_id?: string; display_name: string; message: string; created_at: string; }
+interface ProductTag { productId: string; productName: string; priceCents: number; imageUri?: string | null; highlighted?: boolean }
 
-export default function SellerLiveScreen() {
-  // `&demo=1` renders the broadcast screen in a browser (camera placeholder)
-  // for the screenshot harness; a real web visit still gets the notice.
-  const { demo } = useLocalSearchParams<{ demo?: string }>();
-  if (Platform.OS === 'web' && demo !== '1') {
-    return (
-      <NativeOnlyFeature
-        icon="video-off"
-        title="Broadcasting is mobile-only"
-        description="Start and manage a Brandthread live broadcast from the iOS or Android app, where camera, microphone, and live-stream controls are available."
-      />
-    );
-  }
-  return <SellerLiveNativeScreen />;
+export function formatLiveClock(secs: number): string {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-function SellerLiveNativeScreen() {
-  const { theme } = useAppTheme();
-  const { accent: PURPLE } = theme;
-  const BG = theme.background;
-  const BORDER = theme.border;
-  const FG = theme.text;
-  const MUTED = theme.muted;
-  const SUBTLE = theme.subtle;
-  const PURPLE_DIM = theme.accentDim;
-  const s = React.useMemo(() => makeStyles(theme), [theme]);
+function toChat(c: Comment, hostId?: string | null): LiveChatMessage {
+  return {
+    id: String(c.id),
+    userId: c.user_id,
+    username: c.display_name,
+    text: c.message,
+    at: new Date(c.created_at).getTime() || Date.now(),
+    kind: hostId && c.user_id === hostId ? 'host' : 'chat',
+  };
+}
+
+export default function SellerLiveScreen() {
   const params = useLocalSearchParams<{
     streamId: string; channelName: string; agoraUid: string;
-    agoraAppId: string; token: string; title: string; facing?: string;
+    agoraAppId: string; token: string; title: string; facing?: string; mic?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
+  const topInset = useHeaderTopInset();
   const api = useApi();
   const { user } = useUser();
+  const preview = isLivePreviewDemo();
 
-  const [viewerCount, setViewerCount]     = useState(0);
-  const [comments, setComments]           = useState<Comment[]>([]);
-  const [commentText, setCommentText]     = useState('');
-  const [duration, setDuration]           = useState(0);
-  const [productTags, setProductTags]     = useState<any[]>([]);
-  // Set when the SERVER ended this live (crash recovery / host silent), not
-  // the host's own End button.
-  const [streamEndedBy, setStreamEndedBy] = useState<'server' | null>(null);
-  const [showProductPicker, setShowProductPicker] = useState(false);
-  const [showLiveCodes, setShowLiveCodes]   = useState(false);
-  const [allProducts, setAllProducts]     = useState<any[]>([]);
-  const [ending, setEnding]               = useState(false);
-  const [agoraReady, setAgoraReady]       = useState(false);
+  const [viewerCount, setViewerCount] = useState(0);
+  const [comments, setComments] = useState<LiveChatMessage[]>([]);
+  const [duration, setDuration] = useState(0);
+  const [productTags, setProductTags] = useState<ProductTag[]>([]);
+  const [catalog, setCatalog] = useState<any[]>([]);
+  const [showShop, setShowShop] = useState(false);
+  const [showLiveCodes, setShowLiveCodes] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const [micOn, setMicOn] = useState(params.mic !== 'off');
+  const [facing, setFacing] = useState<'front' | 'back'>(params.facing === 'back' ? 'back' : 'front');
+  const [notice, setNotice] = useState('');
+
   // Host-only tips total; stays null (and renders nothing) while the
   // `live_tips` flag is OFF or the call fails.
   const liveTipsEnabled = useFeatureFlag('live_tips');
-  // Live auctions (live_auctions flag): the host's card + "Start an auction" sheet.
-  const liveAuctionsEnabled = useFeatureFlag('live_auctions');
-  const auctionState = useLiveAuction(params.streamId, { enabled: liveAuctionsEnabled, viewerId: user?.id });
-  const auctionEventRef = useRef(auctionState.handleEvent);
-  auctionEventRef.current = auctionState.handleEvent;
-  const [showAuctionSheet, setShowAuctionSheet] = useState(false);
   const [tipsTotalCents, setTipsTotalCents] = useState<number | null>(null);
   useEffect(() => {
-    if (!liveTipsEnabled || !params.streamId) return undefined;
+    if (!liveTipsEnabled || !params.streamId || preview) return undefined;
     let cancelled = false;
     const load = () => {
       api.liveTips.total(params.streamId)
@@ -143,39 +112,20 @@ function SellerLiveNativeScreen() {
     load();
     const timer = setInterval(load, 8000);
     return () => { cancelled = true; clearInterval(timer); };
-  }, [api, liveTipsEnabled, params.streamId]);
+  }, [api, liveTipsEnabled, params.streamId, preview]);
 
   // Moderation + co-host (pinned comment, co-host tiles, comment actions sheet).
   const mod = useLiveModeration(params.streamId);
   const [actionComment, setActionComment] = useState<CommentActionTarget | null>(null);
-  // Accepted co-hosts on stage (routes/live-cohost.ts): split stage when any.
-  const [cohosts, setCohosts]             = useState<LiveCohostPerson[]>([]);
-  // "<first name> bought <product>" from purchases paid in this live.
-  const purchaseToasts = useLivePurchaseToasts();
 
-  const engineRef     = useRef<any>(null);
-  const commentsRef   = useRef<ScrollView>(null);
-  // New comments scroll the list once they've laid out (no fixed delay).
-  const commentsScroll = useScrollToEndOnContentChange(commentsRef);
-  // Slow-polling fallback loop — only runs when the WebSocket genuinely
-  // can't connect (see useLiveSocket's onFallback below).
+  const engineRef = useRef<any>(null);
   const fallbackPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const timerRef      = useRef<ReturnType<typeof setInterval> | null>(null);
-  const consecutiveFailuresRef = useRef(0);
-  const generationRef = useRef(0);
-  const requestGenerationRef = useRef<number | null>(null);
   const lastCommentTs = useRef<string>(new Date().toISOString());
 
-  // ─── Init Agora ─────────────────────────────────────────────────────────────
+  // ─── Init Agora (host) ──────────────────────────────────────────────────────
   useEffect(() => {
-    if (!AgoraModule || !params.agoraAppId) return;
-
-    const {
-      createAgoraRtcEngine,
-      ChannelProfileType,
-      ClientRoleType,
-    } = AgoraModule;
-
+    if (!AgoraModule || !params.agoraAppId) return undefined;
+    const { createAgoraRtcEngine, ChannelProfileType, ClientRoleType } = AgoraModule;
     try {
       const engine = createAgoraRtcEngine();
       engine.initialize({ appId: params.agoraAppId });
@@ -183,18 +133,16 @@ function SellerLiveNativeScreen() {
       engine.setClientRole(ClientRoleType.ClientRoleBroadcaster);
       engine.enableVideo();
       // Agora's local preview starts on the rear camera; match whichever
-      // camera the go-live setup screen was already previewing on.
+      // camera the camera check was already previewing on.
       if (params.facing === 'front') {
-        try { engine.switchCamera(); } catch {}
+        try { engine.switchCamera(); } catch { /* single camera */ }
+      }
+      if (params.mic === 'off') {
+        try { engine.muteLocalAudioStream(true); } catch { /* older SDK */ }
       }
       engine.startPreview();
       engine.registerEventHandler({
-        onJoinChannelSuccess: () => setAgoraReady(true),
-        // viewerCount is now a real presence count broadcast over the
-        // live WebSocket (see the useLiveSocket call below /
-        // jobs/liveViewersPresence.ts) — not derived from Agora's own
-        // channel-membership events, which only ever went up.
-        onError:       (err: any) => console.warn('[Agora]', err),
+        onError: (err: any) => console.warn('[Agora]', err),
       });
       engine.joinChannel(
         params.token || null,
@@ -206,191 +154,126 @@ function SellerLiveNativeScreen() {
     } catch (e) {
       console.warn('[Agora init]', e);
     }
-
     return () => {
-      try {
-        engineRef.current?.leaveChannel();
-        engineRef.current?.release();
-      } catch {}
+      try { engineRef.current?.leaveChannel(); engineRef.current?.release(); } catch { /* gone */ }
     };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Running time ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    const t = setInterval(() => setDuration(d => d + 1), 1000);
+    return () => clearInterval(t);
   }, []);
 
-  // ─── Duration timer + initial data ─────────────────────────────────────────
+  // ─── Initial items (what setup lined up) + catalog ─────────────────────────
   useEffect(() => {
-    generationRef.current += 1;
-    consecutiveFailuresRef.current = 0;
-    timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
-    loadProducts();
-    // Products lined up on the go-live screen are already on the stream —
-    // show them on the rail straight away (they used to appear only after
-    // the first socket broadcast).
+    let alive = true;
+    if (preview) {
+      const provider = getLiveStreamProvider();
+      void provider.listLive().then(list => {
+        const mine = list.find(s => s.id === params.streamId);
+        if (!alive || !mine) return;
+        setProductTags(mine.products.map(p => ({ productId: p.productId, productName: p.name, priceCents: p.priceCents, imageUri: p.imageUri })));
+      }).catch(() => {});
+      const off = provider.subscribe(params.streamId, event => {
+        if (event.type === 'viewers') setViewerCount(event.viewerCount);
+        if (event.type === 'chat') setComments(prev => [...prev, ...event.messages].slice(-80));
+      });
+      return () => { alive = false; off(); };
+    }
     (api as any).live.get(params.streamId)
-      .then((d: any) => {
-        if (Array.isArray(d?.stream?.product_tags)) setProductTags(d.stream.product_tags);
-        if (d?.stream && d.stream.status !== 'live') setStreamEndedBy('server');
+      .then((r: any) => {
+        if (!alive) return;
+        const tags = Array.isArray(r?.stream?.product_tags) ? r.stream.product_tags : [];
+        setProductTags(tags);
+        setViewerCount(Number(r?.stream?.viewer_count) || 0);
       })
       .catch(() => {});
-    return () => {
-      clearInterval(timerRef.current!);
-      if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
-    };
-  }, []);
+    (api as any).products?.list?.()
+      .then((r: any) => { if (alive) setCatalog(Array.isArray(r) ? r : r?.products ?? []); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ─── Realtime: WebSocket room for this stream, replacing the old 3s poll ──────
-  const handleLiveEvent = React.useCallback((event: LiveSocketEvent) => {
-    auctionEventRef.current(event as any);
+  // ─── Realtime: WebSocket room for this stream ───────────────────────────────
+  const handleLiveEvent = useCallback((event: LiveSocketEvent) => {
     if (event.type === 'comment') {
       lastCommentTs.current = event.comment.created_at;
-      setComments(prev => [...prev, event.comment].slice(-80));
-      commentsScroll.requestScrollToEnd();
+      setComments(prev => [...prev, toChat(event.comment as Comment, user?.id)].slice(-80));
     } else if (event.type === 'products') {
-      setProductTags(event.productTags);
+      setProductTags(event.productTags as ProductTag[]);
     } else if (event.type === 'viewerCount') {
       setViewerCount(event.count);
     } else if (event.type === 'comment_removed') {
       setComments(prev => prev.filter(c => c.id !== event.commentId));
       mod.handleEvent(event);
-    } else if (event.type === 'ended' && event.reason !== 'host') {
-      setStreamEndedBy('server');
-    } else if (event.type === 'cohosts') {
-      setCohosts(Array.isArray(event.cohosts) ? event.cohosts : []);
-    } else if (event.type === 'purchase' || event.type === 'gift') {
-      if (event.type === 'purchase' && 'buyerFirstName' in event.purchase) purchaseToasts.push(event.purchase);
-      // "Ana just bought …" / "Ana sent $5 Thread Cash" in the host's chat (no user_id: not moderatable).
-      const a = roomAnnouncement(event.type === 'purchase' ? event.purchase : event.gift);
-      setComments(prev => prev.some(c => c.id === a.id) ? prev : [...prev, { id: a.id, display_name: a.name, message: a.text, created_at: a.at }].slice(-80));
-      setTimeout(() => commentsRef.current?.scrollToEnd({ animated: true }), 100);
     } else {
       mod.handleEvent(event);
     }
-  }, [mod.handleEvent, commentsScroll.requestScrollToEnd]);
+  }, [mod.handleEvent, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const startFallbackPolling = React.useCallback((active: boolean) => {
+  const pollComments = useCallback(async () => {
+    try {
+      const data = await (api as any).live.comments(params.streamId, lastCommentTs.current) as any;
+      const fresh: Comment[] = (data.comments ?? []).reverse();
+      if (fresh.length) {
+        lastCommentTs.current = fresh[fresh.length - 1].created_at;
+        setComments(prev => [...prev, ...fresh.map(c => toChat(c, user?.id))].slice(-80));
+      }
+    } catch { /* next tick */ }
+  }, [api, params.streamId, user?.id]);
+
+  const startFallbackPolling = useCallback((active: boolean) => {
     if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
     if (!active) return;
-    fallbackPollRef.current = setInterval(() => {
-      void pollComments(generationRef.current);
-      // Host presence over HTTP while the socket is down, so the stream
-      // isn't swept as abandoned (jobs/liveStaleStreams.ts).
-      void (api as any).live.heartbeat(params.streamId).catch(() => {});
-    }, 15000);
-  }, []);
+    fallbackPollRef.current = setInterval(() => { void pollComments(); }, 15000);
+  }, [pollComments]);
+  useEffect(() => () => { if (fallbackPollRef.current) clearInterval(fallbackPollRef.current); }, []);
 
   useLiveSocket({
     streamId: params.streamId,
-    enabled: !!params.streamId,
+    enabled: !!params.streamId && !preview,
     asHost: true,
     onEvent: handleLiveEvent,
-    onConnected: () => {
-      void pollComments(generationRef.current);
-      mod.refresh();
-      (api as any).liveCohost.list(params.streamId).then((r: any) => setCohosts(r?.cohosts ?? [])).catch(() => {});
-    },
+    onConnected: () => { void pollComments(); mod.refresh(); },
     onFallback: startFallbackPolling,
   });
 
-  /** One-shot HTTP backfill — used on WebSocket connect/reconnect, and as
-   * the fallback loop's refresh when the socket can't connect at all. */
-  async function pollComments(generation: number) {
-    if (requestGenerationRef.current === generation) return;
-    requestGenerationRef.current = generation;
-    try {
-      const data = await (api as any).live.comments(params.streamId, lastCommentTs.current) as any;
-      if (generationRef.current !== generation) return;
-      const newComments: Comment[] = (data.comments ?? []).reverse();
-      if (newComments.length) {
-        lastCommentTs.current = newComments[newComments.length - 1].created_at;
-        setComments(prev => [...prev, ...newComments].slice(-80));
-        commentsScroll.requestScrollToEnd();
-      }
-      consecutiveFailuresRef.current = 0;
-    } catch {
-      consecutiveFailuresRef.current += 1;
-    } finally {
-      if (requestGenerationRef.current === generation) {
-        requestGenerationRef.current = null;
-      }
+  // ─── Actions ───────────────────────────────────────────────────────────────
+  async function sendComment(message: string) {
+    if (preview) {
+      setComments(prev => [...prev, { id: `you-${Date.now()}`, userId: user?.id, username: user?.username ?? 'You', text: message, at: Date.now(), kind: 'host' as const }].slice(-80));
+      return;
     }
+    await (api as any).live.comment(params.streamId, {
+      message,
+      displayName: user?.username ?? user?.firstName ?? 'Host',
+    });
   }
 
-  async function loadProducts() {
-    try {
-      const r = await (api as any).products?.list?.() as any;
-      const list = Array.isArray(r) ? r : (r?.products ?? []);
-      setAllProducts(list.filter((p: any) => !p?.status || p.status === 'active'));
-    } catch {}
-  }
-
-  function formatDuration(secs: number) {
-    const h = Math.floor(secs / 3600);
-    const m = Math.floor((secs % 3600) / 60);
-    const s = secs % 60;
-    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  }
-
-  async function sendComment() {
-    const msg = commentText.trim();
-    if (!msg) return;
-    setCommentText('');
-    try {
-      await (api as any).live.comment(params.streamId, {
-        message: msg,
-        displayName: user?.firstName ?? user?.username ?? 'Host',
-      });
-    } catch {}
-  }
-
-  useEffect(() => {
-    if (streamEndedBy !== 'server') return;
-    Alert.alert('Your live ended', 'This live was ended because the connection to it was lost. Go live again to keep streaming.', [
-      { text: 'Summary', onPress: () => openSummary() },
-      { text: 'OK', onPress: () => router.dismissTo('/(tabs)/' as any) },
-    ]);
-  }, [streamEndedBy]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  /** The live summary (app/live-summary.tsx) replaces the broadcast screen. */
-  function openSummary() {
-    router.replace({ pathname: '/live-summary', params: { streamId: params.streamId } } as any);
-  }
-
-  /** Sends the rail to the server, which prices/names each product from the
-   *  catalogue; the server's copy replaces the optimistic one, or the rail
-   *  rolls back if it didn't reach viewers. */
-  async function saveProductTags(updated: any[], previous: any[], failTitle: string) {
+  async function addProduct(product: any) {
+    hapticSelection();
+    const updated = [...productTags, {
+      productId: product.id, productName: product.name, priceCents: product.priceCents ?? 0, imageUri: product.imageUrl ?? undefined,
+    }];
     setProductTags(updated);
-    try {
-      const res = await (api as any).live.updateProducts(
-        params.streamId,
-        updated.map(t => ({ productId: t.productId, highlighted: Boolean(t.highlighted) })),
-      );
-      if (Array.isArray(res?.productTags)) setProductTags(res.productTags);
-    } catch (e: any) {
-      setProductTags(previous);
-      Alert.alert(failTitle, e?.message ?? 'Please try again.');
+    if (preview) return;
+    try { await (api as any).live.updateProducts(params.streamId, updated); } catch {
+      setNotice("Couldn't add that item. Try again.");
     }
   }
 
-  async function toggleProduct(product: any) {
-    haptic('select');
-    const exists = productTags.find(t => t.productId === product.id);
-    const updated = exists
-      ? productTags.filter(t => t.productId !== product.id)
-      : [...productTags, { productId: product.id, productName: product.name }];
-    await saveProductTags(updated, productTags, 'Could not update products');
-  }
-
-  async function highlightProduct(productId: string) {
-    haptic('select');
-    // Tapping the featured product again unpins it. The pin is stored and
-    // broadcast by the server (POST /api/live/:id/pin), which also keeps the
-    // legacy `highlighted` flag in step.
-    const alreadyPinned = productTags.find(tag => tag.productId === productId)?.highlighted === true;
-    const updated = productTags.map(tag => ({
-      ...tag,
-      highlighted: !alreadyPinned && tag.productId === productId,
-    }));
-    await saveProductTags(updated, productTags, "Couldn't feature product");
+  async function setPinned(productId: string | null) {
+    hapticSelection();
+    const prev = productTags;
+    setProductTags(tags => tags.map(tag => ({ ...tag, highlighted: productId != null && tag.productId === productId })));
+    if (preview) return;
+    try {
+      await (api as any).live.pin(params.streamId, productId);
+    } catch {
+      setProductTags(prev);
+      setNotice("Couldn't update the pinned item. Buyers still see the last one.");
+    }
   }
 
   async function runCommentAction(action: CommentAction, c: CommentActionTarget) {
@@ -401,369 +284,171 @@ function SellerLiveNativeScreen() {
       else if (action === 'remove') await (api as any).liveMod.removeComment(id, c.id);
       else if (action === 'mute' && c.user_id) await (api as any).liveMod.mute(id, c.user_id);
       else if (action === 'ban' && c.user_id) await (api as any).liveMod.ban(id, c.user_id);
-      if (action === 'ban' && c.user_id) setComments(prev => prev.filter(x => x.user_id !== c.user_id));
+      if (action === 'ban' && c.user_id) setComments(prev => prev.filter(x => x.userId !== c.user_id));
       if (action === 'remove') setComments(prev => prev.filter(x => x.id !== c.id));
     } catch {
-      Alert.alert('Couldn’t update the live', 'Try again.');
+      setNotice('That action did not go through. Try again.');
     }
   }
 
-  // Live Activity on the Lock Screen / Dynamic Island while broadcasting
-  // (iOS dev builds only; a no-op elsewhere): LIVE, viewers, sales.
-  useEffect(() => {
-    if (!params.streamId) return undefined;
-    const streamId = params.streamId;
-    startLiveStreamActivity(streamId, params.title || 'Live', { viewers: 0, salesCents: 0, ordersCount: 0, isLive: true });
-    return () => endLiveStreamActivity(streamId, { viewers: 0, salesCents: 0, ordersCount: 0, isLive: false });
-  }, [params.streamId, params.title]);
-  useEffect(() => {
-    if (params.streamId) updateLiveStreamActivity(params.streamId, { viewers: viewerCount, salesCents: 0, ordersCount: 0, isLive: true });
-  }, [params.streamId, viewerCount]);
+  const flipCamera = useCallback(() => {
+    hapticSelection();
+    try { engineRef.current?.switchCamera?.(); } catch { /* single camera */ }
+    setFacing(f => (f === 'front' ? 'back' : 'front'));
+  }, []);
 
-  async function handleEnd() {
-    Alert.alert('End stream?', "We'll try to save your stream as a replay in the Thread feed. This can take a few minutes, and isn't guaranteed.", [
-      { text: 'Keep going', style: 'cancel' },
-      {
-        text: 'End & save', style: 'destructive',
-        onPress: async () => {
-          setEnding(true);
-          try {
-            await (api as any).live.end(params.streamId);
-          } catch (e: any) {
-            // Leaving now would keep the live showing in buyers' feeds.
-            setEnding(false);
-            Alert.alert('Could not end live', e?.message ?? 'Check your connection and try again.');
-            return;
-          }
-          
-          openSummary();
-        },
-      },
+  const toggleMic = useCallback(() => {
+    setMicOn(on => {
+      // Muting when it was on, unmuting when it was off.
+      try { engineRef.current?.muteLocalAudioStream?.(on); } catch { /* older SDK */ }
+      return !on;
+    });
+  }, []);
+
+  function openMore() {
+    showActionSheet(undefined, undefined, [
+      { text: micOn ? 'Mute microphone' : 'Unmute microphone', onPress: toggleMic },
+      { text: 'Live codes', onPress: () => setShowLiveCodes(true) },
+      { text: 'Moderation', onPress: () => router.push({ pathname: '/live-moderation', params: { streamId: params.streamId } } as any) },
+      { text: 'Invite a co-host', onPress: () => router.push({ pathname: '/live-cohost', params: { streamId: params.streamId } } as any) },
+      { text: 'Cancel', style: 'cancel' },
     ]);
   }
 
-  const LocalCameraView = AgoraModule
-    ? AgoraModule.RtcSurfaceView
-    : null;
+  function confirmEnd() {
+    showActionSheet('End show?', 'Buyers will see that your show has ended.', [
+      { text: 'End show', style: 'destructive', onPress: () => { void endShow(); } },
+      { text: 'Keep going', style: 'cancel' },
+    ]);
+  }
+
+  async function endShow() {
+    setEnding(true);
+    try {
+      if (preview) await getLiveStreamProvider().stop(params.streamId);
+      else await (api as any).live.end(params.streamId);
+    } catch { /* the summary still loads what the server has */ }
+    hapticSuccessAction();
+    router.replace({
+      pathname: '/seller-live-summary',
+      params: { streamId: params.streamId, duration: String(duration), title: params.title ?? '' },
+    } as never);
+  }
+
+  // ─── Derived ───────────────────────────────────────────────────────────────
+  const host: LiveHost = useMemo(() => {
+    const name = user?.username ?? user?.firstName ?? 'You';
+    return { id: user?.id ?? 'me', name, handle: user?.username ? `@${user.username}` : '', initials: name.slice(0, 2).toUpperCase(), avatarColor: MEDIA.chip, avatarUri: user?.imageUrl ?? null, verified: false };
+  }, [user?.id, user?.username, user?.firstName, user?.imageUrl]);
+
+  const { products: showProducts } = productsFromTags(productTags);
+  const withImages: LiveProduct[] = showProducts.map(p => ({ ...p, imageUri: productTags.find(t => t.productId === p.productId)?.imageUri ?? null }));
+  const pinnedId = productTags.find(t => t.highlighted)?.productId ?? null;
+  const pinned = withImages.find(p => p.productId === pinnedId) ?? null;
+  const tagged = new Set(productTags.map(t => t.productId));
+  const shopList: LiveProduct[] = [
+    ...withImages,
+    ...catalog.filter(p => !tagged.has(p.id)).map(p => ({ productId: p.id, name: p.name, priceCents: p.priceCents ?? 0, imageUri: p.imageUrl ?? null })),
+  ];
+
+  const LocalCameraView = AgoraModule ? AgoraModule.RtcSurfaceView : null;
+  const bottomInset = Math.max(insets.bottom, 10);
 
   return (
-    <View style={s.root}>
-      {/* Camera preview (Agora host view) — inside the split stage below while co-hosts are on */}
-      {cohosts.length > 0 ? null : LocalCameraView ? (
-        <LocalCameraView
-          canvas={{ uid: 0, renderMode: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+    <View style={styles.root} testID="seller-live-screen">
+      {LocalCameraView && params.agoraAppId ? (
+        <LocalCameraView canvas={{ uid: 0, renderMode: 1 }} style={StyleSheet.absoluteFill} />
       ) : (
-        <View style={[StyleSheet.absoluteFill, s.cameraPlaceholder]}>
-          <Icon name="video" size={48} color={MUTED} />
-          <Text style={s.cameraPlaceholderText}>Camera preview available on device</Text>
-        </View>
+        <CameraView style={StyleSheet.absoluteFill} facing={facing} mute />
       )}
 
-      {/* Co-hosts on stage: host (local camera) on top, co-hosts below. */}
-      <LiveCohostSplit
-        hostUid={0}
-        hostName={user?.firstName ?? user?.username ?? 'You'}
-        hostAvatarUrl={user?.imageUrl ?? null}
-        cohosts={cohosts}
-        RtcSurfaceView={LocalCameraView}
-      />
+      <LinearGradient pointerEvents="none" colors={[MEDIA.scrim, 'transparent']} style={[styles.topScrim, { height: topInset + 90 }]} />
+      <LinearGradient pointerEvents="none" colors={['transparent', MEDIA.chip, MEDIA.scrim]} locations={[0, 0.45, 1]} style={[styles.bottomScrim, { height: bottomInset + 380 }]} />
 
-      {/* Gradient overlay */}
-      <View style={[StyleSheet.absoluteFill, s.overlay]} pointerEvents="none" />
-
-      {/* Top bar */}
-      <View style={[s.topBar, { paddingTop: headerTopInset + 8 }]}>
-        <View style={s.topLeft}>
-          <View style={[s.livePill, { backgroundColor: LIVE_RED }]}>
-            <View style={s.liveDot} />
-            <Text style={s.livePillText}>LIVE</Text>
-          </View>
-          <Text style={s.durationText}>{formatDuration(duration)}</Text>
+      <View style={[styles.topRow, { top: topInset + 6 }]} pointerEvents="box-none">
+        <View style={styles.hostCol}>
+          <LiveHostRow host={host} following={false} />
+          <Text style={styles.clock} testID="seller-live-duration">{formatLiveClock(duration)}</Text>
         </View>
-        <TouchableOpacity onPress={handleEnd} disabled={ending} style={s.endBtn}>
-          {ending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.endBtnText}>End</Text>}
-        </TouchableOpacity>
+        <LiveTopRight viewerCount={viewerCount} onLeave={confirmEnd} leaveIcon="x" leaveLabel="End show" />
       </View>
 
-      {/* Viewer count */}
-      <View style={[s.viewerRow, { paddingTop: headerTopInset + 48 }]}>
-        <View style={[s.viewerBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
-          <Icon name="eye" size={13} color="#fff" />
-          <Text style={s.viewerText}>{viewerCount.toLocaleString()}</Text>
-        </View>
-      </View>
-
-      {/* Tips total (live_tips flag ON and at least one tip) */}
       {tipsTotalCents != null && tipsTotalCents > 0 && (
-        <View style={[s.tipsRow, { paddingTop: headerTopInset + 78 }]} pointerEvents="none">
-          <View style={[s.viewerBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]} testID="seller-live-tips-total">
-            <Icon name="gift" size={13} color="#fff" />
-            <Text style={s.viewerText}>{formatMoney(tipsTotalCents)} in tips</Text>
+        <View style={[styles.tips, { top: topInset + 50 }]} pointerEvents="none" testID="seller-live-tips-total">
+          <Text style={styles.tipsText}>{formatCents(tipsTotalCents)} in tips</Text>
+        </View>
+      )}
+
+      <CohostTiles cohosts={mod.cohosts} RtcSurfaceView={AgoraModule?.RtcSurfaceView ?? null} top={topInset + 86} />
+
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.bottom, { paddingBottom: bottomInset + 8 }]} pointerEvents="box-none">
+        <View style={styles.chatAndRail} pointerEvents="box-none">
+          <View style={styles.chatCol} pointerEvents="box-none">
+            <PinnedCommentBar comment={mod.pinned} />
+            <View style={styles.chatWrap} pointerEvents="box-none">
+              <LiveChatList
+                messages={comments}
+                onLongPressMessage={m => {
+                  if (!m.userId || m.userId === user?.id) return;
+                  setActionComment({ id: m.id, user_id: m.userId, display_name: m.username, message: m.text });
+                }}
+              />
+            </View>
+            <LiveChatInput onSend={sendComment} disabled={ending} />
           </View>
+          <LiveRail productCount={productTags.length} onMore={openMore} onFlip={flipCamera} onOpenShop={() => { hapticLight(); setShowShop(true); }} />
         </View>
-      )}
-
-      {/* Right action rail */}
-      <View style={[s.rightRail, { paddingTop: headerTopInset + 80 }]}>
-        {/* Products */}
-        <TouchableOpacity onPress={() => setShowProductPicker(true)} style={s.railBtn} activeOpacity={0.7}>
-          <Icon name="shopping-bag" size={22} color="#fff" />
-          {productTags.length > 0 && (
-            <View style={[s.railBadge, { backgroundColor: LIVE_RED }]}>
-              <Text style={s.railBadgeText}>{productTags.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        {/* Live-only discount codes */}
-        <TouchableOpacity onPress={() => setShowLiveCodes(true)} style={s.railBtn} activeOpacity={0.7} accessibilityLabel="Live codes">
-          <Icon name="tag" size={21} color="#fff" />
-        </TouchableOpacity>
-        {/* Switch camera */}
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Switch camera"
-          style={s.railBtn}
-          activeOpacity={0.7}
-          onPress={() => engineRef.current?.switchCamera?.()}
-        >
-          <Icon name="refresh-cw" size={20} color="#fff" />
-        </TouchableOpacity>
-        {/* Moderation */}
-        <TouchableOpacity
-          style={s.railBtn}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Moderation"
-          onPress={() => router.push({ pathname: '/live-moderation', params: { streamId: params.streamId } } as any)}
-        >
-          <Icon name="shield" size={20} color="#fff" />
-        </TouchableOpacity>
-        {/* Co-host */}
-        <TouchableOpacity
-          style={s.railBtn}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Invite a co-host"
-          testID="seller-live-cohost"
-          onPress={() => router.push({ pathname: '/live-cohost', params: { streamId: params.streamId } } as any)}
-        >
-          <Icon name="user-plus" size={20} color="#fff" />
-          {cohosts.length > 0 && (
-            <View style={[s.railBadge, { backgroundColor: LIVE_RED }]}>
-              <Text style={s.railBadgeText}>{cohosts.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        {/* Auction (live_auctions flag) */}
-        {liveAuctionsEnabled && (
-          <TouchableOpacity
-            style={s.railBtn}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Start an auction"
-            onPress={() => setShowAuctionSheet(true)}
-            testID="seller-live-auction"
-          >
-            <Feather name="clock" size={20} color="#fff" />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Purchases paid from this live */}
-      <LivePurchaseToast purchase={purchaseToasts.current} top={headerTopInset + 84} />
-      {liveAuctionsEnabled && auctionState.auction && (
-        <View style={{ position: 'absolute', left: 12, right: 64, bottom: 205, zIndex: 9 }}>
-          <LiveAuctionCard
-            auction={auctionState.auction}
-            receivedAt={auctionState.receivedAt}
-            onCancel={() => { void cancelLiveAuction(params.streamId, auctionState.auction!.id).then(auctionState.refresh).catch(() => {}); }}
+        {pinned && (
+          <LiveProductCard
+            product={pinned}
+            onPress={() => setShowShop(true)}
+            action={{ label: 'Unpin', onPress: () => { void setPinned(null); }, testID: 'seller-live-unpin' }}
           />
-        </View>
-      )}
-      {liveAuctionsEnabled && (
-        <LiveAuctionHostSheet
-          streamId={params.streamId}
-          products={productTags.map(t => ({ productId: t.productId, productName: t.productName, priceCents: t.priceCents }))}
-          visible={showAuctionSheet}
-          onClose={() => setShowAuctionSheet(false)}
-          onStarted={auctionState.refresh}
-        />
-      )}
-
-      {/* Co-host tiles */}
-      <CohostTiles cohosts={mod.cohosts} RtcSurfaceView={AgoraModule?.RtcSurfaceView ?? null} top={headerTopInset + 86} />
-
-      {/* Tagged products strip */}
-      {productTags.length > 0 && (
-        <View style={s.productStrip}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.productStripContent}>
-            {productTags.map(tag => (
-              <TouchableOpacity
-                key={tag.productId}
-                onPress={() => highlightProduct(tag.productId)}
-                activeOpacity={0.8}
-                style={[
-                  s.productChip,
-                  { backgroundColor: tag.highlighted ? LIVE_RED : 'rgba(0,0,0,0.65)' },
-                ]}
-              >
-                <Icon name="shopping-bag" size={12} color={LIVE_RED} />
-                <Text style={s.productChipText} numberOfLines={1}>{tag.productName}</Text>
-                <Text style={s.productChipPrice}>{formatMoney(tag.priceCents ?? 0)}</Text>
-                {tag.highlighted && <Text style={s.featuredLabel}>FEATURED</Text>}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Comments + input */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={s.bottomSection}
-      >
-        {/* Pinned comment */}
-        <PinnedCommentBar comment={mod.pinned} />
-
-        {/* Comments scroll — tap or long-press a viewer comment for Pin / Remove / Mute / Ban */}
-        <ScrollView
-          ref={commentsRef}
-          style={s.commentScroll}
-          onContentSizeChange={commentsScroll.onContentSizeChange}
-          onScrollBeginDrag={commentsScroll.cancelScrollToEnd}
-          contentContainerStyle={s.commentContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {comments.map(c => (
-            <TouchableOpacity
-              key={c.id}
-              activeOpacity={0.8}
-              disabled={!c.user_id || c.user_id === user?.id}
-              onPress={() => setActionComment(c)}
-              onLongPress={() => setActionComment(c)}
-              accessibilityRole="button"
-              accessibilityHint="Opens moderation actions"
-              style={s.commentBubble}
-            >
-              <Text style={s.commentAuthor}>{c.display_name} </Text>
-              <Text style={s.commentText}>{c.message}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Comment input */}
-        <Composer
-          overMedia
-          value={commentText}
-          onChangeText={setCommentText}
-          onSend={sendComment}
-          placeholder="Say something…"
-          hideTabBar={false}
-          testID="seller-live-composer"
-        />
+        )}
+        {notice ? <Text style={styles.notice} onPress={() => setNotice('')}>{notice}</Text> : null}
       </KeyboardAvoidingView>
 
+      {showShop && (
+        <LiveProductsSheet
+          visible
+          products={shopList}
+          pinnedProductId={pinnedId}
+          onClose={() => setShowShop(false)}
+          emptyText="No products yet. Add products to your store first."
+          actionFor={(product, isPinned) => {
+            if (!tagged.has(product.productId)) {
+              const source = catalog.find(p => p.id === product.productId);
+              return { label: 'Add to show', onPress: () => { if (source) void addProduct(source); } };
+            }
+            return isPinned
+              ? { label: 'Pinned', selected: true, onPress: () => { void setPinned(null); } }
+              : { label: 'Pin', onPress: () => { void setPinned(product.productId); setShowShop(false); } };
+          }}
+        />
+      )}
       {showLiveCodes && <LiveCodesHostSheet streamId={params.streamId} onClose={() => setShowLiveCodes(false)} />}
       <LiveCommentActionsSheet
         comment={actionComment}
         pinned={!!actionComment && mod.pinned?.id === actionComment.id}
         onClose={() => setActionComment(null)}
-        onAction={(action, c) => { void runCommentAction(action, c); }}
+        onAction={(action, c) => { setActionComment(null); void runCommentAction(action, c); }}
       />
-
-      {/* Product picker modal */}
-      {showProductPicker && (
-        <View style={[StyleSheet.absoluteFill, s.pickerModal]}>
-          <View style={[s.pickerSheet, { paddingBottom: insets.bottom + 12 }]}>
-            <View style={s.pickerHeader}>
-              <Text style={s.pickerTitle}>Tag products</Text>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowProductPicker(false)}>
-                <Icon name="x" size={22} color={FG} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView>
-              {allProducts.map(p => {
-                const tagged = productTags.some(t => t.productId === p.id);
-                return (
-                  <TouchableOpacity
-                    key={p.id}
-                    onPress={() => toggleProduct(p)}
-                    activeOpacity={0.7}
-                    style={[s.pickerRow, tagged && { backgroundColor: `${PURPLE}12` }]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.pickerRowName, { color: FG }]} numberOfLines={1}>{p.name}</Text>
-                       {typeof p.priceCents === 'number' && (
-                         <Text style={[s.pickerRowPrice, { color: MUTED }]}>{formatMoney(p.priceCents)}</Text>
-                       )}
-                    </View>
-                    <View style={[s.checkbox, tagged && { backgroundColor: PURPLE, borderColor: PURPLE }]}>
-                      {tagged && <Icon name="check" size={13} color={theme.onAccent} />}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-              {allProducts.length === 0 && (
-                <Text style={[s.emptyText, { color: MUTED }]}>No products found</Text>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      )}
     </View>
   );
 }
 
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const BG = theme.background;
-  const BORDER = theme.border;
-  const FG = theme.text;
-  const MUTED = theme.muted;
-  const PURPLE = theme.accent;
-  const PURPLE_DIM = theme.accentDim;
-  const RED = LIVE_RED;
-  return StyleSheet.create({
-  root:             { flex: 1, backgroundColor: 'transparent' },
-  overlay:          { backgroundColor: 'rgba(0,0,0,0.25)' },
-  cameraPlaceholder:{ alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a', gap: 12 },
-  cameraPlaceholderText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', paddingHorizontal: 40 },
-  topBar:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-  topLeft:          { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  livePill:         { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 5 },
-  liveDot:          { width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff' },
-  livePillText:     { color: '#fff', fontFamily: FONT.bold, fontSize: 12 },
-  durationText:     { color: TEXT_SECONDARY, fontFamily: FONT.semibold, fontSize: 13 },
-  endBtn:           { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.sm, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  endBtnText:       { color: '#fff', fontFamily: FONT.semibold, fontSize: 13 },
-  viewerRow:        { position: 'absolute', top: 0, left: 16, zIndex: 9 },
-  tipsRow:          { position: 'absolute', top: 0, left: 16, zIndex: 9 },
-  viewerBadge:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 5 },
-  viewerText:       { color: '#fff', fontFamily: FONT.semibold, fontSize: 12 },
-  rightRail:        { position: 'absolute', right: 12, top: 0, zIndex: 10, gap: 16 },
-  railBtn:          { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
-  railBadge:        { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  railBadgeText:    { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
-  productStrip:     { position: 'absolute', bottom: 160, left: 0, right: 0, zIndex: 8 },
-  productStripContent: { paddingHorizontal: 12, gap: 8 },
-  productChip:      { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 7 },
-  productChipText:  { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, maxWidth: 100 },
-  productChipPrice: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: 11 },
-  featuredLabel: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
-  bottomSection:    { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10 },
-  commentScroll:    { maxHeight: 200, marginHorizontal: 12 },
-  commentContent:   { gap: 4, paddingBottom: 8 },
-  commentBubble:    { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, paddingVertical: 4 },
-  commentAuthor:    { color: '#fff', fontFamily: FONT.bold, fontSize: 12 },
-  commentText:      { color: FG, fontFamily: FONT.regular, fontSize: 12 },
-  // Product picker
-  pickerModal:      { backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 20, justifyContent: 'flex-end' },
-  pickerSheet:      { backgroundColor: FILL_ELEVATED, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%' },
-  pickerHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
-  pickerTitle:      { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
-  pickerRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
-  pickerRowName:    { fontSize: FS.sm, fontFamily: FONT.semibold },
-  pickerRowPrice:   { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  checkbox:         { width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5), borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  emptyText:        { textAlign: 'center', padding: 24, fontFamily: FONT.regular, fontSize: FS.sm },
-  });
-};
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: MEDIA.backdrop },
+  topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
+  bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  topRow: { position: 'absolute', left: 12, right: 12, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  hostCol: { flexShrink: 1, gap: 4 },
+  clock: { color: MEDIA.fgMuted, fontFamily: FONT.semibold, fontSize: FS.meta, marginLeft: 42, fontVariant: ['tabular-nums'] },
+  tips: { position: 'absolute', right: 12, height: 28, paddingHorizontal: 10, borderRadius: 14, backgroundColor: MEDIA.chip, justifyContent: 'center' },
+  tipsText: { color: MEDIA.fg, fontFamily: FONT.semibold, fontSize: FS.meta },
+  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 12, gap: 12 },
+  chatAndRail: { flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
+  chatCol: { flex: 1, minWidth: 0, gap: 10 },
+  chatWrap: { maxHeight: 220, justifyContent: 'flex-end' },
+  notice: { color: MEDIA.fg, fontFamily: FONT.medium, fontSize: FS.meta, textAlign: 'center' },
+});

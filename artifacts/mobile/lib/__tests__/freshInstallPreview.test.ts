@@ -105,21 +105,22 @@ describe("fresh-install: personal preview modules gate their seeded cast on isPr
     expect(s).toMatch(/function previewForcesEmpty\(\)[\s\S]{0,80}return !\(BOOT_DEMO \|\| isPreviewDemoMode\(\)\);/);
   });
 
-  it("lib/live/previewLiveProvider.ts: the seeded upcoming-lives schedule and suggested creators (fake follower counts) only return under demo=1 — app/live.tsx's LiveEmptyState must see real empty arrays on a fresh install, not just an empty stream list", () => {
+  it("lib/live/previewLiveProvider.ts: the seeded upcoming-lives schedule and suggested creators (fake follower counts) only return under demo=1 — the LIVE grid's Upcoming list must see real empty arrays on a fresh install, not just an empty stream list", () => {
     const s = src("../live/previewLiveProvider.ts");
     expect(s).toMatch(/async listUpcoming\(\): Promise<UpcomingLive\[\]> \{\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*if \(forceEmpty\) return \[\];/);
     expect(s).toMatch(/async listSuggestedCreators\(\): Promise<SuggestedCreator\[\]> \{\s*if \(forceEmpty\) return \[\];/);
   });
 
-  it("app/live-feed.tsx: the sample fashion-runway rooms (fake viewer counts, scripted chat) only render under demo=1, a fresh preview shows the real LiveEmptyState", () => {
-    const s = src("../../app/live-feed.tsx");
-    expect(s).toContain("import { isPreviewDemoMode } from '@/lib/devPreview';");
-    expect(s).toContain("import { LiveEmptyState } from '@/components/live/LiveEmptyState';");
-    expect(s).toMatch(/const showDemoRooms = isPreviewDemoMode\(\);/);
-    expect(s).toMatch(/const \[rooms, setRooms\] = useState<LiveRoom\[\]>\(\s*showDemoRooms/);
-    // The empty branch must actually use the shared LiveEmptyState, not a
-    // bespoke "no lives" screen that could itself drift from the pattern.
-    expect(s).toMatch(/rooms\.length === 0[\s\S]{0,40}<LiveEmptyState/);
+  it("app/live-feed.tsx: the LIVE grid has no sample rooms at all — it lists the live provider's real shows, and the provider itself only seeds preview shows under demo=1", () => {
+    const screen = src("../../app/live-feed.tsx");
+    const grid = src("../../components/live/LiveShowsGrid.tsx");
+    expect(screen).toContain("<LiveShowsGrid");
+    expect(grid).toContain("provider.listLive()");
+    for (const s of [screen, grid]) {
+      expect(s).not.toMatch(/PREVIEW_LIVE_STREAMS|showDemoRooms|LiveRoom\b/);
+    }
+    // No Agora key on the server → the honest unavailable state, never a fake show.
+    expect(grid).toContain("availability === 'unavailable'");
   });
 });
 

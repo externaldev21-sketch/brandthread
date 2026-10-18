@@ -93,9 +93,12 @@ describe('navigation scene isolation', () => {
   });
 
   it('returns a completed seller live stream to the real seller root', () => {
+    // The broadcast ends on the post-show summary, whose Done goes home.
     const sellerLive = read('app/seller-live.tsx');
+    const summary = read('app/seller-live-summary.tsx');
 
-    expect(sellerLive).toContain("router.dismissTo('/(tabs)/'");
-    expect(sellerLive).not.toContain('/(seller)/(tabs)/home');
+    expect(sellerLive).toContain("pathname: '/seller-live-summary'");
+    expect(summary).toContain("router.dismissTo('/(tabs)/'");
+    expect(summary).not.toContain('/(seller)/(tabs)/home');
   });
 });

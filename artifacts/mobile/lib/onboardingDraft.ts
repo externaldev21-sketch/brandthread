@@ -15,13 +15,19 @@
  */
 import {
   DRAFT_VERSION,
-  isAccountStep,
-  isStepId,
-  restoreDraftStepId,
-  type AuthMethod,
+  AUTH_STEPS,
+  FIRST_PROFILE_STEP,
+  isAuthStep,
+  profileStepsFor,
+  restoreDraftStep,
   type Flow,
   type StepId,
 } from './onboardingFlow';
+
+type AuthMethod = 'email' | 'apple' | 'google';
+function isStepId(value: unknown): value is StepId {
+  return typeof value === 'string' && [...AUTH_STEPS, ...profileStepsFor('seller').map(s => s.id)].includes(value as StepId);
+}
 
 export const PENDING_DRAFT_KEY = 'onboarding_pending_draft';
 export const USER_DRAFT_KEY_PREFIX = 'onboarding_draft:';
@@ -70,7 +76,7 @@ function str(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
 
-/** Parse a stored draft (any version) into the v9 shape, or null if unusable. */
+/** Preserve owned answers, but restart incompatible step layouts. */
 export function parseDraft(raw: string | null | undefined): OnboardingDraft | null {
   if (!raw) return null;
   let data: Record<string, unknown>;
@@ -82,10 +88,12 @@ export function parseDraft(raw: string | null | undefined): OnboardingDraft | nu
   return {
     version: DRAFT_VERSION,
     flow,
-    stepId: restoreDraftStepId(flow, data),
+    stepId: data.version === DRAFT_VERSION && isStepId(data.stepId ?? data.step)
+      ? (data.stepId ?? data.step) as StepId
+      : restoreDraftStep({ version: data.version, step: data.stepId ?? data.step }, !!data.ownerId || data.accountCreated === true),
     authMethod,
     // Drafts older than v9 were only ever written for signed-in accounts.
-    accountCreated: data.version === DRAFT_VERSION ? data.accountCreated === true : true,
+    accountCreated: data.accountCreated === true || (data.version !== DRAFT_VERSION && typeof data.ownerId === 'string'),
     ownerId: typeof data.ownerId === 'string' ? data.ownerId : null,
     email: str(data.email),
     firstName: str(data.firstName),
@@ -119,21 +127,17 @@ export interface ResumeContext {
  */
 export function resolveResumeStep(draft: Pick<OnboardingDraft, 'stepId' | 'authMethod' | 'dob' | 'email'>, ctx: ResumeContext): StepId {
   const { stepId } = draft;
-  if (!isStepId(stepId)) return 'ACCOUNT_TYPE';
-  if (ctx.accountReady) return isAccountStep(stepId) ? 'NAME' : stepId;
-  if (!isAccountStep(stepId)) {
-    // Profile steps need an account; without a session, start the account steps again.
-    if (['WELCOME', 'ACCOUNT_TYPE', 'STAGE', 'GOALS', 'LOCATION'].includes(stepId)) return stepId;
-    return 'EMAIL';
-  }
+  if (!isStepId(stepId)) return ctx.accountReady ? FIRST_PROFILE_STEP : 'WELCOME';
+  if (ctx.accountReady) return isAuthStep(stepId) ? FIRST_PROFILE_STEP : stepId;
+  if (stepId === 'WELCOME' || stepId === 'BIRTHDAY') return stepId;
+  if (!draft.dob) return 'BIRTHDAY';
+  if (!isAuthStep(stepId)) return 'EMAIL';
   if (draft.authMethod !== 'email') {
-    // Apple/Google: nothing secret was typed; the birthday must exist before terms.
-    if (stepId === 'TERMS' && !draft.dob) return 'BIRTHDAY';
-    return stepId === 'CODE' || stepId === 'PASSWORD' ? 'BIRTHDAY' : stepId;
+    return stepId === 'DETAILS' && ctx.signUpPending ? 'DETAILS' : 'WELCOME';
   }
   if (stepId === 'EMAIL') return 'EMAIL';
   if (!ctx.signUpPending || !draft.email) return 'EMAIL';
   if (!ctx.emailVerified) return 'CODE';
-  // The password was never stored, so anything after it starts at PASSWORD.
-  return 'PASSWORD';
+  // Any instance-required password/name is entered again, never restored.
+  return 'DETAILS';
 }

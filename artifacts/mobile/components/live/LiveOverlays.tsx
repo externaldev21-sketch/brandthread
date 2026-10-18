@@ -1,53 +1,38 @@
 /**
- * Overlay pieces for a LIVE pager page — compact, monochrome, TikTok-LIVE
- * style. Red is used only for the LIVE marker itself.
+ * Overlay pieces for a live show page, laid out 1:1 with Whatnot's show
+ * screen (https://mobbin.com/flows/ed55f754-472f-46f8-914b-ce7cb7345c7b,
+ * "Watching a livestream" frame 3) and reskinned to black/white/silver:
+ *
+ *   top-left   host avatar · name, Follow pill under the name
+ *   top-right  viewer-count pill · round chevron-down to leave
+ *   right      More · Share · Shop (icon over a small label)
+ *   bottom     chat rows (avatar, name, message) · "Say something..."
+ *              · the item being sold · one full-width Buy now pill
+ *
+ * Whatnot's yellow becomes white with black text; red is used only for the
+ * LIVE marker. Hearts are TikTok LIVE's tap-to-like burst
+ * (https://mobbin.com/flows/7824af04-b028-4359-8f08-59ca894677ad).
+ * Shared by the buyer viewer (app/live.tsx) and the host's own controls
+ * (app/seller-live.tsx), so both sides look the same.
  */
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-
-import { FontAwesome } from '@expo/vector-icons';
-
-import { Icon } from '@/components/ui/Icon';
-
+import {
+  Animated, Easing, Platform, Pressable, StyleSheet, Text, TextInput, View,
+} from 'react-native';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { CachedImage } from '@/components/CachedImage';
-
-import { FONT, FS, RADIUS, ON_DARK_MUTED, FG, TEXT_SECONDARY } from '@/lib/theme';
-
+import { FONT, FS, MEDIA } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
-
 import { TABULAR_NUMS } from '@/constants/typography';
-
-import { haptics, hapticFollow, haptic } from '@/lib/haptics';
-
-
+import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { LIVE_CHAT_VISIBLE, formatViewerCount } from '@/lib/live/liveOrdering';
-
-import type { LiveChatMessage, LiveHost, LiveProduct, LiveViewerAvatar } from '@/lib/live/types';
-import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
-
-import { a11yHidden } from '@/lib/a11yHidden';
-
-import { minHitSlop } from '@/lib/hitSlop';
-
-import { Glass } from '@/components/ui/Glass';
-
-import Composer from '@/components/ui/Composer';
-import { useAppTheme } from '@/contexts/AppThemeContext';
-
+import type { LiveChatMessage, LiveHost, LiveProduct } from '@/lib/live/types';
 import { LIVE_RED } from './LiveAvatarRing';
 
-import { radius } from '@/constants/radii';
-import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
-
-import { crispPx } from '@/lib/crispPixel';
-
 const ND = Platform.OS !== 'web';
-/** One consistent rail-icon treatment (point 4): every icon the same size on
- *  the same translucent circle — no bare icons mixed with disc'd ones. */
-const RAIL_ICON_SIZE = 28;
-const RAIL_ICON_CIRCLE = 44;
+const SHADOW = { textShadowColor: MEDIA.scrim, textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 } as const;
 
-// ─── Host pill (top-left) ─────────────────────────────────────────────────────
+// ─── Host (top-left) ─────────────────────────────────────────────────────────
 
 export function LiveHostAvatar({ host, size }: { host: LiveHost; size: number }) {
   return (
@@ -55,267 +40,256 @@ export function LiveHostAvatar({ host, size }: { host: LiveHost; size: number })
       {host.avatarUri ? (
         <CachedImage source={{ uri: host.avatarUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
       ) : (
-        <Text style={[styles.hostInitials, { fontSize: Math.round(size * 0.36) }]}>{host.initials}</Text>
+        <Text style={[styles.hostInitials, { fontSize: Math.round(size * 0.38) }]}>{host.initials}</Text>
       )}
     </View>
   );
 }
 
-// Host profile tap area is ~35pt tall inside the pill → pad to 44 vertically.
-const HOST_TAP_HIT_SLOP = minHitSlop({ height: 35 });
-// Pinned product "Buy" pill is 32pt tall (centred in a 64pt card).
-const BUY_HIT_SLOP = minHitSlop({ height: 32 });
-// Comment-bar quick icons are 34×40 boxes laid edge to edge; the drawn icons
-// (20–24pt) are centred, so 5pt of side slop never reaches a neighbour's glyph.
-const QUICK_ICON_HIT_SLOP = minHitSlop({ width: 34, height: 40 });
-
-export function LiveHostPill({
-  host, viewerCount, following, onFollow, onOpenHost,
+export function LiveHostRow({
+  host, following, onFollow, onOpenHost,
 }: {
   host: LiveHost;
-  viewerCount: number;
   following: boolean;
-  onFollow: () => void;
-  onOpenHost: () => void;
+  /** Omitted on the host's own screen — you don't follow yourself. */
+  onFollow?: () => void;
+  onOpenHost?: () => void;
 }) {
   return (
-    <View style={styles.hostPill} testID="live-host-pill">
-      <View style={styles.hostIdentity} testID="live-host-identity">
-        <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
-        <Pressable
-          onPress={onOpenHost}
-          style={styles.hostTap}
-          hitSlop={HOST_TAP_HIT_SLOP}
-          accessibilityRole="button"
-          accessibilityLabel={`${host.name}${host.verified ? ', verified' : ''}. ${formatViewerCount(viewerCount)} watching. Open profile`}
-        >
-          <LiveHostAvatar host={host} size={36} />
-          <View style={styles.hostText}>
-            <View style={styles.hostNameRow}>
-              <Text style={styles.hostName} numberOfLines={1}>{host.name}</Text>
-              {host.verified && <VerifiedBadge onMedia style={{ marginLeft: 3 }} />}
-            </View>
-            <View style={styles.hostMetaRow}>
-              <View style={styles.liveBadge}><Text style={styles.liveBadgeText}>LIVE</Text></View>
-              <Icon name="eye" size={10} color="rgba(255,255,255,0.8)" />
-              <Text style={[styles.hostMeta, TABULAR_NUMS]} testID="live-viewer-count">{formatViewerCount(viewerCount)}</Text>
-            </View>
+    <View style={styles.hostRow} testID="live-host-row">
+      <Pressable onPress={onOpenHost} disabled={!onOpenHost} accessibilityRole="button" accessibilityLabel={`${host.name}. Open profile`} hitSlop={4}>
+        <LiveHostAvatar host={host} size={34} />
+      </Pressable>
+      <View style={styles.hostText}>
+        <Pressable onPress={onOpenHost} disabled={!onOpenHost} hitSlop={4}>
+          <View style={styles.hostNameRow}>
+            <Text style={styles.hostName} numberOfLines={1}>{host.handle.replace(/^@/, '') || host.name}</Text>
+            {host.verified && <Feather name="check-circle" size={12} color={MEDIA.fg} style={{ marginLeft: 4 }} />}
           </View>
         </Pressable>
+        {onFollow ? (
+          <Pressable
+            onPress={() => { hapticSelection(); onFollow(); }}
+            style={[styles.followBtn, following && styles.followBtnOn]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: following }}
+            accessibilityLabel={following ? `Following ${host.name}` : `Follow ${host.name}`}
+            hitSlop={6}
+            testID="live-follow"
+          >
+            <Text style={[styles.followText, following && styles.followTextOn]}>{following ? 'Following' : 'Follow'}</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.liveTag}><Text style={styles.liveTagText}>LIVE</Text></View>
+        )}
       </View>
-      <Pressable
-        onPress={() => { hapticFollow(!following); onFollow(); }}
-        style={[styles.followBtn, following && styles.followBtnOn]}
-        accessibilityRole="button"
-        accessibilityState={{ selected: following }}
-        accessibilityLabel={following ? `Following ${host.name}` : `Follow ${host.name}`}
-        hitSlop={6}
-        testID="live-follow"
-      >
-        {following && <Glass variant="regular" tint="dark" radius={radius.sm} style={StyleSheet.absoluteFill} />}
-        {following
-          ? <Icon name="check" size={14} color="#fff" />
-          : <Text style={styles.followText}>Follow</Text>}
+    </View>
+  );
+}
+
+// ─── Viewer count + leave (top-right) ────────────────────────────────────────
+
+export function LiveTopRight({ viewerCount, onLeave, leaveLabel = 'Leave show', leaveIcon = 'chevron-down' }: {
+  viewerCount: number;
+  onLeave: () => void;
+  leaveLabel?: string;
+  leaveIcon?: 'chevron-down' | 'x';
+}) {
+  return (
+    <View style={styles.topRight}>
+      <View style={styles.viewerPill} accessibilityLabel={`${formatViewerCount(viewerCount)} watching`}>
+        <View style={styles.liveDot} />
+        <Feather name="eye" size={13} color={MEDIA.fg} />
+        <Text style={[styles.viewerText, TABULAR_NUMS]} testID="live-viewer-count">{formatViewerCount(viewerCount)}</Text>
+      </View>
+      <Pressable onPress={onLeave} style={styles.leaveBtn} accessibilityRole="button" accessibilityLabel={leaveLabel} hitSlop={8} testID="live-close">
+        <Feather name={leaveIcon} size={20} color={MEDIA.fg} />
       </Pressable>
     </View>
   );
 }
 
-// ─── Viewer avatar stack (top-right) ─────────────────────────────────────────
+// ─── Right rail ──────────────────────────────────────────────────────────────
 
-export function LiveViewerStack({ viewers }: { viewers: LiveViewerAvatar[] }) {
-  if (viewers.length === 0) return null;
+function RailItem({ icon, label, onPress, testID, badge }: {
+  icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void; testID?: string; badge?: number;
+}) {
   return (
-    <View style={styles.viewerStack} {...a11yHidden(true)}>
-      {viewers.slice(0, 3).map((v, i) => (
-        <View key={v.id} style={[styles.viewerDot, { backgroundColor: v.color, marginLeft: i === 0 ? 0 : -8, zIndex: 3 - i }]}>
-          {v.uri
-            ? <CachedImage source={{ uri: v.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-            : <Text style={styles.viewerInitials}>{v.initials}</Text>}
-        </View>
-      ))}
-    </View>
+    <Pressable onPress={() => { hapticLight(); onPress(); }} style={styles.railItem} accessibilityRole="button" accessibilityLabel={label} testID={testID} hitSlop={4}>
+      <View>
+        <Feather name={icon} size={23} color={MEDIA.fg} style={SHADOW as never} />
+        {badge != null && badge > 0 && (
+          <View style={styles.railBadge}><Text style={[styles.railBadgeText, TABULAR_NUMS]}>{badge}</Text></View>
+        )}
+      </View>
+      <Text style={styles.railLabel}>{label.split(',')[0]}</Text>
+    </Pressable>
   );
 }
 
-/** The numeric count next to the top-right viewer-avatar stack — distinct
- *  from the host pill's own LIVE-row count, matching TikTok's top-right
- *  cluster (avatars, then a count, then close). */
-export function LiveViewerCount({ count }: { count: number }) {
+export function LiveRail({ productCount, onMore, onShare, onFlip, onOpenShop }: {
+  productCount: number;
+  onMore: () => void;
+  onShare?: () => void;
+  /** Host only: switch cameras. */
+  onFlip?: () => void;
+  onOpenShop: () => void;
+}) {
   return (
-    <View style={styles.viewerCountPill} testID="live-top-viewer-count">
-      <Text style={[styles.viewerCountText, TABULAR_NUMS]}>{formatViewerCount(count)}</Text>
+    <View style={styles.rail} testID="live-rail">
+      <RailItem icon="more-horizontal" label="More" onPress={onMore} testID="live-more" />
+      {onShare && <RailItem icon="share" label="Share" onPress={onShare} testID="live-share" />}
+      {onFlip && <RailItem icon="refresh-cw" label="Flip" onPress={onFlip} testID="live-flip" />}
+      <RailItem icon="shopping-bag" label={`Shop, ${productCount} items`} onPress={onOpenShop} badge={productCount} testID="live-bag" />
     </View>
   );
 }
 
 // ─── Chat (bottom-left) ──────────────────────────────────────────────────────
 
-const FADE = [0.28, 0.5, 0.7, 0.88, 1];
+function chatInitial(name: string) {
+  return (name.trim()[0] ?? '•').toUpperCase();
+}
 
-/** System-ish events (someone joined, someone bought) get one consistent
- *  subtle pill; ordinary chat/host messages get no bubble at all — plain
- *  white text with a soft shadow directly over the video, TikTok-style. */
-function ChatRow({ msg, opacity }: { msg: LiveChatMessage; opacity: number }) {
+function ChatRow({ msg, onLongPress }: { msg: LiveChatMessage; onLongPress?: (m: LiveChatMessage) => void }) {
   const enter = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(enter, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: ND }).start();
+    Animated.timing(enter, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: ND }).start();
   }, [enter]);
-  const translateY = enter.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
-  const animatedStyle = [styles.chatRow, { opacity: Animated.multiply(enter, opacity), transform: [{ translateY }] }];
-
-  if (msg.kind === 'join' || msg.kind === 'purchase' || msg.kind === 'gift') {
+  const style = [styles.chatRow, { opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }];
+  if (msg.kind === 'join') {
     return (
-      <Animated.View style={animatedStyle}>
-        <View style={styles.eventPill}>
-          {/* Chat rows accumulate/scroll during a live stream — a real blur
-              per row would be a live BlurView per message, exactly what this
-              sweep's own performance guidance rules out. `noBlur` keeps the
-              specular edge + translucent fill (still reads as glass) without
-              the per-row blur cost. */}
-          <Glass variant="regular" tint="dark" radius={RADIUS.pill} noBlur style={StyleSheet.absoluteFill} />
-          <Text style={styles.eventPillText} numberOfLines={1}>
-            {msg.kind === 'purchase' ? '🛍️ ' : ''}
-            <Text style={styles.chatUserMuted}>{msg.username}</Text>
-            {msg.kind === 'purchase' || msg.kind === 'gift' ? ` ${msg.text}` : ' joined'}
-          </Text>
-        </View>
+      <Animated.View style={style}>
+        <Text style={styles.chatEvent} numberOfLines={1}>{msg.username} joined</Text>
       </Animated.View>
     );
   }
   return (
-    <Animated.View style={animatedStyle}>
-      {/* One nested-Text tree, not a row View splitting username/tag/message
-          into separate flex items — a row wraps each item as a whole to the
-          next line (the username+tag stranded on their own line, the message
-          starting a new line with the row's gap read as leading spaces).
-          Nested Text reflows word by word like any other inline text. */}
-      <Text style={styles.chatText} numberOfLines={3}>
-        <Text style={styles.chatUser}>{msg.username}</Text>
-        {msg.kind === 'host' && <Text style={styles.hostTagText}> HOST </Text>}
-        {' '}{msg.text}
-      </Text>
+    <Animated.View style={style}>
+      <Pressable
+        onLongPress={onLongPress ? () => { hapticLight(); onLongPress(msg); } : undefined}
+        disabled={!onLongPress}
+        delayLongPress={350}
+        style={styles.chatPress}
+        accessibilityHint={onLongPress ? 'Long press to report or block' : undefined}
+      >
+      <View style={styles.chatAvatar}><Text style={styles.chatAvatarText}>{chatInitial(msg.username)}</Text></View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.chatUser} numberOfLines={1}>
+          {msg.username}{msg.kind === 'host' ? '  ' : ''}
+          {msg.kind === 'host' && <Text style={styles.hostTag}> Host </Text>}
+        </Text>
+        <Text style={styles.chatText} numberOfLines={3}>
+          {msg.text}
+        </Text>
+      </View>
+      </Pressable>
     </Animated.View>
   );
 }
 
-export function LiveChatList({ messages }: { messages: LiveChatMessage[] }) {
+export function LiveChatList({ messages, onLongPressMessage }: {
+  messages: LiveChatMessage[];
+  /** Report / block (viewer) or moderate (host) one message. */
+  onLongPressMessage?: (m: LiveChatMessage) => void;
+}) {
   const visible = messages.slice(-LIVE_CHAT_VISIBLE);
-  const offset = FADE.length - visible.length;
   return (
-    <View style={styles.chatList} pointerEvents="none" testID="live-chat" accessibilityLiveRegion="polite">
-      {visible.map((m, i) => <ChatRow key={m.id} msg={m} opacity={FADE[offset + i]} />)}
+    <View style={styles.chatList} pointerEvents={onLongPressMessage ? 'box-none' : 'none'} testID="live-chat" accessibilityLiveRegion="polite">
+      {visible.map(m => <ChatRow key={m.id} msg={m} onLongPress={onLongPressMessage} />)}
     </View>
   );
 }
 
-// ─── Pinned product (bottom) ─────────────────────────────────────────────────
+// ─── "Say something..." ─────────────────────────────────────────────────────
 
-export function LivePinnedProductCard({
-  product, onBuy, onOpenBag,
+export function LiveChatInput({ onSend, disabled }: { onSend: (text: string) => Promise<void> | void; disabled?: boolean }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    const t = text.trim();
+    if (!t || busy) return;
+    setBusy(true);
+    setText('');
+    try { await onSend(t); } catch { setText(t); } finally { setBusy(false); }
+  };
+  const canSend = text.trim().length > 0 && !busy;
+  return (
+    <View style={styles.inputPill} testID="live-comment">
+      <TextInput
+        value={text}
+        onChangeText={setText}
+        onSubmitEditing={() => { void submit(); }}
+        placeholder="Say something..."
+        placeholderTextColor={MEDIA.fgMuted}
+        editable={!disabled}
+        maxLength={300}
+        returnKeyType="send"
+        blurOnSubmit={false}
+        style={styles.input}
+        accessibilityLabel="Say something in the live chat"
+        testID="live-comment-input"
+      />
+      {canSend && (
+        <Pressable onPress={() => { void submit(); }} style={styles.sendBtn} accessibilityRole="button" accessibilityLabel="Send" hitSlop={6} testID="live-comment-send">
+          <Feather name="arrow-up" size={16} color={MEDIA.onFg} />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+// ─── The item being sold + Buy now (bottom) ──────────────────────────────────
+
+export function LiveProductCard({
+  product, onPress, action,
 }: {
   product: LiveProduct;
-  onBuy: () => void;
-  onOpenBag: () => void;
+  /** Opens the shop sheet. */
+  onPress: () => void;
+  /** The full-width pill under the item: Buy now (buyer) or Unpin (host). */
+  action: { label: string; onPress: () => void; testID?: string; disabled?: boolean };
 }) {
   const swap = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     swap.setValue(0);
-    // withTiming/ease-out, not a spring — a bouncy overshoot here read as
-    // exactly the kind of "bounce" polish is meant to remove.
     Animated.timing(swap, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: ND }).start();
   }, [product.productId, swap]);
   const onSale = product.compareAtPriceCents != null && product.compareAtPriceCents > product.priceCents;
   return (
     <Animated.View
-      style={[styles.pinned, { opacity: swap, transform: [{ translateY: swap.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }]}
+      style={{ opacity: swap, transform: [{ translateY: swap.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}
       testID="live-pinned-product"
     >
-      <Pressable onPress={onOpenBag} style={styles.pinnedTap} accessibilityRole="button" accessibilityLabel={`Now selling ${product.name}, ${formatCents(product.priceCents)}. See all products`}>
-        <View style={styles.pinnedThumb}>
+      <Pressable onPress={onPress} style={styles.productRow} accessibilityRole="button" accessibilityLabel={`${product.name}, ${formatCents(product.priceCents)}. See all items`}>
+        <View style={styles.productThumb}>
           {product.imageUri
             ? <CachedImage source={{ uri: product.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-            : <Icon name="shopping-bag" size={18} color="#111" />}
+            : <Feather name="shopping-bag" size={20} color={MEDIA.fg} />}
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.pinnedEyebrow}>NOW SELLING{product.remainingUnits != null ? ` · ${product.remainingUnits} LEFT` : ''}</Text>
-          <Text style={styles.pinnedName} numberOfLines={1}>{product.name}</Text>
-          <View style={styles.pinnedPriceRow}>
-            <Text style={[styles.pinnedPrice, TABULAR_NUMS]}>{formatCents(product.priceCents)}</Text>
-            {onSale && <Text style={[styles.pinnedCompare, TABULAR_NUMS]}>{formatCents(product.compareAtPriceCents!)}</Text>}
-          </View>
+          <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
+          <Text style={styles.productMeta} numberOfLines={1}>
+            {product.remainingUnits != null ? `${product.remainingUnits} left` : 'Buy now'}
+            {product.sizes?.length ? ` · ${product.sizes.length} sizes` : ''}
+          </Text>
+        </View>
+        <View style={styles.productPriceCol}>
+          <Text style={[styles.productPrice, TABULAR_NUMS]}>{formatCents(product.priceCents)}</Text>
+          {onSale && <Text style={[styles.productCompare, TABULAR_NUMS]}>{formatCents(product.compareAtPriceCents!)}</Text>}
         </View>
       </Pressable>
       <Pressable
-        onPress={() => { haptic('sheet'); onBuy(); }}
-        style={styles.buyBtn}
-        hitSlop={BUY_HIT_SLOP}
+        onPress={() => { hapticLight(); action.onPress(); }}
+        disabled={action.disabled}
+        style={[styles.buyBtn, action.disabled && { opacity: 0.5 }]}
         accessibilityRole="button"
-        accessibilityLabel={`Buy ${product.name}`}
-        testID="live-buy"
+        accessibilityLabel={`${action.label}: ${product.name}`}
+        testID={action.testID ?? 'live-buy'}
       >
-        <Text style={styles.buyText}>Buy</Text>
+        <Text style={styles.buyText}>{action.label}</Text>
       </Pressable>
     </Animated.View>
-  );
-}
-
-// ─── Right rail ──────────────────────────────────────────────────────────────
-
-// forwardRef so the like button can be measured for the heart-burst origin
-// without wrapping it in an extra plain View — every rail item (mute, heart,
-// cart, share) is now built through this exact same call, with no
-// per-item structural difference that could make one look inconsistent.
-const RailButton = forwardRef<View, {
-  icon: React.ReactNode; label: string; count?: string; onPress: () => void; testID?: string; badge?: number;
-}>(function RailButton({ icon, label, count, onPress, testID, badge }, ref) {
-  return (
-    <Pressable ref={ref} onPress={onPress} style={styles.railBtn} accessibilityRole="button" accessibilityLabel={label} testID={testID} hitSlop={4}>
-      <View style={styles.railIcon}>
-        <Glass variant="regular" tint="dark" radius={RAIL_ICON_CIRCLE / 2} style={StyleSheet.absoluteFill} />
-        {icon}
-        {badge != null && badge > 0 && (
-          <View style={styles.railBadge}><Text style={styles.railBadgeText}>{badge}</Text></View>
-        )}
-      </View>
-      {count != null && <Text style={[styles.railCount, TABULAR_NUMS]}>{count}</Text>}
-    </Pressable>
-  );
-});
-
-export function LiveRail({
-  likeCount, liked, productCount, muted, onLike, onShare, onOpenBag, onToggleSound,
-}: {
-  likeCount: number; liked: boolean; productCount: number; muted: boolean;
-  onLike: (e: { x: number; y: number }) => void; onShare: () => void; onOpenBag: () => void; onToggleSound: () => void;
-}) {
-  const likeRef = useRef<View>(null);
-  const pop = useRef(new Animated.Value(1)).current;
-  const handleLike = () => {
-    haptic('like');
-    pop.setValue(0.75);
-    Animated.timing(pop, { toValue: 1, duration: 160, easing: Easing.out(Easing.cubic), useNativeDriver: ND }).start();
-    likeRef.current?.measureInWindow?.((x, y, w) => onLike({ x: x + w / 2, y }));
-  };
-  return (
-    <View style={styles.rail} testID="live-rail">
-      <RailButton
-        testID="live-sound"
-        label={muted ? 'Turn sound on' : 'Mute'}
-        onPress={onToggleSound}
-        icon={<Icon name={muted ? 'volume-x' : 'volume-2'} size={RAIL_ICON_SIZE} color="#fff" />}
-      />
-      <RailButton
-        ref={likeRef}
-        testID="live-like"
-        label={`Like, ${formatViewerCount(likeCount)} likes`}
-        count={formatViewerCount(likeCount)}
-        onPress={handleLike}
-        icon={<Animated.View style={{ transform: [{ scale: pop }] }}>{liked ? <FontAwesome name="heart" size={RAIL_ICON_SIZE} color="#fff" /> : <Icon name="heart" size={RAIL_ICON_SIZE} color="#fff" />}</Animated.View>}
-      />
-      <RailButton testID="live-bag" label={`Products in this live, ${productCount}`} onPress={onOpenBag} badge={productCount} icon={<Icon name="shopping-bag" size={RAIL_ICON_SIZE} color="#fff" />} />
-      <RailButton testID="live-share" label="Share this live" onPress={onShare} icon={<Icon name="send" size={RAIL_ICON_SIZE} color="#fff" />} />
-    </View>
   );
 }
 
@@ -366,7 +340,7 @@ export const LiveHeartLayer = forwardRef<LiveHeartLayerHandle, { originOffset?: 
               ],
             }}
           >
-            <FontAwesome name="heart" size={h.size} color="#fff" />
+            <FontAwesome name="heart" size={h.size} color={MEDIA.fg} />
           </Animated.View>
         ))}
       </View>
@@ -374,166 +348,62 @@ export const LiveHeartLayer = forwardRef<LiveHeartLayerHandle, { originOffset?: 
   },
 );
 
-// ─── Comment bar (bottom) ────────────────────────────────────────────────────
-
-export function LiveCommentBar({
-  onSend, disabled, onGift, onShare, onMore,
-}: {
-  onSend: (text: string) => Promise<void> | void;
-  disabled?: boolean;
-  /** Quick icons to the right of the pill, TikTok-style (gift/Thread Cash,
-   *  share, report/block overflow) — each omitted has no effect on the pill itself. */
-  onGift?: () => void;
-  onShare?: () => void;
-  onMore?: () => void;
-}) {
-  const { theme } = useAppTheme();
-  const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
-  const submit = async () => {
-    const t = text.trim();
-    if (!t || busy) return;
-    setBusy(true);
-    setText('');
-    try { await onSend(t); } catch { setText(t); } finally { setBusy(false); }
-  };
-  const hasQuick = !!(onGift || onShare || onMore);
-  return (
-    <Composer
-          overMedia
-      value={text}
-      onChangeText={setText}
-      onSend={submit}
-      canSend={text.trim().length > 0 && !busy}
-      editable={!disabled}
-      placeholder="Add comment..."
-      accessibilityLabel="Add a comment to the live chat"
-      maxLength={300}
-      hideTabBar={false}
-      bottomInset={0}
-      testID="live-comment"
-      style={styles.composerFlush}
-      rightAccessory={hasQuick ? (
-        <>
-          {onGift && (
-            <Pressable onPress={onGift} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Send Thread Cash" hitSlop={QUICK_ICON_HIT_SLOP} testID="live-gift">
-              <ThreadCashBill width={24} />
-            </Pressable>
-          )}
-          {onShare && (
-            <Pressable onPress={onShare} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Share this live" hitSlop={QUICK_ICON_HIT_SLOP} testID="live-comment-share">
-              <Icon name="share" size={20} color={theme.text} />
-            </Pressable>
-          )}
-          {onMore && (
-            <Pressable onPress={onMore} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Live stream options" hitSlop={QUICK_ICON_HIT_SLOP} testID="live-comment-more">
-              <Icon name="more-horizontal" size={20} color={theme.text} />
-            </Pressable>
-          )}
-        </>
-      ) : undefined}
-    />
-  );
-}
-
 const styles = StyleSheet.create({
   hostAvatar: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
-  hostInitials: { color: '#fff', fontFamily: FONT.bold },
-  // Allow the identity to truncate before it crowds the close button on
-  // narrow screens. The follow button remains a separate target.
-  hostPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 18, flexShrink: 1, minWidth: 0, maxWidth: 300,
-  },
-  hostIdentity: {
-    height: 48, justifyContent: 'center', flexShrink: 1, minWidth: 0,
-    paddingLeft: 5, paddingRight: 14,
-    borderRadius: RADIUS.pill, overflow: 'hidden',
-  },
-  hostTap: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1, minWidth: 0 },
-  hostText: { flexShrink: 1, minWidth: 0, justifyContent: 'center' },
+  hostInitials: { color: MEDIA.fg, fontFamily: FONT.bold },
+  hostRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 },
+  hostText: { flexShrink: 1, minWidth: 0, gap: 3, alignItems: 'flex-start' },
   hostNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
-  hostName: { color: '#fff', fontFamily: FONT.bold, fontSize: 15, lineHeight: 18, flexShrink: 1 },
-  hostMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 16, marginTop: 2 },
-  hostMeta: { color: TEXT_SECONDARY, fontFamily: FONT.semibold, fontSize: 11, lineHeight: 14 },
-  liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2 },
-  liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, lineHeight: 12 },
-  followBtn: {
-    minWidth: 66, height: 32, paddingHorizontal: 14, borderRadius: radius.sm,
-    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  followBtnOn: { backgroundColor: 'transparent', overflow: 'hidden', minWidth: 34, paddingHorizontal: 0, width: 34, height: 34 },
-  followText: { color: '#000', fontFamily: FONT.bold, fontSize: 12 },
+  hostName: { color: MEDIA.fg, fontFamily: FONT.bold, fontSize: 15, lineHeight: 18, flexShrink: 1, ...SHADOW },
+  followBtn: { height: 22, paddingHorizontal: 10, borderRadius: 11, backgroundColor: MEDIA.fg, alignItems: 'center', justifyContent: 'center' },
+  followBtnOn: { backgroundColor: MEDIA.chip },
+  followText: { color: MEDIA.onFg, fontFamily: FONT.bold, fontSize: FS.meta },
+  followTextOn: { color: MEDIA.fg },
+  liveTag: { backgroundColor: LIVE_RED, borderRadius: 4, paddingHorizontal: 6, height: 20, justifyContent: 'center' },
+  liveTagText: { color: MEDIA.fg, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.6 },
 
-  // Fixed width (24 + 2×16 = 56 for up to 3 overlapping 24pt avatars, each
-  // overlapping the last by 8) and flexShrink: 0 so the flex row never
-  // compresses it — without an explicit width the row shrank to fit
-  // whatever space the host pill left, clipping/squishing the last avatar
-  // against the viewer count next to it.
-  viewerStack: { flexDirection: 'row', alignItems: 'center', width: 56, flexShrink: 0 },
-  viewerDot: {
-    width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-    overflow: 'hidden', flexShrink: 0,
-  },
-  viewerInitials: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
-  viewerCountPill: { marginLeft: 6 },
-  viewerCountText: { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3, fontVariant: ['tabular-nums'] },
+  topRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  viewerPill: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 32, paddingHorizontal: 11, borderRadius: 16, backgroundColor: MEDIA.chip },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: LIVE_RED },
+  viewerText: { color: MEDIA.fg, fontFamily: FONT.semibold, fontSize: FS.sm },
+  leaveBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: MEDIA.chip, alignItems: 'center', justifyContent: 'center' },
 
-  // Chat: capped at ~70% width so a long line never runs under the right
-  // rail, no bubble on ordinary messages (plain text over video, TikTok
-  // style), and one consistent subtle pill for system/purchase events only.
-  chatList: { gap: 5, justifyContent: 'flex-end', maxWidth: '70%', alignSelf: 'flex-start' },
-  chatRow: { alignSelf: 'flex-start', maxWidth: '100%' },
-  chatText: {
-    color: '#fff', fontFamily: FONT.regular, fontSize: 13, lineHeight: 17,
-    textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-  },
-  chatUser: {
-    color: '#fff', fontFamily: FONT.semibold, fontSize: 13,
-    textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-  },
-  // Nested inside the chat Text (not a row View) so "username HOST message"
-  // flows and wraps as one line of text instead of the tag forcing a break.
-  hostTagText: {
-    color: '#000', backgroundColor: '#fff', fontFamily: FONT.bold, fontSize: FS.xs,
-    borderRadius: 3,
-  },
-  eventPill: {
-    borderRadius: RADIUS.pill, overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 5,
-  },
-  eventPillText: { color: FG, fontFamily: FONT.regular, fontSize: 12 },
-  chatUserMuted: { fontFamily: FONT.semibold, color: '#fff' },
-
-  pinned: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, height: 64, paddingHorizontal: 8, paddingRight: 10,
-    borderRadius: 12, backgroundColor: 'rgba(20,20,20,0.72)',
-  },
-  pinnedTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
-  pinnedThumb: { width: 48, height: 48, borderRadius: 8, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  // Solid opaque greys (ON_DARK_MUTED), not translucent white — a sub-1-alpha
-  // text color subpixel-antialiases against the live video underneath, which
-  // reads as a soft/smudgy mid-grey rather than a crisp silver (see
-  // lib/theme.ts's ON_DARK_MUTED doc comment).
-  pinnedEyebrow: { color: ON_DARK_MUTED, fontFamily: FONT.bold, fontSize: FS.xs },
-  pinnedName: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 1 },
-  pinnedPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 1 },
-  pinnedPrice: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
-  pinnedCompare: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: 11, textDecorationLine: 'line-through' },
-  buyBtn: { height: 32, paddingHorizontal: 16, borderRadius: radius.sm, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  buyText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.sm },
-
-  rail: { alignItems: 'center', gap: 14 },
-  railBtn: { alignItems: 'center', minWidth: 44 },
-  railIcon: {
-    width: RAIL_ICON_CIRCLE, height: RAIL_ICON_CIRCLE, borderRadius: RAIL_ICON_CIRCLE / 2,
-    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-  },
-  railCount: { color: '#fff', fontFamily: FONT.semibold, fontSize: 11, marginTop: 3, textShadowColor: 'rgba(0,0,0,0.45)', textShadowRadius: 3, fontVariant: ['tabular-nums'] },
+  rail: { alignItems: 'center', gap: 16 },
+  railItem: { alignItems: 'center', minWidth: 44, gap: 3 },
+  railLabel: { color: MEDIA.fg, fontFamily: FONT.semibold, fontSize: FS.xs, ...SHADOW },
   railBadge: {
-    position: 'absolute', top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 3,
-    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
+    position: 'absolute', top: -6, right: -10, minWidth: 17, height: 17, borderRadius: 9, paddingHorizontal: 4,
+    backgroundColor: MEDIA.fg, alignItems: 'center', justifyContent: 'center',
   },
-  railBadgeText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.xs },
+  railBadgeText: { color: MEDIA.onFg, fontFamily: FONT.bold, fontSize: 10 },
 
-  composerFlush: { paddingHorizontal: 0, paddingTop: 0 },
-  quickIconBtn: { width: 34, height: 40, alignItems: 'center', justifyContent: 'center' },
+  chatList: { gap: 8, justifyContent: 'flex-end' },
+  chatRow: { alignSelf: 'stretch' },
+  chatPress: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  chatAvatar: { width: 26, height: 26, borderRadius: 13, backgroundColor: MEDIA.chip, borderWidth: StyleSheet.hairlineWidth, borderColor: MEDIA.hairline, alignItems: 'center', justifyContent: 'center' },
+  chatAvatarText: { color: MEDIA.fg, fontFamily: FONT.bold, fontSize: FS.xs },
+  chatUser: { color: MEDIA.fgMuted, fontFamily: FONT.semibold, fontSize: FS.meta, lineHeight: 15, ...SHADOW },
+  hostTag: { color: MEDIA.onFg, backgroundColor: MEDIA.fg, fontFamily: FONT.bold, fontSize: 10 },
+  chatText: { color: MEDIA.fg, fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 18, ...SHADOW },
+  chatEvent: { color: MEDIA.fgMuted, fontFamily: FONT.medium, fontSize: FS.meta, marginLeft: 34, ...SHADOW },
+
+  inputPill: {
+    flexDirection: 'row', alignItems: 'center', height: 40, borderRadius: 20, paddingLeft: 14, paddingRight: 5,
+    backgroundColor: MEDIA.chip, borderWidth: 1, borderColor: MEDIA.hairline,
+  },
+  input: { flex: 1, color: MEDIA.fg, fontFamily: FONT.regular, fontSize: 14, height: 40, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as object : null) },
+  sendBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: MEDIA.fg, alignItems: 'center', justifyContent: 'center' },
+
+  productRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  productThumb: {
+    width: 56, height: 56, borderRadius: 8, overflow: 'hidden', backgroundColor: MEDIA.chip,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  productName: { color: MEDIA.fg, fontFamily: FONT.bold, fontSize: 15, lineHeight: 19, ...SHADOW },
+  productMeta: { color: MEDIA.fgMuted, fontFamily: FONT.medium, fontSize: FS.meta, marginTop: 2, ...SHADOW },
+  productPriceCol: { alignItems: 'flex-end' },
+  productPrice: { color: MEDIA.fg, fontFamily: FONT.bold, fontSize: 17, ...SHADOW },
+  productCompare: { color: MEDIA.fgMuted, fontFamily: FONT.regular, fontSize: FS.meta, textDecorationLine: 'line-through' },
+  buyBtn: { height: 48, borderRadius: 24, backgroundColor: MEDIA.fg, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+  buyText: { color: MEDIA.onFg, fontFamily: FONT.bold, fontSize: 16 },
 });

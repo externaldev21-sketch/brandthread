@@ -1,174 +1,108 @@
-import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { BUYER_STEPS, DRAFT_VERSION, SELLER_STEPS } from "../lib/onboardingFlow";
+/** Contracts updated for the approved shared, role-last launch flow. */
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import {
+  AUTH_STEPS, DRAFT_VERSION, FIRST_PROFILE_STEP, isStepSkippable,
+  profileStepsFor, restoreDraftStep, usernameSuggestions, USERNAME_RE,
+} from '../lib/onboardingFlow';
 
-const read = (rel: string) => readFileSync(path.resolve(__dirname, "../app", rel), "utf8");
-const source = read("./onboarding.tsx");
-const accountType = read("./account-type.tsx");
-const accountSteps = read("../components/onboarding/steps/AccountSteps.tsx");
-const profileSteps = read("../components/onboarding/steps/ProfileSteps.tsx");
-const sellerSteps = read("../components/onboarding/steps/SellerSteps.tsx");
-const allOnboardingCopy = [source, accountType, accountSteps, profileSteps, sellerSteps].join("\n");
+const read = (rel: string) => readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
+const source = read('app/onboarding.tsx');
+const profile = read('components/onboarding/launch/ProfileScreens.tsx');
+const auth = read('components/onboarding/launch/AuthScreens.tsx');
+const kit = read('components/onboarding/launch/kit.tsx');
+const client = read('lib/api.ts');
+const ids = (role: 'buyer' | 'seller') => profileStepsFor(role).map(s => s.id);
 
-describe("Dev's onboarding items", () => {
-  it("1: buyer and seller accounts are described as separate, never one combined account", () => {
-    expect(allOnboardingCopy).not.toContain("One account for everything");
-    expect(accountType).toContain("Buyer and seller accounts are separate. You can have both.");
+describe('launch onboarding order and choices', () => {
+  it('keeps separate buyer and seller completion paths', () => {
+    expect(ids('buyer').at(-1)).toBe('ROLE');
+    expect(ids('seller').slice(-2)).toEqual(['STORE', 'STAGE']);
+    expect(source).toContain("accountType: 'buyer', expectedClerkId:");
+    expect(source).toContain("accountType: 'seller', expectedClerkId:");
   });
-});
-describe("onboarding questionnaire defaults", () => {
-  it("preselects editable preference choices without pre-filling identity fields", () => {
-    expect(source).toContain("useState<string[]>(DEFAULT_BUYER_INTERESTS)");
-    expect(source).toContain("const [brandStage, setBrandStage] = useState('')");
-    expect(source).toContain("const [goals, setGoals] = useState<string[]>([])");
-    expect(source).toContain("planId ?? recommendedPlanId");
-    expect(source).toContain("setStyleArr((prev) => prev.includes(item)");
-    expect(source).toContain("setGoals((prev) => prev.includes(g)");
-    expect(source).toContain('useState(\'\')');
-    expect(source).toContain("selectedAccent,");
-    expect(source).toContain("isStoreAccent(draft.selectedAccent)");
+  it('collects birthday before email and account verification', () => {
+    expect(AUTH_STEPS.slice(0, 4)).toEqual(['WELCOME', 'BIRTHDAY', 'EMAIL', 'CODE']);
   });
-});
-
-describe("seller pre-plan experience", () => {
-  it("uses the store accent palette and a server-backed one-sample request", () => {
-    expect(sellerSteps).toContain("STORE_ACCENT_COLORS.map");
-    expect(source).toContain("api.logo.onboardingSample");
-    expect(sellerSteps).toContain("onboarding-generate-sample");
-    expect(source).toContain("showLogoSample={false}");
-    expect(sellerSteps).toContain('accessibilityRole="radio"');
-    expect(sellerSteps).toContain("accessibilityState={{ selected: selectedAccent === color }}");
-    // The storefront accent saves to the store, never the seller's app theme.
-    expect(source).toContain("await api.seller.setStoreAccent(selectedAccent)");
-    expect(source).not.toContain("selectTheme(");
+  it('asks one signed-in question per step, with no duplicates', () => {
+    expect(new Set(ids('seller')).size).toBe(ids('seller').length);
+    expect(source).toContain("case 'USERNAME':");
+    expect(source).toContain("case 'ROLE':");
   });
-
-  it("saves the accepted AI sample as the seller logo and surfaces failures", () => {
-    expect(source).toContain("await api.seller.uploadLogo({ uri, mimeType: 'image/png' })");
-    expect(source).toContain("await dataUrlToLocalFile(sampleUri, 'onboarding-logo')");
-    expect(source).toMatch(/await api\.seller\.uploadLogo[\s\S]*await api\.auth\.completeOnboarding/);
+  it('asks role after editable interests, brands and sizes', () => {
+    expect(ids('buyer')).toEqual(['USERNAME', 'PHOTO', 'INTEREST', 'BRANDS', 'SIZES', 'NOTIFICATIONS', 'ROLE']);
   });
-});
-
-describe("v7 step order: Welcome opener, then AccountType, then path-specific auth", () => {
-  it("Welcome and account type precede the buyer account fields and seller questions", () => {
-    expect(BUYER_STEPS.indexOf('WELCOME')).toBe(0);
-    expect(BUYER_STEPS.indexOf('ACCOUNT_TYPE')).toBe(1);
-    expect(BUYER_STEPS.indexOf('EMAIL')).toBe(2);
-    expect(SELLER_STEPS.indexOf('WELCOME')).toBe(0);
-    expect(SELLER_STEPS.indexOf('ACCOUNT_TYPE')).toBe(1);
-    expect(SELLER_STEPS.slice(2, 5)).toEqual(['STAGE', 'GOALS', 'LOCATION']);
-    expect(SELLER_STEPS.indexOf('EMAIL')).toBe(5);
+  it('keeps identity and seller store questions required', () => {
+    for (const step of ['USERNAME', 'ROLE', 'STORE', 'STAGE'] as const) expect(isStepSkippable(step)).toBe(false);
   });
-
-  it("2: one question per screen, buyer/seller first, Create new account starts at that question", () => {
-    expect(BUYER_STEPS[1]).toBe("ACCOUNT_TYPE");
-    expect(SELLER_STEPS[1]).toBe("ACCOUNT_TYPE");
-    expect(source).toContain("isAddAccount || start === 'account-type' ? 'ACCOUNT_TYPE' : 'WELCOME'");
-    // No screen crams username, email and password together any more.
-    expect(source).not.toContain("SharedAuthStep");
-    expect(source).not.toContain("Confirm password");
+  it('offers a skip on optional personalization questions', () => {
+    for (const step of ['PHOTO', 'INTEREST', 'BRANDS', 'SIZES', 'NOTIFICATIONS'] as const) expect(isStepSkippable(step)).toBe(true);
   });
-
-  it("3: the referral field is hidden behind a small 'Have a code?' link and auto-fills from the invite link", () => {
-    expect(source).toContain("Have a code?");
-    expect(source).toContain("useState(false);\n  const [styleInterests"); // showReferral defaults to hidden
-    expect(source).toContain("cleanReferral(referralCodeParam)");
+  it('loads real brand choices instead of demo fixtures', () => {
+    expect(profile).toContain('discoverBrands(60)');
+    expect(profile).not.toMatch(/DEMO_BRANDS|demoBrands/);
   });
-
-  it("4: no AI-sounding copy, arrows on buttons or 'Already signed in' wording", () => {
-    for (const phrase of ["journey", "Already signed in", "Never miss", "Build my workspace"]) {
-      expect(allOnboardingCopy).not.toContain(phrase);
-    }
-    // No arrows inside any string literal (button labels, copy).
-    expect(allOnboardingCopy).not.toMatch(/['"`][^'"`\n]*[→›»][^'"`\n]*['"`]/);
-  });
-
-  it("5 & 6: no payouts during sign-up; plan + trial only after the store preview, with Dev's exact copy", () => {
-    for (const phrase of ["payout-setup", "SellerPlanRecommendationStep", "Continue to plans"]) {
-      expect(source).not.toContain(phrase);
-    }
-    expect(SELLER_STEPS.slice(-2)).toEqual(["BUILDING", "PLAN"]);
-    const plan = read("../components/onboarding/steps/PlanStep.tsx");
-    expect(plan).toContain("trialCopy(days, reminderDaysBefore)");
-    expect(plan).not.toMatch(/label="Skip|'Skip'/);
-    expect(source).toContain("void trial.start(planId ?? recommendedPlanId)");
-  });
-
-  it("7: the free logo sample sends the install id so the server limits it per device", () => {
-    expect(source).toContain("api.logo.onboardingSample(brandName.trim(), sampleStyle, await getInstallId())");
-    expect(source).toContain("onboarding_sample_used");
-  });
-
-  it("8: buyer onboarding ends with styles and brands to follow", () => {
-    expect(BUYER_STEPS.slice(-5)).toEqual(["STYLE", "TASTE", "SIZES", "BRANDS", "FEED_PREVIEW"]);
-    expect(source).toContain("<BrandsToFollowStep");
-  });
-
-  it("9: no notification permission step in onboarding", () => {
-    expect(source).not.toContain("NotificationsStep");
-    expect(source).not.toContain("requestPermissionsAsync");
-  });
-
-  it("10: answers are saved as a draft (v9) and restored on reopen, password excluded", () => {
-    expect(DRAFT_VERSION).toBe(9);
-    expect(source).toContain("sanitizeDraftForStorage(draft)");
-    expect(source).toContain("resolveResumeStep(");
-    expect(source).toContain("password, setPassword] = useState(''); // memory only, never in a draft");
+  it('only suggests usernames the backend format accepts', () => {
+    const suggestions = usernameSuggestions({ firstName: 'A', lastName: "O'Neil", email: 'a@example.test' }, '1234');
+    expect(suggestions.length).toBeGreaterThan(0);
+    for (const suggestion of suggestions) expect(USERNAME_RE.test(suggestion)).toBe(true);
   });
 });
 
-describe("account creation order and safety", () => {
-  it("creates the Clerk account only after birthday and terms (age gate before any account exists)", () => {
-    const terms = source.indexOf("async function agreeToTerms()");
-    const finalize = source.indexOf("await finalizeEmailAccount()", terms);
-    expect(source.indexOf("signUp.create({ emailAddress")).toBeGreaterThan(0);
-    expect(finalize).toBeGreaterThan(terms);
-    expect(source).toContain("signUp.password({ password, legalAccepted: true })");
-    expect(source).toContain("checkDobInput(wheelDateToDobInput(birthday), { seller: flow === 'seller' })");
+describe('launch identity, persistence and completion', () => {
+  it('restores only the current signed-in draft schema', () => {
+    expect(restoreDraftStep({ version: DRAFT_VERSION, step: 'PHOTO' }, true)).toBe('PHOTO');
+    expect(restoreDraftStep({ version: DRAFT_VERSION - 1, step: 'PHOTO' }, true)).toBe(FIRST_PROFILE_STEP);
   });
+  it('never resumes a signed-in draft without a session', () => {
+    expect(restoreDraftStep({ version: DRAFT_VERSION, step: 'ROLE' }, false)).toBe('WELCOME');
+  });
+  it('checks draft ownership before restoring answers', () => {
+    expect(source).toContain('draft && draft.ownerId === user.id');
+    expect(source).toContain('ownerId: user!.id');
+  });
+  it('supports additional fields only when Clerk requires them', () => {
+    expect(source).toContain("missing.includes('password')");
+    expect(source).toContain('needsPassword={needs.password}');
+    expect(auth).not.toContain('Confirm password');
+  });
+  it('keeps Google and Apple authentication available', () => {
+    expect(source).toContain('APPLE_OAUTH_STRATEGY');
+    expect(source).toContain("'oauth_google'");
+  });
+  it('submits pending age before completing either role', () => {
+    const buyer = source.slice(source.indexOf('async function finishBuyer'), source.indexOf('async function finishSeller'));
+    const seller = source.slice(source.indexOf('async function finishSeller'), source.indexOf('async function markComplete'));
+    expect(buyer.indexOf('await submitPendingAge(api)')).toBeLessThan(buyer.indexOf('await api.auth.updateProfile'));
+    expect(seller.indexOf('await submitPendingAge(api)')).toBeLessThan(seller.indexOf('await api.auth.completeOnboarding'));
+  });
+  it('keeps referral attribution bound to the synced account', () => {
+    expect(source).toContain('api.referrals.apply(referralCode, profile.clerkId)');
+  });
+  it('saves buyer preferences then opens the Threads explainer', () => {
+    expect(source).toContain('await syncBuyerOnboarding(profile.clerkId, styleInterests, api)');
+    expect(source).toContain("router.replace('/thread-explainer' as never)");
+  });
+  it('finishes the seller account before opening store setup, without charging a plan', () => {
+    expect(source).toContain("await api.auth.completeOnboarding('seller')");
+    expect(source).toContain("router.push('/store-setup-brand' as never)");
+    expect(source).not.toContain('trial.start(');
+  });
+  it('requests notifications only through the optional explicit action', () => {
+    expect(source).toContain('onTurnOn={() => { void turnOnNotifications(); }}');
+    expect(source).toContain("onSkip={() => advance('NOTIFICATIONS')}");
+  });
+});
 
-  it("Apple and Google go through birthday and terms before the OAuth sheet", () => {
-    expect(source).toContain("goTo('BIRTHDAY', 1);");
-    expect(source).toContain("if (authMethod !== 'email') { await runOAuth(authMethod); return; }");
+describe('shared app capabilities retained alongside the new first-run UI', () => {
+  it('retains the server-budgeted logo sample and logo persistence APIs', () => {
+    expect(client).toContain('onboardingSample: (brandName: string, style: string, deviceId?: string)');
+    expect(client).toContain('uploadLogo: (image:');
   });
-
-  it("buyer lands directly on the feed, seller on the dashboard", () => {
-    expect(source).toContain("router.replace('/(buyer)/'");
-    expect(source).toContain("thread_explainer_seen:${userId}");
-    expect(source).toContain("router.replace('/(tabs)/'");
-  });
-  it("buyer auth opens the email question directly", () => {
-    expect(BUYER_STEPS[2]).toBe('EMAIL');
-    expect(source).toContain("case 'EMAIL':");
-    expect(accountSteps).toContain('keyboardType="email-address"');
-  });
-
-  it("buyer success retains the explainer flag and seller billing stays an explicit action", () => {
-    expect(source).toContain("router.replace('/(buyer)/'");
-    // Keep the approved dashboard billing flow, not an automatic paywall.
-    expect(source).toContain("router.replace('/(tabs)/'");
-    const plans = read("./plans.tsx");
-    expect(plans).toContain("const isOnboarding = fromOnboarding === 'true';");
-    expect(plans).toContain("'onboarding_selected_plan'");
-    expect(plans).toContain("router.replace('/(tabs)/'");
-  });
-
-  it("style interests remain editable in the active interests step", () => {
-    expect(source).toContain("setStyleArr((prev) => prev.includes(item)");
-    expect(source).toContain("styleInterests");
-    expect(source).toContain("case 'BUYER_INTERESTS':");
-    expect(source).toContain("styleArr.includes(item)");
-  });
-
-  it("uses one editable name question and restores its draft", () => {
-    expect(source).toContain("name={fullName} onChange={setFullName}");
-    expect(source).toContain("setFullName([draft.firstName, draft.lastName].filter(Boolean).join(' '))");
-  });
-
-  it("combined name is written to profile with first and last name", () => {
-    // Name is composed as 'firstName lastName'
-    expect(source).toMatch(/name:\s*fullName/);
+  it('keeps system fonts, keyboard clearance and plain action labels', () => {
+    expect(kit).toContain('<KeyboardAvoidingView');
+    expect(kit).not.toContain('Inter_');
+    expect([kit, auth, profile].join('\n')).not.toContain('Build my workspace');
   });
 });

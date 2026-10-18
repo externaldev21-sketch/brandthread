@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { parseDraft, resolveResumeStep, sanitizeDraftForStorage, userDraftKey, type OnboardingDraft } from './onboardingDraft';
+import { DRAFT_VERSION } from './onboardingFlow';
 
 const base: OnboardingDraft = {
-  version: 9, flow: 'buyer', stepId: 'BIRTHDAY', authMethod: 'email', accountCreated: false, ownerId: null,
-  email: 'mila@x.co', firstName: '', lastName: '', username: '', dob: null, referralCode: '', photoUri: null,
+  version: DRAFT_VERSION, flow: 'buyer', stepId: 'BIRTHDAY', authMethod: 'email', accountCreated: false, ownerId: null,
+  email: 'mila@x.co', firstName: '', lastName: '', username: '', dob: '1995-01-01', referralCode: '', photoUri: null,
   styleInterests: [], survey: null, brandName: '', brandStage: '', goals: [], country: 'US', selectedThemeId: 'monochrome',
 };
 
@@ -27,7 +28,7 @@ describe('parseDraft', () => {
     expect(parseDraft('{oops')).toBeNull();
     expect(parseDraft(JSON.stringify({ flow: 'admin' }))).toBeNull();
   });
-  it('reads a v9 draft', () => {
+  it('reads a current draft', () => {
     const d = parseDraft(JSON.stringify({ ...base, stepId: 'CODE' }))!;
     expect(d.stepId).toBe('CODE');
     expect(d.email).toBe('mila@x.co');
@@ -35,7 +36,7 @@ describe('parseDraft', () => {
   });
   it('treats an old (v8) per-user draft as belonging to an existing account', () => {
     const d = parseDraft(JSON.stringify({ version: 8, flow: 'seller', step: 4, brandName: 'Noir', ownerId: 'u1' }))!;
-    expect(d.stepId).toBe('BRAND_NAME');
+    expect(d.stepId).toBe('USERNAME');
     expect(d.accountCreated).toBe(true);
     expect(d.brandName).toBe('Noir');
   });
@@ -48,7 +49,7 @@ describe('resolveResumeStep', () => {
   const pending = { accountReady: false, signUpPending: true, emailVerified: false };
 
   it('returns to the same question before the account steps', () => {
-    expect(resolveResumeStep({ ...base, stepId: 'GOALS' }, pending)).toBe('GOALS');
+    expect(resolveResumeStep({ ...base, stepId: 'BIRTHDAY' }, pending)).toBe('BIRTHDAY');
   });
   it('returns to the code screen while the sign-up is still open in Clerk', () => {
     expect(resolveResumeStep({ ...base, stepId: 'CODE' }, pending)).toBe('CODE');
@@ -56,18 +57,18 @@ describe('resolveResumeStep', () => {
   it('restarts at email when Clerk no longer has the sign-up', () => {
     expect(resolveResumeStep({ ...base, stepId: 'CODE' }, { ...pending, signUpPending: false })).toBe('EMAIL');
   });
-  it('asks for the password again after it, because it is never stored', () => {
-    expect(resolveResumeStep({ ...base, stepId: 'TERMS' }, { ...pending, emailVerified: true })).toBe('PASSWORD');
-    expect(resolveResumeStep({ ...base, stepId: 'BIRTHDAY' }, { ...pending, emailVerified: true })).toBe('PASSWORD');
+  it('resumes verified signup at required details without restoring a password', () => {
+    expect(resolveResumeStep({ ...base, stepId: 'DETAILS' }, { ...pending, emailVerified: true })).toBe('DETAILS');
+    expect(resolveResumeStep({ ...base, stepId: 'CODE' }, { ...pending, emailVerified: true })).toBe('DETAILS');
   });
-  it('Apple/Google resume at terms only with a birthday on file', () => {
+  it('Apple/Google resume required details only with a birthday on file', () => {
     const apple = { ...base, authMethod: 'apple' as const };
-    expect(resolveResumeStep({ ...apple, stepId: 'TERMS', dob: '1990-02-02' }, pending)).toBe('TERMS');
-    expect(resolveResumeStep({ ...apple, stepId: 'TERMS' }, pending)).toBe('BIRTHDAY');
+    expect(resolveResumeStep({ ...apple, stepId: 'DETAILS', dob: '1990-02-02' }, pending)).toBe('DETAILS');
+    expect(resolveResumeStep({ ...apple, stepId: 'DETAILS', dob: null }, pending)).toBe('BIRTHDAY');
   });
   it('with a session, skips account steps and keeps profile steps', () => {
     const ready = { accountReady: true, signUpPending: false, emailVerified: false };
-    expect(resolveResumeStep({ ...base, stepId: 'TERMS' }, ready)).toBe('NAME');
+    expect(resolveResumeStep({ ...base, stepId: 'DETAILS' }, ready)).toBe('USERNAME');
     expect(resolveResumeStep({ ...base, stepId: 'PHOTO' }, ready)).toBe('PHOTO');
   });
   it('profile steps without a session go back to email', () => {

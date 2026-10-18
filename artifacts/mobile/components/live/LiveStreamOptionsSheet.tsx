@@ -24,13 +24,16 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { MenuSheet } from '@/components/ui/MenuSheet';
 
 export function LiveStreamOptionsSheet({
-  visible, hostName, onClose, onReport, onBlock,
+  visible, hostName, onClose, onReport, onBlock, sound, onGift, reportLabel = 'Report live stream',
 }: {
   visible: boolean;
   hostName: string;
   onClose: () => void;
   onReport: () => void;
   onBlock: () => void;
+  sound?: { muted: boolean; onToggle: () => void };
+  onGift?: () => void;
+  reportLabel?: string;
 }) {
   return (
     <MenuSheet
@@ -39,7 +42,9 @@ export function LiveStreamOptionsSheet({
       accessibilityLabel="Live stream options"
       testID="live-stream-options-sheet"
       sections={[[
-        { key: 'report', icon: 'flag', label: 'Report live stream', destructive: true, onPress: onReport },
+        ...(sound ? [{ key: 'sound', icon: sound.muted ? 'volume-2' as const : 'volume-x' as const, label: sound.muted ? 'Turn sound on' : 'Mute sound', onPress: sound.onToggle }] : []),
+        ...(onGift ? [{ key: 'gift', icon: 'gift' as const, label: `Send Thread Cash to ${hostName}`, onPress: onGift }] : []),
+        { key: 'report', icon: 'flag', label: reportLabel, destructive: true, onPress: onReport },
         { key: 'block', icon: 'slash', label: `Block ${hostName}`, destructive: true, onPress: onBlock },
       ]]}
     />

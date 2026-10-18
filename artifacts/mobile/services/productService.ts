@@ -7,6 +7,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resetListing } from '@/lib/listing/listingStore';
 import {
   Product, ProductDraft, ProductFilter, ProductSearchQuery,
   ProductMedia, ProductVariant, ProductOption, ProductCategory,
@@ -86,6 +87,7 @@ let _productUserId = 'anon';
 export function initProductService(userId: string | null): void {
   const newUserId = userId ?? 'anon';
   if (newUserId === _productUserId) return;
+  resetListing();
   _productUserId = newUserId;
   _initialized = false;
   _products = [];

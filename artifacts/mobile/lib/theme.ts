@@ -117,6 +117,15 @@ export const MEDIA = {
   muted: MUTED,
   border: BORDER,
   line: CREATE_CANVAS.line,
+  // LIVE overlays use fixed contrast regardless of the selected page theme.
+  fg: '#FFFFFF',
+  fgMuted: 'rgba(255,255,255,0.72)',
+  fgFaint: 'rgba(255,255,255,0.5)',
+  hairline: 'rgba(255,255,255,0.28)',
+  chip: 'rgba(0,0,0,0.38)',
+  scrim: 'rgba(0,0,0,0.55)',
+  backdrop: '#000000',
+  onFg: '#000000',
   metal: {
     mid: '#B8B8B8',
     highlight: '#F2F2F2',
