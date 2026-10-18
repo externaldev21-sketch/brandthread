@@ -1097,7 +1097,6 @@ export default function ProfileScreen() {
             action={emptyAction}
             actionStyle="text"
             alignTop={activeTab === 'Posts'}
-            quiet
           />
         )}
         showsVerticalScrollIndicator={false}

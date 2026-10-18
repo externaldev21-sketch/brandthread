@@ -51,7 +51,7 @@ describe('quote UI structure', () => {
     const src = read('components/ThreadShareSheet.tsx');
     // The approved share grid moves Quote into More, preserving its UUID gate.
     expect(src).toMatch(/if \(isUUID\(postId\)\) \{\s*options\.push\(\{ text: 'Quote'/);
-    expect(src).toContain('quotePostHref(postId)');
+    expect(src).toMatch(/quotePostHref\(\{\s*postId\b/);
     for (const label of ['Copy link', 'Messages', 'Email', 'More', 'Report', 'Save video']) {
       expect(src).toContain(`label="${label}"`);
     }
