@@ -1,3101 +1,342 @@
-import { Icon as Feather } from '@/components/ui/Icon';
-import { apiErrorMessage } from '@/lib/safety';
-import { CachedImage as Image } from '@/components/CachedImage';
-
-import { hapticToggle, haptics, haptic } from '@/lib/haptics';
-
 /**
- * Add Product — four steps over the same sections
+ * Sell an item / Edit listing.
  *
- * Photos → Details (title, description, category + Organization, Sales model,
- * Size chart, Manufacturing, Storefront & SEO) → Price & sizes (price,
- * variants, inventory + Profit, Shipping) → Publish (the buyer product page
- * built from the form). Header Save works on every step.
+ * One scrolling form, laid out like Vinted's "Sell an item"
+ * (mobbin.com/flows/f6d5c7c8-cc36-4fdb-9896-e6e93476f22e): photos, then
+ * Title + Describe your item, then rows that push their own picker screens
+ * (Category → Brand → Size → Condition → Colours → Material), Quantity,
+ * Price (with the "you'll earn" note), and Shipping. Depop's photo row
+ * ("Add photos (Up to 8)" + Edit photos) and its sticky "Save to drafts" /
+ * primary button bar (mobbin.com/flows/9f6278f3-41a4-4e03-9e3f-0db7cc5bcac7)
+ * sit at the top and bottom. The primary button opens the preview
+ * (Vestiaire's "Review before submitting"), where the listing is posted.
+ *
+ * State lives in lib/listing/listingStore so the pushed pickers (app/listing/*)
+ * edit the same listing.
  */
-
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { plural } from '@/lib/plural';
-
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, Platform, LayoutAnimation, UIManager, ActivityIndicator } from 'react-native';
-
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
-
-import { LinearGradient } from 'expo-linear-gradient';
-
-import { Icon, type IconName } from '@/components/ui/Icon';
-
-import { useRouter, useLocalSearchParams, useNavigation, useFocusEffect } from 'expo-router';
-
-import { takePendingAiDescription, toUploadObjectPath } from '@/lib/aiHelperHandoff';
-
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import * as ImagePicker from 'expo-image-picker';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { showActionSheet } from '@/components/ui/ActionSheet';
-
-import { MediaCropper } from '@/components/media/MediaCropper';
-
-import { applyCropRect } from '@/lib/mediaCrop';
-
-import * as ImageManipulator from 'expo-image-manipulator';
-import { File, Paths } from 'expo-file-system';
-
-import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
-
-import { useAppTheme } from '@/contexts/AppThemeContext';
-import { PRODUCT_PHOTO_ASPECT } from '@/constants/media';
-import { RADII, radius } from '@/constants/radii';
-
-import { TYPE_SCALE } from '@/constants/typography';
-
-
-
-import { Button } from '@/components/ui/Button';
-
-import { SuccessSheet } from '@/components/ui/SuccessSheet';
-import { useProductLimitSheet } from '@/components/products/ProductLimitSheet';
-
-import { openShareStoreSheet } from '@/lib/shareStoreSheet';
-
-import { preOrderShipDateError, PREORDER_SHIP_DATE_REQUIRED_MESSAGE } from '@/lib/deliveryGuarantee';
-
-import { EDITION_SIZE_MAX, EDITION_SIZE_MIN, parseEditionSize } from '@/lib/editions';
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
-
-import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
-
-import { dateToYmd, dateToYmdHm, startOfToday, ymdHmToDate, ymdToDate } from '@/lib/dateTimeField';
-
-import { getProduct, saveDraft, loadDraft, deleteDraft, getCollections, createProduct, updateProduct } from '@/services/productService';
-
-import { useAuth } from '@clerk/expo';
-
-import { isSellerDevPreview } from '@/lib/devPreview';
-
-import { isPreviewSellerProductId } from '@/lib/previewSellerProducts';
-
-import { buildServerVariants, sanitizeMoneyInput } from '@/lib/productSave';
-
-import { useApi } from '@/hooks/useApi';
-import { FormSection } from '@/components/products/FormSection';
-import { ProductPhotoGrid } from '@/components/products/ProductPhotoGrid';
-import { VariantTable } from '@/components/products/VariantTable';
-
-import { confirmPublishWithoutPayouts } from '@/lib/payoutReadinessPrompt';
-
-import { getEntitlementRejection } from '@/lib/entitlementError';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { isFirstStoreLive, storeLiveSeenKey, type OwnProductRow } from '@/lib/storeLive';
-
-import { Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES, SIZE_PRESETS, COLOR_PRESETS, SalesModel, OptionType, ProductOption, OptionValue, ProductVariant, ProductMedia, ProductCollection } from '@/services/productTypes';
-
-import { calcPricing, generateVariantCombinations, buildVariantTitle, validateForPublish, applyBulkEditToVariants } from '@/lib/productUtils';
-
-import { formatCents, parseDecimalToCents } from '@/lib/money';
-
-import { displayPriceInput, sanitizePriceInput } from '@/lib/priceInput';
-
-import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
-
-import { completeSetupTaskAfter, completeSetupTaskWhen } from '@/lib/setupCompletion';
-
-import { confirmChoice } from '@/lib/confirmChoice';
-
-import { publishesSoldOut, SOLD_OUT_CONFIRM } from '@/lib/productPublishChecks';
-
-import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
-
-import { FeeBreakdown } from '@/components/money/FeeBreakdown';
-
-import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
-
+import { FormRow, GroupNote, LabeledField, ListingBottomBar, SectionGap } from '@/components/listing/ListingRows';
+import { PhotoStrip } from '@/components/listing/PhotoStrip';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { useApi } from '@/lib/api';
+import { FONT, FS, SP } from '@/lib/theme';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
-import { useUser } from '@clerk/expo';
-import { PressableScale } from '@/components/BrandthreadUI';
-import { ReorderablePhotoStrip } from '@/components/product/ReorderablePhotoStrip';
-import { BuyerProductPreview, buyerProductFromDraftRow } from '@/components/product/BuyerProductPreview';
-import { movePhotoToFront, reorderPhotos, withCoverFirst } from '@/lib/photoOrder';
-import { LAST_LISTING_STEP, LISTING_STEPS, canJumpToStep, isListingStepValid, type ListingStep, type ListingStepInput } from '@/lib/listingSteps';
-import { buildDraftPreviewRow, setDraftPreviewRow } from '@/lib/draftBuyerPreview';
-
-import { takePendingMockup } from '@/lib/mockupProductHandoff';
-
-import { minHitSlop } from '@/lib/hitSlop';
-
-import { crispPx } from '@/lib/crispPixel';
-
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-// ─── Collapsible section component ──────────────────────────────────────────
-// One scrolling page, Shopify-iOS-style: essentials (photos, title, price,
-// variants, inventory) are always open; secondary fields (shipping,
-// manufacturing, sales model, size chart, storefront/SEO, live preview) are
-// collapsed rows a seller taps open, same as Shopify's own "Shipping" /
-// "Search engine listing" disclosure rows.
-
-interface CollapsibleSectionProps {
-  title: string;
-  icon: IconName;
-  expanded: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-  hint?: string;   // shown in the header when collapsed
-}
-
-function CollapsibleSection({ title, icon, expanded, onToggle, children, hint }: CollapsibleSectionProps) {
-  const { theme } = useAppTheme();
-  const s = React.useMemo(() => makeStyles(theme), [theme]);
-  const MUTED = theme.muted;
-  return (
-    <View style={s.collapsibleBlock}>
-      <TouchableOpacity style={s.collapsibleHeader} onPress={onToggle} activeOpacity={0.75}>
-        <View style={s.collapsibleHeaderLeft}>
-          <View style={[s.collapsibleIconWrap, { backgroundColor: theme.accentDim }]}>
-            <Icon name={icon} size={15} color={theme.accentLight} />
-          </View>
-          <View style={{ gap: 1 }}>
-            <Text style={s.collapsibleTitle}>{title}</Text>
-            {!expanded && hint ? <Text style={s.collapsibleHint}>{hint}</Text> : null}
-          </View>
-        </View>
-        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
-      </TouchableOpacity>
-      {expanded && (
-        <View style={s.collapsibleBody}>
-          {children}
-        </View>
-      )}
-    </View>
-  );
-}
-
-// ─── Inventory stepper (− / qty / +) — Shopify's own inventory-row control ──
-
-// The drawn −/+ buttons stay 28×28; hitSlop pads the tap area to 44×44
-// (measured from inside their 1pt border, hence 26).
-const STEPPER_BTN_HIT_SLOP = minHitSlop({ width: 26, height: 26 });
-
-function Stepper({ label, value, onChange, min = 0 }: {
-  label: string; value: number; onChange: (next: number) => void; min?: number;
-}) {
-  const { theme } = useAppTheme();
-  const s = React.useMemo(() => makeStyles(theme), [theme]);
-  return (
-    <View style={s.stepperRow}>
-      <Text style={s.stepperLabel} numberOfLines={1}>{label}</Text>
-      <View style={s.stepperControl}>
-        <TouchableOpacity
-          style={s.stepperBtn}
-          disabled={value <= min}
-          onPress={() => {  onChange(Math.max(min, value - 1)); }}
-          hitSlop={STEPPER_BTN_HIT_SLOP}
-          accessibilityRole="button"
-          accessibilityLabel={`Decrease ${label}`}
-        >
-          <Icon name="minus" size={14} color={value <= min ? theme.subtle : theme.text} />
-        </TouchableOpacity>
-        <TextInput
-          style={s.stepperInput}
-          value={String(value)}
-          onChangeText={(txt) => {
-            const n = parseInt(txt.replace(/[^0-9]/g, ''), 10);
-            onChange(Number.isFinite(n) ? Math.max(min, n) : min);
-          }}
-          keyboardType="numeric"
-          textAlign="center"
-          accessibilityLabel={`${label} quantity`}
-        />
-        <TouchableOpacity
-          style={s.stepperBtn}
-          onPress={() => {  onChange(value + 1); }}
-          hitSlop={STEPPER_BTN_HIT_SLOP}
-          accessibilityRole="button"
-          accessibilityLabel={`Increase ${label}`}
-        >
-          <Icon name="plus" size={14} color={theme.text} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
-// ─── Local state interfaces ───────────────────────────────────────────────
-
-interface LocalOption {
-  id: string;
-  type: OptionType;
-  name: string;
-  values: { id: string; value: string; colorHex?: string }[];
-  customInput: string;
-}
-
-interface LocalVariant {
-  id: string;
-  title: string;
-  optionValues: { optionId: string; valueId: string }[];
-  sku: string;
-  price: string;
-  qty: string;
-}
-
-function uid() { return Math.random().toString(36).slice(2, 11); }
-function centsToInput(cents: number | undefined): string {
-  if (cents === undefined) return '';
-  return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
-}
-
-// ─── Screen ─────────────────────────────────────────────────────────
+import { leaveSetupFlow } from '@/lib/setupNavigation';
+import { formatCents, parseDecimalToCents } from '@/lib/money';
+import { useFeeSchedule } from '@/hooks/useFeeSchedule';
+import { quoteFromSchedule } from '@/lib/feeSchedule';
+import { loadDraft, saveDraft } from '@/services/productService';
+import {
+  emptyListing, getListing, getListingVersion, missingForPublish, photosUploading, resetListing,
+  totalQuantity, updateListing, useListing, useListingVersion,
+} from '@/lib/listing/listingStore';
+import { draftToListing, listingToDraft, productToListing, type ApiProduct } from '@/lib/listing/listingPersistence';
+import { pickFromLibrary, removePhoto, takePhoto, uploadListingPhoto } from '@/lib/listing/listingMedia';
+import { notify } from '@/lib/listing/notify';
+import { conditionLabel, DESCRIPTION_MAX, parcelLabel, TITLE_MAX } from '@/lib/listing/taxonomy';
 
 export default function AddProductScreen() {
   useHideTabBar();
   const { theme } = useAppTheme();
-  const {
-    background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
-    border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE,
-    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
-    secondary: CYAN, secondaryDim: CYAN_DIM, success: SUCCESS, warning: ORANGE, error: RED,
-    onAccent: ON_DARK,
-  } = theme;
-  const BORDER_ACTIVE = theme.accentLight;
-  const BLUE = theme.accentLight;
-  const GOLD = theme.accent;
-  const GRAD_CARD_GLOW = theme.glowGradient;
-  const s = React.useMemo(() => makeStyles(theme), [theme]);
+  const s = useMemo(() => makeStyles(theme), [theme]);
   const router = useRouter();
   const navigation = useNavigation();
-  const params = useLocalSearchParams();
-  const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
-  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ editId?: string; from?: string; section?: string }>();
   const api = useApi();
-  // Signed-out seller preview (?bt_preview=seller with no account): there is
-  // no server to save to, so Save keeps the product in the local product
-  // store the Products tab and product detail read (services/productService.ts)
-  // and never calls a protected API — same rule as app/subscription.tsx.
-  const { isLoaded: authLoaded, isSignedIn, userId: authUserId } = useAuth();
-  const localOnlyPreview = isSellerDevPreview() && (!authLoaded || !isSignedIn || !authUserId);
-  const publishingRef = useRef(false);
+  const form = useListing();
+  // Re-render on every edit so the dirty check and row values stay current.
+  useListingVersion();
+  const schedule = useFeeSchedule();
+
+  const [loading, setLoading] = useState(!!params.editId);
+  const [showErrors, setShowErrors] = useState(false);
+  /** Opened from Drafts — Depop labels the button "Update draft". */
+  const [fromDraft, setFromDraft] = useState(false);
+  /** Store version at the last load/save — anything newer is unsaved. */
+  const savedVersionRef = useRef(0);
+  const exitingRef = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
-  const variantsSectionY = useRef<number | null>(null);
-  const pendingSectionScroll = useRef(params.section === 'variants');
-  const productLimit = useProductLimitSheet();
 
-  const [draftData, setDraftData] = useState<Partial<Product>>({
-    name: '',
-    description: '',
-    tags: [],
-    styleTags: [],
-    media: [],
-    pricing: { priceCents: 0, currency: 'USD' },
-    options: [],
-    variants: [],
-    inventory: {
-      productId: '',
-      trackQuantity: true,
-      allowOverselling: false,
-      policy: 'deny',
-      lowStockThreshold: 5,
-      totalStock: 0,
-      availableStock: 0,
-      reservedStock: 0,
-      incomingStock: 0,
-      locationStock: [],
-      variantStock: [],
-    },
-    salesModel: params.intent === 'drop' ? 'pre-order' : 'pre-made',
-    preorderSettings: {
-      unitsOrdered: 0,
-      isFunded: false,
-    },
-    fulfillment: { type: 'seller' },
-    manufacturing: { stage: 'none' },
-    storeSettings: {
-      status: 'draft',
-      collectionIds: [],
-      featuredOnHomepage: false,
-      relatedProductIds: [],
-      seo: { searchVisible: true },
-    },
-  });
+  const isEdit = !!form.editProductId;
+  const priceCents = parseDecimalToCents(form.priceStr);
+  const missing = missingForPublish(form, priceCents);
 
-  // ── Field state ──
-  const [tagsInput, setTagsInput] = useState('');
-  const [priceStr, setPriceStr] = useState('');
-  const [compareAtStr, setCompareAtStr] = useState('');
-  const [costStr, setCostStr] = useState('');
-  const [shippingStr, setShippingStr] = useState('');
-  const [feesStr, setFeesStr] = useState('');
-  const [localOptions, setLocalOptions] = useState<LocalOption[]>([]);
-  const [localVariants, setLocalVariants] = useState<LocalVariant[]>([]);
-  const [trackInventory, setTrackInventory] = useState(true);
-  const [allowOversell, setAllowOversell] = useState(false);
-  const [stockStr, setStockStr] = useState('');
-  const [lowStockStr, setLowStockStr] = useState('5');
-  const [variantQtys, setVariantQtys] = useState<Record<string, string>>({});
-  const [mfgMode, setMfgMode] = useState<'none' | 'existing' | 'quote'>('none');
-  const [mfgName, setMfgName] = useState('');
-  const [targetCost, setTargetCost] = useState('');
-  const [reqQty, setReqQty] = useState('');
-  const [prodDeadline, setProdDeadline] = useState('');
-  const [featuredHome, setFeaturedHome] = useState(false);
-  const [dismissedTips, setDismissedTips] = useState<string[]>([]);
-  const [publishing, setPublishing] = useState(false);
-  const [publishError, setPublishError] = useState<string | null>(null);
-  const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string; soldOut?: boolean } | null>(null);
-  const [publishingNow, setPublishingNow] = useState(false);
-  // "Share store" in the publish sheet opens the Share store sheet once this one has finished closing.
-  const shareStoreAfterClose = useRef(false);
-  const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
-  const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
-  const [sizeChartUploadStatus, setSizeChartUploadStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
-  // Media crop system: newly-picked photos queue up to be cropped one at a
-  // time (each keeps its own transform once cropped — this is "crop each
-  // photo" via a sequential flow rather than a single multi-photo session
-  // with a live thumbnail strip, which the shared MediaCropper doesn't
-  // build yet; every photo still gets its own crop either way).
-  const [cropQueue, setCropQueue] = useState<string[]>([]);
-  const [cropTargetId, setCropTargetId] = useState<string | null>(null);
-  // Photos row: 3 empty "Add photo" squares by default, growable one at a
-  // time (up to 10) via the quiet "+" tile at the end — see renderPhotos().
-  // Never allowed to drop below however many photos are already filled in.
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editProductId, setEditProductId] = useState<string | null>(null);
-  const [collections, setCollections] = useState<ProductCollection[]>([]);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [descOpen, setDescOpen] = useState(false);
-
-  // A drop starts in pre-order mode, matching its initial sales model.
-  const [isPreOrder, setIsPreOrder] = useState(params.intent === 'drop');
-  // Limited numbered run: each unit sold gets "No. 014 of 200" in the buyer's Closet.
-  const [numbered, setNumbered] = useState(false);
-  const [editionSizeText, setEditionSizeText] = useState('');
-
-  // ── Variants: bulk-edit selection ──
-  const [bulkEditMode, setBulkEditMode] = useState(false);
-  const [selectedVariantIds, setSelectedVariantIds] = useState<Set<string>>(new Set());
-  const [bulkPrice, setBulkPrice] = useState('');
-  const [bulkQty, setBulkQty] = useState('');
-
-  // ── Photos: background removal per image ──
-  const [bgRemovalState, setBgRemovalState] = useState<Record<string, 'processing' | 'done' | 'failed'>>({});
-
-  // ── Collapsible section state — everything below the essentials starts closed ──
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    profit:        false,
-    fulfillment:   false,
-    salesModel:    false,
-    sizeChart:     false,
-    manufacturing: false,
-    storefront:    false,
-    preview:       false,
-  });
-
-  // ── Steps: Photos → Details → Price & sizes → Publish (lib/listingSteps.ts).
-  // The sections below are unchanged; each step shows its own subset. ──
-  const [step, setStep] = useState<ListingStep>(0);
-  const [photoSlotCount, setPhotoSlotCount] = useState(3);
-  const visibleSlotCount = Math.min(10, Math.max(photoSlotCount, (draftData.media ?? []).length));
-  const canAddSlot = visibleSlotCount < 10;
-  const { user } = useUser();
-  // First-photo title/category prefill: tried once, and never over a value
-  // the seller typed or picked themselves.
-  const prefillTriedRef = useRef(false);
-  const sellerEditedRef = useRef({ name: false, category: false });
-
-  const draftId = useRef('draft_' + uid());
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasUnsavedChangesRef = useRef(false);
-  const changeVersionRef = useRef(0);
-  const latestDraftSnapshotRef = useRef<ProductDraft | null>(null);
-  const isExitingRef = useRef(false);
-
-  function markUnsavedChanges() {
-    changeVersionRef.current += 1;
-    hasUnsavedChangesRef.current = true;
-    setHasUnsavedChanges(true);
-  }
-
-  function updateUnsavedState<T>(
-    setter: React.Dispatch<React.SetStateAction<T>>,
-    value: React.SetStateAction<T>,
-  ) {
-    markUnsavedChanges();
-    setter(value);
-  }
-
-  function toggleSection(key: string) {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
-  }
-
-  // ── Restore helper ──
-  function restoreFormState(source: Partial<Product>) {
-    if (source.pricing) {
-      setPriceStr(centsToInput(source.pricing.priceCents));
-      setCompareAtStr(centsToInput(source.pricing.compareAtPriceCents));
-      setCostStr(centsToInput(source.pricing.costCents));
-      setShippingStr(centsToInput(source.pricing.estimatedShippingCostCents));
-      setFeesStr(centsToInput(source.pricing.estimatedFeesCents));
-    }
-    if (source.tags) setTagsInput(source.tags.join(', '));
-    if (source.storeSettings?.featuredOnHomepage) setFeaturedHome(source.storeSettings.featuredOnHomepage);
-    if (source.inventory) {
-      setTrackInventory(source.inventory.trackQuantity ?? true);
-      setAllowOversell(source.inventory.allowOverselling ?? false);
-      setStockStr(source.inventory.totalStock?.toString() ?? '');
-      setLowStockStr(source.inventory.lowStockThreshold?.toString() ?? '5');
-    }
-    if (source.options?.length) {
-      setLocalOptions(source.options.map(o => ({
-        id: o.id,
-        type: o.type,
-        name: o.name,
-        values: o.values.map(v => ({ id: v.id, value: v.value, colorHex: v.colorHex })),
-        customInput: '',
-      })));
-    }
-    if (source.variants?.length) {
-      setLocalVariants(source.variants.map(v => ({
-        id: v.id,
-        title: v.title,
-        optionValues: v.optionValues,
-        sku: v.sku ?? '',
-        price: centsToInput(v.priceCents),
-        qty: v.inventoryQuantity.toString(),
-      })));
-      const qtys: Record<string, string> = {};
-      source.variants.forEach(v => { qtys[v.id] = v.inventoryQuantity.toString(); });
-      setVariantQtys(qtys);
-    }
-    if (source.salesModel) {
-      setIsPreOrder(source.salesModel === 'pre-order' || source.salesModel === 'both');
-    }
-    if (source.manufacturing) {
-      if (source.manufacturing.manufacturerName) {
-        setMfgMode('existing');
-        setMfgName(source.manufacturing.manufacturerName);
-      }
-      setTargetCost(centsToInput(source.manufacturing.targetCostPerUnitCents));
-      setReqQty(source.manufacturing.requiredQuantity?.toString() ?? '');
-      setProdDeadline(source.manufacturing.productionDeadline ?? '');
-    }
-  }
-
-  // ── Draft / edit load on mount ──
+  // ── Load: fresh form, a saved draft, or a published product to edit ──────
   useEffect(() => {
-    const editId = params.editId as string | undefined;
-    if (!editId) return;
-
-    async function loadForEdit() {
-      const draft = await loadDraft(editId!);
+    const editId = params.editId;
+    if (!editId) {
+      resetListing(emptyListing());
+      savedVersionRef.current = 0;
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const draft = await loadDraft(editId);
       if (draft) {
-        setDraftData(draft as Partial<Product>);
-        restoreFormState(draft);
-        draftId.current = editId!;
-        return;
-      }
-      let product = await getProduct(editId!);
-      if (product) {
-        const runSize = (product as unknown as { editionSize?: number | null }).editionSize;
-        if (typeof runSize === 'number' && runSize > 0) { setNumbered(true); setEditionSizeText(String(runSize)); }
-        // API rows carry isPreOrder / preOrderEstShipDate; map them onto the
-        // form so editing a pre-order shows its ship date (required on save).
-        const row = product as unknown as { isPreOrder?: boolean; preOrderEstShipDate?: string | null };
-        if (row.isPreOrder && !product.preorderSettings?.estimatedShippingDate) {
-          product = {
-            ...product,
-            salesModel: product.salesModel === 'both' ? 'both' : 'pre-order',
-            preorderSettings: {
-              unitsOrdered: 0, isFunded: false, ...product.preorderSettings,
-              estimatedShippingDate: row.preOrderEstShipDate ? String(row.preOrderEstShipDate).slice(0, 10) : undefined,
-            },
-          };
+        if (!cancelled) { resetListing(draftToListing(draft)); setFromDraft(true); }
+      } else {
+        try {
+          const product = await api.products.get(editId) as ApiProduct;
+          if (!cancelled) resetListing(productToListing(product));
+        } catch {
+          if (!cancelled) {
+            resetListing(emptyListing());
+            notify('Couldn’t load listing', 'Check your connection and try again.');
+          }
         }
-        setIsEditMode(true);
-        setEditProductId(editId!);
-        setDraftData(product as Partial<Product>);
-        restoreFormState(product);
-        draftId.current = 'edit_' + editId!;
       }
-    }
-    loadForEdit();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      if (cancelled) return;
+      savedVersionRef.current = getListingVersion();
+      setLoading(false);
+      if (params.section === 'variants') router.push('/listing/size' as never);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.editId]);
 
-  // ── Deep link to a section (QA-0652): product detail's "Edit variants"
-  // opens /add-product?editId=<id>&section=variants — land on Variants.
-  function scrollToVariantsSection() {
-    const y = variantsSectionY.current;
-    if (y === null) return;
-    scrollRef.current?.scrollTo({ y: Math.max(0, y - SP.sm), animated: true });
-  }
-  useEffect(() => {
-    if (!pendingSectionScroll.current) return;
-    // Re-aim once the edit data has filled the sections above, then stop
-    // following layout changes so later edits never yank the scroll.
-    const aim = setTimeout(scrollToVariantsSection, 450);
-    const stop = setTimeout(() => { pendingSectionScroll.current = false; }, 1200);
-    return () => { clearTimeout(aim); clearTimeout(stop); };
-  }, [params.editId, params.section]);
-  // ── Mockup preview "Add to product → Create new product": start with the mockup photo ──
-  useEffect(() => {
-    const mockupProjectId = typeof params.mockupProjectId === 'string' ? params.mockupProjectId : undefined;
-    if (!mockupProjectId || params.editId) return;
-    const mockup = takePendingMockup(mockupProjectId);
-    if (!mockup) return;
-    const item: ProductMedia = {
-      id: `mockup-${Date.now()}`, type: 'image', uri: mockup.uri, originalUri: mockup.uri,
-      isCover: true, sortOrder: 0, createdAt: new Date().toISOString(),
-    };
-    patchDraft({ media: [item] });
-    void uploadMediaAsset(item);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Load collections ──
-  useEffect(() => {
-    getCollections().then(cols => setCollections(cols)).catch(() => {});
+  // ── Leaving with unsaved changes (Depop asks to save a draft) ────────────
+  const isDirty = useCallback(() => {
+    const f = getListing();
+    const touched = f.photos.length > 0 || !!f.title.trim() || !!f.description.trim() || !!f.priceStr;
+    return touched && getListingVersion() > savedVersionRef.current;
   }, []);
 
-  // ── Auto-save draft ──
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      const saveVersion = changeVersionRef.current;
-      saveDraft(buildDraftSnapshot()).then(() => {
-        if (changeVersionRef.current === saveVersion) {
-          hasUnsavedChangesRef.current = false;
-          setHasUnsavedChanges(false);
-        }
-      });
-    }, 2000);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [
-    draftData, localOptions, localVariants, variantQtys,
-    priceStr, compareAtStr, costStr, shippingStr, feesStr,
-    trackInventory, allowOversell, stockStr, lowStockStr,
-    mfgMode, mfgName, targetCost, reqQty, prodDeadline, isPreOrder,
-  ]);
+  const saveToDrafts = useCallback(async () => {
+    await saveDraft(listingToDraft(getListing()));
+    savedVersionRef.current = getListingVersion();
+  }, []);
 
-  // Intercept native back gestures/buttons so the same protection applies
-  // when the seller leaves without tapping the header close button.
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', event => {
-      if (!hasUnsavedChangesRef.current || isExitingRef.current) return;
+  const confirmExit = useCallback((onExit: () => void) => {
+    const editing = !!getListing().editProductId;
+    showActionSheet(
+      editing ? 'Discard changes?' : 'Save to drafts?',
+      editing ? 'Your changes to this listing won’t be saved.' : 'You can finish this listing later from your drafts.',
+      editing
+        ? [
+          { text: 'Discard changes', style: 'destructive', onPress: onExit },
+          { text: 'Keep editing', style: 'cancel' },
+        ]
+        : [
+          { text: 'Save to drafts', onPress: () => { void saveToDrafts().then(onExit); } },
+          { text: 'Discard', style: 'destructive', onPress: onExit },
+          { text: 'Cancel', style: 'cancel' },
+        ],
+    );
+  }, [saveToDrafts]);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
+      if (exitingRef.current || !isDirty()) return;
       event.preventDefault();
-      showExitAlert(() => {
-        isExitingRef.current = true;
+      confirmExit(() => {
+        exitingRef.current = true;
         navigation.dispatch(event.data.action);
       });
     });
     return unsubscribe;
-    // The refs keep the listener current without re-registering on every edit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigation]);
+  }, [navigation, isDirty, confirmExit]);
 
-  // ── Helpers ──
-  function patchDraft(patch: Partial<Product>) {
-    if ('name' in patch) sellerEditedRef.current.name = true;
-    if ('category' in patch) sellerEditedRef.current.category = true;
-    markUnsavedChanges();
-    setDraftData(prev => ({ ...prev, ...patch }));
-  }
-
-  // AI description chosen on /ai-helper ("Use in product") lands in this draft only.
-  useFocusEffect(useCallback(() => {
-    const text = takePendingAiDescription();
-    if (text) { setDescOpen(true); patchDraft({ description: text }); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []));
-
-  function buildDraftSnapshot(): ProductDraft {
-    const productOptions: ProductOption[] = localOptions.map((o, i) => ({
-      id: o.id, type: o.type, name: o.name, values: o.values, sortOrder: i,
-    }));
-    const productVariants: ProductVariant[] = localVariants.map(v => ({
-      id: v.id, productId: '',
-      title: v.title, optionValues: v.optionValues,
-       sku: v.sku, priceCents: parseDecimalToCents(v.price) ?? undefined,
-      inventoryQuantity: parseInt(variantQtys[v.id] ?? v.qty) || 0,
-      reservedQuantity: 0, incomingQuantity: 0,
-      status: 'active' as const,
-      requiresShipping: true, taxable: true,
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    }));
-    return {
-      ...draftData,
-      options: productOptions,
-      variants: productVariants,
-      pricing: {
-        ...(draftData.pricing ?? { currency: 'USD' }),
-        priceCents: parseDecimalToCents(priceStr) ?? 0,
-        compareAtPriceCents: parseDecimalToCents(compareAtStr) ?? undefined,
-        costCents: parseDecimalToCents(costStr) ?? undefined,
-        estimatedShippingCostCents: parseDecimalToCents(shippingStr) ?? 0,
-        estimatedFeesCents: parseDecimalToCents(feesStr) ?? 0,
-        currency: 'USD',
-      },
-      inventory: {
-        ...(draftData.inventory ?? {
-          productId: '', policy: 'deny', reservedStock: 0, incomingStock: 0,
-          locationStock: [], variantStock: [],
-        }),
-        trackQuantity: trackInventory,
-        allowOverselling: allowOversell,
-        policy: allowOversell ? 'continue' : 'deny',
-        lowStockThreshold: parseInt(lowStockStr) || 5,
-        totalStock: parseInt(stockStr) || 0,
-        availableStock: parseInt(stockStr) || 0,
-      },
-      manufacturing: {
-        ...(draftData.manufacturing ?? {}),
-        stage: mfgMode === 'quote' ? 'quote_requested' : 'none',
-        manufacturerName: mfgName || undefined,
-        targetCostPerUnitCents: parseDecimalToCents(targetCost) ?? undefined,
-        requiredQuantity: parseInt(reqQty) || undefined,
-        productionDeadline: prodDeadline || undefined,
-      },
-      id: draftId.current,
-      isDraft: true,
-      currentStep: 1,
-      lastSavedAt: new Date().toISOString(),
-    };
-  }
-
-  latestDraftSnapshotRef.current = buildDraftSnapshot();
-
-  async function saveDraftAndClear(snapshot: ProductDraft) {
-    const saveVersion = changeVersionRef.current;
-    await saveDraft(snapshot);
-    if (changeVersionRef.current === saveVersion) {
-      hasUnsavedChangesRef.current = false;
-      setHasUnsavedChanges(false);
-    }
-  }
-
-  function showExitAlert(onExit: () => void) {
-    Alert.alert(
-      'Exit product creation?',
-      'You have unsaved changes — save as draft?',
-      [
-        {
-          text: 'Save draft',
-          onPress: async () => {
-            await saveDraftAndClear(latestDraftSnapshotRef.current ?? buildDraftSnapshot());
-            onExit();
-          },
-        },
-        { text: 'Discard', style: 'destructive', onPress: onExit },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-    );
-  }
-
-  function leaveProductFlow() {
-    isExitingRef.current = true;
-    // Cancel / Discard / Done pop to the exact screen underneath (dashboard,
-    // products tab, setup checklist…); only a cold deep link with no history
-    // falls back to the explicit `from` origin. Never replace() to a tabs
-    // index here — that is what used to strand the seller on the wrong tab.
+  function leave() {
+    exitingRef.current = true;
     leaveSetupFlow(router, params.from);
   }
 
-  function handleExit() {
-    if (!hasUnsavedChanges) {
-      leaveProductFlow();
-      return;
-    }
-    showExitAlert(leaveProductFlow);
+  function handleClose() {
+    if (isDirty()) confirmExit(leave);
+    else leave();
   }
 
-  // ── Pricing helpers ──
-  function getPricing() {
-    return calcPricing({
-       priceCents: parseDecimalToCents(priceStr) ?? 0,
-       compareAtPriceCents: parseDecimalToCents(compareAtStr) ?? undefined,
-       costCents: parseDecimalToCents(costStr) ?? undefined,
-       estimatedShippingCostCents: parseDecimalToCents(shippingStr) ?? 0,
-       estimatedFeesCents: parseDecimalToCents(feesStr) ?? 0,
-      currency: 'USD',
-    });
+  async function handleSaveDraft() {
+    await saveToDrafts();
+    leave();
   }
 
-  // ── Variant generation ──
-  function generateVariants() {
-    if (localOptions.length === 0) {
-      Alert.alert('No options', 'Add at least one option with values first.');
-      return;
-    }
-    const opts = localOptions.map(o => ({ id: o.id, name: o.name, values: o.values }));
-    const combos = generateVariantCombinations(opts);
-    const variants: LocalVariant[] = combos.map(combo => ({
-      id: uid(),
-      title: buildVariantTitle(combo.map(c => c.value)),
-      optionValues: combo.map(c => ({ optionId: c.optionId, valueId: c.valueId })),
-      sku: '', price: '', qty: '',
-    }));
-    updateUnsavedState(setLocalVariants, variants);
-  }
-
-  // ── Publish ──
-  // Alert.alert is a no-op on web, so surface the failure inline everywhere.
-  function showPublishError(title: string, message: string) {
-    setPublishError(`${title}: ${message}`);
-    if (Platform.OS !== 'web') Alert.alert(title, message);
-  }
-
-  // "Publish now" on the Draft saved sheet: the product just created goes live.
-  async function handlePublishNow() {
-    const created = publishSuccess;
-    if (!created || publishingNow) return;
-    if (created.soldOut && !(await confirmChoice(SOLD_OUT_CONFIRM))) return;
-    setPublishingNow(true);
-    try {
-      await api.products.update(created.productId, { status: 'active' });
-      await completeSetupTaskWhen('first_product', true);
-      setDraftData(prev => ({ ...prev, storeSettings: { ...(prev.storeSettings as any), status: 'active' } }));
-      haptics.success();
-      if (await openStoreLiveIfFirst(created.productId)) return;
-    } catch {
-      showPublishError('Could not publish', 'Your draft is saved. Try again.');
-    } finally {
-      setPublishingNow(false);
-    }
-  }
-
-  async function openStoreLiveIfFirst(productId: string): Promise<boolean> {
-    if (!authUserId || localOnlyPreview || isPreviewSellerProductId(productId)) return false;
-    try {
-      const key = storeLiveSeenKey(authUserId);
-      if ((await AsyncStorage.getItem(key)) === '1') return false;
-      const rows = (await api.products.list()) as OwnProductRow[];
-      if (!isFirstStoreLive(rows ?? [], productId, false)) return false;
-      await AsyncStorage.setItem(key, '1');
-      router.replace({ pathname: '/store-live', params: { productId } } as never);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  async function handlePublish() {
-    setPublishError(null);
-    if (photosUploading) {
-      showPublishError('Still uploading', 'Wait for your photos to finish uploading before publishing.');
-      return;
-    }
-    const decimalFields: Array<[string, string]> = [
-      ['Price', priceStr],
-      ['Compare-at price', compareAtStr],
-      ['Cost', costStr],
-      ['Shipping cost', shippingStr],
-      ['Fees', feesStr],
-      ['Target unit cost', targetCost],
-      ...localVariants.map((variant) => [`Price for ${variant.title || 'variant'}`, variant.price] as [string, string]),
-    ];
-    const invalidField = decimalFields.find(([, value]) => value.trim() !== '' && parseDecimalToCents(value) === null);
-    if (invalidField) {
-      showPublishError('Invalid price', `${invalidField[0]} must be a non-negative amount with up to two decimal places.`);
-      return;
-    }
-
-    const pricing = {
-      priceCents: parseDecimalToCents(priceStr) ?? 0,
-      compareAtPriceCents: parseDecimalToCents(compareAtStr) ?? undefined,
-      costCents: parseDecimalToCents(costStr) ?? undefined,
-      estimatedShippingCostCents: parseDecimalToCents(shippingStr) ?? 0,
-      estimatedFeesCents: parseDecimalToCents(feesStr) ?? 0,
-      currency: 'USD',
-    };
-    const productOptions: ProductOption[] = localOptions.map((o, i) => ({
-      id: o.id, type: o.type, name: o.name,
-      values: o.values.map(v => ({ id: v.id, value: v.value, colorHex: v.colorHex })),
-      sortOrder: i,
-    }));
-    const productVariants: ProductVariant[] = localVariants.map(v => ({
-      id: v.id, productId: '',
-      title: v.title, optionValues: v.optionValues,
-      sku: v.sku, priceCents: parseDecimalToCents(v.price) ?? undefined,
-      inventoryQuantity: parseInt(variantQtys[v.id] || v.qty) || 0,
-      reservedQuantity: 0, incomingQuantity: 0,
-      status: 'active' as const,
-      requiresShipping: true, taxable: true,
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    }));
-    const forValidation = {
-      name: draftData.name ?? '',
-      description: draftData.description ?? '',
-      pricing,
-      media: draftData.media ?? [],
-      variants: productVariants,
-    };
-    const warnings = validateForPublish(forValidation);
-    if (warnings.length > 0) {
-      showPublishError(
-        'Cannot publish',
-        'Please fix the following:\n' + warnings.map(w => '• ' + w).join('\n')
-      );
-      return;
-    }
-
-    // A ref, not just the `publishing` state: a second tap can land before
-    // the re-render that disables Save, which used to create the product twice.
-    if (publishing || publishingRef.current) return;
-    if (shipDateError) {
-      showPublishError('Add a ship date', PREORDER_SHIP_DATE_REQUIRED_MESSAGE);
-      return;
-    }
-    publishingRef.current = true;
-    setPublishing(true);
-
-    const retailPriceCents = parseDecimalToCents(priceStr);
-    if (retailPriceCents === null || retailPriceCents <= 0) {
-      showPublishError('Invalid price', 'Enter a valid price with up to two decimal places.');
-      setPublishing(false);
-      publishingRef.current = false;
-      return;
-    }
-    const compareAtCents = compareAtStr ? parseDecimalToCents(compareAtStr) : undefined;
-    if (compareAtStr && (compareAtCents === null || compareAtCents === undefined || compareAtCents <= retailPriceCents)) {
-      showPublishError('Compare-at price', 'Compare-at price should be higher than the retail price.');
-      setPublishing(false);
-      publishingRef.current = false;
-      return;
-    }
-
-    const ps = draftData.preorderSettings;
-    const salesModel = draftData.salesModel;
-    if ((salesModel === 'pre-order' || salesModel === 'both') && ps && ps.openDate && ps.closeDate && ps.closeDate <= ps.openDate) {
-      showPublishError('Invalid dates', 'Pre-order close date must be after the open date.');
-      setPublishing(false);
-      publishingRef.current = false;
-      return;
-    }
-
-    const skus = productVariants.map(v => v.sku).filter(Boolean);
-    const uniqueSkus = new Set(skus);
-    if (skus.length !== uniqueSkus.size) {
-      showPublishError('Duplicate SKU', 'Each variant must have a unique SKU.');
-      setPublishing(false);
-      publishingRef.current = false;
-      return;
-    }
-
-    // No variants: the product-level "In stock" count is the stock (it used
-    // to be dropped, saving every option-less product with 0 in stock).
-    const totalStock = productVariants.length > 0
-      ? productVariants.reduce((sum, v) => sum + v.inventoryQuantity, 0)
-      : (trackInventory ? Math.max(0, parseInt(stockStr, 10) || 0) : 0);
-
-    // The header status pill (Active/Draft) decides what gets saved — Save
-    // always runs this same flow, just with a different final status.
-    const finalStatus: 'active' | 'draft' = draftData.storeSettings?.status === 'active' ? 'active' : 'draft';
-    const soldOut = { trackInventory, allowOversell, isPreOrder, totalStock };
-    if (publishesSoldOut({ status: finalStatus, ...soldOut }) && !(await confirmChoice(SOLD_OUT_CONFIRM))) {
-      setPublishing(false);
-      return;
-    }
-
-    // A new live listing from a seller without payouts can't be bought yet:
-    // say so first, and let them set up payouts or publish anyway (BT-206).
-    if (finalStatus === 'active' && !isEditMode && !(await confirmPublishWithoutPayouts(api, router))) {
-      setPublishing(false);
-      return;
-    }
-
-    const productPayload: Partial<Product> = {
-      ...draftData,
-      pricing,
-      options: productOptions,
-      variants: productVariants,
-      status: finalStatus,
-      inventory: {
-        ...(draftData.inventory ?? { productId: '', trackQuantity: true, allowOverselling: false, policy: 'deny', lowStockThreshold: 5, reservedStock: 0, incomingStock: 0, locationStock: [], variantStock: [] }),
-        productId: isEditMode && editProductId ? editProductId : '',
-        totalStock,
-        availableStock: totalStock,
-        trackQuantity: trackInventory,
-        allowOverselling: allowOversell,
-        policy: allowOversell ? 'continue' : 'deny',
-        lowStockThreshold: parseInt(lowStockStr) || 5,
-      },
-      storeSettings: {
-        ...(draftData.storeSettings ?? { collectionIds: [], featuredOnHomepage: false, relatedProductIds: [], seo: { searchVisible: true } }),
-        status: finalStatus,
-        featuredOnHomepage: featuredHome,
-      },
-      manufacturing: {
-        stage: mfgMode === 'quote' ? 'quote_requested' : 'none',
-        manufacturerName: mfgName || undefined,
-        targetCostPerUnitCents: parseDecimalToCents(targetCost) ?? undefined,
-        requiredQuantity: parseInt(reqQty) || undefined,
-        productionDeadline: prodDeadline || undefined,
-      },
-    };
-
-    const productVariantsForServer = buildServerVariants({
-      name: productPayload.name ?? '',
-      options: productOptions,
-      variants: productVariants,
-      priceCents: productPayload.pricing?.priceCents ?? 0,
-      stock: totalStock,
-      lowStockThreshold: parseInt(lowStockStr, 10) || 5,
-    }).map((v) => {
-      const compareAt = productPayload.pricing?.compareAtPriceCents;
-      return compareAt && compareAt > v.priceCents ? { ...v, compareAtPriceCents: compareAt } : v;
-    });
-
-    const editionSize = numbered ? parseEditionSize(editionSizeText) : null;
-    if (numbered && editionSize === null) {
-      showPublishError('Check the run size', `A numbered run is ${EDITION_SIZE_MIN} to ${EDITION_SIZE_MAX.toLocaleString()} pieces.`);
-      setPublishing(false);
-      return;
-    }
-
-    const serverCreatePayload = {
-      name:        productPayload.name ?? '',
-      description: productPayload.description,
-      category:    typeof productPayload.category === 'string' ? productPayload.category : 'apparel',
-      status:      finalStatus,
-      images:      (productPayload.media ?? []).map((m: any) => m.uri ?? m.url ?? '').filter(Boolean),
-      tags:        productPayload.tags ?? [],
-      styleTags:   productPayload.styleTags ?? [],
-      variants:    productVariantsForServer,
-      // No size/colour options: the server makes one default variant from
-      // these so the listing can be bought (BT-205).
-      ...(productVariantsForServer.length === 0 && (productPayload.pricing?.priceCents ?? 0) > 0
-        ? {
-            priceCents: productPayload.pricing!.priceCents,
-            stock: parseInt(stockStr, 10) || 0,
-            ...(productPayload.pricing?.compareAtPriceCents ? { compareAtPriceCents: productPayload.pricing.compareAtPriceCents } : {}),
-          }
-        : {}),
-      sizeChartImageUrl: productPayload.sizeChartImageUrl ?? undefined,
-      isPreOrder,
-      preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
-      preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,
-      ...(editionSize !== null && { editionSize }),
-    };
-
-    const serverUpdatePayload = {
-      name:        productPayload.name,
-      description: productPayload.description,
-      category:    typeof productPayload.category === 'string' ? productPayload.category : undefined,
-      // Price edits for the product's existing variants (matched by SKU on the
-      // server; unknown SKUs are ignored). Stock is left to the stock editor so
-      // a stale editor can't overwrite units sold meanwhile.
-      variants:    productVariantsForServer.map((v: any) => ({ sku: v.sku, priceCents: v.priceCents })),
-      status:      finalStatus,
-      images:      (productPayload.media ?? []).map((m: any) => m.uri ?? m.url ?? '').filter(Boolean),
-      tags:        productPayload.tags ?? [],
-      styleTags:   productPayload.styleTags ?? [],
-      sizeChartImageUrl: productPayload.sizeChartImageUrl ?? null,
-      compareAtPriceCents: productPayload.pricing?.compareAtPriceCents ?? null,
-      // A simple product saved before it had a variant gets one now (BT-205);
-      // the server ignores these once the product has variants.
-      ...(productVariantsForServer.length === 0 && (productPayload.pricing?.priceCents ?? 0) > 0
-        ? { priceCents: productPayload.pricing!.priceCents, stock: parseInt(stockStr, 10) || 0 }
-        : {}),
-      isPreOrder,
-      preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
-      preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,
-      editionSize,
-    };
-
-    try {
-      const name = draftData.name ?? 'Product';
-      if (isEditMode && editProductId) {
-        const wasActive = finalStatus === 'active' && !localOnlyPreview && !isPreviewSellerProductId(editProductId)
-          ? await api.products.get(editProductId).then((p: any) => p?.status === 'active').catch(() => true)
-          : true;
-        // A seeded demo product (?demo=1) has no server row to update.
-        if (!localOnlyPreview && !isPreviewSellerProductId(editProductId)) await api.products.update(editProductId, serverUpdatePayload);
-        // Product detail and the Products tab read the local product store.
-        await updateProduct(editProductId, productPayload);
-        await deleteDraft(draftId.current);
-        if (!wasActive && await openStoreLiveIfFirst(editProductId)) return;
-        setPublishSuccess({ name, kind: 'updated', productId: editProductId });
-      } else if (localOnlyPreview) {
-        const saved = await createProduct(productPayload);
-        await deleteDraft(draftId.current);
-        setPublishSuccess({ name, kind: 'created', productId: saved.id });
-      } else {
-        // "Add your first product" is done only once buyers can see it.
-        const newProduct = await completeSetupTaskAfter(
-          'first_product',
-          () => api.products.create(serverCreatePayload),
-          () => finalStatus === 'active',
-        ) as any;
-        // Mirror it under the server's id into the local product store that
-        // the Products tab and product detail read — otherwise "View product"
-        // opened "Couldn't load this product" and the list never showed it.
-        await createProduct(
-          { ...productPayload, publishedAt: finalStatus === 'active' ? new Date().toISOString() : undefined },
-          { id: String(newProduct.id) },
-        ).catch(() => undefined);
-        await deleteDraft(draftId.current);
-        if (finalStatus === 'active' && newProduct?.id && await openStoreLiveIfFirst(newProduct.id)) return;
-        setPublishSuccess({ name, kind: 'created', productId: newProduct.id, soldOut: publishesSoldOut({ status: 'active', ...soldOut }) });
-      }
-    } catch (err: any) {
-      // Over the plan's product limit (the free limits when unsubscribed, BT-002).
-      if (err?.code === 'COUNTERFEIT_TERMS') {
-        const message = apiErrorMessage(err, 'Remove brand names and replica terms to publish.');
-        setPublishError(`Can't publish yet: ${message}`);
-        if (Platform.OS !== 'web') {
-          Alert.alert("Can't publish yet", message, [
-            { text: 'Edit listing', style: 'cancel' },
-            { text: 'Get verified', onPress: () => router.push('/seller-verification' as any) },
-          ]);
-        }
-        return;
-      }
-      if (productLimit.showFor(err)) return;
-      const planLimit = getEntitlementRejection(err);
-      if (planLimit) {
-        setPublishError(planLimit.message);
-        if (Platform.OS !== 'web') {
-          Alert.alert('Plan limit reached', planLimit.message, [
-            { text: 'Not Now', style: 'cancel' },
-            { text: 'See Plans', onPress: () => router.push(`/plans?highlight=${planLimit.requiredPlan}&source=product_limit` as never) },
-          ]);
-        }
-        return;
-      }
-      const needsShipDate = err?.code === 'PREORDER_SHIP_DATE_REQUIRED';
-      const runError = typeof err?.code === 'string' && err.code.startsWith('EDITION_');
-      showPublishError(
-        needsShipDate ? 'Add a ship date' : runError ? 'Check the run size' : 'Error',
-        needsShipDate ? PREORDER_SHIP_DATE_REQUIRED_MESSAGE : runError ? String(err?.message ?? 'Check the run size.') : 'Could not publish. Please try again.',
-      );
-    } finally {
-      setPublishing(false);
-      publishingRef.current = false;
-    }
-  }
-
-  // ─── Section renderers ────────────────────────────────────────────
-  // Each is identical to the original step render, just without the outer
-  // <View style={s.stepContent}> wrapper (sections provide their own padding).
-
-  // Uploads a locally-picked photo, tracking per-item status so the thumbnail
-  // can show a progress overlay and Publish can be blocked until it's done.
-  async function uploadMediaAsset(item: ProductMedia) {
-    if (localOnlyPreview) {
-      // Nothing to upload to — the picked photo stays local (see localOnlyPreview).
-      setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'done', remoteUri: item.uri } }));
-      return;
-    }
-    setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'uploading' } }));
-    try {
-      const uploaded = await api.products.uploadImage({ uri: item.uri });
-      const remoteUri = (uploaded as any)?.objectPath || (uploaded as any)?.url || item.uri;
-      setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'done', remoteUri } }));
-      setDraftData(prev => ({ ...prev, media: (prev.media ?? []).map(m => m.id === item.id ? { ...m, uri: remoteUri } : m) }));
-      void prefillFromFirstPhoto(remoteUri);
-    } catch {
-      setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'error' } }));
-    }
-  }
-
-  // New listing, first photo uploaded, no title yet: ask the existing
-  // product-description helper once for a title and category and put them in
-  // as ordinary editable values. Silent no-op on any failure (no key, gated,
-  // offline); a value the seller typed or picked always wins.
-  async function prefillFromFirstPhoto(remoteUri: string) {
-    if (prefillTriedRef.current || params.editId || sellerEditedRef.current.name) return;
-    const path = toUploadObjectPath(remoteUri);
-    if (!path) return;
-    prefillTriedRef.current = true;
-    try {
-      const r = await api.aiHelpers.listingPrefill({ imagePaths: [path] });
-      const title = typeof r?.title === 'string' ? r.title.trim() : '';
-      const category = PRODUCT_CATEGORIES.find(c => c === r?.category);
-      if (!title && !category) return;
-      markUnsavedChanges();
-      setDraftData(prev => ({
-        ...prev,
-        ...(title && !sellerEditedRef.current.name && !(prev.name ?? '').trim() ? { name: title } : {}),
-        ...(category && !sellerEditedRef.current.category && !prev.category ? { category } : {}),
-      }));
-    } catch {
-      // Best-effort only.
-    }
-  }
-
-  // ── Size chart photo (item: size chart photo) ────────────────────────────
-  // Same upload pipeline as product photos (api.products.uploadImage), one
-  // optional image rather than a media array.
-  async function uploadSizeChartPhoto(localUri: string) {
-    setSizeChartUploadStatus('uploading');
-    patchDraft({ sizeChartImageUrl: localUri });
-    if (localOnlyPreview) { setSizeChartUploadStatus('idle'); return; }
-    try {
-      const uploaded = await api.products.uploadImage({ uri: localUri });
-      const remoteUri = (uploaded as any)?.objectPath || (uploaded as any)?.url || localUri;
-      setSizeChartUploadStatus('idle');
-      setDraftData(prev => ({ ...prev, sizeChartImageUrl: remoteUri }));
-    } catch {
-      setSizeChartUploadStatus('error');
-    }
-  }
-
-  function pickSizeChartPhoto() {
-    showActionSheet('Size chart photo', undefined, [
-      {
-        text: 'Take Photo',
-        onPress: async () => {
-          const perm = await ImagePicker.requestCameraPermissionsAsync();
-          if (!perm.granted) {
-            Alert.alert('Camera access needed', 'Allow camera access in Settings to take a photo.');
-            return;
-          }
-          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 1 });
-          if (!result.canceled && result.assets[0]) void uploadSizeChartPhoto(result.assets[0].uri);
-        },
-      },
-      {
-        text: 'Choose from Library',
-        onPress: async () => {
-          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (!perm.granted) {
-            Alert.alert('Permission required', 'Please allow access to your photo library in Settings.');
-            return;
-          }
-          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 1 });
-          if (!result.canceled && result.assets[0]) void uploadSizeChartPhoto(result.assets[0].uri);
-        },
-      },
+  // ── Photos ────────────────────────────────────────────────────────────────
+  function addMedia() {
+    showActionSheet('Add photos', undefined, [
+      { text: 'Choose from library', onPress: () => { void pickFromLibrary(api); } },
+      { text: 'Take photo', onPress: () => { void takePhoto(api); } },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
 
-  function removeSizeChartPhoto() {
-    setSizeChartUploadStatus('idle');
-    patchDraft({ sizeChartImageUrl: null });
-  }
-
-  // ── Photos: reorder / set cover / crop / background removal ──────────────────
-
-  function moveMedia(id: string, direction: -1 | 1) {
-    const media = draftData.media ?? [];
-    const idx = media.findIndex(m => m.id === id);
-    const target = idx + direction;
-    if (idx === -1 || target < 0 || target >= media.length) return;
-    // Cover follows the first position (lib/photoOrder.ts).
-    const resequenced = reorderPhotos(media, idx, target);
-    hapticToggle();
-    patchDraft({ media: resequenced });
-  }
-
-  function setCoverImage(id: string) {
-    const media = draftData.media ?? [];
-    hapticToggle();
-    patchDraft({ media: movePhotoToFront(media, id) });
-  }
-
-  function toggleCutoutUse(id: string) {
-    const media = draftData.media ?? [];
-    patchDraft({ media: media.map(m => m.id === id ? { ...m, useCutout: !m.useCutout } : m) });
-  }
-
-  /** Opens the shared MediaCropper for an existing photo ("Edit crop"),
-   *  always re-cropping from its uncropped original. */
-  function openCropperFor(item: ProductMedia) {
-    haptic('sheet');
-    setCropTargetId(item.id);
-  }
-
-  /** Advances the sequential crop queue after a photo's crop is applied
-   *  (or skipped) — opens the next queued photo's cropper, if any. */
-  function advanceCropQueue(justCroppedId: string) {
-    setCropQueue(prev => {
-      const rest = prev.filter(id => id !== justCroppedId);
-      setCropTargetId(rest[0] ?? null);
-      return rest;
-    });
-  }
-
-  async function handleCropSave(itemId: string, result: { rect: { x: number; y: number; width: number; height: number } }) {
-    const media = draftData.media ?? [];
-    const item = media.find(m => m.id === itemId);
-    if (!item) { advanceCropQueue(itemId); return; }
-    const sourceUri = item.originalUri ?? item.uri;
-    setMediaUpload(prev => ({ ...prev, [itemId]: { status: 'uploading' } }));
-    try {
-      const croppedUri = await applyCropRect(sourceUri, result.rect);
-      patchDraft({
-        media: (draftData.media ?? []).map(m => m.id === itemId
-          ? { ...m, uri: croppedUri, originalUri: sourceUri, cropRect: result.rect }
-          : m),
-      });
-      void uploadMediaAsset({ ...item, uri: croppedUri });
-    } catch {
-      Alert.alert('Crop failed', 'Could not crop this photo. Please try again.');
-      setMediaUpload(prev => ({ ...prev, [itemId]: { status: 'error' } }));
-    } finally {
-      advanceCropQueue(itemId);
-    }
-  }
-
-  function handleCropCancel(itemId: string) {
-    advanceCropQueue(itemId);
-  }
-
-  /**
-   * Calls the existing background-removal service for one photo. Stores the
-   * cutout as a local PNG (via bgRemovalService's file convention) and
-   * uploads it so both the original and cutout have remote URLs — the
-   * seller toggles which one is used per image.
-   */
-  async function removeBackgroundForMedia(item: ProductMedia) {
-    setBgRemovalState(prev => ({ ...prev, [item.id]: 'processing' }));
-    try {
-      const manipulated = await ImageManipulator.manipulateAsync(
-        item.uri, [], { base64: true, compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
-      );
-      if (!manipulated.base64) throw new Error('Could not read image data');
-      const dataUrl = `data:image/jpeg;base64,${manipulated.base64}`;
-      const result = await api.bgRemoval.remove(dataUrl);
-      if (!result?.b64_json) throw new Error('No cutout returned');
-
-      const localFile = new File(Paths.cache, `product-cutout-${item.id}-${Date.now()}.png`);
-      localFile.write(result.b64_json, { encoding: 'base64' });
-
-      const media = draftData.media ?? [];
-      patchDraft({ media: media.map(m => m.id === item.id ? { ...m, cutoutUri: localFile.uri, useCutout: true } : m) });
-      setBgRemovalState(prev => ({ ...prev, [item.id]: 'done' }));
-
-      // Upload the cutout in the background so it has a remote URL by publish time.
-      try {
-        const uploaded = await api.products.uploadImage({ uri: localFile.uri });
-        const remoteCutoutUri = (uploaded as any)?.objectPath || (uploaded as any)?.url || localFile.uri;
-        setDraftData(prev => ({ ...prev, media: (prev.media ?? []).map(m => m.id === item.id ? { ...m, cutoutUri: remoteCutoutUri } : m) }));
-      } catch {
-        // Cutout stays local; it will be re-uploaded on publish/retry via uploadMediaAsset-style flow.
-      }
-    } catch {
-      // Network failure / offline / service error — degrade to an explicit
-      // "retry" affordance rather than silently dropping the feature. There
-      // is no reliable on-device fallback for background removal.
-      setBgRemovalState(prev => ({ ...prev, [item.id]: 'failed' }));
-    }
-  }
-
-  async function pickPhotos() {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Permission required', 'Please allow access to your photo library in Settings.');
+  // ── Continue to preview ───────────────────────────────────────────────────
+  function handlePreview() {
+    if (missing.length) {
+      setShowErrors(true);
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      const list = missing.join(', ');
+      notify('Almost there', `Add ${list.replace(/, ([^,]*)$/, ' and $1')} to continue.`);
       return;
     }
-    const existingMedia = draftData.media ?? [];
-    const room = Math.max(0, 10 - existingMedia.length);
-    if (room === 0) {
-      Alert.alert('10 photos max', 'Remove a photo to add another.');
+    if (photosUploading(form)) {
+      notify('Still uploading', 'Wait for your photos to finish uploading.');
       return;
     }
-    // The system picker itself stops at the photos left (no silent
-    // drop after picking) and numbers each pick, so the order you tap
-    // is the order they're added in (Depop / Instagram multi-select).
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      selectionLimit: room,
-      orderedSelection: true,
-      quality: 1,
-    });
-    if (result.canceled || result.assets.length === 0) return;
-    const assets = result.assets.slice(0, room);
-    const newItems: ProductMedia[] = assets.map((a, i) => ({
-      id: `${Date.now()}-${i}`,
-      type: 'image' as const,
-      uri: a.uri,
-      originalUri: a.uri,
-      isCover: existingMedia.length + i === 0,
-      sortOrder: existingMedia.length + i,
-      createdAt: new Date().toISOString(),
-    }));
-    patchDraft({ media: [...existingMedia, ...newItems] });
-    // Every new photo crops to 4:5 (PRODUCT_PHOTO_ASPECT) before it uploads — the crop queue opens
-    // the shared cropper for each one in turn.
-    const newIds = newItems.map(item => item.id);
-    setCropQueue(prev => [...prev, ...newIds]);
-    setCropTargetId(current => current ?? newIds[0] ?? null);
+    if (form.photos.some(p => p.status === 'error')) {
+      notify('Photo didn’t upload', 'Tap the photo to retry, or remove it.');
+      return;
+    }
+    router.push('/listing/preview' as never);
   }
 
-  /** Long-press a photo tile: cover / background removal / remove, in one
-   *  sheet instead of a permanent row of chips under every thumbnail. */
-  function openPhotoActionsFor(m: ProductMedia) {
-    const bgStatus = bgRemovalState[m.id];
-    haptic('longPress');
-    showActionSheet(undefined, undefined, [
-      ...(!m.isCover ? [{ text: 'Set as cover photo', onPress: () => setCoverImage(m.id) }] : []),
-      { text: 'Edit crop', onPress: () => openCropperFor(m) },
-      ...(bgStatus !== 'processing' ? [{
-        text: m.cutoutUri ? 'Redo background removal' : 'Remove background',
-        onPress: () => removeBackgroundForMedia(m),
-      }] : []),
-      ...(m.cutoutUri ? [{
-        text: m.useCutout ? 'Use original (not cutout)' : 'Use background-removed cutout',
-        onPress: () => toggleCutoutUse(m.id),
-      }] : []),
-      {
-        text: 'Remove photo', style: 'destructive' as const, onPress: () => {
-          const media = draftData.media ?? [];
-          patchDraft({ media: withCoverFirst(media.filter(x => x.id !== m.id)) });
-          setMediaUpload(prev => { const next = { ...prev }; delete next[m.id]; return next; });
-          setBgRemovalState(prev => { const next = { ...prev }; delete next[m.id]; return next; });
-        },
-      },
-      { text: 'Cancel', style: 'cancel' as const },
-    ]);
-  }
-
-  // Photo grid (Shopify iOS media grid): numbered tiles in listing order
-  // (1 = first), "Cover" on the cover photo, and a dashed "+ Add" tile until
-  // the 10-photo limit. Tap crops, hold opens more options (set cover,
-  // background cutout, …), × removes, chevrons move a photo earlier/later.
-  function displayableUri(uri: string | undefined): string | null {
-    if (!uri) return null;
-    // blob:/data: are what the web picker returns; a leading "/" is a
-    // same-origin bundled asset (web) — both render fine in <Image>.
-    return (uri.startsWith('http') || uri.startsWith('file') || uri.startsWith('ph://') || uri.startsWith('asset-library://') || uri.startsWith('content://') || uri.startsWith('/') || uri.startsWith('blob:') || uri.startsWith('data:image/')) ? uri : null;
-  }
-
-  function renderPhotos() {
-    const media = draftData.media ?? [];
-    return (
-      <View style={{ gap: SP.sm }}>
-        <View style={s.photoRowHeader}>
-          <Text style={s.photoRowTitle}>Photos</Text>
-          <Text style={s.photoRowCount}>{media.length}/10</Text>
-        </View>
-        <ReorderablePhotoStrip
-          items={media}
-          itemSize={84}
-          gap={SP.sm}
-          contentContainerStyle={s.photoRowContent}
-          onReorder={(from, to) => patchDraft({ media: reorderPhotos(media, from, to) })}
-          onHold={item => openPhotoActionsFor(item)}
-          testID="add-product-photo-strip"
-          renderItem={(_item, idx) => {
-            const m = media[idx];
-            if (!m) {
-              return (
-                <TouchableOpacity
-                  key={`empty-${idx}`}
-                  style={s.photoAddSlot}
-                  onPress={pickPhotos}
-                  accessibilityLabel="Add photo"
-                  accessibilityRole="button"
-                  testID="add-product-add-photos"
-                >
-                  <Icon name="camera" size={20} color={MUTED} />
-                  <Text style={s.photoAddSlotLabel}>Add photo</Text>
-                </TouchableOpacity>
-              );
-            }
-            const upload = mediaUpload[m.id];
-            const bgStatus = bgRemovalState[m.id];
-            const displayUri = m.useCutout && m.cutoutUri ? m.cutoutUri : m.uri;
-            return (
-              <TouchableOpacity
-                key={m.id}
-                style={s.photoSlot}
-                onPress={() => openCropperFor(m)}
-                accessibilityLabel={`Photo ${idx + 1}${idx === 0 ? ', cover' : ''}. Tap to crop, hold for more options.`}
-                accessibilityActions={[{ name: 'longpress', label: 'More options' }]}
-                onAccessibilityAction={e => { if (e.nativeEvent.actionName === 'longpress') openPhotoActionsFor(m); }}
-                testID={`add-product-photo-${m.id}`}
-              >
-                {displayUri && (displayUri.startsWith('http') || displayUri.startsWith('file') || displayUri.startsWith('ph://') || displayUri.startsWith('asset-library://') || displayUri.startsWith('content://') || displayUri.startsWith('/objects/')) ? (
-                  <Image source={{ uri: displayUri }} style={s.photoSlotImg} resizeMode="cover" />
-                ) : (
-                  <View style={[s.photoSlotImg, s.photoSlotImgPlaceholder]}>
-                    <Icon name="image" size={20} color={MUTED} />
-                  </View>
-                )}
-                {idx === 0 && (
-                  <View style={s.mediaCoverBadge}>
-                    <Text style={s.mediaCoverBadgeText}>Cover</Text>
-                  </View>
-                )}
-                {(upload?.status === 'uploading' || bgStatus === 'processing') && (
-                  <View style={s.mediaUploadOverlay}>
-                    <ActivityIndicator color={ON_DARK} />
-                  </View>
-                )}
-                {upload?.status === 'error' && (
-                  <TouchableOpacity style={s.mediaUploadOverlay} onPress={() => uploadMediaAsset(m)} accessibilityLabel="Retry photo upload">
-                    <Icon name="refresh-cw" size={16} color={ON_DARK} />
-                    <Text style={s.mediaRetryLabel}>Retry upload</Text>
-                  </TouchableOpacity>
-                )}
-                {bgStatus === 'failed' && upload?.status !== 'error' && (
-                  <TouchableOpacity style={s.mediaUploadOverlay} onPress={() => removeBackgroundForMedia(m)} accessibilityLabel="Retry background removal">
-                    <Icon name="refresh-cw" size={16} color={ON_DARK} />
-                    <Text style={s.mediaRetryLabel}>Retry cutout</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={s.mediaDeleteBtn}
-                  onPress={() => {
-                    const list = draftData.media ?? [];
-                    patchDraft({ media: withCoverFirst(list.filter(x => x.id !== m.id)) });
-                    setMediaUpload(prev => { const next = { ...prev }; delete next[m.id]; return next; });
-                    setBgRemovalState(prev => { const next = { ...prev }; delete next[m.id]; return next; });
-                  }}
-                  accessibilityLabel="Remove photo"
-                >
-                  <Icon name="x" size={12} color={ON_DARK} />
-                </TouchableOpacity>
-                <View style={s.mediaReorderRow}>
-                  <TouchableOpacity
-                    disabled={idx === 0}
-                    onPress={() => moveMedia(m.id, -1)}
-                    style={[s.mediaReorderBtn, idx === 0 && { opacity: 0.3 }]}
-                    accessibilityLabel="Move photo earlier"
-                  >
-                    <Icon name="chevron-left" size={12} color={ON_DARK} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    disabled={idx === media.length - 1}
-                    onPress={() => moveMedia(m.id, 1)}
-                    style={[s.mediaReorderBtn, idx === media.length - 1 && { opacity: 0.3 }]}
-                    accessibilityLabel="Move photo later"
-                  >
-                    <Icon name="chevron-right" size={12} color={ON_DARK} />
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            );
-          }}
-          trailing={<>
-            {Array.from({ length: Math.max(0, visibleSlotCount - media.length) }, (_, i) => (
-              <TouchableOpacity
-                key={`empty-${media.length + i}`}
-                style={s.photoAddSlot}
-                onPress={pickPhotos}
-                accessibilityLabel="Add photo"
-                accessibilityRole="button"
-                testID="add-product-add-photos"
-              >
-                <Icon name="camera" size={20} color={MUTED} />
-                <Text style={s.photoAddSlotLabel}>Add photo</Text>
-              </TouchableOpacity>
-            ))}
-
-          {canAddSlot && (
-            <TouchableOpacity
-              style={s.photoMoreSlot}
-              onPress={() => { hapticToggle(); setPhotoSlotCount(c => Math.min(10, c + 1)); }}
-              accessibilityLabel="Add another photo slot"
-              accessibilityRole="button"
-              testID="add-product-add-slot"
-            >
-              <Icon name="plus" size={16} color={SUBTLE} />
-            </TouchableOpacity>
-          )}
-          </>}
-        />
-      </View>
-    );
-  }
-
-  function openCategoryPicker() {
-    haptic('sheet');
-    showActionSheet('Category', undefined, [
-      ...PRODUCT_CATEGORIES.map(cat => ({ text: cat, onPress: () => patchDraft({ category: cat }) })),
-      { text: 'Cancel', style: 'cancel' as const },
-    ]);
-  }
-
-  // Title, description and category — Shopify's own top-of-page essentials.
-  // Description and category are collapsed "+ Add…" rows until tapped/set,
-  // same as the Shopify iOS Add Product screen this page is modeled on.
-  function renderBasicInfo() {
-    const aiPaths = (draftData.media ?? []).map(m => toUploadObjectPath(m.uri)).filter((x): x is string => !!x).slice(0, 4);
-    const aiDescriptionHref = aiPaths.length > 0 || editProductId
-      ? `/ai-helper?mode=description${editProductId ? `&productId=${editProductId}` : `&paths=${encodeURIComponent(aiPaths.join(','))}`}${draftData.name ? `&name=${encodeURIComponent(draftData.name)}` : ''}`
-      : null;
-    const showDescription = descOpen || !!draftData.description;
-    return (
-      <>
-        <FormInput
-          label="Title"
-          value={draftData.name ?? ''}
-          onChange={v => patchDraft({ name: v })}
-          placeholder="e.g. Vintage Washed Tee"
-        />
-
-        {showDescription ? (
-          <FormInput
-            label="Description"
-            value={draftData.description ?? ''}
-            onChange={v => patchDraft({ description: v })}
-            placeholder="Describe your product, materials, fit and care..."
-            multiline
-          />
-        ) : (
-          <TouchableOpacity style={s.plusRow} onPress={() => setDescOpen(true)} accessibilityRole="button">
-            <Icon name="plus" size={15} color={theme.accentLight} />
-            <Text style={s.plusRowText}>Add description</Text>
-          </TouchableOpacity>
-        )}
-
-        {aiDescriptionHref ? (
-          <TouchableOpacity style={s.plusRow} onPress={() => router.push(aiDescriptionHref as never)} accessibilityRole="button" testID="add-product-ai-description">
-            <Icon name="zap" size={15} color={theme.accentLight} />
-            <Text style={s.plusRowText}>Write with AI</Text>
-          </TouchableOpacity>
-        ) : null}
-
-        <TouchableOpacity style={s.plusRow} onPress={openCategoryPicker} accessibilityRole="button" testID="add-product-category-row">
-          <Icon name={draftData.category ? 'tag' : 'plus'} size={15} color={theme.accentLight} />
-          <Text style={s.plusRowText}>{draftData.category ?? 'Select category'}</Text>
-        </TouchableOpacity>
-      </>
-    );
-  }
-
-  // Type / Vendor / Collections / Tags — Shopify groups these under one
-  // "Organization" card near the bottom of the page.
-  function renderOrganization() {
-    return (
-      <>
-        <FormInput
-          label="Product type"
-          value={draftData.productType ?? ''}
-          onChange={v => patchDraft({ productType: v })}
-          placeholder="Apparel, Accessories..."
-        />
-        <FormInput
-          label="Vendor"
-          value={draftData.vendor ?? ''}
-          onChange={v => patchDraft({ vendor: v })}
-          placeholder="Your brand or supplier"
-        />
-        {collections.length > 0 && (
-          <>
-            <Text style={s.optionLabel}>Collections</Text>
-            <View style={s.chipGrid}>
-              {collections.map(col => {
-                const collIds = draftData.storeSettings?.collectionIds ?? [];
-                const active = collIds.includes(col.id);
-                return (
-                  <FilterChip
-                    key={col.id}
-                    label={col.name}
-                    active={active}
-                    onPress={() => {
-                      const updated = active
-                        ? collIds.filter(id => id !== col.id)
-                        : [...collIds, col.id];
-                      patchDraft({ storeSettings: { ...(draftData.storeSettings ?? { status: 'draft', featuredOnHomepage: false, relatedProductIds: [], seo: { searchVisible: true } }), collectionIds: updated } });
-                    }}
-                  />
-                );
-              })}
-            </View>
-          </>
-        )}
-        <FormInput
-          label="Tags"
-          value={tagsInput}
-          onChange={v => {
-            updateUnsavedState(setTagsInput, v);
-            patchDraft({ tags: v.split(',').map(t => t.trim()).filter(Boolean) });
-          }}
-          placeholder="streetwear, hoodie, oversized"
-        />
-      </>
-    );
-  }
-
-  // Retail price + compare-at — always visible, side by side (Shopify's own
-  // Pricing row layout).
-  function renderPriceEssentials() {
-    return (
-      <>
-      <View style={s.priceRow}>
-        <FormInput
-          label="Price"
-          price
-          value={priceStr}
-          onChange={v => updateUnsavedState(setPriceStr, sanitizePriceInput(v))}
-          keyboardType="decimal-pad"
-          validate={v => (parseFloat(v) > 0 ? null : 'Add a price')}
-          style={{ flex: 1 }}
-        />
-        <FormInput
-          label="Compare-at price"
-          optional
-          price
-          value={compareAtStr}
-          onChange={v => updateUnsavedState(setCompareAtStr, sanitizePriceInput(v))}
-          keyboardType="decimal-pad"
-          style={{ flex: 1 }}
-        />
-      </View>
-      <FeeBreakdown collapsible priceCents={parseDecimalToCents(priceStr)} />
-      </>
-    );
-  }
-
-  // Cost / shipping / fees / profit summary — Shopify collapses this under
-  // its own "Profit" disclosure by default.
-  function renderProfit() {
-    const pricing = getPricing();
-    const fmt = (v: number | undefined) => v !== undefined ? formatCents(v) : '—';
-    return (
-      <>
-        <FormInput
-          label="Product cost"
-          value={costStr}
-          onChange={v => updateUnsavedState(setCostStr, sanitizeMoneyInput(v))}
-          placeholder="What it costs to make"
-          price
-        />
-        <FormInput
-          label="Est. shipping cost"
-          value={shippingStr}
-          onChange={v => updateUnsavedState(setShippingStr, sanitizeMoneyInput(v))}
-          placeholder="per unit"
-          price
-        />
-        <FormInput
-          label="Est. fees"
-          value={feesStr}
-          onChange={v => updateUnsavedState(setFeesStr, sanitizeMoneyInput(v))}
-          placeholder="Platform + payment fees"
-          price
-        />
-        <GradientCard glow style={s.pricingCard}>
-          <Text style={s.pricingTitle}>Pricing Summary</Text>
-          <View style={s.pricingRow}>
-            <Text style={s.pricingLabel}>Gross profit</Text>
-            <Text style={[s.pricingValue, { color: pricing.grossProfitCents !== undefined && pricing.grossProfitCents >= 0 ? SUCCESS : RED }]}>
-              {fmt(pricing.grossProfitCents)}
-            </Text>
-          </View>
-          <View style={s.pricingRow}>
-            <Text style={s.pricingLabel}>Net profit</Text>
-            <Text style={[s.pricingValue, { color: pricing.netProfitCents !== undefined && pricing.netProfitCents >= 0 ? SUCCESS : RED }]}>
-              {fmt(pricing.netProfitCents)}
-            </Text>
-          </View>
-          <View style={s.pricingRow}>
-            <Text style={s.pricingLabel}>Margin</Text>
-            <Text style={[s.pricingValue, { color: PURPLE_LIGHT }]}>
-              {pricing.marginPercent !== undefined ? `${pricing.marginPercent.toFixed(1)}%` : '—'}
-            </Text>
-          </View>
-          <View style={s.pricingRow}>
-            <Text style={s.pricingLabel}>Break-even</Text>
-            <Text style={s.pricingValue}>{fmt(pricing.breakEvenPriceCents)}</Text>
-          </View>
-        </GradientCard>
-      </>
-    );
-  }
-
-  // Location rows with −/qty/+ steppers, matching Shopify's own Inventory
-  // section (this app has a single implicit location, so one row when
-  // there are no variants, one row per variant when there are).
-  function renderInventory() {
-    return (
-      <>
-        <View style={s.switchRow}>
-          <Text style={s.switchLabel}>Track inventory</Text>
-          <HapticSwitch
-            accessibilityLabel="Track inventory"
-            value={trackInventory}
-            onValueChange={v => {
-              updateUnsavedState(setTrackInventory, v);
-              patchDraft({ inventory: { ...(draftData.inventory!), trackQuantity: v } });
-            }}
-          />
-        </View>
-        {trackInventory && (
-          <>
-            {localVariants.length > 0 ? (
-              <View style={{ gap: SP.xs }}>
-                <Text style={s.optionLabel}>Stock by variant</Text>
-                {localVariants.map(v => (
-                  <Stepper
-                    key={v.id}
-                    label={v.title || 'Variant'}
-                    value={parseInt(variantQtys[v.id] ?? v.qty, 10) || 0}
-                    onChange={n => updateUnsavedState(setVariantQtys, prev => ({ ...prev, [v.id]: String(n) }))}
-                  />
-                ))}
-              </View>
-            ) : (
-              <Stepper
-                label="In stock"
-                value={parseInt(stockStr, 10) || 0}
-                onChange={n => updateUnsavedState(setStockStr, String(n))}
-              />
-            )}
-            <FormInput
-              label="Low-stock threshold"
-              value={lowStockStr}
-              onChange={v => updateUnsavedState(setLowStockStr, v)}
-              placeholder="5"
-              keyboardType="numeric"
-            />
-          </>
-        )}
-        <View style={s.switchRow}>
-          <Text style={s.switchLabel}>Allow overselling</Text>
-          <HapticSwitch
-            accessibilityLabel="Allow overselling"
-            value={allowOversell}
-            onValueChange={v => {
-              updateUnsavedState(setAllowOversell, v);
-              patchDraft({ inventory: { ...(draftData.inventory!), allowOverselling: v, policy: v ? 'continue' : 'deny' } });
-            }}
-          />
-        </View>
-      </>
-    );
-  }
-
-  function addVariantOption() {
-    updateUnsavedState(setLocalOptions, prev => [...prev, {
-      id: uid(), type: 'size' as OptionType, name: 'Size', values: [], customInput: '',
-    }]);
-  }
-
-  function renderVariants() {
-    return (
-      <>
-        <Text style={s.sectionHelper}>Color, size and other choices buyers pick from.</Text>
-
-        {localOptions.map((opt, idx) => (
-          <BrandthreadCard key={opt.id} style={s.optionCard}>
-            <Text style={s.optionLabel}>Option type</Text>
-            <View style={s.chipRow}>
-              {(['size', 'color', 'material', 'style', 'custom'] as OptionType[]).map(t => (
-                <FilterChip
-                  key={t}
-                  label={t.charAt(0).toUpperCase() + t.slice(1)}
-                  active={opt.type === t}
-                  onPress={() => {
-                    const updated = [...localOptions];
-                    updated[idx] = { ...opt, type: t, name: t === 'custom' ? '' : t.charAt(0).toUpperCase() + t.slice(1) };
-                    updateUnsavedState(setLocalOptions, updated);
-                  }}
-                />
-              ))}
-            </View>
-            <FormInput
-              label="Option name"
-              value={opt.name}
-              onChange={v => {
-                const updated = [...localOptions];
-                updated[idx] = { ...opt, name: v };
-                updateUnsavedState(setLocalOptions, updated);
-              }}
-              placeholder="e.g. Size, Color..."
-            />
-            {opt.type === 'size' && (
-              <>
-                <Text style={[s.optionLabel, { marginTop: SP.sm }]}>Size presets</Text>
-                <View style={s.chipRow}>
-                  {SIZE_PRESETS.map(sz => (
-                    <FilterChip
-                      key={sz}
-                      label={sz}
-                      active={opt.values.some(v => v.value === sz)}
-                      onPress={() => {
-                        const updated = [...localOptions];
-                        const already = opt.values.some(v => v.value === sz);
-                        updated[idx] = { ...opt, values: already ? opt.values.filter(v => v.value !== sz) : [...opt.values, { id: uid(), value: sz }] };
-                        updateUnsavedState(setLocalOptions, updated);
-                      }}
-                    />
-                  ))}
-                </View>
-              </>
-            )}
-            {opt.type === 'color' && (
-              <>
-                <Text style={[s.optionLabel, { marginTop: SP.sm }]}>Color presets</Text>
-                <View style={s.colorGrid}>
-                  {COLOR_PRESETS.map(c => {
-                    const selected = opt.values.some(v => v.value === c.name);
-                    return (
-                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={c.name}
-                        key={c.name}
-                        onPress={() => {
-                          const updated = [...localOptions];
-                          const already = opt.values.some(v => v.value === c.name);
-                          updated[idx] = { ...opt, values: already ? opt.values.filter(v => v.value !== c.name) : [...opt.values, { id: uid(), value: c.name, colorHex: c.hex }] };
-                          updateUnsavedState(setLocalOptions, updated);
-                        }}
-                        style={[s.colorSwatch, { backgroundColor: c.hex, borderColor: selected ? theme.accent : BORDER, borderWidth: selected ? 2 : 1 }]}
-                      >
-                        {selected && <Icon name="check" size={12} color={c.hex === '#FFFFFF' || c.hex === '#F5F0E8' ? '#000' : '#fff'} />}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </>
-            )}
-            {opt.values.length > 0 && (
-              <View style={[s.chipRow, { marginTop: SP.sm }]}>
-                {opt.values.map(v => (
-                  <TouchableOpacity
-                    key={v.id}
-                    style={s.valueChip}
-                    onPress={() => {
-                      const updated = [...localOptions];
-                      updated[idx] = { ...opt, values: opt.values.filter(x => x.id !== v.id) };
-                      updateUnsavedState(setLocalOptions, updated);
-                    }}
-                  >
-                    {v.colorHex && <View style={[s.valueDot, { backgroundColor: v.colorHex }]} />}
-                    <Text style={[s.valueChipText, { color: theme.accentLight }]}>{v.value}</Text>
-                    <Icon name="x" size={10} color={MUTED} />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-            <View style={s.customValueRow}>
-              <TextInput
-                style={s.customValueInput}
-                value={opt.customInput}
-                onChangeText={v => {
-                  const updated = [...localOptions];
-                  updated[idx] = { ...opt, customInput: v };
-                  updateUnsavedState(setLocalOptions, updated);
-                }}
-                placeholder="Add value..."
-                placeholderTextColor={SUBTLE}
-              />
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add value"
-                style={s.customValueAdd}
-                onPress={() => {
-                  if (!opt.customInput.trim()) return;
-                  const updated = [...localOptions];
-                  updated[idx] = { ...opt, values: [...opt.values, { id: uid(), value: opt.customInput.trim() }], customInput: '' };
-                  updateUnsavedState(setLocalOptions, updated);
-                }}
-              >
-                <Icon name="plus" size={16} color={PURPLE_LIGHT} />
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity
-              style={s.deleteOptionBtn}
-              onPress={() => updateUnsavedState(setLocalOptions, prev => prev.filter((_, i) => i !== idx))}
-            >
-              <Icon name="trash-2" size={14} color={RED} />
-              <Text style={s.deleteOptionText}>Remove option</Text>
-            </TouchableOpacity>
-          </BrandthreadCard>
-        ))}
-
-        {localOptions.length > 0 && (
-          <PrimaryButton
-            label={`Generate combinations${localVariants.length > 0 ? ` (${localVariants.length} existing)` : ''}`}
-            onPress={generateVariants}
-            icon="zap"
-            style={{ marginTop: SP.sm }}
-          />
-        )}
-
-        {localVariants.length > 0 && (
-          <>
-            <View style={s.variantsHeaderRow}>
-              <Text style={s.variantCount}>{localVariants.length} variant{localVariants.length !== 1 ? 's' : ''}</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setBulkEditMode(v => !v);
-                  setSelectedVariantIds(new Set());
-                }}
-              >
-                <Text style={[s.bulkEditToggle, { color: theme.accentLight }]}>
-                  {bulkEditMode ? 'Done' : 'Bulk edit'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {bulkEditMode && (
-              <BrandthreadCard style={s.bulkEditCard}>
-                <Text style={s.optionLabel}>{selectedVariantIds.size} selected</Text>
-                <View style={s.chipRow}>
-                  <FilterChip
-                    label={selectedVariantIds.size === localVariants.length ? 'Deselect all' : 'Select all'}
-                    active={selectedVariantIds.size === localVariants.length && localVariants.length > 0}
-                    onPress={() => setSelectedVariantIds(
-                      selectedVariantIds.size === localVariants.length ? new Set() : new Set(localVariants.map(v => v.id)),
-                    )}
-                  />
-                </View>
-                <View style={s.variantFields}>
-                  <TextInput
-                    style={s.variantInput}
-                    value={displayPriceInput(bulkPrice)}
-                    onChangeText={txt => setBulkPrice(sanitizePriceInput(txt))}
-                    placeholder="Set price for selected"
-                    placeholderTextColor={SUBTLE}
-                    keyboardType="decimal-pad"
-                  />
-                  <TextInput
-                    style={s.variantInput}
-                    value={bulkQty}
-                    onChangeText={setBulkQty}
-                    placeholder="Set stock for selected"
-                    placeholderTextColor={SUBTLE}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <SecondaryButton
-                  label="Apply to selected"
-                  icon="check"
-                  disabled={selectedVariantIds.size === 0 || (!bulkPrice.trim() && !bulkQty.trim())}
-                  onPress={() => {
-                    if (bulkPrice.trim()) {
-                      updateUnsavedState(setLocalVariants, prev => applyBulkEditToVariants(prev, selectedVariantIds, { price: bulkPrice }));
-                    }
-                    if (bulkQty.trim()) {
-                      updateUnsavedState(setVariantQtys, prev => {
-                        const next = { ...prev };
-                        selectedVariantIds.forEach(id => { next[id] = bulkQty; });
-                        return next;
-                      });
-                    }
-                    setBulkPrice(''); setBulkQty('');
-                  }}
-                />
-              </BrandthreadCard>
-            )}
-
-            {/* Variant table: one row per variant × inline Price and Stock
-                (SKU under the name). Same local state as before. */}
-            <VariantTable
-              testID="add-product-variant-table"
-              rows={localVariants.map(v => ({
-                id: v.id,
-                label: v.title,
-                price: v.price,
-                stock: variantQtys[v.id] ?? v.qty,
-                pricePlaceholder: priceStr || '0.00',
-                highlighted: bulkEditMode && selectedVariantIds.has(v.id),
-              }))}
-              onChangePrice={(id, txt) => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === id ? { ...x, price: txt } : x))}
-              onChangeStock={(id, txt) => updateUnsavedState(setVariantQtys, prev => ({ ...prev, [id]: txt }))}
-              renderLeading={bulkEditMode ? (row) => {
-                const selected = selectedVariantIds.has(row.id);
-                return (
-                  <TouchableOpacity
-                    onPress={() => setSelectedVariantIds(prev => {
-                      const next = new Set(prev);
-                      if (next.has(row.id)) next.delete(row.id); else next.add(row.id);
-                      return next;
-                    })}
-                    style={[s.variantCheckbox, selected && { backgroundColor: theme.accent, borderColor: theme.accent }]}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: selected }}
-                    accessibilityLabel={`Select ${row.label}`}
-                  >
-                    {selected && <Icon name="check" size={11} color={theme.onAccent} />}
-                  </TouchableOpacity>
-                );
-              } : undefined}
-              renderTrailing={(row) => (
-                <TouchableOpacity
-                  onPress={() => updateUnsavedState(setLocalVariants, prev => prev.filter(x => x.id !== row.id))}
-                  style={{ padding: SP.xs }}
-                  hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
-                  accessibilityLabel={`Remove ${row.label}`}
-                >
-                  <Icon name="trash-2" size={14} color={MUTED} />
-                </TouchableOpacity>
-              )}
-              renderBelow={(row) => {
-                const v = localVariants.find(x => x.id === row.id);
-                return (
-                  <TextInput
-                    style={s.variantSkuInput}
-                    value={v?.sku ?? ''}
-                    onChangeText={txt => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === row.id ? { ...x, sku: txt } : x))}
-                    placeholder="SKU (optional)"
-                    placeholderTextColor={SUBTLE}
-                    autoCapitalize="characters"
-                    accessibilityLabel={`SKU for ${row.label}`}
-                  />
-                );
-              }}
-            />
-          </>
-        )}
-
-      </>
-    );
-  }
-
-  /** Size chart photo — optional, own collapsible section (item: size chart
-   *  photo). Uploads through the same api.products.uploadImage pipeline as
-   *  product photos; the photo itself always stays exactly as uploaded (no
-   *  3:4 crop — it's a reference chart, not a listing photo). */
-  function renderSizeChart() {
-    return (
-      draftData.sizeChartImageUrl ? (
-        <View style={s.sizeChartRow}>
-          <View style={s.sizeChartThumbWrap}>
-            <Image cachePolicy="memory-disk" source={{ uri: draftData.sizeChartImageUrl }} style={s.sizeChartThumb} contentFit="cover" />
-            {sizeChartUploadStatus === 'uploading' && (
-              <View style={s.mediaUploadOverlay}>
-                <ActivityIndicator color={ON_DARK} />
-              </View>
-            )}
-            {sizeChartUploadStatus === 'error' && (
-              <TouchableOpacity style={s.mediaUploadOverlay} onPress={pickSizeChartPhoto} accessibilityLabel="Retry size chart photo upload">
-                <Icon name="refresh-cw" size={16} color={ON_DARK} />
-                <Text style={s.mediaRetryLabel}>Retry upload</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <View style={s.sizeChartActions}>
-            <SecondaryButton label="Replace" icon="image" onPress={pickSizeChartPhoto} />
-            <TouchableOpacity style={s.deleteOptionBtn} onPress={removeSizeChartPhoto}>
-              <Icon name="trash-2" size={14} color={RED} />
-              <Text style={s.deleteOptionText}>Remove</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        <TouchableOpacity style={s.plusRow} onPress={pickSizeChartPhoto} accessibilityRole="button">
-          <Icon name="plus" size={15} color={theme.accentLight} />
-          <Text style={s.plusRowText}>Add a size chart photo</Text>
-        </TouchableOpacity>
-      )
-    );
-  }
-
-  /** Measurement-table editor (product-size-chart.tsx) — only for a saved
-   *  product, since it writes products.sizeChart directly. */
-  function renderSizeChartTable() {
-    if (!editProductId) return null;
-    const name = draftData.name ? `&productName=${encodeURIComponent(draftData.name)}` : '';
-    return (
-      <TouchableOpacity style={s.plusRow} onPress={() => router.push(`/product-size-chart?productId=${editProductId}${name}` as never)} accessibilityRole="button" testID="add-product-size-chart-table">
-        <Feather name="grid" size={15} color={theme.accentLight} />
-        <Text style={s.plusRowText}>Edit size chart table</Text>
-      </TouchableOpacity>
-    );
-  }
-
-  /** AI size chart entry — only for a saved product, since the chart is written to it directly. */
-  function renderSizeChartAi() {
-    if (!editProductId) return null;
-    return (
-      <TouchableOpacity style={s.plusRow} onPress={() => router.push(`/ai-helper?mode=size-chart&productId=${editProductId}` as never)} accessibilityRole="button" testID="add-product-ai-size-chart">
-        <Icon name="zap" size={15} color={theme.accentLight} />
-        <Text style={s.plusRowText}>Generate size chart with AI</Text>
-      </TouchableOpacity>
-    );
-  }
-
-  function renderSalesModel() {
-    const sm = draftData.salesModel ?? 'pre-made';
-    const ps = draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false };
-    const models: { key: SalesModel; title: string; desc: string }[] = [
-      { key: 'pre-made',  title: 'Pre-made',  desc: 'Sell from existing inventory. Ship when ordered.' },
-      { key: 'pre-order', title: 'Pre-order', desc: 'Accept orders before production. Set open/close dates.' },
-      { key: 'both',      title: 'Both',      desc: 'Sell stock until empty, then take pre-orders.' },
-    ];
-
-    return (
-      <>
-        <SectionHeader title="How will you sell this product?" style={s.sectionHdr} />
-        {models.map(m => (
-          <TouchableOpacity key={m.key} onPress={() => { haptic('select'); patchDraft({ salesModel: m.key }); }} activeOpacity={0.8}>
-            <BrandthreadCard style={[s.modelCard, sm === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
-              <View style={s.modelCardHeader}>
-                <Text style={s.modelTitle}>{m.title}</Text>
-                {sm === m.key && <Icon name="check-circle" size={18} color={PURPLE_LIGHT} />}
-              </View>
-              <Text style={s.modelDesc}>{m.desc}</Text>
-            </BrandthreadCard>
-          </TouchableOpacity>
-        ))}
-        {(sm === 'pre-order' || sm === 'both') && (
-          <>
-            <SectionHeader title="Pre-order settings" style={s.sectionHdr} />
-            <NativeDateTimeField mode="date" label="Pre-order opens" value={ymdToDate(ps.openDate)} onChange={d => patchDraft({ preorderSettings: { ...ps, openDate: dateToYmd(d) } })} onClear={() => patchDraft({ preorderSettings: { ...ps, openDate: undefined } })} divider />
-            <NativeDateTimeField mode="date" label="Pre-order closes" value={ymdToDate(ps.closeDate)} onChange={d => patchDraft({ preorderSettings: { ...ps, closeDate: dateToYmd(d) } })} onClear={() => patchDraft({ preorderSettings: { ...ps, closeDate: undefined } })} minimumDate={ymdToDate(ps.openDate) ?? undefined} divider />
-            <NativeDateTimeField mode="date" label="Est. shipping date" value={ymdToDate(ps.estimatedShippingDate)} onChange={d => patchDraft({ preorderSettings: { ...ps, estimatedShippingDate: dateToYmd(d) } })} minimumDate={startOfToday()} />
-            <FormInput label="Funding goal (units)" value={ps.fundingGoalUnits?.toString() ?? ''} onChange={v => patchDraft({ preorderSettings: { ...ps, fundingGoalUnits: parseInt(v) || 0 } })} keyboardType="numeric" />
-            <FormInput label="Min order qty" keyboardType="numeric" value={ps.minOrderQty?.toString() ?? ''} onChange={v => patchDraft({ preorderSettings: { ...ps, minOrderQty: parseInt(v) || 1 } })} />
-            <FormInput label="Max order qty" keyboardType="numeric" value={ps.maxOrderQty?.toString() ?? ''} onChange={v => patchDraft({ preorderSettings: { ...ps, maxOrderQty: parseInt(v) || 0 } })} />
-            <NativeDateTimeField mode="date" label="Est. production date" value={ymdToDate(ps.productionStartDate)} onChange={d => patchDraft({ preorderSettings: { ...ps, productionStartDate: dateToYmd(d) } })} onClear={() => patchDraft({ preorderSettings: { ...ps, productionStartDate: undefined } })} />
-            <FormInput label="Pre-order disclaimer" value={ps.disclaimer ?? ''} onChange={v => patchDraft({ preorderSettings: { ...ps, disclaimer: v } })} placeholder="e.g. Production begins when funding goal is reached." multiline />
-          </>
-        )}
-      </>
-    );
-  }
-
-  function renderFulfillment() {
-    const ff = draftData.fulfillment ?? { type: 'seller' };
-    const types: { key: 'seller' | 'manufacturer' | 'mixed'; label: string }[] = [
-      { key: 'seller',       label: 'Fulfilled by me' },
-      { key: 'manufacturer', label: 'Fulfilled by manufacturer' },
-      { key: 'mixed',        label: 'Mixed' },
-    ];
-
-    return (
-      <>
-        <SectionHeader title="Fulfillment type" style={s.sectionHdr} />
-        <View style={s.chipRow}>
-          {types.map(t => (
-            <FilterChip key={t.key} label={t.label} active={ff.type === t.key} onPress={() => patchDraft({ fulfillment: { ...ff, type: t.key } })} />
-          ))}
-        </View>
-        <FormInput label="Weight (grams)" value={ff.weightGrams?.toString() ?? ''} onChange={v => patchDraft({ fulfillment: { ...ff, weightGrams: parseInt(v) || undefined } })} keyboardType="numeric" placeholder="280" />
-        <FormInput label="Length (cm)" value={ff.packageLengthCm?.toString() ?? ''} onChange={v => patchDraft({ fulfillment: { ...ff, packageLengthCm: parseFloat(v) || undefined } })} keyboardType="numeric" placeholder="30" />
-        <FormInput label="Width (cm)" value={ff.packageWidthCm?.toString() ?? ''} onChange={v => patchDraft({ fulfillment: { ...ff, packageWidthCm: parseFloat(v) || undefined } })} keyboardType="numeric" placeholder="25" />
-        <FormInput label="Height (cm)" value={ff.packageHeightCm?.toString() ?? ''} onChange={v => patchDraft({ fulfillment: { ...ff, packageHeightCm: parseFloat(v) || undefined } })} keyboardType="numeric" placeholder="4" />
-        <FormInput label="Processing time (days)" value={ff.processingTimeDays?.toString() ?? ''} onChange={v => patchDraft({ fulfillment: { ...ff, processingTimeDays: parseInt(v) || undefined } })} keyboardType="numeric" placeholder="2" />
-        <FormInput label="Country of origin" value={ff.countryOfOrigin ?? ''} onChange={v => patchDraft({ fulfillment: { ...ff, countryOfOrigin: v } })} placeholder="US" />
-      </>
-    );
-  }
-
-  function renderManufacturing() {
-    const modes: { key: 'none' | 'existing' | 'quote'; label: string; desc: string }[] = [
-      { key: 'none',     label: 'No manufacturer yet', desc: 'Skip for now, assign later.' },
-      { key: 'existing', label: 'Assign existing',     desc: 'Link an existing manufacturer to this product.' },
-      { key: 'quote',    label: 'Request quote',       desc: 'Submit production details and request pricing.' },
-    ];
-
-    return (
-      <>
-        <SectionHeader title="Manufacturer" style={s.sectionHdr} />
-        {modes.map(m => (
-          <TouchableOpacity key={m.key} onPress={() => { haptic('select'); updateUnsavedState(setMfgMode, m.key); }} activeOpacity={0.8}>
-            <BrandthreadCard style={[s.modelCard, mfgMode === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
-              <View style={s.modelCardHeader}>
-                <Text style={s.modelTitle}>{m.label}</Text>
-                {mfgMode === m.key && <Icon name="check-circle" size={18} color={PURPLE_LIGHT} />}
-              </View>
-              <Text style={s.modelDesc}>{m.desc}</Text>
-            </BrandthreadCard>
-          </TouchableOpacity>
-        ))}
-        {mfgMode === 'existing' && (
-          <FormInput label="Manufacturer name" value={mfgName} onChange={v => updateUnsavedState(setMfgName, v)} placeholder="e.g. Euro Stitch Ltd" />
-        )}
-        {mfgMode === 'quote' && (
-          <>
-            <FormInput label="Target cost per unit" value={targetCost} onChange={v => updateUnsavedState(setTargetCost, v)} price />
-            <FormInput label="Required quantity" value={reqQty} onChange={v => updateUnsavedState(setReqQty, v)} placeholder="50" keyboardType="numeric" />
-            <NativeDateTimeField mode="date" label="Production deadline" value={ymdToDate(prodDeadline)} onChange={d => updateUnsavedState(setProdDeadline, dateToYmd(d))} onClear={() => updateUnsavedState<string>(setProdDeadline, '')} minimumDate={startOfToday()} />
-            <SecondaryButton label="Upload tech pack" onPress={() => Alert.alert('Tech Pack', 'Tech pack upload will be available in the next release.')} icon="upload" disabled />
-          </>
-        )}
-      </>
-    );
-  }
-
-  function renderStorefront() {
-    const ss = draftData.storeSettings ?? { status: 'draft', collectionIds: [], featuredOnHomepage: false, relatedProductIds: [], seo: { searchVisible: true } };
-    const seo = ss.seo ?? { searchVisible: true };
-    // Active/Draft are set from the header status pill now — this list is
-    // the other visibility options that don't fit a two-way pill.
-    const statuses: { key: 'scheduled' | 'hidden' | 'archived'; label: string; desc: string }[] = [
-      { key: 'scheduled', label: 'Scheduled', desc: 'Goes live automatically at a set date.' },
-      { key: 'hidden',    label: 'Hidden',    desc: 'Only accessible via direct link.' },
-      { key: 'archived',  label: 'Archived',  desc: 'Removed from storefront, data retained.' },
-    ];
-
-    return (
-      <>
-        <SectionHeader title="More visibility options" style={s.sectionHdr} />
-        {statuses.map(st => (
-          <TouchableOpacity key={st.key} onPress={() => { haptic('select'); patchDraft({ storeSettings: { ...ss, status: st.key }, status: st.key }); }} activeOpacity={0.8}>
-            <BrandthreadCard style={[s.modelCard, ss.status === st.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
-              <View style={s.modelCardHeader}>
-                <Text style={s.modelTitle}>{st.label}</Text>
-                {ss.status === st.key && <Icon name="check-circle" size={18} color={PURPLE_LIGHT} />}
-              </View>
-              <Text style={s.modelDesc}>{st.desc}</Text>
-            </BrandthreadCard>
-          </TouchableOpacity>
-        ))}
-        {ss.status === 'scheduled' && (
-          <NativeDateTimeField mode="datetime" label="Publish date" value={ymdHmToDate(ss.scheduledPublishDate)} onChange={d => patchDraft({ storeSettings: { ...ss, scheduledPublishDate: dateToYmdHm(d) } })} minimumDate={new Date()} testID="add-product-publish-date" />
-        )}
-        <View style={s.switchRow}>
-          <Text style={s.switchLabel}>Featured on homepage</Text>
-          <HapticSwitch
-            accessibilityLabel="Featured on homepage"
-            value={featuredHome}
-            onValueChange={v => { setFeaturedHome(v); patchDraft({ storeSettings: { ...ss, featuredOnHomepage: v } }); }}
-          />
-        </View>
-        <SectionHeader title="SEO & URL" style={s.sectionHdr} />
-        <FormInput label="URL handle" value={seo.urlHandle ?? ''} onChange={v => patchDraft({ storeSettings: { ...ss, seo: { ...seo, urlHandle: v } } })} placeholder="my-product-name" />
-        <FormInput label="SEO title" value={seo.title ?? ''} onChange={v => patchDraft({ storeSettings: { ...ss, seo: { ...seo, title: v } } })} placeholder="Product name — Brand" />
-        <FormInput label="SEO description" value={seo.description ?? ''} onChange={v => patchDraft({ storeSettings: { ...ss, seo: { ...seo, description: v } } })} multiline />
-      </>
-    );
-  }
-
-  // A pre-order needs a real future ship date (API: PREORDER_SHIP_DATE_REQUIRED);
-  // buyers are refunded automatically if it is missed, so it can't be skipped.
-  const shipDateError = preOrderShipDateError(isPreOrder, draftData.preorderSettings?.estimatedShippingDate);
-
-  // Sales model / pre-order — a Brandthread-specific extra beyond vanilla
-  // Shopify, folded into its own collapsible section.
-  function renderSalesModelToggle() {
-    return (
-      <>
-        <View style={s.switchRow}>
-          <View style={{ flex: 1, paddingRight: SP.sm }}>
-            <Text style={s.switchLabel}>Accept pre-orders</Text>
-            <Text style={s.collapsibleHint}>Take orders before the item ships. Only enable if you can fulfil later.</Text>
-          </View>
-          <HapticSwitch
-            accessibilityLabel="Accept pre-orders"
-            accessibilityHint="Take orders before the item ships. Only enable if you can fulfil later."
-            value={isPreOrder}
-            onValueChange={v => {
-              setIsPreOrder(v);
-              patchDraft({ salesModel: v ? 'pre-order' : 'pre-made' });
-            }}
-          />
-        </View>
-        {isPreOrder && (
-          <>
-            <NativeDateTimeField
-              mode="date"
-              label="Pre-order closes"
-              value={ymdToDate(draftData.preorderSettings?.closeDate)}
-              onChange={d => patchDraft({ preorderSettings: { ...(draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false }), closeDate: dateToYmd(d) } })}
-              onClear={() => patchDraft({ preorderSettings: { ...(draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false }), closeDate: undefined } })}
-              minimumDate={startOfToday()}
-              divider
-              testID="add-product-preorder-closes"
-            />
-            <NativeDateTimeField
-              mode="date"
-              label="Ship date (required)"
-              value={ymdToDate(draftData.preorderSettings?.estimatedShippingDate)}
-              onChange={d => patchDraft({ preorderSettings: { ...(draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false }), estimatedShippingDate: dateToYmd(d) } })}
-              minimumDate={startOfToday()}
-              error={shipDateError}
-              helper={shipDateError ? undefined : PREORDER_SHIP_DATE_REQUIRED_MESSAGE}
-              testID="add-product-ship-date"
-            />
-          </>
-        )}
-        <View style={s.switchRow}>
-          <View style={{ flex: 1, paddingRight: SP.sm }}>
-            <Text style={s.switchLabel}>Numbered run</Text>
-            <Text style={s.collapsibleHint}>Each buyer gets their number, like No. 014 of 200.</Text>
-          </View>
-          <HapticSwitch value={numbered} onValueChange={setNumbered} testID="numbered-run-switch" />
-        </View>
-        {numbered && (
-          <FormInput
-            label="Pieces in the run"
-            value={editionSizeText}
-            onChange={(v) => setEditionSizeText(v.replace(/[^0-9]/g, ''))}
-            placeholder="200"
-            keyboardType="numeric"
-            error={editionSizeText && parseEditionSize(editionSizeText) === null ? `${EDITION_SIZE_MIN} to ${EDITION_SIZE_MAX.toLocaleString()} pieces` : undefined}
-          />
-        )}
-      </>
-    );
-  }
-
-  // Live preview — Discover/feed-style render of the listing so far.
-  function renderReviewStep() {
-    const media = draftData.media ?? [];
-    const cover = media.find(m => m.isCover) ?? media[0];
-    const coverUri = cover ? (cover.useCutout && cover.cutoutUri ? cover.cutoutUri : cover.uri) : undefined;
-    const pricing = getPricing();
-    const totalStock = localVariants.length > 0
-      ? localVariants.reduce((sum, v) => sum + (parseInt(variantQtys[v.id] ?? v.qty) || 0), 0)
-      : parseInt(stockStr) || 0;
-
-    return (
-      <>
-        <SectionHeader title="Live preview" style={s.sectionHdr} />
-        <Text style={s.collapsibleHint}>Approximate render — actual layout on Discover and in the feed may vary slightly.</Text>
-
-        {/* Discover-style card preview */}
-        <BrandthreadCard style={s.previewCard}>
-          <View style={s.previewImageWrap}>
-            {coverUri ? (
-              <Image cachePolicy="memory-disk" source={{ uri: coverUri }} style={s.previewImage} contentFit="cover" />
-            ) : (
-              <View style={[s.previewImage, { alignItems: 'center', justifyContent: 'center' }]}>
-                <Icon name="image" size={28} color={SUBTLE} />
-              </View>
-            )}
-            {pricing.isOnSale && (
-              <View style={s.previewSaleBadge}>
-                <Text style={s.previewSaleBadgeText}>-{pricing.discountPercent}%</Text>
-              </View>
-            )}
-          </View>
-          <View style={s.previewInfo}>
-            <Text style={s.previewName} numberOfLines={1}>{draftData.name || 'Untitled product'}</Text>
-            <View style={s.previewPriceRow}>
-              <Text style={s.previewPrice}>{formatCents(pricing.retailPriceCents)}</Text>
-              {pricing.isOnSale && pricing.compareAtPriceCents !== undefined && (
-                <Text style={s.previewCompareAt}>{formatCents(pricing.compareAtPriceCents)}</Text>
-              )}
-            </View>
-            {isPreOrder && <StatusBadge label="Pre-order" variant="warning" />}
-          </View>
-        </BrandthreadCard>
-
-        {/* Feed product-sheet style preview */}
-        <BrandthreadCard style={s.previewSheetCard}>
-          <View style={s.previewSheetHeader}>
-            {coverUri && <Image cachePolicy="memory-disk" source={{ uri: coverUri }} style={s.previewSheetThumb} contentFit="cover" />}
-            <View style={{ flex: 1 }}>
-              <Text style={s.previewName} numberOfLines={1}>{draftData.name || 'Untitled product'}</Text>
-              <Text style={s.previewPrice}>{formatCents(pricing.retailPriceCents)}</Text>
-            </View>
-          </View>
-          <Text style={s.previewDescription} numberOfLines={3}>
-            {draftData.description || 'No description yet.'}
-          </Text>
-          <View style={s.previewMetaRow}>
-            <Text style={s.collapsibleHint}>{media.length} photo{media.length !== 1 ? 's' : ''}</Text>
-            <Text style={s.collapsibleHint}>·</Text>
-            <Text style={s.collapsibleHint}>{localVariants.length > 0 ? plural(localVariants.length, 'variant') : 'No variants'}</Text>
-            <Text style={s.collapsibleHint}>·</Text>
-            <Text style={s.collapsibleHint}>{totalStock} in stock</Text>
-          </View>
-        </BrandthreadCard>
-      </>
-    );
-  }
-
-  // Save is enabled once the three things a listing needs to exist are
-  // present — everything else (variants, shipping, SEO...) is optional and
-  // can be filled in later, same bar whether saving as Active or Draft.
-  const canSave = !!draftData.name?.trim()
-    && (draftData.media ?? []).length > 0
-    && (parseDecimalToCents(priceStr) ?? 0) > 0
-    && !shipDateError;
-
-  const currentStatus: 'active' | 'draft' = draftData.storeSettings?.status === 'active' ? 'active' : 'draft';
-
-  function openStatusPicker() {
-    haptic('sheet');
-    showActionSheet('Product status', undefined, [
-      {
-        text: 'Active — visible and purchasable', onPress: () => {
-          const ss = draftData.storeSettings ?? { status: 'draft', collectionIds: [], featuredOnHomepage: false, relatedProductIds: [], seo: { searchVisible: true } };
-          patchDraft({ storeSettings: { ...ss, status: 'active' }, status: 'active' });
-        },
-      },
-      {
-        text: 'Draft — not visible yet', onPress: () => {
-          const ss = draftData.storeSettings ?? { status: 'draft', collectionIds: [], featuredOnHomepage: false, relatedProductIds: [], seo: { searchVisible: true } };
-          patchDraft({ storeSettings: { ...ss, status: 'draft' }, status: 'draft' });
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }
-
-  // ─── Steps (Grailed "Adding a listing" pattern: thin progress under the
-  // header, one full-width Next at the bottom, disabled until the step is
-  // valid). ────────────────────────────────────────────────────────────
-  const stepInput: ListingStepInput = {
-    media: draftData.media ?? [],
-    name: draftData.name ?? '',
-    priceStr, compareAtStr, costStr,
-    variants: localVariants.map(v => ({ title: v.title, sku: v.sku, price: v.price })),
-    isPreOrder,
-    preOrderOpenDate: draftData.preorderSettings?.openDate,
-    preOrderCloseDate: draftData.preorderSettings?.closeDate,
-    shipDateError,
-  };
-  const stepValid = isListingStepValid(step, stepInput);
-  const editingExisting = !!params.editId;
-
-  function goToStep(next: ListingStep) {
-    setStep(next);
-    scrollRef.current?.scrollTo({ y: 0, animated: false });
-  }
-
-  function renderStepIndicator() {
-    return (
-      <View style={s.stepIndicator} accessibilityRole="tablist" testID="add-product-steps">
-        {LISTING_STEPS.map((label, i) => {
-          const target = i as ListingStep;
-          const active = target === step;
-          const reached = target <= step;
-          const enabled = canJumpToStep(target, step, stepInput, editingExisting);
-          return (
-            <View key={label} style={s.stepItem}>
-              <PressableScale
-                style={s.stepItemInner}
-                onPress={() => goToStep(target)}
-                disabled={!enabled || active}
-                accessibilityRole="tab"
-                accessibilityLabel={`Step ${i + 1} of ${LISTING_STEPS.length}: ${label}`}
-                accessibilityState={{ selected: active, disabled: !enabled }}
-                testID={`add-product-step-${i}`}
-              >
-                <View style={[s.stepBar, { backgroundColor: reached ? FG : BORDER }]} />
-                <Text style={[s.stepLabel, { color: active ? FG : MUTED }]} numberOfLines={1}>{label}</Text>
-              </PressableScale>
-            </View>
-          );
-        })}
-      </View>
-    );
-  }
-
-  function renderStepFooter() {
-    const isLast = step === LAST_LISTING_STEP;
-    return (
-      <View style={[s.stepFooter, { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
-        {step > 0 && (
-          <View style={s.stepFooterSlot}>
-            <Button
-              variant="secondary"
-              label="Back"
-              onPress={() => goToStep((step - 1) as ListingStep)}
-              fullWidth
-              testID="add-product-step-back"
-            />
-          </View>
-        )}
-        {isLast ? (
-          <View style={s.stepFooterSlot}>
-            <Button
-              label={publishing ? 'Saving…' : currentStatus === 'active' ? 'Publish' : 'Save draft'}
-              onPress={handlePublish}
-              disabled={!canSave || publishing || photosUploading}
-              loading={publishing}
-              fullWidth
-              testID="add-product-step-publish"
-            />
-          </View>
-        ) : (
-          <View style={s.stepFooterSlot}>
-            <Button
-              label="Next"
-              onPress={() => goToStep((step + 1) as ListingStep)}
-              disabled={!stepValid}
-              fullWidth
-              testID="add-product-step-next"
-            />
-          </View>
-        )}
-      </View>
-    );
-  }
-
-  // Publish step: the buyer product page itself, built from the form.
-  function buildBuyerPreviewRow() {
-    return buildDraftPreviewRow({
-      name: draftData.name ?? '',
-      description: draftData.description ?? '',
-      category: typeof draftData.category === 'string' ? draftData.category : null,
-      // Same list handlePublish sends as `images`, so the preview matches.
-      imageUris: (draftData.media ?? []).map(m => m.uri),
-      priceCents: parseDecimalToCents(priceStr) ?? 0,
-      compareAtPriceCents: parseDecimalToCents(compareAtStr),
-      stock: parseInt(stockStr, 10) || 0,
-      trackInventory,
-      isPreOrder,
-      preOrderClosingDate: draftData.preorderSettings?.closeDate,
-      preOrderEstShipDate: draftData.preorderSettings?.estimatedShippingDate,
-      sizeChartImageUrl: draftData.sizeChartImageUrl ?? null,
-      tags: draftData.tags ?? [],
-      sellerDisplayName: user?.fullName || user?.username || null,
-      options: localOptions,
-      variants: localVariants.map(v => ({
-        id: v.id,
-        optionValues: v.optionValues,
-        priceCents: parseDecimalToCents(v.price),
-        qty: parseInt(variantQtys[v.id] ?? v.qty, 10) || 0,
-      })),
-    });
-  }
-
-  function renderPublishStep() {
-    const row = buildBuyerPreviewRow();
-    return (
-      <>
-        <BuyerProductPreview product={buyerProductFromDraftRow(row)} testID="add-product-buyer-preview" />
-        <View style={s.essentialSection}>
-          <Button
-            variant="secondary"
-            icon="eye"
-            label="Preview as buyer"
-            onPress={() => { setDraftPreviewRow(row); router.push('/product-preview-as-buyer' as never); }}
-            testID="add-product-preview-as-buyer"
-          />
-        </View>
-      </>
-    );
-  }
-
-  // ─── Render ─────────────────────────────────────────────────────
+  // ── Derived row values ────────────────────────────────────────────────────
+  const earnings = schedule && priceCents && priceCents > 0 ? quoteFromSchedule(schedule, priceCents).sellerNetCents : null;
+  const sizeValue = form.sizes.length > 3
+    ? `${form.sizes.length} sizes`
+    : form.sizes.map(sz => sz.size).join(', ');
+  const shippingValue = [parcelLabel(form.parcelSize), form.shippingPayer === 'seller' ? 'Free shipping' : undefined]
+    .filter(Boolean).join(' · ');
+  const err = (key: string) => showErrors && missing.includes(key);
+  const multiSize = form.sizes.length > 1;
 
   return (
-    <View style={s.root}>
-
-      {/* ── Header: Cancel · status · Save, one row, vertically centered,
-          standard 44pt height below the notch. Save works on every step;
-          the step footer repeats it on Publish. ── */}
-      <View style={{ paddingTop: insets.top, backgroundColor: BG, borderBottomWidth: 1, borderBottomColor: BORDER }}>
-        <View style={s.headerRow}>
-          <Button
-            variant="tertiary"
-            size="compact"
-            label="Cancel"
-            onPress={handleExit}
-            testID="add-product-exit"
-          />
-          <TouchableOpacity
-            style={s.statusPill}
-            onPress={openStatusPicker}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+    <View style={s.screen} testID="add-product-screen">
+      <ScreenHeader
+        title={isEdit ? 'Edit listing' : 'Sell an item'}
+        onBack={handleClose}
+        backAccessibilityLabel="Close"
+        backTestID="add-product-close"
+        rightElement={isEdit ? undefined : (
+          <Pressable
+            onPress={() => router.push('/drafts' as never)}
+            style={s.headerIcon}
             accessibilityRole="button"
-            accessibilityLabel={`Product status: ${currentStatus === 'active' ? 'Active' : 'Draft'}`}
-            testID="add-product-status-pill"
+            accessibilityLabel="Drafts"
+            testID="add-product-drafts"
           >
-            <Text style={s.statusPillText}>{currentStatus === 'active' ? 'Active' : 'Draft'}</Text>
-            <Icon name="chevron-down" size={13} color={MUTED} />
-          </TouchableOpacity>
-          <Button
-            variant="tertiary"
-            size="compact"
-            label={publishing ? 'Saving…' : 'Save'}
-            onPress={handlePublish}
-            disabled={!canSave || publishing || photosUploading}
-            loading={publishing}
-            testID="add-product-save"
-          />
-        </View>
-      </View>
-      {renderStepIndicator()}
-
-      {publishError ? (
-        <View style={s.publishError} testID="add-product-publish-error" accessibilityRole="alert">
-          <Text style={s.publishErrorText}>{publishError}</Text>
-        </View>
-      ) : null}
-
-      {/* ── One scrolling page, Shopify-iOS-style ── */}
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          testID="add-product-form"
-          ref={scrollRef}
-          style={s.scrollView}
-          contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + SP.xl }]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Grouped sections, Shopify product-editor order. Same fields
-              and handlers as before, only grouped under headers. */}
-          {step === 0 && (<FormSection title="Media" meta={`${(draftData.media ?? []).length}/10`} testID="add-product-section-media">
-            {renderPhotos()}
-          </FormSection>)}
-
-          {step === 1 && (<FormSection title="Title & description" testID="add-product-section-details">
-            {renderBasicInfo()}
-          </FormSection>)}
-
-          {step === 2 && (<FormSection title="Pricing" testID="add-product-section-pricing">
-            {renderPriceEssentials()}
-          </FormSection>)}
-
-          {step === 2 && (<FormSection
-            title="Variants"
-            action={{ label: 'Add options', onPress: addVariantOption, testID: 'add-product-add-options' }}
-            testID="add-product-section-variants"
-
- onLayout={e => {variantsSectionY.current = e.nativeEvent.layout.y; if (pendingSectionScroll.current) scrollToVariantsSection();}}
-          >
-            {renderVariants()}
-          </FormSection>)}
-
-          {step === 2 && (<FormSection title="Inventory" testID="add-product-section-inventory">
-            {renderInventory()}
-          </FormSection>)}
-
-          {step === 1 && (<FormSection title="Organization" testID="add-product-section-organization">
-            {renderOrganization()}
-          </FormSection>)}
-
-          {(step === 1 || step === 2) && <>
-          <Text style={s.moreDetailsHeader} accessibilityRole="header">More details</Text>
-          {/* The optional sections stay collapsible, grouped in one card. */}
-          <View style={s.moreDetailsGroup}>
-          {/* -1 hides the first row's top divider under the card border. */}
-          <View style={{ marginTop: -1 }}>
-
-          {step === 2 && <>
-          <CollapsibleSection
-            title="Profit"
-            icon="trending-up"
-            expanded={expandedSections.profit}
-            onToggle={() => toggleSection('profit')}
-            hint="Cost, margin, break-even"
-          >
-            {renderProfit()}
-          </CollapsibleSection>
-
-          <CollapsibleSection
-            title="Shipping"
-            icon="truck"
-            expanded={expandedSections.fulfillment}
-            onToggle={() => toggleSection('fulfillment')}
-            hint="Weight, dimensions, processing time"
-          >
-            {renderFulfillment()}
-          </CollapsibleSection>
-          </>}
-
-          {step === 1 && <>
-          <CollapsibleSection
-            title="Sales model"
-            icon="repeat"
-            expanded={expandedSections.salesModel}
-            onToggle={() => toggleSection('salesModel')}
-            hint={isPreOrder ? 'Pre-order' : 'Pre-made (ship on order)'}
-          >
-            {renderSalesModelToggle()}
-          </CollapsibleSection>
-
-          <CollapsibleSection
-            title="Size chart"
-            icon="grid"
-            expanded={expandedSections.sizeChart}
-            onToggle={() => toggleSection('sizeChart')}
-            hint={draftData.sizeChartImageUrl ? 'Added' : 'Optional'}
-          >
-            {renderSizeChart()}
-            {renderSizeChartTable()}
-            {renderSizeChartAi()}
-          </CollapsibleSection>
-
-          <CollapsibleSection
-            title="Manufacturing"
-            icon="tool"
-            expanded={expandedSections.manufacturing}
-            onToggle={() => toggleSection('manufacturing')}
-            hint={mfgMode === 'none' ? 'Not set up yet' : mfgMode === 'existing' ? mfgName || 'Existing manufacturer' : 'Quote requested'}
-          >
-            {renderManufacturing()}
-          </CollapsibleSection>
-
-          <CollapsibleSection
-            title="Storefront & SEO"
-            icon="globe"
-            expanded={expandedSections.storefront}
-            onToggle={() => toggleSection('storefront')}
-            hint="More visibility options, URL handle"
-          >
-            {renderStorefront()}
-          </CollapsibleSection>
-          </>}
-
-          </View>
-          </View>
-          </>}
-          {step === LAST_LISTING_STEP && renderPublishStep()}
-        </ScrollView>
-        {renderStepFooter()}
-      </KeyboardAvoidingView>
-
-      {productLimit.sheet}
-
-      <SuccessSheet
-        visible={!!publishSuccess}
-        onClose={() => {
-          setPublishSuccess(null);
-          if (shareStoreAfterClose.current) {
-            shareStoreAfterClose.current = false;
-            leaveProductFlow();
-            openShareStoreSheet();
-          }
-        }}
-        title={publishSuccess?.kind === 'updated' ? 'Product updated' : currentStatus === 'active' ? 'Product published' : 'Draft saved'}
-        subtitle={publishSuccess ? `${publishSuccess.name} ${publishSuccess.kind === 'updated' ? 'has been updated.' : currentStatus === 'active' ? 'is now live.' : 'was saved as a draft.'}` : undefined}
-        primaryAction={publishSuccess?.kind === 'created' && currentStatus === 'draft' ? {
-          label: publishingNow ? 'Publishing…' : 'Publish now',
-          onPress: () => { void handlePublishNow(); },
-        } : {
-          label: 'View product',
-          onPress: () => {
-            const id = publishSuccess?.productId;
-            setPublishSuccess(null);
-            if (id) router.replace(('/product-detail?id=' + id) as never);
-          },
-        }}
-        // A newly published product: hand the seller the one Share store sheet
-        // (then Done moves to a text button under it).
-        secondaryAction={publishSuccess?.kind === 'created' && currentStatus === 'active'
-          ? { label: 'Share store', onPress: () => { shareStoreAfterClose.current = true; setPublishSuccess(null); } }
-          : { label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}
-        tertiaryAction={publishSuccess?.kind === 'created' && currentStatus === 'active'
-          ? { label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }
-          : undefined}
-        testID="add-product-success-sheet"
+            <Feather name="folder" size={22} color={theme.text} />
+          </Pressable>
+        )}
       />
 
-      {cropTargetId && (() => {
-        const cropItem = (draftData.media ?? []).find(m => m.id === cropTargetId);
-        if (!cropItem) return null;
-        return (
-          <MediaCropper
-            visible
-            uri={cropItem.originalUri ?? cropItem.uri}
-            targetRatio={PRODUCT_PHOTO_ASPECT}
-            initialRect={cropItem.cropRect ?? null}
-            title="Crop photo"
-            onCancel={() => handleCropCancel(cropTargetId)}
-            onSave={(result) => void handleCropSave(cropTargetId, result)}
-          />
-        );
-      })()}
-      <FirstRunTip
-        id="add-product"
-        variant="anchored"
-        contentReady
-        anchored={{ steps: ADD_PRODUCT_STEPS }}
+      <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          ref={scrollRef}
+          style={s.flex}
+          contentContainerStyle={s.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          {loading ? <View style={s.loading} /> : (
+            <>
+              <PhotoStrip
+                form={form}
+                error={err('photos')}
+                onAdd={addMedia}
+                onRemove={removePhoto}
+                onRetry={id => { const p = getListing().photos.find(x => x.id === id); if (p) void uploadListingPhoto(api, p); }}
+                onRemoveVideo={() => updateListing({ video: null })}
+                onEdit={() => router.push('/listing/photos' as never)}
+              />
+
+              <SectionGap />
+              <LabeledField
+                label="Title"
+                error={err('title')}
+                value={form.title}
+                onChangeText={title => updateListing({ title })}
+                placeholder="e.g. White cotton boxy tee"
+                maxLength={TITLE_MAX}
+                returnKeyType="next"
+                testID="add-product-title"
+              />
+              <LabeledField
+                label="Describe your item"
+                value={form.description}
+                onChangeText={description => updateListing({ description })}
+                placeholder="e.g. only worn a few times, true to size"
+                multiline
+                maxLength={DESCRIPTION_MAX}
+                counter={form.description.length > DESCRIPTION_MAX * 0.8 ? `${form.description.length}/${DESCRIPTION_MAX}` : undefined}
+                last
+                testID="add-product-description"
+              />
+
+              <SectionGap />
+              <FormRow label="Category" value={form.subcategory} error={err('category')} onPress={() => router.push('/listing/category' as never)} testID="add-product-category" />
+              <FormRow label="Brand" value={form.brand} onPress={() => router.push('/listing/brand' as never)} testID="add-product-brand" />
+              <FormRow label="Size" value={sizeValue} onPress={() => router.push('/listing/size' as never)} testID="add-product-size" />
+              {form.editProductId ? <FormRow label="Edit size chart table" onPress={() => router.push({ pathname: '/product-size-chart', params: { productId: form.editProductId! } } as never)} testID="add-product-size-chart" /> : null}
+              <FormRow label="Condition" value={conditionLabel(form.condition)} error={err('condition')} onPress={() => router.push('/listing/condition' as never)} testID="add-product-condition" />
+              <FormRow label="Colours" value={form.colors.join(', ')} onPress={() => router.push('/listing/colors' as never)} testID="add-product-colors" />
+              <FormRow label="Material (recommended)" value={form.material} onPress={() => router.push('/listing/material' as never)} testID="add-product-material" />
+              {multiSize ? (
+                <FormRow label="Quantity" value={`${totalQuantity(form)} across ${form.sizes.length} sizes`} onPress={() => router.push('/listing/size' as never)} last testID="add-product-quantity" />
+              ) : (
+                <View style={s.qtyRow}>
+                  <Text style={s.qtyLabel}>Quantity</Text>
+                  <TextInput
+                    value={String(form.quantity)}
+                    onChangeText={t => {
+                      const n = parseInt(t.replace(/[^0-9]/g, ''), 10);
+                      updateListing({ quantity: Number.isFinite(n) ? Math.min(n, 9999) : 0 });
+                    }}
+                    keyboardType="number-pad"
+                    selectTextOnFocus
+                    style={s.qtyInput}
+                    selectionColor={theme.text}
+                    accessibilityLabel="Quantity"
+                    testID="add-product-quantity"
+                  />
+                </View>
+              )}
+
+              <SectionGap />
+              <LabeledField label="Numbered run" value={form.editionSize == null ? '' : String(form.editionSize)} placeholder="Optional total pieces" keyboardType="number-pad" maxLength={7} onChangeText={text => updateListing({ editionSize: text.replace(/\D/g, '') ? Number(text.replace(/\D/g, '')) : null })} testID="add-product-edition-size" />
+              <FormRow
+                label="Price"
+                value={priceCents ? formatCents(priceCents) : undefined}
+                error={err('price')}
+                onPress={() => router.push('/listing/price' as never)}
+                last
+                testID="add-product-price"
+              />
+              {earnings !== null ? (
+                <GroupNote>{`You’ll earn ${formatCents(earnings)} after fees.`}</GroupNote>
+              ) : <SectionGap />}
+
+              <FormRow label="Shipping" value={shippingValue} placeholder="Parcel size" onPress={() => router.push('/listing/shipping' as never)} last testID="add-product-shipping" />
+              <GroupNote>
+                {form.shippingPayer === 'seller'
+                  ? 'You’re offering free shipping. The label cost comes out of your earnings.'
+                  : 'The buyer always pays for shipping.'}
+              </GroupNote>
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <ListingBottomBar
+        secondaryLabel={isEdit ? undefined : fromDraft ? 'Update draft' : 'Save to drafts'}
+        onSecondary={isEdit ? undefined : () => { void handleSaveDraft(); }}
+        secondaryTestID="add-product-save-draft"
+        primaryLabel={isEdit ? 'Review changes' : 'Preview'}
+        onPrimary={handlePreview}
+        primaryTestID="add-product-preview"
       />
     </View>
   );
 }
 
-// ─── Styles ─────────────────────────────────────────────────────────
-
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const {
-    background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
-    border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE,
-    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
-    secondary: CYAN, secondaryDim: CYAN_DIM, success: SUCCESS, warning: ORANGE, error: RED,
-    onAccent: ON_DARK,
-  } = theme;
-  const BORDER_ACTIVE = theme.accentLight;
-  const BLUE = theme.accentLight;
-  const GOLD = theme.accent;
-  const GRAD_CARD_GLOW = theme.glowGradient;
+function makeStyles(t: AppThemePreset) {
   return StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-
-  // Header: Cancel · status pill · Save — one row, centered, 44pt.
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: 44,
-    paddingHorizontal: SP.sm,
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: SP.sm,
-    paddingVertical: 6,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  statusPillText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  publishError: {
-    marginHorizontal: SP.md,
-    marginTop: SP.sm,
-    padding: SP.sm,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: RED,
-    backgroundColor: CARD,
-  },
-  publishErrorText: { fontSize: FS.sm, fontFamily: FONT.medium, color: RED, lineHeight: 20 },
-
-  // Step indicator (under the header) + sticky Back / Next footer.
-  stepIndicator: { flexDirection: 'row', gap: SP.xs, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.xs },
-  stepItem: { flex: 1 },
-  stepItemInner: { gap: 6 },
-  stepFooterSlot: { flex: 1 },
-  stepBar: { height: 2, borderRadius: 1 },
-  stepLabel: { fontSize: FS.xs, fontFamily: FONT.medium },
-  stepFooter: {
-    flexDirection: 'row', gap: SP.sm,
-    paddingHorizontal: SP.md, paddingTop: SP.sm,
-    borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: BG,
-  },
-
-  // Scroll
-  scrollView: { flex: 1 },
-  scrollContent: { paddingTop: SP.md },
-
-  // Essential sections (always visible)
-  moreDetailsHeader: {
-    fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.semibold, color: MUTED,
-    marginHorizontal: SP.md + SP.xs, marginBottom: SP.sm,
-  },
-  moreDetailsGroup: {
-    marginHorizontal: SP.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: RADIUS.md,
-    backgroundColor: CARD,
-    overflow: 'hidden',
-  },
-  essentialSection: {
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.lg,
-    gap: SP.md,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: BORDER,
-    marginHorizontal: SP.md,
-    marginBottom: SP.md,
-  },
-
-  // Collapsible sections
-  collapsibleBlock: {
-    borderTopWidth: 1,
-    borderTopColor: BORDER,
-  },
-  collapsibleHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    paddingVertical: 14,
-  },
-  collapsibleHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    flex: 1,
-  },
-  collapsibleIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  collapsibleTitle: {
-    fontSize: FS.base,
-    fontFamily: FONT.semibold,
-    color: FG,
-  },
-  collapsibleHint: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: MUTED,
-  },
-  collapsibleBody: {
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.lg,
-    gap: SP.md,
-  },
-
-  // Shared field helpers
-  sectionHdr: { paddingHorizontal: 0 },
-  sectionHelper: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: -SP.xs, marginBottom: SP.md },
-  chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  // A collapsed "+ Add X" row (description, category, size chart) —
-  // Shopify's own pattern for an optional field that isn't set yet.
-  plusRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 44, paddingVertical: SP.xs },
-  plusRowText: { fontSize: FS.base, fontFamily: FONT.medium, color: FG },
-  priceRow: { flexDirection: 'row', gap: SP.sm },
-
-  // Photo row: true 1:1 square tiles. 84x84 x3 default tiles + the quiet
-  // "+" tile + 3 x 8px gaps = 360px, fitting a 393px screen's 361px content
-  // width (16px gutters) without needing to scroll until a 4th photo is added.
-  photoRowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  photoRowTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
-  photoRowCount: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-  photoRowContent: { flexDirection: 'row', gap: SP.sm, paddingVertical: 2 },
-  photoAddSlot: {
-    width: 84, height: 84, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: BORDER,
-    backgroundColor: '#000',
-    alignItems: 'center', justifyContent: 'center', gap: 6,
-  },
-  photoAddSlotLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textAlign: 'center', paddingHorizontal: 4 },
-  photoSlot: {
-    width: 84, height: 84, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: BORDER,
-    backgroundColor: '#000',
-    overflow: 'hidden', position: 'relative',
-  },
-  photoSlotImg: { width: '100%', height: '100%' },
-  photoSlotImgPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  // The trailing "add another slot" tile — deliberately quieter than the
-  // "Add photo" slots (no label, thin dim "+", faint border) so it reads
-  // as a minor affordance rather than competing with the real action rows.
-  photoMoreSlot: {
-    width: 84, height: 84, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  mediaDeleteBtn: {
-    position: 'absolute', top: 4, right: 4,
-    width: 20, height: 20, borderRadius: RADII.pill,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  mediaUploadOverlay: {
-    // theme-exempt: scrim over media thumbnail, not a themed surface
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center', justifyContent: 'center', gap: 4,
-  },
-  mediaRetryLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: ON_DARK },
-  sizeChartRow: { flexDirection: 'row', gap: SP.md, alignItems: 'flex-start' },
-  sizeChartThumbWrap: {
-    width: 100, height: 130, borderRadius: RADIUS.sm,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
-    overflow: 'hidden', position: 'relative',
-  },
-  sizeChartThumb: { width: '100%', height: '100%' },
-  sizeChartActions: { flex: 1, gap: SP.sm, justifyContent: 'center' },
-  mediaCoverBadge: {
-    position: 'absolute', bottom: 4, left: 4,
-    backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 2,
-  },
-  mediaCoverBadgeText: { ...TYPE_SCALE.caption, fontFamily: FONT.bold, color: ON_DARK },
-  mediaReorderRow: {
-    position: 'absolute', top: 4, left: 4, flexDirection: 'row', gap: 2,
-  },
-  mediaReorderBtn: {
-    width: 18, height: 18, borderRadius: RADII.pill, backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-
-  // Pricing
-  pricingCard: { gap: SP.sm },
-  pricingTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginBottom: SP.xs },
-  pricingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  pricingLabel: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  pricingValue: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
-
-  // Inventory
-  switchRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: SP.md, height: COMP.inputH,
-  },
-  switchLabel: { fontSize: FS.base, fontFamily: FONT.medium, color: FG },
-
-  // Stepper (− / qty / +) — Shopify's own inventory-row control.
-  stepperRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: SP.md, height: COMP.inputH,
-  },
-  stepperLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG, flex: 1 },
-  stepperControl: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  stepperBtn: {
-    width: 28, height: 28, borderRadius: RADIUS.sm,
-    borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  // Fixed width: on web a TextInput is an <input> with a ~170px intrinsic
-  // width, which squeezed the label into two lines ("In / stock").
-  stepperInput: {
-    width: 48, minWidth: 32, fontSize: FS.sm, fontFamily: FONT.semibold, color: FG,
-    paddingVertical: 0,
-  },
-
-  // Options / variants
-  optionCard: { gap: SP.sm },
-  optionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
-  colorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  colorSwatch: { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
-  valueChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: CARD_ELEVATED, borderRadius: radius.sm,
-    paddingHorizontal: 10, paddingVertical: 4,
-    borderWidth: 1, borderColor: BORDER_ACTIVE,
-  },
-  valueDot: { width: 10, height: 10, borderRadius: RADII.pill, borderWidth: 1, borderColor: BORDER },
-  valueChipText: { fontSize: FS.xs, fontFamily: FONT.medium },
-  customValueRow: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: SP.md, height: COMP.inputH,
-  },
-  customValueInput: { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: FG },
-  customValueAdd: { padding: SP.xs },
-  deleteOptionBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.xs, alignSelf: 'flex-start', marginTop: SP.xs,
-  },
-  deleteOptionText: { fontSize: FS.xs, fontFamily: FONT.medium, color: RED },
-  variantCount: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, fontVariant: ['tabular-nums'] },
-  variantsHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.xs },
-  bulkEditToggle: { fontSize: FS.sm, fontFamily: FONT.semibold },
-  bulkEditCard: { gap: SP.sm },
-  variantRow: { gap: SP.sm },
-  variantTitleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  variantCheckbox: {
-    width: 18, height: 18, borderRadius: RADIUS.xs, borderWidth: crispPx(1.5), borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  variantTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  variantFields: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
-  variantInput: {
-    flex: 1, height: 40, backgroundColor: SURFACE,
-    borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
-  },
-  variantSkuInput: {
-    height: 36, marginTop: SP.sm, backgroundColor: SURFACE,
-    borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
-  },
-
-  // Review step: live preview cards
-  previewCard: { padding: 0, overflow: 'hidden' },
-  previewImageWrap: { width: '100%', aspectRatio: PRODUCT_PHOTO_ASPECT, backgroundColor: CARD },
-  previewImage: { width: '100%', height: '100%' },
-  previewSaleBadge: {
-    position: 'absolute', top: SP.sm, left: SP.sm,
-    backgroundColor: RED, borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 2,
-  },
-  previewSaleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
-  previewInfo: { padding: SP.md, gap: 4 },
-  previewName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  previewPriceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  previewPrice: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, fontVariant: ['tabular-nums'] },
-  previewCompareAt: { fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, textDecorationLine: 'line-through' },
-  previewSheetCard: { gap: SP.sm },
-  previewSheetHeader: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
-  previewSheetThumb: { width: 48, height: 48, borderRadius: RADIUS.sm, backgroundColor: CARD },
-  previewDescription: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
-  previewMetaRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-
-  // Model selection cards
-  modelCard: { gap: SP.xs },
-  modelCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  modelTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  modelDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
+    screen: { flex: 1, backgroundColor: t.background },
+    flex: { flex: 1 },
+    content: { paddingBottom: SP.xl },
+    loading: { height: 400 },
+    headerIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    qtyRow: {
+      minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: SP.md, backgroundColor: t.background,
+    },
+    qtyLabel: { fontSize: FS.base, fontFamily: FONT.regular, color: t.text },
+    qtyInput: { minWidth: 64, textAlign: 'right', fontSize: FS.base, fontFamily: FONT.regular, color: t.text, paddingVertical: SP.sm },
   });
-};
+}

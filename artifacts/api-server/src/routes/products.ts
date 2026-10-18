@@ -95,6 +95,7 @@ import { acceptUploadSession } from "../lib/uploadSessions";
 import { parseDefaultStock, resolveRowStock } from "../lib/productImport/bulkRows";
 import { checkListingIntegrity, counterfeitRefusal } from "../lib/listingIntegrity";
 import { salesFlagsForSeller } from "../lib/productSalesFlagsQuery";
+import { parseListingDetails } from "../lib/listingDetails";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -253,9 +254,15 @@ router.post("/", requireRole("manager"), validateInput({ body: createProductBody
     priceCents, stock, compareAtPriceCents,
     // Limited numbered run ("No. 014 of 200"); null/absent = not numbered.
     editionSize,
+    // Sell-an-item attributes (brand, condition, colours, parcel size…).
+    listingDetails: rawListingDetails,
   } = req.body;
   if (!name || typeof name !== "string" || name.trim() === "") {
     res.status(400).json({ error: "name required" }); return;
+  }
+  const listingDetails = rawListingDetails === undefined ? undefined : parseListingDetails(rawListingDetails);
+  if (listingDetails && "error" in listingDetails) {
+    res.status(400).json({ error: listingDetails.error }); return;
   }
   {
     const problem = validateEditionSize(editionSize, 0);
@@ -356,6 +363,7 @@ router.post("/", requireRole("manager"), validateInput({ body: createProductBody
         ...(dropId !== undefined && { dropId: dropId ?? null }),
         ...(sizeChartImageUrl !== undefined && { sizeChartImageUrl: sizeChartImageUrl ?? null }),
         ...(typeof editionSize === "number" && { editionSize }),
+        ...(listingDetails && { listingDetails: listingDetails.value }),
       })
       .returning();
 
@@ -449,12 +457,17 @@ router.put("/:id", requireRole("manager"), validateInput({ params: productIdPara
     priceCents, stock,
     // Limited numbered run; null turns it off (only before any piece is numbered).
     editionSize,
+    listingDetails: rawListingDetails,
   } = req.body;
   if (editionSize !== undefined) {
     const [stored] = await db.select({ issued: products.editionIssued })
       .from(products).where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId))).limit(1);
     const problem = validateEditionSize(editionSize, stored?.issued ?? 0);
     if (problem) { res.status(problem.status).json({ error: problem.error, code: problem.code }); return; }
+  }
+  const listingDetails = rawListingDetails === undefined ? undefined : parseListingDetails(rawListingDetails);
+  if (listingDetails && "error" in listingDetails) {
+    res.status(400).json({ error: listingDetails.error }); return;
   }
   if (compareAtPriceCents !== undefined && compareAtPriceCents !== null &&
       (!Number.isInteger(compareAtPriceCents) || compareAtPriceCents <= 0)) {
@@ -521,6 +534,7 @@ router.put("/:id", requireRole("manager"), validateInput({ params: productIdPara
       ...(sizeChart              !== undefined && { sizeChart: sizeChart ?? null }),
       ...(sizeChartImageUrl      !== undefined && { sizeChartImageUrl: sizeChartImageUrl ?? null }),
       ...(editionSize            !== undefined && { editionSize: editionSize ?? null }),
+      ...(listingDetails         && { listingDetails: listingDetails.value }),
       updatedAt: new Date(),
   };
 

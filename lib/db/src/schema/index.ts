@@ -411,6 +411,10 @@ export const products = pgTable('products', {
   // ── Numbered run (migration 263): null = not numbered ─────────────────────
   editionSize:           integer('edition_size'),
   editionIssued:         integer('edition_issued').notNull().default(0),
+  // Sell-an-item attributes (department, subcategory, brand, condition,
+  // colours, material, parcel size, who pays shipping). Shape and limits:
+  // api-server lib/listingDetails.ts. Migration 640.
+  listingDetails:        jsonb('listing_details').$type<Record<string, unknown> | null>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

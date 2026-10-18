@@ -1,404 +1,188 @@
 import React from 'react';
-vi.mock('react-native-qrcode-svg', () => ({ default: () => null }));
-vi.mock('@/contexts/FirstRunTipsContext', () => ({
-  useFirstRunTipsController: () => ({
-    ready: true, hasSeen: () => true, skipAll: true, claim: () => false,
-    release() {}, activeTipId: null, markSeen() {}, setSkipAllTips() {},
-    replayTips: async () => {},
-  }),
-}));
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  alertMock,
-  addListenerMock,
-  dispatchMock,
-  routerBackMock,
-  saveDraftMock,
+  alertMock, actionSheetMock, addListenerMock, dispatchMock, routerPushMock, saveDraftMock, leaveSetupFlowMock,
 } = vi.hoisted(() => ({
   alertMock: vi.fn(),
+  actionSheetMock: vi.fn(),
   addListenerMock: vi.fn(),
   dispatchMock: vi.fn(),
-  routerBackMock: vi.fn(),
+  routerPushMock: vi.fn(),
   saveDraftMock: vi.fn(),
+  leaveSetupFlowMock: vi.fn(),
 }));
 
-vi.mock('expo-image', () => ({
-  Image: (props: Record<string, unknown>) => React.createElement('Image', props),
-}));
-vi.mock('react-native', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('react-native')>();
+vi.mock('react-native', () => {
   const React = require('react') as typeof import('react');
-  const nativeComponent = (name: string) => {
-    function MockNativeComponent(props: Record<string, unknown>) {
+  const native = (name: string) => {
+    function Mock(props: Record<string, unknown>) {
       return React.createElement(name, props, props.children as React.ReactNode);
     }
-    MockNativeComponent.displayName = name;
-    return MockNativeComponent;
+    Mock.displayName = name;
+    return Mock;
   };
-
   return {
-    ...actual,
-    ActivityIndicator: nativeComponent('ActivityIndicator'),
     Alert: { alert: alertMock },
-    Image: nativeComponent('Image'),
-    KeyboardAvoidingView: nativeComponent('KeyboardAvoidingView'),
-    LayoutAnimation: { configureNext: vi.fn(), Presets: { easeInEaseOut: {} } },
     Platform: { OS: 'ios' },
-    ScrollView: nativeComponent('ScrollView'),
-    StyleSheet: { create: (styles: unknown) => styles },
-    Switch: nativeComponent('Switch'),
-    Text: nativeComponent('Text'),
-    TextInput: nativeComponent('TextInput'),
-    TouchableOpacity: nativeComponent('TouchableOpacity'),
-    UIManager: { setLayoutAnimationEnabledExperimental: vi.fn() },
-    View: nativeComponent('View'),
+    Pressable: native('Pressable'),
+    ScrollView: native('ScrollView'),
+    StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
+    Text: native('Text'),
+    TextInput: native('TextInput'),
+    View: native('View'),
   };
 });
-
-vi.mock('@/components/ui/Button', () => {
-  const React = require('react') as typeof import('react');
-  return {
-    Button: ({ label, ...props }: { label: string; onPress: () => void; testID?: string; disabled?: boolean }) =>
-      React.createElement('Button', { ...props, accessibilityLabel: label }, label),
-    StickyBottomCTA: ({ header }: { header?: React.ReactNode }) =>
-      React.createElement('View', null, header),
-  };
-});
-
-vi.mock('@/components/ui/SuccessSheet', () => {
-  const React = require('react') as typeof import('react');
-  // The real component pulls in BottomSheet -> react-native-reanimated,
-  // which this suite's plain react-native mock doesn't support (no test
-  // here exercises the publish-success sheet's content) — stub it to just
-  // render nothing when hidden and its actions as plain pressables when
-  // visible, so a future test asserting on it can still find them.
-  return {
-    SuccessSheet: ({ visible, title, primaryAction, secondaryAction, testID }: {
-      visible: boolean; title: string;
-      primaryAction: { label: string; onPress: () => void };
-      secondaryAction?: { label: string; onPress: () => void };
-      testID?: string;
-    }) => {
-      if (!visible) return null;
-      return React.createElement('View', { testID }, [
-        React.createElement('Text', { key: 'title' }, title),
-        React.createElement('Button', { key: 'primary', onPress: primaryAction.onPress, accessibilityLabel: primaryAction.label }, primaryAction.label),
-        secondaryAction
-          ? React.createElement('Button', { key: 'secondary', onPress: secondaryAction.onPress, accessibilityLabel: secondaryAction.label }, secondaryAction.label)
-          : null,
-      ]);
-    },
-  };
-});
-
-vi.mock('expo-linear-gradient', () => ({
-  LinearGradient: ({ children, ...props }: { children?: React.ReactNode }) =>
-    React.createElement('LinearGradient', props, children),
-}));
 
 vi.mock('@expo/vector-icons', () => ({
   Feather: ({ name }: { name: string }) => React.createElement('Feather', { name }),
 }));
 
-vi.mock('expo-haptics', () => ({
-  impactAsync: vi.fn().mockResolvedValue(undefined),
-  selectionAsync: vi.fn().mockResolvedValue(undefined),
-  notificationAsync: vi.fn().mockResolvedValue(undefined),
-  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
-  NotificationFeedbackType: { Success: 'success', Error: 'error', Warning: 'warning' },
-}));
-
-vi.mock('expo-image-picker', () => ({
-  launchImageLibraryAsync: vi.fn(),
-  requestMediaLibraryPermissionsAsync: vi.fn(async () => ({ granted: true })),
-  MediaTypeOptions: { Images: 'Images' },
-}));
-
-vi.mock('expo-image-manipulator', () => ({
-  manipulateAsync: vi.fn(async () => ({ uri: 'file:///cropped.jpg', width: 100, height: 100, base64: 'abc' })),
-  SaveFormat: { JPEG: 'jpeg' },
-}));
-
-vi.mock('expo-file-system', () => ({
-  File: class FakeFile {
-    uri: string;
-    exists = false;
-    constructor(dirOrUri: string, filename?: string) {
-      this.uri = filename ? `${dirOrUri}/${filename}` : dirOrUri;
-    }
-    write() {}
-    create() {}
-    delete() {}
-  },
-  Paths: { document: 'file:///documents', cache: 'file:///cache' },
-}));
-
 vi.mock('expo-router', () => ({
-  usePathname: () => '/add-product',
-  useFocusEffect: (callback: () => void | (() => void)) => React.useEffect(callback, [callback]),
-  useRouter: () => ({ back: routerBackMock, canGoBack: () => true }),
+  useRouter: () => ({ push: routerPushMock, back: vi.fn() }),
   useLocalSearchParams: () => ({}),
-  useNavigation: () => ({
-    addListener: addListenerMock,
-    dispatch: dispatchMock,
-  }),
+  useNavigation: () => ({ addListener: addListenerMock, dispatch: dispatchMock }),
 }));
 
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+vi.mock('@/components/KeyboardProviderCompat', () => ({
+  KeyboardAvoidingView: ({ children }: { children?: React.ReactNode }) => React.createElement('KAV', null, children),
 }));
+
+vi.mock('@/components/ScreenHeader', () => ({
+  ScreenHeader: ({ title, onBack, rightElement }: { title: string; onBack: () => void; rightElement?: React.ReactNode }) =>
+    React.createElement('Header', { title }, React.createElement('Close', { testID: 'add-product-close', onPress: onBack }), rightElement),
+}));
+
+vi.mock('@/components/ui/ActionSheet', () => ({ showActionSheet: actionSheetMock }));
+
+vi.mock('@/components/listing/PhotoStrip', () => ({
+  PhotoStrip: () => React.createElement('PhotoStrip'),
+}));
+
+vi.mock('@/components/listing/ListingRows', () => {
+  const React = require('react') as typeof import('react');
+  return {
+    SectionGap: () => null,
+    GroupNote: ({ children }: { children: React.ReactNode }) => React.createElement('Note', null, children),
+    FormRow: (props: { testID?: string; label: string; error?: boolean; onPress: () => void }) => React.createElement('FormRow', props),
+    LabeledField: (props: Record<string, unknown>) => React.createElement('TextInput', props),
+    ListingBottomBar: (props: { primaryLabel: string; onPrimary: () => void; secondaryLabel?: string; onSecondary?: () => void }) =>
+      React.createElement('Bar', null,
+        props.secondaryLabel ? React.createElement('Button', { testID: 'add-product-save-draft', onPress: props.onSecondary, label: props.secondaryLabel }) : null,
+        React.createElement('Button', { testID: 'add-product-preview', onPress: props.onPrimary, label: props.primaryLabel })),
+  };
+});
 
 vi.mock('@/contexts/AppThemeContext', () => ({
-  useAppTheme: () => ({
-    theme: {
-      accent: '#c7cdd5',
-      accentDim: '#34383e',
-      accentLight: '#f8fafc',
-      secondaryDim: '#172554',
-    },
-  }),
+  useAppTheme: () => ({ theme: { background: '#111', surface: '#222', text: '#eee', muted: '#aaa', subtle: '#999', border: '#333', error: '#f99' } }),
 }));
 
-vi.mock('@/hooks/useApi', () => ({
-  useApi: () => ({}),
+vi.mock('@/lib/api', () => ({ useApi: () => ({ products: {} }) }));
+vi.mock('@/lib/tabBarVisibility', () => ({ useHideTabBar: () => {} }));
+vi.mock('@/lib/setupNavigation', () => ({ leaveSetupFlow: leaveSetupFlowMock }));
+vi.mock('@/hooks/useFeeSchedule', () => ({ useFeeSchedule: () => ({ platformFeeBps: 500, processing: { bps: 290, fixedCents: 30 } }) }));
+vi.mock('@/lib/listing/listingMedia', () => ({
+  pickFromLibrary: vi.fn(), takePhoto: vi.fn(), removePhoto: vi.fn(), uploadListingPhoto: vi.fn(),
 }));
-
 vi.mock('@/services/productService', () => ({
-  deleteDraft: vi.fn(),
-  getCollections: vi.fn(async () => []),
-  getProduct: vi.fn(),
   loadDraft: vi.fn(async () => null),
   saveDraft: saveDraftMock,
 }));
 
-vi.mock('@/components/StyleTagsPicker', () => ({
-  default: () => null,
-}));
-
-vi.mock('@/components/BrandthreadUI', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/components/BrandthreadUI')>();
-  const React = require('react') as typeof import('react');
-  const native = (name: string) => (props: Record<string, unknown>) =>
-    React.createElement(name, props, props.children as React.ReactNode);
-
-  return {
-    ...actual,
-    BrandthreadCard: native('BrandthreadCard'),
-    GradientCard: native('GradientCard'),
-    PrimaryButton: native('PrimaryButton'),
-    SecondaryButton: native('SecondaryButton'),
-    IconButton: native('IconButton'),
-    FilterChip: native('FilterChip'),
-    StatusBadge: native('StatusBadge'),
-    SectionHeader: native('SectionHeader'),
-    ProgressCard: native('ProgressCard'),
-    EmptyState: native('EmptyState'),
-    GuidedTip: native('GuidedTip'),
-    PressableScale: native('PressableScale'),
-    FormInput: ({
-      label,
-      value,
-      onChange,
-      onSubmitEditing,
-    }: {
-      label?: string;
-      value: string;
-      onChange: (value: string) => void;
-      onSubmitEditing?: () => void;
-    }) =>
-      React.createElement(
-        'View',
-        null,
-        label ? React.createElement('Text', null, label) : null,
-        React.createElement('TextInput', {
-          testID: label ? `product-input-${label}` : undefined,
-          value,
-          onChangeText: onChange,
-          onSubmitEditing,
-        }),
-      ),
-  };
-});
-
-vi.mock('@/lib/productUtils', () => ({
-  buildVariantTitle: vi.fn((values: string[]) => values.join(' / ')),
-  calcPricing: vi.fn(() => ({
-    grossProfitCents: undefined,
-    netProfitCents: undefined,
-    marginPercent: undefined,
-    breakEvenPriceCents: undefined,
-    isOnSale: false,
-    discountPercent: undefined,
-    retailPriceCents: 0,
-  })),
-  generateVariantCombinations: vi.fn(() => []),
-  validateForPublish: vi.fn(() => []),
-  applyBulkEditToVariants: vi.fn((variants: any[]) => variants),
-}));
-
-vi.mock('@/lib/money', () => ({
-  formatCents: vi.fn(() => '$0.00'),
-  parseDecimalToCents: vi.fn((value: string) =>
-    /^\d+(?:\.\d{1,2})?$/.test(value.trim()) ? Math.round(Number(value) * 100) : null),
-}));
-
 import AddProductScreen from '@/app/add-product';
+import { resetListing, updateListing } from '@/lib/listing/listingStore';
 
-type AlertButton = {
-  text?: string;
-  onPress?: () => void | Promise<void>;
-};
-
-function lastAlertButtons(): AlertButton[] {
-  const buttons = alertMock.mock.lastCall?.[2];
-  return Array.isArray(buttons) ? buttons : [];
-}
-
-async function renderScreen(): Promise<ReactTestRenderer> {
-  let renderer!: ReactTestRenderer;
+async function render(): Promise<ReactTestRenderer> {
+  let r!: ReactTestRenderer;
   await act(async () => {
-    renderer = create(<AddProductScreen />);
+    r = create(<AddProductScreen />);
     await Promise.resolve();
   });
-  return renderer;
+  return r;
 }
 
-describe('AddProduct draft exit protection', () => {
-  let renderer!: ReactTestRenderer;
+type SheetButton = { text: string; onPress?: () => void };
+const lastSheetButtons = (): SheetButton[] => actionSheetMock.mock.lastCall?.[2] ?? [];
+
+describe('Sell an item form', () => {
+  let renderer: ReactTestRenderer | undefined;
 
   beforeEach(() => {
-    vi.useFakeTimers();
-    alertMock.mockReset();
-    addListenerMock.mockReset();
-    dispatchMock.mockReset();
-    routerBackMock.mockReset();
-    saveDraftMock.mockReset();
+    [alertMock, actionSheetMock, addListenerMock, dispatchMock, routerPushMock, saveDraftMock, leaveSetupFlowMock].forEach(m => m.mockReset());
     saveDraftMock.mockResolvedValue(undefined);
     addListenerMock.mockReturnValue(vi.fn());
+    resetListing();
   });
 
   afterEach(async () => {
-    await act(async () => {
-      renderer?.unmount();
-    });
-    vi.useRealTimers();
+    await act(async () => { renderer?.unmount(); });
   });
 
-  it('warns after an immediate edit, then skips the warning once that edit is saved', async () => {
-    renderer = await renderScreen();
+  it('shows the Vinted field rows in order with Depop’s Save to drafts / Preview bar', async () => {
+    renderer = await render();
+    const rows = renderer.root.findAll(n => (n.type as unknown) === 'FormRow').map(n => n.props.label);
+    expect(rows).toEqual(['Category', 'Brand', 'Size', 'Condition', 'Colours', 'Material (recommended)', 'Price', 'Shipping']);
+    expect(renderer.root.findByProps({ testID: 'add-product-save-draft' }).props.label).toBe('Save to drafts');
+    expect(renderer.root.findByProps({ testID: 'add-product-preview' }).props.label).toBe('Preview');
+    // Fixes #105: no step tabs.
+    expect(renderer.root.findAll(n => n.props.accessibilityRole === 'tab')).toHaveLength(0);
+  });
 
-    const nameInput = renderer.root.findByProps({ testID: 'product-input-Title' });
+  it('closes straight away when nothing was entered', async () => {
+    renderer = await render();
+    await act(async () => { renderer!.root.findByProps({ testID: 'add-product-close' }).props.onPress(); });
+    expect(actionSheetMock).not.toHaveBeenCalled();
+    expect(leaveSetupFlowMock).toHaveBeenCalledOnce();
+  });
+
+  it('offers Save to drafts on close after an edit, and saves the listing', async () => {
+    renderer = await render();
+    await act(async () => { updateListing({ title: 'Boxy tee' }); });
+    await act(async () => { renderer!.root.findByProps({ testID: 'add-product-close' }).props.onPress(); });
+    expect(actionSheetMock).toHaveBeenCalledWith('Save to drafts?', expect.any(String), expect.any(Array));
+    expect(lastSheetButtons().map(b => b.text)).toEqual(['Save to drafts', 'Discard', 'Cancel']);
     await act(async () => {
-      nameInput.props.onChangeText('Last-second product edit');
-    });
-
-    await act(async () => {
-      renderer.root.findByProps({ testID: 'add-product-exit' }).props.onPress();
-    });
-
-    expect(alertMock).toHaveBeenCalledWith(
-      'Exit product creation?',
-      'You have unsaved changes — save as draft?',
-      expect.any(Array),
-    );
-    expect(routerBackMock).not.toHaveBeenCalled();
-    expect(lastAlertButtons().map((button) => button.text)).toEqual([
-      'Save draft',
-      'Discard',
-      'Cancel',
-    ]);
-
-    alertMock.mockClear();
-    await act(async () => {
-      vi.advanceTimersByTime(2000);
+      lastSheetButtons()[0].onPress?.();
+      await Promise.resolve();
       await Promise.resolve();
     });
-
-    expect(saveDraftMock).toHaveBeenCalledOnce();
-    expect(saveDraftMock.mock.calls[0][0]).toMatchObject({
-      id: expect.any(String),
-      name: 'Last-second product edit',
-      isDraft: true,
-    });
-
-    await act(async () => {
-      renderer.root.findByProps({ testID: 'add-product-exit' }).props.onPress();
-    });
-
-    expect(alertMock).not.toHaveBeenCalled();
-    expect(routerBackMock).toHaveBeenCalledOnce();
+    expect(saveDraftMock).toHaveBeenCalledWith(expect.objectContaining({ name: 'Boxy tee', isDraft: true }));
+    expect(leaveSetupFlowMock).toHaveBeenCalledOnce();
   });
 
-  it('prevents native back navigation after an immediate edit until the seller chooses to leave', async () => {
-    renderer = await renderScreen();
+  it('guards native back after an edit until the seller chooses', async () => {
+    renderer = await render();
+    await act(async () => { updateListing({ description: 'Worn twice' }); });
+    const beforeRemove = addListenerMock.mock.calls.find(c => c[0] === 'beforeRemove')![1];
+    const preventDefault = vi.fn();
+    const action = { type: 'GO_BACK' };
+    await act(async () => { beforeRemove({ preventDefault, data: { action } }); });
+    expect(preventDefault).toHaveBeenCalledOnce();
+    await act(async () => { lastSheetButtons().find(b => b.text === 'Discard')!.onPress?.(); });
+    expect(dispatchMock).toHaveBeenCalledWith(action);
+  });
 
-    const nameInput = renderer.root.findByProps({ testID: 'product-input-Title' });
+  it('Preview lists what is missing and marks the rows instead of a hidden disabled button', async () => {
+    renderer = await render();
+    await act(async () => { renderer!.root.findByProps({ testID: 'add-product-preview' }).props.onPress(); });
+    expect(alertMock).toHaveBeenCalledWith('Almost there', 'Add photos, title, category, condition and price to continue.');
+    expect(routerPushMock).not.toHaveBeenCalled();
+    expect(renderer.root.findByProps({ testID: 'add-product-price' }).props.error).toBe(true);
+  });
+
+  it('opens the preview once the listing is complete, and previews earnings under Price', async () => {
+    renderer = await render();
     await act(async () => {
-      nameInput.props.onChangeText('Native back draft edit');
-    });
-
-    expect(addListenerMock).toHaveBeenCalledWith('beforeRemove', expect.any(Function));
-    const beforeRemove = addListenerMock.mock.calls[0][1] as (event: {
-      preventDefault: () => void;
-      data: { action: unknown };
-    }) => void;
-    const preventDefaultMock = vi.fn();
-    const nativeBackAction = { type: 'GO_BACK' };
-
-    await act(async () => {
-      beforeRemove({
-        preventDefault: preventDefaultMock,
-        data: { action: nativeBackAction },
+      updateListing({
+        photos: [{ id: 'a', uri: 'file:///a.jpg', remoteUri: '/objects/a', status: 'done' }],
+        title: 'Boxy tee', department: 'Men', category: 'Tops', subcategory: 'T-shirts',
+        condition: 'good', priceStr: '40',
       });
     });
-
-    expect(preventDefaultMock).toHaveBeenCalledOnce();
-    expect(alertMock).toHaveBeenCalledWith(
-      'Exit product creation?',
-      'You have unsaved changes — save as draft?',
-      expect.any(Array),
-    );
-    expect(dispatchMock).not.toHaveBeenCalled();
-
-    await act(async () => {
-      const discardButton = lastAlertButtons().find((button) => button.text === 'Discard');
-      discardButton?.onPress?.();
-      await Promise.resolve();
-    });
-
-    expect(dispatchMock).toHaveBeenCalledWith(nativeBackAction);
-  });
-
-  it('shows the full product form and one publish action without a wizard footer', async () => {
-    renderer = await renderScreen();
-    const form = renderer.root.findByProps({ testID: 'add-product-form' });
-
-    expect(form.findByProps({ testID: 'product-input-Title' })).toBeTruthy();
-    expect(form.findByProps({ testID: 'product-input-Price *' })).toBeTruthy();
-    expect(renderer.root.findAllByProps({ testID: 'add-product-save' }).filter(button => typeof button.type === 'string')).toHaveLength(1);
-    expect(form.findAllByProps({ label: 'Next' })).toHaveLength(0);
-    expect(form.findAllByProps({ label: 'Cancel' })).toHaveLength(0);
-    expect(renderer.root.findByProps({ testID: 'add-product-status-pill' })).toBeTruthy();
-
-    await act(async () => {
-      form.findByProps({ title: 'Shipping' }).props.onToggle();
-    });
-    expect(form.findByProps({ testID: 'product-input-Weight (grams)' })).toBeTruthy();
-    const options = form.findAllByProps({ title: 'Variants' })
-      .find(node => typeof node.props.action?.onPress === 'function')!;
-    await act(async () => {
-      options.props.action.onPress();
-    });
-    expect(form.findByProps({ testID: 'product-input-Option name' })).toBeTruthy();
-    expect(form.findByProps({ testID: 'product-input-Title' })).toBeTruthy();
-
-    await act(async () => {
-      await renderer.root.findAllByProps({ testID: 'add-product-save' })
-        .find(node => typeof node.props.onPress === 'function')!.props.onPress();
-    });
-    expect(alertMock).toHaveBeenCalledWith('Invalid price', expect.stringContaining('Enter a valid price'));
-    expect(renderer.root.findByProps({ testID: 'add-product-publish-error' })).toBeTruthy();
+    const note = renderer.root.findAll(n => (n.type as unknown) === 'Note').map(n => n.props.children);
+    expect(note[0]).toMatch(/^You’ll earn \$\d+\.\d\d after fees\.$/);
+    await act(async () => { renderer!.root.findByProps({ testID: 'add-product-preview' }).props.onPress(); });
+    expect(routerPushMock).toHaveBeenCalledWith('/listing/preview');
   });
 });

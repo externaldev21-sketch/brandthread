@@ -137,7 +137,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/(tabs)/more.tsx',
   'app/(tabs)/products.tsx',
   'app/(tabs)/profile.tsx',
-  'app/add-product.tsx',
   'app/automation.tsx', // redirect-only route
   // Renders the shared components/chat/ConversationThread.tsx (own chat header).
   'app/buyer-conversation.tsx',

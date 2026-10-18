@@ -150,7 +150,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'app/+html.tsx',
   'app/_layout.tsx',
   'app/activity-center.tsx',
-  'app/add-product.tsx',
   'app/ai-brain.tsx',
   'app/ai-studio.tsx',
   'app/appearance.tsx',

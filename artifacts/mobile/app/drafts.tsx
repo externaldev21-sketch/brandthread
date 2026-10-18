@@ -1,430 +1,166 @@
 /**
- * Brandthread — Seller Drafts
- *
- * Full-screen list for sellers with more in-progress product drafts than fit
- * in the Products tab preview strip.
+ * Drafts — Depop's Drafts screen: "Ready to post" / "Incomplete" underline
+ * tabs over plain rows (square thumbnail, title, "Men / Tops / T-shirts",
+ * then the price or what it still needs in red). Tap a row to finish it in
+ * Sell an item; press and hold to delete.
+ * Ref: mobbin.com/screens/8cd4d9bf-694f-4822-a02d-b594269f79bf
  */
-
 import React, { useCallback, useMemo, useState } from 'react';
-import { goBackOr } from '@/lib/navigation/goBackOr';
-
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
-
-import { Icon } from '@/components/ui/Icon';
-
-import { ScreenHeader } from '@/components/ScreenHeader';
-
+import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { haptics } from '@/lib/haptics';
-
-import { BG, BORDER, CARD, FG, MUTED, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-
-import { useColors } from '@/hooks/useColors';
-
-import { EmptyState, SearchBar } from '@/components/BrandthreadUI';
-
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { showActionSheet } from '@/components/ui/ActionSheet';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { hapticLight } from '@/lib/haptics';
+import { formatCents, parseDecimalToCents } from '@/lib/money';
+import { FONT, FS, SP } from '@/lib/theme';
 import { deleteDraft, listDrafts } from '@/services/productService';
+import type { ProductDraft } from '@/services/productTypes';
+import { draftToListing } from '@/lib/listing/listingPersistence';
+import { missingForPublish } from '@/lib/listing/listingStore';
+import { categoryPath } from '@/lib/listing/taxonomy';
 
-import { ProductDraft } from '@/services/productTypes';
+type Tab = 'ready' | 'incomplete';
 
-import { usePullToRefresh } from '@/hooks/usePullToRefresh';
-
-import { minHitSlop } from '@/lib/hitSlop';
-
-// Sort options draw 40pt tall with a 1pt border (slop is measured from the
-// 38pt padding box on web); pad the touch area vertically to 44pt.
-const SORT_OPTION_HIT_SLOP = minHitSlop({ height: 38 });
-
-type DraftSort = 'lastSaved' | 'name';
-
-function formatSavedDate(value?: string): string {
-  if (!value) return 'Not saved yet';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Not saved yet';
-  return `Saved ${date.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })}`;
+interface DraftRowData {
+  id: string;
+  title: string;
+  path: string;
+  cover?: string;
+  priceCents: number | null;
+  missing: string[];
 }
 
-function DraftRow({
-  draft,
-  onResume,
-  onDiscard,
-}: {
-  draft: ProductDraft;
-  onResume: () => void;
-  onDiscard: () => void;
-}) {
-  const colors = useColors();
-  const styles = createStyles(colors);
-  const step = Math.min(Math.max(draft.currentStep ?? 1, 1), 10);
-  const name = draft.name?.trim() || 'Untitled product';
-
-  return (
-    <View style={styles.row}>
-      <View style={styles.rowHeading}>
-        <View style={styles.draftIcon}>
-          <Icon name="edit-3" size={ICON.sm} color={colors.foreground} />
-        </View>
-        <View style={styles.rowTitleWrap}>
-          <Text style={styles.rowTitle} numberOfLines={1}>{name}</Text>
-          <Text style={styles.rowDate}>{formatSavedDate(draft.lastSavedAt)}</Text>
-        </View>
-        <Text style={styles.stepLabel}>Step {step}/10</Text>
-      </View>
-
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${step * 10}%` }]} />
-      </View>
-
-      <View style={styles.rowActions}>
-        <TouchableOpacity
-          style={styles.resumeButton}
-          onPress={onResume}
-          activeOpacity={0.75}
-          accessibilityRole="button"
-          accessibilityLabel={`Resume ${name}`}
-        >
-          <Icon name="play" size={13} color={colors.background} />
-          <Text style={styles.resumeLabel}>Resume</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.discardButton}
-          onPress={onDiscard}
-          activeOpacity={0.75}
-          accessibilityRole="button"
-          accessibilityLabel={`Discard ${name}`}
-        >
-          <Icon name="trash-2" size={13} color={colors.foreground} />
-          <Text style={styles.discardLabel}>Discard</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+function toRow(draft: ProductDraft): DraftRowData {
+  const form = draftToListing(draft);
+  const priceCents = parseDecimalToCents(form.priceStr);
+  return {
+    id: draft.id,
+    title: form.title.trim() || 'Untitled item',
+    path: categoryPath(form.department, form.category, form.subcategory),
+    cover: form.photos[0]?.uri,
+    priceCents,
+    missing: missingForPublish(form, priceCents),
+  };
 }
 
 export default function DraftsScreen() {
-  const colors = useColors();
-  const styles = createStyles(colors);
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [drafts, setDrafts] = useState<ProductDraft[]>([]);
-  const [sort, setSort] = useState<DraftSort>('lastSaved');
-  const [filterQuery, setFilterQuery] = useState('');
+  const [rows, setRows] = useState<DraftRowData[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const loadDrafts = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      const rows = await listDrafts();
-      setDrafts(Array.isArray(rows) ? rows : []);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const pull = usePullToRefresh(() => loadDrafts(true));
+  const [tab, setTab] = useState<Tab>('ready');
 
   useFocusEffect(useCallback(() => {
-    loadDrafts();
-  }, [loadDrafts]));
-
-  const visibleDrafts = useMemo(() => {
-    const query = filterQuery.trim().toLocaleLowerCase();
-    const filtered = query
-      ? drafts.filter(draft => (draft.name || 'Untitled product').toLocaleLowerCase().includes(query))
-      : drafts;
-
-    return [...filtered].sort((a, b) => {
-      if (sort === 'name') {
-        const nameA = (a.name || 'Untitled product').trim().toLocaleLowerCase();
-        const nameB = (b.name || 'Untitled product').trim().toLocaleLowerCase();
-        return nameA.localeCompare(nameB) || b.lastSavedAt.localeCompare(a.lastSavedAt);
-      }
-      return b.lastSavedAt.localeCompare(a.lastSavedAt);
+    let alive = true;
+    listDrafts().then(drafts => {
+      if (!alive) return;
+      setRows(drafts.map(toRow));
+      setLoading(false);
     });
-  }, [drafts, filterQuery, sort]);
+    return () => { alive = false; };
+  }, []));
 
-  const discardDraft = useCallback((draft: ProductDraft) => {
-    const name = draft.name?.trim() || 'Untitled product';
-    Alert.alert(
-      'Discard draft?',
-      `"${name}" will be permanently deleted.`,
-      [
-        { text: 'Keep', style: 'cancel' },
-        {
-          text: 'Discard draft',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteDraft(draft.id);
-            setDrafts(current => current.filter(item => item.id !== draft.id));
-          },
+  const ready = rows.filter(r => r.missing.length === 0);
+  const incomplete = rows.filter(r => r.missing.length > 0);
+  const visible = tab === 'ready' ? ready : incomplete;
+
+  function remove(row: DraftRowData) {
+    showActionSheet(row.title, undefined, [
+      {
+        text: 'Delete draft', style: 'destructive', onPress: () => {
+          void deleteDraft(row.id);
+          setRows(current => current.filter(r => r.id !== row.id));
         },
-      ],
-    );
-  }, []);
-
-  const renderDraft = useCallback(({ item }: { item: ProductDraft }) => (
-    <DraftRow
-      draft={item}
-      onResume={() => router.push(('/add-product?editId=' + item.id) as never)}
-      onDiscard={() => discardDraft(item)}
-    />
-  ), [discardDraft, router]);
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
 
   return (
-    <View style={styles.root}>
-      <ScreenHeader
-        title="In-progress drafts"
-        onBack={() => goBackOr(router)}
-      />
-
-      <View style={styles.controlsSection}>
-        <Text style={styles.controlLabel}>Filter drafts</Text>
-        <SearchBar
-          value={filterQuery}
-          onChange={setFilterQuery}
-          placeholder="Filter by product name"
-        />
-
-        <Text style={[styles.controlLabel, styles.sortLabel]}>Sort by</Text>
-        <View style={styles.sortOptions}>
-          <TouchableOpacity
-            style={[styles.sortOption, sort === 'lastSaved' && styles.sortOptionActive]}
-            onPress={() => setSort('lastSaved')}
-            activeOpacity={0.75}
-            hitSlop={SORT_OPTION_HIT_SLOP}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: sort === 'lastSaved' }}
+    <View style={s.screen} testID="drafts-screen">
+      <ScreenHeader title="Drafts" />
+      <View style={s.tabs} accessibilityRole="tablist">
+        {([['ready', 'Ready to post'], ['incomplete', 'Incomplete']] as const).map(([key, label]) => (
+          <Pressable
+            key={key}
+            onPress={() => { hapticLight(); setTab(key); }}
+            style={s.tab}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === key }}
+            testID={`drafts-tab-${key}`}
           >
-            <Icon name="clock" size={14} color={sort === 'lastSaved' ? colors.accentForeground : MUTED} />
-            <Text style={[styles.sortOptionLabel, sort === 'lastSaved' && styles.sortOptionLabelActive]}>
-              Last saved
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sortOption, sort === 'name' && styles.sortOptionActive]}
-            onPress={() => setSort('name')}
-            activeOpacity={0.75}
-            hitSlop={SORT_OPTION_HIT_SLOP}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: sort === 'name' }}
-          >
-            <Icon name="type" size={14} color={sort === 'name' ? colors.accentForeground : MUTED} />
-            <Text style={[styles.sortOptionLabel, sort === 'name' && styles.sortOptionLabelActive]}>
-              Product name
-            </Text>
-          </TouchableOpacity>
-        </View>
+            <Text style={[s.tabLabel, tab === key && s.tabLabelActive]}>{label}</Text>
+            <View style={[s.tabLine, tab === key && { backgroundColor: theme.text }]} />
+          </Pressable>
+        ))}
       </View>
 
-      <FlatList
-        data={visibleDrafts}
-        keyExtractor={item => item.id}
-        renderItem={renderDraft}
-        refreshControl={pull.refreshControl}
-        contentContainerStyle={[
-          styles.listContent,
-          visibleDrafts.length === 0 && styles.emptyListContent,
-          { paddingBottom: insets.bottom + SP.xl },
-        ]}
-        showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={styles.rowSeparator} />}
-        ListEmptyComponent={
-          loading ? null : (
-            <EmptyState
-              icon={filterQuery.trim() ? 'search' : 'edit-3'}
-              title={filterQuery.trim() ? 'No matching drafts' : 'No drafts yet'}
-              description={
-                filterQuery.trim()
-                  ? `No drafts match “${filterQuery.trim()}”.`
-                  : 'Product drafts you save while creating will appear here.'
-              }
-              action={filterQuery.trim()
-                ? { label: 'Clear filter', icon: 'x', onPress: () => setFilterQuery('') }
-                : {
-                    label: 'Create product',
-                    icon: 'plus',
-                    onPress: () => router.push('/add-product' as never),
-                  }}
-            />
-          )
-        }
-      />
-
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator color={colors.primary} size="large" />
-        </View>
+      {loading ? (
+        <ActivityIndicator style={s.loading} color={theme.text} />
+      ) : (
+        <FlatList
+          data={visible}
+          keyExtractor={r => r.id}
+          contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}
+          ListEmptyComponent={(
+            <View style={s.empty}>
+              <Text style={s.emptyTitle}>{tab === 'ready' ? 'No drafts ready to post' : 'No incomplete drafts'}</Text>
+              <Text style={s.emptyBody}>Items you save to drafts while listing show up here.</Text>
+            </View>
+          )}
+          renderItem={({ item }) => (
+            <Pressable
+              onPress={() => { hapticLight(); router.push(`/add-product?editId=${encodeURIComponent(item.id)}` as never); }}
+              onLongPress={() => remove(item)}
+              style={({ pressed }) => [s.row, pressed && { backgroundColor: theme.surface }]}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.title}. ${item.missing.length ? `Needs ${item.missing.join(', ')}` : 'Ready to post'}`}
+              accessibilityHint="Opens the draft. Press and hold to delete."
+              testID={`draft-row-${item.id}`}
+            >
+              {item.cover ? <Image source={{ uri: item.cover }} style={s.thumb} /> : <View style={[s.thumb, { backgroundColor: theme.surface }]} />}
+              <View style={s.rowText}>
+                <Text style={s.rowTitle} numberOfLines={1}>{item.title}</Text>
+                {item.path ? <Text style={s.rowMeta} numberOfLines={1}>{item.path}</Text> : null}
+                {item.missing.length ? (
+                  <Text style={[s.rowMeta, { color: theme.error }]} numberOfLines={1}>
+                    {`Needs ${item.missing.join(', ')}`}
+                  </Text>
+                ) : (
+                  <Text style={s.rowMeta}>{formatCents(item.priceCents ?? 0)}</Text>
+                )}
+              </View>
+            </Pressable>
+          )}
+        />
       )}
     </View>
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  controlsSection: {
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  controlLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: MUTED,
-    marginBottom: SP.sm,
-  },
-  sortLabel: {
-    marginTop: SP.md,
-  },
-  sortOptions: {
-    flexDirection: 'row',
-    gap: SP.sm,
-  },
-  sortOption: {
-    flex: 1,
-    minHeight: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.xs,
-    paddingHorizontal: SP.sm,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: colors.card,
-  },
-  sortOptionActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.accent,
-  },
-  sortOptionLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: MUTED,
-  },
-  sortOptionLabelActive: {
-    color: colors.accentForeground,
-  },
-  listContent: {
-    paddingHorizontal: SP.md,
-    paddingTop: SP.md,
-  },
-  emptyListContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  row: {
-    backgroundColor: colors.card,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: SP.md,
-  },
-  rowHeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  draftIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: RADIUS.sm,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SP.sm,
-  },
-  rowTitleWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  rowTitle: {
-    fontSize: FS.base,
-    fontFamily: FONT.semibold,
-    color: colors.foreground,
-  },
-  rowDate: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: MUTED,
-    marginTop: 3,
-  },
-  stepLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: MUTED,
-    marginLeft: SP.sm,
-  },
-  progressTrack: {
-    height: 5,
-    borderRadius: RADIUS.pill,
-    // Same wash SUBTLE_WASH gives at ~1/3 alpha (was `SUBTLE + '55'`, which
-    // broke silently once SUBTLE became a solid hex — non-text background,
-    // stays translucent on purpose).
-    backgroundColor: 'rgba(247,247,250,0.17)',
-    marginTop: SP.md,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: RADIUS.pill,
-    backgroundColor: colors.foreground,
-  },
-  rowActions: {
-    flexDirection: 'row',
-    gap: SP.sm,
-    marginTop: SP.md,
-  },
-  resumeButton: {
-    flex: 1,
-    minHeight: 38,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: RADIUS.sm,
-    backgroundColor: colors.primary,
-  },
-  resumeLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.bold,
-    color: colors.primaryForeground,
-  },
-  discardButton: {
-    minHeight: 38,
-    minWidth: 102,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: 'transparent',
-  },
-  discardLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: colors.foreground,
-  },
-  rowSeparator: {
-    height: SP.sm,
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(7,7,15,0.6)',
-  },
-});
+function makeStyles(t: AppThemePreset) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.background },
+    tabs: { flexDirection: 'row', paddingHorizontal: SP.md, gap: SP.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: t.border },
+    tab: { paddingTop: SP.sm },
+    tabLabel: { fontSize: FS.base, fontFamily: FONT.semibold, color: t.muted, paddingBottom: SP.sm },
+    tabLabelActive: { color: t.text },
+    tabLine: { height: 2, backgroundColor: 'transparent' },
+    loading: { marginTop: SP.xl },
+    row: {
+      flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: t.border,
+    },
+    thumb: { width: 56, height: 56, borderRadius: 4 },
+    rowText: { flex: 1, gap: 2 },
+    rowTitle: { fontSize: FS.base, fontFamily: FONT.regular, color: t.text },
+    rowMeta: { fontSize: FS.meta, fontFamily: FONT.regular, color: t.muted },
+    empty: { alignItems: 'center', paddingTop: SP.xxl, paddingHorizontal: SP.xl, gap: SP.sm },
+    emptyTitle: { fontSize: FS.md, fontFamily: FONT.semibold, color: t.text },
+    emptyBody: { fontSize: FS.sm, fontFamily: FONT.regular, color: t.muted, textAlign: 'center' },
+  });
+}
