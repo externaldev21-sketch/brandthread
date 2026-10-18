@@ -47,8 +47,9 @@ describe("oauthProviderVisibility (App Store 4.8)", () => {
     expect(oauthProviderVisibility("ios", { apple: false, google: true })).toEqual({ apple: false, google: false });
   });
 
-  it("keeps Android and web unchanged (Apple is iOS-only in the app)", () => {
-    expect(oauthProviderVisibility("android", { apple: true, google: true })).toEqual({ apple: false, google: true });
+  it("offers Apple on Android and web too, and lets Google stand alone there if Apple is flagged off", () => {
+    expect(oauthProviderVisibility("android", { apple: true, google: true })).toEqual({ apple: true, google: true });
+    expect(oauthProviderVisibility("web", { apple: true, google: true })).toEqual({ apple: true, google: true });
     expect(oauthProviderVisibility("web", { apple: false, google: true })).toEqual({ apple: false, google: true });
   });
 });

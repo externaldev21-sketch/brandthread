@@ -3,14 +3,12 @@
  * End-to-end web walkthrough of account onboarding (buyer + seller), driven
  * against the REAL onboarding screen (app/onboarding.tsx) — no ?bt_preview or
  * dev bypass — with a mocked Clerk (clerk-onboarding-stub.mjs) and a mocked
- * API (fake-api.mjs). Both walkthroughs run at two viewport sizes and save a
- * screenshot after every major step.
+ * API (fake-api.mjs). Both walkthroughs run at 390x844 and save a
+ * screenshot after every step at 390x844 (launch QA rule).
  *
  *   pnpm --filter @workspace/mobile run walkthrough:onboarding
  *   node scripts/onboarding-walkthrough/capture.mjs           (from artifacts/mobile)
  *   node scripts/onboarding-walkthrough/capture.mjs --skip-build
- *   node scripts/onboarding-walkthrough/capture.mjs --skip-build --narrow --demo
- *     (--narrow: 390x844 only; --demo: seed brands to follow)
  *
  * Output: scripts/onboarding-walkthrough/output/<viewport>/<buyer|seller>/<NN-step>.png
  * Exit code is non-zero if any step fails to reach its expected screen/text.
@@ -27,17 +25,15 @@ const BUILD_DIR = path.join(MOBILE_ROOT, '.onboarding-walkthrough', 'web-build')
 const OUTPUT_DIR = path.join(HERE, 'output');
 const DEMO_API = 'https://api.brandthread.test';
 
+// Launch QA rule: hands-on at 390x844 only.
 const VIEWPORTS = [
   { id: '390x844', width: 390, height: 844, isMobile: true },
-  { id: '1440x900', width: 1440, height: 900, isMobile: false },
 ];
 
 function parseArgs(argv) {
-  const options = { skipBuild: false, demo: false, narrowOnly: false };
+  const options = { skipBuild: false };
   for (const arg of argv) {
     if (arg === '--skip-build') options.skipBuild = true;
-    else if (arg === '--demo') options.demo = true;
-    else if (arg === '--narrow') options.narrowOnly = true;
     else throw new Error(`Unknown option ${arg}`);
   }
   return options;
@@ -58,7 +54,6 @@ function makeReport(role, viewportId) {
         const message = String(error?.message ?? error).split('\n')[0];
         console.log(`  ✗ ${label} — ${message}`);
         rows.push({ name, ok: false, message });
-        error.walkthroughRows = rows;
         throw error;
       }
     },
@@ -68,8 +63,6 @@ function makeReport(role, viewportId) {
 async function screenshot(page, dir, index, name) {
   mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `${String(index).padStart(2, '0')}-${name}.png`);
-  // Let the 230ms step transition finish so the shot isn't mid-fade.
-  await page.waitForTimeout(450);
   await page.screenshot({ path: file, animations: 'disabled', caret: 'hide' });
 }
 
@@ -116,63 +109,63 @@ function identity(role, viewportId) {
   };
 }
 
-/** The account steps shared by both paths (Instagram's sign-up). */
-async function accountSteps(page, report, shot, id, { seller }) {
-  await report.step('email', async () => {
+/** Welcome → birthday → email → code: the shared sign-up every run starts with. */
+async function signUp(page, id, shot, report) {
+  await report.step('welcome (TikTok sign up)', async () => {
+    await page.getByTestId('onboarding-welcome').waitFor({ timeout: 20_000 });
+    await dismissCookieBanner(page);
+    await shot('welcome');
+    await page.getByTestId('onboarding-toggle-mode').click();
+    await page.getByText('Log in to', { exact: false }).waitFor({ timeout: 5_000 });
+    await shot('welcome-login');
+    await page.getByTestId('onboarding-toggle-mode').click();
+    await page.getByTestId('onboarding-use-email').click();
+  });
+
+  await report.step('birthday (TikTok) with under-13 error', async () => {
+    await page.getByTestId('onboarding-dob').waitFor({ timeout: 10_000 });
+    await shot('birthday');
+    await page.getByTestId('onboarding-dob').fill('01012020');
+    await page.getByTestId('onboarding-dob-continue').click();
+    await page.getByTestId('onboarding-dob-error').waitFor({ timeout: 5_000 });
+    await shot('birthday-error');
+    await page.getByTestId('onboarding-dob').fill('');
+    await page.getByTestId('onboarding-dob').fill('01152000');
+    await page.getByTestId('onboarding-dob-continue').click();
+  });
+
+  await report.step('email (Depop sign up or log in)', async () => {
     await page.getByTestId('onboarding-email-input').waitFor({ timeout: 10_000 });
-    await shot('email-empty');
-    await page.getByTestId('onboarding-email-input').fill(id.email.split('@')[0]);
-    await page.getByTestId('onboarding-email-domains').waitFor({ timeout: 5_000 });
-    await shot('email-domain-chips');
     await page.getByTestId('onboarding-email-input').fill(id.email);
-    await page.getByTestId('onboarding-email-next').click();
+    await shot('email');
+    await page.getByTestId('onboarding-email-continue').click();
   });
 
-  await report.step('confirmation code', async () => {
-    await page.getByTestId('onboarding-code-input').waitFor({ timeout: 10_000 });
-    await page.getByTestId('onboarding-code-input').fill('000000');
-    await shot('code');
-    await page.getByTestId('onboarding-code-next').click();
+  await report.step('code with wrong-code error', async () => {
+    await page.getByTestId('onboarding-code').waitFor({ timeout: 10_000 });
+    const input = page.getByTestId('onboarding-code-input').locator('input');
+    await input.fill('123456');
+    await page.getByTestId('onboarding-code-error').waitFor({ timeout: 5_000 });
+    await shot('code-error');
+    await input.fill('');
+    await input.fill('000000');
   });
 
-  await report.step('password', async () => {
-    await page.getByTestId('onboarding-password-input').waitFor({ timeout: 10_000 });
-    await page.getByTestId('onboarding-password-input').fill(id.password);
-    await shot('password');
-    await page.getByTestId('onboarding-password-next').click();
-  });
-
-  await report.step('birthday (age gate blocks a child, then passes)', async () => {
-    await page.getByTestId('onboarding-birthday-wheel').waitFor({ timeout: 10_000 });
-    await shot('birthday-today');
-    await page.getByTestId('onboarding-birthday-next').click();
-    await page.getByTestId('onboarding-step-error').waitFor({ timeout: 5_000 });
-    // Scroll the year wheel back ~30 years (36pt rows) and let it settle.
-    const year = page.getByTestId('onboarding-birthday-year');
-    const box = await year.boundingBox();
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.wheel(0, -36 * 30);
-    await page.waitForTimeout(600);
-    await shot(seller ? 'birthday-adult' : 'birthday-set');
-    await page.getByTestId('onboarding-birthday-next').click();
-  });
-
-  await report.step('terms', async () => {
-    await page.getByTestId('onboarding-terms-agree').waitFor({ timeout: 10_000 });
-    await shot('terms');
-    await page.getByTestId('onboarding-terms-agree').click();
-  });
-
-  await report.step('name (account now exists)', async () => {
-    await page.getByTestId('onboarding-first-name-input').waitFor({ timeout: 20_000 });
-    await shot('name-empty');
-    await page.getByTestId('onboarding-first-name-input').fill(`${id.firstName} ${id.lastName}`);
-    await page.getByTestId('onboarding-name-next').click();
+  await report.step('username (Depop) with taken + available', async () => {
+    await page.getByTestId('onboarding-username').waitFor({ timeout: 15_000 });
+    await shot('username-empty');
+    await page.getByTestId('onboarding-username-input').fill('taken');
+    await page.getByTestId('onboarding-username-error').waitFor({ timeout: 5_000 });
+    await shot('username-taken');
+    await page.getByTestId('onboarding-username-input').fill(id.username);
+    await page.getByText('is available', { exact: false }).waitFor({ timeout: 5_000 });
+    await shot('username-available');
+    await page.getByTestId('onboarding-username-continue').click();
   });
 }
 
-async function runBuyerWalkthrough(browser, { viewport, origin, outDir, demo }) {
-  const api = createFakeOnboardingApi({ demo });
+async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
+  const api = createFakeOnboardingApi();
   const { context, page } = await openOnboardingContext(browser, { viewport, origin, api });
   const report = makeReport('buyer', viewport.id);
   const id = identity('buyer', viewport.id);
@@ -180,122 +173,71 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir, demo }) 
   const shot = (name) => screenshot(page, outDir, ++index, name);
 
   try {
-    await report.step('welcome screen loads', async () => {
-      await page.goto(`${origin}/onboarding`);
-      await waitClerkLoaded(page);
-      await page.getByTestId('onboarding-welcome-get-started').waitFor({ timeout: 20_000 });
-      await dismissCookieBanner(page);
-      await shot('welcome');
-    });
+    await page.goto(`${origin}/onboarding`);
+    await waitClerkLoaded(page);
+    await signUp(page, id, shot, report);
 
-    await report.step('choose buyer account type', async () => {
-      await page.getByTestId('onboarding-welcome-get-started').click();
-      await page.getByTestId('onboarding-account-type-buyer').waitFor({ timeout: 10_000 });
-      await shot('account-type');
-      await page.getByTestId('onboarding-account-type-buyer').click();
-      await shot('account-type-selected');
-      await page.getByTestId('onboarding-account-type-continue').click();
-    });
-
-    await accountSteps(page, report, shot, id, { seller: false });
-
-    await report.step('username (suggested, available)', async () => {
-      await page.getByTestId('onboarding-username-input').waitFor({ timeout: 10_000 });
-      await page.getByTestId('onboarding-username-available').waitFor({ timeout: 10_000 });
-      await shot('username');
-      await page.getByTestId('onboarding-username-input').fill(id.username);
-      await page.getByTestId('onboarding-username-available').waitFor({ timeout: 10_000 });
-      await page.getByTestId('onboarding-username-next').click();
-    });
-
-    await report.step('profile picture (skip)', async () => {
-      await page.getByTestId('onboarding-photo-skip').waitFor({ timeout: 15_000 });
+    await report.step('photo (Instagram): add, then continue', async () => {
+      await page.getByTestId('onboarding-photo').waitFor({ timeout: 10_000 });
       await shot('photo');
-      await page.getByTestId('onboarding-photo-skip').click();
+      const chooser = page.waitForEvent('filechooser');
+      await page.getByTestId('onboarding-photo-add').click();
+      await (await chooser).setFiles(path.join(MOBILE_ROOT, 'assets/images/products/leather-ankle-boots.jpg'));
+      await page.getByTestId('onboarding-photo-preview').waitFor({ timeout: 10_000 });
+      await shot('photo-picked');
+      await page.getByTestId('onboarding-photo-continue').click();
     });
 
-    await report.step('welcome, @username', async () => {
-      await page.getByTestId('onboarding-welcome-user').waitFor({ timeout: 10_000 });
-      await shot('welcome-user');
+    await report.step('interest (Depop): pick a department', async () => {
+      await page.getByTestId('onboarding-interest').waitFor({ timeout: 10_000 });
+      await shot('interest');
+      await page.getByTestId('onboarding-interest-Womenswear').click();
     });
 
-    await report.step('pick styles', async () => {
-      await page.getByTestId('onboarding-style-step').waitFor({ timeout: 10_000 });
-      await page.getByTestId('onboarding-interest-streetwear').click();
-      await shot('styles');
-      await page.getByTestId('onboarding-style-next').click();
-      // No quiz catalogue is a legitimate automatic skip, not a missing CTA.
-      await page.locator('[data-testid="onboarding-sizes-step"], [data-testid="taste-quiz-skip"]').first().waitFor({ timeout: 15_000 });
-      if (await page.getByTestId('taste-quiz-skip').count()) await page.getByTestId('taste-quiz-skip').click();
+    await report.step('brands (Depop): search, pick, follow', async () => {
+      await page.getByTestId('onboarding-brands').waitFor({ timeout: 10_000 });
+      await page.getByText('Fixture Brand A').waitFor({ timeout: 10_000 });
+      await shot('brands');
+      await page.getByTestId('onboarding-brand-seller_fixture_0').click();
+      await page.getByTestId('onboarding-brand-seller_fixture_3').click();
+      await page.getByTestId('onboarding-brands-search').fill('atelier');
+      await shot('brands-picked-search');
+      await page.getByTestId('onboarding-brands-search').fill('');
+      await page.getByTestId('onboarding-brands-next').click();
     });
 
-    await report.step('sizes', async () => {
-      await page.getByTestId('onboarding-sizes-step').waitFor({ timeout: 10_000 });
-      await shot('sizes-empty');
-      await page.getByTestId('onboarding-sizes-skip').click();
+    await report.step('sizes (Depop): open the picker sheet, pick', async () => {
+      await page.getByTestId('onboarding-sizes').waitFor({ timeout: 10_000 });
+      await shot('sizes');
+      await page.getByTestId('onboarding-size-tops').click();
+      await page.getByTestId('onboarding-size-tops-M').waitFor({ timeout: 5_000 });
+      await shot('sizes-sheet');
+      await page.getByTestId('onboarding-size-tops-M').click();
+      await page.getByTestId('onboarding-size-shoes').click();
+      await page.getByTestId('onboarding-size-shoes-9').click();
+      await shot('sizes-picked');
+      await page.getByTestId('onboarding-sizes-ok').click();
     });
 
-    await report.step('brands to follow', async () => {
-      if (!demo) {
-        // A successful empty API now skips this step automatically.
-        await page.getByTestId('onboarding-feed-preview').waitFor({ timeout: 10_000 });
-        return;
-      }
-      await page.getByTestId('onboarding-brands-step').waitFor({ timeout: 10_000 });
-      await page.waitForTimeout(800);
-      if (demo) {
-        await page.locator('[data-testid^="onboarding-brand-card-"]').first().click();
-        await page.waitForTimeout(400);
-      }
-      await shot('brands-to-follow');
-      await page.getByTestId(demo ? 'onboarding-brands-next' : 'onboarding-brands-skip').click();
+    await report.step('notifications (Cash App)', async () => {
+      await page.getByTestId('onboarding-notifications').waitFor({ timeout: 10_000 });
+      await shot('notifications');
+      await page.getByTestId('onboarding-notifications-continue').click();
     });
 
-    await report.step('feed preview finale', async () => {
-      await page.getByTestId('onboarding-feed-preview').waitFor({ timeout: 10_000 });
-      await shot('feed-finale');
-      await page.getByTestId('onboarding-see-feed').click();
-    });
-
-    await report.step('lands directly on buyer feed', async () => {
-      await page.waitForFunction(() => !/\/onboarding|\/thread-explainer/.test(window.location.pathname), { timeout: 20_000 });
-      await shot('buyer-feed');
-    });
-
-    await report.step('server-side data was actually saved', async () => {
+    await report.step('Shop or Sell (Etsy) → finish as buyer', async () => {
+      await page.getByTestId('onboarding-role').waitFor({ timeout: 10_000 });
+      await shot('role');
+      await page.getByTestId('account-type-buyer').click();
+      await shot('role-shop');
+      await page.getByTestId('onboarding-role-continue').click();
+      await page.waitForURL(/thread-explainer/, { timeout: 20_000 });
       const user = api.getUser();
-      if (!user) throw new Error('No /api/auth/sync call was ever recorded — no account was created.');
-      if (user.accountType !== 'buyer') throw new Error(`Expected accountType "buyer", got ${JSON.stringify(user.accountType)}`);
-      if (user.onboardingComplete !== true) throw new Error('Expected onboardingComplete to be true after finishing onboarding.');
-      if (user.username !== id.username.toLowerCase()) throw new Error(`Expected username ${id.username}, got ${JSON.stringify(user.username)}`);
-      if (!api.getCalls().some((c) => c.pathname.endsWith('/auth/age'))) throw new Error('Expected the birthday to be sent to /api/auth/age.');
-      if (user.ageBand !== '18_plus') throw new Error('Expected the backend to acknowledge the adult age band.');
-      const storedDraft = await page.evaluate(() => Object.entries(localStorage)
-        .filter(([key]) => key.includes('onboarding_draft:') || key.includes('onboarding_pending_draft'))
-        .map(([, value]) => JSON.parse(value)));
-      if (storedDraft.some((draft) => draft.dob)) throw new Error('Birthday must be removed from drafts after successful submission.');
-    });
-
-    // Dev P0: "Create an account" while a session is still on the device, then
-    // the email that really exists vs. a brand-new one.
-    await report.step('create another account: taken email shows "Switch to it", a new one goes to the code', async () => {
-      await page.goto(`${origin}/onboarding?start=account-type`);
-      await waitClerkLoaded(page);
-      await page.getByTestId('onboarding-account-type-buyer').waitFor({ timeout: 20_000 });
-      await page.getByTestId('onboarding-account-type-buyer').click();
-      await page.getByTestId('onboarding-account-type-continue').click();
-      await page.getByTestId('onboarding-email-input').waitFor({ timeout: 10_000 });
-      await page.getByTestId('onboarding-email-input').fill(id.email);
-      await page.getByTestId('onboarding-email-next').click();
-      await page.getByTestId('onboarding-email-switch').waitFor({ timeout: 10_000 });
-      await page.waitForTimeout(450);
-      await shot('email-already-has-account');
-      await page.getByTestId('onboarding-email-use-different').click();
-      await page.getByTestId('onboarding-email-input').fill(`new-${id.email}`);
-      await page.getByTestId('onboarding-email-next').click();
-      await page.getByTestId('onboarding-code-input').waitFor({ timeout: 10_000 });
-      await page.waitForTimeout(450);
-      await shot('new-email-goes-to-code');
+      if (!user?.onboardingComplete || user.accountType !== 'buyer' || user.username !== id.username) {
+        throw new Error(`server row not completed as buyer: ${JSON.stringify(user)}`);
+      }
+      if (JSON.stringify(user.styleInterests) !== '["Womenswear"]') throw new Error(`department not saved: ${JSON.stringify(user.styleInterests)}`);
+      await shot('landing');
     });
   } finally {
     await context.close();
@@ -303,8 +245,8 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir, demo }) 
   return report.rows;
 }
 
-async function runSellerWalkthrough(browser, { viewport, origin, outDir, demo }) {
-  const api = createFakeOnboardingApi({ demo });
+async function runSellerWalkthrough(browser, { viewport, origin, outDir }) {
+  const api = createFakeOnboardingApi();
   const { context, page } = await openOnboardingContext(browser, { viewport, origin, api });
   const report = makeReport('seller', viewport.id);
   const id = identity('seller', viewport.id);
@@ -312,120 +254,46 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir, demo })
   const shot = (name) => screenshot(page, outDir, ++index, name);
 
   try {
-    await report.step('welcome screen loads', async () => {
-      await page.goto(`${origin}/onboarding`);
-      await waitClerkLoaded(page);
-      await page.getByTestId('onboarding-welcome-get-started').waitFor({ timeout: 20_000 });
-      await dismissCookieBanner(page);
-      await shot('welcome');
+    await page.goto(`${origin}/onboarding`);
+    await waitClerkLoaded(page);
+    await signUp(page, id, shot, report);
+
+    await report.step('skip every optional step', async () => {
+      await page.getByTestId('onboarding-photo-skip').click();
+      await page.getByTestId('onboarding-interest-skip').click();
+      await page.getByTestId('onboarding-brands-skip').click();
+      await page.getByTestId('onboarding-sizes-skip').click();
+      await page.getByTestId('onboarding-notifications-skip').click();
     });
 
-    await report.step('choose seller account type', async () => {
-      await page.getByTestId('onboarding-welcome-get-started').click();
-      await page.getByTestId('onboarding-account-type-seller').waitFor({ timeout: 10_000 });
-      await page.getByTestId('onboarding-account-type-seller').click();
-      await shot('account-type-selected');
-      await page.getByTestId('onboarding-account-type-continue').click();
+    await report.step('back button walks back one step', async () => {
+      await page.getByTestId('onboarding-role').waitFor({ timeout: 10_000 });
+      await page.getByTestId('onboarding-back').click();
+      await page.getByTestId('onboarding-notifications').waitFor({ timeout: 5_000 });
+      await page.getByTestId('onboarding-notifications-skip').click();
     });
 
-    await report.step('brand stage question', async () => {
-      await page.getByTestId('onboarding-stage-step').waitFor({ timeout: 10_000 });
-      await shot('stage-empty');
-      await page.getByTestId('onboarding-choice-build').click();
-      await shot('stage-selected');
-      await page.getByTestId('onboarding-question-next').click();
+    await report.step('Sell → store name (Depop Start selling)', async () => {
+      await page.getByTestId('account-type-seller').click();
+      await shot('role-sell');
+      await page.getByTestId('onboarding-role-continue').click();
+      await page.getByTestId('onboarding-store').waitFor({ timeout: 10_000 });
+      await shot('store');
+      await page.getByTestId('onboarding-store-name').fill(id.brandName);
+      await page.getByTestId('onboarding-store-continue').click();
     });
 
-    await report.step('goals question', async () => {
-      await page.getByTestId('onboarding-goals-step').waitFor({ timeout: 10_000 });
-      await page.getByTestId('onboarding-choice-find-manufacturers').click();
-      await page.getByTestId('onboarding-choice-launch-my-store').click();
-      await shot('goals');
-      await page.getByTestId('onboarding-question-next').click();
-    });
-
-    await report.step('location', async () => {
-      await page.getByTestId('onboarding-location-step').waitFor({ timeout: 10_000 });
-      await shot('location');
-      await page.getByTestId('onboarding-question-next').click();
-    });
-
-    await accountSteps(page, report, shot, id, { seller: true });
-
-    await report.step('brand name', async () => {
-      await page.getByTestId('onboarding-brand-name-input').waitFor({ timeout: 10_000 });
-      await page.getByTestId('onboarding-brand-name-input').fill(id.brandName);
-      await shot('brand-name');
-      await page.getByTestId('onboarding-brand-name-next').click();
-    });
-
-    await report.step('username (suggested from brand)', async () => {
-      await page.getByTestId('onboarding-username-available').waitFor({ timeout: 10_000 });
-      await shot('username');
-      await page.getByTestId('onboarding-username-next').click();
-    });
-
-    await report.step('building your store', async () => {
-      await page.getByTestId('onboarding-store-preview').waitFor({ timeout: 15_000 });
-      await page.getByTestId('onboarding-building-done').waitFor({ timeout: 15_000 });
-      await shot('store-ready');
-      if (await page.getByTestId('onboarding-generate-sample').count()) throw new Error('Removed logo prompt is still present');
-      await page.getByTestId('onboarding-building-done').click();
-    });
-
-    await report.step('plan + free trial (card via Stripe Checkout on web)', async () => {
-      await page.getByTestId('onboarding-plan-trial-copy').waitFor({ timeout: 10_000 });
-      const copy = await page.getByTestId('onboarding-plan-trial-copy').innerText();
-      if (!/^Free for 7 days\. You won't be charged until [A-Z][a-z]{2} \d{1,2}\. We'll remind you 2 days before\. Cancel anytime\.$/.test(copy)) {
-        throw new Error(`Unexpected trial copy: ${copy}`);
-      }
-      await shot('plan');
-      for (const [id, headline] of [['starter', 'List up to 10 products'], ['growth', 'List up to 50 products'], ['pro', 'Unlimited products']]) {
-        const text = await page.getByTestId(`onboarding-plan-${id}-headline`).innerText();
-        if (text !== headline) throw new Error(`Plan ${id} headline: ${text}`);
-      }
-      await page.mouse.move(195, 400);
-      await page.mouse.wheel(0, 1200);
-      await page.waitForTimeout(300);
-      await shot('plan-scrolled');
-      await page.getByTestId('onboarding-plan-compare').click();
-      await page.getByTestId('plan-compare-sheet').waitFor({ timeout: 5_000 }).catch(() => {});
-      await page.waitForTimeout(600);
-      await shot('plan-compare-all-features');
-      await page.keyboard.press('Escape');
-      await page.mouse.click(195, 60);
-      await page.waitForTimeout(600);
-      await page.getByTestId('onboarding-plan-growth').click();
-      const popup = page.context().waitForEvent('page', { timeout: 10_000 }).catch(() => null);
-      await page.getByTestId('onboarding-plan-start').click();
-      const stripeTab = await popup;
-      await stripeTab?.close().catch(() => {});
-      // Coming back from Stripe: the app polls the subscription and finishes.
-      await page.bringToFront();
-      await page.evaluate(() => {
-        document.dispatchEvent(new Event('visibilitychange'));
-        window.dispatchEvent(new Event('focus'));
-      });
-    });
-
-    await report.step('lands on seller dashboard', async () => {
-      await page.waitForURL(/\/\(tabs\)|\/$/, { timeout: 20_000 }).catch(() => {});
-      await page.waitForTimeout(1500);
-      await shot('seller-dashboard');
-    });
-
-    await report.step('server-side data was actually saved', async () => {
+    await report.step('brand stage → store is open', async () => {
+      await page.getByTestId('onboarding-stage').waitFor({ timeout: 10_000 });
+      await page.getByTestId('onboarding-stage-build').click();
+      await shot('stage');
+      await page.getByTestId('onboarding-stage-continue').click();
+      await page.waitForURL(/store-setup-brand/, { timeout: 20_000 });
       const user = api.getUser();
-      if (!user) throw new Error('No /api/auth/sync call was ever recorded — no account was created.');
-      if (user.accountType !== 'seller') throw new Error(`Expected accountType "seller", got ${JSON.stringify(user.accountType)}`);
-      if (user.ageBand !== '18_plus') throw new Error('Expected the seller birthday to be acknowledged by the backend.');
-      if (user.onboardingComplete !== true) throw new Error('Expected onboardingComplete to be true after finishing onboarding.');
-      if (user.brandName !== id.brandName) throw new Error(`Expected brandName to have been saved, got ${JSON.stringify(user.brandName)}`);
-      if (!user.goals || !user.goals.includes('Find manufacturers')) throw new Error('Expected the chosen goals to have been saved via /api/seller/onboarding/data.');
-      if (user.brandStage !== 'build') throw new Error(`Expected brandStage "build", got ${JSON.stringify(user.brandStage)}`);
-      if (!user.username) throw new Error('Expected a username to have been saved.');
-      if (!user.shipFromCountry) throw new Error('Expected the business location to have been saved as the ship-from country.');
-      if (user.subscriptionPlanId !== 'growth') throw new Error(`Expected a growth trial checkout, got ${JSON.stringify(user.subscriptionPlanId)}`);
+      if (!user?.onboardingComplete || user.accountType !== 'seller' || user.brandName !== id.brandName || user.brandStage !== 'build') {
+        throw new Error(`server row not completed as seller: ${JSON.stringify(user)}`);
+      }
+      await shot('store-setup');
     });
   } finally {
     await context.close();
@@ -448,26 +316,24 @@ async function main() {
   const allRows = [];
   let hadFailure = false;
   try {
-    for (const viewport of options.narrowOnly ? VIEWPORTS.slice(0, 1) : VIEWPORTS) {
+    for (const viewport of VIEWPORTS) {
       console.log(`\n=== Viewport ${viewport.id} ===`);
 
       console.log(`-- buyer walkthrough --`);
       const buyerDir = path.join(OUTPUT_DIR, viewport.id, 'buyer');
       try {
-        const rows = await runBuyerWalkthrough(browser, { viewport, origin: server.origin, outDir: buyerDir, demo: options.demo });
+        const rows = await runBuyerWalkthrough(browser, { viewport, origin: server.origin, outDir: buyerDir });
         allRows.push(...rows.map((r) => ({ ...r, viewport: viewport.id, role: 'buyer' })));
-      } catch (error) {
-        allRows.push(...(error.walkthroughRows ?? []).map((r) => ({ ...r, viewport: viewport.id, role: 'buyer' })));
+      } catch {
         hadFailure = true;
       }
 
       console.log(`-- seller walkthrough --`);
       const sellerDir = path.join(OUTPUT_DIR, viewport.id, 'seller');
       try {
-        const rows = await runSellerWalkthrough(browser, { viewport, origin: server.origin, outDir: sellerDir, demo: options.demo });
+        const rows = await runSellerWalkthrough(browser, { viewport, origin: server.origin, outDir: sellerDir });
         allRows.push(...rows.map((r) => ({ ...r, viewport: viewport.id, role: 'seller' })));
-      } catch (error) {
-        allRows.push(...(error.walkthroughRows ?? []).map((r) => ({ ...r, viewport: viewport.id, role: 'seller' })));
+      } catch {
         hadFailure = true;
       }
     }

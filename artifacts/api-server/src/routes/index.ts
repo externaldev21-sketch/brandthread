@@ -7,6 +7,7 @@ import { aiSafetyGuard } from "../middlewares/aiSafetyGuard";
 import { requireAiConsent } from "../middlewares/requireAiConsent";
 import healthRouter from "./health";
 import { responseCache, invalidateResponseCache, bumpResponseCacheGeneration } from "../middlewares/responseCache";
+import clerkStatusRouter from "./clerk-status";
 import authRouter from "./auth";
 import accountsRouter from "./accounts";
 import ageRouter from "./age";
@@ -259,6 +260,7 @@ router.use(killSwitchGate); // Live / Payments / AI kill switches (Admin → Kil
 router.use("/wallet",          walletPassesRouter);
 router.use("/fx",             fxRouter); // GET /rates public (display-only currency, intl #107); /display-currency authed per route
 router.use("/profile-music", profileMusicRouter);
+router.use("/public",          clerkStatusRouter); // GET /clerk-status (non-production only)
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public",          publicWebAnnualPlansRouter); // GET /web-annual-plans (no auth; empty until a yearly web price is set)

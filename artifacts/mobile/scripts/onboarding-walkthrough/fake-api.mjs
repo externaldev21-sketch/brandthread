@@ -24,22 +24,10 @@ function clerkIdFromAuthHeader(authorization) {
   return match ? match[1] : null;
 }
 
-/** Seeded only with --demo, so the brands step can be shown with brands in it. */
-const DEMO_BRANDS = [
-  { id: 'b1', sellerId: 'seller_demo_1', name: 'Noir Field', brandType: 'Streetwear', logoUrl: null, verified: true },
-  { id: 'b2', sellerId: 'seller_demo_2', name: 'Atelier Rue', brandType: 'Luxury', logoUrl: null, verified: false },
-  { id: 'b3', sellerId: 'seller_demo_3', name: 'Common Thread', brandType: 'Basics', logoUrl: null, verified: false },
-  { id: 'b4', sellerId: 'seller_demo_4', name: 'Second Hand Club', brandType: 'Vintage', logoUrl: null, verified: true },
-  { id: 'b5', sellerId: 'seller_demo_5', name: 'Mono Lab', brandType: 'Minimal', logoUrl: null, verified: false },
-];
-
-export function createFakeOnboardingApi({ demo = false } = {}) {
+export function createFakeOnboardingApi() {
   /** @type {any} */
   let dbUser = null;
   const calls = [];
-  // Becomes 'trialing' once a checkout session is opened (Stripe would do
-  // this through its webhook after the card is added).
-  let subscriptionStatus = 'none';
 
   function ensureUser(name, clerkId) {
     if (!dbUser) {
@@ -86,20 +74,6 @@ export function createFakeOnboardingApi({ demo = false } = {}) {
       const user = ensureUser(body?.name, clerkId);
       return { status: 200, body: user };
     }
-    if (p === '/auth/age' && method === 'POST') {
-      if (!dbUser) return { status: 404, body: { error: 'Call /auth/sync first' } };
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(body?.dateOfBirth ?? '')) {
-        return { status: 400, body: { error: 'Enter a valid date of birth.' } };
-      }
-      const birth = new Date(`${body.dateOfBirth}T00:00:00Z`);
-      const now = new Date();
-      let age = now.getUTCFullYear() - birth.getUTCFullYear();
-      if (now.getUTCMonth() < birth.getUTCMonth()
-        || (now.getUTCMonth() === birth.getUTCMonth() && now.getUTCDate() < birth.getUTCDate())) age--;
-      if (age < 13) return { status: 403, body: { error: 'You must be at least 13.' } };
-      dbUser.ageBand = age < 18 ? '13_17' : '18_plus';
-      return { status: 200, body: { ageBand: dbUser.ageBand } };
-    }
     if (p === '/auth/me' && get) {
       if (!dbUser) return { status: 404, body: { error: { code: 'NOT_FOUND', message: 'No account yet' } } };
       return { status: 200, body: dbUser };
@@ -132,19 +106,20 @@ export function createFakeOnboardingApi({ demo = false } = {}) {
       return { status: 200, body: user };
     }
     if (p === '/seller/onboarding/data' && method === 'POST') {
-      const user = ensureUser(undefined, clerkId);
+      const user = ensureUser();
       if (body?.goals != null) user.goals = body.goals;
       if (body?.brandStage != null) user.brandStage = body.brandStage;
       return { status: 200, body: { ok: true } };
     }
-    if (p === '/public/username-check' && get) {
-      return { status: 200, body: { available: true } };
-    }
-    if (p === '/public/email-check' && get) {
-      return { status: 200, body: { available: true } };
-    }
     if (p === '/auth/username/check' && get) {
-      return { status: 200, body: { available: true } };
+      // 'taken' lets the walkthrough show the live "already taken" state.
+      return { status: 200, body: query.get?.('username') === 'taken' ? { available: false, error: 'Username is already taken.' } : { available: true } };
+    }
+    if (p === '/seller/profile/avatar/upload' && method === 'POST') {
+      return { status: 200, body: { profileImageUrl: `data:image/png;base64,${TINY_PNG_BASE64}` } };
+    }
+    if (p === '/social/follow' && method === 'POST') {
+      return { status: 200, body: { isFollowing: true, followersCount: 1 } };
     }
     if (p === '/onboarding-sample/logo' && method === 'POST') {
       return { status: 200, body: { b64_json: TINY_PNG_BASE64 } };
@@ -156,13 +131,10 @@ export function createFakeOnboardingApi({ demo = false } = {}) {
       return { status: 200, body: { ok: true, inviterId: 'seller_stub' } };
     }
     if (p === '/public/brands/discover' && get) {
-      // Empty is a valid, gracefully-handled state for BrandsToFollowStep.
-      return { status: 200, body: { brands: demo ? DEMO_BRANDS : [] } };
-    }
-    if (p === '/shipping-zones/settings' && method === 'PATCH') {
-      const user = ensureUser();
-      user.shipFromCountry = body?.shipFromCountry ?? null;
-      return { status: 200, body: { shipFromCountry: user.shipFromCountry } };
+      // QA fixtures only (this fake backend never ships): labelled as such so
+      // nobody mistakes the screenshots for real catalogue data.
+      const names = ['Fixture Brand A', 'Fixture Brand B', 'Fixture Brand C', 'Fixture Studio', 'Fixture Atelier', 'Fixture Label'];
+      return { status: 200, body: { brands: names.map((name, i) => ({ id: `b${i}`, sellerId: `seller_fixture_${i}`, name, brandType: null, logoUrl: null, verified: false })) } };
     }
     if (p === '/config/features' && get) {
       return { status: 200, body: { flags: { aiPhotoShoot: true, outfitSwap: true, boosts: true, manufacturerHub: true }, updatedAt: null } };
@@ -194,29 +166,8 @@ export function createFakeOnboardingApi({ demo = false } = {}) {
     }
     if (get && p === '/orders') return { status: 200, body: [] };
     if (get && p === '/conversations') return { status: 200, body: [] };
-    if (p === '/seller/subscription/checkout' && method === 'POST') {
-      subscriptionStatus = 'trialing';
-      const user = ensureUser();
-      user.subscriptionPlanId = body?.planId ?? null;
-      return { status: 200, body: { url: 'https://checkout.stripe.test/c/pay/stub' } };
-    }
-    if (get && p === '/config/seller-plans') {
-      // Dev's tier decision in the shape GET /api/config/seller-plans sends
-      // (Revenue P0, #766). AI credits are left out until the catalogue sets them.
-      const plan = (id, amountCents, productLimit, staffSeats, tier) => ({
-        id, name: id.charAt(0).toUpperCase() + id.slice(1), amountCents, interval: 'month', productLimit, staffSeats,
-        features: {
-          analytics: ['basic', 'advanced', 'full'][tier], analyticsExport: tier === 2, liveSelling: tier > 0, dropsEscrow: tier > 0,
-          boostFeatured: tier > 0, customDomain: tier > 0, manufacturerHub: tier > 0,
-          payoutSpeed: tier === 2 ? 'faster' : 'standard', prioritySupport: tier === 2,
-        },
-      });
-      return { status: 200, body: { trialDays: 7, reminderDaysBefore: 2, checkoutMode: 'auto', currency: 'usd', commissionPercent: 5, plans: [
-        plan('starter', 1999, 10, 1, 0), plan('growth', 4900, 50, 3, 1), plan('pro', 12900, null, null, 2),
-      ] } };
-    }
     if (get && p === '/seller/subscription/status') {
-      return { status: 200, body: { plan: dbUser?.subscriptionPlanId ?? 'starter', status: subscriptionStatus, trialEnd: null, trialStartAt: null, trialEndAt: null, trialBanner: null, renewsOn: null, amountCents: 0, paymentMethodLabel: null, effectiveProvider: 'stripe' } };
+      return { status: 200, body: { plan: 'starter', status: 'trialing', trialEnd: null, trialStartAt: null, trialEndAt: null, trialBanner: null, renewsOn: null, amountCents: 0, paymentMethodLabel: null, effectiveProvider: 'stripe' } };
     }
     if (get && p === '/team/context') return { status: 200, body: { role: 'owner', storeOwnerId: dbUser?.clerkId ?? null, teamMembershipId: null } };
     if (get && p === '/team/my-memberships') return { status: 200, body: { memberships: [] } };

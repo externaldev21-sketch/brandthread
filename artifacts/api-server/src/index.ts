@@ -61,8 +61,10 @@ import { pool } from "@workspace/db";
 import { closeRedis } from "./lib/redis";
 import { attachUserWebSocket } from "./ws/userHub";
 import { jobRunner } from "./jobs/runner";
+import { probeClerkSecretKey } from "./lib/clerkKeyStatus";
 
 validateEnv();
+void probeClerkSecretKey();
 
 const rawPort = process.env["PORT"];
 

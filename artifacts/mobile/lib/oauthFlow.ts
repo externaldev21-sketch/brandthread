@@ -2,16 +2,18 @@ export const BRANDTHREAD_URL_SCHEME = 'brandthread';
 export const APPLE_OAUTH_STRATEGY = 'oauth_apple' as const;
 
 /**
- * Which social buttons to render. App Store 4.8: on iOS, Google may only be
- * offered while Sign in with Apple is offered too, so a server-side flag flip
- * that turns Apple off can never leave Google as the only social login.
- * Apple is iOS-only in the app (Android/web have no Apple button today).
+ * Which social buttons to render. Sign in with Apple is offered on every
+ * platform whenever its flag is on (Clerk's `oauth_apple` runs as a browser
+ * redirect on Android/web, natively on iOS) — TikTok and Depop show it
+ * everywhere. App Store 4.8: on iOS, Google may only be offered while Apple
+ * is offered too, so a server-side flag flip that turns Apple off can never
+ * leave Google as the only social login.
  */
 export function oauthProviderVisibility(
   os: string,
   flags: { apple: boolean; google: boolean },
 ): { apple: boolean; google: boolean } {
-  const apple = os === 'ios' && flags.apple;
+  const apple = flags.apple;
   const google = flags.google && (os !== 'ios' || apple);
   return { apple, google };
 }

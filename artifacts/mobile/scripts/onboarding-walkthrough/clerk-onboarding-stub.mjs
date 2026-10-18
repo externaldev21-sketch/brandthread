@@ -26,8 +26,7 @@
 export function clerkOnboardingStubScript() {
   return `(() => {
   const genId = (prefix) => prefix + '_' + Math.random().toString(36).slice(2, 10);
-  // Walkthroughs may seed emails that already belong to an account.
-  const usedEmails = new Set(Array.isArray(window.__BT_USED_EMAILS__) ? window.__BT_USED_EMAILS__ : []);
+  const usedEmails = new Set();
 
   // ── "backend" state for the in-flight sign-up attempt ──────────────────────
   function freshSignUpState() {
@@ -43,7 +42,6 @@ export function clerkOnboardingStubScript() {
       createdUserId: null,
       pendingCode: null,
       pendingProfile: null,
-      emailVerified: false,
     };
   }
   let signUpState = freshSignUpState();
@@ -90,10 +88,8 @@ export function clerkOnboardingStubScript() {
     signUpListeners.forEach((fn) => { try { fn(); } catch {} });
   }
 
-  // meta.paramName mirrors real Clerk: a duplicate names the field it hit.
-  function fakeError(code, message, paramName) {
-    const meta = paramName ? { paramName } : undefined;
-    return { code, message, longMessage: message, clerkError: true, meta, errors: [{ code, message, longMessage: message, meta }] };
+  function fakeError(code, message) {
+    return { code, message, longMessage: message, clerkError: true, errors: [{ code, message, longMessage: message }] };
   }
 
   function makeUser(profile) {
@@ -150,18 +146,6 @@ export function clerkOnboardingStubScript() {
     return s;
   }
 
-  function maybeComplete() {
-    if (!signUpState.emailVerified || !signUpState.hasPassword) return;
-    signUpState.status = 'complete';
-    signUpState.pendingProfile = {
-      id: genId('user'),
-      firstName: signUpState.firstName || '',
-      lastName: signUpState.lastName || '',
-      username: signUpState.username || '',
-      email: signUpState.emailAddress,
-    };
-  }
-
   // ── SignUpFutureResource-shaped object (see @clerk/shared/types state.d.ts) ─
   const signUpResource = {
     get id() { return signUpState.id; },
@@ -188,16 +172,14 @@ export function clerkOnboardingStubScript() {
     protectCheck: null,
     canBeDiscarded: false,
 
-    // Mirrors real Clerk: create() starts a sign-up with just an email;
-    // password() on an existing sign-up PATCHes the password in. The sign-up
-    // is complete once the email is verified AND a password is set — the
-    // order the onboarding uses (email → code → password, Instagram-style).
     async create(params) {
+      // Email first, no password (Depop-style): same identifier check as
+      // password(); the instance in this stub requires nothing else.
       const emailAddress = (params?.emailAddress || '').trim().toLowerCase();
       if (usedEmails.has(emailAddress)) {
-        return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.', 'email_address') };
+        return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.') };
       }
-      signUpState = { ...freshSignUpState(), id: genId('su'), emailAddress };
+      signUpState = { ...freshSignUpState(), emailAddress, firstName: params?.firstName ?? null, lastName: params?.lastName ?? null };
       notifySignUp();
       return { error: null };
     },
@@ -209,19 +191,12 @@ export function clerkOnboardingStubScript() {
       return { error: null };
     },
     async password(params) {
-      if (signUpState.id && !params?.emailAddress) {
-        signUpState.hasPassword = true;
-        maybeComplete();
-        notifySignUp();
-        return { error: null };
-      }
       const emailAddress = (params?.emailAddress || '').trim().toLowerCase();
       if (usedEmails.has(emailAddress)) {
-        return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.', 'email_address') };
+        return { error: fakeError('form_identifier_exists', 'That email address is taken. Please try another.') };
       }
       signUpState = {
         ...freshSignUpState(),
-        id: genId('su'),
         emailAddress,
         hasPassword: true,
         username: params?.username ?? signUpState.username,
@@ -232,7 +207,7 @@ export function clerkOnboardingStubScript() {
       return { error: null };
     },
     verifications: {
-      get emailAddress() { return { status: signUpState.emailVerified ? 'verified' : 'unverified' }; },
+      get emailAddress() { return { status: signUpState.status === 'complete' ? 'verified' : 'unverified' }; },
       phoneNumber: { status: 'unverified' },
       web3Wallet: { status: 'unverified' },
       externalAccount: { status: 'unverified' },
@@ -251,8 +226,14 @@ export function clerkOnboardingStubScript() {
           return { error: fakeError('form_code_incorrect', 'Invalid code. Please check and try again.') };
         }
         signUpState.id = signUpState.id || genId('su');
-        signUpState.emailVerified = true;
-        maybeComplete();
+        signUpState.status = 'complete';
+        signUpState.pendingProfile = {
+          id: genId('user'),
+          firstName: signUpState.firstName || '',
+          lastName: signUpState.lastName || '',
+          username: signUpState.username || '',
+          email: signUpState.emailAddress,
+        };
         notifySignUp();
         return { error: null };
       },
@@ -324,7 +305,17 @@ export function clerkOnboardingStubScript() {
   // build a new snapshot object when the sign-up state actually changes
   // (inside notifySignUp), never on every read.
   let signUpSnapshot = { errors: STATIC_EMPTY_ERRORS, fetchStatus: 'idle', signUp: signUpResource };
-  const STATIC_SIGN_IN_SNAPSHOT = { errors: STATIC_EMPTY_ERRORS, fetchStatus: 'idle', signIn: null };
+  // Log-in by email code is not exercised by the walkthrough; this only keeps
+  // useSignIn() well-formed and answers honestly if it is reached.
+  const signInResource = {
+    status: 'needs_identifier',
+    emailCode: {
+      async sendCode() { return { error: fakeError('not_supported', 'Log-in is not available in this preview build.') }; },
+      async verifyCode() { return { error: fakeError('not_supported', 'Log-in is not available in this preview build.') }; },
+    },
+    async finalize() { return { error: fakeError('not_supported', 'Log-in is not available in this preview build.') }; },
+  };
+  const STATIC_SIGN_IN_SNAPSHOT = { errors: STATIC_EMPTY_ERRORS, fetchStatus: 'idle', signIn: signInResource };
   const STATIC_WAITLIST_SNAPSHOT = { errors: STATIC_EMPTY_ERRORS, fetchStatus: 'idle', waitlist: null };
 
   // Restore a session persisted by a previous load (see persistSession()
