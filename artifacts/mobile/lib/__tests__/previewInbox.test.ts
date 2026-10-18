@@ -145,9 +145,9 @@ describe('previewInbox module contract (source check)', () => {
     expect(existsSync(filePath)).toBe(true);
   });
 
-  it('reuses isPreviewCatalogEnabled() as its gate rather than inventing a new one', () => {
+  it('reuses the demo catalog gate and enables the official welcome chat in the development buyer preview', () => {
     expect(src).toContain("import { isPreviewCatalogEnabled } from './previewCatalog'");
-    expect(src).toContain('return isPreviewCatalogEnabled();');
+    expect(src).toContain('return isPreviewCatalogEnabled() || isBuyerDevPreview();');
   });
 
   it('exports the functions call sites need', () => {

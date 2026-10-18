@@ -975,16 +975,7 @@ export default function SellerHomeCommerceDashboard({
             </View>
           ) : (
             <>
-              {showReadyToSell && readyToSell.data ? (
-                <View style={styles.readyToSell}>
-                  <ReadyToSellChecklist
-                    data={readyToSell.data}
-                    hasPlan={readyToSell.hasPlan}
-                    onOpen={(route) => nav(route === '/add-product' ? withOrigin(route, 'dashboard') : route)}
-                    testID="seller-dashboard-ready-to-sell"
-                  />
-                </View>
-              ) : (
+              {(
               <>
               {/* ── Hero + scrubbable chart ────────────────────────────── */}
               <PressableScale onPress={() => setMetric('sales')} style={styles.heroWrap} accessibilityRole="button" accessibilityLabel="Show Total sales in the chart">
@@ -1033,11 +1024,6 @@ export default function SellerHomeCommerceDashboard({
               </>
               )}
 
-              {/* ── Quick actions ────────────────────────────────────────── */}
-              <View style={styles.section}>
-                <SellerDashboardQuickActions theme={theme} onNavigate={nav} />
-              </View>
-
               {/* ── Stat tile grid ───────────────────────────────────────────
                   Shown for a brand-new store too: real zeros (Orders 0,
                   Visitors 0…) are the headline numbers sellers expect at the
@@ -1047,9 +1033,6 @@ export default function SellerHomeCommerceDashboard({
                 <SellerDashboardStatGrid tiles={tiles} activeKey={metric} onSelect={(key) => setMetric(key as MetricKey)} theme={theme} />
               </View>
 
-              <View style={styles.section}>
-                <SellerLiveMap data={liveMap.data} ping={liveMap.ping} theme={theme} />
-              </View>
               {/* ── Payouts: next payout, then balance / withdraw ───────── */}
               {showOwnerMoney && (
                 <View style={styles.section} testID="seller-dashboard-payouts">
@@ -1108,7 +1091,7 @@ export default function SellerHomeCommerceDashboard({
 
               {/* ── Action needed / top products / recent orders, or the new-seller setup card ── */}
               <View style={isTablet ? styles.tabletRow : undefined}>
-                {firstWeek.visible || showReadyToSell ? null : newSeller ? (
+                {firstWeek.visible ? null : newSeller ? (
                   <View style={[isTablet && styles.tabletRowItem, styles.section]}>
                     <SellerDashboardSetupCard
                       theme={theme}
@@ -1135,11 +1118,11 @@ export default function SellerHomeCommerceDashboard({
                   when AI Settings turns them off or there are none. */}
               <SellerDashboardAISuggestions theme={theme} refreshKey={retryTick + storeContextTick} style={styles.section} />
 
-              {topProducts && (newSeller || topProducts.length > 0) && (
+              {(newSeller || (topProducts?.length ?? 0) > 0) && (
                 <View style={styles.section}>
                   <SellerDashboardTopProducts
                     emptyMessage="Your best sellers show up here after your first sale."
-                    products={topProducts}
+                    products={topProducts ?? []}
                     theme={theme}
                     onOpenProduct={() => nav('/(tabs)/products')}
                     onSeeAll={() => nav('/(tabs)/products')}
@@ -1172,16 +1155,32 @@ export default function SellerHomeCommerceDashboard({
                   <SellerDashboardActivityFeed items={activityItems} theme={theme} onNavigate={nav} />
                 </View>
               )}
-              {recentOrders && (newSeller || recentOrders.length > 0) && (
+              {(newSeller || (recentOrders?.length ?? 0) > 0) && (
                 <View style={styles.section}>
                   <SellerDashboardRecentOrders
                     emptyMessage="No orders yet. New orders show up here first."
-                    orders={recentOrders}
+                    orders={recentOrders ?? []}
                     onOpenOrder={(id) => nav(`/order-detail?id=${id}`)}
                     onSeeAll={() => nav('/(tabs)/orders')}
                   />
                 </View>
               )}
+              {showReadyToSell && readyToSell.data ? (
+                <View style={styles.section}>
+                  <ReadyToSellChecklist
+                    data={readyToSell.data}
+                    hasPlan={readyToSell.hasPlan}
+                    onOpen={(route) => nav(route === '/add-product' ? withOrigin(route, 'dashboard') : route)}
+                    testID="seller-dashboard-ready-to-sell"
+                  />
+                </View>
+              ) : null}
+              <View style={styles.section}>
+                <SellerDashboardQuickActions theme={theme} onNavigate={nav} />
+              </View>
+              <View style={styles.section}>
+                <SellerLiveMap data={liveMap.data} ping={liveMap.ping} theme={theme} />
+              </View>
             </>
           )}
 
@@ -1265,6 +1264,8 @@ const styles = StyleSheet.create({
   heroLabel: {
     fontFamily: FONT.semibold,
     fontSize: FS.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   heroValue: {
     fontFamily: FONT.bold,

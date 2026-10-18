@@ -42,6 +42,7 @@ import { stitchHref } from '@/lib/fits';
 import { useRouter } from 'expo-router';
 import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { isBuyerDevPreview } from '@/lib/devPreview';
+import { getPreviewConversations } from '@/lib/previewInbox';
 import { remixActionVisible, remixRoute } from '@/lib/remix';
 import { publishPostEngagement } from '@/lib/postEngagement';
 import { OFFICIAL_AVATAR_SOURCE, isOfficialAccountId } from '@/lib/officialAccount';
@@ -187,7 +188,15 @@ function AccountThreadShareSheet({
     if (!visible) return;
     setAllTargets([]);
     // Signed out: no DM history to read (and never a protected call).
-    if (!myUserId) { setContactStatus('signed_out'); return; }
+    if (!myUserId) {
+      if (isBuyerDevPreview()) {
+        setAllTargets(allShareTargets(getPreviewConversations(), [], 'me'));
+        setContactStatus('ready');
+      } else {
+        setContactStatus('signed_out');
+      }
+      return;
+    }
     let cancelled = false;
     setContactStatus('loading');
     void Promise.all([getConversations(), getAcceptedFriends()])
@@ -353,6 +362,7 @@ function AccountThreadShareSheet({
 
   function openMoreOptions() {
     const options: { text: string; onPress: () => void; style?: 'cancel' }[] = [];
+    options.push({ text: 'Add to Story', onPress: addToStory });
     if (isUUID(postId)) {
       options.push({ text: 'Quote', onPress: () => { onClose(); router.push(quotePostHref({ postId, author: creator, caption, thumb: isVideo ? undefined : mediaUri, mediaType: isVideo ? 'video' : 'photo' }) as never); } });
     }
@@ -449,9 +459,11 @@ function AccountThreadShareSheet({
       <Sheet
         visible={visible}
         onClose={onClose}
-        title="Send to"
+        title="Share to"
         centerTitle
         headerRight="plain-close"
+        showGrabber={false}
+        surfaceStyle={{ backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1, borderBottomWidth: 0 }}
         padded={false}
         accessibilityLabel="Share menu"
         testID="thread-share-sheet"
@@ -478,7 +490,6 @@ function AccountThreadShareSheet({
                   highlighted={reposted}
                 />
               ) : null}
-              <ShareAction label="Add to Story" icon="plus-circle" onPress={addToStory} />
               {friends.map(friend => (
                 <ShareAction
                   key={friend.userId}
@@ -488,19 +499,19 @@ function AccountThreadShareSheet({
                   avatar={{ initials: friend.initials, color: friend.color, uri: friend.avatarUri, official: friend.isOfficial || isOfficialAccountId(friend.userId) }}
                 />
               ))}
+              <ShareAction label="Find friends" icon="users" onPress={() => { onClose(); router.push('/(buyer)/friends' as never); }} />
               <ShareAction
                 label="More"
                 testID="thread-share-more-contacts"
-                icon="search"
+                icon="more-horizontal"
                 onPress={() => setPickerOpen(true)}
               />
               <ShareAction
-                label="Invite friends to chat"
+                label="Invite"
                 icon="user-plus"
                 busy={busy === 'invite'}
                 onPress={() => void systemShare('invite', `Join me on Brandthread and check this out\n${postUrl}`)}
               />
-              <ShareAction label="Find friends" icon="users" onPress={() => { onClose(); router.push('/(buyer)/friends' as never); }} />
             </ScrollView>
           </View>
 
@@ -510,21 +521,19 @@ function AccountThreadShareSheet({
               <ShareAction label="Copy link" icon="link-2" busy={busy === 'copy'} onPress={() => void copyLink()} />
               <ShareAction label="Messages" platform="messages" busy={busy === 'sms'} onPress={() => void openExternal('sms')} />
               <ShareAction label="WhatsApp" platform="whatsapp" busy={busy === 'whatsapp'} onPress={() => void openWhatsApp()} />
+              <ShareAction label="Instagram" platform="instagram" busy={busy === 'instagram'} onPress={() => void shareToInstagram()} />
               <ShareAction label="Snapchat" platform="snapchat" onPress={() => void openMore()} />
               <ShareAction label="Email" icon="mail" busy={busy === 'email'} onPress={() => void openExternal('email')} />
-              <ShareAction label="Instagram" platform="instagram" busy={busy === 'instagram'} onPress={() => void shareToInstagram()} />
               <ShareAction label="More" icon="more-horizontal" busy={busy === 'more'} onPress={openMoreOptions} />
             </ScrollView>
           </View>
 
           <View style={styles.section}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionRow}>
-              <ShareAction label="Report" icon="flag" onPress={() => { onClose(); onReport(); }} muted />
-              <ShareAction label="Not interested" icon="slash" onPress={() => { onClose(); onNotInterested(); }} muted />
+              <ShareAction label="Report" icon="flag" onPress={() => { onClose(); onReport(); }} />
               {isVideo && mediaUri && downloadAllowed === true ? (
-                <ShareAction label="Save video" icon="download" onPress={() => void saveVideo()} muted />
+                <ShareAction label="Save video" icon="download" onPress={() => void saveVideo()} />
               ) : null}
-              <ShareAction label="Why this video" icon="help-circle" onPress={whyThisVideo} muted />
             </ScrollView>
           </View>
         </>

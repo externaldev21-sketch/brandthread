@@ -1776,9 +1776,9 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
                   ]}>
                     <Text
                       style={[s.noteBubbleText, { color: myNote ? theme.text : theme.subtle, fontFamily: myNote ? FONT.medium : FONT.regular }]}
-                      numberOfLines={2}
+                      numberOfLines={myNote ? 2 : undefined}
                     >
-                      {myNote ? myNote.text : 'Your thoughts go here...'}
+                      {myNote ? myNote.text : 'Your thoughts\ngo here...'}
                     </Text>
                   </View>
                   <View style={[s.noteBubbleTail, { backgroundColor: theme.cardElevated, borderColor: theme.border }]} />
@@ -2176,9 +2176,9 @@ avatar56: {
   // the row still lines up on the same baseline regardless of who has a
   // note bubble floating above them.
   activeRailNoteWrap: { height: 46, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
-  noteBubbleTouchable: { height: 46, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
+  noteBubbleTouchable: { minHeight: 46, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
   noteBubble: {
-    maxWidth: 84, paddingHorizontal: 10, paddingVertical: 5,
+    width: 84, paddingHorizontal: 6, paddingVertical: 5,
     borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth,
   },
   noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14, textAlign: 'center' },

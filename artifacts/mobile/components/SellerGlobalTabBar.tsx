@@ -46,7 +46,8 @@ import {
 import { getSellerOrderBadgeCount } from '@/lib/sellerOrderBadge';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { countRealOrders, maybeRequestStoreReview } from '@/lib/storeReviewPrompt';
-import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { Image as BrandMarkImage } from 'expo-image';
+import { BRANDTHREAD_AVATAR_SOURCE } from '@/constants/branding';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import { radius } from '@/constants/radii';
 import { cancelStudioReturn } from '@/lib/navigation/studioReturn';
@@ -508,7 +509,14 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
         accessibilityLabel="Open Brandthread AI"
         onPress={openAI}
       >
-        <BrandthreadLogo size={metrics.iconSize - 1} opacity={1} />
+        <BrandMarkImage
+          source={BRANDTHREAD_AVATAR_SOURCE}
+          style={{ width: metrics.iconSize + 3, height: metrics.iconSize + 3, borderRadius: (metrics.iconSize + 3) / 2 }}
+          contentFit="contain"
+          transition={0}
+          accessibilityLabel="Brandthread logo"
+          testID="seller-ai-brandthread-mark"
+        />
       </TabBarCircle>
     </Animated.View>
   );

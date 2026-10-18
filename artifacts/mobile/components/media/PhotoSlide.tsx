@@ -4,7 +4,7 @@
  * cropped or stretched). The foreground accepts an animated zoom style.
  */
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Image as NativeImage, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { CachedImage } from '@/components/CachedImage';
@@ -25,6 +25,14 @@ export function PhotoSlide({ uri, index, count, pageWidth, pageHeight, authoredA
   // A pre-mounted image can finish before its page becomes active.
   useEffect(() => { if (paintedUri === uri) onPainted?.(); }, [paintedUri, uri, onPainted]);
   const aspect = resolveSlideAspect(authoredAspect, natural);
+  useEffect(() => {
+    if (aspect || !uri) return;
+    let active = true;
+    NativeImage.getSize(uri, (width, height) => {
+      if (active && width > 0 && height > 0) setNatural({ width, height });
+    }, () => {});
+    return () => { active = false; };
+  }, [uri, aspect]);
   useEffect(() => { if (aspect) onAspect?.(index, aspect); }, [aspect, index, onAspect]);
   const rect = containRect(pageWidth, pageHeight, aspect);
   return (
@@ -41,8 +49,9 @@ export function PhotoSlide({ uri, index, count, pageWidth, pageHeight, authoredA
             pointerEvents="none"
           >
             <CachedImage
-              source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" placeholder={null} transition={0}
+              source={{ uri }} contentFit="contain" placeholder={null} transition={0}
               priority={priority === 'low' ? 'low' : priority}
+              style={[StyleSheet.absoluteFill, !aspect && { opacity: 0 }]}
               onLoad={(e) => {
                 const src = e?.source;
                 if (src && src.width > 0 && src.height > 0

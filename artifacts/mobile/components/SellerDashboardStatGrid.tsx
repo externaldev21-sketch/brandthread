@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
-import { FONT, FS, SP } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
 export interface SellerDashboardStatTileData {
   key: string;
@@ -36,9 +36,7 @@ export function SellerDashboardStatGrid({
             testID={`seller-dashboard-stat-tile-${tile.key}`}
             style={[
               styles.tile,
-              // Flat stat cells on black, separated by a hairline; the selected
-              // (charted) cell's hairline turns solid (BRANDTHREAD_DESIGN.md).
-              { borderTopColor: selected ? theme.accent : theme.border },
+              { backgroundColor: theme.card, borderColor: selected ? theme.accent : theme.borderSubtle },
             ]}
             activeOpacity={0.8}
             onPress={() => onSelect(tile.key)}
@@ -47,7 +45,7 @@ export function SellerDashboardStatGrid({
             accessibilityState={{ selected }}
           >
             <Text style={[styles.label, { color: theme.muted }]} numberOfLines={2} maxFontSizeMultiplier={1.8}>
-              {tile.label}
+              {tile.label.toUpperCase()}
             </Text>
             <Text
               style={[styles.value, { color: theme.text }]}
@@ -74,20 +72,22 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    columnGap: SP.sm,
+    gap: SP.sm,
   },
   tile: {
     flexBasis: '48%',
     flexGrow: 1,
     minHeight: 92,
-    paddingVertical: SP.md,
-    borderTopWidth: 1,
+    padding: SP.md,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
     gap: 4,
     justifyContent: 'center',
   },
   label: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    fontSize: 11,
+    letterSpacing: 0.6,
   },
   value: {
     fontFamily: FONT.bold,

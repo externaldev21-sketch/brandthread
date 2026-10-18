@@ -116,6 +116,9 @@ export interface SheetProps {
   accessibilityLabel?: string;
   /** Extra style for the body content container. */
   contentContainerStyle?: StyleProp<ViewStyle>;
+  /** Preserve a screen's approved surface without replacing the shared engine. */
+  surfaceStyle?: StyleProp<ViewStyle>;
+  showGrabber?: boolean;
   /** Preserve the filter sheet's half/full snap points on the shared engine. */
   detents?: boolean;
 }
@@ -176,7 +179,7 @@ export function SheetGrabber() {
 export function Sheet({
   visible, onClose, title, centerTitle = false, headerRight, headerLeft, onDone, primaryAction, secondaryAction, footer,
   children, scrollable = true, padded = true, maxHeightRatio = 0.92, avoidKeyboard = true,
-  testID, reduceMotion, accessibilityLabel, contentContainerStyle, detents = false,
+  testID, reduceMotion, accessibilityLabel, contentContainerStyle, detents = false, surfaceStyle, showGrabber = true,
 }: SheetProps) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -290,12 +293,13 @@ export function Sheet({
               { backgroundColor: sheetSurfaceColor(theme), maxHeight: `${Math.round(maxHeightRatio * 100)}%` },
               detents && { height: fullHeight, maxHeight: fullHeight },
               sheetStyle,
+              surfaceStyle,
             ]}
           >
             <Animated.View style={[styles.sheetInner, detents && { flex: 1 }, keyboardStyle]}>
               {wrapHandleDrag(
                 <View>
-                  <SheetGrabber />
+                  {showGrabber ? <SheetGrabber /> : null}
                   {hasHeader ? (
                     <View style={styles.header}>
                       {headerLeft ? <View style={styles.headerLeft}>{headerLeft}</View> : null}

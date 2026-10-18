@@ -19,7 +19,7 @@
  */
 import { Asset } from 'expo-asset';
 import { isPreviewCatalogEnabled } from './previewCatalog';
-import { isPreviewDemoMode } from './devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode } from './devPreview';
 import {
   BRANDTHREAD_AGENT_SEED, PREVIEW_CONVERSATION_SEEDS, PREVIEW_FOLLOWER_SEEDS,
   SELLER_PREVIEW_CONVERSATION_SEEDS,
@@ -29,9 +29,10 @@ import type {
   Conversation, Message, MessageAttachment, MessageReaction, Notification, ReactionType,
 } from '@/services/socialTypes';
 import { acceptConversationInList, removeConversationFromList } from './conversationListMutations';
+import { BRANDTHREAD_ASSISTANT_NAME } from './brandthreadAssistant';
 
 export function isPreviewInboxEnabled(): boolean {
-  return isPreviewCatalogEnabled();
+  return isPreviewCatalogEnabled() || isBuyerDevPreview();
 }
 
 // Same 10 fashion preview posters previewCatalog.ts uses, reused here as
@@ -113,7 +114,7 @@ function toConversation(seed: PreviewConversationSeed): Conversation {
     type: 'buyer_to_seller',
     participants: [{
       userId: seed.participantUserId,
-      name: seed.participantName,
+      name: seed.isOfficial ? BRANDTHREAD_ASSISTANT_NAME : seed.participantName,
       handle: seed.participantHandle,
       initials: seed.participantInitials,
       color: seed.participantColor,
@@ -144,6 +145,7 @@ function toConversation(seed: PreviewConversationSeed): Conversation {
 }
 
 let cachedConversations: Conversation[] | null = null;
+let cachedDemoMode: boolean | null = null;
 
 // Conversations created at runtime (not part of the fixed seed list) — e.g.
 // replying to a story tray author (lib/previewStories.ts) who has no
@@ -159,12 +161,16 @@ const runtimeConversations = new Map<string, Conversation>();
  *
  *  Fresh install by default: the seeded cast only appears with the explicit
  *  `?bt_preview=buyer&demo=1` opt-in (isPreviewDemoMode()). A brand-new
- *  preview account starts with zero conversations — but any thread actually
+ *  buyer preview includes only the official welcome conversation, plus any thread actually
  *  started this session (via getOrCreatePreviewConversationForAuthor, e.g.
  *  messaging a seller from their profile) still shows, exactly like a real
  *  new account's first real conversation would. */
 export function getPreviewConversations(): Conversation[] {
-  if (!cachedConversations) cachedConversations = isPreviewDemoMode() ? allSeeds().map(toConversation) : [];
+  const demo = isPreviewDemoMode();
+  if (!cachedConversations || cachedDemoMode !== demo) {
+    cachedConversations = (isPreviewDemoMode() ? allSeeds() : [BRANDTHREAD_AGENT_SEED]).map(toConversation);
+    cachedDemoMode = demo;
+  }
   const runtime = [...runtimeConversations.values()].sort((a, b) => (b.lastMessageTs ?? 0) - (a.lastMessageTs ?? 0));
   return [...runtime, ...cachedConversations];
 }

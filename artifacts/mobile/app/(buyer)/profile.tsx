@@ -62,7 +62,8 @@ import { ProfileMeta } from '@/components/profile/ProfileShell';
 import { ProfileChip, ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
 import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
-import { useHeroPosterOnly } from '@/components/profile/ProfileVideoHeader';
+import { ProfileVideoHeader, useHeroPosterOnly } from '@/components/profile/ProfileVideoHeader';
+import { Button } from '@/components/ui/Button';
 import { ProfileStoryAvatar } from '@/components/profile/ProfileStoryAvatar';
 import { ProfileBannerHeader } from '@/components/profile/ProfileBannerHeader';
 import { bannerCoversStatusBar, bannerHeight, resolveProfileBanner, type ProfileBanner } from '@/components/profile/profileBannerRules';
@@ -352,8 +353,8 @@ export default function ProfileScreen() {
     enabled: true,
     onCompose: () => router.push('/(buyer)/inbox' as any),
   });
-  // Own profile: always the banner layout; no banner = a dark "Add banner"
-  // placeholder that opens the same Edit banner sheet as Edit profile.
+  // Existing covers keep the banner flow. Without one, use the approved
+  // compact profile header; adding a banner stays available in Edit profile.
   const bannerFlow = useProfileBanner({ banner, userId: user?.id });
   const { height: windowHeight } = useWindowDimensions();
   const bannerH = bannerHeight(windowHeight);
@@ -986,9 +987,8 @@ export default function ProfileScreen() {
 
   const header = (
     <View onLayout={handleHeaderLayout}>
-      {/* ── Banner + identity (TikTok): always the banner layout on your own
-          profile; no banner yet → a subtle dark "Add banner" placeholder. ── */}
-      <ProfileBannerHeader
+      {/* Existing covers remain editable; no empty banner placeholder. */}
+      {banner ? <ProfileBannerHeader
         banner={banner}
         height={bannerH}
         active={heroActive}
@@ -1005,12 +1005,32 @@ export default function ProfileScreen() {
         statsLoading={loading}
         coversTop={focused && bannerCoversTop}
         onAddBanner={bannerFlow.openSheet}
-      />
+      /> : <ProfileVideoHeader
+        hero={{ videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl }}
+        heroActive={heroActive}
+        posterOnly={heroPosterOnly}
+        topPad={topPad}
+        topBar={bannerTopBar}
+        avatar={profileAvatar}
+        name={displayName}
+        handle={displayHandle && displayHandle !== displayName ? displayHandle : null}
+        stats={stats}
+        statsLoading={loading}
+        onHeroHeight={setHeroHeight}
+      />}
       {/* Below the banner the profile continues as before: chip, bio, link. */}
       <View style={topBarStyles.bannerBelow} testID="profile-banner-below">
         {profileMeta}
       </View>
-
+      <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: SP.md, paddingTop: 16, alignItems: 'center' }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Button label="Edit profile" variant="secondary" size="compact" fullWidth style={{ borderRadius: 8, paddingHorizontal: SP.sm, backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }} onPress={() => router.push('/(buyer)/edit-profile')} testID="profile-edit-button" />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Button label="Share profile" variant="secondary" size="compact" fullWidth style={{ borderRadius: 8, paddingHorizontal: SP.sm, backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }} onPress={handleShareProfile} testID="profile-share-button" />
+        </View>
+        <Button label="" icon="user-plus" variant="secondary" size="compact" style={{ width: 36, borderRadius: 8, paddingHorizontal: 0, backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }} accessibilityLabel="Discover people" onPress={() => router.push('/(buyer)/friends' as any)} testID="profile-discover-people" />
+      </View>
 
       {/* ── Story Highlights: circles + "New" ── */}
       <View style={styles.highlightsWrap} testID="profile-highlights">

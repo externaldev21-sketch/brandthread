@@ -1,7 +1,7 @@
 /**
  * "Get ready to sell" — Shopify's home setup guide, reskinned black / white /
  * silver: a title, a one-line subtitle, a "0 / 6 completed" pill, a grouped
- * list whose rows carry a dashed circle that becomes a check, and a "Select a
+ * list whose rows carry a solid circle that becomes a check, and a "Select a
  * plan" block under it while the seller has no plan. Shared: the seller
  * dashboard shows it until the first sale, and onboarding routes here too.
  */
@@ -40,6 +40,9 @@ export function ReadyToSellChecklist({ data, hasPlan, onOpen, testID = 'ready-to
       <View style={[styles.pill, { borderColor: theme.border }]} testID={`${testID}-count`}>
         <Text style={[styles.pillText, { color: theme.muted }]}>{completedLabel(data)}</Text>
       </View>
+      <View style={[styles.progressTrack, { backgroundColor: theme.border }]} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: data.steps.length, now: data.steps.filter(step => step.done).length }} testID={`${testID}-progress`}>
+        <View style={{ height: '100%', backgroundColor: theme.text, width: `${data.steps.length ? data.steps.filter(step => step.done).length / data.steps.length * 100 : 0}%` }} />
+      </View>
 
       <View style={[styles.group, { backgroundColor: theme.surface }]}>
         {data.steps.map((step, i) => {
@@ -58,7 +61,7 @@ export function ReadyToSellChecklist({ data, hasPlan, onOpen, testID = 'ready-to
                   <Feather name="check" size={13} color={theme.background} />
                 </View>
               ) : (
-                <View style={[styles.dashed, { borderColor: theme.muted }]} />
+                <View style={[styles.incomplete, { borderColor: theme.muted }]} />
               )}
               <Text style={[styles.rowTitle, { color: theme.text }]} numberOfLines={1}>{meta.title}</Text>
               <Feather name="chevron-right" size={18} color={theme.subtle} />
@@ -97,10 +100,11 @@ const styles = StyleSheet.create({
   pillText: { ...TYPE_SCALE.caption },
   group: { marginTop: 14, borderRadius: 12, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 52, paddingHorizontal: 16 },
-  dashed: { width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2, borderWidth: 1.5, borderStyle: 'dashed' },
+  incomplete: { width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2, borderWidth: 1.5 },
+  progressTrack: { height: 4, marginTop: 10, borderRadius: 999, overflow: 'hidden' },
   check: { width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2, alignItems: 'center', justifyContent: 'center' },
   rowTitle: { ...TYPE_SCALE.body, flex: 1 },
-  plan: { marginTop: 16, borderRadius: 12, padding: 16 },
+  plan: { marginTop: 16, borderRadius: 12, paddingVertical: 16 },
   planTitle: { ...TYPE_SCALE.headline },
   planBody: { ...TYPE_SCALE.footnote, marginTop: 4 },
   planButton: { marginTop: 14 },

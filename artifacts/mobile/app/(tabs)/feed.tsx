@@ -3596,7 +3596,7 @@ function FeedScreenContent({
        * through SpotlightPage/VideoVisual/PhotoCarousel above — so it never
        * lingers over, or pops against, live content.
        */}
-      {overlayPosterSource && !overlayDismissed && (
+      {overlayPosterSource && !overlayDismissed && firstContentItem && 'contentType' in firstContentItem && firstContentItem.contentType === 'video' && (
         <Animated.View
           pointerEvents="none"
           style={[StyleSheet.absoluteFill, { zIndex: 6, opacity: overlayOpacity }]}

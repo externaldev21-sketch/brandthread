@@ -74,7 +74,7 @@ describe('action sheet', () => {
   it('renders the themed iOS-style action sheet on every platform, not the OS alert', () => {
     const show = actionSheet.slice(actionSheet.indexOf('export function showActionSheet'));
     expect(show).not.toContain("Platform.OS !== 'web'");
-    expect(show).toContain('hostOpen(title, message, buttons);');
+    expect(show).toContain('presentActionSheet(title, message, buttons);');
   });
 
   it('runs on the shared engine and runs the tapped action only after the close finishes', () => {

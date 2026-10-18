@@ -150,8 +150,8 @@ describe('SellerDashboardTrafficSources', () => {
     });
     const t = texts();
     expect(t.join(' ')).toContain('No visits yet');
-    // Share store moved to the Dashboard header (Dev's share store spec).
-    expect(t.join(' ')).not.toContain('Share store');
+    // The approved dashboard layout restores the empty-state Share store CTA.
+    expect(t.join(' ')).toContain('Share store');
     // The doubled-up bug: a zero table (four "0" + four "0%" rows) must
     // never render alongside the empty-state message.
     expect(t.filter((x) => x === '0').length).toBe(0);

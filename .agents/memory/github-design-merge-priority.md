@@ -19,4 +19,4 @@ For reviewed PRs based on an older GitHub snapshot, the owner's explicit instruc
 
 **Why:** Older PRs can restore monolithic inbox, conversation, or Bag screens and silently bypass newer shared privacy, persistence, quantity, and cache behavior.
 
-**How to apply:** Read each PR's body, identify the current owner of its behavior, and integrate there. Preserve native icon imports and shared haptics while applying the approved visual or interaction change. A merge commit alone is not proof that every described change was integrated.
+**How to apply:** Read each PR's body, identify the current owner of its behavior, and integrate there. Preserve native icon imports and shared haptics while applying the approved visual or interaction change. A merge commit alone is not proof that every described change was integrated. Compare the running fresh buyer and seller previews at 390×844 with the PR's committed screenshots: newer conditional layouts, shared components and preview gates can hide an otherwise merged change. Approved PR layout wins; preserve newer data and persistence behavior underneath it.

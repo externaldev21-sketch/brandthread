@@ -3,6 +3,13 @@ name: Fresh seller preview
 description: Owner's standing requirement for an empty, new-account development preview and nonpersistent web demo mode.
 ---
 
+## Buyer welcome-chat exception
+
+The fresh buyer development preview includes the pinned official Brandthread assistant welcome thread. Ordinary seeded friends and conversations still require the current URL's explicit `demo=1`; do not add them to a fresh preview.
+
+**Why:** The owner explicitly requested that the approved pinned Brandthread chat be visible in preview/demo mode too.
+
+**How to apply:** Keep the official welcome thread available without loosening production authentication or populating the seller's fresh inbox. A zero-state account is not a reason to hide the app's own welcome chat.
 The seller preview must look like a brand-new seller who just signed up: zero products, zero orders, zero revenue, empty messages, an empty profile grid, and zero followers. Skipping onboarding in Expo Go selects the explicitly requested preview role; it must never select or seed a populated demo account.
 
 **Why:** The owner repeated: “I told you I wanted my app to be in a state on how it would be when somebody first downloads and creates an account.” Populated products, orders and dashboard money were explicitly rejected.

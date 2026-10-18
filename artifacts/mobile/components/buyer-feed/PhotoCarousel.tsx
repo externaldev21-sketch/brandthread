@@ -1,7 +1,7 @@
 /**
  * Photo-mode carousel for a slideshow Thread (feed). Thin wrapper over the
  * shared ZoomablePhotoPager: UI-thread paging with a 10pt direction lock
- * (vertical swipes still belong to the feed), live counter + tappable dots,
+ * (vertical swipes still belong to the feed), live tappable dots (no counter),
  * per-post remembered slide, neighbour preload, contain + blurred backdrop,
  * and pinch-to-zoom (up to 4x) that springs home on release while lifted
  * above the nav via PhotoZoomHost. Taps stay with the parent Pressable, so
@@ -46,6 +46,7 @@ export function PhotoCarousel({
         height={pageHeight}
         aspects={aspects}
         mode="reset"
+        showCounter={false}
         counterTop={counterTop}
         dotsPlacement="overlay"
         dotsBottom={indicatorBottom}

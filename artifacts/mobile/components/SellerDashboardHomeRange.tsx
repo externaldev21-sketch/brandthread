@@ -1,13 +1,13 @@
 /**
- * The Dashboard's range control under the chart: a segmented control
- * Today / 7D / 30D / 90D (components/ui SegmentedControl, surface variant).
- * The Analytics screens keep their own Today/Week/Month/Year/All pills
- * (SellerDashboardRangePills) — this is the Dashboard-only range set.
+ * The Dashboard's current Today / 7D / 30D / 90D data windows, rendered with
+ * the approved shared glass-pill layout. Keep the existing query ranges:
+ * a visual merge must not label 90 days as a year or as all-time data.
  */
 import React from 'react';
 import { StyleSheet } from 'react-native';
 
-import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { SellerDashboardRangePills } from '@/components/SellerDashboardRangePills';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { HOME_DASHBOARD_RANGES, type SellerHomeDashboardRange } from '@/lib/sellerDashboardHome';
 import { SP } from '@/lib/theme';
 
@@ -18,12 +18,13 @@ export function SellerDashboardHomeRange({
   range: SellerHomeDashboardRange;
   onRangeChange: (range: SellerHomeDashboardRange) => void;
 }) {
+  const { theme } = useAppTheme();
   return (
-    <SegmentedControl
-      options={HOME_DASHBOARD_RANGES}
-      selectedId={range}
-      onChange={(id) => onRangeChange(id as SellerHomeDashboardRange)}
-      testID="seller-dashboard-range-pills"
+    <SellerDashboardRangePills
+      ranges={HOME_DASHBOARD_RANGES}
+      range={range}
+      onRangeChange={onRangeChange}
+      theme={theme}
       style={styles.root}
     />
   );

@@ -26,14 +26,16 @@ export const DASHBOARD_RANGES: Array<{ id: SellerDashboardRange; label: string }
   { id: 'all', label: 'All' },
 ];
 
-export function SellerDashboardRangePills({
+export function SellerDashboardRangePills<T extends string = SellerDashboardRange>({
   range,
   onRangeChange,
   theme,
   style,
+  ranges = DASHBOARD_RANGES as unknown as Array<{ id: T; label: string }>,
 }: {
-  range: SellerDashboardRange;
-  onRangeChange: (range: SellerDashboardRange) => void;
+  range: T;
+  onRangeChange: (range: T) => void;
+  ranges?: Array<{ id: T; label: string }>;
   theme: AppThemePreset;
   /** Extra style for the row (e.g. a different top margin outside the chart). */
   style?: StyleProp<ViewStyle>;
@@ -49,9 +51,9 @@ export function SellerDashboardRangePills({
   // range tab (gap already subtracted so the pill lands exactly on a tab).
   const rangeSegmentGap = SP.xs;
   const rangeSegmentWidth = rangeRowWidth > 0
-    ? (rangeRowWidth - rangeSegmentGap * (DASHBOARD_RANGES.length - 1)) / DASHBOARD_RANGES.length
+    ? (rangeRowWidth - rangeSegmentGap * (ranges.length - 1)) / ranges.length
     : 0;
-  const activeRangeIndex = DASHBOARD_RANGES.findIndex((item) => item.id === range);
+  const activeRangeIndex = ranges.findIndex((item) => item.id === range);
   const rangeIndicatorX = useSharedValue(0);
   // The pill only mounts once rangeSegmentWidth is known (below), but that
   // first layout measurement lands well after mount — often seconds, on a
@@ -89,7 +91,7 @@ export function SellerDashboardRangePills({
           <Glass solid radius={999} style={StyleSheet.absoluteFill} />
         </Animated.View>
       )}
-      {DASHBOARD_RANGES.map((item) => {
+      {ranges.map((item) => {
         const selected = item.id === range;
         return (
           <TouchableOpacity
