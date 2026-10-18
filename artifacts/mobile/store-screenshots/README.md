@@ -6,6 +6,9 @@ re-run the command after UI changes. Demo data only: no real accounts, orders or
 | Folder | Store | Upload to | Size (px) |
 | --- | --- | --- | --- |
 | `iphone-6.9in/` | App Store | iPhone 6.9" Display | 1320 × 2868 |
+| `iphone-6.7in/` | App Store | iPhone 6.7" Display | 1290 × 2796 |
+| `iphone-6.1in/` | App Store | iPhone 6.1" Display | 1179 × 2556 |
+| `framed/` | App Store | Marketing frames for 6.7" and 6.1" (see `framed/README.md`) | as above |
 | `ipad-13in/` | App Store | iPad 13" Display | 2064 × 2752 |
 | `android-phone/` | Google Play | Phone screenshots | 1080 × 1920 |
 | `android-tablet-7in/` | Google Play | 7-inch tablet screenshots | 1200 × 1920 |

@@ -246,7 +246,7 @@ export default function UsersScreen() {
         title={title}
         rightElement={
           <View style={styles.headerActions}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Team options"
               onPress={(event) => { haptic('sheet'); openPullDownMenu(event, [
                   { label: 'Invite someone', icon: 'user-plus', onPress: () => router.push('/team' as never) },
                 ], { title });

@@ -77,11 +77,14 @@ function ToggleRow({
 }
 
 export function LiveMoreSheet({
-  visible, onClose, onReport, onNotInterested, onCopyLink, captionsOn, onToggleCaptions, dataSaverOn, onToggleDataSaver,
+  visible, onClose, onReport, onBlock, blockLabel = 'Block', onNotInterested, onCopyLink, captionsOn, onToggleCaptions, dataSaverOn, onToggleDataSaver,
 }: {
   visible: boolean;
   onClose: () => void;
   onReport: () => void;
+  /** Omitted when there is no real host to block (preview rooms). */
+  onBlock?: () => void;
+  blockLabel?: string;
   onNotInterested: () => void;
   onCopyLink: () => void;
   captionsOn: boolean;
@@ -97,6 +100,7 @@ export function LiveMoreSheet({
         testID="live-more"
         sections={[[
           { key: 'report', icon: 'flag', label: 'Report', destructive: true, onPress: onReport },
+          ...(onBlock ? [{ key: 'block', icon: 'slash' as const, label: blockLabel, destructive: true, onPress: onBlock }] : []),
           { key: 'not-interested', icon: 'eye-off', label: 'Not interested', onPress: onNotInterested },
           { key: 'copy-link', icon: 'link', label: 'Copy link', onPress: onCopyLink },
         ]]}

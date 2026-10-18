@@ -5,6 +5,9 @@
  *
  * App Store (App Store Connect → Previews and Screenshots):
  *   - 6.9" iPhone display: 1320 × 2868 portrait (required for iPhone apps).
+ *   - 6.7" iPhone display: 1290 × 2796 portrait (iPhone 15/16 Plus and Pro Max size;
+ *     App Store Connect accepts it in the 6.7"/6.9" slot).
+ *   - 6.1" iPhone display: 1179 × 2556 portrait (iPhone 15/16 and Pro).
  *   - 13" iPad display:    2064 × 2752 portrait (required because the app
  *     supports iPad, `ios.supportsTablet: true`).
  * Google Play (Play Console → Main store listing → Graphics):
@@ -20,6 +23,26 @@ export const DEVICES = [
     store: 'App Store',
     field: 'iPhone 6.9" Display',
     viewport: { width: 440, height: 956 },
+    scale: 3,
+    userAgent:
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    isMobile: true,
+  },
+  {
+    id: 'iphone-6.7in',
+    store: 'App Store',
+    field: 'iPhone 6.7" Display',
+    viewport: { width: 430, height: 932 },
+    scale: 3,
+    userAgent:
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    isMobile: true,
+  },
+  {
+    id: 'iphone-6.1in',
+    store: 'App Store',
+    field: 'iPhone 6.1" Display',
+    viewport: { width: 393, height: 852 },
     scale: 3,
     userAgent:
       'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',

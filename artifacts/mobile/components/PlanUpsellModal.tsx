@@ -194,7 +194,7 @@ export default function PlanUpsellModal({
               <Text style={[s.upgradeBtnText, { color: theme.onAccent }]}>Upgrade to {planLabel}{planPrice ? ` — ${planPrice}/mo` : ''}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={s.laterBtn} onPress={handleClose} activeOpacity={0.7}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Maybe later" style={s.laterBtn} onPress={handleClose} activeOpacity={0.7}>
               <Text style={s.laterText}>Maybe later</Text>
             </TouchableOpacity>
           </ScrollView>

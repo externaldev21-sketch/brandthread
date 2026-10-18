@@ -544,7 +544,7 @@ function NativeCallScreen() {
         )}
 
         {/* Hang up */}
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="End call"
           style={[s.ctrlBtn, s.hangUpBtn]}
           onPress={handleHangUp}
           activeOpacity={0.8}

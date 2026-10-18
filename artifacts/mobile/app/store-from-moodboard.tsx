@@ -398,7 +398,7 @@ export default function StoreFromMoodboardScreen() {
                     We couldn't fully analyze your images — showing a suggested starting point.
                   </Text>
                 </View>
-                <TouchableOpacity style={mb.retryBtn} onPress={handleAnalyze} disabled={analyzing || restoringAnalysis}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Retry analyzing this mood board" style={mb.retryBtn} onPress={handleAnalyze} disabled={analyzing || restoringAnalysis}>
                   <Icon name="refresh-cw" size={12} color={theme.warning} />
                   <Text style={[mb.retryText, { color: theme.warning }]}>Retry Analysis</Text>
                 </TouchableOpacity>

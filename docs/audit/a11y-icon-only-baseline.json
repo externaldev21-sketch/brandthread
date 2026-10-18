@@ -1,16 +1,6 @@
 {
   "note": "Per-file count of icon-only pressables without an accessibilityLabel. Only ever lower these numbers.",
   "files": {
-    "app/design-bg-replace.tsx": 1,
-    "app/design-campaign.tsx": 4,
-    "app/design-canvas.tsx": 24,
-    "app/design-garment.tsx": 1,
-    "app/design-upload-sketch.tsx": 4,
-    "app/product-size-chart.tsx": 4,
-    "app/roles.tsx": 2,
-    "app/setup.tsx": 1,
-    "app/store-editor.tsx": 2,
-    "app/users.tsx": 1,
-    "components/design-studio/ColorPicker.tsx": 1
+    "app/design-upload-sketch.tsx": 4
   }
 }

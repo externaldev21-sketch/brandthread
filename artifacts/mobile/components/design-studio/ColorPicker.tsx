@@ -355,10 +355,10 @@ export default function ColorPicker(props: ColorPickerProps) {
                         {p.isDefault ? 'Default' : 'Set Default'}
                       </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => onSaveToPalette(p.id, color)} accessibilityLabel={`Add current color to ${p.name}`} testID={`palette-add-current-${p.id}`}>
+                    <TouchableOpacity accessibilityRole="button" onPress={() => onSaveToPalette(p.id, color)} accessibilityLabel={`Add current color to ${p.name}`} testID={`palette-add-current-${p.id}`}>
                       <Icon name="plus-circle" size={ICON.xs} color={SUBTLE} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => onDeletePalette(p.id)} accessibilityLabel={`Delete ${p.name} palette`} testID={`palette-delete-${p.id}`}>
+                    <TouchableOpacity accessibilityRole="button" onPress={() => onDeletePalette(p.id)} accessibilityLabel={`Delete ${p.name} palette`} testID={`palette-delete-${p.id}`}>
                       <Icon name="trash-2" size={ICON.xs} color={SUBTLE} />
                     </TouchableOpacity>
                   </View>

@@ -1075,10 +1075,10 @@ export default function StoreEditor() {
             <Text style={sectionStyles.actionBtnText}>Delete</Text>
           </TouchableOpacity>
           <View style={sectionStyles.orderBtns}>
-            <TouchableOpacity onPress={() => handleMoveUp(section.id)} hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Move up" onPress={() => handleMoveUp(section.id)} hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}>
               <Icon name="chevron-up" size={ICON.sm} color={MUTED} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleMoveDown(section.id)} hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Move down" onPress={() => handleMoveDown(section.id)} hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}>
               <Icon name="chevron-down" size={ICON.sm} color={MUTED} />
             </TouchableOpacity>
           </View>

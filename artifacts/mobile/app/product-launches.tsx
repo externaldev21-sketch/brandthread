@@ -145,7 +145,7 @@ export default function ProductLaunchesScreen() {
           ))}
           {launched.length > 0 && <Text style={[s.section, { color: colors.mutedForeground }]}>LAUNCHED</Text>}
           {launched.map((l) => (
-            <LaunchRow key={l.productId} launch={l} onPress={() => {}} />
+            <LaunchRow key={l.productId} launch={l} onPress={() => router.push(('/product-detail?id=' + encodeURIComponent(l.productId)) as never)} />
           ))}
         </ScrollView>
       )}
@@ -199,7 +199,7 @@ function LaunchRow({ launch, onPress }: { launch: Launch; onPress: () => void })
     <TouchableOpacity
       style={[s.row, { backgroundColor: colors.card, borderColor: colors.border }]}
       onPress={onPress}
-      activeOpacity={done ? 1 : 0.7}
+      activeOpacity={0.7}
       accessibilityLabel={`${launch.name}, ${done ? 'launched' : 'launching'} ${whenLabel(launch.launchAt)}`}
     >
       <Thumb uri={launch.imageUrl} colors={colors} />

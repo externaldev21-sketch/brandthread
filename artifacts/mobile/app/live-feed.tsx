@@ -76,9 +76,9 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 
 import { isPreviewDemoMode } from '@/lib/devPreview';
-
 import { buildCanonicalLiveUrl } from '@/lib/shareLive';
-
+import { useReportSheet } from '@/components/safety/ReportSheet';
+import { confirmBlock } from '@/lib/safety';
 import Composer from '@/components/ui/Composer';
 import { radius } from '@/constants/radii';
 import { getLiveStreamProvider } from '@/lib/live/liveProvider';
@@ -368,6 +368,7 @@ export default function LiveFeedScreen() {
                 insetBottom={insets.bottom}
                 onClose={close}
                 onBuy={() => buy(item)}
+                onHide={() => setRooms(prev => prev.filter(r => r.id !== item.id))}
               />
             )}
             pagingEnabled
@@ -396,7 +397,7 @@ export default function LiveFeedScreen() {
 
 
 function LiveRoomPage({
-  room, isActive, pageWidth, pageHeight, insetTop, insetBottom, onClose, onBuy,
+  room, isActive, pageWidth, pageHeight, insetTop, insetBottom, onClose, onBuy, onHide,
 }: {
   room: LiveRoom;
   isActive: boolean;
@@ -406,10 +407,13 @@ function LiveRoomPage({
   insetBottom: number;
   onClose: () => void;
   onBuy: () => void;
+  /** Drops this room from the pager (Not interested, or after blocking the host). */
+  onHide: () => void;
 }) {
   const api = useApi();
   const { user } = useUser();
   const { showToast } = useFeedToast();
+  const { openReport } = useReportSheet();
   const [following, setFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
   const [chat, setChat] = useState<LiveChatLine[]>(room.isSample ? SAMPLE_CHAT_LINES.slice(0, 2) : []);
@@ -605,12 +609,34 @@ function LiveRoomPage({
     }
   }
 
+  // Report and Block reach the server for real rooms (same ReportSheet and
+  // confirmBlock as buyer-live.tsx). Sample rooms only exist in the dev
+  // preview and have nothing on the server to report.
   function handleReport() {
-    showToast('Thanks for the report. Our team will review this live.', 'info');
+    if (room.isSample || !room.streamId) {
+      showToast('Preview room: nothing to report.', 'info');
+      return;
+    }
+    openReport({
+      targetType: 'live',
+      targetId: room.streamId,
+      label: `${room.brandName}'s live`,
+      ownerId: room.sellerId,
+      ownerName: room.brandName,
+    });
+  }
+
+  async function handleBlock() {
+    if (room.isSample || !room.sellerId) return;
+    if (await confirmBlock({ userId: room.sellerId, name: room.brandName }, api.social.block)) {
+      showToast(`You blocked ${room.brandName}`, 'info');
+      onHide();
+    }
   }
 
   function handleNotInterested() {
     showToast('We’ll show you fewer lives like this.', 'info');
+    onHide();
   }
 
   // Data Saver has a real, observable effect — freezing playback on the
@@ -789,6 +815,8 @@ function LiveRoomPage({
         visible={moreOpen}
         onClose={() => setMoreOpen(false)}
         onReport={handleReport}
+        onBlock={room.isSample || !room.sellerId ? undefined : handleBlock}
+        blockLabel={`Block ${room.brandName}`}
         onNotInterested={handleNotInterested}
         onCopyLink={handleCopyLink}
         captionsOn={captionsOn}

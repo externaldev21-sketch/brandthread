@@ -5,6 +5,9 @@
  *   pnpm run screenshots                  build the web app, then capture everything
  *   pnpm run screenshots -- --skip-build  reuse the last build (much faster)
  *   pnpm run screenshots -- --only discover,cart --devices iphone-6.9in
+ *   pnpm run screenshots -- --direct      load each route by URL instead of the
+ *                                         in-app navigation (for builds whose
+ *                                         router ignores the history push)
  *
  * Output: store-screenshots/<device>/<NN-screen>.png plus a README.md that
  * lists every file, its pixel size and the store field it belongs in.
@@ -38,7 +41,7 @@ export const OUTPUT_DIR = path.join(MOBILE_ROOT, 'store-screenshots');
 
 /**
  * The screens, in store order. `ready` is visible text that proves the screen
- * rendered with demo data. `prepare` runs after it appears (taps, selections).
+ * rendered with demo data (or a list of alternatives, any one of which counts). `prepare` runs after it appears (taps, selections).
  * `fallback` is used when the primary screen cannot render.
  */
 export const SCREENS = [
@@ -64,7 +67,7 @@ export const SCREENS = [
   },
   { id: 'discover', title: 'Discover', role: 'buyer', path: '/discover', ready: 'For You' },
   { id: 'cart', title: 'Cart', role: 'buyer', path: '/cart', ready: 'Order summary' },
-  { id: 'checkout', title: 'Checkout', role: 'buyer', path: '/buyer-checkout?source=cart', ready: '1120 NW Everett Street' },
+  { id: 'checkout', title: 'Checkout', role: 'buyer', path: '/buyer-checkout?source=cart', ready: ['1120 NW Everett Street', 'Express checkout'] },
   { id: 'seller-dashboard', title: 'Seller dashboard', role: 'seller', path: '/(tabs)', ready: '$1,842.50' },
   { id: 'manufacturer-hub', title: 'Manufacturer hub', role: 'seller', path: '/manufacturer-hub', ready: 'Porto Knit Collective' },
   {
@@ -72,21 +75,25 @@ export const SCREENS = [
     title: 'Theme picker',
     role: 'seller',
     path: '/app-theme',
-    ready: 'Choose your Brandthread finish',
+    ready: ['Choose your Brandthread finish', 'App icon'],
     async prepare(page) {
-      await page.getByLabel(/^Black & Gold theme/).first().click({ timeout: 5_000 });
-      await page.getByText('Using Black & Gold').first().waitFor({ timeout: 5_000 });
+      // Builds without the Black & Gold finish keep the default theme.
+      const blackGold = page.getByLabel(/^Black & Gold theme/).first();
+      if (!(await blackGold.count())) return;
+      await blackGold.click({ timeout: 5_000 });
+      await page.getByText('Using Black & Gold').or(page.getByText('Black & Gold')).first().waitFor({ timeout: 5_000 });
     },
   },
 ];
 
 function parseArgs(argv) {
-  const options = { skipBuild: false, strict: false, only: null, devices: null, buildDir: DEFAULT_BUILD_DIR };
+  const options = { skipBuild: false, strict: false, direct: false, only: null, devices: null, buildDir: DEFAULT_BUILD_DIR };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--') continue;
     else if (arg === '--skip-build') options.skipBuild = true;
     else if (arg === '--strict') options.strict = true;
+    else if (arg === '--direct') options.direct = true;
     else if (arg === '--only') options.only = argv[++i].split(',');
     else if (arg === '--devices') options.devices = argv[++i].split(',');
     else if (arg === '--build-dir') options.buildDir = path.resolve(argv[++i]);
@@ -95,12 +102,18 @@ function parseArgs(argv) {
   return options;
 }
 
-async function captureOne(browser, { device, screen, origin, images, file }) {
+async function captureOne(browser, { device, screen, origin, images, file, direct }) {
   const unseeded = new Set();
   const { context, page, activity } = await openContext(browser, { device, role: screen.role, origin, images, onUnseeded: (r) => unseeded.add(r) });
   const attempt = async (target, ready, prepare) => {
-    await openScreen(page, activity, origin, screen.role, target);
-    await page.getByText(ready, { exact: false }).first().waitFor({ timeout: 20_000 });
+    if (direct) {
+      await page.goto(`${origin}${target}${target.includes('?') ? '&' : '?'}bt_preview=${screen.role}`);
+      await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20_000 });
+    } else {
+      await openScreen(page, activity, origin, screen.role, target);
+    }
+    const readyTexts = Array.isArray(ready) ? ready : [ready];
+    await readyTexts.map((t) => page.getByText(t, { exact: false }).first()).reduce((a, b) => a.or(b)).first().waitFor({ timeout: 20_000 });
     if (prepare) await prepare(page);
     await waitForQuietNetwork(activity);
     await waitForImages(page);
@@ -179,7 +192,7 @@ async function main() {
         const index = SCREENS.indexOf(screen) + 1;
         const file = path.join(dir, `${String(index).padStart(2, '0')}-${screen.id}.png`);
         rmSync(file, { force: true });
-        const result = await captureOne(browser, { device, screen, origin: server.origin, images, file });
+        const result = await captureOne(browser, { device, screen, origin: server.origin, images, file, direct: options.direct });
         results.push({ device: device.id, screen: screen.id, ...result });
         const mark = result.status === 'captured' ? '✓' : result.status === 'fallback' ? '~' : '✗';
         console.log(`${mark} ${device.id.padEnd(20)} ${screen.id}${result.reason ? `  (${result.reason})` : ''}`);
