@@ -209,7 +209,7 @@ export function BagTotals({
 // ─── Sticky bar ───────────────────────────────────────────────────────────────
 
 export function BagCheckoutBar({
-  totalCents, subtotalCents = totalCents, bottomInset, busy, disabled, onCheckout,
+  totalCents, subtotalCents = totalCents, bottomInset, busy, disabled, onCheckout, walletSlot,
 }: {
   totalCents: number;
   subtotalCents?: number;
@@ -217,6 +217,7 @@ export function BagCheckoutBar({
   busy: boolean;
   disabled: boolean;
   onCheckout: () => void;
+  walletSlot?: React.ReactNode;
 }) {
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
@@ -239,6 +240,7 @@ export function BagCheckoutBar({
           testID="cart-go-to-checkout"
         />
       </View>
+      {walletSlot}
     </View>
   );
 }

@@ -14,6 +14,7 @@ import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 
 import { View, Text, ScrollView, StyleSheet, Alert, TextInput, TouchableOpacity } from 'react-native';
 
+import { ActivityIndicator, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CachedImage } from '@/components/CachedImage';
@@ -59,7 +60,8 @@ import { stripePaymentAvailable } from '@/components/checkout/StripePayment';
 // Same flat-black language as the one-page checkout: sections on pure black,
 // uppercase labels, 1px hairlines. No card containers.
 import { CheckoutSection } from '@/components/checkout/CheckoutPrimitives';
-
+import { StripePaymentProvider, WalletShortcut } from '@/components/checkout/StripePayment';
+import { useCheckoutLive } from '@/lib/checkoutLive';
 import { isPreviewCheckoutGroup } from '@/lib/previewCheckout';
 
 import { isBuyerDevPreview } from '@/lib/devPreview';
@@ -196,6 +198,10 @@ export default function CartScreen() {
   const [validating, setValidating] = useState(false);
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [pointsInput, setPointsInput] = useState('');
+  // Wallet button only where that wallet is switched on server-side
+  // (lib/checkoutLive.ts); never on web, where the sheet needs checkout's own tap.
+  const checkoutLive = useCheckoutLive();
+  const walletAllowed = Platform.OS === 'ios' ? checkoutLive.applePay : Platform.OS === 'android' ? checkoutLive.googlePay : false;
   const [redeemingPoints, setRedeemingPoints] = useState(false);
   const [loyaltyRedemption, setLoyaltyRedemption] = useState<CheckoutLoyaltyRedemption | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -494,7 +500,7 @@ export default function CartScreen() {
    * order/payment APIs (isBuyNow=true just scopes which items build the
    * session; it never changes how payment itself works).
    */
-  async function startCheckout(items: CartItem[], opts: { onBusy?: (busy: boolean) => void } = {}) {
+  async function startCheckout(items: CartItem[], opts: { onBusy?: (busy: boolean) => void; wallet?: boolean } = {}) {
     const setBusy = opts.onBusy ?? setValidating;
     if (items.length === 0) return;
     setBusy(true);
@@ -636,7 +642,7 @@ export default function CartScreen() {
             refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
             contentContainerStyle={{
               paddingHorizontal: SP.md,
-              paddingBottom: (hasItems ? BAG_BAR_HEIGHT : 0) + insets.bottom + SP.lg,
+              paddingBottom: (hasItems ? BAG_BAR_HEIGHT + (walletAllowed ? 56 : 0) : 0) + insets.bottom + SP.lg,
             }}
           >
             {hasItems ? (
@@ -773,6 +779,14 @@ export default function CartScreen() {
               busy={validating}
               disabled={!hasItems}
               onCheckout={() => { void startCheckout(cart.items); }}
+              walletSlot={walletAllowed ? (
+                <StripePaymentProvider amountCents={displayedTotal}>
+                  <WalletShortcut
+                    onPress={() => { void startCheckout(cart.items, { wallet: true }); }}
+                    disabled={!hasItems || validating}
+                  />
+                </StripePaymentProvider>
+              ) : null}
             />
           )}
         </>

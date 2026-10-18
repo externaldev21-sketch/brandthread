@@ -1285,6 +1285,9 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
 
   // ── Render helpers ──────────────────────────────────────────────────────────
 
+  const officialConv = conversations.find(conv => conv.isOfficial);
+  useFocusEffect(useCallback(() => () => { setComposeVisible(false); setNoteComposeVisible(false); }, []));
+
   function renderConvRow({ item: conv, index }: { item: Conversation; index: number }) {
     const participant = participantOf(conv);
     if (!participant) return null;
@@ -1736,7 +1739,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
             { icon: 'search', onPress: openMessagesSearch, accessibilityLabel: 'Search messages', testID: 'inbox-header-search' },
             isSeller
               ? { icon: 'plus', onPress: () => openInboxComposeMenu(router), accessibilityLabel: 'Create or join a group', testID: 'inbox-header-compose' }
-              : { name: 'plus', onPress: openCompose, accessibilityLabel: 'New message', testID: 'inbox-header-compose' },
+              : { icon: 'plus', onPress: openCompose, accessibilityLabel: 'New message', testID: 'inbox-header-compose' },
           ]}
         />
       )}

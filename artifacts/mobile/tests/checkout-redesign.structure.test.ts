@@ -178,18 +178,19 @@ describe('checkout screen structure', () => {
     expect(screen).toContain('placePreviewOrder(');
   });
 
-  it('routes Track order with the verified order id only', () => {
+  it('routes View order with the verified order id only', () => {
     const confirmation = read('components/checkout/OrderConfirmation.tsx');
     expect(confirmation).toContain("'/buyer-order-detail?id=' + encodeURIComponent(firstVerified.id)");
-    expect(confirmation).toContain('disabled={!firstVerified?.id}');
+    expect(confirmation).toContain('disabled={!firstVerified?.id || finalizing}');
   });
 });
 
-describe('order confirmation actions', () => {
+describe('order confirmation (Depop "Thank you!" + GOAT "Discover more")', () => {
   const confirmation = read('components/checkout/OrderConfirmation.tsx');
   const actions = confirmation.slice(confirmation.indexOf('export function OrderConfirmationActions'), confirmation.indexOf('const styles = StyleSheet.create'));
+  const content = confirmation.slice(0, confirmation.indexOf('export function OrderConfirmationActions'));
 
-  it('pins ONE primary button (Track order, or Check order status while finalizing)', () => {
+  it('pins ONE primary button (Continue shopping, or Check order status while finalizing)', () => {
     expect(actions.match(/<Button\b/g)).toHaveLength(2); // the finalizing and the confirmed branch, one each
     expect(actions).toContain("label={t('Track order')}");
     expect(actions).not.toContain('View receipt');

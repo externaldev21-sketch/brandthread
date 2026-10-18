@@ -1899,7 +1899,7 @@ function SpotlightPageImpl({
   }, []);
 
   useEffect(() => { if (!isActive) setPaused(false); }, [isActive]);
-  useEffect(() => { if (isActive) onPausedChange?.(item.id, paused || holdPaused); }, [item.id, isActive, paused, holdPaused, onPausedChange]);
+  useEffect(() => { if (isActive) onPausedChange?.(item.id, paused); }, [item.id, isActive, paused, onPausedChange]);
 
   /** Double-tap heart: appears where the second tap landed, pops once
    *  (0.6 -> 1.1 -> 1), holds, fades. No particles, no second burst. */

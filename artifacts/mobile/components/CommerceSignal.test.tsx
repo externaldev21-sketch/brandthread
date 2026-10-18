@@ -851,15 +851,14 @@ describe('Buyer drop detail — truthful units and accent urgency', () => {
     expect(source).toMatch(/accent=\{theme\.accent\}/);
   });
 
-  it('buyer-product-detail uses CommerceSignal demand layer with accent', async () => {
+  it('buyer-product-detail has no demand layer (launch: Etsy / Vestiaire product pages show none)', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const source = readFileSync(resolve(__dirname, '../app/buyer-product-detail.tsx'), 'utf8');
-    expect(source).toContain('ClaimedRemainingLabel');
-    expect(source).toContain('UrgencyBar');
-    expect(source).toContain('DemandBadge');
-    expect(source).toContain('TimeRemainingLabel');
-    expect(source).toMatch(/accent=\{theme\.accent\}/);
-    expect(source).toMatch(/accentColor=\{theme\.accent\}/);
+    // Drops keep it (buyer-drop-detail above); a plain product page shows
+    // price, title, seller and shipping like the reference apps.
+    for (const piece of ['ClaimedRemainingLabel', 'UrgencyBar', 'DemandBadge', 'TimeRemainingLabel']) {
+      expect(source).not.toContain(piece);
+    }
   });
 });

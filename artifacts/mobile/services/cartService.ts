@@ -1525,3 +1525,9 @@ export function isCancellationEligible(orderStatus: string): { eligible: boolean
     default:           return { eligible: false, reason: 'Order is past the cancellation window.' };
   }
 }
+
+/** Product shipping preview, without losing the bag's grouped shipping estimates. */
+export async function getShippingEstimate(sellerId: string, subtotalCents: number): Promise<{ amountCents: number; processingDays: number | null } | null> {
+  try { const rate = await fetchShippingRateDetails(sellerId, subtotalCents); return { amountCents: rate.amountCents, processingDays: rate.processingDays }; }
+  catch { return null; }
+}

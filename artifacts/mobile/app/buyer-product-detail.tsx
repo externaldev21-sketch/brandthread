@@ -27,6 +27,10 @@ import { DETAIL_STALE_TIME_MS, queryKeys } from '@/lib/queryClient';
 import { buildProductUrl } from '@/lib/shareLinks';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Platform } from 'react-native';
+
+
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { formatMoney as formatCents } from '@/lib/format';
@@ -44,6 +48,8 @@ import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 
 import { addToCart, createBuyNowSession, replaceCartItemVariant, getCart, warmCart } from '@/services/cartService';
 
+import { getShippingEstimate } from '@/services/cartService';
+import { deliveryWindowLabel } from '@/lib/checkoutPayment';
 import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribution } from '@/services/cartTypes';
 
 import { useApi } from '@/hooks/useApi';
@@ -52,6 +58,7 @@ import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 
 import { reportHref } from '@/lib/safety';
 
+import { shareLinkWithFallback } from '@/lib/shareProfile';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 
 import { useAuth } from '@clerk/expo';
@@ -652,7 +659,9 @@ export function ProductGallery({ imageUris, accentColor, video, focusUri, brand,
 
 // ─── Option Picker ────────────────────────────────────────────────────────────
 
-export function OptionPicker({ product, option, selections, onSelect, recommendedLabel }: {
+export function OptionPicker({ product, option, selections, onSelect, recommendedLabel, onSizeGuide }: {
+  /** Opens the seller's size guide; the link sits on the label row (Vestiaire "Size Guide"). */
+  onSizeGuide?: () => void;
   /** Size chip to mark (never select) from the buyer's saved sizes. */
   recommendedLabel?: string | null;
   product: BuyerProduct;
@@ -672,6 +681,18 @@ export function OptionPicker({ product, option, selections, onSelect, recommende
             {option.values.find(v => v.id === selections[option.id])?.label}
           </Text>
         )}
+        {onSizeGuide ? (
+          <TouchableOpacity
+            onPress={onSizeGuide}
+            style={{ marginLeft: 'auto' }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Size guide"
+            testID="product-size-guide-link"
+          >
+            <Text style={[op.optionName, { textDecorationLine: 'underline', fontFamily: FONT.regular }]}>Size guide</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
       {/* Sizes sit on one row (item 130): a single horizontal line of chips,
           sold-out sizes crossed out, so the size row never pushes Add below
@@ -1013,7 +1034,6 @@ export default function BuyerProductDetailScreen() {
   // Track whether options were touched at least once (for required-option feedback)
   const [optionsTouched, setOptionsTouched] = useState(false);
   // Track added-to-bag confirmation to show a banner (auto-clears after 2s)
-  const addedBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Waitlist & pre-order reservation state
   const [launching, setLaunching] = useState(false);
@@ -1391,6 +1411,7 @@ export default function BuyerProductDetailScreen() {
   const variantPrice = variant?.priceCents ?? product.priceCents;
   const variantCompare = variant?.compareAtPriceCents ?? product.compareAtPriceCents;
   const hasDiscount = variantCompare && variantCompare > variantPrice;
+  const sizeChartTable = (product as { sizeChart?: SizeChart | null }).sizeChart ?? null;
   const savingsAmt = hasDiscount ? variantCompare! - variantPrice : 0;
   const allSelected = allOptionsSelected(product, selections);
   const inStock = variant ? variant.isAvailable && variant.inventoryQuantity > 0 : true;
@@ -1495,10 +1516,6 @@ export default function BuyerProductDetailScreen() {
       setCartCount(result.cart.items.reduce((sum, item) => sum + item.quantity, 0));
       bumpCart();
       setBagPlusOne(prev => ({ trigger: prev.trigger + 1, quantity: qty }));
-      // Auto-clear the icon-button checkmark after 2.5s; the sheet itself
-      // stays open until the buyer taps View bag or Keep shopping.
-      if (addedBannerTimerRef.current) clearTimeout(addedBannerTimerRef.current);
-      addedBannerTimerRef.current = setTimeout(() => setAddedToCart(false), IN_BAG_CONFIRM_MS);
     } else {
       Alert.alert("Couldn't add to cart", result.message ?? 'Try again.');
     }
@@ -1527,13 +1544,27 @@ export default function BuyerProductDetailScreen() {
     }) as never);
   }
 
+  // Share: the same arrow and the same system share sheet / copy-link
+  // fallback as the feed rail (RightActionRail) and profile share.
   function handleShare() {
     if (!product) return;
-    const link = buildProductUrl(product.id);
-    Share.share(link ? { message: `${product.name} — ${link}`, url: link } : { message: product.name }).catch(() => {});
+    haptics.light();
+    const url = buildProductUrl(product.id);
+    const message = `${product.name} on Brandthread`;
+    if (!url) {
+      if (Platform.OS !== 'web') void Share.share({ message }).catch(() => {});
+      return;
+    }
+    void shareLinkWithFallback({
+      url,
+      message,
+      platformOS: Platform.OS,
+      nativeShare: (content) => Share.share(content),
+      webNavigator: typeof navigator !== 'undefined' ? (navigator as never) : null,
+    }).then((result) => {
+      if (result === 'copied') Alert.alert('Link copied');
+    }).catch(() => {});
   }
-
-  const topBarHeight = headerTopInset + SP.sm * 2 + COMP.iconBtn;
 
   async function handleBuyNow() {
     if (sellerPreview) return;
@@ -1639,22 +1670,17 @@ export default function BuyerProductDetailScreen() {
             )}
           </View>
 
-          {/* Page order (item: preview buy flow) follows real marketplace
-              product pages (SSENSE / Farfetch / Depop on Mobbin): photos →
-              title → price → sizes → the purchase bar (sticky) → seller →
-              About this piece → returns → purchase protection (once) →
-              you might also like → report links, small, at the very end. */}
-          {/* Brand above the name, tappable to the store (item 136; SSENSE
-              product page: designer name, then product name, then price). */}
-          <BrandLink
-            sellerId={product.sellerId}
-            name={product.sellerName}
-            style={s.brandLink}
-            testID="product-brand-link"
-          />
-          <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
           <MysteryBoxLabel productId={product.id} />
-          {/* Price */}
+          <ProductShippingLine shipping={product.sellerShipping} />
+          <PayLaterLine sellerId={product.sellerId} priceCents={variantPrice} />
+          {/* Polish 91: real counts from other shoppers' bags, shown from 3. */}
+          <InBagCount productId={product.id} />
+          <FriendsSavedLine productId={product.id} />
+          {/* Page order follows Etsy's listing page (mobbin.com/screens/
+              ff53baaa-c992-4a3f-b930-adac8bb00cf6): price → title → "Sold
+              by" → est. delivery → options → the purchase bar (sticky) →
+              seller → description → policies → you may also like → report,
+              small, at the very end. */}
           <View style={s.priceRow}>
             <Text style={s.price}>{formatCents(variantPrice)}</Text>
             {hasDiscount && <Text style={s.comparePrice}>{fmtPrice(variantCompare!)}</Text>}
@@ -1664,11 +1690,19 @@ export default function BuyerProductDetailScreen() {
               </Text>
             )}
           </View>
-          <ProductShippingLine shipping={product.sellerShipping} />
-          <PayLaterLine sellerId={product.sellerId} priceCents={variantPrice} />
-          {/* Polish 91: real counts from other shoppers' bags, shown from 3. */}
-          <InBagCount productId={product.id} />
-          <FriendsSavedLine productId={product.id} />
+          <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
+          <TouchableOpacity
+            onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)}
+            accessibilityRole="link"
+            accessibilityLabel={`Sold by ${product.sellerName}`}
+            hitSlop={{ top: 6, bottom: 6 }}
+            style={s.soldByRow}
+            testID="product-sold-by"
+          >
+            <Text style={s.soldByText}>Sold by <Text style={s.soldByName}>{product.sellerName}</Text></Text>
+          </TouchableOpacity>
+
+          <ShippingEstimateRow product={product} subtotalCents={variantPrice * qty} />
 
           {!sellerPreview && <LaunchCountdown productId={product.id} onLaunchingChange={setLaunching} />}
 
@@ -1771,7 +1805,7 @@ export default function BuyerProductDetailScreen() {
                   product={product}
                   option={option}
                   selections={selections}
-                  onSelect={handleSelect}
+                  onSelect={handleSelect} onSizeGuide={hasSizeGuide ? () => setSizeGuideOpen(true) : undefined}
                 />
                 )}
                 {isUnselected && (
@@ -1888,47 +1922,39 @@ export default function BuyerProductDetailScreen() {
             </View>
           )}
 
-          {/* Size Chart — expandable table */}
-          {!!(product as any).sizeChart && (
-            <>
-              <TouchableOpacity
-                style={[sz.toggle, { borderTopColor: theme.border }]}
-                onPress={() => { setSizeChartOpen(o => !o); }}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Size chart"
-                accessibilityState={{ expanded: sizeChartOpen }}
-              >
-                <Text style={[sz.label, { color: theme.text }]}>Size Chart</Text>
-                <AppIcon name={sizeChartOpen ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
-              </TouchableOpacity>
-              {sizeChartOpen && <SizeChartViewer chart={(product as any).sizeChart} />}
-            </>
-          )}
-
-          {/* Bundle & save — active bundles with this product; renders nothing when none. */}
-
-
-          <PriceHistoryChart productId={product.id} />
-
           <View style={s.divider} />
-          <ProductSellerRow
-            sellerId={product.sellerId}
-            sellerName={product.sellerName}
-            sellerHandle={product.sellerHandle}
-            sellerAvatarUri={product.sellerAvatarUri}
-            onOpenStore={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)}
-          />
-          <Button
-            label="Message seller"
-            icon="message-circle"
-            onPress={handleMessageSeller}
-            variant="secondary"
-            size="small"
-            accessibilityHint="Opens a chat with the seller about this product"
-            style={{ alignSelf: 'flex-start', marginBottom: SP.md }}
-            testID="product-message-seller"
-          />
+          {/* Seller — Depop's "Sold by" block (mobbin.com/flows/
+              c76a3a77-0de3-489e-921a-5633d26a63bc): avatar row, then Visit
+              shop / Message seller as two equal buttons. */}
+          <TouchableOpacity style={s.sellerCard} onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`} testID="product-seller-link">
+            <Avatar name={product.sellerName} uri={product.sellerAvatarUri} size={48} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.sellerHandle} numberOfLines={1}>Sold by</Text>
+              <Text style={s.sellerName} numberOfLines={1}>{product.sellerName}</Text>
+            </View>
+          </TouchableOpacity>
+          <View style={s.sellerActions}>
+            <View style={s.halfBtn}>
+              <Button
+                label="Visit shop"
+                onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)}
+                variant="secondary"
+                fullWidth
+                testID="product-visit-shop"
+              />
+            </View>
+            <View style={s.halfBtn}>
+              <Button
+                label="Message"
+                accessibilityLabel="Message seller"
+                onPress={handleMessageSeller}
+                variant="secondary"
+                accessibilityHint="Opens a chat with the seller about this product"
+                fullWidth
+                testID="product-message-seller"
+              />
+            </View>
+          </View>
 
           {/* Details / Fit / Returns — full-width rows over the page's
               existing content (description, the seller's size chart, the
@@ -2151,74 +2177,38 @@ export default function BuyerProductDetailScreen() {
         accessibilityRole="toolbar"
         accessibilityLabel="Product purchase actions"
       >
-        {/* Add to bag (live price inside) with Save and Share beside it
-            (Nike PDP CTA, https://mobbin.com/screens/5163c408-ea2f-46d1-b945-ab33395eacd1).
-            The bag-icon bump on success is unchanged. */}
-        <View style={s.buyNowBtn}>
-        {productDraw.draw && productDraw.phase ? (() => {
-          const footer = drawFooter(productDraw.phase);
-          return (
-            <Button
-              label={footer.label}
-              variant={productDraw.phase.kind === 'entered' ? 'secondary' : 'primary'}
-              disabled={!footer.enabled}
-              onPress={() => {
-                if (footer.target === 'entry') router.push({ pathname: '/draw-entry', params: { productId: product.id, ...(variant ? { variantId: variant.id } : {}) } } as never);
-                if (footer.target === 'result') router.push({ pathname: '/draw-result', params: { productId: product.id } } as never);
-              }}
-              style={s.drawBtn}
-              fullWidth
-              testID="product-draw-button"
-            />
-          );
-        })() : null}
-        {productDraw.draw ? null : addedToCart ? (
+        {/* Etsy's pair (mobbin.com/screens/ff53baaa-c992-4a3f-b930-adac8bb00cf6):
+            filled "Add to bag" (→ "View in bag" once added) and outlined
+            "Buy now". Make an offer is left out: Brandthread has no offers.
+            Each half sits in a flex:1 View with a fullWidth Button (the
+            Button's own style is on its inner view, where flex collapses). */}
+        <View style={s.halfBtn}>
+        {addedToCart ? (
           <Button
-            label="In bag ✓"
+            label="View in bag"
+            variant="primary"
             onPress={() => router.push('/(buyer)/cart' as never)}
-            accessibilityLabel="In your bag. View cart"
+            accessibilityLabel="View in bag"
             fullWidth
-            style={s.bagBtn}
             testID="product-view-cart"
           />
         ) : (
           <Button
-            label={dropsAt ? `Drops ${dropsOnLabel(dropsAt)}` : allSelected && !inStock ? 'Sold out' : `Add to bag · ${formatCents(variantPrice)}`}
+            label="Add to bag"
             variant="primary"
             onPress={handleAddToCart}
             loading={addingToCart}
-            disabled={!!dropsAt || !!sellerPreview || addingToCart || launching || (allSelected && !inStock)}
+            disabled={addingToCart || launching || (allSelected && !inStock)}
             accessibilityLabel={!allSelected ? 'Add to bag. Select a size first' : !inStock ? 'Out of stock' : 'Add to bag'}
             fullWidth
-            style={s.bagBtn}
             testID="product-add-to-cart"
           />
         )}
         </View>
-        <SaveHeart
-          productId={product.id}
-          title={product.name}
-          brand={product.sellerName}
-          priceCents={product.priceCents > 0 ? product.priceCents : undefined}
-          size={44}
-          iconColor={theme.text}
-          style={[s.barCircleBtn, { borderColor: theme.border }]}
-          testID="product-save-heart"
-        />
-        <IconButton
-          name="share"
-          onPress={handleShare}
-          accessibilityLabel="Share product"
-          variant="plain"
-          color={theme.text}
-          style={[s.barCircleBtn, { borderColor: theme.border }]}
-          testID="product-share-bar"
-        />
-      </View>
-      {/* Buy now / Reserve keep their place in the bar, as the secondary
-          action under Add to bag. */}
-      <View style={s.actionBarSecondRow}>
+
+        <View style={s.halfBtn}>
         {dropsAt ? <Text style={s.vacationText}>{dropName ? `${dropName} · ` : ''}Drops {dropsOnLabel(dropsAt)}</Text> : productDraw.draw ? null : sellerPreview ? (<Button label="Not for sale yet" onPress={() => {}} disabled fullWidth testID="product-seller-preview-buy" />) : product.isPreOrder ? (
+
           <Button
             label={reserved ? 'Reserved ✓' : 'Reserve (No Charge)'}
             onPress={handleReserve}
@@ -2233,19 +2223,19 @@ export default function BuyerProductDetailScreen() {
           <Button
             label={
               paymentUnavailable ? 'Payments unavailable'
-                : !allSelected ? 'Select options'
-                : !inStock ? 'Sold Out'
+                : allSelected && !inStock ? 'Sold out'
                 : 'Buy now'
             }
-            icon={!inStock && allSelected && !paymentUnavailable ? 'clock' : undefined}
             onPress={handleBuyNow}
             variant="secondary"
-            size="small"
             loading={buyingNow}
             disabled={buyingNow || launching || (allSelected && !inStock) || paymentUnavailable}
+            accessibilityLabel={!allSelected ? 'Buy now. Select a size first' : undefined}
             fullWidth
+            testID="product-buy-now"
           />
         )}
+        </View>
       </View>
       </StickyFooter>
       <FirstRunTip
@@ -2254,6 +2244,48 @@ export default function BuyerProductDetailScreen() {
         contentReady={!loading}
         spotlight={{ target: actionBarRect, ...BUYER_PRODUCT_DETAIL_SPOTLIGHT }}
       />
+    </View>
+  );
+}
+
+// ─── Shipping estimate ───────────────────────────────────────────────────────
+
+/**
+ * Etsy's "Est. delivery" row under the title (mobbin.com/screens/
+ * ff53baaa-c992-4a3f-b930-adac8bb00cf6): two label/value columns between
+ * hairlines. Uses the seller's real rate (GET /api/shipping-rates/calculate);
+ * renders nothing until it answers or when the seller has no rate.
+ */
+function ShippingEstimateRow({ product, subtotalCents }: { product: BuyerProduct; subtotalCents: number }) {
+  const { BORDER, FG, MUTED } = useThemeAliases();
+  const [estimate, setEstimate] = useState<{ amountCents: number; processingDays: number | null } | null>(null);
+  useEffect(() => {
+    let active = true;
+    if (!product.sellerId || subtotalCents <= 0) return;
+    void getShippingEstimate(product.sellerId, subtotalCents).then(next => { if (active) setEstimate(next); });
+    return () => { active = false; };
+  }, [product.sellerId, subtotalCents]);
+  if (!estimate) return null;
+  // "Ships in 2 business days" → label "Ships in", value "2 business days",
+  // so the value fits its half of the row at 390pt.
+  const window = deliveryWindowLabel({ processingDays: estimate.processingDays, isPreOrder: product.isPreOrder });
+  const shipsIn = /^Ships in (.+)$/.exec(window);
+  const cell = { flex: 1, gap: 2 } as const;
+  const label = { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm } as const;
+  const value = { color: FG, fontFamily: FONT.semibold, fontSize: FS.md } as const;
+  return (
+    <View
+      style={{ flexDirection: 'row', paddingVertical: SP.md, marginBottom: SP.md, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: BORDER }}
+      testID="product-shipping-estimate"
+    >
+      <View style={cell}>
+        <Text style={label}>Shipping</Text>
+        <Text style={value}>{estimate.amountCents > 0 ? formatCents(estimate.amountCents) : 'Free'}</Text>
+      </View>
+      <View style={[cell, { borderLeftWidth: StyleSheet.hairlineWidth, borderColor: BORDER, paddingLeft: SP.md }]}>
+        <Text style={label}>{shipsIn ? 'Ships in' : 'Delivery'}</Text>
+        <Text style={value} numberOfLines={1}>{shipsIn ? shipsIn[1] : window}</Text>
+      </View>
     </View>
   );
 }
@@ -2844,6 +2876,12 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   cartBadgeText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: 11, lineHeight: 13 },
   mediaChromeBtn: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill },
+  sellerActions: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md },
+  soldByRow: { alignSelf: 'flex-start', marginTop: -SP.xs, marginBottom: SP.md },
+  soldByText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
+  soldByName: { color: FG, fontFamily: FONT.semibold, textDecorationLine: 'underline' },
+  // Same round chrome as the IconButton back / save / bag circles beside it.
+  shareChrome: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill },
   body: { paddingVertical: SP.md },
   badgeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CYAN_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
@@ -2867,7 +2905,7 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // black in the default theme, so the spec's grey is set directly.)
   sellerCard: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm,
-    padding: SP.md, borderRadius: RADII.card, backgroundColor: SELLER_CARD_RAISED,
+    paddingVertical: SP.xs,
   },
   sellerName: { ...TYPE.bodyMedium, color: FG, flexShrink: 1 },
   sellerHandle: { ...TYPE.caption, color: MUTED, flexShrink: 1 },
@@ -2895,7 +2933,8 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   vacationTitle: { color: ORANGE, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: 3 },
   vacationText: { color: FG, fontFamily: FONT.medium, fontSize: FS.meta, lineHeight: 18 },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs },
+  price: { ...TYPE.heading, fontFamily: FONT.bold, color: FG },
   promiseRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: SP.md },
   sizeRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 52, marginBottom: SP.sm,
@@ -2904,7 +2943,6 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   sizeRowLabel: { flex: 1, fontSize: FS.base, fontFamily: FONT.medium, color: FG },
   sizeRowValue: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   promiseText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG, flexShrink: 1 },
-  price: { fontVariant: ['tabular-nums'],  ...TYPE.heading, fontFamily: FONT.bold, color: FG },
   priceSale: { color: SUCCESS },
   comparePrice: { fontVariant: ['tabular-nums'],  fontSize: FS.base, fontFamily: FONT.regular, color: SUBTLE, textDecorationLine: 'line-through' },
   savings: { fontSize: FS.sm, fontFamily: FONT.semibold, color: SUCCESS },
@@ -2938,6 +2976,7 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM,
     alignItems: 'center', justifyContent: 'center',
   },
+  halfBtn: { flex: 1 },
   buyNowBtn: { flex: 1 },
   drawBtn: { flex: 1, borderRadius: RADIUS.pill },
   reviewsHeader: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.sm },

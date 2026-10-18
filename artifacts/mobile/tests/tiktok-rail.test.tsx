@@ -1,3 +1,4 @@
+import { SoundDisc } from '@/components/buyer-feed/SoundDisc';
 /**
  * TikTok rail pass: the buyer feed's right action rail is TikTok's stack
  * (avatar + follow, Like, Comment, Save, Share, sound disc — no Repost), sits
@@ -72,7 +73,8 @@ function railProps(overrides: Partial<RailProps>): RailProps {
     creator: 'Atelier Noire', avatarColor: '#222', initials: 'AN', engagement: undefined,
     commentsCount: 0, shares: 0, saves: 0,
     onOpenCreator: noop, onFollow: noop, onLike: noop, onOpenComments: noop, onSave: noop, onShare: noop,
-    anims, style: { bottom: 97, right: 6 }, testIdBase: 'post-a',
+    footerNode: <SoundDisc avatarColor="#222" initials="AN" sound="Original sound" spinning={false} reduceMotion={true} soundOn={true} onPress={noop} />,
+    style: { bottom: 97, right: 6 }, testIdBase: 'post-a',
     ...overrides,
   };
 }
@@ -112,7 +114,7 @@ describe('rail stack is TikTok\'s, with no Repost', () => {
       .filter(id => /-(btn|disc)-post-a$/.test(id))
       .map(id => id.replace(/-post-a$/, ''));
     expect([...new Set(ids)]).toEqual(['avatar-btn', 'follow-btn', 'like-btn', 'comment-btn', 'save-btn', 'share-btn', 'sound-disc']);
-    expect(railSource).not.toMatch(/onRepost|repost-btn|retweet/);
+    expect(railSource).not.toMatch(/repost-btn|kind="repost"|retweet/);
   });
 
   it('counts always show, starting at 0', () => {
@@ -136,8 +138,8 @@ describe('rail stack is TikTok\'s, with no Repost', () => {
 
 describe('rail position is independent of the post', () => {
   it('lays out identically for a video, a slideshow, long/short captions, live or not, any counts', () => {
-    const video = render(railProps({ testIdBase: 'video-1', sound: 'After Dark', commentsCount: 980, shares: 2045, saves: 3100, engagement: { likes: 12_400, liked: true } }));
-    const slideshow = render(railProps({ testIdBase: 'slides-1', sound: undefined, discSpinning: false, commentsCount: 0, shares: 0, saves: 0, engagement: { following: true, saved: true } }));
+    const video = render(railProps({ testIdBase: 'video-1', commentsCount: 980, shares: 2045, saves: 3100, engagement: { likes: 12_400, liked: true } }));
+    const slideshow = render(railProps({ testIdBase: 'slides-1', commentsCount: 0, shares: 0, saves: 0, engagement: { following: true, saved: true } }));
     const photo = render(railProps({ testIdBase: 'photo-1', avatarUri: 'https://cdn.example/a.jpg', commentsCount: 1_200_000 }));
     // The disc's artwork (photo or initials) sits inside its fixed 24x24 box.
     const sig = (t: ReturnType<typeof create>) => layoutSignature(t.root).filter(s => s !== 'Text:{}' && s !== 'Image:{"width":24,"height":24}');

@@ -173,12 +173,16 @@ export interface InboxPromptDeps {
 }
 
 async function defaultSellerPrompt(userId: string): Promise<string> {
-  const [{ buildSystemPrompt }, { buildSellerSnapshot }] = await Promise.all([
+  const [{ buildSystemPrompt }, { buildSellerSnapshot }, { loadAiSettingsForEnforcement }] = await Promise.all([
     import("../routes/ai"),
     import("./sellerSnapshot"),
+    import("./aiSettingsStore"),
   ]);
-  const snapshot = await buildSellerSnapshot(userId);
-  return buildSystemPrompt(snapshot, { screen: "inbox" });
+  const [snapshot, settings] = await Promise.all([
+    buildSellerSnapshot(userId),
+    loadAiSettingsForEnforcement(userId),
+  ]);
+  return buildSystemPrompt(snapshot, { screen: "inbox" }, undefined, settings);
 }
 
 export async function buildInboxAssistantPrompt(

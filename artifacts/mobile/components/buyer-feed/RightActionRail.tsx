@@ -54,7 +54,7 @@ export interface RailEngagement {
 }
 
 /** Always visible: zero/non-finite/invalid/negative -> '0'; exact 1-999, then 1.2K / 3.4M. Never a blank spacer. */
-export function formatRailCount(n: number): string {
+export function formatRailCount(n: number = 0): string {
   if (typeof n !== 'number' || !Number.isFinite(n) || n < 1) return '0';
   if (n < 1_000) return String(Math.trunc(n));
   const [unit, suffix] = n < 1_000_000 ? [1_000, 'K'] : [1_000_000, 'M'];

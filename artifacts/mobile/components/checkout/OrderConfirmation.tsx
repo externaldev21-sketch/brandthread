@@ -1,3 +1,4 @@
+import { countRealOrders, maybeRequestStoreReview } from '@/lib/storeReviewPrompt';
 import * as Haptics from 'expo-haptics';
 /**
  * Order confirmation — redesigned 1:1 on the Shopify Shop app's
@@ -242,6 +243,19 @@ export function OrderConfirmation({
     ) as never);
   }
 
+  useEffect(() => {
+    // A buyer's 5th order is a good moment to ask for an App Store review
+    // (rate limited inside maybeRequestStoreReview). Wait so the confirmation
+    // is seen first.
+    if (!firstVerified?.id || !userId) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api.buyer.orders.list()
+        .then((orders) => { if (!cancelled && countRealOrders(orders) === 5) void maybeRequestStoreReview(userId, 'fifth_order'); })
+        .catch(() => {});
+    }, 4000);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [firstVerified?.id, userId, api]);
   return (
     <View testID="checkout-confirmation">
       <View style={styles.hero}>
@@ -255,7 +269,8 @@ export function OrderConfirmation({
       </View>
 
       <View style={styles.titleBlock}>
-        <Text style={[styles.eyebrow, { color: theme.muted }]}>{t(finalizing ? 'Payment received' : 'Order confirmed')}</Text>
+        <Text style={[styles.thanks, { color: theme.text }]} accessibilityRole="header">{t(finalizing ? 'Payment received' : 'Thank you for your order!')}</Text>
+        {!finalizing && session.contact?.email ? <Text style={[styles.body, { color: theme.muted }]}>{`We’ve sent your order confirmation to ${session.contact.email}.`}</Text> : null}
         {!finalizing ? (
           <View style={styles.orderNumbers}>
             {verifiedOrders.length > 0 ? verifiedOrders.map(order => (
@@ -482,6 +497,7 @@ export function OrderConfirmationActions({
 }
 
 const styles = StyleSheet.create({
+  thanks: { fontFamily: FONT.bold, fontSize: FS.xxl, letterSpacing: -0.6 },
   hero: { alignItems: 'center', paddingTop: SP.sm, paddingBottom: SP.md },
   pending: { width: 64, height: 64, borderRadius: 32, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center' },
   titleBlock: { paddingBottom: SP.md },

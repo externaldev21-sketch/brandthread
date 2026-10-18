@@ -50,4 +50,7 @@ export type ExpressPayProps = {
   /** Whether a wallet is really usable here; the row hides itself otherwise (no dead buttons). */
   onAvailability: (available: boolean) => void;
   disabled?: boolean;
+  /** Open the wallet sheet as soon as it is ready (the bag's Apple Pay button
+   *  hands off to checkout with ?wallet=1). Native only; once per mount. */
+  autoStart?: boolean;
 };
