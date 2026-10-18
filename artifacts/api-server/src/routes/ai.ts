@@ -36,11 +36,11 @@ const router = Router();
 const MAX_MESSAGES         = 40;
 const MAX_PER_MESSAGE_CHARS = 4000;
 const MIN_CONTENT_CHARS    = 1;
-const CHAT_MODEL           = "gpt-5.4-mini";
+export const CHAT_MODEL           = "gpt-5.4-mini";
 
 // ─── System prompt builder ─────────────────────────────────────────────────────
 
-function buildSystemPrompt(
+export function buildSystemPrompt(
   snapshot: SellerSnapshot,
   rawContext: Record<string, unknown>,
   rawBrandMemory: Record<string, string> | undefined,

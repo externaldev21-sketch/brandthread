@@ -1,3 +1,6 @@
+import { BRANDTHREAD_ASSISTANT_NAME, inboxPinRank } from '@/lib/brandthreadAssistant';
+import { VerifiedMark } from '@/components/community/VerifiedMark';
+import { loadBuyerProfile } from '@/lib/buyerProfile';
 import {
   INBOX_FILTERS, inboxFilterLabel, conversationMatchesInboxFilter, communityMatchesInboxFilter,
   type InboxFilter,
@@ -126,31 +129,80 @@ const NO_RIPPLE = false;
 type InboxTab = 'inbox' | 'requests';
 
 function InboxPillRow({
-  value, onChange, requestsCount, theme, onFilterPress,
+  value, onChange, requestsCount, theme, gutter = SP.lg, onFilterPress,
 }: {
   value: InboxTab;
   onChange: (tab: InboxTab) => void;
   requestsCount: number;
   theme: ReturnType<typeof useAppTheme>['theme'];
-  /** Omitted (seller): no filter pill. */
+  gutter?: number;
   onFilterPress?: () => void;
 }) {
+  const tabs: { key: InboxTab; label: string; count?: number }[] = [
+    { key: 'inbox', label: 'Inbox' },
+    { key: 'requests', label: 'Requests', count: requestsCount },
+  ];
   return (
-    <SegmentTabs
-      tabs={[
-        { key: 'inbox', label: 'Inbox', testID: 'inbox-tab-inbox' },
-        { key: 'requests', label: 'Requests', count: requestsCount, testID: 'inbox-tab-requests' },
-      ]}
-      value={value}
-      onChange={onChange}
-      trailing={onFilterPress ? (
-        <IconButton name="sliders" variant="plain" size={18} color={xColors(theme).text}
-          onPress={onFilterPress} rippleEnabled={NO_RIPPLE}
-          accessibilityLabel="Filter messages" testID="inbox-filter-pill" />
-      ) : null}
-    />
+    <View style={[pillS.row, { borderBottomColor: theme.border }]} accessibilityRole="tablist">
+      {tabs.map(tab => {
+        const active = value === tab.key;
+        return (
+          // PressableScale doesn't pass flex through — the plain View owns
+          // the equal-width half.
+          <View key={tab.key} style={pillS.tab}>
+          <PressableScale
+            style={pillS.tabPress}
+            onPress={() => onChange(tab.key)}
+            rippleEnabled={NO_RIPPLE}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            testID={`inbox-tab-${tab.key}`}
+          >
+            <View style={pillS.labelRow}>
+              <Text style={[pillS.label, { color: active ? theme.text : theme.muted, fontFamily: active ? FONT.bold : FONT.medium }]}>
+                {tab.label}
+              </Text>
+              {!!tab.count && tab.count > 0 && (
+                <View style={[pillS.count, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
+                  <Text style={[pillS.countText, { color: active ? theme.onAccent : theme.muted }]}>
+                    {tab.count > 99 ? '99+' : tab.count}
+                  </Text>
+                </View>
+              )}
+            </View>
+            {active && <View style={[pillS.indicator, { backgroundColor: theme.text }]} testID={`inbox-tab-indicator-${tab.key}`} />}
+          </PressableScale>
+          </View>
+        );
+      })}
+      <PressableScale
+        style={[pillS.filter, { right: gutter - 8 }]}
+        onPress={onFilterPress}
+        rippleEnabled={NO_RIPPLE}
+        accessibilityRole="button"
+        accessibilityLabel="Filter messages"
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        testID="inbox-filter-pill"
+      >
+        <Feather name="sliders" size={17} color={theme.muted} />
+      </PressableScale>
+    </View>
   );
 }
+const pillS = StyleSheet.create({
+  row: {
+    flexDirection: 'row', alignItems: 'stretch', height: 48, marginBottom: SP.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tab: { flex: 1 },
+  tabPress: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  label: { fontSize: FS.base, letterSpacing: 0.1 },
+  indicator: { position: 'absolute', left: 0, right: 0, bottom: -StyleSheet.hairlineWidth, height: 3, borderRadius: 1.5 },
+  count: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  countText: { fontSize: 11, fontFamily: FONT.bold },
+  filter: { position: 'absolute', top: 0, bottom: 0, width: 32, alignItems: 'center', justifyContent: 'center' },
+});
 
 // ─── Compose sheet: unified "person" shape ────────────────────────────────────
 // Friends/followers/following come from the follow-graph endpoints in
@@ -406,7 +458,13 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     })) : [], { persist: !previewTrayAtMount });
   const [myStoryId, setMyStoryId] = useStickyState<string | null>(`${inboxCachePrefix}:myStoryId`,
     () => previewTrayAtMount ? PREVIEW_MY_STORY.id : null, { persist: !previewTrayAtMount });
-  const myAvatarUri = clerkUser?.hasImage ? clerkUser.imageUrl : undefined;
+  const [profileAvatar, setProfileAvatar] = useState<{ owner: string | null; uri: string | null }>({ owner: null, uri: null });
+  const myAvatarUri = (profileAvatar.owner === userId ? profileAvatar.uri : null) || (clerkUser?.hasImage ? clerkUser.imageUrl : undefined);
+  useEffect(() => {
+    let current = true;
+    if (userId) void loadBuyerProfile().then(profile => { if (current) setProfileAvatar({ owner: userId, uri: profile.avatarUri || null }); }).catch(() => {});
+    return () => { current = false; };
+  }, [userId]);
   const myDisplayName = clerkUser?.fullName || clerkUser?.firstName || clerkUser?.username || 'You';
   const myInitials = myDisplayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'Y';
 
@@ -701,7 +759,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       }
       return true;
     })
-    .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
+    .sort((a, b) => inboxPinRank(b) - inboxPinRank(a));
 
   // Joined community group chats live beside DMs (joining is consent), so
   // they are merged in by recency here and never counted as requests.
@@ -891,6 +949,13 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   }
 
   function longPressConversation(conv: Conversation) {
+    if (conv.isOfficial) {
+      showActionSheet(BRANDTHREAD_ASSISTANT_NAME, 'Brandthread is the app’s AI assistant.', [
+        { text: 'Mute', onPress: () => { void swipeMuteConversation(conv); } },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
     const other = getParticipant(conv);
     const opened = other ? openContextMenu({
       preview: {
@@ -1240,7 +1305,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
         color: theme.accentDim,
         textColor: theme.accentLight,
         onPress: () => swipeMarkReadConversation(conv),
-        accessibilityLabel: `Mark conversation with ${participant.name} as read`,
+        accessibilityLabel: `Mark conversation with ${conv.isOfficial ? BRANDTHREAD_ASSISTANT_NAME : participant.name} as read`,
       },
       // Instagram-inspired action (icon/naming borrowed from its DM
       // pin/mute/delete set — see the Mobbin citation in this PR's
@@ -1281,7 +1346,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
 
     return (
       <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10} disabled={!shouldAnimateRow(conv.id)}>
-        <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
+        <InboxSwipeRow rowId={conv.id} actions={swipeActions.filter(action => !conv.isOfficial || action.key === 'read' || action.key === 'mute')}>
           <PressableScale
             style={[s.convRow, { backgroundColor: theme.background }]}
             onPressIn={() => warmThreadOnPressIn(userId, conv.id)}
@@ -1346,14 +1411,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
                 >
                   {participant.name}
                 </Text>
-                {conv.isOfficial && (
-                  <View style={s.officialBadgeRow} testID={`inbox-official-badge-${conv.id}`}>
-                    <Feather name="check-circle" size={12} color={theme.accent} />
-                    <View style={[s.aiTag, { backgroundColor: theme.accentDim }]}>
-                      <Text style={[s.aiTagText, { color: theme.accent }]}>AI</Text>
-                    </View>
-                  </View>
-                )}
+                {conv.isOfficial && <VerifiedMark size={14} />}
               </View>
               {isTyping ? (
                 <Text style={[s.convPreview, { color: theme.accent, fontFamily: FONT.semibold }]} testID={`inbox-typing-${conv.id}`}>
@@ -1678,7 +1736,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
             { icon: 'search', onPress: openMessagesSearch, accessibilityLabel: 'Search messages', testID: 'inbox-header-search' },
             isSeller
               ? { icon: 'plus', onPress: () => openInboxComposeMenu(router), accessibilityLabel: 'Create or join a group', testID: 'inbox-header-compose' }
-              : { icon: 'plus', onPress: () => openInboxComposeMenu(router, openCompose), accessibilityLabel: 'New message or group', testID: 'inbox-header-compose' },
+              : { name: 'plus', onPress: openCompose, accessibilityLabel: 'New message', testID: 'inbox-header-compose' },
           ]}
         />
       )}
@@ -1869,7 +1927,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
         >
           <View>
-            {messagesSearchLower || loadError || inboxFilter !== 'all' ? renderEmptyState() : renderInboxEmptyState()}
+            {messagesSearchLower || loadError || inboxFilter !== 'all' ? renderEmptyState() : null}
             {!messagesSearchLower && !loadError && inboxFilter === 'all' && renderSuggestedSection()}
           </View>
         </ScrollView>
@@ -1912,10 +1970,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
             />
             {composeDirLoading && !composeQueryLower ? (
               <View style={s.composeCenter}><ActivityIndicator color={theme.accent} /></View>
-            ) : composeSections.length === 0 ? (
-              composeLoading ? (
-                <View style={s.composeCenter}><ActivityIndicator color={theme.accent} /></View>
-              ) : (
+            ) : (
                 <View style={s.composeCenter}>
                   <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>
                     {composeQueryLower ? 'No one found' : 'No one to show yet'}
@@ -1925,6 +1980,40 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
             ) : (
               <SectionList
                 sections={composeSections}
+                ListHeaderComponent={<View>
+                <PressableScale
+                  style={s.composeResultRow}
+                  onPress={() => { closeCompose(); router.push('/community-create' as never); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="New group"
+                  testID="compose-new-group"
+                >
+                  <View style={[s.composeAvatar, { backgroundColor: theme.cardElevated }]}>
+                    <Feather name="users" size={18} color={theme.text} />
+                  </View>
+                  <Text style={{ flex: 1, color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }}>New group</Text>
+                </PressableScale>
+                {officialConv && (
+                  <PressableScale
+                    style={s.composeResultRow}
+                    onPress={() => { closeCompose(); openConversation(officialConv); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Message ${BRANDTHREAD_ASSISTANT_NAME}`}
+                    testID="compose-brandthread"
+                  >
+                    <View style={[s.composeAvatar, s.officialAvatar]}>
+                      <BrandthreadAvatar size={22} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }} numberOfLines={1}>{BRANDTHREAD_ASSISTANT_NAME}</Text>
+                        <VerifiedMark size={12} />
+                      </View>
+                      <Text style={{ color: theme.muted, fontFamily: FONT.medium, fontSize: FS.meta }} numberOfLines={1}>Ask anything about the app</Text>
+                    </View>
+                  </PressableScale>
+                )}
+              </View>}
                 keyExtractor={item => item.userId}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
@@ -1989,6 +2078,23 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
 
 function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: number) {
   return StyleSheet.create({
+inboxEmptyBadge: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SP.sm,
+  },
+convNameOfficial: { flexShrink: 1, fontSize: FS.base },
+avatar56: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   root: { flex: 1 },
 
   // Compose modal
@@ -2076,12 +2182,12 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   activeRailNoteWrap: { height: 46, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
   noteBubbleTouchable: { height: 46, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
   noteBubble: {
-    maxWidth: 84, paddingHorizontal: 9, paddingVertical: 5,
+    maxWidth: 84, paddingHorizontal: 10, paddingVertical: 5,
     borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth,
   },
   noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14, textAlign: 'center' },
   noteBubbleTail: {
-    width: 7, height: 7, marginTop: -4, borderRadius: 2,
+    width: 7, height: 7, marginTop: -4, borderRadius: 1.5,
     borderWidth: StyleSheet.hairlineWidth, transform: [{ rotate: '45deg' }],
   },
 

@@ -13,7 +13,6 @@
  * balance is unchanged by any agent interaction.
  */
 import { Router, type Request, type Response } from "express";
-import { openai } from "@workspace/integrations-openai-ai-server";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { db, conversations, conversationParticipants, messages, users } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -25,34 +24,23 @@ import {
   BRANDTHREAD_AGENT_COLOR, isAgentConversation, composeThreadCashCard, composeDiscoverCard,
 } from "../lib/brandthreadAgent";
 import { logger } from "../lib/logger";
+import {
+  assistantAvailable, buildInboxAssistantPrompt, parseAssistantReply, composeLinkCard,
+  ASSISTANT_OFFLINE_REPLY, ASSISTANT_UNREACHABLE_REPLY,
+} from "../lib/brandthreadAssistant";
 
 const router = Router();
 router.use(requireAuth);
 
+// Same model as Brandthread AI (/ai-brain, routes/ai.ts).
 const CHAT_MODEL = "gpt-5.4-mini";
 const MAX_HISTORY_MESSAGES = 16;
 const MAX_INPUT_CHARS = 2000;
 
-const FALLBACK_REPLY = "having a moment — try that again in a sec 🙏";
-
-const SYSTEM_PROMPT = [
-  "You are the Brandthread Agent — the official AI account built into the Brandthread fashion marketplace app.",
-  "You are openly AI-run by Brandthread. If asked whether you're a real person, say plainly that you're an AI built by Brandthread — never claim to be human.",
-  "",
-  "## Tone",
-  "Casual, short, friend-like texts. Lowercase is fine. Emoji sparingly. 1-3 sentences per reply — this is a chat thread, not an essay.",
-  "",
-  "## What you know",
-  "- The feed/Discover surfaces fresh drops and brands picked for the buyer; Shop is where they browse and check out.",
-  "- Buyer protection covers orders that don't arrive or don't match — buyers can open a dispute from their order.",
-  "- Thread Cash: buyers earn it by checking in daily (streaks earn bonus amounts). At checkout it can be toggled on as a stacked discount — the card on file is ALWAYS charged for the remainder, Thread Cash never fully replaces the card charge unless it happens to cover 100%. It can only be sent to buyers who mutually follow each other. Thread Cash someone else sent you cannot be re-sent onward. It cannot be cashed out or converted to real money.",
-  "- Sellers: list products from the Seller Hub, go live via Studio → Go Live, get paid out via Stripe Connect once orders ship, and can import their existing catalog from Shopify.",
-  "",
-  "## Rules",
-  "- Never claim to move, grant, or check anyone's Thread Cash balance yourself — if asked about their balance, tell them to check the Thread Cash screen.",
-  "- Never promise a refund, discount code, or account change you can't actually make.",
-  "- Keep it brief and friendly. If you don't know something, say so honestly.",
-].join("\n");
+// Replies when the LLM can't answer are honest status messages, never a
+// made-up answer — see ASSISTANT_OFFLINE_REPLY / ASSISTANT_UNREACHABLE_REPLY.
+// The system prompt (buyer app guide, or the /ai-brain seller prompt +
+// snapshot for sellers) lives in lib/brandthreadAssistant.ts.
 
 async function loadHistory(conversationId: string) {
   const rows = await db
@@ -72,7 +60,8 @@ async function loadHistory(conversationId: string) {
 
 /** Very small heuristic card picker — not a full recommendation engine, just
  *  enough to demo rich cards from real conversation intent. */
-function pickCard(userText: string) {
+function pickCard(userText: string, accountType: "buyer" | "seller") {
+  if (accountType !== "buyer") return undefined;
   const lower = userText.toLowerCase();
   if (lower.includes("thread cash")) return composeThreadCashCard();
   if (lower.includes("discover") || lower.includes("find me") || lower.includes("brands")) return composeDiscoverCard();
@@ -123,7 +112,7 @@ router.post("/message", rateLimit("agent-chat"), requireAiConsent(), async (req:
   }
 
   const [me] = await db
-    .select({ name: users.displayName, initials: users.username })
+    .select({ name: users.displayName, initials: users.username, accountType: users.accountType })
     .from(users)
     .where(eq(users.clerkId, userId))
     .limit(1);
@@ -150,26 +139,38 @@ router.post("/message", rateLimit("agent-chat"), requireAiConsent(), async (req:
     })
     .where(eq(conversations.id, conversationId));
 
-  let replyText = FALLBACK_REPLY;
-  let card: ReturnType<typeof composeThreadCashCard> | undefined;
-  try {
-    const history = await loadHistory(conversationId);
-    const completion = await openai.chat.completions.create({
-      model: CHAT_MODEL,
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
-      max_completion_tokens: 300,
-    });
-    const raw = (completion.choices[0]?.message?.content ?? "").trim();
-    if (raw) {
-      // Basic output moderation — the agent's own reply must never contain
-      // anything the ordinary DM moderator would reject.
-      const outputDecision = moderateMessage(raw);
-      replyText = outputDecision.blocked ? FALLBACK_REPLY : raw;
-      if (!outputDecision.blocked) card = pickCard(trimmed);
+  const accountType = me?.accountType === "seller" ? "seller" : "buyer";
+  let replyText = ASSISTANT_OFFLINE_REPLY;
+  let card: ReturnType<typeof composeThreadCashCard> | ReturnType<typeof composeLinkCard> | undefined;
+  if (await assistantAvailable()) {
+    replyText = ASSISTANT_UNREACHABLE_REPLY;
+    try {
+      // Imported lazily: the shared client throws at import time when its
+      // env vars are missing, and assistantAvailable() has just checked them.
+      const { openai } = await import("@workspace/integrations-openai-ai-server");
+      const [history, systemPrompt] = await Promise.all([
+        loadHistory(conversationId),
+        buildInboxAssistantPrompt(userId, accountType),
+      ]);
+      const completion = await openai.chat.completions.create({
+        model: CHAT_MODEL,
+        messages: [{ role: "system", content: systemPrompt }, ...history],
+        max_completion_tokens: 400,
+      });
+      const parsed = parseAssistantReply((completion.choices[0]?.message?.content ?? "").trim(), accountType);
+      if (parsed.text) {
+        // Output moderation — the reply must never contain anything the
+        // ordinary DM moderator would reject.
+        const outputDecision = moderateMessage(parsed.text);
+        if (!outputDecision.blocked) {
+          replyText = parsed.text;
+          card = parsed.link ? composeLinkCard(parsed.link) : pickCard(trimmed, accountType);
+        }
+      }
+    } catch (err) {
+      logger.error({ err, conversationId }, "Brandthread Agent completion failed");
+      replyText = ASSISTANT_UNREACHABLE_REPLY;
     }
-  } catch (err) {
-    logger.error({ err, conversationId }, "Brandthread Agent completion failed");
-    replyText = FALLBACK_REPLY;
   }
 
   const replyAt = new Date();

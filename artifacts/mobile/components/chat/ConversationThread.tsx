@@ -1,3 +1,4 @@
+import { BRANDTHREAD_ASSISTANT_NAME } from '@/lib/brandthreadAssistant';
 import { radius as ControlRadius } from '@/constants/radii';
 /**
  * The ONE 1:1 chat thread screen, shared by both sides of a DM.
@@ -782,7 +783,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   // Chat details > Nicknames: once set, the nickname replaces the real name
   // everywhere this screen shows the counterpart — header, request-mode
   // profile header, media-sheet copy, etc.
-  const displayName = participant?.nickname || participant?.name || params.participantName || '';
+  const displayName = (conv?.isOfficial || participant?.userId === BRANDTHREAD_AGENT_USER_ID) ? BRANDTHREAD_ASSISTANT_NAME : participant?.nickname || participant?.name || params.participantName || '';
   // Chat details > Theme: a conversation-level property — same background
   // and bubble colors for both participants. Null = Brandthread's existing
   // default monochrome look, completely unchanged.
@@ -1557,7 +1558,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       setMessages(msgs);
       void result;
     } catch {
-      const { text: replyText } = cannedAgentReply(messageText);
+      const replyText = 'Couldn’t reach Brandthread just now. Check your connection and try again.';
       setMessages((prev) => [...prev.filter((m) => m.id !== optimistic.id), optimistic, {
         id: `local-agent-fallback-${Date.now()}`,
         conversationId: conv.id,
@@ -1756,7 +1757,33 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
 
   // ── Header options ──────────────────────────────────────────────────────────
 
+  function openAgentOptions() {
+    if (!participant) return;
+    showActionSheet(
+      BRANDTHREAD_ASSISTANT_NAME,
+      'Brandthread is the app\'s AI assistant. It can make mistakes, so double-check anything important.',
+      [
+        {
+          text: 'Mute',
+          onPress: async () => {
+            try {
+              const { muteUser } = await import('@/services/socialService');
+              await muteUser({
+                userId: participant.userId, name: BRANDTHREAD_ASSISTANT_NAME,
+                handle: participant.handle, initials: participant.initials, color: participant.color,
+              });
+            } catch {
+              Alert.alert('Couldn’t mute', 'Please try again.');
+            }
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
+  }
+
   function openOptions() {
+    if (isAgentConv) { openAgentOptions(); return; }
     if (!participant) return;
     // Alert.alert() with a button array is a silent no-op on web (see
     // components/ui/ActionSheet.tsx's header comment) — this left the
@@ -2001,7 +2028,19 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     if (msg.attachment?.type === 'quick_replies') {
       const options = parseQuickReplies(msg.attachment.meta?.optionsJson);
       return (
-        <View style={[s.quickReplyOuterRow, { marginTop: isFirstInGroup ? 12 : 2 }]}>
+        <View>
+        {/* The message's own text (e.g. the welcome's closing line) sits
+            above its chips instead of being dropped. */}
+        {msg.text ? (
+          <View style={{ paddingLeft: BUBBLE_COLUMN_LEFT, paddingRight: SP.md, marginTop: isFirstInGroup ? 12 : 2 }}>
+            <View style={{ maxWidth: BUBBLE_MAX }}>
+              <View style={[s.bubble, { backgroundColor: receivedBubbleColor, alignSelf: 'flex-start' }]}>
+                <Text style={[s.msgText, { color: receivedTextColor }]}>{msg.text}</Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
+        <View style={[s.quickReplyOuterRow, { marginTop: msg.text ? 8 : isFirstInGroup ? 12 : 2 }]}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -2018,6 +2057,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
             ))}
           </ScrollView>
         </View>
+        </View>
       );
     }
 
@@ -2031,6 +2071,16 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       const cardKind = att.meta?.cardKind;
       return (
         <View style={{ marginTop: isFirstInGroup ? 12 : 2, paddingLeft: BUBBLE_COLUMN_LEFT, paddingRight: SP.md }}>
+          {/* Reply text first, then its deep-link card. */}
+          {msg.text ? (
+            <View style={{ flexDirection: 'row', justifyContent: isOwn ? 'flex-end' : 'flex-start', marginBottom: 6 }}>
+              <View style={{ maxWidth: BUBBLE_MAX }}>
+                <View style={[s.bubble, { backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor, alignSelf: isOwn ? 'flex-end' : 'flex-start' }]}>
+                  <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
+                </View>
+              </View>
+            </View>
+          ) : null}
           <PressableScale rippleEnabled={false}
             bounce={false}
             style={[s.agentCardOuter, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
@@ -2042,7 +2092,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                 <ThreadCashBillIcon size={18} />
               ) : (
                 <Feather
-                  name={cardKind === 'product' ? 'shopping-bag' : cardKind === 'profile' ? 'user' : 'compass'}
+                  name={cardKind === 'product' ? 'shopping-bag' : cardKind === 'profile' ? 'user' : cardKind === 'link' ? 'arrow-up-right' : 'compass'}
                   size={18}
                   color={theme.accent}
                 />
@@ -2054,15 +2104,6 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
             </View>
             {deepLink && <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />}
           </PressableScale>
-          {msg.text ? (
-            <View style={{ flexDirection: 'row', justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: 4 }}>
-              <View style={{ maxWidth: BUBBLE_MAX }}>
-                <View style={[s.bubble, { backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor, alignSelf: isOwn ? 'flex-end' : 'flex-start' }]}>
-                  <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
-                </View>
-              </View>
-            </View>
-          ) : null}
         </View>
       );
     }

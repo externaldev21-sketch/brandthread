@@ -39,7 +39,8 @@ import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { maybeSendAwayAutoReply } from "../lib/awayAutoReply";
 import { isFollowedBy, shouldRouteToRequests } from "../lib/conversationRouting";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
-import { isAgentUserId } from "../lib/brandthreadAgent";
+import { isAgentUserId, isAgentConversation, AGENT_CONVERSATION_TYPE } from "../lib/brandthreadAgent";
+import { ensureAgentWelcomeOnce } from "../lib/brandthreadAssistant";
 import { enrichProductAttachments } from "../lib/productAttachmentInfo";
 import { enrichOrderAttachments } from "../lib/orderAttachmentInfo";
 import { parseClientMessageId } from "../lib/clientMessageId";
@@ -121,7 +122,15 @@ function getAttachmentPreview(attachment: unknown): string | undefined {
   return typeof title === "string" && title.trim() ? title.trim() : "Attachment";
 }
 
+// Brandthread assistant extras (chip rows, deep-link cards) ride along on a
+// text message — the inbox previews that text, not "Attachment".
+const TEXT_FIRST_ATTACHMENT_TYPES = new Set(["quick_replies", "agent_card"]);
+
 function getMessagePreview(body: string | null | undefined, attachment: unknown, attachments?: unknown): string | undefined {
+  const attachmentType = attachment && typeof attachment === "object" ? (attachment as { type?: unknown }).type : undefined;
+  if (typeof attachmentType === "string" && TEXT_FIRST_ATTACHMENT_TYPES.has(attachmentType) && body?.trim()) {
+    return body.trim();
+  }
   const attachmentPreview = getAttachmentPreview(attachment)
     ?? (Array.isArray(attachments) ? getAttachmentPreview(attachments[0]) : undefined);
   if (attachmentPreview) return attachmentPreview;
@@ -342,6 +351,10 @@ router.get("/", async (req, res) => {
   if (!page.success) return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
   const { limit, offset } = page.data;
 
+  // Every inbox has the pinned Brandthread chat — created here on first open
+  // for accounts that never hit the onboarding hook (idempotent).
+  await ensureAgentWelcomeOnce(userId);
+
   const myParts = await db
     .select({ conversationId: conversationParticipants.conversationId })
     .from(conversationParticipants)
@@ -354,7 +367,7 @@ router.get("/", async (req, res) => {
       // message newer than the delete arrives.
       sql`(${conversationParticipants.hiddenAt} IS NULL OR ${conversations.lastMessageAt} > ${conversationParticipants.hiddenAt})`,
     ))
-    .orderBy(desc(conversations.updatedAt))
+    .orderBy(desc(sql`(${conversations.type} = ${AGENT_CONVERSATION_TYPE})`), desc(conversations.updatedAt))
     .limit(limit)
     .offset(offset);
 
@@ -419,7 +432,7 @@ router.get("/", async (req, res) => {
     .where(and(eq(messageHidden.userId, userId), inArray(messages.conversationId, convIds)));
   for (const row of hiddenRows) hiddenForMe.add(row.conversationId);
 
-  return res.json(convs.map((c) => buildConversationView(
+  return res.json(sortAgentFirst(convs).map((c) => buildConversationView(
     c,
     partsByConv.get(c.id) ?? [],
     userId,
@@ -427,6 +440,12 @@ router.get("/", async (req, res) => {
     presence,
   )));
 });
+
+/** Brandthread chat first, then the existing most-recent-first order. */
+export function sortAgentFirst<T extends { type: string }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) =>
+    Number(b.type === AGENT_CONVERSATION_TYPE) - Number(a.type === AGENT_CONVERSATION_TYPE));
+}
 
 type ParticipantInput = { userId: string; name: string; handle: string; initials: string; color: string; accountType: string };
 
@@ -1770,6 +1789,11 @@ router.delete("/:id", async (req, res) => {
     .limit(1);
 
   if (!isMember) return res.status(404).json({ error: "Conversation not found" });
+
+  // The Brandthread chat is permanent — it can be muted, never deleted.
+  if (await isAgentConversation(id)) {
+    return res.status(409).json({ error: "The Brandthread chat can't be deleted. You can mute it instead.", code: "AGENT_THREAD_PERMANENT" });
+  }
 
   const now = new Date();
   await db.update(conversationParticipants)
