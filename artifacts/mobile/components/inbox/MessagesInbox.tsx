@@ -1971,13 +1971,6 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
             {composeDirLoading && !composeQueryLower ? (
               <View style={s.composeCenter}><ActivityIndicator color={theme.accent} /></View>
             ) : (
-                <View style={s.composeCenter}>
-                  <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>
-                    {composeQueryLower ? 'No one found' : 'No one to show yet'}
-                  </Text>
-                </View>
-              )
-            ) : (
               <SectionList
                 sections={composeSections}
                 ListHeaderComponent={<View>
