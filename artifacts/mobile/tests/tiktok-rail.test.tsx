@@ -73,7 +73,7 @@ function railProps(overrides: Partial<RailProps>): RailProps {
     creator: 'Atelier Noire', avatarColor: '#222', initials: 'AN', engagement: undefined,
     commentsCount: 0, shares: 0, saves: 0,
     onOpenCreator: noop, onFollow: noop, onLike: noop, onOpenComments: noop, onSave: noop, onShare: noop,
-    footerNode: <SoundDisc avatarColor="#222" initials="AN" sound="Original sound" spinning={false} reduceMotion={true} soundOn={true} onPress={noop} />,
+    footerSlot: <SoundDisc initials="AN" sound="Original sound" spinning={false} reduceMotion={true} soundOn={true} onPress={noop} />,
     style: { bottom: 97, right: 6 }, testIdBase: 'post-a',
     ...overrides,
   };

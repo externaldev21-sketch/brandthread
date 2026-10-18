@@ -19,14 +19,14 @@ The owner wants Instagram/TikTok-style photo browsing across Threads, Following 
 
 ## TikTok feed contract
 
-Threads/Following uses the supplied TikTok iOS flows as the layout and interaction reference, but keeps Brandthread's red LIVE side tab, Cart and navigation. The seller swipe/glow and system font are protected exceptions, not redesign targets. Photo auto-advance is optional and defaults off; when enabled it advances every three seconds and stops while interacting or zooming.
+Threads/Following uses the supplied TikTok iOS flows as the layout and interaction reference. The latest approved header has LIVE as its first text tab, not the older red edge notch. Keep Cart and navigation. The seller swipe/glow and system font are protected exceptions, not redesign targets. Photo auto-advance is optional and defaults off; when enabled it advances every three seconds and stops while interacting or zooming.
 
 **Why:** The owner explicitly requested the whole TikTok feed, not just a loosely similar action rail, while retaining those Brandthread-specific controls and manual photo browsing.
 
 **How to apply:** Compare actual feed states against the reference frames, preserve those exceptions, and never alter real post captions or invent creators merely to produce visual evidence.
 
-The owner reiterated that all five rail counts must remain visible at zero and the rail must stay compact. Align Share to the caption text's last line, not the music row or a footer disc's bottom.
+The latest approved rail design supersedes the earlier rail brief: Repost lives in the share sheet, not on the rail. Every displayed count remains visible at zero. Rail geometry stays fixed between posts; captions cannot move it. Sound is always on natively (including silent mode), and on after the first gesture on web; there is no mute control or caption music line. Keep the sound disc and persistent paused icon.
 
-**Why:** Earlier rail revisions contradicted the explicit count/spacing brief, and adding a sound-disc footer can silently shift the Share anchor.
+**Why:** The owner explicitly approved this newer design over earlier interpretations. Older branches must not restore a Repost rail button, hidden zeros, per-post rail jumps or sound toggles.
 
-**How to apply:** Follow the latest explicit rail specification over older spacing conventions, measure the caption and footer independently, and leave LiveEdgeTab's measured-label sizing alone.
+**How to apply:** Apply reviewed visual changes on top of the current playback, HLS, carousel and persistence internals; do not replace those internals with an older implementation.

@@ -982,6 +982,7 @@ export default function BuyerProductDetailScreen() {
     return usesThreadPull ? back() : goBackOr(router, '/(buyer)/discover');
   };
   const insets = useSafeAreaInsets();
+  const [topBarHeight, setTopBarHeight] = useState(0);
   const headerTopInset = useHeaderTopInset();
   const api    = useApi();
   const { isSignedIn } = useAuth();
@@ -2066,6 +2067,7 @@ export default function BuyerProductDetailScreen() {
           Solid dark scrim, not a blur, over the swipeable gallery — the
           same reason as PR #109. */}
       <View
+        onLayout={event => setTopBarHeight(event.nativeEvent.layout.height)}
         style={[
           s.topBar,
           { paddingTop: headerTopInset + SP.sm, paddingLeft: SP.md + insets.left, paddingRight: SP.md + insets.right },

@@ -2160,17 +2160,7 @@ function SpotlightPageImpl({
         belowCaptionSlot={<PollCard postId={feedPostId(item.id)} variant="overlay" />}
         soundActive={isActive}
         reduceMotion={reduceMotion}
-        topSlot={((watchedForRepost && isActive && !engagement?.reposted) || (!!item.productTags?.length && shopTagShown)) && <View style={{ alignItems: 'flex-start', gap: 8 }}>
-          {watchedForRepost && isActive && !engagement?.reposted && (
-            <Pressable
-              onPress={() => { void onRepost(item.id); }}
-              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 4, backgroundColor: '#FFFFFF', opacity: pressed ? 0.7 : 1 })}
-              accessibilityRole="button" accessibilityLabel="Repost this post" testID={`repost-prompt-${item.id}`}
-            >
-              <Icon name="repeat" size={16} color="#000000" />
-              <Text style={{ color: '#000000', fontSize: 12, fontWeight: '600' }}>Repost</Text>
-            </Pressable>
-          )}
+        topSlot={!!item.productTags?.length && shopTagShown && <View style={{ alignItems: 'flex-start', gap: 8 }}>
           {!!item.productTags?.length && shopTagShown && (
           <Animated.View style={{ opacity: shopTagOpacity }}>
             <ShopTagPill
