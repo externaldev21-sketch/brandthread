@@ -2,9 +2,8 @@
  * Runs non-critical start-up work after the first screen has had a chance to
  * paint, instead of inside the first render/effect pass.
  *
- * Uses InteractionManager (native: after the initial animations and layout
- * settle; web: after the next frame) and a timeout ceiling so the work still
- * runs if an animation keeps the interaction queue busy. Returns a cancel
+ * Gives the initial commit two animation frames, then uses InteractionManager
+ * and a timeout ceiling so an animation cannot starve background work. Returns a cancel
  * function for effect cleanup. Crash reporting is deliberately NOT deferred.
  */
 import { InteractionManager } from 'react-native';
@@ -13,6 +12,14 @@ export const DEFER_CEILING_MS = 3000;
 
 export function runAfterFirstPaint(task: () => void, ceilingMs: number = DEFER_CEILING_MS): () => void {
   let done = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let handle: ReturnType<typeof InteractionManager.runAfterInteractions> | undefined;
+  const requestFrame = typeof requestAnimationFrame === 'function'
+    ? requestAnimationFrame
+    : (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 16) as unknown as number;
+  const cancelFrame = typeof cancelAnimationFrame === 'function'
+    ? cancelAnimationFrame
+    : (id: number) => clearTimeout(id);
   const run = () => {
     if (done) return;
     done = true;
@@ -23,11 +30,18 @@ export function runAfterFirstPaint(task: () => void, ceilingMs: number = DEFER_C
       // Deferred warm-up must never take the app down.
     }
   };
-  const handle = InteractionManager.runAfterInteractions(run);
-  const timer = setTimeout(run, ceilingMs);
+  let frame = requestFrame(() => {
+    if (done) return;
+    frame = requestFrame(() => {
+      if (done) return;
+      timer = setTimeout(run, ceilingMs);
+      handle = InteractionManager.runAfterInteractions(run);
+    });
+  });
   return () => {
     done = true;
     clearTimeout(timer);
-    handle.cancel();
+    cancelFrame(frame);
+    handle?.cancel();
   };
 }

@@ -3,6 +3,12 @@ name: Native transition measurement
 description: Reliable boundaries for physical-device transition and keyboard performance checks.
 ---
 
+Do not infer Expo Go's delivered JavaScript size from `--no-dev --minify` alone. Inspect the manifest's actual launch URL and downloaded response, and distinguish minified JavaScript from Hermes bytecode.
+
+**Why:** Expo SDK 57 skips JavaScript minification for Hermes requests carrying `transform.bytecode=1`, expecting a later Hermes compiler pass. The running Expo Go preview returned readable JavaScript on that path even with `dev=false` and `minify=true`; a `transform.bytecode=0` comparison was substantially smaller.
+
+**How to apply:** Report the actual Expo Go launch payload separately from the explicitly minified JS comparison or an exported Hermes bundle. Production-mode Expo Go removes development checks but is not evidence of release-build startup size or native frame rate.
+
 Measure JavaScript scheduling and animation completion inside the app rather than using device-automation request time as a paint metric. Use native screen recordings to detect visible frozen frames, and confirm delayed focus through the input's focus event plus native keyboard visibility. When an animation targets a measured native view, await `measureInWindow` (with a bounded fallback) before mounting or starting a native-driver animation; a late coordinate state update cannot reliably retarget one already in flight.
 
 **Why:** Appium command and accessibility polling latency varies independently of app performance. A timer callback that calls `focus()` also does not prove the input focused or the keyboard opened. Native measurement callbacks are asynchronous, and starting first can lock in a fallback destination or create a visible jump.

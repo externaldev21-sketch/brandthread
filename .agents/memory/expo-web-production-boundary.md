@@ -3,6 +3,18 @@ name: Expo web production boundary
 description: Production conventions for extending the Brandthread Expo app to browser hosting without weakening auth or faking native capabilities.
 ---
 
+## Development preview routing
+
+Keep the mobile `expo-domain` artifact dedicated to Metro. Register an additional static speed-preview server under the shared HTTP/API artifact instead.
+
+**Why:** Adding a second, path-scoped static service to the mobile artifact redirected the Expo domain to that service. Every workflow could be running and return HTTP 200 while Expo Go received HTML instead of its native manifest. Browser comparisons then accidentally measured the same static site twice.
+
+**How to apply:** Verify the Expo host's `/status` says `packager-status:running`, and an `Expo-Platform: ios` manifest request returns `application/expo+json` with a Metro launch asset. Separately verify the shared host's static preview health. Do not infer native connectivity from a successful browser page or workflow status.
+
+Run data-dependent browser checks against the actual shared preview origin. A localhost screenshot has a different CORS origin and can show an empty feed even when the public preview works; do not relax API CORS just to make that capture pass.
+
+## Published web boundary
+
 Brandthread web is the existing Expo Router product exported for browser hosting, not a separate website or an Expo Go landing page. Keep API and Clerk traffic same-origin in production, with Clerk using the server proxy rather than relying on a deployment-specific direct frontend API origin. The only published browser origin is `https://brandthread.app`; the generated Replit hostname must permanently redirect there while preserving path and query.
 
 **Why:** Static browser hosting changes the auth origin and exposes every route to direct navigation. A same-origin boundary keeps deployment/custom-domain changes from breaking authenticated calls, while avoiding hardcoded temporary domains. Multiple crawlable hostnames also split search authority and can leak unstable generated URLs into links, emails, and hosted payment flows.

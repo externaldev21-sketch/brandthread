@@ -10,6 +10,7 @@ import { prefetchRouteCode, scheduleRouteWarmup } from '@/lib/navigation/routeWa
 import { PerfOverlay } from '@/components/dev/PerfOverlay';
 import { isGuestBrowseRoute, safeReturnTo } from '@/lib/guestRoutes';
 import { runAfterFirstPaint } from '@/lib/deferStartup';
+import { webAppPathname } from '@/lib/webAppPathname';
 import { isAccessCleared } from '@/lib/accessGate';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from '@/components/KeyboardProviderCompat';
@@ -98,7 +99,6 @@ import { CelebrationHost } from '@/components/thread-cash/CelebrationHost';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
 import { configureNotificationAccountSwitcher, createNotificationResponseHandler } from '@/lib/notificationNavigation';
 import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
-import AnalyticsBridge from '@/components/AnalyticsBridge';
 import { wrapRootComponent } from '@/lib/monitoring';
 import { setMarketingPixelConsent, trackMarketingPixelEvent } from '@/lib/marketingPixels';
 import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notificationEventOutbox';
@@ -109,16 +109,13 @@ import { ActionSheetHost, installConfirmationSheets } from '@/components/ui/Acti
 import { AppAlertHost } from '@/components/ui/AppAlertHost';
 import { ContextMenuHost } from '@/components/ui/ContextMenuHost';
 import { PushPrePromptHost } from '@/components/PushPrePromptHost';
-import { SystemSurfacesBridge } from '@/components/SystemSurfacesBridge';
 import { handleNotificationAction } from '@/lib/notificationActions';
 import { showNotificationBanner } from '@/lib/notificationBannerBus';
 import { isNewOrderPush } from '@/lib/newOrderAlert';
 import { getNotifications as getFeedNotifications } from '@/services/socialService';
 import { syncNotificationBadge } from '@/lib/notificationBadge';
-import { RealtimeBridge } from '@/components/realtime/RealtimeBridge';
 import { registerNotificationCategories } from '@/lib/notificationCategories';
 import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
-import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
 import ForceUpdateGate from '@/components/ForceUpdateGate';
 import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
@@ -461,6 +458,11 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
 // shows by default on every seller route, and is hidden only on the small,
 // explicit set of genuine full-screen flows — see the deny-list comment above.
 
+const AnalyticsBridge = React.lazy(() => import('@/components/AnalyticsBridge'));
+const SystemSurfacesBridge = React.lazy(() => import('@/components/SystemSurfacesBridge').then(m => ({ default: m.SystemSurfacesBridge })));
+const RealtimeBridge = React.lazy(() => import('@/components/realtime/RealtimeBridge').then(m => ({ default: m.RealtimeBridge })));
+const SellerStudioRadialMenu = React.lazy(() => import('@/components/SellerStudioRadialMenu'));
+
 function SellerBarGate() {
   const { isActiveSeller } = useSellerShell();
   const segments = useSegments();
@@ -521,12 +523,14 @@ function SellerBarGate() {
         }}
       />
       {!isFullScreenRoute && (
+        <React.Suspense fallback={null}>
         <SellerStudioRadialMenu
           hideTrigger
           openRequestKey={studioOpenRequestKey}
           closeRequestKey={studioCloseRequestKey}
           onOpenChange={setIsStudioOpen}
         />
+        </React.Suspense>
       )}
     </>
   );
@@ -619,8 +623,6 @@ if (Platform.OS !== 'web') {
 
 SplashScreen.preventAutoHideAsync();
 
-// Queries pause/resume with connectivity; queued offline taps replay on reconnect.
-startOfflineSync();
 // Settings › Sounds & haptics switch — read before the first tap.
 void hydrateHapticsPreference();
 
@@ -700,9 +702,9 @@ if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
   // Timestamped and read-once (see app/index.tsx) so a stale leftover from
   // an earlier load in this same tab is never mistaken for the current one.
   if (typeof sessionStorage !== 'undefined') {
-    if (window.location.pathname !== '/') {
+    if (webAppPathname(window.location.pathname) !== '/') {
       sessionStorage.setItem('bt_preview_entry_path', JSON.stringify({
-        path: window.location.pathname + window.location.search,
+        path: webAppPathname(window.location.pathname) + window.location.search,
         ts: Date.now(),
       }));
     } else {
@@ -1128,9 +1130,10 @@ function ServiceConfigurer() {
   const prevUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    configureServices(() => getToken());
-    configureApi(() => getToken(), () => user?.id ?? 'anonymous');
-  }, [getToken, user?.id]);
+    const token = () => isLoaded && isSignedIn ? getToken() : Promise.resolve(null);
+    configureServices(token);
+    configureApi(token, () => user?.id ?? 'anonymous');
+  }, [getToken, user?.id, isLoaded, isSignedIn]);
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) dismissNetworkNotice();
@@ -1199,6 +1202,8 @@ function ServiceConfigurer() {
     initAnalyticsService(newUserId);
 
     if (!newUserId || !isSignedIn) return;
+    return runAfterFirstPaint(() => {
+    if (prevUserIdRef.current !== newUserId) return;
     // Bring the signed-out bag into this account once (then it's cleared).
     void adoptGuestCart(newUserId);
     // Defense in depth for people who sign in on another device or have an
@@ -1229,6 +1234,7 @@ function ServiceConfigurer() {
         }, socialKeysForUser(newUserId));
       })
       .catch((error) => {
+        if (prevUserIdRef.current !== newUserId) return;
         // This profile was deleted but its login still owns the other
         // (buyer or seller) profile: take the person there, not to sign-in.
         if (isDeletedProfileWithOthers(error)) {
@@ -1237,6 +1243,7 @@ function ServiceConfigurer() {
         }
         console.warn('[identity] Local profile provisioning failed', error);
       });
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, isSignedIn, api]);
 
@@ -1392,6 +1399,13 @@ const RootLayoutRuntime = React.memo(function RootLayoutRuntime({ featurePaused 
   const { userId } = useAuth();
   const { role } = useRole();
   const handledNotificationIdsRef = useRef(new Set<string>());
+  const [backgroundReady, setBackgroundReady] = useState(false);
+  useEffect(() => runAfterFirstPaint(() => {
+    // Connectivity polling/replay is non-critical; don't start it while
+    // the first screen's layout and images are being committed.
+    startOfflineSync();
+    setBackgroundReady(true);
+  }), []);
   useEffect(() => {
     if (!userId && !isBuyerDevPreview() && !isSellerDevPreview()) return;
     let cancelWarmup = () => {};
@@ -1409,7 +1423,7 @@ const RootLayoutRuntime = React.memo(function RootLayoutRuntime({ featurePaused 
   }, [api, userId]);
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || !backgroundReady) return;
     // Leave Expo's last response intact until Clerk has resolved the account
     // that owns the account-scoped durable event outbox.
     if (!userId) return;
@@ -1498,7 +1512,7 @@ const RootLayoutRuntime = React.memo(function RootLayoutRuntime({ featurePaused 
       subscription.remove();
       receiptSubscription.remove();
     };
-  }, [api, router, userId]);
+  }, [api, router, userId, backgroundReady]);
 
   if (featurePaused) {
     return (
@@ -1540,7 +1554,7 @@ const RootLayoutRuntime = React.memo(function RootLayoutRuntime({ featurePaused 
       <OfflineBanner />
       <ActionSheetHost />
       <PushPrePromptHost />
-      <SystemSurfacesBridge />
+      {backgroundReady && <React.Suspense fallback={null}><SystemSurfacesBridge /></React.Suspense>}
       <Pressable onPress={dismissKeyboardUnlessTextInput} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
           <AppStack />
@@ -1552,12 +1566,16 @@ const RootLayoutRuntime = React.memo(function RootLayoutRuntime({ featurePaused 
       <WhatsNewHost />
       <AuthGate />
       <ServiceConfigurer />
-      <RealtimeBridge />
-      <PushRegistrar />
-      <NotificationAccountSwitcherBridge />
-      <AffiliateRefCapture />
-      <MarketingPixelTracker />
-      <AnalyticsBridge />
+      {backgroundReady && (
+        <React.Suspense fallback={null}>
+          <RealtimeBridge />
+          <PushRegistrar />
+          <NotificationAccountSwitcherBridge />
+          <AffiliateRefCapture />
+          <MarketingPixelTracker />
+          <AnalyticsBridge />
+        </React.Suspense>
+      )}
       <LegalAcceptanceGate />
       <AiConsentSheet />
       <AppLockGate />

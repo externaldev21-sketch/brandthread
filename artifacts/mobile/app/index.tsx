@@ -11,6 +11,7 @@ import { Redirect, useLocalSearchParams, useRootNavigationState, useRouter, useS
 import BootScreen from '@/components/BootScreen';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { webAppPathname } from '@/lib/webAppPathname';
 
 /**
  * Reads (and always consumes — a stored entry is one-shot, read-once,
@@ -95,7 +96,7 @@ export default function Index() {
       // Expo web may mount the index briefly while hydrating a deep link.
       // Do not replace /inbox, /activity, or another preview screen with Home.
       if (Platform.OS === 'web' && typeof window !== 'undefined'
-        && window.location.pathname.replace(/\/+$/, '') !== '') return;
+        && webAppPathname(window.location.pathname).replace(/\/+$/, '') !== '') return;
       // Re-check the LIVE ref at fire time, not the atRoot this effect
       // closed over — see atRootRef's own comment above for why.
       if (!atRootRef.current) return;
@@ -109,7 +110,7 @@ export default function Index() {
       // read stale in a window this narrow. window.location.pathname has no
       // such dependency on React's render/commit timing at all, so trust it
       // over atRootRef whenever the two disagree.
-      if (typeof window !== 'undefined' && window.location.pathname !== '/') return;
+      if (typeof window !== 'undefined' && webAppPathname(window.location.pathname) !== '/') return;
       // Restore the ORIGINAL requested path if this load ever had one and
       // some other redirect (outside this file's control — e.g. an
       // onboarding-skip path that runs ahead of AuthGate's own devRole

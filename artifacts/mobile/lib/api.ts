@@ -5666,12 +5666,20 @@ export interface LinkedProfilesResponse {
 }
 
 export function useApi(): BrandthreadApi {
-  const { getToken, userId } = useAuth();
-  const getTokenRef = useRef(getToken);
-  getTokenRef.current = getToken;
+  const { getToken, userId, isLoaded, isSignedIn } = useAuth();
+  const authRef = useRef({ getToken, isLoaded, isSignedIn });
+  authRef.current = { getToken, isLoaded, isSignedIn };
   return useMemo(
-    () => createApi(async () => getTokenRef.current(), () => userId ?? 'anonymous'),
-    [userId],
+    () => createApi(async () => {
+      const auth = authRef.current;
+      // Don't ask an unresolved/signed-out Clerk instance for a session.
+      // signedOutGate answers preview reads locally and rejects protected
+      // reads before fetch, without triggering the network error banner.
+      return auth.isLoaded && auth.isSignedIn ? auth.getToken() : null;
+    }, () => userId ?? 'anonymous'),
+    // A new auth state also gets a fresh token-cache identity; an old cached
+    // bearer must not bypass the local guard during sign-out/loading.
+    [userId, isLoaded, isSignedIn],
   );
 }
 

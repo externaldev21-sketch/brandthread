@@ -12,7 +12,9 @@ const path = require('path');
 const { writeLandingPage } = require('./landing-page');
 
 const projectRoot = path.resolve(__dirname, '..');
-const outputDir = path.join(projectRoot, 'static-build');
+const workspacePreview = process.argv.includes('--preview');
+const outputName = workspacePreview ? 'static-preview-build' : 'static-build';
+const outputDir = path.join(projectRoot, outputName);
 const CANONICAL_ORIGIN = 'https://brandthread.app';
 const OG_IMAGE_URL = `${CANONICAL_ORIGIN}/brandthread-logo.png`;
 const DEFAULT_METADATA = {
@@ -47,6 +49,10 @@ const ROUTE_METADATA = {
 const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/community-guidelines', '/seller-agreement', '/refund-policy', '/pricing'];
 
 function domainFromEnvironment() {
+  if (workspacePreview) {
+    if (!process.env.REPLIT_DEV_DOMAIN) throw new Error('Static preview requires the workspace development domain.');
+    return process.env.REPLIT_DEV_DOMAIN;
+  }
   const isPublishedBuild =
     process.env.NODE_ENV === 'production' ||
     Boolean(process.env.REPLIT_DEPLOYMENT_DOMAIN || process.env.REPLIT_INTERNAL_APP_DOMAIN);
@@ -201,6 +207,8 @@ function writePublicCrawlFiles() {
 
 const env = {
   ...process.env,
+  BRANDTHREAD_STATIC_PREVIEW: workspacePreview ? '1' : '',
+  EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST: workspacePreview ? '1' : '',
   EXPO_PUBLIC_DOMAIN: domainFromEnvironment(),
   EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY:
     process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ||
@@ -210,7 +218,7 @@ const env = {
   // Never inherit EXPO_PUBLIC_* URLs from .replit/dev workflow configuration,
   // or the deployed bundle can accidentally target the development backend.
   EXPO_PUBLIC_CLERK_PROXY_URL:
-    `https://${domainFromEnvironment()}/api/__clerk`,
+    workspacePreview ? '' : `https://${domainFromEnvironment()}/api/__clerk`,
   EXPO_PUBLIC_API_BASE_URL:
     `https://${domainFromEnvironment()}`,
 };
@@ -231,7 +239,11 @@ console.log(`Exporting Brandthread web build for ${env.EXPO_PUBLIC_DOMAIN}…`);
 const result = spawnSync(
   'pnpm',
   [
-    'exec', 'expo', 'export', '--platform', 'web', '--output-dir', 'static-build',
+    'exec', 'expo', 'export',
+    // Reuse only on an explicitly requested workspace rebuild with unchanged
+    // build-time environment. Published builds always clear public-env caches.
+    ...(!workspacePreview || !process.argv.includes('--reuse-cache') ? ['--clear'] : []),
+    '--platform', 'web', '--output-dir', outputName,
     ...(uploadSourceMaps ? ['--source-maps', 'external'] : []),
   ],
   {

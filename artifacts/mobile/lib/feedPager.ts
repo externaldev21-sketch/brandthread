@@ -22,19 +22,14 @@ export function verticalPagerListProps(pageHeight: number, itemCount: number) {
     bounces: false,
     alwaysBounceVertical: false,
     overScrollMode: 'never' as const,
-    // Bounds how many video players ever exist at once: the active page
-    // plus roughly the next/previous 2 stay mounted (poster-first, so they
-    // start instantly the moment they become active) — the rest are
-    // unmounted rather than left decoding off-screen. On web,
-    // react-native-web's VirtualizedList batches renders off scroll events
-    // rather than native's more reliable cell-recycling timers; a low
-    // initialNumToRender/windowSize there let fast/paginated swiping outrun
-    // the render batches, landing on pages that were never mounted at all
-    // (a blank page) after only a handful of swipes. Web renders the whole
-    // (small, ~10-item) preview list up front instead of virtualizing it.
-    initialNumToRender: Platform.OS === 'web' ? itemCount : 3,
-    maxToRenderPerBatch: Platform.OS === 'web' ? itemCount : 2,
-    windowSize: Platform.OS === 'web' ? 21 : 5,
+    // Render a bounded poster window, not every fetched page. The separate
+    // VideoVisual gate allocates players only for current/previous/next.
+    // A web overscan of two pages and frame-sized batches let a fast flick
+    // reach a rendered neighbour without mounting an unbounded image tree.
+    initialNumToRender: Math.max(1, Math.min(itemCount, 3)),
+    maxToRenderPerBatch: 3,
+    updateCellsBatchingPeriod: 16,
+    windowSize: Platform.OS === 'web' ? 5 : 3,
     removeClippedSubviews: Platform.OS !== 'web',
     getItemLayout: (_: unknown, index: number) => ({ length: pageHeight, offset: pageHeight * index, index }),
   };

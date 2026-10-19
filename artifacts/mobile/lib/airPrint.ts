@@ -4,7 +4,7 @@
  * sheet on web or when printing is unavailable.
  */
 import { Linking, Platform } from 'react-native';
-import * as Print from 'expo-print';
+import type * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { buildPackingSlipHtml, sharePackingSlip } from '@/lib/packingSlip';
 import type { Order } from '@/services/orderTypes';
@@ -50,6 +50,7 @@ export async function printLabel(labelUrl: string): Promise<void> {
     return;
   }
   try {
+    const Print = await import('expo-print');
     await Print.printAsync(labelPrintOptions(labelUrl));
   } catch (err) {
     if (isPrintCancel(err)) return;
@@ -64,6 +65,7 @@ export async function printPackingSlip(order: Order): Promise<void> {
     return;
   }
   try {
+    const Print = await import('expo-print');
     await Print.printAsync({ html: buildPackingSlipHtml(order) });
   } catch (err) {
     if (isPrintCancel(err)) return;

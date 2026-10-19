@@ -47,6 +47,7 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+artifacts/mobile/static-preview-build/
 
 # Most CI workflows are stored disabled under docs/ci because the Replit GitHub credential lacks
 # workflow scope. The mobile release accessibility gate is intentionally active and tracked.

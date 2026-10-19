@@ -21,7 +21,12 @@ beforeEach(() => {
   queue.length = 0;
   cancelled.length = 0;
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+function paint() { vi.advanceTimersByTime(32); }
 
 describe('runAfterFirstPaint', () => {
   it('does not run the task synchronously', () => {
@@ -33,6 +38,8 @@ describe('runAfterFirstPaint', () => {
   it('runs once when interactions settle, and not again from the ceiling timer', () => {
     const task = vi.fn();
     runAfterFirstPaint(task);
+    expect(queue).toHaveLength(0);
+    paint();
     queue[0]();
     expect(task).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(DEFER_CEILING_MS + 1);
@@ -42,13 +49,14 @@ describe('runAfterFirstPaint', () => {
   it('still runs at the ceiling when the interaction queue stays busy', () => {
     const task = vi.fn();
     runAfterFirstPaint(task);
-    vi.advanceTimersByTime(DEFER_CEILING_MS);
+    vi.advanceTimersByTime(32 + DEFER_CEILING_MS);
     expect(task).toHaveBeenCalledTimes(1);
   });
 
   it('can be cancelled before it runs', () => {
     const task = vi.fn();
     const cancel = runAfterFirstPaint(task);
+    paint();
     cancel();
     queue[0]();
     vi.advanceTimersByTime(DEFER_CEILING_MS + 1);
@@ -58,7 +66,33 @@ describe('runAfterFirstPaint', () => {
 
   it('swallows errors from the deferred task', () => {
     runAfterFirstPaint(() => { throw new Error('boom'); });
+    paint();
     expect(() => queue[0]()).not.toThrow();
+  });
+
+  it('does not start interactions work before a paint, even if interactions are idle', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => frames.push(callback));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const task = vi.fn();
+    runAfterFirstPaint(task);
+    expect(queue).toHaveLength(0);
+    frames[0](0);
+    expect(queue).toHaveLength(0);
+    frames[1](16);
+    expect(queue).toHaveLength(1);
+    queue[0]();
+    expect(task).toHaveBeenCalledOnce();
+  });
+
+  it('cancels during the paint boundary without starting background work', () => {
+    const task = vi.fn();
+    const cancel = runAfterFirstPaint(task);
+    vi.advanceTimersByTime(16);
+    cancel();
+    vi.advanceTimersByTime(32 + DEFER_CEILING_MS);
+    expect(queue).toHaveLength(0);
+    expect(task).not.toHaveBeenCalled();
   });
 });
 

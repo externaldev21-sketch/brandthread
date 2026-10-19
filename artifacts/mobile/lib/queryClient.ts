@@ -10,6 +10,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isTransientFailure } from '@/lib/requestResilience';
 
 // Data is considered fresh for 30s (no refetch on remount/focus within that
 // window) and kept around for 24h so a relaunch has something to paint
@@ -26,7 +27,9 @@ export const queryClient = new QueryClient({
       // Screens still get a background refresh when they refocus after the
       // data has gone stale — just not a duplicate refetch on every focus.
       refetchOnMount: true,
-      retry: 1,
+      // Authentication/validation failures cannot recover by repeating the
+      // same query. In particular, never retry a local signed-out rejection.
+      retry: (failureCount, error) => failureCount < 1 && isTransientFailure(error),
     },
     mutations: {
       retry: 0,

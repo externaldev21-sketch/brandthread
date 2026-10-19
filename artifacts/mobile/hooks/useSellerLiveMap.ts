@@ -9,6 +9,7 @@
  *   while it isn't connected, the same endpoint is polled every 60s.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { subscribeStoreContext } from '@/lib/api';
 import { useSellerSocket } from '@/lib/live/useSellerSocket';
@@ -21,13 +22,14 @@ export interface LiveMapPing { key: string; seq: number }
 
 export function useSellerLiveMap({ enabled, preview }: { enabled: boolean; preview: 'demo' | 'fresh' | null }) {
   const api = useApi();
+  const { isLoaded, isSignedIn } = useAuth();
   const [data, setData] = useState<LiveMapToday | null>(preview ? previewLiveMap(preview) : null);
   const [error, setError] = useState(false);
   const [ping, setPing] = useState<LiveMapPing | null>(null);
   const [connected, setConnected] = useState(false);
   const [storeTick, setStoreTick] = useState(0);
   const generationRef = useRef(0);
-  const live = enabled && !preview;
+  const live = enabled && !preview && !!isLoaded && !!isSignedIn;
 
   const load = useCallback(async () => {
     const generation = generationRef.current;

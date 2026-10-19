@@ -663,3 +663,17 @@ mtime_ms = 1792297103058
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/b4939473-d40c-4513-a8c9-6aea52f8a228/e9f52072-40c2-4e41-84a8-bdf2c048e195"
 storage_version_token = "1792297124260117"
 content_type = "image/png"
+
+[[outputs]]
+id = "4zTlrQDtbKb2R1feNKxDx"
+uri = "file://.local/performance/preview-audit/expo-preview-qr.png"
+type = "image"
+title = "Expo Go — production-mode preview"
+description = "Scan with the iPhone. The same QR is reused after switching between development and production preview modes."
+logical_id = "69864891-5305-4a33-ac64-fb65a1e2b889"
+content_hash = "sha256:0d999c3176075bae5d05a5e98486372c89e348c0221a397eea6edad6934c35db"
+size = 4469
+mtime_ms = 1792440367103
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/69864891-5305-4a33-ac64-fb65a1e2b889/17b67e24-005a-41c0-8127-a7b4e52dad05"
+storage_version_token = "1792440463876468"
+content_type = "image/png"

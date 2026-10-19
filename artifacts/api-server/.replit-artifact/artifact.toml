@@ -43,3 +43,17 @@ NODE_ENV = "production"
 
 [services.production.health.startup]
 path = "/api/healthz"
+
+[[services]]
+name = "fast-preview"
+localPort = 18116
+paths = [ "/fast-preview" ]
+ensurePreviewReachable = "/fast-preview/status"
+
+[services.development]
+run = "pnpm --filter @workspace/mobile run preview:web:serve"
+
+[services.env]
+PORT = "18116"
+BASE_PATH = "/fast-preview"
+EXPO_WEB_BUILD_DIR = "static-preview-build"
